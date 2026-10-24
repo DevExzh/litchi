@@ -346,7 +346,7 @@ pub(super) fn inspect_odp_buffered_archive(
     bytes: &[u8],
     shape: SemanticShape,
 ) -> Result<OdpBufferedIdentity, Box<dyn Error>> {
-    let archive = ArchiveReader::new(bytes)?;
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let names = archive.file_names().collect::<Vec<_>>();
     let actual_set = names.iter().copied().collect::<BTreeSet<_>>();
     let expected_set = ODP_BUFFERED_MEMBER_NAMES
@@ -461,7 +461,11 @@ pub(super) fn verify_odp_corpus_binding(
     expected_generator: &str,
     expected_name: &str,
 ) -> Result<(), Box<dyn Error>> {
-    let reopened_target = ArchiveReader::new(&corpus.archive)?.read("content.xml")?;
+    let reopened_target = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .read("content.xml")?;
     if corpus.target_name != "content.xml"
         || corpus.manifest.target_entry != "content.xml"
         || corpus.target_payload != reopened_target
@@ -507,7 +511,9 @@ pub(super) fn verify_odp_corpus_binding(
 pub(crate) fn build_odp_buffered_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let archive = odp_buffered_bytes(shape)?;
     let identity = inspect_odp_buffered_archive(&archive, shape)?;
-    let target_payload = ArchiveReader::new(&archive)?.read("content.xml")?;
+    let target_payload =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .read("content.xml")?;
     let corpus = Corpus {
         manifest: CorpusManifest {
             name: format!("odp-buffered-slides-{}", shape.name()),
@@ -758,8 +764,10 @@ mod tests {
             mutated[offset] = value;
             assert!(verify_odp_buffered_compression(&mutated).is_err());
         }
-        let reader = ArchiveReader::new(&original).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
+        let reader =
+            ArchiveReader::new(&original, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for path in [
             "content.xml",
             "mimetype",
@@ -781,8 +789,13 @@ mod tests {
     #[test]
     fn buffered_oracle_rejects_manifest_binding_mutation() {
         let mut corpus = build_odp_buffered_corpus(SemanticShape::Tiny).unwrap();
-        let reader = ArchiveReader::new(&corpus.archive).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
+        let reader = ArchiveReader::new(
+            &corpus.archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for name in reader.file_names() {
             let mut payload = reader.read(name).unwrap();
             if name == "META-INF/manifest.xml" {
@@ -815,8 +828,13 @@ mod tests {
     #[test]
     fn buffered_oracle_rejects_semantic_content_mutation() {
         let mut corpus = build_odp_buffered_corpus(SemanticShape::Tiny).unwrap();
-        let reader = ArchiveReader::new(&corpus.archive).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
+        let reader = ArchiveReader::new(
+            &corpus.archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for name in reader.file_names() {
             let mut payload = reader.read(name).unwrap();
             if name == "content.xml" {

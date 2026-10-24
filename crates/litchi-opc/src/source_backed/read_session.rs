@@ -121,7 +121,9 @@ mod tests {
     }
 
     fn mixed_archive() -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -140,7 +142,9 @@ mod tests {
     }
 
     fn ordinary_archive(document: &[u8]) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",

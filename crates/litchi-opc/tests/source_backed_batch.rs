@@ -77,7 +77,8 @@ fn archive_bytes(corrupt_member: Option<&str>) -> (Vec<u8>, Vec<(PackURI, Vec<u8
         (pack(GAMMA_URI), GAMMA_MEMBER, payload(0x71)),
     ];
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -157,7 +158,8 @@ fn deflated_archive_bytes() -> (Vec<u8>, Vec<(PackURI, Vec<u8>)>) {
         ),
     ];
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();

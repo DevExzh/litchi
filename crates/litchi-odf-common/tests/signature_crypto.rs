@@ -133,8 +133,14 @@ fn rewrite_entry(
     target: &str,
     replacement: impl FnOnce(Vec<u8>) -> Vec<u8>,
 ) -> Vec<u8> {
-    let archive = soapberry_zip::office::ArchiveReader::new(bytes).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     let mut pending_replacement = Some(replacement);
     for name in archive.file_names() {
         let mut content = archive.read(name).unwrap();

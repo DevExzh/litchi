@@ -155,7 +155,11 @@ pub fn apply(
 
     let archive = ZipArchive::from_slice(base.as_slice())?.into_zip_archive();
     let mut index_buffer = vec![0_u8; RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut index_buffer)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut index_buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let main_ids = index
         .entries()
         .iter()
@@ -168,7 +172,10 @@ pub fn apply(
         _ => return Err(CompressionProfileError::DuplicateMainDocument),
     };
 
-    let reader = ArchiveReader::new(base.as_slice())?;
+    let reader = ArchiveReader::new(
+        base.as_slice(),
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let main_xml = reader.read(MAIN_DOCUMENT_PATH)?;
     let replacement =
         RegeneratedEntry::new(MAIN_DOCUMENT_PATH, main_xml).compression_method(method);
@@ -300,7 +307,7 @@ mod tests {
     }
 
     fn decoded_member(bytes: &[u8], name: &str) -> Vec<u8> {
-        ArchiveReader::new(bytes)
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
             .expect("archive reader must parse")
             .read(name)
             .expect("member must decode")

@@ -12,7 +12,8 @@ const TYPES: &[u8] = br#"<t:Types xmlns:t='http://schemas.openxmlformats.org/pac
 const RELS: &[u8] = br#"<r:Relationships xmlns:r='http://schemas.openxmlformats.org/package/2006/relationships'><!--rels--><r:Relationship TargetMode='External' Target='https://example.test/old' Type='urn:test' Id='rId1'/></r:Relationships>"#;
 
 fn package(rels: bool) -> OpcPackage {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_deflated("[Content_Types].xml", TYPES).unwrap();
     writer.write_deflated("custom/item.bin", b"opaque").unwrap();
     writer.write_deflated("_rels/.rels", br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#).unwrap();
@@ -60,7 +61,8 @@ fn wire_metadata_restores_exact_bytes_after_publication_and_reopen() {
             .unwrap()
     );
     let saved = PackageWriter::to_bytes(&package).unwrap();
-    let archive = ArchiveReader::new(&saved).unwrap();
+    let archive =
+        ArchiveReader::new(&saved, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert_eq!(archive.read("[Content_Types].xml").unwrap(), *next_types);
     assert_eq!(
         archive.read("custom/_rels/item.bin.rels").unwrap(),
@@ -237,7 +239,7 @@ fn wire_member_presence_is_explicit_and_cannot_discard_lexical_content() {
     assert!(present.member_present());
     let saved = PackageWriter::to_bytes(&package).unwrap();
     assert!(
-        ArchiveReader::new(&saved)
+        ArchiveReader::new(&saved, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .file_names()
             .any(|name| name == "custom/_rels/item.bin.rels")
@@ -260,7 +262,7 @@ fn wire_member_presence_is_explicit_and_cannot_discard_lexical_content() {
     );
     let saved = PackageWriter::to_bytes(&package).unwrap();
     assert!(
-        !ArchiveReader::new(&saved)
+        !ArchiveReader::new(&saved, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .file_names()
             .any(|name| name == "custom/_rels/item.bin.rels")

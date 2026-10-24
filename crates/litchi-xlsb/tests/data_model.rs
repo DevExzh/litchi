@@ -130,7 +130,9 @@ fn package_with_explicit_empty_model_relationships_with_padding(padding: usize) 
         .source_relationships(&root, litchi_opc::SourceLimits::default())
         .expect("root rels");
     let model = PackURI::new(DATA_MODEL_PART_NAME).expect("model URI");
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("[Content_Types].xml", &content_types)
         .expect("content types member");
@@ -661,8 +663,11 @@ fn source_tokens_restore_explicit_empty_model_relationships_after_reopened_zip_i
         .membername()
         .to_owned();
     let before_zip = package.to_bytes().expect("opened ZIP bytes");
-    let before_archive =
-        soapberry_zip::office::ArchiveReader::new(&before_zip).expect("opened ZIP archive");
+    let before_archive = soapberry_zip::office::ArchiveReader::new(
+        &before_zip,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("opened ZIP archive");
     let before_content_types = before_archive
         .read("[Content_Types].xml")
         .expect("content types member");
@@ -700,8 +705,11 @@ fn source_tokens_restore_explicit_empty_model_relationships_after_reopened_zip_i
         .map(litchi_core::edit::Commit::into_package)
         .expect("inverse model");
     let restored_zip = restored.to_bytes().expect("restored ZIP bytes");
-    let restored_archive =
-        soapberry_zip::office::ArchiveReader::new(&restored_zip).expect("restored ZIP archive");
+    let restored_archive = soapberry_zip::office::ArchiveReader::new(
+        &restored_zip,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("restored ZIP archive");
     assert_eq!(
         restored_archive
             .read("[Content_Types].xml")
@@ -729,8 +737,11 @@ fn elevated_source_tokens_survive_reopened_inverse_with_large_content_types() {
         .membername()
         .to_owned();
     let before_zip = package.to_bytes().expect("large source ZIP bytes");
-    let before_archive =
-        soapberry_zip::office::ArchiveReader::new(&before_zip).expect("large source archive");
+    let before_archive = soapberry_zip::office::ArchiveReader::new(
+        &before_zip,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("large source archive");
     let before_content_types = before_archive
         .read("[Content_Types].xml")
         .expect("large content types member");
@@ -774,8 +785,11 @@ fn elevated_source_tokens_survive_reopened_inverse_with_large_content_types() {
         .map(litchi_core::edit::Commit::into_package)
         .expect("inverse model");
     let restored_zip = restored.to_bytes().expect("restored ZIP bytes");
-    let restored_archive =
-        soapberry_zip::office::ArchiveReader::new(&restored_zip).expect("restored ZIP archive");
+    let restored_archive = soapberry_zip::office::ArchiveReader::new(
+        &restored_zip,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("restored ZIP archive");
     assert_eq!(
         restored_archive
             .read("[Content_Types].xml")

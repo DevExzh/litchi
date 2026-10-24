@@ -99,7 +99,11 @@ fn rejects_wrong_password_and_ciphertext_tampering() {
     let wrong = OwnedPackage::from_bytes_with_password(bytes.clone(), "wrong").unwrap();
     assert!(wrong.get_file("content.xml").is_err());
 
-    let archive = soapberry_zip::office::ArchiveReader::new(&bytes).unwrap();
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        &bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let ciphertext = archive.read("content.xml").unwrap();
     let offset = bytes
         .windows(ciphertext.len())

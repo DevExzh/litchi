@@ -49,7 +49,8 @@ fn fixture() -> Fixture {
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rData" Type="{DATA_REL}" Target="../custom/data.bin"/></Relationships>"#
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();

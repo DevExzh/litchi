@@ -1024,7 +1024,8 @@ mod tests {
     }
 
     fn indexed_catalog() -> Result<ComponentCatalog> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Alpha.iwa", &iwa_bytes(1, 6000)?)?;
         writer.write_stored("Index/Bravo.iwa", &iwa_bytes(2, 6001)?)?;
         writer.write_stored("Index/Charlie.iwa", &iwa_bytes(3, 6002)?)?;
@@ -1096,7 +1097,8 @@ mod tests {
         let max_iwa_bytes = usize::try_from(alpha_bytes.max(bravo_bytes)).map_err(|_error| {
             crate::Error::InvalidBundle("test IWA stream length does not fit usize".to_owned())
         })?;
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Alpha.iwa", &alpha)?;
         writer.write_stored("Index/Bravo.iwa", &bravo)?;
         let bytes = writer.finish_to_bytes()?;
@@ -1162,7 +1164,8 @@ mod tests {
 
     #[test]
     fn parses_direct_iwa_and_skips_operation_storage() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
         writer.write_stored("Index/OperationStorage.iwa", b"bvxn opaque data")?;
         let bytes = writer.finish_to_bytes()?;
@@ -1184,7 +1187,8 @@ mod tests {
 
     #[test]
     fn semantic_directory_index_reads_only_canonical_iwa_entries() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Document.iwa", &iwa_bytes(1, 6_000)?)?;
         writer.write_stored("Data/asset.bin", b"unrelated asset")?;
         writer.write_stored("Preview/preview.jpg", b"unrelated preview")?;
@@ -1218,7 +1222,8 @@ mod tests {
             crate::Error::InvalidBundle("test IWA stream length does not fit usize".to_owned())
         })?;
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Alpha.iwa", &alpha)?;
         writer.write_stored("Index/Bravo.iwa", &bravo)?;
         let bytes = writer.finish_to_bytes()?;
@@ -1269,7 +1274,8 @@ mod tests {
 
     #[test]
     fn consumes_component_name_and_archive() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
         let bytes = writer.finish_to_bytes()?;
 
@@ -1288,11 +1294,13 @@ mod tests {
 
     #[test]
     fn parses_nested_index_and_rejects_encryption() -> Result<()> {
-        let mut index = StreamingArchiveWriter::new();
+        let mut index =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         index.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
         let index_bytes = index.finish_to_bytes()?;
 
-        let mut outer = StreamingArchiveWriter::new();
+        let mut outer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         outer.write_stored("legacy.pages/Index.zip", &index_bytes)?;
         let outer_bytes = outer.finish_to_bytes()?;
         assert_eq!(
@@ -1300,7 +1308,8 @@ mod tests {
             1
         );
 
-        let mut encrypted = StreamingArchiveWriter::new();
+        let mut encrypted =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         encrypted.write_stored(".iwpv2", b"metadata")?;
         encrypted.write_stored("Index/Document.iwa", b"ciphertext")?;
         let encrypted_bytes = encrypted.finish_to_bytes()?;
@@ -1311,11 +1320,13 @@ mod tests {
 
     #[test]
     fn rejects_mixed_direct_and_legacy_representations() -> Result<()> {
-        let mut index = StreamingArchiveWriter::new();
+        let mut index =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         index.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
         let index_bytes = index.finish_to_bytes()?;
 
-        let mut outer = StreamingArchiveWriter::new();
+        let mut outer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         outer.write_stored("legacy.pages/Index.zip", &index_bytes)?;
         outer.write_stored("Index/CalculationEngine.iwa", &iwa_bytes(2, 7000)?)?;
         let outer_bytes = outer.finish_to_bytes()?;
@@ -1337,7 +1348,8 @@ mod tests {
 
     #[test]
     fn source_catalog_reuses_shared_source_and_traverses_direct_zip_once() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
         writer.write_stored("Metadata/DocumentIdentifier", b"shared-source")?;
         let source: Arc<[u8]> = writer.finish_to_bytes()?.into();
@@ -1364,7 +1376,8 @@ mod tests {
     #[cfg(feature = "internal-iwork-source")]
     #[test]
     fn source_catalog_reuses_owned_vector_payload_without_copy() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
         let bytes = writer.finish_to_bytes()?;
         let original_pointer = bytes.as_ptr();
@@ -1385,7 +1398,8 @@ mod tests {
     fn semantic_source_catalog_materializes_only_components_and_fixed_sidecars() -> Result<()> {
         let document = iwa_bytes(1, 6_000)?;
         let metadata = iwa_bytes(2, 6_001)?;
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Document.iwa", &document)?;
         writer.write_stored("Index/Metadata.iwa", &metadata)?;
         writer.write_stored("Metadata/Properties.plist", b"properties")?;
@@ -1418,7 +1432,8 @@ mod tests {
 
     #[test]
     fn source_catalog_retains_the_validated_ingress_profile() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
         let source: Arc<[u8]> = writer.finish_to_bytes()?.into();
         let source_len = u64::try_from(source.len()).map_err(|_error| {
@@ -1434,7 +1449,8 @@ mod tests {
 
     #[test]
     fn source_catalog_component_handoff_releases_physical_source() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
         writer.write_stored("Metadata/DocumentIdentifier", b"physical-source")?;
         let source: Arc<[u8]> = writer.finish_to_bytes()?.into();
@@ -1457,11 +1473,13 @@ mod tests {
 
     #[test]
     fn source_catalog_normalizes_legacy_index_during_two_required_traversals() -> Result<()> {
-        let mut index = StreamingArchiveWriter::new();
+        let mut index =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         index.write_stored("Index/Document.iwa", &iwa_bytes(1, 6000)?)?;
         let index_bytes = index.finish_to_bytes()?;
 
-        let mut outer = StreamingArchiveWriter::new();
+        let mut outer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         outer.write_stored("legacy.pages/Index.zip", &index_bytes)?;
         outer.write_stored("legacy.pages/Metadata/DocumentIdentifier", b"legacy-source")?;
         let source: Arc<[u8]> = outer.finish_to_bytes()?.into();
@@ -1492,7 +1510,8 @@ mod tests {
 
     #[test]
     fn source_catalog_component_projection_matches_component_only_ingress() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Bravo.iwa", &iwa_bytes(2, 6001)?)?;
         writer.write_stored("Index/Alpha.iwa", &iwa_bytes(1, 6000)?)?;
         writer.write_stored("Index/OperationStorage.iwa", b"bvxn opaque data")?;

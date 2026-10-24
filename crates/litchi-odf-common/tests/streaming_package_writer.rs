@@ -207,7 +207,8 @@ fn short_non_seek_sink_round_trips_exact_stream_and_is_deterministic() {
     writer.finish_to_writer().unwrap();
 
     let output = sink_bytes.borrow();
-    let archive = ArchiveReader::new(&output).unwrap();
+    let archive =
+        ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert!(archive.is_stored("mimetype").unwrap());
     assert_eq!(
         digest(&archive.read("Pictures/stream.bin").unwrap()),

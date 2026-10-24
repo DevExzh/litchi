@@ -104,8 +104,12 @@ impl OwnedPhysPkgReader {
         limits.check_input_bytes(data.len() as u64)?;
         admit_total_archive_entries(&data, limits)?;
         // Validate the ZIP archive can be parsed
-        let _ = LazyArchiveReader::new_with_limits(&data, limits.zip_limits())
-            .map_err(|error| map_archive_error(&error))?;
+        let _ = LazyArchiveReader::new(
+            &data,
+            limits.zip_limits(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .map_err(|error| map_archive_error(&error))?;
         Ok(Self {
             data,
             limits,
@@ -266,8 +270,12 @@ impl<'data> PhysPkgReader<'data> {
     ) -> Result<Self> {
         limits.check_input_bytes(data.len() as u64)?;
         admit_total_archive_entries(data, limits)?;
-        let archive = LazyArchiveReader::new_with_limits(data, limits.zip_limits())
-            .map_err(|error| map_archive_error(&error))?;
+        let archive = LazyArchiveReader::new(
+            data,
+            limits.zip_limits(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .map_err(|error| map_archive_error(&error))?;
         Ok(Self {
             archive,
             limits,
@@ -1496,7 +1504,9 @@ impl PhysPkgWriter<Cursor<Vec<u8>>> {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            archive: soapberry_zip::office::StreamingArchiveWriter::new(),
+            archive: soapberry_zip::office::StreamingArchiveWriter::new(
+                soapberry_zip::office::StreamingArchiveLimits::default(),
+            ),
             part_names: PartNamePolicy::Ordinary(PartNameSet::default()),
             directory_spool: false,
         }
@@ -1521,7 +1531,10 @@ impl<W: Write> PhysPkgWriter<W> {
     /// Create a physical package writer over a sequential sink.
     pub fn with_writer(writer: W) -> Self {
         Self {
-            archive: soapberry_zip::office::StreamingArchiveWriter::with_writer(writer),
+            archive: soapberry_zip::office::StreamingArchiveWriter::with_writer(
+                writer,
+                soapberry_zip::office::StreamingArchiveLimits::default(),
+            ),
             part_names: PartNamePolicy::Ordinary(PartNameSet::default()),
             directory_spool: false,
         }
@@ -1557,14 +1570,13 @@ impl<W: Write> PhysPkgWriter<W> {
     where
         S: Read + Write + Seek + Send + Sync + 'static,
     {
-        let archive =
-            soapberry_zip::office::StreamingArchiveWriter::with_writer_and_limits_and_spool(
-                writer,
-                soapberry_zip::office::StreamingArchiveLimits::default(),
-                spool,
-                soapberry_zip::DirectorySpoolLimits::new(maximum_spool_bytes, buffer_bytes),
-            )
-            .map_err(OpcError::from)?;
+        let archive = soapberry_zip::office::StreamingArchiveWriter::with_writer_and_spool(
+            writer,
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+            spool,
+            soapberry_zip::DirectorySpoolLimits::new(maximum_spool_bytes, buffer_bytes),
+        )
+        .map_err(OpcError::from)?;
         Ok(Self {
             archive,
             part_names: PartNamePolicy::Ordinary(PartNameSet::default()),
@@ -1588,14 +1600,15 @@ impl<W: Write> PhysPkgWriter<W> {
     where
         S: Read + Write + Seek + Send + Sync + 'static,
     {
-        let archive = soapberry_zip::office::StreamingArchiveWriter::with_writer_and_limits_and_spool_and_name_plan(
-            writer,
-            soapberry_zip::office::StreamingArchiveLimits::default(),
-            spool,
-            soapberry_zip::DirectorySpoolLimits::new(maximum_spool_bytes, buffer_bytes),
-            plan.inner,
-        )
-        .map_err(OpcError::from)?;
+        let archive =
+            soapberry_zip::office::StreamingArchiveWriter::with_writer_and_spool_and_name_plan(
+                writer,
+                soapberry_zip::office::StreamingArchiveLimits::default(),
+                spool,
+                soapberry_zip::DirectorySpoolLimits::new(maximum_spool_bytes, buffer_bytes),
+                plan.inner,
+            )
+            .map_err(OpcError::from)?;
         Ok(Self {
             archive,
             part_names: PartNamePolicy::Generated,
@@ -2142,7 +2155,8 @@ mod tests {
 
     #[test]
     fn total_archive_entry_limit_includes_directory_records() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for index in 0..=4_096 {
             let name = format!("directory-{index}/");
             writer.write_stored(&name, &[]).unwrap();

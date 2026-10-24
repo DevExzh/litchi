@@ -39,9 +39,7 @@ struct RawRecord {
 fn raw_records(data: &[u8]) -> HashMap<Vec<u8>, RawRecord> {
     let archive = ZipArchive::from_slice(data).unwrap().into_zip_archive();
     let mut scratch = vec![0; RECOMMENDED_BUFFER_SIZE];
-    let index =
-        PreservationIndex::new_with_limits(&archive, &mut scratch, ArchiveLimits::UNBOUNDED)
-            .unwrap();
+    let index = PreservationIndex::new(&archive, &mut scratch, ArchiveLimits::UNBOUNDED).unwrap();
     index
         .entries()
         .iter()

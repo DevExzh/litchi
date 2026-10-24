@@ -260,7 +260,8 @@ fn every_signature_owner_name_is_read_only() {
 #[test]
 fn zip_encryption_is_classified_by_the_owned_package() {
     const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.presentation"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="Vendor/opaque.bin" manifest:media-type="application/octet-stream"/></manifest:manifest>"#;
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     archive.write_deflated("content.xml", CONTENT).unwrap();
     archive
@@ -433,7 +434,8 @@ fn repeated_replacements_account_only_the_current_staged_payload() {
 #[test]
 fn dtd_in_an_xml_owner_fails_media_removal_closed() {
     const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.presentation"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="Vendor/links.xml" manifest:media-type="application/xml"/><manifest:file-entry manifest:full-path="Pictures/orphan.png" manifest:media-type="image/png"/></manifest:manifest>"#;
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     archive.write_deflated("content.xml", CONTENT).unwrap();
     archive

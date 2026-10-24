@@ -474,7 +474,8 @@ fn producer_bom_remains_source_provenance_during_rich_content_edit() {
     const MANIFEST: &[u8] = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.presentation"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/></m:manifest>"#;
     let mut content = b"\xef\xbb\xbf".to_vec();
     content.extend_from_slice(CONTENT);
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     archive.write_deflated("content.xml", &content).unwrap();
     archive
@@ -585,7 +586,8 @@ fn noncompact_content_whole_rewrite_is_refused_atomically() {
   </office:body>
 </office:document-content>"#;
     const MANIFEST: &[u8] = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.presentation"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/></m:manifest>"#;
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     archive.write_deflated("content.xml", CONTENT).unwrap();
     archive
@@ -696,7 +698,8 @@ fn content_only_raw_publication_preserves_noncompact_referenced_xml() {
     const MIME: &str = "application/vnd.oasis.opendocument.presentation";
     const CONTENT: &[u8] = br#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page draw:name="Source"><draw:rect draw:name="retained"/></draw:page></office:presentation></office:body></office:document-content>"#;
     const MANIFEST: &[u8] = br#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.presentation"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="Object 1/content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     archive.write_deflated("content.xml", CONTENT).unwrap();
     archive
@@ -762,7 +765,8 @@ fn custom_manifest_source() -> (Vec<u8>, Vec<u8>) {
 "#,
     );
 
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     for path in package.files().unwrap() {
         if matches!(path.as_str(), "mimetype" | "META-INF/manifest.xml") {

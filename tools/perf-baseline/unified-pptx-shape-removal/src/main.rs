@@ -126,7 +126,7 @@ fn unified_once<'p>(file: &File, target: TargetArg<'p>) -> Result<File> {
 }
 
 fn decoded_members(bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>> {
-    let archive = ArchiveReader::new(bytes)?;
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let mut members = BTreeMap::new();
     for name in archive.file_names() {
         members.insert(name.to_owned(), archive.read(name)?);

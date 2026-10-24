@@ -178,8 +178,12 @@ fn export_case(
         &output,
     )?;
     let output_archive = descriptor(&output_relative, &output);
-    let source_reader = ArchiveReader::new(&corpus.archive)?;
-    let output_reader = ArchiveReader::new(&output)?;
+    let source_reader = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
+    let output_reader =
+        ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())?;
     let members = audited_member_names(updates);
     let mut audited_xml_members = Vec::with_capacity(members.len());
     for member in members {

@@ -485,7 +485,8 @@ fn lexical_stale_fixture() -> (Vec<u8>, Vec<u8>) {
     .into_bytes();
 
     let build = |content_types: &[u8], document_relationships: &[u8]| {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored("[Content_Types].xml", content_types)
             .unwrap();

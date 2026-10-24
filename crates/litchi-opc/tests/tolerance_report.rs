@@ -26,7 +26,8 @@ const STYLES: &str =
 
 /// Build a minimal package from the given manifests.
 fn package(content_types: &str, root_rels: &str, document_rels: &str) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();

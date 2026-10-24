@@ -345,7 +345,8 @@ fn assert_inert_signature_graph(package: &Package) {
 }
 
 fn inert_signed_fixture(source: &[u8]) -> Package {
-    let reader = ArchiveReader::new(source).expect("source ZIP");
+    let reader = ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())
+        .expect("source ZIP");
     let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
     assert!(!names.iter().any(|name| name.starts_with("_xmlsignatures/")));
 
@@ -362,7 +363,8 @@ fn inert_signed_fixture(source: &[u8]) -> Package {
         r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdSignature" Type="{SIGNATURE_REL}" Target="sig1.xml"/></Relationships>"#,
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut saw_content_types = false;
     let mut saw_root_relationships = false;
     for name in names {

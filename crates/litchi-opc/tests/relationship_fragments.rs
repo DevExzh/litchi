@@ -26,7 +26,8 @@ fn catalog(xml: &str) -> RelationshipFragments {
     .unwrap()
 }
 fn package(xml: &str) -> OpcPackage {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_deflated("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="bin" ContentType="application/octet-stream"/></Types>"#).unwrap();
     writer.write_deflated("custom/item.bin", b"opaque").unwrap();
     writer.write_deflated("_rels/.rels", br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#).unwrap();
@@ -95,7 +96,7 @@ fn removal_inverse_retains_exact_xml_and_unrelated_destination_overlays() {
         .unwrap();
     let saved = PackageWriter::to_bytes(&package).unwrap();
     assert_eq!(
-        ArchiveReader::new(&saved)
+        ArchiveReader::new(&saved, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .read("custom/_rels/item.bin.rels")
             .unwrap(),

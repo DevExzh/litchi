@@ -22,7 +22,8 @@ fn pack(uri: &str) -> PackURI {
 }
 
 fn payload_archive(comment: &[u8], binary_payload: &[u8]) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_deflated(
             "[Content_Types].xml",

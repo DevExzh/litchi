@@ -1496,8 +1496,10 @@ fn serialized_opc(package: &OpcPackage) -> Vec<u8> {
 /// retained `.rels` bytes differ, which exercises source authorization rather
 /// than only semantic relationship metadata.
 fn with_relationship_source_markers(bytes: &[u8], members: &[&str]) -> Vec<u8> {
-    let archive = ArchiveReader::new(bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let mut member = archive.read(name).unwrap();
         if members.contains(&name) {

@@ -82,7 +82,8 @@ fn authored_xml_preserves_valid_comments_byte_for_byte() {
     let content = b"<root><!--keep this authored comment--><child>text</child></root>";
     let output = authored_package_with(content);
 
-    let archive = ArchiveReader::new(&output).unwrap();
+    let archive =
+        ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert_eq!(archive.read("content.xml").unwrap(), content);
 }
 

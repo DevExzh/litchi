@@ -56,7 +56,9 @@ fn unsupported_real_producer_pages_are_refused_before_staging() {
 #[test]
 fn noncompact_source_without_settings_or_declarations_is_refused() {
     const CONTENT: &[u8] = br#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"><office:body><office:presentation><draw:page draw:name="page-a" /><draw:page draw:name="page-b" /></office:presentation></office:body></office:document-content>"#;
-    let mut archive = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut archive = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     archive
         .write_stored(
             "mimetype",

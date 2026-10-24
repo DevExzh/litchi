@@ -841,10 +841,12 @@ fn shapes_with_member(name: &str, edit: impl FnOnce(&str) -> String) -> Vec<u8> 
 /// copied byte for byte in its original order.
 fn archive_with_member(archive: &[u8], name: &str, edit: impl FnOnce(&str) -> String) -> Vec<u8> {
     use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
-    let reader = ArchiveReader::new(archive).unwrap();
+    let reader =
+        ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let names: Vec<String> = reader.file_names().map(str::to_owned).collect();
     let mut edit = Some(edit);
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member in names {
         let mut bytes = reader.read(&member).unwrap();
         if member == name {

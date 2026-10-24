@@ -140,7 +140,7 @@ pub fn inspect_detection_root(bytes: &[u8], limits: Limits) -> Result<DetectionR
     let input_size = u64::try_from(bytes.len())
         .map_err(|_error| Error::InvalidBundle("ZIP input length does not fit u64".to_owned()))?;
     validated_limits.check_input_size(input_size, "ZIP input")?;
-    let archive = ArchiveReader::new_with_limits(bytes, validated_limits.zip_limits())?;
+    let archive = ArchiveReader::new(bytes, validated_limits.zip_limits())?;
     inspect_zip(&archive, validated_limits, true)
 }
 
@@ -319,7 +319,7 @@ fn inspect_zip(
         Error::InvalidBundle("legacy iWork Index.zip length does not fit u64".to_owned())
     })?;
     limits.check_input_size(index_size, "legacy iWork Index.zip")?;
-    let index = ArchiveReader::new_with_limits(&index_data, limits.zip_limits())?;
+    let index = ArchiveReader::new(&index_data, limits.zip_limits())?;
     inspect_zip(&index, limits, false)
 }
 

@@ -38,8 +38,10 @@ fn deck() -> Vec<u8> {
         .map(|slide| slide.id())
         .collect();
     let bytes = package.to_bytes().unwrap();
-    let archive = ArchiveReader::new(&bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let mut data = archive.read(name).unwrap();
         if name == "ppt/presentation.xml" {
@@ -75,7 +77,8 @@ fn membership(package: &mut Package) -> Vec<Vec<usize>> {
         .map(|slide| slide.id())
         .collect();
     let bytes = package.to_bytes().unwrap();
-    let archive = ArchiveReader::new(&bytes).unwrap();
+    let archive =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let xml = String::from_utf8(archive.read("ppt/presentation.xml").unwrap()).unwrap();
     xml.split("<p14:section ")
         .skip(1)

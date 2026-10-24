@@ -306,7 +306,7 @@ pub fn validate_package(
         },
     };
 
-    let archive = match ArchiveReader::new_with_limits(data, input_limits.archive) {
+    let archive = match ArchiveReader::new(data, input_limits.archive) {
         Ok(archive) => archive,
         Err(error) => {
             if allocation_failure(&error) {

@@ -430,7 +430,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
         mutate(&mut members);
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for (name, payload) in members {
             writer
                 .write_deflated(&name, &payload)

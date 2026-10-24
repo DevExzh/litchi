@@ -32,8 +32,9 @@ fn definition() -> Definition {
 }
 
 fn with_pretty_styles(bytes: &[u8]) -> TestResult<Vec<u8>> {
-    let reader = ArchiveReader::new(bytes)?;
-    let mut writer = StreamingArchiveWriter::new();
+    let reader = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in reader.file_names() {
         let payload = if name == "styles.xml" {
             STYLES.replace("><", ">\n<").into_bytes()

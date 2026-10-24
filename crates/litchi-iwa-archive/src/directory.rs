@@ -2647,7 +2647,8 @@ mod tests {
     }
 
     fn index_zip(entries: &[(&str, Vec<u8>)]) -> Result<Vec<u8>> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for (name, bytes) in entries {
             writer.write_stored(name, bytes)?;
         }

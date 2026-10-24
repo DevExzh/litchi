@@ -31,8 +31,14 @@ fn fixture() -> Vec<u8> {
 /// `Simple.xlsb` with a second `rId4` relationship in the workbook manifest.
 fn duplicate_relationship_id() -> Vec<u8> {
     let source = fixture();
-    let archive = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        &source,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for name in archive.file_names() {
         let mut bytes = archive.read(name).unwrap();
         if name == WORKBOOK_RELS {

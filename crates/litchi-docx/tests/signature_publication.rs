@@ -290,8 +290,10 @@ fn opaque_signature_members_allow_noop_but_refuse_raw_and_semantic_changes() {
     use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
     let signed = signed_source();
-    let archive = ArchiveReader::new(&signed).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&signed, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         writer
             .write_stored(name, &archive.read(name).unwrap())

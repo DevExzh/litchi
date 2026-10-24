@@ -2294,7 +2294,11 @@ mod tests {
 
     fn docx_document_xml(path: &Path) -> Option<Vec<u8>> {
         let bytes = std::fs::read(path).ok()?;
-        let reader = soapberry_zip::office::ArchiveReader::new(&bytes).ok()?;
+        let reader = soapberry_zip::office::ArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .ok()?;
         reader.read("word/document.xml").ok()
     }
 }

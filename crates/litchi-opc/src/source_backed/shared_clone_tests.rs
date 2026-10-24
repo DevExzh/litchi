@@ -45,7 +45,8 @@ fn payload(seed: usize, bytes: usize) -> Vec<u8> {
 /// A main document plus `parts` custom XML parts, all deflated, so that a
 /// publication replacing them regenerates deflate members.
 fn package_bytes(parts: usize, bytes: usize) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", CONTENT_TYPES)
         .unwrap();

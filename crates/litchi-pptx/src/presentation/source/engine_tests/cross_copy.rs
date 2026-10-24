@@ -66,7 +66,7 @@ fn source_backed_cross_copy_supports_one_relationship_free_chart_leaf() -> TestR
         vec!["ppt/charts/chart1.xml".to_owned()]
     );
 
-    let archive = ArchiveReader::new(&output)
+    let archive = ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index chart output: {error}")))?;
     let chart = archive
         .read("ppt/charts/chart1.xml")
@@ -229,8 +229,9 @@ fn source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collision
     );
     assert_eq!(output, repeated);
 
-    let source_archive = ArchiveReader::new(&source)
-        .map_err(|error| Error::Invalid(format!("cannot index chart source: {error}")))?;
+    let source_archive =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default())
+            .map_err(|error| Error::Invalid(format!("cannot index chart source: {error}")))?;
     let source_chart = source_archive
         .read("ppt/charts/chart-one.xml")
         .map_err(|error| Error::Invalid(format!("cannot read source chart: {error}")))?;
@@ -326,7 +327,7 @@ fn source_backed_cross_copy_copies_charts_alongside_images() -> TestResult {
         chart_members_0383(&output)?,
         vec!["ppt/charts/chart1.xml".to_owned()]
     );
-    let archive = ArchiveReader::new(&output)
+    let archive = ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index mixed output: {error}")))?;
     let image_relative_target = image_relationship
         .target
@@ -684,7 +685,7 @@ fn chart_payload_0383(label: &str) -> Vec<u8> {
 }
 
 fn chart_slide_xml_0383(bytes: &[u8]) -> TestResult<String> {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index chart slide output: {error}")))?;
     for name in archive.file_names() {
         if !name.starts_with("ppt/slides/slide") || !name.ends_with(".xml") {
@@ -703,7 +704,7 @@ fn chart_slide_xml_0383(bytes: &[u8]) -> TestResult<String> {
 }
 
 fn chart_members_0383(bytes: &[u8]) -> TestResult<Vec<String>> {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index chart members: {error}")))?;
     let mut members = archive
         .file_names()
@@ -900,7 +901,7 @@ fn stored_archive(entries: &[Entry<'_>], archive_comment: &[u8]) -> Vec<u8> {
 }
 
 fn add_zip_metadata(bytes: &[u8], archive_comment: &[u8]) -> TestResult<Vec<u8>> {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index fixture ZIP: {error}")))?;
     let mut names = Vec::new();
     let mut payloads = Vec::new();
@@ -1147,7 +1148,7 @@ fn source_backed_cross_copy_keeps_inserted_namespace_bindings_self_contained() -
     let projection = slide_projection(&output)?;
     assert_eq!(projection.len(), 3);
     let presentation = String::from_utf8(
-        ArchiveReader::new(&output)
+        ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
             .map_err(|error| Error::Invalid(format!("cannot index output: {error}")))?
             .read(PRESENTATION_XML)
             .map_err(|error| Error::Invalid(format!("cannot read presentation: {error}")))?,
@@ -1344,10 +1345,13 @@ fn source_backed_cross_copy_retargets_layout_to_destination_graph() -> TestResul
     let source_bytes = source_fixture()?;
     let destination_bytes = destination_fixture()?;
     let output = publish(&source_bytes, &destination_bytes, 0, 1, 1)?;
-    let archive = ArchiveReader::new(&output)
+    let archive = ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index output: {error}")))?;
-    let source_archive = ArchiveReader::new(&source_bytes)
-        .map_err(|error| Error::Invalid(format!("cannot index source: {error}")))?;
+    let source_archive = ArchiveReader::new(
+        &source_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot index source: {error}")))?;
     let slide_member = archive
         .file_names()
         .find(|name| {
@@ -1811,16 +1815,20 @@ fn source_backed_cross_copy_reports_source_change_during_output_with_exact_progr
 fn source_backed_cross_copy_managed_memory_reservation_is_exact_and_bounded() -> TestResult {
     let source_bytes = source_fixture()?;
     let destination_bytes = destination_fixture()?;
-    let source_slide_bytes = ArchiveReader::new(&source_bytes)
-        .map_err(|error| Error::Invalid(format!("cannot index source: {error}")))?
-        .read("ppt/slides/slide1.xml")
-        .map_err(|error| Error::Invalid(format!("cannot read source slide: {error}")))?;
-    let destination_presentation_bytes = ArchiveReader::new(&destination_bytes)
-        .map_err(|error| Error::Invalid(format!("cannot index destination: {error}")))?
-        .read(PRESENTATION_XML)
-        .map_err(|error| {
-            Error::Invalid(format!("cannot read destination presentation: {error}"))
-        })?;
+    let source_slide_bytes = ArchiveReader::new(
+        &source_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot index source: {error}")))?
+    .read("ppt/slides/slide1.xml")
+    .map_err(|error| Error::Invalid(format!("cannot read source slide: {error}")))?;
+    let destination_presentation_bytes = ArchiveReader::new(
+        &destination_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot index destination: {error}")))?
+    .read(PRESENTATION_XML)
+    .map_err(|error| Error::Invalid(format!("cannot read destination presentation: {error}")))?;
     let publication_reservation = source_slide_bytes
         .len()
         .checked_add(destination_presentation_bytes.len())
@@ -2317,8 +2325,12 @@ fn raw_archive(data: &[u8]) -> TestResult<RawArchive> {
     let comment = slice.comment().as_bytes().to_vec();
     let archive = slice.into_zip_archive();
     let mut scratch = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = soapberry_zip::PreservationIndex::new(&archive, &mut scratch)
-        .map_err(|error| Error::Invalid(format!("cannot preserve raw ZIP: {error}")))?;
+    let index = soapberry_zip::PreservationIndex::new(
+        &archive,
+        &mut scratch,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot preserve raw ZIP: {error}")))?;
     let mut members = BTreeMap::new();
     let mut local_positions = Vec::new();
     let mut central_order = Vec::new();
@@ -2348,7 +2360,7 @@ fn raw_archive(data: &[u8]) -> TestResult<RawArchive> {
             return Err(Error::Invalid("central record is too short".into()));
         }
         central_bytes[42..46].fill(0);
-        let payload = ArchiveReader::new(data)
+        let payload = ArchiveReader::new(data, soapberry_zip::office::ArchiveLimits::default())
             .map_err(|error| Error::Invalid(format!("cannot read ZIP payload: {error}")))?
             .read(&name)
             .map_err(|error| Error::Invalid(format!("cannot read {name}: {error}")))?;
@@ -2416,9 +2428,11 @@ where
 
 fn add_stored_member(bytes: &[u8], name: &str, payload: &[u8]) -> TestResult<Vec<u8>> {
     let mut output = rewrite_archive(bytes, |_name, payload| Ok(payload.to_vec()))?;
-    let archive = ArchiveReader::new(&output)
+    let archive = ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index rewritten ZIP: {error}")))?;
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for member in archive.file_names() {
         let data = archive
             .read(member)
@@ -2548,9 +2562,11 @@ fn rewrite_archive<F>(bytes: &[u8], mut replace: F) -> TestResult<Vec<u8>>
 where
     F: FnMut(&str, &[u8]) -> TestResult<Vec<u8>>,
 {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index fixture ZIP: {error}")))?;
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for member in archive.file_names() {
         let payload = archive.read(member).map_err(|error| {
             Error::Invalid(format!("cannot read fixture member {member}: {error}"))
@@ -2828,20 +2844,27 @@ fn source_backed_cross_copy_reserves_before_reading_picture_media() -> TestResul
     let destination_bytes = destination_fixture()?;
     let (media_start, media_end) =
         zip_member_data_range(&source_bytes, "ppt/media/source-only.png")?;
-    let source_slide_bytes = ArchiveReader::new(&source_bytes)
-        .map_err(|error| Error::Invalid(format!("cannot index source: {error}")))?
-        .read("ppt/slides/slide1.xml")
-        .map_err(|error| Error::Invalid(format!("cannot read source slide: {error}")))?;
-    let destination_presentation_bytes = ArchiveReader::new(&destination_bytes)
-        .map_err(|error| Error::Invalid(format!("cannot index destination: {error}")))?
-        .read(PRESENTATION_XML)
-        .map_err(|error| {
-            Error::Invalid(format!("cannot read destination presentation: {error}"))
-        })?;
-    let media_bytes = ArchiveReader::new(&source_bytes)
-        .map_err(|error| Error::Invalid(format!("cannot index source media: {error}")))?
-        .read("ppt/media/source-only.png")
-        .map_err(|error| Error::Invalid(format!("cannot read source media: {error}")))?;
+    let source_slide_bytes = ArchiveReader::new(
+        &source_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot index source: {error}")))?
+    .read("ppt/slides/slide1.xml")
+    .map_err(|error| Error::Invalid(format!("cannot read source slide: {error}")))?;
+    let destination_presentation_bytes = ArchiveReader::new(
+        &destination_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot index destination: {error}")))?
+    .read(PRESENTATION_XML)
+    .map_err(|error| Error::Invalid(format!("cannot read destination presentation: {error}")))?;
+    let media_bytes = ArchiveReader::new(
+        &source_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot index source media: {error}")))?
+    .read("ppt/media/source-only.png")
+    .map_err(|error| Error::Invalid(format!("cannot read source media: {error}")))?;
     let staged_bytes = source_slide_bytes
         .len()
         .checked_add(destination_presentation_bytes.len())
@@ -3298,7 +3321,7 @@ fn replace_text_member(bytes: &[u8], member: &str, from: &str, to: &str) -> Test
 }
 
 fn copied_slide_uri(bytes: &[u8]) -> TestResult<PackURI> {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index copied ZIP: {error}")))?;
     let marker = b"name=\"Source One\"";
     let mut found = None;
@@ -3441,7 +3464,7 @@ fn source_backed_cross_copy_copies_multiple_embedded_images_in_source_order() ->
         ],
     )?;
 
-    let archive = ArchiveReader::new(&output)
+    let archive = ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index copied ZIP: {error}")))?;
     assert_eq!(
         archive
@@ -3523,7 +3546,7 @@ fn source_backed_cross_copy_allocates_case_equivalent_media_collision() -> TestR
     assert_eq!(image_media[0].2, b"source-only-media");
     assert_eq!(image_media[0].3, ct::PNG);
 
-    let archive = ArchiveReader::new(&output)
+    let archive = ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index copied ZIP: {error}")))?;
     assert_eq!(
         archive
@@ -3566,8 +3589,11 @@ fn source_backed_cross_copy_aggregates_image_reservation_before_payload_reads() 
         "ppt/media/second-source.png",
         "ppt/media/third-source.jpg",
     ];
-    let source_archive = ArchiveReader::new(&source_bytes)
-        .map_err(|error| Error::Invalid(format!("cannot index source: {error}")))?;
+    let source_archive = ArchiveReader::new(
+        &source_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot index source: {error}")))?;
     let mut ranges = Vec::new();
     let mut media_size = 0usize;
     for member in media_members {
@@ -3585,11 +3611,14 @@ fn source_backed_cross_copy_aggregates_image_reservation_before_payload_reads() 
         .read("ppt/slides/slide1.xml")
         .expect("multi-image fixture slide must be readable")
         .len();
-    let destination_size = ArchiveReader::new(&destination_bytes)
-        .map_err(|error| Error::Invalid(format!("cannot index destination: {error}")))?
-        .read(PRESENTATION_XML)
-        .expect("destination presentation fixture must be readable")
-        .len();
+    let destination_size = ArchiveReader::new(
+        &destination_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot index destination: {error}")))?
+    .read(PRESENTATION_XML)
+    .expect("destination presentation fixture must be readable")
+    .len();
     let staged_size = source_slide_size
         .checked_add(destination_size)
         .and_then(|size| size.checked_add(media_size))
@@ -3853,7 +3882,7 @@ fn copied_slide_parts(bytes: &[u8]) -> TestResult<(PackURI, String, String)> {
         .rsplit_once('/')
         .ok_or_else(|| Error::Invalid("copied slide URI has no parent".into()))?;
     let relationships_member = format!("{directory}/_rels/{file_name}.rels");
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index copied ZIP: {error}")))?;
     let slide_xml = String::from_utf8(
         archive
@@ -4241,7 +4270,7 @@ const TEST_STRICT_RELATIONSHIP_NAMESPACE: &[u8] =
     b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 
 fn presentation_slide_relationship_id(bytes: &[u8], position: usize) -> TestResult<String> {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index presentation fixture: {error}")))?;
     let xml =
         String::from_utf8(archive.read(PRESENTATION_XML).map_err(|error| {
@@ -4839,7 +4868,7 @@ fn append_slide_element_to_member(
 }
 
 fn read_zip_member_bytes(bytes: &[u8], member: &str) -> TestResult<Vec<u8>> {
-    ArchiveReader::new(bytes)
+    ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index ZIP member {member}: {error}")))?
         .read(member)
         .map_err(|error| Error::Invalid(format!("cannot read ZIP member {member}: {error}")))
@@ -4897,7 +4926,7 @@ fn assert_mismatched_xml_refusal(error: &Error) {
 }
 
 fn physical_media_members(bytes: &[u8]) -> TestResult<BTreeSet<String>> {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| Error::Invalid(format!("cannot index media members: {error}")))?;
     Ok(archive
         .file_names()
@@ -5390,9 +5419,10 @@ fn source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusa
                 "pressure must exercise decoded Deflate fallback"
             );
             let old =
-                ArchiveReader::new(&expected).map_err(|error| Error::Invalid(error.to_string()))?;
-            let new =
-                ArchiveReader::new(&output).map_err(|error| Error::Invalid(error.to_string()))?;
+                ArchiveReader::new(&expected, soapberry_zip::office::ArchiveLimits::default())
+                    .map_err(|error| Error::Invalid(error.to_string()))?;
+            let new = ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
+                .map_err(|error| Error::Invalid(error.to_string()))?;
             let old_names: BTreeSet<_> = old.file_names().collect();
             let new_names: BTreeSet<_> = new.file_names().collect();
             assert_eq!(old_names, new_names);

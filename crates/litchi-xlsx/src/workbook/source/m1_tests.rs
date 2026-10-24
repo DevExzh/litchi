@@ -113,7 +113,8 @@ fn workbook_bytes(sheets: &[Sheet], defined_names: &str) -> Vec<u8> {
         r#"<Relationship Id="rId{strings_id}" Type="{REL}/sharedStrings" Target="sharedStrings.xml"/><Relationship Id="rId{styles_id}" Type="{REL}/styles" Target="styles.xml"/>"#
     ));
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored(
             "[Content_Types].xml",

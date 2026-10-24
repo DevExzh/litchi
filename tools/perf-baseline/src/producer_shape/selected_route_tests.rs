@@ -129,7 +129,8 @@ fn reviewed_read_corpus() -> ProducerCorpus {
 }
 
 fn worksheet_xmls(archive: &[u8]) -> Vec<Vec<u8>> {
-    let reader = ArchiveReader::new(archive).expect("producer archive opens");
+    let reader = ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default())
+        .expect("producer archive opens");
     let mut worksheets = Vec::with_capacity(REVIEWED_SHEETS);
     for sheet in 1..=REVIEWED_SHEETS {
         let name = format!("xl/worksheets/sheet{sheet}.xml");

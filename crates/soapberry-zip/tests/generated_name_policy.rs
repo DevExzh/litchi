@@ -25,7 +25,7 @@ fn literals(names: &[&str]) -> GeneratedNamePlan {
 }
 
 fn planned<W: Write>(output: W, plan: GeneratedNamePlan) -> StreamingArchiveWriter<W> {
-    StreamingArchiveWriter::with_writer_and_limits_and_spool_and_name_plan(
+    StreamingArchiveWriter::with_writer_and_spool_and_name_plan(
         output,
         StreamingArchiveLimits::default(),
         Cursor::new(Vec::new()),
@@ -75,9 +75,13 @@ fn mixed_owned_sized_and_reader_routes_preserve_bytes_and_payloads() {
     let planned = mixed(planned(Vec::new(), plan.finish().unwrap()));
     assert_eq!(
         planned,
-        mixed(StreamingArchiveWriter::with_writer(Vec::new()))
+        mixed(StreamingArchiveWriter::with_writer(
+            Vec::new(),
+            soapberry_zip::office::StreamingArchiveLimits::default()
+        ))
     );
-    let archive = ArchiveReader::new(&planned).unwrap();
+    let archive =
+        ArchiveReader::new(&planned, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert_eq!(archive.len(), 6);
     for (name, expected) in [
         ("metadata.bin", &b"metadata"[..]),
@@ -189,7 +193,7 @@ fn every_borrowed_route_refuses_wrong_names_without_consuming_the_plan() {
             archive.write_stored("expected1.bin", b"accepted").unwrap();
             let output = archive.finish().unwrap();
             assert_eq!(
-                ArchiveReader::new(&output)
+                ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
                     .unwrap()
                     .read("expected1.bin")
                     .unwrap(),
@@ -230,7 +234,7 @@ fn missing_members_refuse_finalization_with_exact_progress() {
     let failure = archive.finish_with_progress().unwrap_err();
     assert_eq!(failure.progress().output_bytes(), before);
     assert_eq!(output.len() as u64, before);
-    assert!(ArchiveReader::new(&output).is_err());
+    assert!(ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default()).is_err());
 }
 
 #[test]
@@ -241,9 +245,12 @@ fn a_completed_plan_rejects_extra_members_but_can_finish() {
     assert!(archive.write_stored("extra.bin", b"extra").is_err());
     assert_eq!(archive.output_bytes(), before);
     assert_eq!(
-        ArchiveReader::new(&archive.finish().unwrap())
-            .unwrap()
-            .len(),
+        ArchiveReader::new(
+            &archive.finish().unwrap(),
+            soapberry_zip::office::ArchiveLimits::default()
+        )
+        .unwrap()
+        .len(),
         1
     );
 }
@@ -261,7 +268,7 @@ fn generated_plan_cannot_raise_streaming_entry_or_name_limits() {
         },
     ] {
         let mut output = Vec::new();
-        let result = StreamingArchiveWriter::with_writer_and_limits_and_spool_and_name_plan(
+        let result = StreamingArchiveWriter::with_writer_and_spool_and_name_plan(
             &mut output,
             limits,
             MustNotAccessSpool,
@@ -279,21 +286,32 @@ fn an_empty_plan_can_finalize_an_empty_archive() {
     let output = planned(Vec::new(), builder().finish().unwrap())
         .finish()
         .unwrap();
-    assert_eq!(ArchiveReader::new(&output).unwrap().len(), 0);
+    assert_eq!(
+        ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
+            .unwrap()
+            .len(),
+        0
+    );
 }
 
 #[test]
 fn ordinary_name_validation_still_rejects_duplicates() {
-    let mut archive = StreamingArchiveWriter::with_writer(Vec::new());
+    let mut archive = StreamingArchiveWriter::with_writer(
+        Vec::new(),
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     archive.write_stored("a/b.bin", b"first").unwrap();
     let before = archive.output_bytes();
     assert!(archive.write_stored("a/b.bin", b"duplicate").is_err());
     assert_eq!(archive.output_bytes(), before);
     archive.write_stored("different.bin", b"second").unwrap();
     assert_eq!(
-        ArchiveReader::new(&archive.finish().unwrap())
-            .unwrap()
-            .len(),
+        ArchiveReader::new(
+            &archive.finish().unwrap(),
+            soapberry_zip::office::ArchiveLimits::default()
+        )
+        .unwrap()
+        .len(),
         2
     );
 }

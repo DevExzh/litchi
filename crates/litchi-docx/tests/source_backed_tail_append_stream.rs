@@ -328,7 +328,8 @@ fn archive(main: &[u8], strict: bool, compression: Compression) -> Vec<u8> {
     let relationships = format!(
         r#"<Relationships xmlns="{RELATIONSHIPS}"><Relationship Id="rIdDocument" Type="{office_document}" Target="{MAIN}"/></Relationships>"#
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content-types fixture must be writable");

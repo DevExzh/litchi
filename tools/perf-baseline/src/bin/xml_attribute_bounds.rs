@@ -268,7 +268,7 @@ const BENIGN_STYLES: &str =
 
 fn fixture_member(package: &str, member: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     let bytes = std::fs::read(package)?;
-    let archive = ArchiveReader::new(&bytes)?;
+    let archive = ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())?;
     Ok(archive.read(member)?)
 }
 
@@ -1469,13 +1469,14 @@ fn differential(args: &[String]) -> Result<(), Box<dyn Error>> {
             );
             continue;
         }
-        let archive = match ArchiveReader::new(&bytes) {
-            Ok(archive) => archive,
-            Err(error) => {
-                input.record_failure("package_open", &path, None, error);
-                continue;
-            },
-        };
+        let archive =
+            match ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()) {
+                Ok(archive) => archive,
+                Err(error) => {
+                    input.record_failure("package_open", &path, None, error);
+                    continue;
+                },
+            };
         let names: Vec<String> = archive.file_names().map(str::to_owned).collect();
         let mut package_input = PackageInput {
             path: path.display().to_string(),
@@ -1684,7 +1685,7 @@ fn collect_packages(
             },
         };
         if bytes.starts_with(b"PK\x03\x04") {
-            match ArchiveReader::new(&bytes) {
+            match ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()) {
                 Ok(archive) if archive.contains("[Content_Types].xml") => {
                     let identity = match std::fs::canonicalize(root) {
                         Ok(identity) => identity,

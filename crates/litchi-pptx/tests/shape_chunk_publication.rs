@@ -138,8 +138,10 @@ fn transported_source(patch: &SourcePatch) -> SourcePatch {
 }
 
 fn malformed_second_rotation(source: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(source).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let payload = archive.read(name).unwrap();
         if name == "ppt/slides/slide1.xml" {
@@ -646,7 +648,8 @@ fn malformed_unselected_rotation_is_preserved_by_a_late_property_chunk() {
         1
     );
     let after = edit.commit().unwrap().into_package().to_bytes().unwrap();
-    let archive = ArchiveReader::new(&after).unwrap();
+    let archive =
+        ArchiveReader::new(&after, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let slide = String::from_utf8(archive.read("ppt/slides/slide1.xml").unwrap()).unwrap();
     assert!(slide.contains("rot=\"malformed\""));
     assert!(slide.contains("selected"));

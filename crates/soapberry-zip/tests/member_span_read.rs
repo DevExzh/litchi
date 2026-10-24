@@ -210,12 +210,8 @@ type Opened = (IndexedArchive<Arc<CountingReaderAt>>, Arc<CountingReaderAt>);
 fn open_source(source: CountingReaderAt) -> Opened {
     let length = source.bytes.len() as u64;
     let source = Arc::new(source);
-    let archive = IndexedArchive::from_reader_with_limits(
-        Arc::clone(&source),
-        length,
-        ArchiveLimits::default(),
-    )
-    .unwrap();
+    let archive =
+        IndexedArchive::from_reader(Arc::clone(&source), length, ArchiveLimits::default()).unwrap();
     (archive, source)
 }
 
@@ -483,12 +479,9 @@ fn a_truncated_member_keeps_its_error_identity() {
 
     let (archive, _source) = {
         let source = Arc::new(CountingReaderAt::new(damaged));
-        let archive = IndexedArchive::from_reader_with_limits(
-            Arc::clone(&source),
-            length,
-            ArchiveLimits::default(),
-        )
-        .unwrap();
+        let archive =
+            IndexedArchive::from_reader(Arc::clone(&source), length, ArchiveLimits::default())
+                .unwrap();
         (archive, source)
     };
 

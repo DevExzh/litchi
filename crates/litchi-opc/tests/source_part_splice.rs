@@ -98,7 +98,8 @@ fn package_relationships_for(document_member: &str, signed: bool) -> Vec<u8> {
 }
 
 fn archive_bytes(source: &[u8], deflated: bool, signed: bool) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", &content_types(signed))
         .expect("content types fixture must be writable");
@@ -130,7 +131,8 @@ fn archive_bytes(source: &[u8], deflated: bool, signed: bool) -> Vec<u8> {
 }
 
 fn binary_archive_bytes(source: &[u8], deflated: bool) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", &content_types_for(true))
         .expect("binary content types fixture must be writable");
@@ -316,7 +318,8 @@ fn central_record(bytes: &[u8], wanted: &str) -> Vec<u8> {
 
 #[test]
 fn central_record_oracle_detects_metadata_changes_outside_local_record() {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_deflated(DOCUMENT_MEMBER, VALID_SOURCE)
         .unwrap();
@@ -342,7 +345,8 @@ fn central_record_oracle_detects_metadata_changes_outside_local_record() {
 
 #[test]
 fn raw_record_oracle_includes_descriptor_mode_compressed_payload() {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_deflated(DOCUMENT_MEMBER, VALID_SOURCE)
         .expect("descriptor-mode fixture must write");

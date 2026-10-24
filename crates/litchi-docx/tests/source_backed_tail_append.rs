@@ -284,7 +284,8 @@ fn settings_relationships_xml(entries: &str) -> Vec<u8> {
 }
 
 fn archive(xml: &[u8], compression: Compression, strict: bool, topology: Topology) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", &content_types(topology))
         .expect("content types fixture must be writable");
@@ -335,7 +336,8 @@ fn settings_archive(
     settings_relationships: Option<&[u8]>,
     extra_member: Option<(&str, &[u8])>,
 ) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", &content_types(Topology::Protected))
         .expect("content types fixture must be writable");

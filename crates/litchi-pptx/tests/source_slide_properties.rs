@@ -48,7 +48,8 @@ fn open_source(bytes: &[u8]) -> SourcePackage {
 }
 
 fn members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).unwrap();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     archive
         .file_names()
         .map(|name| (name.to_owned(), archive.read(name).unwrap()))
@@ -56,7 +57,10 @@ fn members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
 }
 
 fn member(bytes: &[u8], name: &str) -> Vec<u8> {
-    ArchiveReader::new(bytes).unwrap().read(name).unwrap()
+    ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .unwrap()
+        .read(name)
+        .unwrap()
 }
 
 fn slide_xml(bytes: &[u8]) -> String {

@@ -191,7 +191,9 @@ fn differential(args: &[String]) -> Result<(), Box<dyn Error>> {
         let Ok(bytes) = std::fs::read(path) else {
             continue;
         };
-        let Ok(archive) = ArchiveReader::new(&bytes) else {
+        let Ok(archive) =
+            ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())
+        else {
             continue;
         };
         let names: Vec<String> = archive.file_names().map(str::to_owned).collect();
@@ -248,7 +250,7 @@ fn collect_packages(root: &Path, packages: &mut Vec<PathBuf>) -> Result<(), Box<
             return Ok(());
         };
         if bytes.starts_with(b"PK\x03\x04")
-            && ArchiveReader::new(&bytes)
+            && ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())
                 .is_ok_and(|archive| archive.contains("[Content_Types].xml"))
         {
             packages.push(root.to_owned());
@@ -409,7 +411,8 @@ fn replace_member(
     member: &str,
     replacement: &[u8],
 ) -> Option<Vec<u8>> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in names {
         if name == member {
             writer.write_stored(name, replacement).ok()?;
@@ -445,7 +448,8 @@ fn relationship_declarations(n: usize) -> Result<Vec<u8>, Box<dyn Error>> {
         let _ = write!(rels, " xmlns:p{index}=\"u\"");
     }
     rels.push_str("/></Relationships>");
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("[Content_Types].xml", CONTENT_TYPES.as_bytes())?;
     writer.write_stored("_rels/.rels", rels.as_bytes())?;
     writer.write_stored("probe.xml", b"<probe/>")?;

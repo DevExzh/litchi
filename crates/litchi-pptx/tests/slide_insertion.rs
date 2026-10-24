@@ -20,8 +20,10 @@ fn layout(package: &Package) -> String {
 }
 fn source(strict: bool) -> Package {
     let bytes = Package::new().unwrap().to_bytes().unwrap();
-    let archive = ArchiveReader::new(&bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let bytes = archive.read(name).unwrap();
         let mut xml = String::from_utf8(bytes).unwrap();
@@ -99,7 +101,8 @@ fn insertions_into_empty_and_populated_lists_compose_and_invert_losslessly() {
         assert_eq!(restored.to_bytes().unwrap(), original_bytes);
         assert_eq!(original.to_bytes().unwrap(), original_bytes);
         let after = changed.to_bytes().unwrap();
-        let archive = ArchiveReader::new(&after).unwrap();
+        let archive =
+            ArchiveReader::new(&after, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         for name in [
             "[Content_Types].xml",
             "ppt/_rels/presentation.xml.rels",
@@ -155,8 +158,10 @@ fn failed_insertion_preserves_prior_staged_edits() {
 }
 
 fn with_incoming_reference(bytes: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         writer
             .write_stored(name, &archive.read(name).unwrap())
@@ -198,7 +203,8 @@ fn insertion_does_not_activate_an_existing_dangling_target() {
         .unwrap();
     let changed = edit.commit().unwrap().into_package();
     let bytes = changed.to_bytes().unwrap();
-    let archive = ArchiveReader::new(&bytes).unwrap();
+    let archive =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert!(
         archive.read("ppt/slides/slide1.xml").is_err(),
         "an existing dangling target reserves the name"
@@ -227,8 +233,10 @@ fn duplicate_layout_names_are_a_typed_atomic_refusal() {
         })
         .unwrap();
     let bytes = original.to_bytes().unwrap();
-    let archive = ArchiveReader::new(&bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let mut bytes = archive.read(name).unwrap();
         if name == member {
@@ -258,8 +266,10 @@ fn insertion_and_inverse_preserve_unrelated_destination_metadata() {
         .unwrap();
     let patch = edit.commit().unwrap().into_patch();
     let bytes = original.to_bytes().unwrap();
-    let archive = ArchiveReader::new(&bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut expected = Vec::new();
     for name in archive.file_names() {
         let mut bytes = archive.read(name).unwrap();
@@ -277,7 +287,8 @@ fn insertion_and_inverse_preserve_unrelated_destination_metadata() {
     let wire = Patch::from_bytes(&patch.to_bytes().unwrap(), Limits::default()).unwrap();
     let changed = overlay.apply(&wire).unwrap().into_package();
     let bytes = changed.to_bytes().unwrap();
-    let archive = ArchiveReader::new(&bytes).unwrap();
+    let archive =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     for (name, _) in &expected {
         assert!(
             String::from_utf8(archive.read(name).unwrap())
@@ -290,7 +301,8 @@ fn insertion_and_inverse_preserve_unrelated_destination_metadata() {
         .unwrap()
         .into_package();
     let bytes = restored.to_bytes().unwrap();
-    let archive = ArchiveReader::new(&bytes).unwrap();
+    let archive =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     for (name, bytes) in expected {
         assert_eq!(archive.read(&name).unwrap(), bytes);
     }
@@ -305,8 +317,10 @@ fn inverse_checks_root_dependencies_but_allows_external_references() {
     let (changed, patch) = edit.commit().unwrap().into_parts();
     let bytes = changed.to_bytes().unwrap();
     for external in [false, true] {
-        let archive = ArchiveReader::new(&bytes).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
+        let archive =
+            ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for name in archive.file_names() {
             let mut bytes = archive.read(name).unwrap();
             if name == "_rels/.rels" {
@@ -389,7 +403,8 @@ fn insertion_refuses_dangling_xml_bindings_ranges_and_unknown_extensions() {
     for strict in [false, true] {
         let base = source(strict);
         let bytes = base.to_bytes().unwrap();
-        let archive = ArchiveReader::new(&bytes).unwrap();
+        let archive =
+            ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         let rels =
             String::from_utf8(archive.read("ppt/_rels/presentation.xml.rels").unwrap()).unwrap();
         let free = (1..100)
@@ -402,7 +417,9 @@ fn insertion_refuses_dangling_xml_bindings_ranges_and_unknown_extensions() {
             "<p:showPr><p:sldRg st=\"1\" end=\"2\"/></p:showPr>".to_owned(),
             "<p:extLst><p:ext uri=\"unknown\"/></p:extLst>".to_owned(),
         ] {
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(
+                soapberry_zip::office::StreamingArchiveLimits::default(),
+            );
             for name in archive.file_names() {
                 let mut payload = archive.read(name).unwrap();
                 if name == "ppt/presentation.xml" {

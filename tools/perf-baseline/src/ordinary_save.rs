@@ -1026,7 +1026,7 @@ fn real_file_manifest(
     // Keep the manifest target on the decoded side of the ZIP boundary. The
     // reader's default limits are finite, so a caller-named archive cannot
     // turn this identity read into an unbounded decompression allocation.
-    let reader = ArchiveReader::new_with_limits(archive, ArchiveLimits::default())?;
+    let reader = ArchiveReader::new(archive, ArchiveLimits::default())?;
     let main_payload = reader.read(main_part)?;
     Ok(CorpusManifest {
         name: format!("{}-real-file-save", format.extension()),
@@ -2061,7 +2061,8 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_deflated(format.main_part(), &main_payload)
             .expect("main ZIP member");

@@ -84,7 +84,11 @@ struct Member {
 fn members(bytes: &[u8]) -> Result<BTreeMap<String, Member>, Box<dyn Error>> {
     let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut scratch)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut scratch,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut result = BTreeMap::new();
     for entry in index.entries() {
         let name = std::str::from_utf8(entry.raw_name_bytes())?.to_owned();
@@ -97,7 +101,8 @@ fn members(bytes: &[u8]) -> Result<BTreeMap<String, Member>, Box<dyn Error>> {
             .ok_or("short central record")?
             .fill(0);
         let member = Member {
-            payload: ArchiveReader::new(bytes)?.read(&name)?,
+            payload: ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?
+                .read(&name)?,
             local: bytes[usize::try_from(local.start)?..usize::try_from(local.end)?].to_vec(),
             central: record,
         };

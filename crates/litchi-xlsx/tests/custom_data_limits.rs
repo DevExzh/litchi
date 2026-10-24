@@ -253,7 +253,9 @@ fn physical_source_with_content_types(
     relationship_overrides: &BTreeMap<String, Vec<u8>>,
     content_types_override: Option<Vec<u8>>,
 ) -> Vec<u8> {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     let mut parts = package
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -772,7 +774,8 @@ fn package_bytes(package: &Package) -> Vec<u8> {
 }
 
 fn archive_members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).expect("package bytes are a valid ZIP");
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("package bytes are a valid ZIP");
     let names = archive.file_names().map(str::to_owned).collect::<Vec<_>>();
     names
         .into_iter()

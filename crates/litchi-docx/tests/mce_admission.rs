@@ -98,7 +98,8 @@ struct Member {
 }
 
 fn members(archive: &[u8]) -> Vec<Member> {
-    let reader = ArchiveReader::new(archive).unwrap();
+    let reader =
+        ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let names: Vec<String> = reader.file_names().map(str::to_owned).collect();
     names
         .into_iter()
@@ -112,7 +113,10 @@ fn members(archive: &[u8]) -> Vec<Member> {
 }
 
 fn main_part(archive: &[u8]) -> Vec<u8> {
-    ArchiveReader::new(archive).unwrap().read(MAIN).unwrap()
+    ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default())
+        .unwrap()
+        .read(MAIN)
+        .unwrap()
 }
 
 fn source(bytes: &[u8]) -> source_backed::Package {
@@ -426,7 +430,8 @@ fn package(document: &str, settings: Option<&str>) -> Vec<u8> {
         r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="{}" Target="{MAIN}"/></Relationships>"#,
         rt::OFFICE_DOCUMENT
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();

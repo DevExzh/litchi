@@ -44,7 +44,8 @@ fn assert_contains_kind(records: &[Revision], kind: RevisionType) {
 }
 
 fn zip_members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).expect("parse ZIP corpus");
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("parse ZIP corpus");
     archive
         .file_names()
         .map(|name| {

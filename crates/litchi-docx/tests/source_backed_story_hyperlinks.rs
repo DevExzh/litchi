@@ -415,7 +415,8 @@ fn suspicious_non_part_fixture() -> Vec<u8> {
 }
 
 fn suspicious_non_part_fixture_with_members(names: &[&str]) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored(
             "[Content_Types].xml",

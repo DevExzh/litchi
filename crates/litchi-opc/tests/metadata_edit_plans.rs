@@ -8,7 +8,9 @@ use litchi_opc::{
 use quick_xml::{Reader, events::Event};
 
 fn package(relationships: Option<&[u8]>) -> OpcPackage {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer.write_stored("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="bin" ContentType="application/octet-stream"/></Types>"#).unwrap();
     if let Some(xml) = relationships {
         writer

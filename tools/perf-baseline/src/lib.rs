@@ -14984,7 +14984,10 @@ fn build_opc_corpus(
     )?;
 
     let archive = PackageWriter::to_bytes(&package)?;
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let target_payload = target_payload.ok_or("generated corpus has no target entry")?;
     let entry_count_u64 = u64::try_from(entry_count)?;
     let entry_bytes_u64 = u64::try_from(entry_bytes)?;
@@ -15161,7 +15164,8 @@ fn opc_casefold_class_lookup_digest(
 
 fn verify_opc_casefold_equivalent_name_gate() -> Result<(), Box<dyn Error>> {
     let package_relationships = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdCasefoldEquivalent" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="casefold/equivalent-00000.bin"/></Relationships>"#;
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("[Content_Types].xml", OPC_CASEFOLD_CONTENT_TYPES_XML)?;
     writer.write_stored("_rels/.rels", package_relationships)?;
     writer.write_stored("casefold/equivalent-00000.bin", b"equivalent-lower")?;
@@ -15207,7 +15211,8 @@ fn build_opc_casefold_corpus(part_count: usize) -> Result<OpcCasefoldCorpus, Box
     }
     verify_opc_casefold_equivalent_name_gate()?;
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("[Content_Types].xml", OPC_CASEFOLD_CONTENT_TYPES_XML)?;
     writer.write_stored("_rels/.rels", OPC_CASEFOLD_PACKAGE_RELS_XML)?;
     let mut part_names = Vec::with_capacity(part_count);
@@ -15232,7 +15237,8 @@ fn build_opc_casefold_corpus(part_count: usize) -> Result<OpcCasefoldCorpus, Box
         canonical_partnames.push(partname);
     }
     let archive = writer.finish_to_bytes()?;
-    let archive_reader = ArchiveReader::new(&archive)?;
+    let archive_reader =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?;
     let archive_member_count = archive_reader.file_names().count();
     if archive_member_count != part_count + 2 {
         return Err("OPC case-fold archive member count differs from fixed corpus identity".into());
@@ -15406,7 +15412,8 @@ fn build_opc_relationship_corpus() -> Result<OpcRelationshipCorpus, Box<dyn Erro
     )?;
 
     let archive = PackageWriter::to_bytes(&package)?;
-    let archive_reader = ArchiveReader::new(&archive)?;
+    let archive_reader =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?;
     let mut members = BTreeMap::new();
     for name in archive_reader.file_names() {
         let name = name.to_owned();
@@ -15418,7 +15425,11 @@ fn build_opc_relationship_corpus() -> Result<OpcRelationshipCorpus, Box<dyn Erro
     }
 
     let expected_names = members.keys().cloned().collect::<Vec<_>>();
-    let lazy_reader = LazyArchiveReader::new(&archive)?;
+    let lazy_reader = LazyArchiveReader::new(
+        &archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+        soapberry_zip::office::LazyArchiveCacheLimits::default(),
+    )?;
     let mut lazy_names = lazy_reader
         .file_names()
         .map(str::to_owned)
@@ -15561,7 +15572,10 @@ fn build_opc_overlay_corpus(shape: OpcOverlayShape) -> Result<Corpus, Box<dyn Er
     )?;
 
     let archive = PackageWriter::to_bytes(&package)?;
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let target_payload = target_payload.ok_or("multi-Part OPC corpus has no target entry")?;
     let entry_count_u64 = u64::try_from(entry_count)?;
     let entry_bytes_u64 = u64::try_from(entry_bytes)?;
@@ -17153,7 +17167,10 @@ fn build_semantic_docx_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
     let archive = semantic_docx_bytes(shape)?;
     let package = litchi_docx::Package::from_reader(Cursor::new(archive.clone()))?;
     verify_semantic_docx(&package, shape, &[])?;
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let target_payload = semantic_docx_text(0, false).into_bytes();
     let content_bytes = (0..shape.docx_paragraphs())
         .try_fold(0usize, |total, index| {
@@ -17413,7 +17430,12 @@ fn build_docx_section_layout_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count: opc.part_count(),
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: DOCX_SECTION_LAYOUT_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes,
             archive_bytes: archive.len(),
@@ -17560,7 +17582,10 @@ fn build_docx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
             return Err("DOCX source-edit media payload differs from specification".into());
         }
     }
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let target = SemanticShape::Medium.docx_paragraphs() / 2;
     let target_payload = semantic_docx_text(target, false).into_bytes();
     Ok(Corpus {
@@ -17623,7 +17648,12 @@ fn build_pptx_source_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: PPTX_SOURCE_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes,
             archive_bytes: archive.len(),
@@ -17780,9 +17810,12 @@ fn build_pptx_cross_copy_corpus(case: Case) -> Result<PptxCrossCopyCorpus, Box<d
         },
         compression: "deflate",
         entry_count: destination_opc.part_count(),
-        archive_member_count: ArchiveReader::new(&destination_archive)?
-            .file_names()
-            .count(),
+        archive_member_count: ArchiveReader::new(
+            &destination_archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )?
+        .file_names()
+        .count(),
         entry_bytes: target_payload.len(),
         uncompressed_payload_bytes,
         archive_bytes: destination_archive.len(),
@@ -18105,7 +18138,12 @@ fn build_pptx_source_image_query_corpus() -> Result<PptxSourceImageQueryCorpus, 
         payload_kind: "deterministic-incompressible-media-and-slide-text",
         compression: "deflate",
         entry_count: source_opc.part_count(),
-        archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+        archive_member_count: ArchiveReader::new(
+            &archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )?
+        .file_names()
+        .count(),
         entry_bytes: selected_payload.len(),
         uncompressed_payload_bytes,
         archive_bytes: archive.len(),
@@ -19731,7 +19769,10 @@ fn source_backed_cross_copy_foreign_destination_refusal(
 fn pptx_cross_copy_archive_members(
     archive_bytes: &[u8],
 ) -> Result<BTreeMap<String, Vec<u8>>, Box<dyn Error>> {
-    let archive = ArchiveReader::new(archive_bytes)?;
+    let archive = ArchiveReader::new(
+        archive_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut members = BTreeMap::new();
     for name in archive.file_names() {
         let owned_name = name.to_owned();
@@ -19751,8 +19792,12 @@ fn rewrite_pptx_archive_member(
     target_member: &str,
     mut rewrite: impl FnMut(&[u8]) -> Result<Vec<u8>, Box<dyn Error>>,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let archive = ArchiveReader::new(archive_bytes)?;
-    let mut writer = StreamingArchiveWriter::new();
+    let archive = ArchiveReader::new(
+        archive_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut found = false;
     for member in archive.file_names() {
         let bytes = archive.read(member)?;
@@ -19773,7 +19818,11 @@ fn rewrite_pptx_archive_member(
 fn raw_zip_layout(bytes: &[u8]) -> Result<(Vec<String>, Vec<String>, Vec<u8>), Box<dyn Error>> {
     let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut records = archive.entries(&mut buffer);
     let mut central_names = Vec::with_capacity(index.entries().len());
     for _ in index.entries() {
@@ -20481,7 +20530,12 @@ fn build_xlsx_calculation_metadata_edit_corpus() -> Result<Corpus, Box<dyn Error
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: XLSX_CALC_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes,
             archive_bytes: archive.len(),
@@ -20541,7 +20595,10 @@ fn build_xlsx_page_break_projection_corpus() -> Result<Corpus, Box<dyn Error>> {
     corpus.manifest.name = "xlsx-page-break-projection-media".to_owned();
     corpus.manifest.generator = XLSX_PAGE_BREAK_PROJECTION_CORPUS_GENERATOR;
     corpus.manifest.entry_count = opc.part_count();
-    corpus.manifest.archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    corpus.manifest.archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     corpus.manifest.uncompressed_payload_bytes = uncompressed_payload_bytes;
     corpus.manifest.archive_bytes = archive.len();
     corpus.manifest.archive_sha256 = sha256_hex(&archive);
@@ -20624,8 +20681,12 @@ fn build_xlsx_data_validation_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     )?;
     opc.get_part_mut(&target_uri)?.set_blob(seeded);
     corpus.archive = PackageWriter::to_bytes(&opc)?;
-    corpus.manifest.archive_member_count =
-        ArchiveReader::new(&corpus.archive)?.file_names().count();
+    corpus.manifest.archive_member_count = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count();
     corpus.manifest.uncompressed_payload_bytes = opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -20657,8 +20718,12 @@ fn build_xlsx_auto_filter_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     )?;
     opc.get_part_mut(&target_uri)?.set_blob(seeded);
     corpus.archive = PackageWriter::to_bytes(&opc)?;
-    corpus.manifest.archive_member_count =
-        ArchiveReader::new(&corpus.archive)?.file_names().count();
+    corpus.manifest.archive_member_count = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count();
     corpus.manifest.uncompressed_payload_bytes = opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -20691,8 +20756,12 @@ fn build_xlsx_conditional_formatting_edit_corpus() -> Result<Corpus, Box<dyn Err
     )?;
     opc.get_part_mut(&target_uri)?.set_blob(seeded);
     corpus.archive = PackageWriter::to_bytes(&opc)?;
-    corpus.manifest.archive_member_count =
-        ArchiveReader::new(&corpus.archive)?.file_names().count();
+    corpus.manifest.archive_member_count = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count();
     corpus.manifest.uncompressed_payload_bytes = opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))
@@ -20773,7 +20842,12 @@ fn build_xlsx_merge_edit_corpus(case: Case) -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-semantic-cells",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: target_payload.len(),
             uncompressed_payload_bytes,
             archive_bytes: archive.len(),
@@ -20851,8 +20925,9 @@ fn rewrite_pptx_slide_names(
     archive: &[u8],
     mut replacement: impl FnMut(usize) -> Option<String>,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let reader = ArchiveReader::new(archive)?;
-    let mut writer = StreamingArchiveWriter::new();
+    let reader = ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default())?;
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member in reader.file_names() {
         let payload = reader.read(member)?;
         let payload = match pptx_slide_member_index(member).and_then(&mut replacement) {
@@ -21112,7 +21187,7 @@ fn odt_media_archive_for_shape(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn 
         document.add_paragraph(&semantic_odt_text(index, false))?;
     }
     let base = document.build()?.to_bytes()?;
-    let source = ArchiveReader::new(&base)?;
+    let source = ArchiveReader::new(&base, soapberry_zip::office::ArchiveLimits::default())?;
     let mut writer =
         litchi_odt::core::PackageWriter::new(litchi_odt::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
@@ -21143,7 +21218,7 @@ fn odt_repeated_text_archive() -> Result<Vec<u8>, Box<dyn Error>> {
 
 fn odt_resource_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
     let base = odt_media_archive()?;
-    let source = ArchiveReader::new(&base)?;
+    let source = ArchiveReader::new(&base, soapberry_zip::office::ArchiveLimits::default())?;
     let mut content = String::from_utf8(source.read("content.xml")?)?;
     let insertion = content
         .rfind("</office:text>")
@@ -21345,7 +21420,7 @@ fn verify_ods_buffered_archive(
     shape: SemanticShape,
     expected_semantic_sha256: &str,
 ) -> Result<(), Box<dyn Error>> {
-    let archive = ArchiveReader::new(bytes)?;
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let names = archive.file_names().collect::<Vec<_>>();
     let expected_names = ["mimetype", "content.xml", "META-INF/manifest.xml"];
     let actual_set = names.iter().copied().collect::<BTreeSet<_>>();
@@ -21410,7 +21485,9 @@ fn build_ods_buffered_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
     let expected_semantic_sha256 = ods_scalar_expected_semantic_sha256(shape);
     let semantic_projection_bytes = ods_scalar_expected_projection(shape).len();
     verify_ods_buffered_archive(&archive, shape, &expected_semantic_sha256)?;
-    let target_payload = ArchiveReader::new(&archive)?.read("content.xml")?;
+    let target_payload =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .read("content.xml")?;
     let row_count = ods_scalar_row_count(shape);
     let entry_count = row_count
         .checked_mul(ODS_BUFFERED_COLUMN_COUNT)
@@ -21485,7 +21562,9 @@ fn build_ods_streaming_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
         return Err("streaming ODS provider report differs from scalar fixture".into());
     }
     verify_ods_buffered_archive(&archive, shape, &expected_semantic_sha256)?;
-    let target_payload = ArchiveReader::new(&archive)?.read("content.xml")?;
+    let target_payload =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .read("content.xml")?;
     if target_payload.len() != report.authored_content_xml_bytes() {
         return Err("streaming ODS authored content byte count differs from archive".into());
     }
@@ -21561,7 +21640,7 @@ fn odp_text_box_batch_page(index: usize) -> usize {
 
 fn ods_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
     let base = semantic_ods_bytes(SemanticShape::Medium)?;
-    let source = ArchiveReader::new(&base)?;
+    let source = ArchiveReader::new(&base, soapberry_zip::office::ArchiveLimits::default())?;
     let mut writer = litchi_odf_common::core::PackageWriter::new(
         litchi_odf_common::core::StreamingArchiveLimits::default(),
     );
@@ -21596,7 +21675,7 @@ fn semantic_odp_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     // generated package with fixed metadata so a benchmark corpus has one
     // stable identity across runs and machines.
     let generated = builder.build()?.to_bytes()?;
-    let reader = ArchiveReader::new(&generated)?;
+    let reader = ArchiveReader::new(&generated, soapberry_zip::office::ArchiveLimits::default())?;
     let content = reader.read("content.xml")?;
     let styles = reader.read("styles.xml")?;
     let mut writer =
@@ -21613,7 +21692,7 @@ fn semantic_odp_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
 
 fn odp_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
     let base = semantic_odp_bytes(SemanticShape::Medium)?;
-    let source = ArchiveReader::new(&base)?;
+    let source = ArchiveReader::new(&base, soapberry_zip::office::ArchiveLimits::default())?;
     let mut writer =
         litchi_odp::core::PackageWriter::new(litchi_odp::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
@@ -21650,7 +21729,10 @@ fn odp_text_box_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
     if !commit.diagnostics().changed() || commit.patch().is_noop() {
         return Err("ODP text-box batch corpus construction was an exact no-op".into());
     }
-    let staged = ArchiveReader::new(commit.package().as_bytes())?;
+    let staged = ArchiveReader::new(
+        commit.package().as_bytes(),
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut writer =
         litchi_odp::core::PackageWriter::new(litchi_odp::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
@@ -21690,7 +21772,12 @@ fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
             payload_kind: "deterministic-semantic-text",
             compression: "deflate",
             entry_count: shape.docx_paragraphs(),
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: target_payload.len(),
             uncompressed_payload_bytes: content_bytes,
             archive_bytes: archive.len(),
@@ -21854,7 +21941,12 @@ fn build_odt_media_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: ODS_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes: paragraph_bytes
                 .checked_add(media_bytes)
@@ -21901,7 +21993,12 @@ fn build_odt_repeated_text_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: ODS_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes: paragraph_bytes
                 .checked_add(media_bytes)
@@ -21951,7 +22048,12 @@ fn build_odt_resource_batch_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media-and-image-resources",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: ODT_RESOURCE_PAYLOAD_BYTES,
             uncompressed_payload_bytes: paragraph_bytes
                 .checked_add(retained_media_bytes)
@@ -21995,7 +22097,12 @@ fn build_semantic_ods_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
             payload_kind: "deterministic-semantic-text",
             compression: "deflate",
             entry_count: shape.ods_cell_count(),
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: target_payload.len(),
             uncompressed_payload_bytes: content_bytes,
             archive_bytes: archive.len(),
@@ -22043,7 +22150,12 @@ fn build_ods_media_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: ODS_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes: cell_bytes
                 .checked_add(media_bytes)
@@ -22083,7 +22195,12 @@ fn build_semantic_odp_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Err
             payload_kind: "deterministic-semantic-text",
             compression: "deflate",
             entry_count: shape.pptx_slides(),
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: target_payload.len(),
             uncompressed_payload_bytes: content_bytes,
             archive_bytes: archive.len(),
@@ -22198,9 +22315,12 @@ fn detection_merge_ooxml_members(
     odf_archive: &[u8],
     include_catalog: bool,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let odf = ArchiveReader::new(odf_archive)?;
+    let odf = ArchiveReader::new(odf_archive, soapberry_zip::office::ArchiveLimits::default())?;
     let ooxml_archive = detection_ooxml_archive(family)?;
-    let ooxml = ArchiveReader::new(&ooxml_archive)?;
+    let ooxml = ArchiveReader::new(
+        &ooxml_archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut writer = litchi_odf_common::core::PackageWriter::new(
         litchi_odf_common::core::StreamingArchiveLimits::default(),
     );
@@ -22420,7 +22540,12 @@ fn build_odp_media_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: ODS_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes: content_bytes
                 .checked_add(media_bytes)
@@ -22554,7 +22679,12 @@ fn build_odp_text_box_batch_corpus() -> Result<Corpus, Box<dyn Error>> {
             payload_kind: "deterministic-incompressible-media-and-rich-text",
             compression: "deflate",
             entry_count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: ODS_MEDIA_ENTRY_BYTES,
             uncompressed_payload_bytes: slide_bytes
                 .checked_add(text_box_bytes)
@@ -22604,7 +22734,12 @@ fn build_semantic_pptx_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
             payload_kind: "deterministic-semantic-text",
             compression: "deflate",
             entry_count: count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: semantic_pptx_text(0, 0, false).len(),
             uncompressed_payload_bytes: content_bytes,
             archive_bytes: archive.len(),
@@ -22873,7 +23008,12 @@ fn build_xlsb_corpus(shape: XlsbShape) -> Result<Corpus, Box<dyn Error>> {
             },
             compression: "deflate",
             entry_count: expected.len(),
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: std::mem::size_of::<f64>(),
             uncompressed_payload_bytes: expected
                 .len()
@@ -22923,7 +23063,12 @@ fn build_pptx_slide_name_index_corpus(shape: SemanticShape) -> Result<Corpus, Bo
             payload_kind: "deterministic-named-slide-text",
             compression: "stored",
             entry_count: count,
-            archive_member_count: ArchiveReader::new(&archive)?.file_names().count(),
+            archive_member_count: ArchiveReader::new(
+                &archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count(),
             entry_bytes: semantic_pptx_text(0, 0, false).len(),
             uncompressed_payload_bytes: content_bytes,
             archive_bytes: archive.len(),
@@ -22962,7 +23107,10 @@ fn build_xlsx_corpus(shape: XlsxShape) -> Result<Corpus, Box<dyn Error>> {
     };
     let target_name = xlsx_cell_name(target);
     let target_payload = xlsx_value(target).to_string().into_bytes();
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
 
     Ok(Corpus {
@@ -23023,7 +23171,10 @@ fn build_xlsx_named_sheet_lookup_corpus(
     };
     let target_name = xlsx_cell_name(target);
     let target_payload = xlsx_value(target).to_string().into_bytes();
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
 
     Ok(Corpus {
@@ -23441,7 +23592,10 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
         .ok_or("XLSX cell CRUD corpus has no target cell")?;
     let target_name = xlsx_cell_name(target);
     let target_payload = xlsx_value(target).to_string().into_bytes();
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
     let vendor_bytes = XLSX_VENDOR_EXTENSION_XML
         .len()
@@ -23565,7 +23719,10 @@ fn build_xlsx_row_visibility_corpus(
     }
     let worksheet_uri = PackURI::new("/xl/worksheets/sheet1.xml")?;
     let target_payload = package.get_part(&worksheet_uri)?.blob().to_vec();
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let (_source_ranges, source_members) = xlsx_source_layout(&archive, spec.sheet_count)?;
     let media_bytes = XLSX_CELL_VALUES_MEDIA_ENTRY_COUNT
         .checked_mul(XLSX_CELL_VALUES_MEDIA_ENTRY_BYTES)
@@ -26579,7 +26736,7 @@ fn execution_context(
 }
 
 fn zip_logical_work(bytes: &[u8]) -> Result<(usize, u64), Box<dyn Error>> {
-    let archive = ArchiveReader::new(bytes)?;
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let names = archive.file_names().map(str::to_owned).collect::<Vec<_>>();
     let mut logical_bytes = 0u64;
     for name in &names {
@@ -27563,7 +27720,9 @@ fn verify_odt_resource_batch_raw_members(
     if identical.contains("content.xml") {
         return Err("ODT embedded-resource content.xml remained raw-identical".into());
     }
-    for path in ArchiveReader::new(source)?.file_names() {
+    for path in
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?.file_names()
+    {
         if !matches!(path, "content.xml" | "META-INF/manifest.xml") && !identical.contains(path) {
             return Err(format!(
                 "ODT embedded-resource publication changed untouched raw member '{path}'; identical={identical:?}"
@@ -27938,7 +28097,9 @@ fn verify_odp_text_box_batch_raw_members(
     if !require_manifest && identical.contains("META-INF/manifest.xml") {
         return Err("ODP scalar text-box staging unexpectedly raw-preserved the manifest".into());
     }
-    for path in ArchiveReader::new(source)?.file_names() {
+    for path in
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?.file_names()
+    {
         if path != "content.xml"
             && (require_manifest || path != "META-INF/manifest.xml")
             && !identical.contains(path)
@@ -35827,14 +35988,16 @@ fn verify_odt_mixed_projection(
 }
 
 fn verify_odt_mixed_raw_members(source: &[u8], published: &[u8]) -> Result<(), Box<dyn Error>> {
-    let source_members = ArchiveReader::new(source)?
-        .file_names()
-        .map(str::to_owned)
-        .collect::<BTreeSet<_>>();
-    let published_members = ArchiveReader::new(published)?
-        .file_names()
-        .map(str::to_owned)
-        .collect::<BTreeSet<_>>();
+    let source_members =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>();
+    let published_members =
+        ArchiveReader::new(published, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>();
     if source_members != published_members {
         return Err(format!(
             "ODT mixed publication changed package member inventory: source={source_members:?}, published={published_members:?}"
@@ -35857,7 +36020,7 @@ fn verify_odt_mixed_raw_members(source: &[u8], published: &[u8]) -> Result<(), B
 }
 
 fn signed_odt_mixed_snapshot(source: &[u8]) -> Result<litchi_odt::Package, Box<dyn Error>> {
-    let archive = ArchiveReader::new(source)?;
+    let archive = ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?;
     let mut writer =
         litchi_odt::core::PackageWriter::new(litchi_odt::core::StreamingArchiveLimits::default());
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
@@ -36188,7 +36351,10 @@ fn odf_content_cow_case(
 }
 
 fn odf_content_xml(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn Error>> {
-    Ok(ArchiveReader::new(bytes)?.read("content.xml")?)
+    Ok(
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?
+            .read("content.xml")?,
+    )
 }
 
 fn odf_content_cow_candidate(
@@ -36255,10 +36421,12 @@ fn verify_odf_content_cow_output(
 }
 
 fn odf_content_cow_member_inventory(bytes: &[u8]) -> Result<BTreeSet<String>, Box<dyn Error>> {
-    Ok(ArchiveReader::new(bytes)?
-        .file_names()
-        .map(str::to_owned)
-        .collect())
+    Ok(
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .map(str::to_owned)
+            .collect(),
+    )
 }
 
 fn odf_content_cow_member_orders(
@@ -36266,7 +36434,11 @@ fn odf_content_cow_member_orders(
 ) -> Result<(Vec<Vec<u8>>, Vec<Vec<u8>>), Box<dyn Error>> {
     let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let central = index
         .entries()
         .iter()
@@ -37737,7 +37909,12 @@ fn verify_ods_source_cell_output(
         if identical.contains("content.xml") {
             return Err("ODS source cell publication left content.xml raw-identical".into());
         }
-        for path in ArchiveReader::new(&corpus.archive)?.file_names() {
+        for path in ArchiveReader::new(
+            &corpus.archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )?
+        .file_names()
+        {
             if path != "content.xml" && !identical.contains(path) {
                 return Err(format!(
                     "ODS source cell publication changed untouched member '{path}'"
@@ -38171,8 +38348,10 @@ fn verify_ods_repeated_edit_media_identity(
     source: &[u8],
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let source_archive = ArchiveReader::new(source)?;
-    let output_archive = ArchiveReader::new(output)?;
+    let source_archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?;
+    let output_archive =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let mut picture_members = 0usize;
     for path in source_archive.file_names() {
         if !path.starts_with("Pictures/") {
@@ -39170,7 +39349,12 @@ fn run_odt_repeated_text(
     let canonical_text_sha256 = sha256_hex(expected_text.as_bytes());
     let content_xml_sha256 = sha256_hex(&content_xml);
     let (content_range, untouched_ranges, picture_ranges) = odt_repeated_text_ranges(corpus)?;
-    let archive_member_count = ArchiveReader::new(&corpus.archive)?.file_names().count();
+    let archive_member_count = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count();
     if archive_member_count != corpus.manifest.archive_member_count {
         return Err("ODT repeated-text archive member count differs from manifest".into());
     }
@@ -39654,7 +39838,12 @@ fn run_odt_source_backed_catalog(
         selected_index.map(|index| sha256_hex(semantic_odt_text(index, false).as_bytes()));
     let content_xml = odf_content_xml(&corpus.archive)?;
     let (content_range, untouched_ranges, picture_ranges) = odt_repeated_text_ranges(corpus)?;
-    let archive_member_count = ArchiveReader::new(&corpus.archive)?.file_names().count();
+    let archive_member_count = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count();
     if archive_member_count != corpus.manifest.archive_member_count || archive_member_count != 13 {
         return Err("ODT source catalog archive member count differs from the fixed corpus".into());
     }
@@ -40228,7 +40417,12 @@ fn run_odp_source_backed_catalog(
     {
         return Err("ODP source catalog source ranges differ from the fixed corpus".into());
     }
-    let archive_member_count = ArchiveReader::new(&corpus.archive)?.file_names().count();
+    let archive_member_count = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count();
     if archive_member_count != corpus.manifest.archive_member_count || archive_member_count != 13 {
         return Err("ODP source catalog archive member count differs from the fixed corpus".into());
     }
@@ -40736,7 +40930,12 @@ fn odp_repeated_text_digest(values: &[String]) -> String {
 }
 
 fn verify_odp_repeated_text_archive(corpus: &Corpus) -> Result<(), Box<dyn Error>> {
-    if ArchiveReader::new(&corpus.archive)?.file_names().count()
+    if ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?
+    .file_names()
+    .count()
         != corpus.manifest.archive_member_count
     {
         return Err("ODP repeated-text archive member topology differs from corpus".into());
@@ -41461,7 +41660,12 @@ fn run_ods_cell_sweep(
             {
                 return Err("ODS cell-sweep source archive changed during measurement".into());
             }
-            if ArchiveReader::new(&source_bytes)?.file_names().count()
+            if ArchiveReader::new(
+                &source_bytes,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count()
                 != corpus.manifest.archive_member_count
             {
                 return Err("ODS cell-sweep source member topology changed".into());
@@ -41670,7 +41874,12 @@ fn run_ods_cell_batch_sweep(
                     "ODS cell batch sweep source archive changed during measurement".into(),
                 );
             }
-            if ArchiveReader::new(&source_bytes)?.file_names().count()
+            if ArchiveReader::new(
+                &source_bytes,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )?
+            .file_names()
+            .count()
                 != corpus.manifest.archive_member_count
             {
                 return Err("ODS cell batch sweep source member topology changed".into());
@@ -42016,7 +42225,9 @@ fn verify_ods_source_identity_postconditions(
     {
         return Err("ODS unified root source file differs from deterministic archive".into());
     }
-    if ArchiveReader::new(&bytes)?.file_names().count()
+    if ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())?
+        .file_names()
+        .count()
         != expected.corpus.manifest.archive_member_count
     {
         return Err("ODS unified root archive member count differs from corpus".into());
@@ -45765,7 +45976,10 @@ fn run_zip_index(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let archive = ArchiveReader::new(&corpus.archive)?;
+        let archive = ArchiveReader::new(
+            &corpus.archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )?;
         let observed = archive.file_names().count();
         std::hint::black_box(observed);
         let duration = started.elapsed();
@@ -45887,7 +46101,10 @@ fn run_zip_read_one(
     warmup_iterations: usize,
     samples: usize,
 ) -> Result<CaseResult, Box<dyn Error>> {
-    let archive = ArchiveReader::new(&corpus.archive)?;
+    let archive = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
@@ -50071,8 +50288,12 @@ fn docx_section_layout_signed_archive(corpus: &Corpus) -> Result<Vec<u8>, Box<dy
     // This is an explicitly test-only signed fixture builder.  It rewrites the
     // raw ZIP rather than invoking PackageWriter, whose normal authoring path
     // must reject introducing signature infrastructure without a policy.
-    let archive = ArchiveReader::new(&corpus.archive)?;
-    let mut writer = StreamingArchiveWriter::new();
+    let archive = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let root_relationship = format!(
         r#"<Relationship Id="rIdSectionLayoutSignature" Type="{}" Target="_xmlsignatures/origin.sigs"/>"#,
         relationship_type::DIGITAL_SIGNATURE_ORIGIN
@@ -56457,8 +56678,10 @@ fn verify_xlsx_calc_chain_content_type_topology(
     source_chain: Option<&XlsxCalcChainIdentity>,
     candidate_chain: Option<&XlsxCalcChainIdentity>,
 ) -> Result<(), Box<dyn Error>> {
-    let source_archive = ArchiveReader::new(source)?;
-    let candidate_archive = ArchiveReader::new(output)?;
+    let source_archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?;
+    let candidate_archive =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let source_content_types = source_archive.read(XLSX_CONTENT_TYPES_MEMBER)?;
     let candidate_content_types = candidate_archive.read(XLSX_CONTENT_TYPES_MEMBER)?;
     let source_count = xlsx_calc_chain_content_type_override_count(source_content_types.as_ref())?;
@@ -56517,8 +56740,12 @@ fn verify_xlsx_cell_crud_workbook_calculation_closure(
     output: &[u8],
     require_invalidation: bool,
 ) -> Result<(), Box<dyn Error>> {
-    let source_archive = ArchiveReader::new(&corpus.archive)?;
-    let candidate_archive = ArchiveReader::new(output)?;
+    let source_archive = ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
+    let candidate_archive =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let source_workbook = source_archive.read(XLSX_WORKBOOK_MEMBER)?;
     let candidate_workbook = candidate_archive.read(XLSX_WORKBOOK_MEMBER)?;
     let (source_without_calc_pr, source_count) =
@@ -56568,8 +56795,10 @@ fn verify_xlsx_cell_crud_raw_calculation_chain_removal(
     output: &[u8],
     chain: &XlsxCalcChainIdentity,
 ) -> Result<(), Box<dyn Error>> {
-    let source_archive = ArchiveReader::new(source)?;
-    let candidate_archive = ArchiveReader::new(output)?;
+    let source_archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?;
+    let candidate_archive =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let source_relationships = source_archive.read(XLSX_WORKBOOK_RELATIONSHIPS_MEMBER)?;
     let candidate_relationships = candidate_archive.read(XLSX_WORKBOOK_RELATIONSHIPS_MEMBER)?;
     let (source_without_chain, source_relationship_count) = xlsx_xml_strip_direct_element(
@@ -56756,7 +56985,11 @@ fn insert_raw_zip_member(
 fn raw_zip_members(bytes: &[u8]) -> Result<BTreeMap<String, RawZipMember>, Box<dyn Error>> {
     let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut records = archive.entries(&mut buffer);
     let mut members = BTreeMap::new();
     for preserved in index.entries() {
@@ -60767,10 +61000,11 @@ fn write_streaming_rtf<W: Write>(
 }
 
 fn verify_streaming_xlsx(bytes: Vec<u8>, shape: SemanticShape) -> Result<(), Box<dyn Error>> {
-    let archive_member_names = ArchiveReader::new(&bytes)?
-        .file_names()
-        .map(str::to_owned)
-        .collect::<Vec<_>>();
+    let archive_member_names =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
     let expected_archive_members = [
         "[Content_Types].xml".to_owned(),
         "_rels/.rels".to_owned(),
@@ -60889,7 +61123,8 @@ fn build_streaming_corpus(
             _ => return Err("non-streaming case requested a streaming corpus".into()),
         };
     let target = if case == Case::XlsxStreamingCreate {
-        ArchiveReader::new(&artifact)?.read(&target_entry)?
+        ArchiveReader::new(&artifact, soapberry_zip::office::ArchiveLimits::default())?
+            .read(&target_entry)?
     } else {
         artifact.clone()
     };
@@ -65425,7 +65660,9 @@ mod tests {
     #[test]
     fn ods_buffered_oracle_rejects_mutated_content_and_extra_members() {
         let archive = super::ods_buffered_bytes(SemanticShape::Tiny).unwrap();
-        let reader = super::ArchiveReader::new(&archive).unwrap();
+        let reader =
+            super::ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())
+                .unwrap();
         let expected_semantic_sha256 =
             super::ods_scalar_expected_semantic_sha256(SemanticShape::Tiny);
         let content = reader.read("content.xml").unwrap();
@@ -65437,7 +65674,9 @@ mod tests {
         let mut mutated_content = content.clone();
         mutated_content[marker_start + marker.len() - 1] = b"X"[0];
 
-        let mut writer = super::StreamingArchiveWriter::new();
+        let mut writer = super::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         for name in reader.file_names() {
             if name == "content.xml" {
                 writer.write_stored(name, &mutated_content).unwrap();
@@ -65459,7 +65698,9 @@ mod tests {
             "mutated content failed for the wrong reason: {error}"
         );
 
-        let mut writer = super::StreamingArchiveWriter::new();
+        let mut writer = super::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         for name in reader.file_names() {
             let payload = reader.read(name).unwrap();
             writer.write_stored(name, &payload).unwrap();
@@ -65761,8 +66002,12 @@ mod tests {
             "unexpected E1 cell failed for the wrong reason: {error}"
         );
 
-        let archive = super::ArchiveReader::new(&artifact).unwrap();
-        let mut writer = super::StreamingArchiveWriter::new();
+        let archive =
+            super::ArchiveReader::new(&artifact, soapberry_zip::office::ArchiveLimits::default())
+                .unwrap();
+        let mut writer = super::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         for name in archive.file_names() {
             let payload = archive.read(name).unwrap();
             writer.write_stored(name, &payload).unwrap();

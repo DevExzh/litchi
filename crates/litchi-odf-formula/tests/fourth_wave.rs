@@ -192,7 +192,8 @@ fn deterministic_mutation_corpus_never_panics_or_changes_classification() {
 
 fn raw_formula_package(content: &str) -> Vec<u8> {
     const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.formula"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive
         .write_stored("mimetype", ODF_FORMULA.as_bytes())
         .expect("mimetype");

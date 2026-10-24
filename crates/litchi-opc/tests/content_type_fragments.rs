@@ -19,7 +19,8 @@ fn catalog(xml: &str) -> ContentTypeFragments {
         .unwrap()
 }
 fn package(xml: &str) -> OpcPackage {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_deflated("[Content_Types].xml", xml.as_bytes())
         .unwrap();
@@ -91,7 +92,7 @@ fn publication_inverse_preserves_destination_changes_and_exact_mapping_bytes() {
         .unwrap();
     let saved = PackageWriter::to_bytes(&reopened).unwrap();
     assert_eq!(
-        ArchiveReader::new(&saved)
+        ArchiveReader::new(&saved, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .read("[Content_Types].xml")
             .unwrap(),
@@ -439,7 +440,8 @@ fn stale_entries_context_keys_and_terminal_gaps_refuse_without_mutation() {
 #[test]
 fn empty_aliased_root_expands_without_canonicalizing_its_wrapper() {
     let original = format!("\u{feff}{} /><!--end-->", ROOT.trim_end_matches('>'));
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_deflated("[Content_Types].xml", original.as_bytes())
         .unwrap();

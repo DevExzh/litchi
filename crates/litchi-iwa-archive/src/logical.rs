@@ -257,7 +257,8 @@ mod tests {
         let logical = LogicalSourceCatalog::from_frozen_entries(entries, Default::default())
             .expect("valid logical snapshot");
 
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored("Index/CalculationEngine.iwa", &calculation)
             .expect("write calculation component");

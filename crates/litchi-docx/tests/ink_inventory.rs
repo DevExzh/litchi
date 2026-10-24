@@ -417,12 +417,14 @@ fn inactive_unknown_choice_is_not_an_annotation_or_semantic_error() {
 fn raw_archive(opc: &OpcPackage) -> Vec<u8> {
     use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
     let valid = PackageWriter::to_bytes(&source(false, false)).unwrap();
-    let archive = ArchiveReader::new(&valid).unwrap();
+    let archive =
+        ArchiveReader::new(&valid, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let payload = opc
         .get_part(&PackURI::new("/payload/handwriting.xml").unwrap())
         .unwrap()
         .blob();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         if name == "payload/handwriting.xml" {
             writer.write_stored(name, payload).unwrap();

@@ -70,7 +70,12 @@ pub fn raw_identical_members(source: &[u8], target: &[u8]) -> Option<BTreeSet<St
 fn raw_member_ranges(bytes: &[u8]) -> Option<BTreeMap<String, RawMemberRanges>> {
     let archive = ZipArchive::from_slice(bytes).ok()?.into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).ok()?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .ok()?;
     let mut records = archive.entries(&mut buffer);
     let mut members = BTreeMap::new();
     for preserved in index.entries() {
@@ -265,7 +270,12 @@ fn try_preserve_content_replacement(
         .ok()?
         .into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).ok()?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .ok()?;
     if !canonical_odf_mimetype(source.as_bytes(), &package, &index) {
         return None;
     }
@@ -870,7 +880,12 @@ mod tests {
             .unwrap()
             .into_zip_archive();
         let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-        let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+        let index = PreservationIndex::new(
+            &archive,
+            &mut buffer,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let local = index.entries().last().unwrap().local_span();
         assert!(validate_preserved_member_framing(&original, &index));
 

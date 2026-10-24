@@ -1925,7 +1925,9 @@ mod tests {
 </r:Relationships>"#;
 
     fn source(xml: &[u8]) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         for (name, bytes) in [
             ("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="bin" ContentType="application/octet-stream"/></Types>"#.as_slice()),
             ("_rels/.rels", xml),
@@ -2427,7 +2429,11 @@ mod tests {
                         .unwrap()
                 );
                 let output = PackageWriter::to_bytes(&package).unwrap();
-                let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+                let archive = soapberry_zip::office::ArchiveReader::new(
+                    &output,
+                    soapberry_zip::office::ArchiveLimits::default(),
+                )
+                .unwrap();
                 assert_eq!(
                     archive
                         .read(owner.rels_uri().unwrap().membername())
@@ -2455,7 +2461,11 @@ mod tests {
                         .unwrap()
                 );
                 let restored = PackageWriter::to_bytes(&reopened).unwrap();
-                let archive = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
+                let archive = soapberry_zip::office::ArchiveReader::new(
+                    &restored,
+                    soapberry_zip::office::ArchiveLimits::default(),
+                )
+                .unwrap();
                 assert_eq!(
                     archive
                         .read(owner.rels_uri().unwrap().membername())
@@ -2872,10 +2882,13 @@ mod tests {
         );
         let output = PackageWriter::to_bytes(&package).unwrap();
         assert_eq!(
-            soapberry_zip::office::ArchiveReader::new(&output)
-                .unwrap()
-                .read(owner.rels_uri().unwrap().membername())
-                .unwrap(),
+            soapberry_zip::office::ArchiveReader::new(
+                &output,
+                soapberry_zip::office::ArchiveLimits::default()
+            )
+            .unwrap()
+            .read(owner.rels_uri().unwrap().membername())
+            .unwrap(),
             empty.bytes()
         );
         package.add_part(Box::new(BlobPart::new(

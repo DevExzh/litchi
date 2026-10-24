@@ -513,12 +513,9 @@ fn assert_generated_offset_case(expected_offset: u64) {
     );
 
     let mut index_buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new_with_limits(
-        &source_archive,
-        &mut index_buffer,
-        ArchiveLimits::UNBOUNDED,
-    )
-    .unwrap();
+    let index =
+        PreservationIndex::new(&source_archive, &mut index_buffer, ArchiveLimits::UNBOUNDED)
+            .unwrap();
     assert_eq!(index.entries().len(), 1);
     assert_eq!(index.entries()[0].local_span(), 0..fixture.central_start);
     assert_eq!(
@@ -681,12 +678,9 @@ fn unsupported_generated_compression_refuses_before_sparse_output() {
     let fixture = sparse_zip_fixture(u64::from(u32::MAX) + 1);
     let source_archive = open_sparse_archive(fixture.source.clone(), fixture.source_length);
     let mut index_buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new_with_limits(
-        &source_archive,
-        &mut index_buffer,
-        ArchiveLimits::UNBOUNDED,
-    )
-    .unwrap();
+    let index =
+        PreservationIndex::new(&source_archive, &mut index_buffer, ArchiveLimits::UNBOUNDED)
+            .unwrap();
 
     let mut plan = PreservationPlan::copy_all(&index);
     plan.try_append(

@@ -26,7 +26,8 @@ fn pack(uri: &str) -> PackURI {
 }
 
 fn mixed_archive() -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored(STORED_MEMBER, STORED_PAYLOAD)
         .expect("stored fixture must be writable");

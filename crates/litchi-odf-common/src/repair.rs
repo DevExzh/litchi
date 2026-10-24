@@ -1730,7 +1730,7 @@ fn inspect_layout(source: &[u8], limits: OdfRepairLimits) -> Result<Layout, Repa
             resource: "repair preservation index buffer",
         })?;
     index_buffer.resize(soapberry_zip::RECOMMENDED_BUFFER_SIZE, 0);
-    let index = PreservationIndex::new(&archive, &mut index_buffer)?;
+    let index = PreservationIndex::new(&archive, &mut index_buffer, ArchiveLimits::default())?;
     let entries = index.entries();
     if entries.len() != central_preflight.record_count {
         return Err(RepairError::Unsupported {
@@ -2126,7 +2126,7 @@ fn scan_package_xml(
     limits: OdfRepairLimits,
     metadata_base: u64,
 ) -> Result<(), RepairError> {
-    let archive = ArchiveReader::new_with_limits(source, archive_limits(limits))?;
+    let archive = ArchiveReader::new(source, archive_limits(limits))?;
     for name in archive.file_names() {
         if name != MANIFEST_PATH && is_xml_family_name(name) {
             scan_archive_xml_member(&archive, name, limits)?;
@@ -2984,7 +2984,7 @@ fn verify_source_member_digests(
     expected_members: usize,
     limits: OdfRepairLimits,
 ) -> Result<(), RepairError> {
-    let archive = ArchiveReader::new_with_limits(source, archive_limits(limits))?;
+    let archive = ArchiveReader::new(source, archive_limits(limits))?;
     let mut member_count = 0_usize;
     for name in archive.file_names() {
         member_count = member_count.saturating_add(1);
@@ -3133,8 +3133,8 @@ fn verify_member_digests(
     limits: OdfRepairLimits,
 ) -> Result<(), RepairError> {
     let archive_limits = archive_limits(limits);
-    let source_archive = ArchiveReader::new_with_limits(source, archive_limits)?;
-    let candidate_archive = ArchiveReader::new_with_limits(candidate, archive_limits)?;
+    let source_archive = ArchiveReader::new(source, archive_limits)?;
+    let candidate_archive = ArchiveReader::new(candidate, archive_limits)?;
     let mut source_names = Vec::new();
     for name in source_archive.file_names() {
         if source_names.len() >= limits.max_members {

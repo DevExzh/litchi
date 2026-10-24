@@ -70,7 +70,9 @@ fn opened_package_with_explicit_empty_chain_relationships(bytes: Vec<u8>) -> Pac
         .expect("root relationships");
     let chain = PackURI::new("/xl/calcChain.bin").expect("chain URI");
 
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("[Content_Types].xml", content_types.bytes())
         .expect("content types member");

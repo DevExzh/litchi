@@ -21,9 +21,10 @@ const BASE: &[u8] = include_bytes!("../../../test-data/ooxml/xlsx/DateFormatTest
 
 /// Rebuild [`BASE`] with each named member passed through its rewrite.
 fn patched(edits: &[(&str, &dyn Fn(&str) -> String)]) -> Vec<u8> {
-    let reader = ArchiveReader::new(BASE).unwrap();
+    let reader = ArchiveReader::new(BASE, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let names: Vec<String> = reader.file_names().map(str::to_owned).collect();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in names {
         let bytes = reader.read(&name).unwrap();
         let bytes = match edits.iter().find(|(member, _)| *member == name) {
@@ -609,7 +610,7 @@ fn theme_color_scheme_deviations_are_repaired_and_recorded() {
     use litchi_xlsx::ThemeDefect;
     use litchi_xlsx::style::theme::{Theme, ThemeColorSlot};
 
-    let reader = ArchiveReader::new(BASE).unwrap();
+    let reader = ArchiveReader::new(BASE, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let xml = String::from_utf8(reader.read("xl/theme/theme1.xml").unwrap()).unwrap();
     assert!(Theme::parse(&xml).unwrap().tolerance_report().is_clean());
 

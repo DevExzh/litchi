@@ -94,7 +94,8 @@ fn oversized_text_package() -> Vec<u8> {
     let manifest = format!(
         r#"<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{MIME}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#
     );
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     archive
         .write_deflated("content.xml", content.as_bytes())
@@ -660,7 +661,8 @@ fn source_facade_rejects_unsafe_member_paths() {
 fn replace_member(bytes: &[u8], target: &str, replacement: &[u8]) -> Vec<u8> {
     let package = OwnedPackage::from_bytes(bytes.to_vec()).unwrap();
     let names = package.files().unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in names {
         let data = if name == target {
             replacement.to_vec()

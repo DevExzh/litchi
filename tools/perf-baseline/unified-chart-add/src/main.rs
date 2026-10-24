@@ -325,7 +325,10 @@ fn case_dotted(format: FileFormat, count: usize, rounds: usize) -> Result<Value>
 
 /// Every archive member, decoded, by name.
 fn members(bytes: &[u8]) -> Result<std::collections::BTreeMap<String, Vec<u8>>> {
-    let archive = soapberry_zip::office::ArchiveReader::new(bytes)?;
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut members = std::collections::BTreeMap::new();
     for name in archive.file_names() {
         members.insert(name.to_owned(), archive.read(name)?);

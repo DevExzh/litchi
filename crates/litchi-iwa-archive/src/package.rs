@@ -3216,7 +3216,10 @@ where
     let checked_limits = limits.validate()?;
     validate_output(entries.clone(), checked_limits)?;
 
-    let mut writer = StreamingArchiveWriter::with_writer(sink);
+    let mut writer = StreamingArchiveWriter::with_writer(
+        sink,
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for (name, data) in entries {
         writer.write_stored(name, data)?;
     }
@@ -5514,7 +5517,8 @@ mod tests {
     }
 
     fn zip(entries: &[(&str, &[u8])]) -> Result<Vec<u8>> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for (name, data) in entries {
             writer.write_stored(name, data)?;
         }
@@ -5835,7 +5839,8 @@ mod tests {
     fn nested_deflate_storage_keeps_the_reader_sentinel_and_arc_owner() -> Result<()> {
         let index = zip(&[("Index/Document.iwa", b"nested component")])?;
         let stored_source = zip(&[("legacy.pages/Index.zip", index.as_slice())])?;
-        let mut deflated_writer = StreamingArchiveWriter::new();
+        let mut deflated_writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         deflated_writer.write_deflated("legacy.pages/Index.zip", &index)?;
         let deflated_source = deflated_writer.finish_to_bytes()?;
 
@@ -6508,7 +6513,8 @@ mod tests {
     #[test]
     fn semantic_detection_does_not_gather_high_count_non_root_names() -> Result<()> {
         let document = semantic_iwa(1)?;
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Document.iwa", &document)?;
         for index in 0..1_024 {
             writer.write_stored(&format!("Index/Foreign-{index}.iwa"), b"corrupt")?;
@@ -6887,7 +6893,8 @@ mod tests {
     fn rejects_declared_nested_index_size_before_decompression() -> Result<()> {
         let repeated = vec![0u8; 64 * 1024];
         let index = zip(&[("Index/Document.iwa", repeated.as_slice())])?;
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_deflated("legacy.pages/Index.zip", &index)?;
         let bytes = writer.finish_to_bytes()?;
         assert!(bytes.len() < index.len());
@@ -6985,7 +6992,8 @@ mod tests {
 
     #[test]
     fn reassembles_deflate_edit_and_round_trips_metadata() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_deflated("Compressed/data", b"old deflate payload")?;
         writer.write_stored("Untouched/data", b"keep")?;
         let bytes = writer.finish_to_bytes()?;
@@ -7033,7 +7041,8 @@ mod tests {
     #[test]
     fn deflate_patch_preserves_untouched_count_and_central_record()
     -> std::result::Result<(), Box<dyn std::error::Error>> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_deflated("Compressed/data", b"old deflate payload")?;
         writer.write_stored("Untouched/data", b"untouched payload")?;
         let source = writer.finish_to_bytes()?;
@@ -7457,7 +7466,8 @@ mod tests {
 
     #[test]
     fn identical_nonempty_edits_use_the_exact_source_for_store_and_deflate() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Stored/data", b"stored payload")?;
         writer.write_deflated("Deflated/data", b"deflated payload repeated")?;
         let bytes = writer.finish_to_bytes()?;
@@ -7683,7 +7693,8 @@ mod tests {
 
     #[test]
     fn insertion_supports_a_deflated_source_and_keeps_existing_compression() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_deflated("Compressed/data", b"old deflate payload")?;
         writer.write_stored("Untouched/data", b"old stored payload")?;
         let source = writer.finish_to_bytes()?;

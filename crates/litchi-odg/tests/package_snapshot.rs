@@ -49,7 +49,8 @@ const REAL_DRAW_CORPUS: &[(&str, &[u8])] = &[
 fn real_drawing_resource_xml_remains_exact_and_opaque() {
     const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.graphics";
     const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.graphics"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="styles.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("mimetype", MIMETYPE).unwrap();
     writer
         .write_deflated("content.xml", CONTENT.as_bytes())

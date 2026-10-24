@@ -130,7 +130,8 @@ fn source_archive(photo_mode: Mode, signed: bool) -> Vec<u8> {
 }
 
 fn streaming_archive(members: &[(&str, &[u8], Mode)]) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for (name, bytes, mode) in members {
         match mode {
             Mode::Stored => writer.write_stored(name, bytes),
@@ -793,7 +794,7 @@ fn the_transfer_capture_never_captures_a_disagreeing_descriptor() {
     let capture = |archive: Vec<u8>| {
         let length = archive.len() as u64;
         let limits = SourceLimits::default();
-        let index = soapberry_zip::office::IndexedArchive::from_reader_with_limits(
+        let index = soapberry_zip::office::IndexedArchive::from_reader(
             std::sync::Arc::new(archive),
             length,
             limits.zip_limits(),

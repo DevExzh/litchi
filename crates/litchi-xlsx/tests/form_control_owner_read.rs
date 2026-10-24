@@ -221,9 +221,11 @@ fn known_token<T: std::fmt::Display>(value: Option<&KnownOrUnknown<T>>) -> Optio
 }
 
 fn rewrite_member(source: &[u8], member: &str, edit: impl FnOnce(String) -> String) -> Vec<u8> {
-    let archive = ArchiveReader::new(source).unwrap();
+    let archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let updated = edit(String::from_utf8(archive.read(member).unwrap()).unwrap()).into_bytes();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let bytes = if name == member {
             updated.clone()
@@ -236,8 +238,10 @@ fn rewrite_member(source: &[u8], member: &str, edit: impl FnOnce(String) -> Stri
 }
 
 fn add_member(source: &[u8], member: &str, bytes: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(source).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         writer
             .write_deflated(name, &archive.read(name).unwrap())
@@ -307,8 +311,10 @@ fn with_ctrlprop_edge_targeting_activex_descriptor(source: &[u8]) -> Vec<u8> {
 }
 
 fn rewrite_members(source: &[u8], edits: &[(&str, &dyn Fn(String) -> String)]) -> Vec<u8> {
-    let archive = ArchiveReader::new(source).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let mut value = String::from_utf8(archive.read(name).unwrap())
             .unwrap_or_else(|_| panic!("member {name} is not text; omit it from rewrite_members"));
@@ -558,7 +564,8 @@ fn native_corpus_inventory_shape_closure_and_source_bytes() {
             json_string(manifest, "sha256"),
             "retained fixture SHA-256 drifted for {file}"
         );
-        let archive = ArchiveReader::new(&source).unwrap();
+        let archive =
+            ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         let eager = litchi_xlsx::Package::from_bytes(&source)
             .unwrap()
             .workbook_ref()
@@ -820,8 +827,10 @@ fn entity_escaped_namespace_uris_preserve_semantics_and_source_bytes() {
         ],
     );
 
-    let source_archive = ArchiveReader::new(&source).unwrap();
-    let escaped_archive = ArchiveReader::new(&escaped).unwrap();
+    let source_archive =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let escaped_archive =
+        ArchiveReader::new(&escaped, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     for member in [
         "xl/worksheets/sheet1.xml",
         "xl/worksheets/_rels/sheet1.xml.rels",
@@ -1947,19 +1956,19 @@ fn properties_relationship_member_presence_is_read_and_malformed_member_refused(
     let drawing_relationship_member = "xl/drawings/_rels/drawing1.xml.rels";
     let vml_relationship_member = "xl/drawings/_rels/vmlDrawing1.vml.rels";
     assert!(
-        !ArchiveReader::new(&source)
+        !ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .file_names()
             .any(|name| name == relationship_member)
     );
     assert!(
-        !ArchiveReader::new(&source)
+        !ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .file_names()
             .any(|name| name == drawing_relationship_member)
     );
     assert!(
-        !ArchiveReader::new(&source)
+        !ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .file_names()
             .any(|name| name == vml_relationship_member)
@@ -2062,10 +2071,11 @@ fn sidecar_relationships_retain_exact_target_data_and_fingerprint() {
     let source = add_member(&source, property_member, property_relationships);
     let source = add_member(&source, drawing_member, drawing_relationships);
     let source = add_member(&source, vml_member, vml_relationships);
-    let properties_xml = ArchiveReader::new(&source)
-        .unwrap()
-        .read("xl/ctrlProps/ctrlProp1.xml")
-        .unwrap();
+    let properties_xml =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default())
+            .unwrap()
+            .read("xl/ctrlProps/ctrlProp1.xml")
+            .unwrap();
 
     let source_controls = source_collection(&source);
     let source_read_set = source_controls.read_set().unwrap();
@@ -2411,7 +2421,8 @@ fn mirror_diagnostic_projection_budget_counts_every_detail() {
 #[test]
 fn source_read_set_retains_exact_owner_relationship_and_mce_provenance() {
     let source = fixture_bytes("checkbox-form-control.xlsx");
-    let archive = ArchiveReader::new(&source).unwrap();
+    let archive =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let worksheet_xml = archive.read("xl/worksheets/sheet1.xml").unwrap();
     let worksheet_rels = archive.read("xl/worksheets/_rels/sheet1.xml.rels").unwrap();
     let drawing_xml = archive.read("xl/drawings/drawing1.xml").unwrap();
@@ -2815,7 +2826,8 @@ fn source_reads_are_read_only_and_repeated_semantic_selection_is_stable() {
         .unwrap();
     assert_eq!(first, second);
     assert_eq!(first.properties().fmla_link().unwrap().as_str(), "#REF!");
-    let archive = ArchiveReader::new(&source).unwrap();
+    let archive =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let raw = archive.read("xl/ctrlProps/ctrlProp1.xml").unwrap();
     assert_eq!(first.properties().source_bytes(), Some(raw.as_slice()));
 }

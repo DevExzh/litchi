@@ -485,7 +485,8 @@ fn signed_encrypted_and_malformed_sources_fail_closed() {
     assert!(signed_edit.commit().is_err());
 
     const ENCRYPTED_MANIFEST: &[u8] = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.presentation"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/><m:file-entry m:full-path="secret.bin" m:media-type="application/octet-stream" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="SHA1" m:key-size="20"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#;
-    let mut encrypted = StreamingArchiveWriter::new();
+    let mut encrypted =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     encrypted.write_stored("mimetype", MIME.as_bytes()).unwrap();
     encrypted
         .write_deflated(

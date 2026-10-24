@@ -2565,7 +2565,8 @@ mod tests {
     }
 
     fn source_backed_xlsx() -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -2614,7 +2615,8 @@ mod tests {
     }
 
     fn empty_source_backed_xlsx() -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -3328,7 +3330,9 @@ mod tests {
             "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 
         fn one_sheet_xlsx(worksheet: &str) -> Vec<u8> {
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(
+                soapberry_zip::office::StreamingArchiveLimits::default(),
+            );
             writer
                 .write_stored(
                     "[Content_Types].xml",
@@ -3628,7 +3632,9 @@ mod tests {
                 )
             });
 
-            let mut writer = StreamingArchiveWriter::new();
+            let mut writer = StreamingArchiveWriter::new(
+                soapberry_zip::office::StreamingArchiveLimits::default(),
+            );
             writer
                 .write_stored(
                     "[Content_Types].xml",

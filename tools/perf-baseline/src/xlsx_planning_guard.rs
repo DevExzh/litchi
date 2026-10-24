@@ -266,7 +266,8 @@ fn archive_for(shape: Shape, worksheet: &[u8]) -> AnyResult<Vec<u8>> {
         r#"<Relationships xmlns="{OPC_REL}"><Relationship Id="rIdSheet" Type="{REL}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("[Content_Types].xml", content_types.as_bytes())?;
     writer.write_stored("_rels/.rels", root_rels.as_bytes())?;
     writer.write_stored("xl/workbook.xml", workbook.as_bytes())?;
@@ -431,13 +432,7 @@ fn run_iteration(
                 // first-use snapshot only after the measured planning region
                 // has closed, so late validator/raw refusals are observed
                 // without charging source resolution to `edit_sheets`.
-                expected_planning_failure(
-                    &editor,
-                    selectors,
-                    Ok(transaction),
-                    case,
-                    expected,
-                )?
+                expected_planning_failure(&editor, selectors, Ok(transaction), case, expected)?
             } else {
                 validate_valid_transaction(transaction)?;
                 if sha256(&fixture.archive) != fixture.source_sha256 {

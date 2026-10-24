@@ -631,7 +631,7 @@ fn limits_record(limits: Limits) -> LimitsRecord {
 
 fn member_identities(bytes: &[u8]) -> BenchResult<Vec<MemberIdentity>> {
     let archive = ZipArchive::from_slice(bytes)?;
-    let reader = ArchiveReader::new(bytes)?;
+    let reader = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let mut records = Vec::new();
     for result in archive.entries() {
         let entry = result?;
@@ -813,8 +813,14 @@ fn build_corpus(count: usize) -> BenchResult<Corpus> {
     let candidate_main = find_member(&candidate_members, MAIN_PATH)?;
     let source_opaque = find_member(&source_members, OPAQUE_PATH)?;
     let candidate_opaque = find_member(&candidate_members, OPAQUE_PATH)?;
-    let source_archive_reader = ArchiveReader::new(&source_archive_vec)?;
-    let candidate_archive_reader = ArchiveReader::new(&candidate_archive_vec)?;
+    let source_archive_reader = ArchiveReader::new(
+        &source_archive_vec,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
+    let candidate_archive_reader = ArchiveReader::new(
+        &candidate_archive_vec,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let source_main_xml_archive = source_archive_reader.read(MAIN_PATH)?;
     let candidate_main_xml_archive = candidate_archive_reader.read(MAIN_PATH)?;
     let source_main_xml_archive_verified = source_main_xml_archive == source_main_xml;

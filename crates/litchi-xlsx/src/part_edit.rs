@@ -1106,7 +1106,8 @@ mod tests {
     const ROOT_RELS_B: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Target="xl/workbook.xml" TargetMode="Internal" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Id="rId1"/></Relationships>"#;
 
     fn package(content_types: &[u8], root_relationships: &[u8]) -> OpcPackage {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored("[Content_Types].xml", content_types)
             .unwrap();

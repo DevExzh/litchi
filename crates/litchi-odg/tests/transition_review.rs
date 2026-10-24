@@ -136,7 +136,8 @@ fn mixed_replacement_page_name(
 fn signed_package(content: &str) -> Vec<u8> {
     const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.graphics";
     let manifest = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.graphics"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/><manifest:file-entry manifest:full-path="META-INF/documentsignatures.xml" manifest:media-type="application/vnd.oasis.opendocument.package"/></manifest:manifest>"#;
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIMETYPE).unwrap();
     archive
         .write_deflated("content.xml", content.as_bytes())

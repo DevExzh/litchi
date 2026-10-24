@@ -14403,7 +14403,7 @@ impl SourceBackedPackage {
         let mut scratch = [0_u8; PRESERVATION_INDEX_STACK_BYTES];
         let index = match self
             .archive
-            .preservation_index_with_limits(&mut scratch, self.limits.zip_limits())
+            .preservation_index(&mut scratch, self.limits.zip_limits())
         {
             Ok(index) => index,
             Err(error) => {
@@ -17807,7 +17807,9 @@ mod tests {
     }
 
     fn archive_bytes(root_relationships: &[u8], document: &[u8], include_junk: bool) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -17832,7 +17834,9 @@ mod tests {
         const CONTENT_TYPES: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="bin" ContentType="application/vnd.ms-excel.sheet.binary.macroEnabled.main"/><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#;
 
         let package_relationships = Relationships::new(PACKAGE_URI.to_owned()).to_xml();
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored("[Content_Types].xml", CONTENT_TYPES)
             .expect("write boundary content types");
@@ -17910,7 +17914,9 @@ mod tests {
     }
 
     fn mixed_compression_archive() -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -18129,7 +18135,11 @@ mod tests {
         let mut output = Vec::new();
         package.write_topology_to_stream(&mut output, plan).unwrap();
 
-        let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &output,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let content_types = archive.read("[Content_Types].xml").unwrap();
         let source_content_types = archive_bytes(root_relationships(), b"<before/>", false);
         assert!(content_types
@@ -18487,10 +18497,13 @@ mod tests {
 
         assert_eq!(shared_output, owned_output);
         assert_eq!(
-            soapberry_zip::office::ArchiveReader::new(&shared_output)
-                .unwrap()
-                .read(partname.membername())
-                .unwrap(),
+            soapberry_zip::office::ArchiveReader::new(
+                &shared_output,
+                soapberry_zip::office::ArchiveLimits::default()
+            )
+            .unwrap()
+            .read(partname.membername())
+            .unwrap(),
             b"<after/>"
         );
     }
@@ -18548,10 +18561,13 @@ mod tests {
         .write_topology_to_stream(&mut output, plan)
         .unwrap();
         assert_eq!(
-            soapberry_zip::office::ArchiveReader::new(&output)
-                .unwrap()
-                .read(partname.membername())
-                .unwrap(),
+            soapberry_zip::office::ArchiveReader::new(
+                &output,
+                soapberry_zip::office::ArchiveLimits::default()
+            )
+            .unwrap()
+            .read(partname.membername())
+            .unwrap(),
             replacement.as_bytes()
         );
     }
@@ -18758,10 +18774,13 @@ mod tests {
         let mut output = Vec::new();
         package.write_topology_to_stream(&mut output, plan).unwrap();
         assert_eq!(
-            soapberry_zip::office::ArchiveReader::new(&output)
-                .unwrap()
-                .read(partname.membername())
-                .unwrap(),
+            soapberry_zip::office::ArchiveReader::new(
+                &output,
+                soapberry_zip::office::ArchiveLimits::default()
+            )
+            .unwrap()
+            .read(partname.membername())
+            .unwrap(),
             b"<after/>"
         );
     }
@@ -18797,10 +18816,13 @@ mod tests {
         .write_topology_to_stream(&mut output, plan)
         .unwrap();
         assert_eq!(
-            soapberry_zip::office::ArchiveReader::new(&output)
-                .unwrap()
-                .read(partname.membername())
-                .unwrap(),
+            soapberry_zip::office::ArchiveReader::new(
+                &output,
+                soapberry_zip::office::ArchiveLimits::default()
+            )
+            .unwrap()
+            .read(partname.membername())
+            .unwrap(),
             b"<replacement/>"
         );
     }
@@ -18968,7 +18990,11 @@ mod tests {
             );
         }
 
-        let archive_reader = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        let archive_reader = soapberry_zip::office::ArchiveReader::new(
+            &output,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             archive_reader.read(added.membername()).unwrap(),
             b"new payload"
@@ -19025,10 +19051,13 @@ mod tests {
             .count();
         assert_eq!(payload_reads, 1);
         assert_eq!(
-            soapberry_zip::office::ArchiveReader::new(&output)
-                .unwrap()
-                .read("word/document.xml")
-                .unwrap(),
+            soapberry_zip::office::ArchiveReader::new(
+                &output,
+                soapberry_zip::office::ArchiveLimits::default()
+            )
+            .unwrap()
+            .read("word/document.xml")
+            .unwrap(),
             b"<after/>"
         );
     }
@@ -19288,7 +19317,9 @@ mod tests {
     #[test]
     fn topology_adds_package_relationship_to_new_part() {
         let root = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -19353,7 +19384,9 @@ mod tests {
         document: &[u8],
         junk_bytes: usize,
     ) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -19376,7 +19409,9 @@ mod tests {
         let root_relationships = format!(
             r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{root_target}"/></Relationships>"#
         );
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -19407,7 +19442,9 @@ mod tests {
             r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{}"/></Relationships>"#,
             parts[0].0
         );
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -19429,7 +19466,9 @@ mod tests {
         let root_relationships = format!(
             r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="{first_name}"/></Relationships>"#
         );
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -19447,7 +19486,9 @@ mod tests {
     }
 
     fn archive_with_document_relationships(document_relationships: &[u8]) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -19475,7 +19516,9 @@ mod tests {
     }
 
     fn topology_relationship_archive(document_relationships: &[u8]) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -19701,7 +19744,11 @@ mod tests {
         expected_relationships.extend_from_slice(generated);
         expected_relationships.extend_from_slice(&relationships[close_start..]);
 
-        let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &output,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             archive.read("word/_rels/document.xml.rels").unwrap(),
             expected_relationships
@@ -19772,7 +19819,11 @@ mod tests {
         expected_relationships.extend_from_slice(generated);
         expected_relationships.extend_from_slice(&relationships[close_start..]);
 
-        let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &output,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             archive.read("word/_rels/document.xml.rels").unwrap(),
             expected_relationships
@@ -19842,7 +19893,11 @@ mod tests {
         expected_relationships.extend_from_slice(generated);
         expected_relationships.extend_from_slice(&compacted[insertion..]);
 
-        let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &output,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             archive.read("word/_rels/document.xml.rels").unwrap(),
             expected_relationships
@@ -20004,7 +20059,11 @@ mod tests {
         expected_relationships.extend_from_slice(&relationships[..removed_start]);
         expected_relationships.extend_from_slice(&relationships[removed_end..]);
 
-        let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &output,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             archive.read("word/_rels/document.xml.rels").unwrap(),
             expected_relationships
@@ -20080,7 +20139,11 @@ mod tests {
         expected_relationships.extend_from_slice(&relationships[..removed_start]);
         expected_relationships.extend_from_slice(&relationships[removed_end..]);
 
-        let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &output,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             archive.read("word/_rels/document.xml.rels").unwrap(),
             expected_relationships
@@ -20145,7 +20208,11 @@ mod tests {
             .write_topology_to_stream(&mut inverse_output, add)
             .unwrap();
 
-        let archive = soapberry_zip::office::ArchiveReader::new(&inverse_output).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &inverse_output,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let inverse_relationships = archive.read("word/_rels/document.xml.rels").unwrap();
         assert!(
             inverse_relationships
@@ -21154,7 +21221,9 @@ mod tests {
     ) -> (Vec<u8>, Vec<String>, Vec<String>) {
         let (first_ids, first_rels) = relationship_batch("first", first);
         let (second_ids, second_rels) = relationship_batch("second", second);
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -21256,7 +21325,9 @@ mod tests {
     }
 
     fn signed_archive(document: &[u8]) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -21284,7 +21355,12 @@ mod tests {
             .unwrap()
             .into_zip_archive();
         let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-        let index = soapberry_zip::PreservationIndex::new(&archive, &mut scratch).unwrap();
+        let index = soapberry_zip::PreservationIndex::new(
+            &archive,
+            &mut scratch,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         index
             .entries()
             .iter()
@@ -22457,7 +22533,9 @@ mod tests {
     /// A package whose ordinary Parts are deflated, so a publication that
     /// replaces them regenerates deflate members rather than stored ones.
     fn deflated_package_bytes(parts: usize, bytes: usize) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -28087,7 +28165,9 @@ mod callback_scoped_verified_reader_tests {
     const PAYLOAD: &[u8] = b"callback-scoped verified payload";
 
     fn archive_bytes(payload: &[u8]) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",

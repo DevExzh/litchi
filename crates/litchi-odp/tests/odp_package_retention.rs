@@ -147,7 +147,8 @@ fn signed_and_encrypted_sources_retain_read_reopen_but_refuse_mutation() {
     assert!(signed_edit.commit().is_err());
 
     const MANIFEST: &[u8] = br#"<m:manifest xmlns:m="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><m:file-entry m:full-path="/" m:media-type="application/vnd.oasis.opendocument.presentation"/><m:file-entry m:full-path="content.xml" m:media-type="text/xml"/><m:file-entry m:full-path="secret.bin" m:media-type="application/octet-stream" m:size="1"><m:encryption-data><m:algorithm m:algorithm-name="http://www.w3.org/2009/xmlenc11#aes256-gcm" m:initialisation-vector="AAAAAAAAAAAAAAAA"/><m:start-key-generation m:start-key-generation-name="SHA1" m:key-size="20"/><m:key-derivation m:key-derivation-name="PBKDF2" m:salt="AQ==" m:iteration-count="1000" m:key-size="32"/></m:encryption-data></m:file-entry></m:manifest>"#;
-    let mut encrypted_writer = StreamingArchiveWriter::new();
+    let mut encrypted_writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     encrypted_writer
         .write_stored("mimetype", MIME.as_bytes())
         .unwrap();
@@ -181,7 +182,8 @@ fn signed_and_encrypted_sources_retain_read_reopen_but_refuse_mutation() {
 
 #[test]
 fn noncompact_fallback_keeps_exact_noop_and_retained_index() {
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", MIME.as_bytes()).unwrap();
     archive
         .write_deflated(

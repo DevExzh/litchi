@@ -264,7 +264,8 @@ mod tests {
     const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 
     fn workbook_bytes(styles: Option<&str>) -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         let styles_override = styles.map_or(String::new(), |_| {
             format!(
                 r#"<Override PartName="/xl/styles.xml" ContentType="{}"/>"#,

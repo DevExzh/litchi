@@ -620,7 +620,8 @@ mod tests {
     }
 
     fn zip(entries: &[(&str, &[u8])]) -> Result<Vec<u8>> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for &(name, data) in entries {
             writer.write_stored(name, data)?;
         }

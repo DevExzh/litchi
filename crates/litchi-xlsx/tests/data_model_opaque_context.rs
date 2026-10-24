@@ -157,10 +157,16 @@ fn source_with_context(source: &[u8], base: &str) -> Vec<u8> {
 }
 
 fn replace_workbook(source: &[u8], replace: impl FnOnce(String) -> String) -> Vec<u8> {
-    let archive = soapberry_zip::office::ArchiveReader::new(source).unwrap();
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        source,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let workbook =
         replace(String::from_utf8(archive.read("xl/workbook.xml").unwrap()).unwrap()).into_bytes();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for name in archive.file_names() {
         let bytes = if name == "xl/workbook.xml" {
             workbook.clone()

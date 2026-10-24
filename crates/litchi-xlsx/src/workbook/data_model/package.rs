@@ -1623,7 +1623,9 @@ mod tests {
     // A synthetic producer ZIP, deliberately bypassing the authored compact
     // writer so that tests exercise genuine ingress provenance for spaced XML.
     fn as_source(package: &OpcPackage) -> OpcPackage {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         let mut parts = package
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))

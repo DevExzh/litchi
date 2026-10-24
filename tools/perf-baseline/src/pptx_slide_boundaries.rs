@@ -167,8 +167,9 @@ fn rewrite_member<F>(
 where
     F: FnOnce(&[u8]) -> Result<Vec<u8>, Box<dyn StdError>>,
 {
-    let archive = ArchiveReader::new(bytes)?;
-    let mut writer = StreamingArchiveWriter::new();
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut rewrite = Some(rewrite);
     for name in archive.file_names() {
         let member = archive.read(name)?;
@@ -185,8 +186,9 @@ where
 }
 
 fn add_unknown_member(bytes: &[u8]) -> Result<Vec<u8>, Box<dyn StdError>> {
-    let archive = ArchiveReader::new(bytes)?;
-    let mut writer = StreamingArchiveWriter::new();
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         writer.write_stored(name, &archive.read(name)?)?;
     }
@@ -255,7 +257,12 @@ fn expected_manifest(archive: &[u8]) -> Result<CorpusManifest, Box<dyn StdError>
         payload_kind: "dependency-free-plain-slide-text",
         compression: "deflate",
         entry_count: opc.part_count(),
-        archive_member_count: ArchiveReader::new(archive)?.file_names().count(),
+        archive_member_count: ArchiveReader::new(
+            archive,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )?
+        .file_names()
+        .count(),
         entry_bytes,
         uncompressed_payload_bytes,
         archive_bytes: archive.len(),

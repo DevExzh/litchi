@@ -2449,8 +2449,13 @@ mod row_reuse_tests {
         // the raw fixture writer so source parsing also covers indentation.
         let placeholder = format!(r#"<worksheet xmlns="{SML}"><sheetData/></worksheet>"#);
         let base = PackageWriter::to_bytes(&fixture_package(&placeholder)).unwrap();
-        let archive = ArchiveReader::new(base.as_slice()).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
+        let archive = ArchiveReader::new(
+            base.as_slice(),
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for name in archive.file_names() {
             let bytes = if name == "xl/worksheets/sheet1.xml" {
                 worksheet.as_bytes().to_vec()

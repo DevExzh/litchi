@@ -224,7 +224,8 @@ fn explicit_spool_preserves_exact_bytes_for_borrowed_descriptors_and_attributes(
     let baseline = baseline_archive(populate_borrowed_concrete).expect("baseline archive");
     let spooled = spooled_archive(populate_borrowed_concrete).expect("spooled archive");
     assert_eq!(spooled, baseline);
-    let reader = ArchiveReader::new(&spooled).expect("office reader");
+    let reader = ArchiveReader::new(&spooled, soapberry_zip::office::ArchiveLimits::default())
+        .expect("office reader");
     assert_eq!(
         reader.file_names().collect::<Vec<_>>(),
         ["borrowed-store.bin", "borrowed-deflate.bin",]
@@ -1008,7 +1009,7 @@ fn office_spool_progress_reports_accepted_output_bytes() {
     let mut sink = Cursor::new(Vec::new());
     let limits =
         StreamingArchiveLimits::new(8, 256, 1 << 20).with_byte_limits(1 << 20, 1 << 20, 1 << 20);
-    let mut writer = StreamingArchiveWriter::with_writer_and_limits_and_spool(
+    let mut writer = StreamingArchiveWriter::with_writer_and_spool(
         &mut sink,
         limits,
         Cursor::new(Vec::new()),
@@ -1023,7 +1024,13 @@ fn office_spool_progress_reports_accepted_output_bytes() {
     let _ = returned;
     assert_eq!(progress.output_bytes(), sink.get_ref().len() as u64);
     assert_eq!(returned_len, sink.get_ref().len());
-    assert!(ArchiveReader::new(sink.get_ref()).is_ok());
+    assert!(
+        ArchiveReader::new(
+            sink.get_ref(),
+            soapberry_zip::office::ArchiveLimits::default()
+        )
+        .is_ok()
+    );
 }
 
 #[test]

@@ -489,7 +489,10 @@ fn changed_commit(editor: &SourceBackedEditor) -> litchi_xlsx::cell_values::shee
 }
 
 fn zip_member(bytes: &[u8], member: &str) -> Vec<u8> {
-    ArchiveReader::new(bytes).unwrap().read(member).unwrap()
+    ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .unwrap()
+        .read(member)
+        .unwrap()
 }
 
 fn calculation_chain_target(package: &OpcPackage) -> Option<PackURI> {
@@ -1919,7 +1922,8 @@ fn mce_relationships_and_signed_changes_are_refused() {
     editor
         .publish_commit_to_stream(&mut output, &commit)
         .expect("shared-string relationship and part are published");
-    let archive = ArchiveReader::new(&output).unwrap();
+    let archive =
+        ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert_eq!(
         archive.read("xl/sharedStrings.xml").unwrap(),
         format!(r#"<sst xmlns="{SML}"><si><t>unused</t></si></sst>"#).into_bytes()

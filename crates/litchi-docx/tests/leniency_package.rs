@@ -64,7 +64,8 @@ fn package_bytes(fixture: &Fixture) -> Vec<u8> {
         r#"<?xml version="1.0"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><property fmtid="{FMTID}" pid="2" name="Good"><vt:lpwstr>ok</vt:lpwstr></property>{bad}</Properties>"#
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for (name, bytes) in [
         ("[Content_Types].xml", content_types.as_bytes()),
         ("_rels/.rels", package_rels.as_bytes()),

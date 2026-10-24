@@ -27,7 +27,8 @@ const BOGUS_SPACE: &str = r#" xml:space="bogus""#;
 const ITEM: &str = "/custom/item.xml";
 
 fn source(content_types_attribute: &str, relationships_attribute: &str, item: &str) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_deflated(
             "[Content_Types].xml",
@@ -95,7 +96,7 @@ fn added_owned_xml_parts_are_audited_before_insertion() {
         .expect("benign caller XML");
     let output = PackageWriter::to_bytes(&receiver).unwrap();
     assert_eq!(
-        ArchiveReader::new(&output)
+        ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .read("custom/item.xml")
             .unwrap(),
@@ -143,7 +144,8 @@ fn manifest_tokens_the_read_policy_admits_keep_their_size_under_the_audit() {
         } else {
             ""
         };
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_deflated(
                 "[Content_Types].xml",
@@ -180,7 +182,7 @@ fn manifest_tokens_the_read_policy_admits_keep_their_size_under_the_audit() {
             assert!(result.expect("the admitted size is audited, not refused"));
             let output = PackageWriter::to_bytes(&package).unwrap();
             assert_eq!(
-                ArchiveReader::new(&output)
+                ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
                     .unwrap()
                     .read("[Content_Types].xml")
                     .unwrap(),

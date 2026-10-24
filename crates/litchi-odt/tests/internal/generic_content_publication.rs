@@ -188,7 +188,12 @@ fn source_package_with_options(
 fn raw_members(bytes: &[u8]) -> BTreeMap<String, RawMember> {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let mut records = archive.entries(&mut buffer);
     index
         .entries()
@@ -240,7 +245,12 @@ fn member_order(bytes: &[u8]) -> Vec<String> {
 fn local_member_order(bytes: &[u8]) -> Vec<String> {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let mut records = archive.entries(&mut buffer);
     let mut names = index
         .entries()
@@ -266,7 +276,12 @@ fn local_member_order(bytes: &[u8]) -> Vec<String> {
 fn swap_central_records(bytes: &[u8], left_name: &str, right_name: &str) -> Vec<u8> {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let mut records = archive.entries(&mut buffer);
     let mut central = Vec::new();
     for preserved in index.entries() {
@@ -309,7 +324,12 @@ fn swap_central_records(bytes: &[u8], left_name: &str, right_name: &str) -> Vec<
 fn swap_local_records(bytes: &[u8], left_name: &str, right_name: &str) -> Vec<u8> {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let mut records = archive.entries(&mut buffer);
     let mut members = Vec::new();
     for preserved in index.entries() {
@@ -369,7 +389,12 @@ fn corrupt_deflated_descriptor(source: &[u8], field_offset: usize) -> Vec<u8> {
     let mut malformed = source.to_vec();
     let archive = ZipArchive::from_slice(source).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let mut records = archive.entries(&mut buffer);
     for preserved in index.entries() {
         let record = records.next_entry().unwrap().unwrap();
@@ -390,7 +415,12 @@ fn corrupt_deflated_payload(source: &[u8]) -> Vec<u8> {
     let mut malformed = source.to_vec();
     let archive = ZipArchive::from_slice(source).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let mut records = archive.entries(&mut buffer);
     for preserved in index.entries() {
         let record = records.next_entry().unwrap().unwrap();

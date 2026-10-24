@@ -37,8 +37,11 @@ fn source_with_sheets(sheet1: &str, sheet2: &str) -> Vec<u8> {
     // correctly refuses it, so construct the adversarial ZIP at its lower
     // container boundary, as the other source-backed refusal tests do.
     let source = two_sheets();
-    let archive = ArchiveReader::new(&source).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for member in archive.file_names() {
         let bytes = match member {
             "xl/worksheets/sheet1.xml" => sheet1.as_bytes().to_vec(),

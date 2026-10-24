@@ -457,7 +457,9 @@ mod tests {
     }
 
     fn cache_isolation_archive() -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -580,7 +582,12 @@ mod tests {
     #[test]
     fn explicit_zip_read_refuses_zero_io_before_member_payload_read() {
         let bytes = archive();
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let budget = Budget::root(
             "opc-open-zero-io",
             Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
@@ -621,8 +628,18 @@ mod tests {
         let (_second_source, second_context) = direct_read_context(second_budget, 4);
         let first = OpenSession::new(first_context).unwrap();
         let second = OpenSession::new(second_context).unwrap();
-        let first_reader = LazyArchiveReader::new(&bytes).unwrap();
-        let second_reader = LazyArchiveReader::new(&bytes).unwrap();
+        let first_reader = LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
+        let second_reader = LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
 
         let first_result = first.read_many(&first_reader, &names).unwrap();
         assert_eq!(first.zip.local_pool_worker_count(), 2);
@@ -645,7 +662,12 @@ mod tests {
     #[test]
     fn zero_cpu_budget_refuses_before_retaining_a_zip_pool() {
         let bytes = archive();
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let budget = Budget::root(
             "opc-open-zero-cpu",
             Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
@@ -677,7 +699,12 @@ mod tests {
     #[test]
     fn zip_byte_cap_that_splits_every_batch_does_not_retain_a_pool() {
         let bytes = archive();
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let budget = Budget::root(
             "opc-open-serial-batches",
             Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)
@@ -706,7 +733,12 @@ mod tests {
     #[test]
     fn explicit_zip_read_preflights_oversized_members_before_cpu_admission() {
         let bytes = archive();
-        let reader = LazyArchiveReader::new(&bytes).unwrap();
+        let reader = LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let budget = Budget::root(
             "opc-open-oversized-member",
             Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX)

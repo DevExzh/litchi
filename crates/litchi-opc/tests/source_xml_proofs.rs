@@ -391,7 +391,9 @@ fn an_invalid_original_is_reported_on_every_write() {
     let generated = package_bytes(&[(SLIDE, PML_SLIDE, slide(1))]);
     let reader =
         litchi_opc::phys_pkg::PhysPkgReader::new(&generated, SourceLimits::default()).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for name in reader.member_names().unwrap() {
         let member = if name == SLIDE[1..] {
             b"<!DOCTYPE a><a/>".to_vec()

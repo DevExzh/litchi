@@ -1122,7 +1122,9 @@ impl ReadAt for CaptureObservedSource {
 }
 
 fn combined_capture_fixture(payload: &[u8], deflated: bool) -> Vec<u8> {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored(
             "[Content_Types].xml",

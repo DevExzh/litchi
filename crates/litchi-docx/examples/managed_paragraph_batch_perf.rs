@@ -487,7 +487,8 @@ fn build_fixture(paragraph_count: usize, replacement_count: usize) -> AnyResult<
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rIdDocument" Type="{office_document}" Target="{MAIN}"/></Relationships>"#,
         office_document = rt::OFFICE_DOCUMENT,
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("[Content_Types].xml", content_types.as_bytes())?;
     writer.write_stored("_rels/.rels", relationships.as_bytes())?;
     writer.write_stored(MEDIA, &media)?;

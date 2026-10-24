@@ -24,8 +24,10 @@ fn bytes(count: usize, strict: bool) -> Vec<u8> {
             .add_text_box(&format!("original {index}"), 0, 0, 914_400, 914_400);
     }
     let bytes = builder.build().unwrap().to_bytes().unwrap();
-    let archive = ArchiveReader::new(&bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let mut xml = String::from_utf8(archive.read(name).unwrap()).unwrap();
         if strict {
@@ -64,7 +66,8 @@ fn open(bytes: &[u8]) -> Package {
     Package::from_read_at(Arc::new(OwnedSource::new(bytes.to_vec()))).unwrap()
 }
 fn members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).unwrap();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     archive
         .file_names()
         .map(|name| (name.to_owned(), archive.read(name).unwrap()))
@@ -444,8 +447,10 @@ fn durable_addition_refuses_forged_shape_surface_changes() {
 #[test]
 fn final_shape_identity_is_usable_and_exhaustion_is_atomic() {
     let original = bytes(1, false);
-    let archive = ArchiveReader::new(&original).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&original, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let payload = archive.read(name).unwrap();
         if name == "ppt/slides/slide1.xml" {
@@ -486,8 +491,10 @@ fn final_shape_identity_is_usable_and_exhaustion_is_atomic() {
 }
 
 fn slide_extra(before: &[u8], marker: &str, extra: &str) -> Vec<u8> {
-    let archive = ArchiveReader::new(before).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(before, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let payload = archive.read(name).unwrap();
         if name == "ppt/slides/slide1.xml" {

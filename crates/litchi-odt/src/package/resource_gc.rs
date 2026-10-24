@@ -547,8 +547,11 @@ fn classify_references(
     candidates: &mut [NormalizedCandidate],
 ) -> Result<()> {
     let archive = package.package()?;
-    let zip_metadata =
-        soapberry_zip::office::ArchiveReader::new(package.as_bytes()).map_err(zip_error)?;
+    let zip_metadata = soapberry_zip::office::ArchiveReader::new(
+        package.as_bytes(),
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(zip_error)?;
     for object in scan_objects(content, styles, &archive)? {
         if !matches!(object.part, Part::Content | Part::Styles) {
             continue;
@@ -790,7 +793,12 @@ fn rewrite_package(
         .map_err(zip_error)?
         .into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).map_err(zip_error)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(zip_error)?;
     let mut records = archive.entries(&mut buffer);
     let mut seen = BTreeSet::new();
     let mut replaced_manifest = false;
@@ -879,7 +887,8 @@ fn generated_manifest_member(
     manifest: &[u8],
     compression: CompressionMethod,
 ) -> Result<(Vec<u8>, Vec<u8>)> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     match compression {
         CompressionMethod::Store => writer.write_stored(MANIFEST_PATH, manifest),
         CompressionMethod::Deflate => writer.write_deflated(MANIFEST_PATH, manifest),
@@ -891,7 +900,12 @@ fn generated_manifest_member(
         .map_err(zip_error)?
         .into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).map_err(zip_error)?;
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(zip_error)?;
     if index.entries().len() != 1 {
         return invalid("generated ODT manifest ZIP has an unexpected entry count");
     }

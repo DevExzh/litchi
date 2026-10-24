@@ -76,7 +76,8 @@ fn package_with(workbook: &str, worksheet: &str) -> Vec<u8> {
     let workbook_relationships = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"{PKG_REL}\"><Relationship Id=\"rIdSheet\" Type=\"{REL}/worksheet\" Target=\"worksheets/sheet1.xml\"/></Relationships>"
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for (name, bytes) in [
         ("[Content_Types].xml", content_types.as_bytes()),
         ("_rels/.rels", package_relationships.as_bytes()),

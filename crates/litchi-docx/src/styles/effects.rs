@@ -3085,7 +3085,9 @@ mod tests {
         const ROOT_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rOwner" Type="urn:litchi:test" Target="word/owner.xml"/></Relationships>"#;
         const OWNER_RELATIONSHIPS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rLeaf" Type="urn:litchi:test" Target="leaf.xml"/></Relationships>"#;
         const OWNER_PAYLOAD: &[u8] = b"<effects-graph-owner/>";
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored("[Content_Types].xml", MANIFEST)
             .expect("manifest");
