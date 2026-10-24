@@ -139,7 +139,11 @@ def _source_state(root: Path) -> dict[str, Any]:
     top = _resolve(Path(_git(root, "rev-parse", "--show-toplevel")))
     if top != root:
         raise PreparationError(f"source is not a worktree top-level: {root}")
-    status = _git(root, "status", "--porcelain=v1", "--untracked-files=all")
+    # Some reviewed fixtures live below repository ignore rules because the
+    # historical baseline never tracked that test corpus.  Include ignored
+    # paths in the receipt/status guard so materializing one cannot be
+    # silently omitted from the exact external adapter closure.
+    status = _git(root, "status", "--porcelain=v1", "--untracked-files=all", "--ignored")
     return {
         "root": str(root),
         "ref": _git(root, "rev-parse", "HEAD"),

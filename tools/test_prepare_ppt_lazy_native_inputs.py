@@ -46,6 +46,8 @@ def repository(
     if not baseline:
         for relative in prep.PROBE_PATHS:
             (root / relative).write_text(f"{relative}\n", encoding="utf-8")
+    if baseline:
+        (root / ".gitignore").write_text("/test-data/compile-fixture-1.bin\n", encoding="utf-8")
     if fixture is not None:
         destination = root / prep.FIXTURE_PATH
         destination.parent.mkdir(parents=True, exist_ok=True)
