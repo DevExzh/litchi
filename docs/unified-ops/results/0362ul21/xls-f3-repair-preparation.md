@@ -19,10 +19,10 @@ repair and are still represented by the frozen overlay identity.
 Fresh build commands, target/TMP roots, source manifests, overlay hashes,
 preserved failed log/target, and the future quiet-driver command are in:
 
-`/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/sheet-native-readiness-472b-f3-repair.json`
+`/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/sheet-native-readiness-472b-f3-repair.json` (SHA-256 `99a0c1f4968889e841c447caa6dfb53c76f65031175b65fd0e5dcffc37a5c7e8`).
 
 Source-preparation manifest SHA-256:
-`8c0640b8e53e2bbefdda44806f59a4a6584d9e377a6e55084dd1f01f4a93d572`.
+`9968f2fcacf858cee6d69840bf15db174419743913d8d0028b0ddc7baff7d6da`.
 
 Independent source-only review is requested from `inventory_drawingml_limits`.
 The root coordinator controls the next Cargo grant; the historical corrected
