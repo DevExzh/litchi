@@ -22,19 +22,20 @@ remain open; this is source integration, not final performance acceptance.
 | ODP | Package edit builds a complete mutable presentation and copies validated slides/source fragments; flat edit clones the slide vector. | 0362uga, reviewed and validated correction merged at `d316d04291`. The already-lazy tail-append entry is not this finding. |
 | ODS | Source cells construct protection state; DDE and sheet-metadata constructors load source projections; package resource-count validation enumerates archive members; flat edits allocate per-sheet staging. | 0362ugc merged at `f144cd6029`; reviewed and validated 0362ugca merged at `3676e21cfa`, removing the added open/edit census while retaining admission at staging, commit and replay. |
 | DOC | Primary/profiled and scoped families serialize/copy the source at entry; paragraph source-backed entry scans the source prefix. | 0362ugd and 0362ugd-a, reviewed and validated source/consumer correction merged at `cf7def80df`. |
-| XLS | Primary and source-backed cells copy/index source state; scoped capture serializes the archive for comments, visibility, objects, names, charts and pivots. | 0362uge, reviewed and validated source/freshness correction merged at `50d4f4b88d`. |
-| XLSX source-backed | Worksheet and defined-name/cell constructors load and decode selected parts or workbook state before staging. | 0362ugf, source correction under validation; baseline reproduction is required for the three remaining slicer failures. |
-| XLSX pivot | Pivot cache/table/data entries load graphs and clone semantic drafts before an operation. | 0362ugn, separate correction assigned from `8bf4833ae5`. |
-| XLSX graph families | Metadata, calculation properties, connections, custom data, external links, data model and XML maps load selected graphs or snapshots at entry. | 0362ugo, separate correction assigned from `8bf4833ae5`. |
-| XLSX object families | Data-type icons, OLE objects, page breaks, revisions, rich-value refresh and surveys parse or copy selected source state at entry. | 0362ugp, separate correction assigned from `8bf4833ae5`. |
-| XLSX catalogs | Slicers and timelines census cache/worksheet parts; task panes load the web graph; smart tags parse selected worksheet XML. | 0362ugq, queued after the source-backed correction packet. |
-| Pages | Body-table constructors rebuild rooted inventories; chart data, drawable order, headers/footers and footnotes decode or copy selected/source graph state. | 0362ugg, correction in progress. |
-| Keynote | Text/name selection can decode a whole show; chart data and table/chart constructors decode selected payloads or scan the graph. | 0362ugh, correction in progress. |
-| Numbers | Title/image selection scans rooted graph state; chart and merge constructors retain decoded data/regions. | 0362ugi, correction in progress. |
-| PPT | Primary and metadata edits serialize and parse the whole CFB. `scoped::Base::capture` copies `to_encrypted_bytes()` into a new shared buffer. | 0362ugj, correction required. |
-| PPTX | In-memory `Package::edit` captures all slides, notes and name indexes and fingerprints parts; opened edit construction also clones the slide vector and name index. | 0362ugk, correction required. Source-backed primary and staged part constructors are already cheap. |
-| DOCX | Ordinary and source-backed document entry parses/indexes main XML; Ink scans package parts and bindings; OPC edit clones graph metadata; several source-backed document families capture source projections at entry. | 0362ugl, correction in progress. Main-part `blob_arc()` itself is cheap; subsequent snapshot parsing is the cost. |
-| XLSB | Primary and cell-value constructors serialize source before-images; several owner families read/clone selected graphs, and a cold `From<OpcPackage>` projection can materialize through generic staged entry. | 0362ugm, correction in progress. |
+| XLS | Primary and source-backed cells copy/index source state; scoped capture serializes the archive for comments, visibility, objects, names, charts and pivots. | 0362uge, reviewed and validated source/freshness correction merged at `50d4f4b88d`; the additional property/feature scope below remains required. |
+| XLS properties and features | Metadata parses/copies properties, property-set entry captures the whole CFB, and worksheet features parse/copy the Workbook stream. | 0362ugea, deferred source and signed exact no-op correction under validation; facade refusal mapping and cached-source fencing are under review. |
+| XLSX source-backed | Worksheet and defined-name/cell constructors load and decode selected parts or workbook state before staging. | 0362ugf/0362ugs, reviewed composed correction and planning-guard consumer merged at `3d129677ce`; package/consumer validation is pinned to the exact sources in 0362ugs. |
+| XLSX pivot | Pivot cache/table/data entries load graphs and clone semantic drafts before an operation. | 0362ugn, reviewed composed correction and validation receipt 0362ugs merged at `3d129677ce`. |
+| XLSX graph families | Metadata, calculation properties, connections, custom data, external links, data model and XML maps load selected graphs or snapshots at entry. | 0362ugo, reviewed composed correction and validation receipt 0362ugs merged at `3d129677ce`. |
+| XLSX object families | Data-type icons, OLE objects, page breaks, revisions, rich-value refresh and surveys parse or copy selected source state at entry. | 0362ugp, reviewed composed correction and validation receipt 0362ugs merged at `3d129677ce`. |
+| XLSX catalogs | Slicers and timelines census cache/worksheet parts; task panes load the web graph; smart tags parse selected worksheet XML. | 0362ugq, reviewed composed correction and validation receipt 0362ugs merged at `3d129677ce`. |
+| Pages | Body-table constructors rebuild rooted inventories; chart data, drawable order, headers/footers and footnotes decode or copy selected/source graph state. | 0362ugg/0362ugr, reviewed and validated correction merged at `9ea602e0e1`. |
+| Keynote | Text/name selection can decode a whole show; chart data and table/chart constructors decode selected payloads or scan the graph. | 0362ugh/0362ugr, reviewed and validated correction merged at `9ea602e0e1`. |
+| Numbers | Title/image selection scans rooted graph state; chart and merge constructors retain decoded data/regions. | 0362ugi/0362ugr, reviewed and validated correction merged at `9ea602e0e1`. |
+| PPT | Primary and metadata edits serialize and parse the whole CFB. `scoped::Base::capture` copies `to_encrypted_bytes()` into a new shared buffer. | 0362ugj, reviewed and validated correction merged at `127c26d59f`; standalone consumers and the ODG adapter compile, with corrected probe bindings. |
+| PPTX | In-memory `Package::edit` captures all slides, notes and name indexes and fingerprints parts; opened edit construction also clones the slide vector and name index. | 0362ugk, reviewed and validated correction merged at `a3eb017da2`; remaining benchmark getter fixed under 0362ugka. |
+| DOCX | Ordinary and source-backed document entry parses/indexes main XML; Ink scans package parts and bindings; OPC edit clones graph metadata; several source-backed document families capture source projections at entry. | 0362ugl/0362ugla/0362uglb, reviewed and validated correction merged at `5ce9829784`, including signed empty-property no-op preservation and all fuzz consumers. |
+| XLSB | Primary and cell-value constructors serialize source before-images; several owner families read/clone selected graphs, and a cold `From<OpcPackage>` projection can materialize through generic staged entry. | 0362ugm, reviewed and validated correction merged at `0d35a83a31`. |
 
 PPT's accepted 0362j work repairs replay and first-commit digest cost. It
 does not authorize serialization at edit construction; the new finding is
@@ -346,3 +347,80 @@ complete Workbook stream. These three families are the finite follow-up scope;
 other public Package edit entries checked are already lazy. This is engineering
 work before source freeze, not an accepted exception. The current XLS getter
 is infallible; its eventual migration must follow the actual corrected API.
+
+
+## XLSX composed merge, 2026-10-24
+
+Source `784d0ea83e`, final receipt `7201866b32` and the composed source-backed,
+catalog, pivot, graph and object corrections merge at `3d129677ce`. Independent
+review confirms lazy admission, retained budgets, source/signature behavior,
+retry atomicity and the migrated consumers. The coordinator verified all twelve
+closed log identities, actual root configuration, used lockfiles and four
+consumer/lint overlay hashes plus the final planning-guard overlay.
+
+The recorded package run has 2,558 passing tests across 98 result blocks and
+36 passing doctests with no ignored tests. Strict Clippy covers the documented
+implementation lint overlay; it does not relabel the earlier clean-source test
+run. Operations, standalone performance consumers and the fuzz consumer compile.
+The guard's valid, late-validator and late-raw diagnostic routes prove exact
+no-op/source preservation or typed first-use refusal and retry preservation.
+Unknown cell attributes remain supported and preserved; the stale validator
+fixture now uses an explicitly unsupported child element. Debug timing fields
+from these diagnostic runs are excluded from performance evidence.
+
+The only merge conflict was formatting of the XLS/PPT metadata benchmark.
+Resolution preserves their currently infallible property getters and the
+already-fallible DOC getter. Pending PPT and XLS-property source changes must
+migrate their own getters when they merge. No native qualification is claimed.
+
+
+## DOCX and PPT merges, 2026-10-24
+
+DOCX final source `0cf1a17174` and receipt `3a6c56958c` merge at `5ce9829784`.
+Independent review covers source/limit precedence, inverse/fidelity assertions,
+lazy projection access, signed valid-target exact no-ops, invalid-target errors
+and complete fuzz publication migration. The coordinator verified ten captured
+logs: 2,355 package tests, 170 doctests (31 ignored), 739 operations tests,
+23 facade tests, focused signed regression, strict checks and standalone
+consumers. Record 0362uglb distinguishes the exact clean pins and the two-file
+fuzz overlay. Merge resolution only normalizes cfg feature order and receipt
+wording/whitespace, adds verified missing identities and preserves every source
+change. No native qualification is claimed.
+
+PPT implementation/operations source `ca125d2ba1` and final consumer/binding
+receipt `70a9b57622` merge at `127c26d59f`. The coordinator verified 1,568 package
+tests (three ignored), 22 doctests (eight ignored), 71 selected operations
+tests, strict Clippy, all-target consumer checks and standalone compilation.
+The shared OLE benchmark explicitly handles the now-fallible PPT property
+getter; XLS remains infallible until its separate follow-up merges. The ODG
+candidate adapter compiles through the separately hashed external overlay.
+All three changed probe identities are refreshed, and 26 build-free ODG tests
+pass. These results qualify compilation and correctness checks, not native
+performance.
+
+The composed strict consumer check passes at `ecf598b637` after a private
+ODF probe identity grouping closes its fourteen-argument lint failure (0362ugsa).
+This pin precedes the DOCX/PPT merges and is not the final gate. The remaining
+known source returns are XLS changed-publication freshness under 0362ugea and
+the PPTX refusal-kind classifier. Final full gates, all-68 inventory, corpus,
+glossary and native qualification remain required.
+
+
+The subsequent combined strict check also passes at
+`99c875ca41d7fa4a6185b2fff122e4499b6c0d88`, including the DOCX and PPT
+merges: all-target/all-feature CLI, operations, facade and Python Clippy
+exits zero in 145.777 seconds. Its source stays clean, three post-exit
+observations find no owned builders, and the target stabilizes at
+4,706,726,912 bytes. The [reduced receipt](results/0362ug/composed-consumer-check.json)
+binds source, command, locks, policy, plan/state and logs. This selected step
+remains distinct from the required full 53-step gate.
+
+PPTX refusal-kind correction 0362ugt merges at `c1eda2fdf6`. `FinalSlide`
+now follows its existing `InvalidValue` kind; signed/protected refusals retain
+`document_protected`. Operation and reason text no longer override the code.
+Classifier, slide-removal, capability and registry tests pass, as does the
+strict PPTX-only operations check. Both generated consumers and the one-line
+capability-table digest are synchronized. The coordinator verified all seven
+logs/receipts and root configuration, then independently reran both static
+OfficeCLI table checks on the composed tree. The final actual corpus replay
+remains part of final acceptance. No unrelated DOC behavior changes.
