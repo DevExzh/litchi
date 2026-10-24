@@ -62,12 +62,14 @@ a timing workload:
 
 ```text
 python3 -m py_compile tools/native_qualification_runner.py tools/native_qualification/drawingml_raw_paired_runner.py tools/native_qualification/drawingml_raw_validator.py tools/test_native_qualification_runner.py tools/test_drawingml_raw_qualification.py
-python3 tools/test_drawingml_raw_qualification.py       # 7 passed
+python3 tools/test_drawingml_raw_qualification.py       # 9 passed
 python3 tools/test_native_qualification_runner.py        # 23 passed
 ```
 
 The DrawingML tests include mutation cases for argv identity, source binding,
-and the sidecar line pointer, plus validator-handoff and fast-child-unavailable
-controls. A separate Python child smoke check captured a positive independent
-RSS/VmHWM sample through the observer. No performance or native acceptance
-result is inferred from these checks.
+and the sidecar line pointer, plus validator-handoff and a deterministic
+disappeared-PID/unavailable-child control. The unavailable-child test simulates
+loss before start-identity capture; it is not a rapid-subprocess measurement.
+A separate Python child smoke check captured a positive independent RSS/VmHWM
+sample through the observer. No performance or native acceptance result is
+inferred from these checks.

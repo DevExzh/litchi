@@ -281,8 +281,8 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
             self.assertEqual(after, before)
             self.assertEqual(after["records"], 1)
 
-    def test_fast_child_is_recorded_unavailable_without_claim(self) -> None:
-        with tempfile.TemporaryDirectory(prefix="drawingml-raw-fast-child-") as directory:
+    def test_disappeared_child_is_recorded_unavailable_without_claim(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="drawingml-raw-disappeared-child-") as directory:
             output = Path(directory)
             observer = paired.ExternalResourceObserver(output)
             token = observer.process_started(
