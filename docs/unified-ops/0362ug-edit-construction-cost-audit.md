@@ -335,7 +335,9 @@ constructor path: `metadata::Edit::new` still constructs a property-set editor,
 parses `SummaryProperties` and clones the initial values before returning.
 The earlier XLS receipt establishes its tested source behavior, but does not
 close this entry-cost gap. Required follow-up 0362ugea is assigned in a fresh
-leaf for metadata/property-set lazy state and every consumer; a bounded XLS
-constructor review will identify any related omissions. This is engineering
+leaf for metadata/property-set lazy state and every consumer. The bounded
+review also found `sheet_features::Edit::new` parsing globals and copying the
+complete Workbook stream. These three families are the finite follow-up scope;
+other public Package edit entries checked are already lazy. This is engineering
 work before source freeze, not an accepted exception. The current XLS getter
 is infallible; its eventual migration must follow the actual corrected API.
