@@ -4192,3 +4192,52 @@ See [0063](0063-source-pptx-modern-comments.md).
   A held glossary leaf is retained. Three obsolete searches are stopped by
   their owners without changing files. Only audit 22 is deferred; nothing is
   pushed.
+
+- Coordinator W8 correctness and gate-resource update (2026-10-24):
+  Both W8 release endpoints now pass all 109 correctness routes. Independent
+  review verifies the original f2 and final 472b archives, role-specific locks,
+  consumer adapter, 518 shared registry identities and six reviewed local
+  graph changes. The endpoint receipt-path repair merges at `553dab0517`;
+  record 0362ul31 merges at `bf603625fa`. It preserves the initial endpoint
+  assembly failure and records the later assembly from retained validation
+  outputs. The pair is `verified_protocol_only`; timing, allocation and final
+  performance acceptance remain open.
+
+  The reviewed compile-only lease protocol merges at `b5964465a2`. It admits
+  only explicitly permitted generic-runner build commands, with exact manifest,
+  process, source and target identities. Ordinary builders and the full gate
+  remain outside those permits; measurements and controls require a quiet
+  host. No existing preparation packet is silently rebound. The composed
+  integration passes 114 focused tooling tests, and its production Rust,
+  Cargo manifests and toolchain remain identical to 472b. A subsequent targeted
+  lifecycle review finds that escaped descendants can outlive the generic
+  runner's leader; that repair must pass review before any lease cohort runs.
+
+  The 9781 gate passes checks 0 through 24, then stops during ops examples
+  after its target grows to 20,763,352,771 bytes. Completed test chunks pass;
+  the row remains failed and its target, logs and receipts are preserved.
+  The first bounded-retention repair is returned for failed-artifact retention,
+  escaped-descendant handling, live guards on every gate command, exact private
+  artifact selection and command-count reconciliation. No replacement gate
+  run is accepted yet. Isolated documentation and actual corpus replay remain
+  required.
+
+  ODG and ODF source preparations pass independent review, including both ODG
+  source closures and a fresh 18-test ODF suite. ODP's plan is returned because
+  its expected binary has no matching build handoff and its source, lock and
+  probe bindings are incomplete. Signed-native qualification also remains
+  under repair for process lifetime and receipt provenance. These are active
+  engineering returns, not additional deferrals.
+
+  Both XLSX release endpoints and the XLS F3 baseline build successfully.
+  The F3 candidate fails on eight outdated consumer-overlay calls and a
+  tracked fixture missing from its sparse checkout. Its preparation is
+  returned for repair, with the failed log and target preserved. No sheet
+  timing or allocation result is accepted from these builds.
+
+  Cleanup wave 52 removes five merged leaves with their branch references
+  retained (0362ul28). Independent verification checks all 13,912 preserved
+  payloads, 25 protected identities and the current sheet command dependencies.
+  A helper-path ambiguity is resolved against both exact engine hashes without
+  altering the raw receipts. The protected trunk probe remains intact; only
+  audit 22 is deferred and nothing is pushed.
