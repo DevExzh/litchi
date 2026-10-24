@@ -16,6 +16,7 @@ use encoding_rs::Encoding;
 
 /// Code-page selection or conversion failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The numeric identifier has no exact supported codec.
     Unsupported(u32),

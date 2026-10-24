@@ -67,6 +67,7 @@ impl Unit {
 
 /// Errors returned by duration range construction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The largest unit is finer than the smallest unit.
     ReversedRange { largest: Unit, smallest: Unit },

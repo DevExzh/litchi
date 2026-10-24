@@ -3143,6 +3143,7 @@ fn map_bnc_error(error: BncError) -> TileError {
         },
         BncError::Allocation { requested } => TileError::Allocation { amount: requested },
         BncError::InvalidFormat(_) | BncError::ParseError(_) => TileError::InvalidSource,
+        _ => TileError::InvalidSource,
     }
 }
 

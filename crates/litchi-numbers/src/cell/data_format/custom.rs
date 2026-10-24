@@ -22,6 +22,7 @@ pub const MAX_RULES: usize = 32;
 
 /// Errors returned by checked custom-format constructors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// A required value is empty.
     Empty { field: &'static str },

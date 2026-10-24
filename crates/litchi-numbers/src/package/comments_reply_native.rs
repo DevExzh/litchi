@@ -357,6 +357,7 @@ fn map_bnc_cell_error(error: litchi_numbers_wire::Error) -> NativeReplyError {
         litchi_numbers_wire::Error::Allocation { .. } => NativeReplyError::Allocation,
         litchi_numbers_wire::Error::InvalidFormat(_)
         | litchi_numbers_wire::Error::ParseError(_) => NativeReplyError::Codec,
+        _ => NativeReplyError::Codec,
     }
 }
 

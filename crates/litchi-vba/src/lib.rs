@@ -65,6 +65,7 @@ impl Default for Limits {
 
 /// Error returned for malformed, unsupported, or over-limit MS-OVBA data.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The containing CFB file could not be read or written.
     Cfb(OleError),

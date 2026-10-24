@@ -79,6 +79,7 @@ pub const MAX_DECIMAL_PLACES: u8 = 30;
 
 /// Errors returned by checked number-format constructors.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// A fixed precision exceeds [`MAX_DECIMAL_PLACES`].
     DecimalPlacesOutOfRange { value: u8, maximum: u8 },

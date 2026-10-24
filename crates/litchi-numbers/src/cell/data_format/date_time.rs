@@ -19,6 +19,7 @@ const ISO_DATE_TIME_24_HOUR_SECONDS_PATTERN: &str = "yyyy-MM-dd H:mm:ss";
 
 /// Errors returned by date-and-time pattern construction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     /// The pattern is empty or contains only whitespace.
     Empty,

@@ -417,6 +417,7 @@ fn rewrite_display_cell_metadata(
             | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => {
                 Error::InvalidSource { path }
             },
+            _ => Error::InvalidSource { path },
         })?;
     let candidate_cell = BncCell::parse(&output).map_err(|_| Error::Verification)?;
     verify_display_cell_metadata(
@@ -518,6 +519,7 @@ fn rewrite_date_time_cell_metadata(
             | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => {
                 Error::InvalidSource { path }
             },
+            _ => Error::InvalidSource { path },
         })?;
     let candidate_cell = BncCell::parse(&output).map_err(|_| Error::Verification)?;
     verify_date_time_cell_metadata(
@@ -613,6 +615,7 @@ fn rewrite_duration_cell_metadata(
             | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => {
                 Error::InvalidSource { path }
             },
+            _ => Error::InvalidSource { path },
         })?;
     let candidate_cell = BncCell::parse(&output).map_err(|_| Error::Verification)?;
     verify_duration_cell_metadata(
@@ -704,6 +707,7 @@ fn rewrite_currency_cell_metadata(
             | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => {
                 Error::InvalidSource { path }
             },
+            _ => Error::InvalidSource { path },
         })?;
     let candidate_cell = BncCell::parse(&output).map_err(|_| Error::Verification)?;
     verify_currency_cell_metadata(
@@ -1058,6 +1062,7 @@ fn map_bnc_error(error: litchi_numbers_wire::Error, path: Path) -> Error {
         litchi_numbers_wire::Error::InvalidFormat(_)
         | litchi_numbers_wire::Error::ParseError(_)
         | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => Error::InvalidSource { path },
+        _ => Error::InvalidSource { path },
     }
 }
 

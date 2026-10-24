@@ -141,6 +141,7 @@ pub struct List {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Error {
     Invalid(String),
     Xml(String),

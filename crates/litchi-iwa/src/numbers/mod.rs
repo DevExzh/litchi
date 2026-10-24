@@ -50,6 +50,7 @@ impl From<bnc::Error> for crate::Error {
             bnc::Error::OutputLimitExceeded { .. } | bnc::Error::Allocation { .. } => {
                 Self::ParseError(error.to_string())
             },
+            _ => Self::ParseError("Numbers cell wire error".to_string()),
         }
     }
 }

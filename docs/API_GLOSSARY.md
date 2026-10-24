@@ -395,6 +395,12 @@ a caller tightens it.
   ingress/egress error types. God enums (`xlsx::Error`, …) split per module,
   staged per wave. Boundary mapping is typed; string flattening
   (`map_ooxml_error` pattern) is retired.
+- Error extensibility is part of that boundary: public format `Error` enums
+  are `#[non_exhaustive]`, and downstream matches retain their current typed
+  classifications with a fixed fallback for future variants. The final sweep
+  closes the 18 assigned format rows in 0362uvb; the concurrent fonts
+  obfuscation row remains assigned to its own lane until its declaration and
+  consumers land.
 - Shared variant taxonomy (payload shapes fixed):
 
 | Concept | Canonical variant | Banned |
