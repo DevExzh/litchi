@@ -10,7 +10,9 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import threading
 import unittest
+from unittest import mock
 
 
 MODULE_PATH = Path(__file__).with_name("safe_chunked_tests.py")
@@ -18,6 +20,12 @@ SPEC = importlib.util.spec_from_file_location("safe_chunked_tests_under_test", M
 assert SPEC and SPEC.loader
 safe = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(safe)
+
+RUNNER_PATH = MODULE_PATH.with_name("run_safe_gate.py")
+RUNNER_SPEC = importlib.util.spec_from_file_location("run_safe_gate_under_test", RUNNER_PATH)
+assert RUNNER_SPEC and RUNNER_SPEC.loader
+runner = importlib.util.module_from_spec(RUNNER_SPEC)
+RUNNER_SPEC.loader.exec_module(runner)
 
 
 FAKE_COMMAND = textwrap.dedent(
@@ -30,7 +38,7 @@ FAKE_COMMAND = textwrap.dedent(
     artifact = Path(sys.argv[1])
     marker = Path(sys.argv[2])
     artifact.parent.mkdir(parents=True, exist_ok=True)
-    artifact.write_bytes(b"fake executable bytes")
+    artifact.write_bytes(b"\x7fELFfake executable bytes")
     artifact.chmod(0o751)
     sidecar = artifact.with_suffix(".d")
     sidecar.write_bytes(b"fake private dependency sidecar")
@@ -81,7 +89,7 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
             destination = Path(record["quarantine"])
             self.assertFalse(artifact.exists())
             self.assertFalse(artifact.with_suffix(".d").exists())
-            self.assertEqual(destination.read_bytes(), b"fake executable bytes")
+            self.assertEqual(destination.read_bytes(), b"\x7fELFfake executable bytes")
             self.assertEqual(record["sha256"], hashlib.sha256(destination.read_bytes()).hexdigest())
             self.assertEqual(record["mode"], "0751")
             self.assertEqual(stat.S_IMODE(destination.stat().st_mode), 0o751)
@@ -111,10 +119,10 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
             artifact = Path(sys.argv[1])
             marker = Path(sys.argv[2])
             artifact.parent.mkdir(parents=True, exist_ok=True)
-            artifact.write_bytes(b"descendant executable")
+            artifact.write_bytes(b"\x7fELFdescendant executable")
             artifact.chmod(0o751)
             subprocess.Popen(
-                [sys.executable, "-c", "import pathlib,sys,time; time.sleep(.35); pathlib.Path(sys.argv[1]).write_text('done')", str(marker)],
+                [sys.executable, "-c", "import os,pathlib,sys,time; os.setsid(); time.sleep(.35); pathlib.Path(sys.argv[1]).write_text('done')", str(marker)],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -141,7 +149,7 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
             artifact = Path(sys.argv[1])
             marker = Path(sys.argv[2])
             artifact.parent.mkdir(parents=True, exist_ok=True)
-            artifact.write_bytes(b"not retired")
+            artifact.write_bytes(b"\x7fELFnot retired")
             artifact.chmod(0o751)
             print(json.dumps({"reason": "compiler-artifact", "target": {"kind": ["test"]}, "executable": str(artifact)}), flush=True)
             growth = artifact.parents[2] / "growth.bin"
@@ -202,6 +210,128 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
             safe._retire_artifacts({link}, target, quarantine, manifest, ["fake"], 0, scan_private=False)
             self.assertTrue(link.is_symlink())
             self.assertFalse(manifest.exists())
+
+    def test_retirement_accepts_only_private_elfs_and_exact_sidecars(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-chunked-private-outputs-") as raw:
+            directory = Path(raw)
+            target = directory / "target"
+            debug = target / "debug"
+            build_output = debug / "build" / "fake-build-script"
+            non_elf = debug / "examples" / "fake-example"
+            real = debug / "examples" / "real-example"
+            shared = debug / "deps" / "libshared.so"
+            for path in (build_output, non_elf, real, shared):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"\x7fELFreal" if path in {real, shared} else b"not an ELF")
+                path.chmod(0o751)
+            sidecar = real.with_suffix(".d")
+            sidecar.write_text("real sidecar", encoding="utf-8")
+            quarantine = directory / "quarantine"
+            manifest = directory / "manifest.jsonl"
+            retired = safe._retire_artifacts(
+                {build_output, non_elf, real},
+                target,
+                quarantine,
+                manifest,
+                ["fake"],
+                0,
+                scan_private=True,
+            )
+            self.assertEqual({Path(row["relative_source"]).name for row in retired}, {"real-example", "real-example.d"})
+            self.assertTrue(build_output.exists())
+            self.assertTrue(non_elf.exists())
+            self.assertTrue(shared.exists())
+            self.assertFalse(real.exists())
+            self.assertFalse(sidecar.exists())
+
+    def test_main_stops_after_first_failed_chunk(self) -> None:
+        metadata = {
+            "workspace_members": ["fixture-id"],
+            "target_directory": "/tmp/safe-chunked-fake-target",
+            "packages": [{"id": "fixture-id", "name": "fixture", "targets": []}],
+        }
+        with tempfile.TemporaryDirectory(prefix="safe-chunked-fail-stop-") as raw:
+            directory = Path(raw)
+            target = directory / "target"
+            log_dir = directory / "logs"
+            quarantine = directory / "quarantine"
+            commands = [("test", ["first"]), ("test", ["second"])]
+
+            def fake_execute(command, _target, log, _quarantine, index):
+                log.write_text(f"chunk {index}\n", encoding="utf-8")
+                return (7 if index == 0 else 0), [], {}
+
+            argv = [
+                "safe_chunked_tests.py",
+                "-p",
+                "fixture",
+                "--log-dir",
+                str(log_dir),
+                "--quarantine-dir",
+                str(quarantine),
+            ]
+            with (
+                mock.patch.object(safe.sys, "argv", argv),
+                mock.patch.object(safe.subprocess, "check_output", return_value=json.dumps(metadata)),
+                mock.patch.object(safe, "plan", return_value=commands),
+                mock.patch.object(safe, "execute", side_effect=fake_execute) as execute,
+            ):
+                self.assertEqual(safe.main(), 1)
+            self.assertEqual(execute.call_count, 1)
+            rows = json.loads((log_dir / "checks.json").read_text(encoding="utf-8"))
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["status"], "failed")
+
+    def test_gate_runner_live_guard_stops_a_non_chunk_command(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-gate-live-guard-") as raw:
+            directory = Path(raw)
+            target = directory / "target"
+            script = directory / "grow.py"
+            growth = target / "debug" / "growth.bin"
+            script.write_text(
+                textwrap.dedent(
+                    """
+                    from pathlib import Path
+                    import sys
+                    import time
+
+                    path = Path(sys.argv[1])
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    while True:
+                        with path.open("ab") as stream:
+                            stream.write(b"x" * 4096)
+                        time.sleep(0.01)
+                    """
+                ),
+                encoding="utf-8",
+            )
+            initial = runner.target_bytes(target)
+            previous_live = runner.LIVE_TARGET
+            runner.LIVE_TARGET = initial + 32_000
+            process = subprocess.Popen(
+                [sys.executable, str(script), str(growth)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            stop = threading.Event()
+            overflow: list[dict] = []
+            stats: dict = {}
+            guard = threading.Thread(target=lambda: stats.update(runner._watch_target(process, target, stop, overflow)))
+            try:
+                guard.start()
+                guard.join(timeout=4)
+                self.assertFalse(guard.is_alive())
+                process.wait(timeout=2)
+                self.assertTrue(overflow)
+                self.assertGreaterEqual(overflow[0]["target_bytes"], runner.LIVE_TARGET)
+            finally:
+                stop.set()
+                if process.poll() is None:
+                    runner._terminate_process_group(process)
+                process.wait()
+                guard.join(timeout=2)
+                runner.LIVE_TARGET = previous_live
 
 
 if __name__ == "__main__":

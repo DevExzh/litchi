@@ -11,6 +11,7 @@ or a release artifact, and a live target guard stops growth before the hard
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
 import json
 import os
@@ -30,6 +31,8 @@ MIN_FREE = 12_000_000_000
 TARGET_POLL_SECONDS = 0.1
 PROCESS_KILL_GRACE_SECONDS = 1.0
 DESCENDANT_WAIT_SECONDS = 2.0
+PR_SET_CHILD_SUBREAPER = 36
+_SUBREAPER_ENABLED = False
 
 
 class TargetOverflow(RuntimeError):
@@ -38,6 +41,24 @@ class TargetOverflow(RuntimeError):
     def __init__(self, detail: dict):
         self.detail = detail
         super().__init__(f"target live guard stopped command: {json.dumps(detail, sort_keys=True)}")
+
+
+def enable_child_subreaper() -> None:
+    """Keep descendants that call ``setsid`` observable by this helper."""
+    global _SUBREAPER_ENABLED
+    if _SUBREAPER_ENABLED:
+        return
+    if sys.platform != "linux":
+        raise RuntimeError("safe chunked tests require Linux child-subreaper support")
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        result = libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0)
+        if result != 0:
+            error = ctypes.get_errno()
+            raise OSError(error, os.strerror(error))
+    except (OSError, AttributeError) as error:
+        raise RuntimeError(f"cannot enable child subreaper: {error}") from error
+    _SUBREAPER_ENABLED = True
 
 
 def plan(metadata: dict, selected: set[str], features: list[str], chunk_size: int):
@@ -92,44 +113,119 @@ def _terminate_process_group(process: subprocess.Popen) -> None:
 
 
 def _process_group_members(pgrp: int) -> list[int]:
-    members: list[int] = []
+    return [pid for pid, row in _process_table().items() if row["pgrp"] == pgrp]
+
+
+def _process_table() -> dict[int, dict[str, int]]:
+    """Read process ancestry without requiring ``/proc/$pid/exe`` to exist.
+
+    A just-exited adopted child is a zombie until this helper reaps it, and
+    Linux removes its ``exe`` link while it is a zombie.  The stat fields are
+    sufficient to distinguish the process identity and its ancestry.
+    """
+    result: dict[int, dict[str, int]] = {}
     for entry in Path("/proc").glob("[0-9]*"):
         try:
             pid = int(entry.name)
             text = (entry / "stat").read_text()
             close = text.rfind(")")
             fields = text[close + 2 :].split()
-            if int(fields[2]) == pgrp:
-                members.append(pid)
-        except (FileNotFoundError, ProcessLookupError, ValueError, IndexError):
+            result[pid] = {
+                "pid": pid,
+                "ppid": int(fields[1]),
+                "pgrp": int(fields[2]),
+                "start_time": int(fields[19]),
+            }
+        except (FileNotFoundError, ProcessLookupError, PermissionError, ValueError, IndexError):
             continue
-    return members
+    return result
 
 
-def _wait_for_descendants(process: subprocess.Popen) -> list[int]:
-    """Do not retire artifacts while a child of the completed Cargo group lives."""
+def _owned_descendants(
+    process: subprocess.Popen,
+    baseline: set[tuple[int, int]],
+) -> tuple[dict[int, dict[str, int]], set[int]]:
+    """Find new group members and adopted descendants of one Cargo command."""
+    table = _process_table()
+    runner_pid = os.getpid()
+    new = {
+        pid: row
+        for pid, row in table.items()
+        if pid != runner_pid and (pid, row["start_time"]) not in baseline
+    }
+    roots = {
+        pid
+        for pid, row in new.items()
+        if row["ppid"] == process.pid or row["ppid"] == runner_pid
+    }
+    owned = set(roots)
+    changed = True
+    while changed:
+        changed = False
+        for pid, row in new.items():
+            if pid not in owned and row["ppid"] in owned:
+                owned.add(pid)
+                changed = True
+    # A process started with start_new_session=True has pgrp == pid.  Keep
+    # the group check as well because it catches a fast fork before ancestry
+    # has been reparented, while the roots above catch a child that called
+    # setsid() and was adopted by this subreaper.
+    owned.update(pid for pid, row in new.items() if row["pgrp"] == process.pid)
+    return table, owned
+
+
+def _reap_owned(table: dict[int, dict[str, int]], owned: set[int]) -> None:
+    for pid in sorted(owned):
+        if pid == os.getpid():
+            continue
+        try:
+            os.waitpid(pid, os.WNOHANG)
+        except (ChildProcessError, ProcessLookupError):
+            continue
+
+
+def _signal_owned(process: subprocess.Popen, pids: set[int], signal_number: int) -> None:
+    try:
+        os.killpg(process.pid, signal_number)
+    except ProcessLookupError:
+        pass
+    for pid in sorted(pids):
+        if pid == os.getpid():
+            continue
+        try:
+            os.kill(pid, signal_number)
+        except ProcessLookupError:
+            continue
+
+
+def _wait_for_descendants(process: subprocess.Popen, baseline: set[tuple[int, int]]) -> list[int]:
+    """Do not retire artifacts while a group or adopted descendant lives."""
     deadline = time.monotonic() + DESCENDANT_WAIT_SECONDS
     while time.monotonic() < deadline:
-        members = _process_group_members(process.pid)
-        if not members:
+        table, owned = _owned_descendants(process, baseline)
+        _reap_owned(table, owned)
+        table, owned = _owned_descendants(process, baseline)
+        if not owned:
             return []
         time.sleep(0.02)
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return []
+
+    table, owned = _owned_descendants(process, baseline)
+    _signal_owned(process, owned, signal.SIGTERM)
     deadline = time.monotonic() + PROCESS_KILL_GRACE_SECONDS
     while time.monotonic() < deadline:
-        members = _process_group_members(process.pid)
-        if not members:
+        table, owned = _owned_descendants(process, baseline)
+        _reap_owned(table, owned)
+        table, owned = _owned_descendants(process, baseline)
+        if not owned:
             return []
         time.sleep(0.02)
-    try:
-        os.killpg(process.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        return []
+    table, owned = _owned_descendants(process, baseline)
+    _signal_owned(process, owned, signal.SIGKILL)
     time.sleep(0.05)
-    return _process_group_members(process.pid)
+    table, owned = _owned_descendants(process, baseline)
+    _reap_owned(table, owned)
+    _, owned = _owned_descendants(process, baseline)
+    return sorted(owned)
 
 
 def _watch_target(
@@ -168,6 +264,47 @@ def _append_manifest(path: Path, row: dict) -> None:
         os.fsync(stream.fileno())
 
 
+def _is_elf(path: Path) -> bool:
+    try:
+        with path.open("rb") as stream:
+            return stream.read(4) == b"\x7fELF"
+    except (FileNotFoundError, OSError):
+        return False
+
+
+def _private_elf(path: Path, debug: Path) -> bool:
+    if (
+        path.is_symlink()
+        or not path.is_file()
+        or path.suffix in {".so", ".dylib", ".dll"}
+        or not os.access(path, os.X_OK)
+        or not _is_elf(path)
+    ):
+        return False
+    try:
+        relative = path.resolve().relative_to(debug)
+    except ValueError:
+        return False
+    return len(relative.parts) == 2 and relative.parts[0] in {"deps", "examples"}
+
+
+def _sidecars(path: Path) -> set[Path]:
+    """Return only Cargo sidecars whose stem exactly matches one ELF."""
+    candidates = {
+        path.with_name(path.name + ".d"),
+        path.with_name(path.name + ".rmeta"),
+        path.with_suffix(".d"),
+        path.with_suffix(".rmeta"),
+    }
+    return {
+        candidate
+        for candidate in candidates
+        if candidate.is_file()
+        and not candidate.is_symlink()
+        and candidate.suffix in {".d", ".rmeta"}
+    }
+
+
 def _retire_artifacts(
     artifacts: set[Path],
     target: Path,
@@ -178,33 +315,38 @@ def _retire_artifacts(
     *,
     scan_private: bool = True,
 ) -> list[dict]:
-    """Move completed command binaries and their private sidecars, retaining evidence."""
+    """Move only private Cargo ELF outputs and their exact sidecars."""
     debug = (target / "debug").resolve()
     destination_root = quarantine / f"{chunk_index:04d}"
     reported = {Path(path).resolve() for path in artifacts}
+    selected_elfs: set[Path] = set()
+    for raw_path in artifacts:
+        path = Path(raw_path)
+        if _private_elf(path, debug):
+            selected_elfs.add(path)
     if scan_private:
         deps = debug / "deps"
         examples = debug / "examples"
-        if deps.is_dir():
-            for path in deps.iterdir():
-                if path.is_file() and not path.is_symlink() and os.access(path, os.X_OK) and path.suffix not in {".so", ".dylib", ".dll"}:
-                    artifacts.add(path)
-                    sidecar = path.with_name(path.name + ".d")
-                    if sidecar.is_file():
-                        artifacts.add(sidecar)
-        if examples.is_dir():
-            for path in examples.iterdir():
-                if path.is_file() and not path.is_symlink() and (os.access(path, os.X_OK) or path.suffix in {".d", ".rmeta"}):
-                    artifacts.add(path)
+        for private_dir in (deps, examples):
+            if private_dir.is_dir():
+                selected_elfs.update(
+                    path for path in private_dir.iterdir() if _private_elf(path, debug)
+                )
+    selected = set(selected_elfs)
+    for path in selected_elfs:
+        selected.update(_sidecars(path))
     retired: list[dict] = []
-    for raw_path in sorted(artifacts):
+    for raw_path in sorted(selected):
         path = Path(raw_path)
         if path.is_symlink():
             continue
         path = path.resolve()
-        if not path.is_file() or path.suffix in {".so", ".dylib", ".dll"}:
+        if not path.is_file():
             continue
-        if not path.is_relative_to(debug) or not (os.access(path, os.X_OK) or path.suffix in {".d", ".rmeta"}):
+        if path.suffix in {".d", ".rmeta"}:
+            if not any(path in _sidecars(elf) for elf in selected_elfs):
+                continue
+        elif not _private_elf(path, debug):
             continue
         source_stat = path.stat()
         source_digest = digest(path)
@@ -261,6 +403,11 @@ def execute(
     manifest = quarantine / "manifest.jsonl"
     command += ["--message-format", "json-render-diagnostics"]
     artifacts: set[Path] = set()
+    enable_child_subreaper()
+    baseline = {
+        (pid, row["start_time"])
+        for pid, row in _process_table().items()
+    }
     guard_stop = threading.Event()
     overflow: list[dict] = []
     guard_stats: dict = {}
@@ -303,7 +450,7 @@ def execute(
         process.stdout.close()
         guard_stop.set()
         guard.join()
-        descendants = _wait_for_descendants(process)
+        descendants = _wait_for_descendants(process, baseline)
         if descendants:
             detail = {"process_group": process.pid, "remaining_descendants": descendants, "command_exit": status}
             stream.write(json.dumps({"safe_chunked_descendant_guard": detail}, sort_keys=True) + "\n")
@@ -424,6 +571,11 @@ def main() -> int:
         print(json.dumps(row), flush=True)
         if status:
             failures.append(row)
+            # A failed chunk is a boundary: its outputs may still be needed
+            # for diagnosis or a controlled retry.  Never let a later
+            # successful private scan retire those artifacts as if this
+            # command had completed.
+            break
     (log_dir / "checks.json").write_text(json.dumps(rows, indent=2) + "\n", encoding="utf-8")
     return 1 if failures else 0
 

@@ -15,22 +15,37 @@ retention ran. The original receipts remain unchanged:
 
 ## Retention contract
 
-`safe_chunked_tests.py` waits for Cargo, its complete process group, and every
-descendant before moving any reported test/example executable. Successful
-test/example executables (including stale hashed variants from earlier
-feature builds) and their private `.d`/`.rmeta` sidecars are atomically moved
-beside the target into a per-chunk quarantine;
+`safe_chunked_tests.py` enables Linux child-subreaper mode and waits for Cargo,
+its complete process group, and every adopted descendant (including a child
+that calls `setsid`) before moving any reported output. Successful
+test/example ELF executables in exactly `target/debug/deps` or
+`target/debug/examples` (including stale hashed variants from earlier feature
+builds) and only their exact `.d`/`.rmeta` sidecars are atomically moved beside
+the target into a per-chunk quarantine;
 their bytes, mode, SHA-256, original relative path, command and chunk index
 are recorded in `manifest.jsonl`. Caches, rlibs, build outputs, shared
-libraries and release artifacts remain in the Cargo target. Failed, aborted or
-hung commands retain their artifacts in place and produce a blocked receipt.
+libraries, non-ELF files, `target/debug/build`, and release artifacts remain
+in the Cargo target. A failed chunk stops the helper immediately; failed,
+aborted or hung commands retain their artifacts in place and produce a blocked
+receipt.
 
-The live guard samples the target during each command and stops its private
-process group at `19,000,000,000` bytes, before the hard `20,000,000,000`
-byte cap. A command starts only below `18,000,000,000` bytes, with at least
-12 GB free disk. The helper uses chunk size 2; planning tests assert that all
-test and example targets occur exactly once, so shrinking the chunks cannot
-drop work. No historical target cleanup is used.
+Both the helper and the outer runner sample the target during each command and
+stop its private process group at `19,000,000,000` bytes, before the hard
+`20,000,000,000` byte cap. A command starts only below `18,000,000,000` bytes,
+with at least 12 GB free disk. The helper uses chunk size 2; planning tests
+assert that all test and example targets occur exactly once, so shrinking the
+chunks cannot drop work. No historical target cleanup is used.
+
+## Preserved command-count receipt
+
+The immutable predecessor's `ops-tests/checks.json` is 98,519 bytes with
+SHA-256 `bc8efb85911c0d4089a5f8687d4ca846fdb663c92209895d6db8ba63ba8a2c2d`.
+Parsing its completed commands gives 167 `--test` selectors, 72
+`--example` selectors, and one `--lib` command. At chunk size 2 this is 121
+selector/build chunks (84 test chunks + 36 example chunks + the library
+command), plus the one `--doc` command: 122 helper commands. This
+checks-derived count is the recorded basis; the historical 132-command
+statement is not used as a receipt or as evidence of completed work.
 
 ## Source binding and locks
 

@@ -17,6 +17,7 @@ import json
 import os
 from pathlib import Path
 import shlex
+import signal
 import shutil
 import subprocess
 import sys
@@ -37,6 +38,7 @@ POST_EXIT_POLL_SECONDS = 0.05
 POST_EXIT_STABLE_SAMPLES = 2
 POST_EXIT_TIMEOUT_SECONDS = 2.0
 PRE_EXIT_POLL_SECONDS = 0.01
+PROCESS_KILL_GRACE_SECONDS = 1.0
 PR_SET_CHILD_SUBREAPER = 36
 _SUBREAPER_ENABLED = False
 _SUBREAPER_ERROR: str | None = None
@@ -356,6 +358,50 @@ def target_bytes(target: Path) -> int:
     return int(subprocess.check_output(["du", "-sb", str(target)], text=True).split()[0])
 
 
+def _terminate_process_group(process: subprocess.Popen) -> None:
+    """Stop the isolated gate command before it reaches the hard target cap."""
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    deadline = time.monotonic() + PROCESS_KILL_GRACE_SECONDS
+    while process.poll() is None and time.monotonic() < deadline:
+        time.sleep(PRE_EXIT_POLL_SECONDS)
+    if process.poll() is None:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def _watch_target(
+    process: subprocess.Popen,
+    target: Path,
+    stop: threading.Event,
+    overflow: list[dict],
+) -> dict:
+    """Enforce the live cap for every gate command, not just Cargo chunks."""
+    maximum = target_bytes(target)
+    samples = 0
+    while not stop.wait(PRE_EXIT_POLL_SECONDS):
+        if process.poll() is not None:
+            break
+        size = target_bytes(target)
+        maximum = max(maximum, size)
+        samples += 1
+        if size >= LIVE_TARGET:
+            detail = {
+                "target_bytes": size,
+                "live_target": LIVE_TARGET,
+                "max_sampled_bytes": maximum,
+                "samples": samples,
+            }
+            overflow.append(detail)
+            _terminate_process_group(process)
+            break
+    return {"max_sampled_bytes": maximum, "samples": samples, "live_target": LIVE_TARGET}
+
+
 def preflight(root: Path, target: Path, source: dict, isolated: bool = False) -> dict:
     current = source_state(root)
     if current["commit"] != source["commit"] or current["status"]:
@@ -510,6 +556,15 @@ def run_step(step: dict, root: Path, target: Path, state_dir: Path, source: dict
     else:
         command = ["bash", "-c", step["command"]]
         process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True, pass_fds=tuple(step.get("pass_fds", ())))
+    live_stop = threading.Event()
+    live_overflow: list[dict] = []
+    live_guard_stats: dict = {}
+    live_guard = threading.Thread(
+        target=lambda: live_guard_stats.update(_watch_target(process, target, live_stop, live_overflow)),
+        name=f"gate-target-guard-{process.pid}",
+        daemon=True,
+    )
+    live_guard.start()
     ownership = new_ownership(process.pid, root, target, prelaunch, process_table())
     monitor = threading.Thread(target=capture_step_identities, args=(process, ownership), name=f"gate-owner-{process.pid}")
     monitor.start()
@@ -519,6 +574,8 @@ def run_step(step: dict, root: Path, target: Path, state_dir: Path, source: dict
             stream.write(line)
             stream.flush()
     status = process.wait()
+    live_stop.set()
+    live_guard.join()
     monitor.join()
     if ownership.get("monitor_error"):
         raise RuntimeError(f"process identity monitor failed: {ownership['monitor_error']}")
@@ -563,7 +620,14 @@ def run_step(step: dict, root: Path, target: Path, state_dir: Path, source: dict
         "cargo_target_trace_bytes": trace.stat().st_size,
         "cargo_target_trace_sha256": sha256(trace),
         "preflight": pre,
+        "target_live_guard": live_guard_stats,
     }
+    if live_overflow:
+        row["resource_failure"] = {
+            "reason": "target live guard stopped command before hard cap",
+            **live_overflow[0],
+        }
+        status = 1
     if size > MAX_TARGET:
         row["resource_failure"] = f"target exceeded 20 GiB: {size}"
         status = 1
