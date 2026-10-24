@@ -4389,3 +4389,28 @@ See [0063](0063-source-pptx-modern-comments.md).
   and actual builds remain held. DOC, Ink and PPT execution-adapter repairs
   continue against concrete review findings. None of these preparations is
   performance acceptance, and nothing is pushed.
+
+- Coordinator reviewed execution-tooling update (2026-10-24):
+  The Ink boundary and concrete final-source handoff merge at `6e323fcbc5`
+  from reviewed leaf `0dbc09268b`. The actual systemd 259 checks verify the
+  named scope, runtime limit and cleanup of escaped children; the composed
+  tree passes all eight boundary tests. The accepted paired release builds
+  and correctness artifacts remain unchanged. Allocation and native timing
+  are still required.
+
+  The signed-consumer source-preparation adapter merges at `1c2ce1f7d5`
+  from `efad4fabbc`. Independent review verifies its composition with the
+  accepted signed protocol, the original-f2 source closure, role-specific
+  locks and fixed dependency policy. All seven adapter tests pass on the
+  composed tree. Original-f2 preparation has completed; it has no build or
+  binary receipt. Candidate preparation remains held for the signed-batch
+  contract decision.
+
+  Isolated workspace documentation continues on unchanged 9781 source.
+  Other build and measurement jobs remain held. The separate core/ops/facade
+  documentation row may run alone after this row passes and its processes
+  terminate. The earlier interrupted documentation invocation is retained
+  as an aborted partial run: Cargo and rustc did start, so it is not a
+  setup-only attempt. Neither attempt is counted as passed before its
+  terminal receipt. Cleanup review continues for inactive merged leaves;
+  no additional leaf has yet been removed. Nothing is pushed.
