@@ -3348,14 +3348,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   baseline accepts the candidate lock; all 228 external dependency rows
   match, independently verified. No native acceptance is claimed.
 
-  Cleanups twenty-four and twenty-five remove five more merged leaves,
+  Cleanups twenty-four through twenty-six remove seven more merged leaves,
   retaining branches, external targets/evidence, and hash-quarantined ignored
   artifacts. The coordinator verified all 5,266 cleanup24 payloads and all
-  three XLS payloads. A restore-layout mismatch was corrected before cleanup25
+  three XLS payloads, plus seven final binding-leaf files. A restore-layout
+  mismatch was corrected before cleanup25
   acceptance. Story-text and ODraw leaves remain because of live foreign
   handles and missing integration ancestry, respectively.
 
   Source integration remains staging. Completion still requires the full
   gate, all-68 inventory, actual corpus replay, glossary closure and quiet
-  native qualification. Only comprehensive redaction audit22 is deferred.
+  native qualification. Only comprehensive redaction audit 22 is deferred.
   Nothing is pushed.
