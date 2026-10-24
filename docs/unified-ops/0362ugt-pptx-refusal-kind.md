@@ -30,10 +30,32 @@ display remains content-free.
 
 ## Validation
 
-Validation is to run from the fresh `uo2/pptx-refusal-kind` leaf using
-`.coord/pptx-refusal-kind/env.sh`: one-job, offline, external temporary and
-target directories, with the 20 GB memory cap. Required checks are the focused
-PPTX classifier test, `pptx_slide_remove`, the PPTX capability golden, and
-strict PPTX-enabled `litchi-ops` Clippy. Their exact source commit, lock
-overlay provenance, logs, counts and target size will be appended after the
-capped build completes.
+Validation was run from the fresh `uo2/pptx-refusal-kind` leaf using
+`.coord/pptx-refusal-kind/env.sh`. The environment used the repository's
+memory-capped cargo shim with `LITCHI_MEM_MAX=20G`,
+`CARGO_BUILD_JOBS=1`, `RUST_TEST_THREADS=1`, `CARGO_INCREMENTAL=0`,
+`CARGO_NET_OFFLINE=true`, and external `CARGO_TARGET_DIR` and `TMPDIR`.
+The accepted source commit for every command below is
+`18346e7f881fb8aa1fa1bb854a8ee0852542ecf2`. The ignored offline lock overlay
+was 139592 bytes with SHA-256
+`6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`.
+
+All raw logs and receipts are in
+`/home/zhuhe/code/litchi-worktrees/.coord/pptx-refusal-kind/validation-18346e7f88/`.
+The raw-log evidence is:
+
+| Check | Command result | Raw log (bytes; SHA-256) |
+| --- | --- | --- |
+| Kind classifier | 1 passed, 0 failed, 443 filtered | `ops-pptx-refusal-kind-18346e7f88.log` (557; `19cf47ec2c9821b165331be6b02d5cb4c5a5ec37c325b45c3636aaf91330f6c4`) |
+| Slide-removal consumers | 10 passed, 0 failed | `ops-pptx-slide-remove-18346e7f88.log` (1225; `80d1091c6f8a34bf1e5a52706964d8dd6e6440b0c8f5c1e1ba6acb59a2445945`) |
+| PPTX capability disposition | 1 passed, 0 failed, 2 filtered | `ops-pptx-capabilities-18346e7f88.log` (481; `ac0e7a1aec1d3e5445d9b626db1d6d6d785f8ad9c0001528e482e4ed19a31a77`) |
+| Strict PPTX-only ops Clippy | exit 0, `-D warnings` | `ops-pptx-clippy-18346e7f88.log` (4592; `54628eed3bb4c2d7e7ac3c4e63e4aabf3c5931548cd0708b593ba1fe6957a8fe`) |
+
+The commands were, respectively, the exact classifier test, the complete
+`pptx_slide_remove` integration target, the exact capability disposition test,
+and `cargo clippy --offline --locked -p litchi-ops --no-default-features
+--features pptx --all-targets -- -D warnings`. Their receipts record the
+source commit, lock SHA, UTC interval, exit status, log size and target size.
+The target grew from 652071845 to 766803350 bytes and remained below the 20 GB
+cap. No native PPTX suite or workspace full-gate was run for this focused
+correction.
