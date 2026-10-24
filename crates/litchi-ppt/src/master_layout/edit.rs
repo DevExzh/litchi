@@ -110,31 +110,31 @@ impl Edit {
     }
 
     /// The contextual layout kind of the edited master record.
-    #[must_use]
+    #[must_use = "handle the fallible master-layout context result"]
     pub fn context(&self) -> Result<Context> {
         Ok(self.state()?.inner.context())
     }
 
     /// A borrowed read view of the staged record tree.
-    #[must_use]
+    #[must_use = "handle the fallible master-layout view result"]
     pub fn view(&self) -> Result<View<'_>> {
         Ok(self.state()?.inner.view())
     }
 
     /// The staged master record tree.
-    #[must_use]
+    #[must_use = "handle the fallible master-layout record result"]
     pub fn record(&self) -> Result<&Record> {
         Ok(self.state()?.inner.record())
     }
 
     /// The content revision of the staged record tree.
-    #[must_use]
+    #[must_use = "handle the fallible master-layout revision result"]
     pub fn revision(&self) -> Result<Revision> {
         Ok(self.state()?.inner.revision())
     }
 
     /// The staged structural changes, in order.
-    #[must_use]
+    #[must_use = "handle the fallible master-layout changes result"]
     pub fn changes(&self) -> Result<&[Change]> {
         Ok(self.state()?.inner.changes())
     }

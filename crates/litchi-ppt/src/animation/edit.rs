@@ -76,25 +76,25 @@ impl Edit {
     }
 
     /// The staged animation timeline of every slide and main master.
-    #[must_use]
+    #[must_use = "handle the fallible animation timelines result"]
     pub fn timelines(&self) -> Result<Vec<Timeline>> {
         Ok(self.inner()?.timelines())
     }
 
     /// The staged timeline of the slide or main master `persist_id`.
-    #[must_use]
+    #[must_use = "handle the fallible animation lookup result"]
     pub fn find(&self, persist_id: u32) -> Result<Option<Timeline>> {
         Ok(self.inner()?.find(persist_id))
     }
 
     /// The staged legacy `PowerPoint` 97 shape animations.
-    #[must_use]
+    #[must_use = "handle the fallible legacy animation result"]
     pub fn legacy_shape_animations(&self) -> Result<Vec<LegacyShapeAnimation>> {
         Ok(self.inner()?.legacy_shape_animations())
     }
 
     /// The staged legacy animation of shape `shape_id` on `persist_id`.
-    #[must_use]
+    #[must_use = "handle the fallible shape animation lookup result"]
     pub fn find_shape(
         &self,
         persist_id: u32,

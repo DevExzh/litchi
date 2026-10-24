@@ -109,7 +109,7 @@ impl Edit {
     }
 
     /// The contextual layout kind of the edited master record.
-    #[must_use]
+    #[must_use = "handle the fallible master context result"]
     pub fn context(&self) -> Result<Context> {
         Ok(self.state()?.inner.context())
     }
@@ -157,13 +157,13 @@ impl Edit {
     }
 
     /// The staged master record tree.
-    #[must_use]
+    #[must_use = "handle the fallible master record result"]
     pub fn record(&self) -> Result<&Record> {
         Ok(self.state()?.inner.record())
     }
 
     /// The staged structural changes, in order.
-    #[must_use]
+    #[must_use = "handle the fallible master changes result"]
     pub fn changes(&self) -> Result<&[Change]> {
         Ok(self.state()?.inner.changes())
     }

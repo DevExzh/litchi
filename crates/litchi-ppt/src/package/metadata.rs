@@ -255,7 +255,7 @@ impl Edit {
     }
 
     /// The staged presentation properties.
-    #[must_use]
+    #[must_use = "handle the fallible metadata projection result"]
     pub fn properties(&self) -> Result<&SummaryProperties> {
         Ok(&self.state()?.properties)
     }

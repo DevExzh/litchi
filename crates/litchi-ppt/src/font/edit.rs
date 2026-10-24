@@ -64,13 +64,13 @@ impl Edit {
     }
 
     /// The staged font collections.
-    #[must_use]
+    #[must_use = "handle the fallible font projection result"]
     pub fn fonts(&self) -> Result<&FontCollections> {
         Ok(self.inner()?.fonts())
     }
 
     /// The staged operations, in order.
-    #[must_use]
+    #[must_use = "handle the fallible font changes result"]
     pub fn changes(&self) -> Result<&[Change]> {
         Ok(self.inner()?.changes())
     }

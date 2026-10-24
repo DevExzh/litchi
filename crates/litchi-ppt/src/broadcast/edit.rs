@@ -94,13 +94,13 @@ impl Edit {
     }
 
     /// Current typed broadcast projection.
-    #[must_use]
+    #[must_use = "handle the fallible broadcast projection result"]
     pub fn broadcast(&self) -> Result<&Broadcast> {
         Ok(self.state()?.inner.broadcast())
     }
 
     /// Opaque source records retained by every candidate publication.
-    #[must_use]
+    #[must_use = "handle the fallible broadcast records result"]
     pub fn unknown_records(&self) -> Result<&[UnknownRecord]> {
         Ok(self.state()?.inner.unknown_records())
     }

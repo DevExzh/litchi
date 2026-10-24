@@ -106,7 +106,7 @@ impl Edit {
     }
 
     /// The staged operations, in order.
-    #[must_use]
+    #[must_use = "handle the fallible slide-sync changes result"]
     pub fn changes(&self) -> Result<&[Change]> {
         Ok(self.state()?.inner.changes())
     }

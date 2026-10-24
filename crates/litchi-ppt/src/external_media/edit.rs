@@ -91,26 +91,26 @@ impl Edit {
 
     /// The staged media collection, or `None` when the live document has no
     /// external-object list.
-    #[must_use]
+    #[must_use = "handle the fallible external-media collection result"]
     pub fn collection(&self) -> Result<Option<&Collection>> {
         Ok(self.state()?.inner.collection())
     }
 
     /// The staged media objects, or an empty slice when no list exists.
-    #[must_use]
+    #[must_use = "handle the fallible external-media objects result"]
     pub fn objects(&self) -> Result<&[Object]> {
         Ok(self.state()?.inner.objects())
     }
 
     /// The staged operations, in order.
-    #[must_use]
+    #[must_use = "handle the fallible external-media changes result"]
     pub fn changes(&self) -> Result<&[Change]> {
         Ok(self.state()?.inner.changes())
     }
 
     /// Number of shapes in the source whose `ExObjRefAtom` references the
     /// media object `id`.
-    #[must_use]
+    #[must_use = "handle the fallible external-media owner count result"]
     pub fn owner_count(&self, id: u32) -> Result<usize> {
         Ok(self.state()?.source.owner_count(id))
     }

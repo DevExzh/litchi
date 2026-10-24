@@ -64,13 +64,13 @@ impl Edit {
 
     /// The staged picture-bullet collection, or `None` when the live
     /// document has none.
-    #[must_use]
+    #[must_use = "handle the fallible picture-bullets projection result"]
     pub fn picture_bullets(&self) -> Result<Option<&PictureBulletCollection>> {
         Ok(self.inner()?.picture_bullets())
     }
 
     /// The staged operations, in order.
-    #[must_use]
+    #[must_use = "handle the fallible picture-bullets changes result"]
     pub fn changes(&self) -> Result<&[PictureBulletChange]> {
         Ok(self.inner()?.changes())
     }

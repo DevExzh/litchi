@@ -90,7 +90,7 @@ impl Edit {
     }
 
     /// The staged semantic changes, in order.
-    #[must_use]
+    #[must_use = "handle the fallible document-comparison changes result"]
     pub fn changes(&self) -> Result<&[Change]> {
         Ok(self.inner()?.changes())
     }

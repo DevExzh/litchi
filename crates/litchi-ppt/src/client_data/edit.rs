@@ -99,7 +99,7 @@ impl Edit {
         })
         .map_err(Failure::from)?;
         if let Some(failure) = failure {
-            return Err(failure.into());
+            return Err(failure);
         }
         let record = record
             .ok_or_else(|| scoped::unsupported_target(OPERATION, "the shape has no client data"))?;
@@ -181,19 +181,19 @@ impl Edit {
     }
 
     /// The staged client data.
-    #[must_use]
+    #[must_use = "handle the fallible client-data projection result"]
     pub fn client_data(&self) -> Result<&ClientData> {
         Ok(self.state()?.inner.client_data())
     }
 
     /// The staged client-data children, in order.
-    #[must_use]
+    #[must_use = "handle the fallible client-data children result"]
     pub fn children(&self) -> Result<&[ClientDataChild]> {
         Ok(self.state()?.inner.children())
     }
 
     /// The staged operations, in order.
-    #[must_use]
+    #[must_use = "handle the fallible client-data changes result"]
     pub fn changes(&self) -> Result<&[Change]> {
         Ok(self.state()?.inner.changes())
     }

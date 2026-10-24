@@ -119,13 +119,13 @@ impl Edit {
     }
 
     /// The staged typed diagram builds, in `BuildList` order.
-    #[must_use]
+    #[must_use = "handle the fallible diagram projection result"]
     pub fn builds(&self) -> Result<impl ExactSizeIterator<Item = Build> + '_> {
         Ok(self.state()?.inner.builds())
     }
 
     /// The staged operations, in order.
-    #[must_use]
+    #[must_use = "handle the fallible diagram changes result"]
     pub fn changes(&self) -> Result<&[Change]> {
         Ok(self.state()?.inner.changes())
     }

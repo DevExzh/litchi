@@ -121,7 +121,7 @@ impl Edit {
     }
 
     /// The staged embedded-object collection.
-    #[must_use]
+    #[must_use = "handle the fallible embedded-object projection result"]
     pub fn objects(&self) -> Result<&Collection> {
         Ok(self.state()?.inner.objects())
     }
