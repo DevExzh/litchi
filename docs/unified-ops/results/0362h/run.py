@@ -665,6 +665,8 @@ def main() -> int:
     parser.add_argument("cpu", type=int, nargs="?", default=29)
     parser.add_argument("--before-manifest", required=True, type=Path)
     parser.add_argument("--after-manifest", required=True, type=Path)
+    parser.add_argument("--original-to-final-policy", type=Path)
+    parser.add_argument("--original-to-final-receipt", type=Path)
     args = parser.parse_args()
     if args.rounds < 5:
         parser.error("at least five ABBA blocks are required")
@@ -675,16 +677,50 @@ def main() -> int:
         parser.error("before and after must be distinct protected binaries")
     if not before.is_file() or not os.access(before, os.X_OK) or not after.is_file() or not os.access(after, os.X_OK):
         parser.error("before and after must be executable protected binaries")
+    if (args.original_to_final_policy is None) != (args.original_to_final_receipt is None):
+        parser.error("--original-to-final-policy and --original-to-final-receipt must be supplied together")
     if out.exists() and any(out.iterdir()):
         parser.error(f"refusing to overwrite nonempty output directory {out}")
     out.mkdir(parents=True, exist_ok=True)
-    before_endpoint = endpoint_manifest(args.before_manifest.resolve(), before, "before")
-    after_endpoint = endpoint_manifest(args.after_manifest.resolve(), after, "after")
-    shared = shared_identity(before_endpoint, after_endpoint)
+    pair_policy = None
+    if args.original_to_final_policy is not None:
+        repo_root = Path(__file__).resolve().parents[4]
+        if str(repo_root) not in sys.path:
+            sys.path.insert(0, str(repo_root))
+        from tools import w8_projection_policy
+
+        pair_policy = w8_projection_policy
+    if pair_policy is None:
+        before_endpoint = endpoint_manifest(args.before_manifest.resolve(), before, "before")
+        after_endpoint = endpoint_manifest(args.after_manifest.resolve(), after, "after")
+        # The ordinary protocol remains strict shared identity.  The explicit
+        # original-to-final policy is opt-in and cannot loosen this path.
+        shared = shared_identity(before_endpoint, after_endpoint)
+    else:
+        before_endpoint = pair_policy.validate_endpoint_manifest(args.before_manifest.resolve(), before, "before")
+        after_endpoint = pair_policy.validate_endpoint_manifest(args.after_manifest.resolve(), after, "after")
+        receipt_path = args.original_to_final_receipt.resolve()
+        pair = pair_policy.verify_pair_receipt(
+            args.original_to_final_policy.resolve(), receipt_path, before_endpoint, after_endpoint,
+        )
+        shared = {
+            "mode": "original_to_final",
+            "policy": pair["policy"],
+            "receipt": artifact(receipt_path),
+            "projection": pair["projection"],
+            "workload": pair["workload"],
+            "build": pair["build"],
+        }
+    before_provenance = pair_policy.endpoint_public_fields(before_endpoint) if pair_policy is not None else before_endpoint
+    after_provenance = pair_policy.endpoint_public_fields(after_endpoint) if pair_policy is not None else after_endpoint
     guard(out, "initial")
     before_routes, before_route_receipt = routes(before, out, args.cpu, "before")
     after_routes, after_route_receipt = routes(after, out, args.cpu, "after")
-    expected_routes = before_endpoint["routes"]
+    # Pair validation exposes an immutable endpoint capability, whose recursive
+    # freeze stores route sequences as tuples.  The route probe returns its
+    # canonical JSON-shaped list, so normalize the validated value at this
+    # boundary before enforcing the exact reviewed order.
+    expected_routes = list(before_endpoint["routes"])
     if before_routes != expected_routes or after_routes != expected_routes:
         raise RuntimeError("endpoint validation does not cover the complete 109-route list")
     if before_routes != after_routes:
@@ -702,8 +738,8 @@ def main() -> int:
         "headroom": HEADROOM,
         "guard": "full /proc comm+cmdline+exe snapshots before/after and every 100ms; only this runner and the child subtree are exempt",
         "provenance": {
-            "before": before_endpoint,
-            "after": after_endpoint,
+            "before": before_provenance,
+            "after": after_provenance,
             "shared": shared,
         },
         "status": "running",

@@ -42,6 +42,8 @@ ADAPTER_RELATIVE = Path("crates/litchi-ops/examples/file_w8_original_baseline_pr
 LOCK_RELATIVE = Path("Cargo.lock")
 REVIEWED_PROBE_SHA256 = "21c8e3833c96411a612a2631f98093bd70cf0a5c28b2952c3d15873f464e54b0"
 REVIEWED_PROBE_BYTES = 75_035
+REVIEWED_LOCK_SHA256 = "1b9b10ae7a9fd65db3b8b29a5bedad1aa560473c10b462f8a7d654c169335b2c"
+REVIEWED_LOCK_BYTES = 139_441
 TARGET = "x86_64-unknown-linux-gnu"
 PROFILE = "release"
 W8_FEATURES = (
@@ -203,6 +205,16 @@ def _archive_prefixes(members: list[tarfile.TarInfo]) -> set[str]:
     return prefixes
 
 
+def _archive_directories(tree: dict[str, tuple[str, str]]) -> set[str]:
+    directories = {""}
+    for path in tree:
+        current = PurePosixPath(path).parent
+        while str(current) not in ("", "."):
+            directories.add(str(current))
+            current = current.parent
+    return directories
+
+
 def _strip_prefix(name: str, prefix: str) -> str | None:
     name = _archive_name(name)
     if not prefix:
@@ -222,16 +234,33 @@ def verify_source_archive(archive: Path, tree: dict[str, tuple[str, str]]) -> di
     try:
         with tarfile.open(archive, "r:*") as stream:
             members = stream.getmembers()
+            names: set[str] = set()
+            for member in members:
+                name = _archive_name(member.name)
+                if name in names:
+                    raise fail(f"source archive has a duplicate member: {member.name}")
+                names.add(name)
+                if not member.isfile() and not member.isdir():
+                    raise fail(f"source archive has an unsupported non-regular member: {member.name}")
             prefixes = _archive_prefixes(members)
+            expected_directories = _archive_directories(tree)
             matches: list[str] = []
             for prefix in sorted(prefixes):
                 seen: set[str] = set()
                 valid = True
                 for member in members:
-                    if not member.isfile():
-                        continue
                     relative = _strip_prefix(member.name, prefix)
-                    if relative is None or relative in seen or relative not in tree:
+                    if relative is None:
+                        if prefix and _archive_name(member.name) == prefix:
+                            continue
+                        valid = False
+                        break
+                    if member.isdir():
+                        if relative not in expected_directories:
+                            valid = False
+                            break
+                        continue
+                    if relative in seen or relative not in tree:
                         valid = False
                         break
                     seen.add(relative)
@@ -243,7 +272,9 @@ def verify_source_archive(archive: Path, tree: dict[str, tuple[str, str]]) -> di
             seen: set[str] = set()
             for member in members:
                 if not member.isfile():
-                    continue
+                    if member.isdir():
+                        continue
+                    raise fail(f"source archive has an unsupported non-regular member: {member.name}")
                 relative = _strip_prefix(member.name, prefix)
                 if relative is None:
                     continue
@@ -306,6 +337,8 @@ def verify_workspace(workspace: Path, tree: dict[str, tuple[str, str]], probe: P
         provenance.safe_location(path, label)
         if not path.is_file():
             raise fail(f"workspace {label} is missing: {path}")
+    if lock.stat().st_size != REVIEWED_LOCK_BYTES or digest(lock) != REVIEWED_LOCK_SHA256:
+        raise fail("workspace pinned lock is not the reviewed historical f2 lock")
     actual = _workspace_files(workspace)
     allowed = {PROBE_RELATIVE.as_posix(), ADAPTER_RELATIVE.as_posix(), LOCK_RELATIVE.as_posix()}
     expected = set(tree) | allowed
