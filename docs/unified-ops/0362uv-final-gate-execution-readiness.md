@@ -6,26 +6,31 @@ must capture all 68 direct libraries with all features and hidden items;
 the glossary's 55 profiles cover 41 packages and cannot replace it.
 
 The runner now clears inherited `LITCHI_CAPPED` before invoking its Cargo
-wrapper. A resource or provenance exception preserves existing child output
-and writes a separate `.blocked.log`, with both hashes in the failure row.
-It no longer overwrites useful command output when post-command checks fail.
+wrapper. Every child runs in a fresh process group; after its top-level exit,
+the runner rejects owned builders, waits for owned descendants to disappear,
+and samples the selected target until it is stable, including after the final
+step. A resource or provenance exception preserves existing child output and
+writes a separate attempt-specific `.blocked.log`, with both hashes in the
+failure row. Retries receive unique current logs and target traces, so an
+earlier attempt cannot be credited.
 This is execution readiness, not a completed gate or performance receipt.
 
 ## Runner identity and reproduction
 
 The external runner is
 `/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py`.
-The preserved predecessor is `run_safe_gate-before-0362uv.py` beside it.
+The preserved predecessor is `run_safe_gate-before-0362uv-postexit.py` beside it.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| Predecessor | 22,130 | `592ff5f7ad8493641ba6df7308bd66a97bddced35fc616c5803aacc5d30dcd2c` |
-| Repaired runner | 22,721 | `d513002381419a3c09fe0457c644db1231eb8f8bb3094896525c8e8545f90c84` |
-| `results/0362uv/safe-gate.patch` | 1,629 | `45a8b8fb8c8fdcc334d357e72b832330acfebe2ed6fe410b9b2905e65de93822` |
+| Predecessor | 22,721 | `d513002381419a3c09fe0457c644db1231eb8f8bb3094896525c8e8545f90c84` |
+| Repaired runner | 26,767 | `2585788b5161c9d85a1a4d9481c378e8ca9bf64283f0ca8ff91bf05f7d741c27` |
+| `results/0362uv/safe-gate-postexit.patch` | 7,482 | `657a87d0f3952ae473c261bb7d21e83e4fa87a79c916b430c98ddc48341b4dc5` |
 
 To reconstruct the repaired source, copy the preserved predecessor to a fresh
-external directory as `run_safe_gate.py`, then apply the tracked patch there
-with `patch -p1 --input <absolute-path-to-safe-gate.patch>`. The runner keeps
+external directory as `run_safe_gate.py`, then apply
+`results/0362uv/safe-gate-postexit.patch` there with
+`patch -p1 --input <absolute-path-to-safe-gate-postexit.patch>`. The runner keeps
 using its preserved sibling `safe_chunked_tests.py` and `bin/cargo`; a real
 gate launch records all three source hashes in its plan.
 
@@ -36,8 +41,10 @@ python3 docs/unified-ops/results/0362uv/verify_safe_gate.py --runner /home/zhuhe
 ```
 
 It verifies the 53-step plan, inventory test registration, cap-marker
-isolation, and preservation of exact child output after an injected
-post-command resource failure, including both recorded log identities.
+isolation, a real forked target mutation after the top-level child exits, the
+owned-builder rejection branch, exact child output after an injected
+post-command resource failure, and two blocked retries with distinct current
+log identities.
 
 ## Remaining phases
 
@@ -69,10 +76,8 @@ documentation-only `947b98f94f` commit; all tested tool sources are unchanged
 from `a2f0984719`. The iWork suite ran on the clean successor. Independent
 review confirms the runner patch and its regression proof.
 
-The coordinator must additionally verify that no gate-owned build children
-remain and remeasure target size after the gate exits, before accepting the
-final receipt or starting a measurement. The runner's per-step size sample
-alone does not prove that a detached child has exited. A blocked retry may
-retain prior child output beside its new failure log; that row is not a new
-command pass. Use a fresh state directory when a distinct attempt receipt is
-needed rather than attributing previous output to a new execution.
+The final gate and native/corpus receipts remain separate acceptance phases;
+this record does not claim that any of them has passed. The repaired runner's
+post-exit guard is part of every step, including the final one, and its
+attempt-specific receipt paths are the identity used when resuming or
+retrying.
