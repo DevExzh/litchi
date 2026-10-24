@@ -49,8 +49,8 @@ BASELINE_SOURCE_REF = "9b1f96d6dce1506dc9d0080f0696b42ba592c397"
 # The harness is copied as a deterministic file overlay from this frozen
 # source commit.  The runner itself is deliberately not an overlay path, so a
 # runner change does not require a self-referential commit list.
-COMMON_HARNESS_REF = "0b8f68d7e9d3c97cfa62cedceacdeb2ad5f4ba76"
-CANDIDATE_SOURCE_REF = "0b8f68d7e9d3c97cfa62cedceacdeb2ad5f4ba76"
+COMMON_HARNESS_REF = "472b6705475b073e7fe08f6e11ee17fb1e29f838"
+CANDIDATE_SOURCE_REF = "472b6705475b073e7fe08f6e11ee17fb1e29f838"
 CANDIDATE_PRODUCTION_COMMITS = (
     "8d491b1e8f084effde712651e07d460ba044cb1f",
     "ef6e6ea25355e56571f870a4cefd1675fdb60366",
