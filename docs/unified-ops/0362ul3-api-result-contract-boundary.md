@@ -1,5 +1,14 @@
 # 0362ul3 — result-contract identity and facade boundary
 
+The final reviewed tool tip `435e1547bd` is merged at `f620a8dd26`.
+All fourteen registered tooling modules pass together on composed source
+`83a0ace78bfaf2cf6e14aa066b27e6657366a811`: 1,428 tests in 46.721 test-runner
+seconds (48.210 wall seconds including process setup). The source/command/log
+binding is in [the composed receipt](results/0362ul3/composed-tooling.json).
+The 633,734-byte raw log remains external with SHA-256
+`f12da526f0dea17c39c98e30ae086495a0726e546a1ba6f8a64f881e9d048a22`.
+This is a composed tooling pass; the full runtime gate remains pending.
+
 The API inventory now distinguishes the two owner-accessor contracts without
 trusting a type's spelling.
 

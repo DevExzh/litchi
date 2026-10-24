@@ -3593,3 +3593,49 @@ See [0063](0063-source-pptx-modern-comments.md).
   the resulting assembled source. The documentation pass on 49c remains
   valid evidence for that revision. Only redaction audit 22 is deferred.
   Nothing is pushed.
+
+- Coordinator checkpoint (2026-10-24, reviewed API repairs and semantic returns):
+  Staging merges the Markdown shared triad at `f442730bb8`, canonical IWA
+  wire-request names at `6ed8035e4a`, font/cache required limits at
+  `0be121e437`, and signature policy/raw limits at `e35cede32a`. Every source
+  change includes its consumers. Markdown's 70 tests, IWA's 972 library tests
+  plus integration binaries, and font/cache/archive's 216 tests pass on the
+  pinned 52ed dependency graph. The signature slice passes its focused tests
+  on the separately recorded 6d diagnostic graph; final composed validation
+  still requires 52ed. No sibling-lock result is relabeled as pinned evidence.
+
+  Reviewed error extensibility merges at `83a0ace78b`: eighteen remaining
+  public enums gain `non_exhaustive`, with every known downstream mapping
+  preserved and fixed future fallbacks. Together with the font error repair,
+  all nineteen identified enum sites are addressed in source. Six affected
+  library suites pass 7,007 tests with seven existing ignores on the recorded
+  diagnostic graph. Standalone fuzz consumers are source-audited separately.
+
+  The result-contract tool is returned for foreign-coverage and alias-identity
+  gaps before merging `435e1547bd` at `f620a8dd26`. It now requires exact
+  auditable defining types, rejects duplicate defining graphs and inconsistent
+  crate identities, preserves type/macro namespaces, and registers 273 replay
+  contracts. Exact AST and wire-value disposition categories merge at
+  `1fb0744f82`; they are structural classifications, not broad waivers. All
+  fourteen registered tooling modules pass together on `83a0ace78b`: 1,428
+  tests. The frozen-49c diagnostic remains separate from final-source closure.
+
+  Source review returns DrawingML before merge: alternate publication methods,
+  action-owner entry/replay, compatibility methods and builder placement still
+  require correction. The spreadsheet Chart also needs canonical builder
+  placement. Dedicated lanes address legacy raw limits/error boundaries and
+  the CFB/ZIP canonical limits work scheduled by 0362rd. Record 0362ul5 makes
+  these engineering requirements explicit; it does not classify them away.
+  Canonical shared value types remain allowed, and raw Reader mutability is
+  reviewed against the specific codec contract rather than builder status.
+
+  Cleanup thirty-seven removes three merged leaf worktrees non-forced. All
+  eight ignored files (6,677,946 bytes), their modes, branches and validation
+  evidence remain; restoration was exercised successfully. The coordinator
+  independently verifies payload hashes and merge ancestry. Active repair
+  leaves and external targets are preserved.
+
+  Source integration remains staging pending the resulting source freeze,
+  fresh all-68 inventory/dispositions, full 53-step gate, real OfficeCLI corpus
+  replay and native performance qualification. Only redaction audit 22 is
+  deferred. Nothing is pushed.
