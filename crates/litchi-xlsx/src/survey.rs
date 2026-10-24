@@ -3627,12 +3627,6 @@ impl Edit {
         Ok(Some(removed))
     }
 
-    /// Whether staged Survey semantics or ownership identities differ.
-    fn changed(&mut self) -> Result<bool> {
-        self.ensure_prepared()?;
-        Ok(!self.snapshot()?.same_semantics(self.draft()?))
-    }
-
     /// Discard every staged change.
     pub fn reset(&mut self) -> Result<()> {
         self.ensure_prepared()?;

@@ -3556,17 +3556,6 @@ impl Edit {
         )
     }
 
-    fn changed(&self) -> bool {
-        self.materialized
-            .as_ref()
-            .is_some_and(|state| !states_equal(&state.before, &state.staged))
-    }
-
-    #[cfg(test)]
-    pub(crate) fn is_changed(&self) -> bool {
-        self.changed()
-    }
-
     /// Discard every staged change.
     pub fn reset(&mut self) {
         let Some(state) = self.materialized.as_mut() else {
