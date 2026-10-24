@@ -94,8 +94,8 @@ pub fn verify<R: Read + Seek>(
     if !ole.directory_exists(&[XML_SIGNATURE_STORAGE]) {
         return Ok(Vec::new());
     }
-    let signatures = signature_entries(ole, policy.limits())?;
-    let snapshot = Snapshot::read(ole, format, policy.limits(), false)?;
+    let signatures = signature_entries(ole, policy.limits_value())?;
+    let snapshot = Snapshot::read(ole, format, policy.limits_value(), false)?;
     let borrowed: Vec<_> = signatures
         .iter()
         .map(|(number, name, bytes)| (*number, name.as_str(), bytes.as_slice()))
@@ -428,12 +428,10 @@ impl fmt::Debug for Editor {
 
 impl Editor {
     /// Consume a compound-file buffer and defer stream materialization until a
-    /// mutation actually needs it.
-    pub fn open(bytes: Vec<u8>, format: Format) -> Result<Self> {
-        Self::with_limits(bytes, format, Limits::standard())
-    }
-
-    pub fn with_limits(bytes: Vec<u8>, format: Format, limits: Limits) -> Result<Self> {
+    /// mutation actually needs it. The raw editor requires an explicit
+    /// signature resource policy so callers cannot accidentally choose an
+    /// unbounded/default admission path.
+    pub fn open(bytes: Vec<u8>, format: Format, limits: Limits) -> Result<Self> {
         if bytes.len() > limits.max_cfb_bytes() {
             return Err(Error::Limit("compound file exceeds byte policy".into()));
         }
@@ -472,7 +470,7 @@ impl Editor {
     /// Add one signature, preserving existing signatures only when they verify.
     pub fn add(&mut self, signer: &Signer) -> Result<&mut Self> {
         self.materialize()?;
-        let existing = self.verify_snapshot(&Policy::strict().with_limits(self.limits.clone()))?;
+        let existing = self.verify_snapshot(&Policy::strict().limits(self.limits.clone()))?;
         if existing.iter().any(|report| {
             report.integrity() != Status::Valid || report.signature() != Status::Valid
         }) {
@@ -590,7 +588,7 @@ impl Editor {
                     "duplicate numeric signature stream name".into(),
                 ));
             }
-            if stream.data.len() > policy.limits().max_signature_bytes() {
+            if stream.data.len() > policy.limits_value().max_signature_bytes() {
                 return Err(Error::Limit(format!(
                     "signature stream {name} is too large"
                 )));
@@ -610,7 +608,7 @@ impl Editor {
                 "signature streams exist without their storage".into(),
             ));
         }
-        if signatures.len() > policy.limits().max_signatures() {
+        if signatures.len() > policy.limits_value().max_signatures() {
             return Err(Error::Limit("too many binary Office signatures".into()));
         }
         verify_entries(snapshot, &signatures, policy)
@@ -853,7 +851,7 @@ mod tests {
     #[test]
     fn signs_verifies_tampers_and_clears() {
         let original = ole(&[(&["Payload"], b"signed bytes")]);
-        let mut editor = Editor::open(original, Format::Doc).unwrap();
+        let mut editor = Editor::open(original, Format::Doc, Limits::standard()).unwrap();
         editor.add(&signer()).unwrap();
         let current = editor.verify(&Policy::strict()).unwrap();
         assert_eq!(current.len(), 1);
@@ -888,7 +886,7 @@ mod tests {
         assert_eq!(tampered_report[0].integrity(), Status::Invalid);
         assert_eq!(tampered_report[0].signature(), Status::Valid);
 
-        let mut editor = Editor::open(signed, Format::Doc).unwrap();
+        let mut editor = Editor::open(signed, Format::Doc, Limits::standard()).unwrap();
         editor.clear().unwrap();
         assert!(reports(&editor.finish().unwrap()).is_empty());
     }
@@ -897,7 +895,7 @@ mod tests {
     fn clean_finish_returns_the_original_allocation() {
         let original = ole(&[(&["Payload"], b"preserve")]);
         let pointer = original.as_ptr();
-        let editor = Editor::open(original, Format::Doc).unwrap();
+        let editor = Editor::open(original, Format::Doc, Limits::standard()).unwrap();
         let finished = editor.finish().unwrap();
         assert_eq!(finished.as_ptr(), pointer);
     }
@@ -905,12 +903,12 @@ mod tests {
     #[test]
     fn failed_resign_is_atomic() {
         let original = ole(&[(&["Payload"], b"preserve")]);
-        let mut editor = Editor::open(original, Format::Doc).unwrap();
+        let mut editor = Editor::open(original, Format::Doc, Limits::standard()).unwrap();
         editor.add(&signer()).unwrap();
         let signed = editor.finish().unwrap();
 
         let missing_time = Signer::p256(SigningKey::from_bytes((&[8_u8; 32]).into()).unwrap());
-        let mut editor = Editor::open(signed.clone(), Format::Doc).unwrap();
+        let mut editor = Editor::open(signed.clone(), Format::Doc, Limits::standard()).unwrap();
         assert!(editor.resign(&missing_time).is_err());
         assert_eq!(editor.finish().unwrap(), signed);
     }
@@ -918,11 +916,11 @@ mod tests {
     #[test]
     fn default_add_rejects_partial_existing_coverage_atomically() {
         let original = ole(&[(&["Payload"], b"preserve")]);
-        let mut editor = Editor::open(original, Format::Doc).unwrap();
+        let mut editor = Editor::open(original, Format::Doc, Limits::standard()).unwrap();
         editor.add(&signer()).unwrap();
         let signed = editor.finish().unwrap();
 
-        let mut editor = Editor::open(signed, Format::Doc).unwrap();
+        let mut editor = Editor::open(signed, Format::Doc, Limits::standard()).unwrap();
         editor.materialize().unwrap();
         let snapshot = editor.snapshot_mut().unwrap();
         snapshot.streams.push(Stream {
@@ -945,7 +943,7 @@ mod tests {
     fn cfb_directory_count_and_depth_are_bounded_before_mutation() {
         let crowded = ole(&[(&["One"], b"1"), (&["Two"], b"2"), (&["Three"], b"3")]);
         let limits = Limits::standard().cfb_entries(2).unwrap();
-        let mut editor = Editor::with_limits(crowded, Format::Doc, limits).unwrap();
+        let mut editor = Editor::open(crowded, Format::Doc, limits).unwrap();
         assert!(matches!(editor.clear(), Err(Error::Limit(_))));
 
         let mut writer = OleWriter::new();
@@ -955,7 +953,7 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
         let limits = Limits::standard().cfb_depth(2).unwrap();
-        let mut editor = Editor::with_limits(output.into_inner(), Format::Doc, limits).unwrap();
+        let mut editor = Editor::open(output.into_inner(), Format::Doc, limits).unwrap();
         assert!(matches!(editor.clear(), Err(Error::Limit(_))));
 
         let signatures = ole(&[
@@ -963,7 +961,7 @@ mod tests {
             (&[XML_SIGNATURE_STORAGE, "2"], b"two"),
         ]);
         let mut file = OleFile::open(Cursor::new(signatures)).unwrap();
-        let policy = Policy::strict().with_limits(Limits::standard().signatures(1).unwrap());
+        let policy = Policy::strict().limits(Limits::standard().signatures(1).unwrap());
         assert!(matches!(
             verify(&mut file, Format::Doc, &policy),
             Err(Error::Limit(_))
@@ -987,7 +985,8 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         writer.write_to(&mut output).unwrap();
 
-        let mut editor = Editor::open(output.into_inner(), Format::Doc).unwrap();
+        let mut editor =
+            Editor::open(output.into_inner(), Format::Doc, Limits::standard()).unwrap();
         editor.add(&signer()).unwrap();
         editor.add(&signer()).unwrap();
         let signed = editor.finish().unwrap();

@@ -5846,8 +5846,12 @@ fn has_structural_content(text: &str) -> bool {
 /// signature state. The signature editor is used only as a bounded detector
 /// and candidate builder; callers retain and publish the original bytes.
 fn unsigned_doc_source(bytes: &[u8]) -> Option<Vec<u8>> {
-    let mut editor =
-        litchi_sign::cfb::Editor::open(bytes.to_vec(), litchi_sign::cfb::Format::Doc).ok()?;
+    let mut editor = litchi_sign::cfb::Editor::open(
+        bytes.to_vec(),
+        litchi_sign::cfb::Format::Doc,
+        litchi_sign::Limits::standard(),
+    )
+    .ok()?;
     editor.clear().ok()?;
     let unsigned = editor.finish().ok()?;
     (unsigned != bytes).then_some(unsigned)

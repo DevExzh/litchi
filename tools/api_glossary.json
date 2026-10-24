@@ -11795,6 +11795,26 @@
       "family_methods": true
     },
     {
+      "id": "sign",
+      "package": "litchi-sign",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_sign",
+          "replacement": "configure Policy with limits(...) or pass Limits to the raw CFB Editor::open entry point (record 0362za1)",
+          "match": "suffix"
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_sign",
+          "replacement": "configure Policy with limits(...) or pass Limits to the raw CFB Editor::open entry point (record 0362za1)"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "ograph",
       "package": "litchi-ograph",
       "default_features": false,
