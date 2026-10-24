@@ -162,7 +162,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// Typed resource dimensions used by every bounded DrawingML reader and
 /// editor.
 ///
-/// The enum is intentionally crate-wide because [`Error`] is the shared
+/// The enum is intentionally crate-wide because [`enum@Error`] is the shared
 /// boundary for the chart, transform, theme, diagram, text, color, model3d,
 /// InkML, and action families.  Family modules may re-export the vocabulary
 /// they own, but a returned error always carries this nominal type rather
