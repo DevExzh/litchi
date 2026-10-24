@@ -99,10 +99,10 @@ projections do not own lifecycle or publication operations.
 Canonical edits of retained destinations refuse packages containing unknown
 syntax; exact body splices preserve unknown destinations byte-for-byte.
 
-`transport::decompress` enforces a finite 256 MiB expansion ceiling before
-allocation. Applications with a different document budget can pass an explicit
-`transport::DecompressionLimits` value to `transport::decompress`:
-`transport::decompress(data, transport::DecompressionLimits::new(max_output_bytes))`.
+`transport::decompress` requires a `transport::DecompressionLimits` profile.
+`DecompressionLimits::default()` selects a 256 MiB expansion ceiling, while
+`DecompressionLimits::new(max_output_bytes)` lets the caller choose another
+finite bound; the selected bound is checked before output allocation.
 Package parsing and file opening use checked `SourceLimits` profiles
 for input, events, binary payloads, expansion and opaque retention. Build a
 profile with `SourceLimits::builder()` and fallible `max_*` setters, then pass

@@ -83,10 +83,45 @@ Read-only validation completed before this record was written:
 * `git diff --check` passed.
 * Python AST parsing of the changed gate runner passed.
 * Read-only plan construction reports 53 unique step names and one `fuzz`
-  step (the current source order places it at row 42); the new RTF command is
+  step (zero-based step index 41, the 42nd step); the new RTF command is
   present in that step.
 * No Cargo command, lock generation, native run, corpus replay, or blessing
-  was performed.
+  was performed in this source-only turn.
 
 The historical gate outputs and prior source/lock receipts remain immutable;
 this record is only the source-ready consumer repair and validation handoff.
+
+## Follow-up bounded validation
+
+The coordinator later granted the isolated RTF check on commit
+`39a417576f4931f136f68bb57c3371c05cd202a7` in the same leaf. The first
+offline metadata attempt was intentionally retained as a diagnostic: the
+sparse checkout did not yet materialize `crates/litchi-codepage`, so it exited
+101. Its empty JSON has SHA-256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` and its
+stderr has SHA-256
+`2713acaf0fe44b9d4c8ba62b93d20d34fd82659845eb77e6ccc8405c35ce84a8`.
+Materializing that path and its `crates/litchi-core` dependency made the
+second metadata run pass: 87 packages, JSON SHA-256
+`3d2f9d4e2cd4eac396915bd8d271fad7dd7d3210c0fb3ed4af60276a9401ce19`.
+
+The approved root lock remained SHA-256
+`4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`; offline
+metadata generated the ignored standalone fuzz lock with SHA-256
+`f040accf51bb28293d71218f497018039566c40f5feea1841f08b7927741f3f2`. Its 83
+registry rows were a complete subset of the approved root lock's 518 rows.
+The pinned Cargo wrapper was SHA-256
+`1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8`.
+
+With `LITCHI_CAPPED` and `LITCHI_BLESS` unset, offline and locked mode, one
+build job, incremental compilation disabled, `MemoryMax=20G`, no swap, and an
+external target, `cargo check --bins` passed with exit 0 in 72.066 seconds.
+The compile result is SHA-256
+`e3ff2f3f60861718b79d22ccd3095785a32327769294e41cc9ada80b65dda734`; the
+target peaked at and ended at 118,970,506 bytes, below the 20,000,000,000-byte
+guard, with no guard errors. The supervisor's post-exit samples contained no
+owned Cargo, rustc, or timeout process. The complete external receipt is
+`rtf-fuzz-39a417-20261024/receipt.json`, 5,060 bytes, SHA-256
+`ef1fc17ff1e95bab311bacc130e06dfeb292fcf86090a3d61c5071bc6b4c4f3a`.
+This validation ran only metadata and the authorized bounded check; no native
+run, corpus replay, or blessing was performed.
