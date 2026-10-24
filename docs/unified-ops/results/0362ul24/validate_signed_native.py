@@ -7,6 +7,7 @@ capability boundary before a guarded timing run is allowed to start.
 """
 from __future__ import annotations
 
+import ctypes
 import hashlib
 import importlib.util
 import json
@@ -14,7 +15,9 @@ import os
 from pathlib import Path
 import math
 import re
+import signal
 import sys
+import time
 import tomllib
 from typing import Any
 
@@ -27,6 +30,7 @@ TARGET_NS = 500_000_000
 MIN_SAMPLE_NS = 150_000_000
 MAX_CALLS = 2_000_000
 MIN_ABBA_ROUNDS = 5
+CHILD_TIMEOUT_S = 300.0
 CHILD_OUTPUT_LIMIT = 4 * 1024 * 1024
 CHILD_RSS_LIMIT = 20 * 1024 * 1024 * 1024
 MEMORY_OUTPUT_LIMIT = 4 * 1024 * 1024
@@ -100,6 +104,7 @@ REVIEWED_W8_BEFORE_PROJECTION = (
     REPOSITORY / "docs/unified-ops/results/0362yh/images/before/projection.json"
 )
 _REVIEWED_PARSER_MODULE: Any | None = None
+_SUBREAPER_ENABLED = False
 REVIEWED_W8_AFTER_PROJECTION = (
     REPOSITORY / "docs/unified-ops/results/0362yh/images/after/projection.json"
 )
@@ -111,6 +116,164 @@ def sha256(path: Path) -> str:
         for block in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+def _proc_records() -> dict[int, tuple[int, int, int, str]]:
+    """Return pid -> (parent, process-group, start-time, state) without /proc races."""
+    records: dict[int, tuple[int, int, int, str]] = {}
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            raw = (entry / "stat").read_text()
+            close = raw.rfind(")")
+            fields = raw[close + 2 :].split()
+            records[int(entry.name)] = (
+                int(fields[1]),
+                int(fields[2]),
+                int(fields[19]),
+                fields[0],
+            )
+        except (FileNotFoundError, PermissionError, ValueError, IndexError):
+            continue
+    return records
+
+
+def enable_child_subreaper() -> None:
+    """Make this runner adopt orphaned descendants so it can kill and reap them."""
+    global _SUBREAPER_ENABLED
+    if _SUBREAPER_ENABLED:
+        return
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        prctl = libc.prctl
+        prctl.argtypes = [ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong]
+        prctl.restype = ctypes.c_int
+        result = prctl(36, 1, 0, 0, 0)  # Linux PR_SET_CHILD_SUBREAPER
+    except (AttributeError, OSError) as error:
+        raise RuntimeError(f"child subreaper is unavailable: {error}") from error
+    if result != 0:
+        error_number = ctypes.get_errno()
+        raise RuntimeError(f"child subreaper setup failed: errno {error_number}")
+    _SUBREAPER_ENABLED = True
+
+
+class OwnedProcessTree:
+    """Track one spawned process and every descendant, including adopted ones."""
+
+    def __init__(self) -> None:
+        enable_child_subreaper()
+        self.owner_pid = os.getpid()
+        records = _proc_records()
+        self._baseline_children = {
+            pid: record[2]
+            for pid, record in records.items()
+            if record[0] == self.owner_pid
+        }
+        self._root: tuple[int, int | None] | None = None
+        self._seen: dict[int, int] = {}
+        self._active: dict[int, tuple[int, int, int, str]] = {}
+
+    def attach(self, pid: int) -> None:
+        record = _proc_records().get(pid)
+        if record is None:
+            # A short-lived child can exit between Popen and the first /proc
+            # read.  Its descendants are still discoverable through the
+            # subreaper's direct-child scan below.
+            self._root = (pid, None)
+            self._seen = {}
+            self._active = {}
+            return
+        self._root = (pid, record[2])
+        self._seen = {pid: record[2]}
+        self._active = {pid: record}
+
+    def refresh(self) -> dict[int, tuple[int, int, int, str]]:
+        if self._root is None:
+            raise RuntimeError("process tree has no root")
+        records = _proc_records()
+        known = dict(self._seen)
+        active: dict[int, tuple[int, int, int, str]] = {}
+        root_pid, root_start = self._root
+        root_record = records.get(root_pid)
+        if root_start is not None and root_record is not None and root_record[2] == root_start:
+            active[root_pid] = root_record
+        changed = True
+        while changed:
+            changed = False
+            for pid, record in records.items():
+                parent, _group, start, _state = record
+                previous_start = known.get(pid)
+                if previous_start is not None and previous_start != start:
+                    continue
+                if pid in active:
+                    continue
+                if parent in active:
+                    active[pid] = record
+                    known[pid] = start
+                    changed = True
+        # A double-fork can reparent a descendant directly to this subreaper
+        # before the next poll.  New direct children cannot be unrelated runner
+        # work: the baseline was captured before the target was spawned.
+        for pid, record in records.items():
+            parent, _group, start, _state = record
+            if (
+                parent != self.owner_pid
+                or self._baseline_children.get(pid) == start
+            ):
+                continue
+            previous_start = known.get(pid)
+            if previous_start is not None and previous_start != start:
+                continue
+            active[pid] = record
+            known[pid] = start
+        self._seen = known
+        self._active = active
+        return dict(active)
+
+    def pids(self) -> set[int]:
+        return set(self.refresh())
+
+    def descendant_pids(self) -> set[int]:
+        root_pid = self._root[0] if self._root is not None else None
+        return self.pids() - ({root_pid} if root_pid is not None else set())
+
+    def escaped_pids(self, process_group: int) -> set[int]:
+        active = self.refresh()
+        root_pid = self._root[0] if self._root is not None else None
+        return {
+            pid
+            for pid, (_parent, group, _start, _state) in active.items()
+            if pid != root_pid and group != process_group
+        }
+
+    def kill(self) -> None:
+        for pid in sorted(self.pids(), reverse=True):
+            if pid == self.owner_pid:
+                continue
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                continue
+
+    def reap(self, timeout: float = 5.0) -> bool:
+        deadline = time.monotonic() + timeout
+        while True:
+            active = self.refresh()
+            for pid, (_parent, _group, _start, _state) in active.items():
+                if pid == self.owner_pid or pid == (self._root[0] if self._root else None):
+                    continue
+                try:
+                    os.waitpid(pid, os.WNOHANG)
+                except (ChildProcessError, ProcessLookupError, PermissionError):
+                    continue
+            active = self.refresh()
+            if not active or time.monotonic() >= deadline:
+                return not active
+            time.sleep(0.01)
+
+    def empty(self) -> bool:
+        return not self.pids()
 
 
 def reject_symlink_path(path: Path, label: str) -> None:
@@ -211,6 +374,10 @@ def checked_relative_path(value: object, label: str) -> str:
     if any(part in {"", ".", ".."} for part in path.parts):
         raise ValueError(f"{label} contains traversal or an unnormalised component")
     return value
+
+
+def memory_row_label(fixture: str, route: str, calls: int) -> str:
+    return f"{fixture.replace('/', '_')}-{route.replace('/', '_')}-{calls}"
 
 
 def load_fixture_manifest(value: dict[str, Any], label: str = "fixtures") -> dict[str, Any]:
@@ -512,6 +679,7 @@ def _validate_capabilities_receipt(
         stdout_path = Path(str(checked_artifact(stdout, f"{label}.{route}.stdout")["path"]))
         child_value = load_json(stdout_path, f"{label}.{route}.stdout")
         child_value["_receipt"] = str(child_path)
+        child_value["_receipt_artifact"] = child_artifact
         validate_child_receipt(
             child_value,
             expected_route=route,
@@ -1034,7 +1202,11 @@ def validate_child_receipt(
     output_path: Path,
     expected_endpoint: str = "final",
 ) -> dict[str, Any]:
-    if not isinstance(value, dict) or not isinstance(value.get("_receipt"), str):
+    if (
+        not isinstance(value, dict)
+        or not isinstance(value.get("_receipt"), str)
+        or not isinstance(value.get("_receipt_artifact"), dict)
+    ):
         raise ValueError(f"{expected_route}: child receipt binding is missing")
     if expected_mode not in {"validate", "measure", "calibrate"}:
         raise ValueError(f"{expected_route}: unsupported timed child mode")
@@ -1043,12 +1215,19 @@ def validate_child_receipt(
     if not receipt_raw_path.is_file():
         raise ValueError(f"{expected_route}: child receipt is not a regular file")
     receipt_path = receipt_raw_path.resolve()
+    receipt_artifact = checked_artifact(
+        value["_receipt_artifact"], f"{expected_route}.receipt"
+    )
+    if receipt_artifact["path"] != str(receipt_path):
+        raise ValueError(f"{expected_route}: child receipt path/hash binding differs")
     output_path = Path(output_path)
     reject_symlink_path(output_path, f"{expected_route} qualification output")
     output_path = output_path.resolve()
     if not receipt_path.is_relative_to(output_path):
         raise ValueError(f"{expected_route}: child receipt escapes qualification output")
     receipt = load_json(receipt_path, f"{expected_route} child receipt")
+    if canonical(receipt) != receipt_path.read_bytes():
+        raise ValueError(f"{expected_route}: child receipt is not canonical JSON")
     if receipt.get("schema") != "litchi_signed_native_child.v1":
         raise ValueError(f"{expected_route}: child receipt schema is invalid")
     if receipt.get("mode") != expected_mode or receipt.get("route") != expected_route:
@@ -1098,8 +1277,10 @@ def validate_child_receipt(
         or not isinstance(receipt.get("aggregate_rss_max_bytes"), int)
         or receipt["aggregate_rss_max_bytes"] < 0
         or receipt["aggregate_rss_max_bytes"] > CHILD_RSS_LIMIT
+        or receipt["rss_max_bytes"] != receipt["aggregate_rss_max_bytes"]
         or receipt.get("rss_limit_bytes") != CHILD_RSS_LIMIT
         or receipt.get("output_limit_bytes") != CHILD_OUTPUT_LIMIT
+        or receipt.get("timeout_seconds") != CHILD_TIMEOUT_S
     ):
         raise ValueError(f"{expected_route}: aggregate process guard is missing")
     failed_after = receipt.get("failed_after")
@@ -1112,6 +1293,7 @@ def validate_child_receipt(
         or not isinstance(failed_after.get("rss_max_bytes"), int)
         or failed_after["rss_max_bytes"] != receipt.get("rss_max_bytes")
         or failed_after["rss_max_bytes"] > CHILD_RSS_LIMIT
+        or failed_after.get("aggregate_rss_max_bytes") != receipt.get("aggregate_rss_max_bytes")
         or failed_after.get("rss_limit_bytes") != CHILD_RSS_LIMIT
         or failed_after.get("output_limit_bytes") != CHILD_OUTPUT_LIMIT
     ):
@@ -1154,6 +1336,7 @@ def validate_child_receipt(
     stdout_value = load_json(Path(str(outputs["stdout"]["path"])), f"{expected_route}.stdout")
     expected_value = dict(value)
     expected_value.pop("_receipt", None)
+    expected_value.pop("_receipt_artifact", None)
     if stdout_value != expected_value:
         raise ValueError(f"{expected_route}: child stdout does not match the bound route result")
     if expected_mode == "measure":
@@ -1442,6 +1625,7 @@ def validate_memory_summary(
         raise ValueError("memory parser is not the pinned reviewed resource parser")
     expected = {(name, route, calls) for name in fixture_names for route in routes for calls in (1, 8, 128)}
     observed: set[tuple[str, str, int]] = set()
+    retained_paths: set[str] = set()
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             raise ValueError(f"memory row {index} is not an object")
@@ -1454,6 +1638,14 @@ def validate_memory_summary(
         if fixture not in fixture_names or route not in routes or calls not in (1, 8, 128) or key in observed:
             raise ValueError(f"memory row {index} is not an exact fixture/route/call tuple")
         observed.add(key)
+        label = row.get("label")
+        expected_label = memory_row_label(fixture, route, calls)
+        if label != expected_label:
+            raise ValueError(f"memory row {index} label is not bound to its fixture/route/call")
+        work_path = raw_path / expected_label
+        reject_symlink_path(work_path, f"memory row {index} work directory")
+        if not work_path.is_dir() or not work_path.resolve().is_relative_to(raw_path):
+            raise ValueError(f"memory row {index} work directory is not bound to raw_root")
         if row.get("scope") != value["scope"]:
             raise ValueError(f"memory row {index} has a different scope")
         if row.get("binary") != endpoint["binary"]:
@@ -1479,6 +1671,22 @@ def validate_memory_summary(
             checked = checked_artifact(row.get(artifact_name), f"memory row {index}.{artifact_name}")
             if not Path(str(checked["path"])).is_relative_to(raw_path):
                 raise ValueError(f"memory row {index}.{artifact_name} escapes raw_root")
+            artifact_path = Path(str(checked["path"]))
+            if artifact_name == "capture":
+                if artifact_path.parent != work_path.resolve() or not artifact_path.name.startswith("heaptrack-profile"):
+                    raise ValueError(f"memory row {index}.capture is not in its bound work directory")
+            else:
+                expected_output = work_path.resolve() / {
+                    "print": "heaptrack-print.txt",
+                    "histogram": "heaptrack-histogram.tsv",
+                    "stdout": "probe.stdout",
+                    "stderr": "probe.stderr",
+                }[artifact_name]
+                if artifact_path != expected_output:
+                    raise ValueError(f"memory row {index}.{artifact_name} is not bound to its label")
+            if str(artifact_path) in retained_paths:
+                raise ValueError(f"memory row {index}.{artifact_name} reuses a retained artifact")
+            retained_paths.add(str(artifact_path))
             checked_outputs[artifact_name] = checked
         command = row.get("command")
         cpu = value.get("cpu")
@@ -1529,11 +1737,22 @@ def validate_memory_summary(
             or len(snapshots) != row["during_snapshots"] + 2
         ):
             raise ValueError(f"memory row {index} host snapshots are incomplete")
-        for snapshot in snapshots:
+        for snapshot_index, snapshot in enumerate(snapshots):
             snapshot_artifact = checked_artifact(snapshot, f"memory row {index}.host")
             snapshot_path = Path(str(snapshot_artifact["path"]))
             if not snapshot_path.is_relative_to(raw_path):
                 raise ValueError(f"memory row {index} host snapshot escapes raw_root")
+            if snapshot_index == 0:
+                expected_snapshot = raw_path / f"{expected_label}.before.host.json"
+            elif snapshot_index == len(snapshots) - 1:
+                expected_snapshot = raw_path / f"{expected_label}.after.host.json"
+            else:
+                expected_snapshot = raw_path / f"{expected_label}.during-{snapshot_index:05}.host.json"
+            if snapshot_path != expected_snapshot.resolve():
+                raise ValueError(f"memory row {index} host snapshot is not bound to its label")
+            if str(snapshot_path) in retained_paths:
+                raise ValueError(f"memory row {index} host snapshot reuses a retained artifact")
+            retained_paths.add(str(snapshot_path))
             snapshot_value = load_json(snapshot_path, f"memory row {index} host snapshot")
             if snapshot_value.get("blockers") != []:
                 raise ValueError(f"memory row {index} host snapshot has blockers")

@@ -125,7 +125,15 @@ def aggregate_group_rss(pgid: int) -> int:
     return sum(process_rss(pid) for pid in process_group_members(pgid))
 
 
-def stop_group(process: subprocess.Popen[bytes], pgid: int) -> None:
+def aggregate_tree_rss(process_tree: VALIDATE.OwnedProcessTree) -> int:
+    return sum(process_rss(pid) for pid in process_tree.pids())
+
+
+def stop_group(
+    process: subprocess.Popen[bytes],
+    pgid: int,
+    process_tree: VALIDATE.OwnedProcessTree,
+) -> None:
     if process_group_members(pgid):
         try:
             os.killpg(pgid, signal.SIGKILL)
@@ -136,6 +144,8 @@ def stop_group(process: subprocess.Popen[bytes], pgid: int) -> None:
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait(timeout=5)
+    process_tree.kill()
+    process_tree.reap()
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline and process_group_members(pgid):
         time.sleep(0.1)
@@ -186,6 +196,7 @@ def run_profile(
     started = time.time_ns()
     stdout = stdout_path.open("wb")
     stderr = stderr_path.open("wb")
+    process_tree = VALIDATE.OwnedProcessTree()
     process = subprocess.Popen(
         command,
         stdout=stdout,
@@ -199,6 +210,7 @@ def run_profile(
     # ``start_new_session`` makes the child PID the process-group ID.  Keep
     # that stable even when the root exits before the first polling turn.
     process_group = process.pid
+    process_tree.attach(process.pid)
     during_hosts: list[str] = []
     guard_error: str | None = None
 
@@ -206,7 +218,7 @@ def run_profile(
         deadline = time.monotonic() + TIMEOUT_S
         checks = 0
         while process.poll() is None:
-            max_rss = max(max_rss, aggregate_group_rss(process_group))
+            max_rss = max(max_rss, aggregate_tree_rss(process_tree))
             if stdout_path.stat().st_size > OUTPUT_LIMIT or stderr_path.stat().st_size > OUTPUT_LIMIT:
                 guard_error = f"{label}: profiler child exceeded output cap"
             if time.monotonic() >= deadline:
@@ -225,12 +237,14 @@ def run_profile(
                 if during_path.is_file() and not during_path.is_symlink():
                     during_hosts.append(str(during_path.resolve()))
             if guard_error is not None:
-                stop_group(process, process_group)
+                stop_group(process, process_group, process_tree)
                 break
             time.sleep(0.1)
         exit_code = process.wait(timeout=5)
     finally:
-        stop_group(process, process_group)
+        if process.poll() is not None and process_tree.descendant_pids() and guard_error is None:
+            guard_error = f"{label}: profiler process tree outlived its root process"
+        stop_group(process, process_group, process_tree)
         stdout.close()
         stderr.close()
     finished = time.time_ns()
@@ -255,7 +269,7 @@ def run_profile(
         "rss_limit_bytes": RSS_LIMIT,
         "output_limit_bytes": OUTPUT_LIMIT,
         "aggregate_rss_max_bytes": max_rss,
-        "process_group_empty": not process_group_members(process_group),
+        "process_group_empty": process_tree.empty(),
         "stdout_bytes": stdout_path.stat().st_size,
         "stderr_bytes": stderr_path.stat().st_size,
     }
@@ -363,7 +377,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         fixture_name = fixture["name"]
         for route in routes:
             for calls in CALL_COUNTS:
-                label = f"{fixture_name.replace('/', '_')}-{route.replace('/', '_')}-{calls}"
+                label = VALIDATE.memory_row_label(fixture_name, route, calls)
                 rows.append(
                     run_profile(
                         binary=binary,

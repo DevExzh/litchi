@@ -39,9 +39,9 @@ W8 = importlib.util.module_from_spec(W8_SPEC)
 W8_SPEC.loader.exec_module(W8)
 
 SAFE_ROUTE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
-CHILD_TIMEOUT_S = 300.0
-CHILD_OUTPUT_LIMIT = 4 * 1024 * 1024
-CHILD_RSS_LIMIT = 20 * 1024 * 1024 * 1024
+CHILD_TIMEOUT_S = VALIDATE.CHILD_TIMEOUT_S
+CHILD_OUTPUT_LIMIT = VALIDATE.CHILD_OUTPUT_LIMIT
+CHILD_RSS_LIMIT = VALIDATE.CHILD_RSS_LIMIT
 
 
 def save(path: Path, value: object) -> None:
@@ -80,6 +80,10 @@ def process_rss(pid: int) -> int:
 
 def aggregate_group_rss(pgid: int) -> int:
     return sum(process_rss(pid) for pid in process_group_members(pgid))
+
+
+def aggregate_tree_rss(process_tree: VALIDATE.OwnedProcessTree) -> int:
+    return sum(process_rss(pid) for pid in process_tree.pids())
 
 
 def wait_for_group_exit(pgid: int, timeout: float = 5.0) -> None:
@@ -137,6 +141,7 @@ def child(
     rss_max = 0
     process_group: int | None = None
     process: subprocess.Popen[bytes] | None = None
+    process_tree: VALIDATE.OwnedProcessTree | None = None
     exit_code: int | None = None
     pending_error: BaseException | None = None
 
@@ -152,9 +157,13 @@ def child(
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=5)
+        if process_tree is not None:
+            process_tree.kill()
+            process_tree.reap()
         wait_for_group_exit(process_group)
 
     try:
+        process_tree = VALIDATE.OwnedProcessTree()
         with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
             process = subprocess.Popen(
                 command,
@@ -167,13 +176,14 @@ def child(
             # using it directly also remains safe if the root exits before
             # the first polling turn.
             process_group = process.pid
+            process_tree.attach(process.pid)
             deadline = time.monotonic() + CHILD_TIMEOUT_S
             checks = 0
             while process.poll() is None:
                 if time.monotonic() >= deadline:
                     timed_out = True
                     guard_error = f"child exceeded {CHILD_TIMEOUT_S:.1f}s timeout"
-                rss_max = max(rss_max, aggregate_group_rss(process_group))
+                rss_max = max(rss_max, aggregate_tree_rss(process_tree))
                 if rss_max > CHILD_RSS_LIMIT and guard_error is None:
                     guard_error = f"child exceeded {CHILD_RSS_LIMIT} byte RSS cap"
                 if (
@@ -205,6 +215,13 @@ def child(
         if process is not None:
             exit_code = process.wait(timeout=5)
     finally:
+        if process_tree is not None and process is not None and process.poll() is not None:
+            try:
+                if process_tree.descendant_pids() and guard_error is None:
+                    guard_error = "child process tree outlived its root process"
+            except RuntimeError as error:
+                if guard_error is None:
+                    guard_error = str(error)
         if process_group is not None:
             stop_group()
         finished_ns = time.time_ns()
@@ -217,7 +234,7 @@ def child(
             "aggregate_rss_max_bytes": rss_max,
             "rss_limit_bytes": CHILD_RSS_LIMIT,
             "output_limit_bytes": CHILD_OUTPUT_LIMIT,
-            "process_group_empty": process_group is None or not process_group_members(process_group),
+            "process_group_empty": process_tree is None or process_tree.empty(),
             "stdout_bytes": stdout_path.stat().st_size if stdout_path.exists() else 0,
             "stderr_bytes": stderr_path.stat().st_size if stderr_path.exists() else 0,
         }
@@ -242,7 +259,7 @@ def child(
                 "after_guard_error": after_error,
                 "stdout_bytes": stdout_path.stat().st_size if stdout_path.exists() else 0,
                 "stderr_bytes": stderr_path.stat().st_size if stderr_path.exists() else 0,
-                "process_group_empty": process_group is None or not process_group_members(process_group),
+                "process_group_empty": process_tree is None or process_tree.empty(),
                 "aggregate_rss_max_bytes": rss_max,
             }
         )
@@ -275,7 +292,8 @@ def child(
         "stdout": VALIDATE.artifact(stdout_path),
         "stderr": VALIDATE.artifact(stderr_path),
     }
-    save(output / f"{label}.receipt.json", receipt)
+    receipt_path = output / f"{label}.receipt.json"
+    receipt_path.write_bytes(VALIDATE.canonical(receipt))
     if pending_error is not None:
         raise pending_error
     if guard_error or after_error:
@@ -288,7 +306,8 @@ def child(
         raise RuntimeError(f"{label} returned invalid JSON: {error}") from error
     if not isinstance(value, dict):
         raise RuntimeError(f"{label} returned a non-object")
-    value["_receipt"] = str((output / f"{label}.receipt.json").resolve())
+    value["_receipt"] = str(receipt_path.resolve())
+    value["_receipt_artifact"] = VALIDATE.artifact(receipt_path)
     return value
 
 

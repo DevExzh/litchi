@@ -5,9 +5,12 @@ from __future__ import annotations
 import copy
 import importlib.util
 import json
+import os
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -485,6 +488,94 @@ class SignedNativeValidatorTests(unittest.TestCase):
             "signed_facade/noop_write",
         )
 
+    def test_owned_process_tree_reaps_a_setsid_descendant(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="signed-process-tree-") as directory:
+            pid_path = Path(directory) / "escaped.pid"
+            script = (
+                "import os, pathlib, sys, time\n"
+                "child = os.fork()\n"
+                "if child:\n"
+                "    os._exit(0)\n"
+                "os.setsid()\n"
+                "pathlib.Path(sys.argv[1]).write_text(str(os.getpid()))\n"
+                "while True:\n"
+                "    time.sleep(1)\n"
+            )
+            tree = VALIDATE.OwnedProcessTree()
+            process = subprocess.Popen(
+                [sys.executable, "-c", script, str(pid_path)], start_new_session=True
+            )
+            tree.attach(process.pid)
+            try:
+                process.wait(timeout=5)
+                deadline = time.monotonic() + 5
+                while (not pid_path.exists() or not pid_path.read_text(encoding="utf-8")) and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(pid_path.is_file())
+                escaped_pid = int(pid_path.read_text(encoding="utf-8"))
+                self.assertIn(escaped_pid, tree.descendant_pids())
+                tree.kill()
+                self.assertTrue(tree.reap())
+                self.assertTrue(tree.empty())
+                self.assertFalse(Path("/proc", str(escaped_pid)).exists())
+            finally:
+                tree.kill()
+                tree.reap()
+
+    def test_runner_receipt_rejects_and_reaps_a_setsid_descendant(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="signed-runner-tree-") as directory:
+            root = Path(directory)
+            output = root / "output"
+            output.mkdir()
+            pid_path = root / "escaped.pid"
+            binary = root / "adversarial.py"
+            binary.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json, os, pathlib, sys, time\n"
+                "child = os.fork()\n"
+                "if child:\n"
+                "    print(json.dumps({'schema': 'litchi_signed_native_probe.v1', "
+                "'route': 'signed_leaf/noop_write', 'mode': 'measure', "
+                "'calls': 1, 'fixture_count': 1, 'elapsed_ns': 150000000, "
+                "'operations': 1}), flush=True)\n"
+                "    os._exit(0)\n"
+                "os.setsid()\n"
+                f"pathlib.Path({str(pid_path)!r}).write_text(str(os.getpid()))\n"
+                "while True:\n"
+                "    time.sleep(1)\n",
+                encoding="utf-8",
+            )
+            binary.chmod(0o755)
+
+            def fake_guard(out: Path, label: str, allowed_roots: set[int] | None = None) -> str:
+                path = out / f"{label}.host.json"
+                path.write_bytes(VALIDATE.canonical({"blockers": []}))
+                return str(path)
+
+            endpoint = {
+                "fixture_root": "/tmp/signed-fixtures",
+                "fixtures": {"path": "/tmp/signed-fixtures.json", "sha256": "a" * 64},
+            }
+            cpu = sorted(os.sched_getaffinity(0))[0]
+            with mock.patch.object(QUALIFICATION.W8, "guard", side_effect=fake_guard):
+                with self.assertRaises(RuntimeError):
+                    QUALIFICATION.child(
+                        output,
+                        "adversarial",
+                        binary,
+                        endpoint,
+                        "signed_leaf/noop_write",
+                        "measure",
+                        cpu,
+                        1,
+                    )
+            escaped_pid = int(pid_path.read_text(encoding="utf-8"))
+            receipt_path = output / "adversarial.receipt.json"
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            self.assertIn("outlived", receipt["guard_error"])
+            self.assertTrue(receipt["failed_after"]["process_group_empty"])
+            self.assertFalse(Path("/proc", str(escaped_pid)).exists())
+
     def test_child_receipt_happy_path_and_mutations_are_checked(self) -> None:
         route = "signed_leaf/noop_write"
         binary = Path(sys.executable).resolve()
@@ -564,9 +655,15 @@ class SignedNativeValidatorTests(unittest.TestCase):
                 "stderr": VALIDATE.artifact(stderr_path),
             }
             receipt_path = output / "happy.receipt.json"
-            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            receipt_path.write_bytes(VALIDATE.canonical(receipt))
             value = dict(stdout_value)
             value["_receipt"] = str(receipt_path)
+            value["_receipt_artifact"] = VALIDATE.artifact(receipt_path)
+
+            def rewrite_receipt() -> None:
+                receipt_path.write_bytes(VALIDATE.canonical(receipt))
+                value["_receipt_artifact"] = VALIDATE.artifact(receipt_path)
+
             kwargs = {
                 "expected_route": route,
                 "expected_mode": "measure",
@@ -579,43 +676,62 @@ class SignedNativeValidatorTests(unittest.TestCase):
             }
             VALIDATE.validate_child_receipt(value, **kwargs)
 
+            receipt_path.write_text(
+                json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+            )
+            value["_receipt_artifact"] = VALIDATE.artifact(receipt_path)
+            with self.assertRaises(ValueError):
+                VALIDATE.validate_child_receipt(value, **kwargs)
+            rewrite_receipt()
+
             stdout_path.write_text(json.dumps({**stdout_value, "route": "signed_facade/noop_write"}), encoding="utf-8")
             with self.assertRaises(ValueError):
                 VALIDATE.validate_child_receipt(value, **kwargs)
             stdout_path.write_text(json.dumps(stdout_value), encoding="utf-8")
             receipt["command"][7] = "signed_facade/noop_write"
-            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            rewrite_receipt()
             with self.assertRaises(ValueError):
                 VALIDATE.validate_child_receipt(value, **kwargs)
             receipt["command"][7] = route
             receipt["aggregate_rss_max_bytes"] = VALIDATE.CHILD_RSS_LIMIT + 1
             receipt["failed_after"]["aggregate_rss_max_bytes"] = VALIDATE.CHILD_RSS_LIMIT + 1
-            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            rewrite_receipt()
             with self.assertRaises(ValueError):
                 VALIDATE.validate_child_receipt(value, **kwargs)
             receipt["aggregate_rss_max_bytes"] = 0
             receipt["failed_after"]["aggregate_rss_max_bytes"] = 0
+            receipt["rss_max_bytes"] = 1
+            receipt["aggregate_rss_max_bytes"] = 2
+            receipt["failed_after"]["rss_max_bytes"] = 1
+            receipt["failed_after"]["aggregate_rss_max_bytes"] = 2
+            rewrite_receipt()
+            with self.assertRaises(ValueError):
+                VALIDATE.validate_child_receipt(value, **kwargs)
+            receipt["rss_max_bytes"] = 0
+            receipt["aggregate_rss_max_bytes"] = 0
+            receipt["failed_after"]["rss_max_bytes"] = 0
+            receipt["failed_after"]["aggregate_rss_max_bytes"] = 0
             receipt["rss_max_bytes"] = VALIDATE.CHILD_RSS_LIMIT + 1
             receipt["failed_after"]["rss_max_bytes"] = VALIDATE.CHILD_RSS_LIMIT + 1
-            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            rewrite_receipt()
             with self.assertRaises(ValueError):
                 VALIDATE.validate_child_receipt(value, **kwargs)
             receipt["rss_max_bytes"] = 0
             receipt["failed_after"]["rss_max_bytes"] = 0
             receipt["failed_after"]["stdout_bytes"] += 1
-            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            rewrite_receipt()
             with self.assertRaises(ValueError):
                 VALIDATE.validate_child_receipt(value, **kwargs)
             receipt["failed_after"]["stdout_bytes"] = stdout_path.stat().st_size
             receipt["command"][5] = "validate"
-            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            rewrite_receipt()
             with self.assertRaises(ValueError):
                 VALIDATE.validate_child_receipt(value, **kwargs)
             receipt["command"][5] = "measure"
             stdout_path.write_text("not-json\n", encoding="utf-8")
             receipt["stdout"] = VALIDATE.artifact(stdout_path)
             receipt["failed_after"]["stdout_bytes"] = stdout_path.stat().st_size
-            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            rewrite_receipt()
             with self.assertRaises(ValueError):
                 VALIDATE.validate_child_receipt(value, **kwargs)
 

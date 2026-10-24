@@ -162,11 +162,14 @@ requires the matrix's expected disposition.
    timeout, RSS and stdout/stderr caps; every timeout or guard failure kills
    the process group, waits for it, records the failed-after receipt and then
    checks the host again. Validation binds the exact taskset/mode/route argv,
-   raw stdout object and retained output-byte/RSS values to that receipt; a
-   child receipt with a changed route, JSON, cap or failed-after field is
-   rejected. Each route calibrates to at least 500 ms, rejects samples below
-   150 ms, and runs at least five outer blocks. Final-only blocks are exactly
-   leaf, facade, facade, leaf.
+   raw stdout object and retained output-byte/RSS values to that canonical,
+   hash-bound child receipt; a child receipt with a changed route, JSON, cap,
+   timeout or failed-after field is rejected. The runner is a Linux child
+   subreaper and tracks the complete descendant tree, including `setsid` and
+   reparented children; every owned descendant is killed and reaped before a
+   receipt can report an empty process tree. Each route calibrates to at least
+   500 ms, rejects samples below 150 ms, and runs at least five outer blocks.
+   Final-only blocks are exactly leaf, facade, facade, leaf.
 5. Allocation evidence is separate and per fixture. The probe introduces no
    allocator or `unsafe` code. The external memory runner profiles the same
    uninstrumented final binary with identical setup for each fixture, route
@@ -179,8 +182,11 @@ requires the matrix's expected disposition.
    parser identity), keeps raw captures outside Git, and commits only
    hash-bound reduced summaries. The validator recomputes every retained
    allocation/heap/RSS metric from the retained print and histogram and
-   requires the final memory summary itself to be canonical JSON. These
-   profiles are bounded-retention evidence, not native latency samples.
+   requires the final memory summary itself to be canonical JSON. Every row's
+   label, work directory, capture prefix, parser outputs, stdout/stderr and
+   ordered host snapshots are bound to its unique fixture/route/call tuple;
+   no retained artifact may be reused by another row. These profiles are
+   bounded-retention evidence, not native latency samples.
 
 6. Run `signed_native_finalize.py` only after both receipts have been checked.
    It revalidates endpoint archives, role-specific lock closures and registry
