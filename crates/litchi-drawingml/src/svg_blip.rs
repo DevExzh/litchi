@@ -986,7 +986,7 @@ pub(crate) mod codec {
     use litchi_ooxml_common::xml::attributes::SeenNames;
 
     /// Read one complete `svgBlip` element.
-    pub fn read(xml: &[u8], limits: Limits) -> Result<SvgBlip> {
+    pub(crate) fn read(xml: &[u8], limits: Limits) -> Result<SvgBlip> {
         let limits = limits.validate()?;
         if xml.len() > limits.max_input_bytes {
             return Err(limit(
@@ -1097,7 +1097,7 @@ pub(crate) mod codec {
     /// The root and its attributes are resolved by a borrowed resolver over
     /// the persistent context chain, and the raw element is retained once as
     /// the contextual source authority.
-    pub fn read_contextual(
+    pub(crate) fn read_contextual(
         xml: &[u8],
         context: &NamespaceContext,
         limits: Limits,
@@ -1224,14 +1224,14 @@ pub(crate) mod codec {
     }
 
     /// Serialize one SVG blip fragment.
-    pub fn write(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
+    pub(crate) fn write(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
         let limits = limits.validate()?;
         validate(value)?;
         write_standalone_bounded(value, limits.max_output_bytes)
     }
 
     /// Serialize a contextual value with an explicit finite output cap.
-    pub fn write_contextual(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
+    pub(crate) fn write_contextual(value: &SvgBlip, limits: Limits) -> Result<Vec<u8>> {
         let limits = limits.validate()?;
         validate(value)?;
         let maximum = limits.max_output_bytes;
@@ -1253,7 +1253,7 @@ pub(crate) mod codec {
     }
 
     /// Stream a contextual value after checking the complete output size.
-    pub fn write_contextual_to<W: Write>(
+    pub(crate) fn write_contextual_to<W: Write>(
         writer: &mut W,
         value: &SvgBlip,
         limits: Limits,
@@ -1288,7 +1288,11 @@ pub(crate) mod codec {
     }
 
     /// Serialize one SVG blip fragment to a caller-owned sink.
-    pub fn write_to<W: Write>(writer: &mut W, value: &SvgBlip, limits: Limits) -> Result<()> {
+    pub(crate) fn write_to<W: Write>(
+        writer: &mut W,
+        value: &SvgBlip,
+        limits: Limits,
+    ) -> Result<()> {
         write_contextual_to(writer, value, limits)
     }
 

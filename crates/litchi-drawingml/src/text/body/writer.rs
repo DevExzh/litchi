@@ -15,8 +15,6 @@
 //! or other unmodeled markup is also refused, because this writer cannot
 //! reproduce that projection losslessly.
 
-use std::fmt::Write as _;
-
 use super::{Body, Paragraph, ParagraphProperties, Properties, Run, RunKind, RunProperties};
 use crate::text::{Anchor, Autofit, Columns, Direction, Wrap};
 

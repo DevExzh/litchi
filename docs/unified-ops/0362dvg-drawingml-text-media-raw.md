@@ -2,7 +2,7 @@
 
 - Date: 2026-10-24.
 - Parent: 0351, 0362dv, 0362dvb.
-- Status: source migration complete; coordinator validation and integration remain.
+- Status: source migration and focused validation complete; coordinator integration remains.
 
 This lane gives the remaining shared DrawingML raw codecs one required policy
 at every resource-scaled boundary. Text-body reads now use the single
@@ -38,3 +38,38 @@ No Cargo command was run in this worker before the coordinator grants the
 validation slot. `rustfmt`, `git diff --check`, and glossary JSON parsing were
 run locally. No generated binaries, third-party paths, or large evidence
 artifacts are part of this commit.
+
+## Coordinator validation receipt
+
+The coordinator granted one focused validation slot after the source change.
+All commands below used the capped cargo shim with `LITCHI_MEM_MAX=20G`,
+`CARGO_BUILD_JOBS=1`, `CARGO_INCREMENTAL=0`, offline mode, and `--locked`.
+The copied lockfile was pinned to SHA-256
+`52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`.
+The external target directory was
+`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-text-media-raw/target`
+(691 MiB after the checks), and no target or raw log is tracked here.
+
+The first attempt compiled dependencies but stopped on the source-only
+`unreachable_pub` visibility lint and an unused formatter import. Those were
+fixed in the follow-up source commit before the passing rerun. The canonical
+DrawingML command was:
+
+```text
+cargo test -p litchi-drawingml --all-features --offline --locked --lib --test svg_blip --no-fail-fast --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-text-media-raw/target
+```
+
+It passed 238 library tests and 22 `svg_blip` integration tests. The consumer
+command was run sequentially for `litchi-spreadsheet-drawing`, `litchi-docx`,
+`litchi-pptx`, and `litchi-xlsx`, each with `--all-features --offline
+--locked --lib`; all four checks passed. External receipts are:
+
+| receipt | bytes | SHA-256 |
+| --- | ---: | --- |
+| `drawingml-focused-rerun.log` | 21,737 | `1daeec36d1c1ccacb4a6af580a666eca1e12e2269faed8c75b2a61cf69a55b00` |
+| `consumer-checks.log` | 12,817 | `cec7c9af1ecb8b519a08e257fe5c9e1b89318113f915ea7bcd6ce2bcbd7f8db7` |
+
+The failed first-attempt receipt remains external at
+`drawingml-focused.log` (6,941 bytes,
+`6cb6f638a20b2e2d6f19ae2fbdcc6e55820a6bc372fb510ad54fbe44698c965a`) for
+traceability. The validation commands exited zero after the repairs.
