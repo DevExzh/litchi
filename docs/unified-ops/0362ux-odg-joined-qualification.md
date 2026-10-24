@@ -56,7 +56,8 @@ closed. Cargo.toml is admitted alongside Cargo.lock, rust-toolchain.toml, and
 build event. Every build command records the complete effective environment,
 resolved Cargo/rustc paths and hashes, ancestor/home Cargo and rustup config
 identities, and the endpoint cwd identity; nonempty unreviewed compiler
-wrapper variables are rejected. Runtime phases reuse the cached closure and
+selection (`RUSTC`/`CARGO_BUILD_RUSTC`) and wrapper variables are rejected.
+Runtime phases reuse the cached closure and
 perform cheap stat probes between launches, with full byte revalidation at
 phase boundaries so stat-hidden edits fail closed. The final target byte
 sample is checked against the 20 GB hard cap both at execution and receipt

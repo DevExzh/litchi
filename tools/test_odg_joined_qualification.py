@@ -262,19 +262,28 @@ class ODGJoinedQualificationTests(unittest.TestCase):
             with self.assertRaises(RUNNER.RunFailure):
                 RUNNER._assert_unchanged(parsed, identity["endpoints"], "manifest-change")
 
-    def test_source_closure_catches_same_size_mtime_restored_bytes(self) -> None:
+    def test_forced_source_closure_catches_bytes_when_stat_probe_is_clean(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             parsed = RUNNER.load_manifest(write_manifest(root))
             out_dir = root / "out"
             out_dir.mkdir()
             identity = RUNNER.runtime_identity(parsed, out_dir, require_build_receipt=False)
-            tracked = identity["endpoints"]["baseline"].endpoint.root / "tracked"
+            endpoint = identity["endpoints"]["baseline"]
+            tracked = endpoint.endpoint.root / "tracked"
             original = tracked.stat()
             tracked.write_bytes(b"tamper-0")
             os.utime(tracked, ns=(original.st_atime_ns, original.st_mtime_ns))
-            with self.assertRaises(RUNNER.RunFailure):
-                RUNNER._assert_unchanged(parsed, identity["endpoints"], "after-correctness")
+            from tools import odg_joined_qualification_builder as builder
+
+            with mock.patch.object(builder, "_cheap_source_closure_probe", return_value=True):
+                with self.assertRaises(RUNNER.RunFailure):
+                    builder._validate_source_closure(
+                        endpoint.endpoint.root,
+                        endpoint.source_closure,
+                        endpoint.endpoint.source_closure,
+                        force_full=True,
+                    )
 
     def test_path_layout_rejects_target_inside_source(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -565,14 +574,37 @@ class ODGJoinedQualificationTests(unittest.TestCase):
             root = Path(directory)
             parsed = RUNNER.load_manifest(write_manifest(root))
             endpoint = parsed.baseline
-            with mock.patch.dict(os.environ, {"RUSTC_WRAPPER": "/unreviewed/wrapper"}, clear=False):
-                with self.assertRaises(RUNNER.RunFailure):
-                    builder._environment_identity(
-                        endpoint.root,
-                        ref=endpoint.requested_ref,
-                        tree=endpoint.expected_tree,
-                        source_closure=endpoint.source_closure,
-                    )
+            for variable in ("RUSTC", "CARGO_BUILD_RUSTC", "RUSTC_WRAPPER"):
+                with mock.patch.dict(os.environ, {variable: "/unreviewed/compiler"}, clear=False):
+                    with self.assertRaises(RUNNER.RunFailure):
+                        builder._environment_identity(
+                            endpoint.root,
+                            ref=endpoint.requested_ref,
+                            tree=endpoint.expected_tree,
+                            source_closure=endpoint.source_closure,
+                        )
+            tool_dir = root / "fake-tools"
+            tool_dir.mkdir()
+            for name in ("cargo", "rustc"):
+                tool = tool_dir / name
+                tool.write_text(f"#!/bin/sh\n# {name}\n", encoding="utf-8")
+                tool.chmod(0o755)
+            first = builder._environment_identity(
+                endpoint.root,
+                ref=endpoint.requested_ref,
+                tree=endpoint.expected_tree,
+                source_closure=endpoint.source_closure,
+                overrides={"PATH": str(tool_dir)},
+            )
+            (tool_dir / "rustc").write_text("#!/bin/sh\n# changed\n", encoding="utf-8")
+            second = builder._environment_identity(
+                endpoint.root,
+                ref=endpoint.requested_ref,
+                tree=endpoint.expected_tree,
+                source_closure=endpoint.source_closure,
+                overrides={"PATH": str(tool_dir)},
+            )
+            self.assertNotEqual(first["tools"]["rustc"], second["tools"]["rustc"])
             with self.assertRaises(RUNNER.RunFailure):
                 builder._validate_target_accounting(
                     {"path": str(root / "target"), "bytes_before": 0,

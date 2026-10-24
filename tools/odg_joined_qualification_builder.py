@@ -687,6 +687,8 @@ def _fixture_plan(raw: Mapping[str, Any], base: Path) -> dict[str, Any]:
 
 
 _REJECTED_WRAPPER_ENV = (
+    "RUSTC",
+    "CARGO_BUILD_RUSTC",
     "RUSTC_WRAPPER",
     "RUSTC_WORKSPACE_WRAPPER",
     "CARGO_BUILD_RUSTC_WRAPPER",
@@ -798,7 +800,7 @@ def _environment_identity(
         environment.update(overrides)
     for key in _REJECTED_WRAPPER_ENV:
         if environment.get(key):
-            raise RunFailure(f"unreviewed compiler wrapper is set in {key}")
+            raise RunFailure(f"unreviewed compiler selection or wrapper is set in {key}")
     if "PATH" not in environment:
         raise RunFailure("bound environment must contain PATH")
     try:
