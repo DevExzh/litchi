@@ -1909,44 +1909,44 @@ fn build_candidate(
     };
     let serialized_bytes = serialized.len();
     // Clean owned ingress proves the destination has built-in parts. Keep
-    // the existing exact-archive reopen for transferring candidates; a
-    // recompressing candidate stays as the already-built graph and is never
-    // read back under the destination's source policy.
-    let (reopened, archive_revision) = if recompressing {
-        (candidate, None)
-    } else {
-        let candidate_read_limits = candidate.read_limits();
-        let reopened = match serialized {
-            CandidateBytes::Owned(bytes) if destination_view.is_unmodified_owned_source() => {
-                OpcPackage::from_vec_reusing_payloads(bytes, candidate_read_limits, &candidate)?
-            },
-            CandidateBytes::Owned(bytes) => OpcPackage::from_vec(bytes, candidate_read_limits)?,
-            CandidateBytes::Shared(bytes) if destination_view.is_unmodified_owned_source() => {
-                OpcPackage::from_shared_vec_reusing_payloads(
-                    bytes,
-                    candidate_read_limits,
-                    &candidate,
-                )?
-            },
-            CandidateBytes::Shared(bytes) => {
-                OpcPackage::from_shared_vec(bytes, candidate_read_limits)?
-            },
-        };
-        // Owned ingress retains the archive it was opened from and republishes
-        // it verbatim, so the bytes just hashed are exactly what a serializing
-        // hash sink would read back. A reopen that revoked that authorization
-        // is left to the ordinary recomputation.
-        let archive_revision = match written_digest {
-            Some(digest) => reopened
-                .is_unmodified_owned_source()
-                .then(|| seal_physical_revision(digest, serialized_bytes))
-                .transpose()?,
-            None => reopened
-                .exact_source_sha256()
-                .map(|digest| seal_physical_revision(digest, serialized_bytes))
-                .transpose()?,
-        };
-        (reopened, archive_revision)
+    // the exact-archive reopen whenever it succeeds, including ordinary
+    // recompressing plans that retain that archive. Only a recompressing
+    // candidate whose own read policy rejects the newly-added member set may
+    // stay as the already-built graph: that route is published by
+    // clone-and-apply and never reads the candidate back.
+    let candidate_read_limits = candidate.read_limits();
+    let reopened = match serialized {
+        CandidateBytes::Owned(bytes) if destination_view.is_unmodified_owned_source() => {
+            OpcPackage::from_vec_reusing_payloads(bytes, candidate_read_limits, &candidate)
+        },
+        CandidateBytes::Owned(bytes) => OpcPackage::from_vec(bytes, candidate_read_limits),
+        CandidateBytes::Shared(bytes) if destination_view.is_unmodified_owned_source() => {
+            OpcPackage::from_shared_vec_reusing_payloads(bytes, candidate_read_limits, &candidate)
+        },
+        CandidateBytes::Shared(bytes) => OpcPackage::from_shared_vec(bytes, candidate_read_limits),
+    };
+    let reopened = reopened.map_err(Error::from);
+    let (reopened, archive_revision) = match reopened {
+        Ok(reopened) => {
+            // Owned ingress retains the archive it was opened from and
+            // republishes it verbatim, so the bytes just hashed are exactly
+            // what a serializing hash sink would read back. A reopen that
+            // revoked that authorization is left to the ordinary
+            // recomputation.
+            let archive_revision = match written_digest {
+                Some(digest) => reopened
+                    .is_unmodified_owned_source()
+                    .then(|| seal_physical_revision(digest, serialized_bytes))
+                    .transpose()?,
+                None => reopened
+                    .exact_source_sha256()
+                    .map(|digest| seal_physical_revision(digest, serialized_bytes))
+                    .transpose()?,
+            };
+            (reopened, archive_revision)
+        },
+        Err(error) if recompressing && is_read_limit(&error) => (candidate, None),
+        Err(error) => return Err(error),
     };
     let copied_media = if recompressing {
         CopiedMedia::Recompressed
