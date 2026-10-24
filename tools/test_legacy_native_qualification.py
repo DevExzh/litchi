@@ -59,7 +59,7 @@ class LegacyNativeQualificationTests(unittest.TestCase):
             reviewed["lock_sha256"],
             {
                 "before": "57c2a19ffeff395fdea95c33f295c85b08400b00e2fd9cec94d66cff56d1583f",
-                "after": "6dbfc0bcc64cdf8e625a6562f2d5d11c1e98ad7cb6edda299b9adf2a36a70e39",
+                "after": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
             },
         )
         self.assertNotEqual(adapter["probe_sha256"], adapter["historical_failed_compile"]["source_sha256"])
