@@ -8,6 +8,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -136,6 +137,8 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             identity["identity_sha256"] = hashlib.sha256(json.dumps(identity, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             identities[role] = identity
 
+        cargo_tool = Path(shutil.which("cargo") or os.sys.executable).resolve()
+        rustc_tool = Path(shutil.which("rustc") or os.sys.executable).resolve()
         build_events = []
         builds: dict[str, object] = {}
         for key in runner.BUILD_KEYS:
@@ -158,7 +161,7 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             _write(stderr, b"")
             driver_root = Path(preparation_document["baseline" if role == "before" else "candidate"]["driver"]["root"])
             command = [
-                "cargo", "build", "--release", "--offline", "--locked", "--manifest-path",
+                str(cargo_tool), "build", "--release", "--offline", "--locked", "--manifest-path",
                 str(driver_root / "Cargo.toml"), "--no-default-features", "--features",
                 validator.EXPECTED_FEATURES[key], "--example", "ole_w5_probe", "--example",
                 "ole_package_clone_probe", "--example", "ole_owner_oracle",
@@ -186,7 +189,10 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             "runner": _record(Path(runner.__file__)), "limits": {"target_preflight_bytes": validator.TARGET_PREFLIGHT_BYTES, "target_hard_bytes": validator.TARGET_HARD_BYTES, "memory_bytes": validator.MEMORY_BYTES},
             "claim_scope": validator.CLAIM_FREE["build"], "target_root": str(target_root),
             "event_journal": {"path": str(build_events_path), "count": len(build_events), "event_ids": [e["event_id"] for e in build_events], "sha256": hashlib.sha256(json.dumps(build_events, sort_keys=True, separators=(",", ":")).encode()).hexdigest(), "file_sha256": hashlib.sha256(event_raw).hexdigest(), "bytes": len(event_raw)},
-            "toolchain": {name: {**_record(Path(os.sys.executable)), "version": "fixture"} for name in ("cargo", "rustc")},
+            "toolchain": {
+                "cargo": {**_record(cargo_tool), "version": "fixture"},
+                "rustc": {**_record(rustc_tool), "version": "fixture"},
+            },
             "identities": identities, "builds": builds,
         }
         build_path = build_dir / "build-receipt.json"
@@ -425,6 +431,77 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
                     manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
                     abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
                 )
+
+    def test_rejects_build_artifact_outside_expected_target(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
+            paths, runner_path = self._fixture(Path(directory))
+            build = json.loads(paths["build"].read_text())
+            artifact = Path(build["builds"]["before/normal"]["artifacts"]["probe"]["path"])
+            misplaced = Path(directory) / "misplaced-probe"
+            _write(misplaced, artifact.read_bytes(), executable=True)
+            build["builds"]["before/normal"]["artifacts"]["probe"] = _record(misplaced)
+            paths["build"].write_text(json.dumps(build, sort_keys=True))
+            with self.assertRaisesRegex(validator.ValidationError, "artifact before/normal/probe path"):
+                validator.validate(
+                    manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
+                    abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
+                )
+
+    def test_rejects_cargo_argv_not_bound_to_toolchain_path(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
+            paths, runner_path = self._fixture(Path(directory))
+            build = json.loads(paths["build"].read_text())
+            alternate = Path(directory) / "alternate-cargo"
+            _write(alternate, b"alternate cargo\n", executable=True)
+            build["builds"]["before/normal"]["command"][0] = str(alternate)
+            paths["build"].write_text(json.dumps(build, sort_keys=True))
+            with self.assertRaisesRegex(validator.ValidationError, "Cargo executable binding"):
+                validator.validate(
+                    manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
+                    abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
+                )
+
+    def test_rejects_duplicate_allocator_route(self) -> None:
+        header = "route\talloc_calls\talloc_bytes\tdealloc_calls\tdealloc_bytes\trealloc_calls\trealloc_old_bytes\trealloc_new_bytes\tbase_live_calls\tbase_live_bytes\tlive_calls\tlive_bytes\tpeak_calls\tpeak_bytes\tretained_packages\tretained_patches"
+        row = "read\t10\t100\t2\t20\t1\t5\t6\t100\t1000\t108\t1081\t110\t1100\t0\t0"
+        lines = [header, row, row]
+        for route in validator.ALLOCATOR_ROUTES[2:]:
+            retained = "129\t128" if route in {"doc_history", "xls_history"} else "0\t0"
+            lines.append(f"{route}\t10\t100\t2\t20\t1\t5\t6\t100\t1000\t108\t1081\t110\t1100\t{retained}")
+        with self.assertRaisesRegex(validator.ValidationError, "route order and uniqueness"):
+            validator._validate_allocator_rows(lines, "duplicate-route")
+
+    def test_rejects_duplicate_doc_xls_indices_and_root_identity(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
+            paths, _ = self._fixture(Path(directory))
+            measurements = json.loads(paths["measurements"].read_text())
+            files = measurements["oracle"]["files"]["before/normal"]["files"]
+            doc_path = Path(files["doc-proof.tsv"]["path"])
+            doc_lines = doc_path.read_text().splitlines()
+            original_doc_lines = list(doc_lines)
+            doc_lines[2] = f"source\t0\t{doc_lines[1].split(chr(9), 2)[2]}"
+            doc_path.write_text("\n".join(doc_lines) + "\n")
+            files["doc-proof.tsv"] = _record(doc_path)
+            with self.assertRaisesRegex(validator.ValidationError, "DOC source indices"):
+                validator._validate_oracle_proofs(files, "duplicate-doc")
+            doc_path.write_text("\n".join(original_doc_lines) + "\n")
+            files["doc-proof.tsv"] = _record(doc_path)
+
+            xls_path = Path(files["xls-proof.tsv"]["path"])
+            xls_lines = xls_path.read_text().splitlines()
+            xls_lines[2] = f"source\t0\t{xls_lines[1].split(chr(9), 2)[2]}"
+            xls_path.write_text("\n".join(xls_lines) + "\n")
+            files["xls-proof.tsv"] = _record(xls_path)
+            with self.assertRaisesRegex(validator.ValidationError, "XLS source indices"):
+                validator._validate_oracle_proofs(files, "duplicate-xls")
+
+            inventory_path = Path(files["ole-inventory.tsv"]["path"])
+            inventory_lines = inventory_path.read_text().splitlines()
+            inventory_lines[1] = inventory_lines[1].replace("\t5\t", "\t2\t", 1)
+            inventory_path.write_text("\n".join(inventory_lines) + "\n")
+            files["ole-inventory.tsv"] = _record(inventory_path)
+            with self.assertRaisesRegex(validator.ValidationError, "Root Entry storage identity"):
+                validator._validate_oracle_proofs(files, "wrong-root")
 
 
 if __name__ == "__main__":

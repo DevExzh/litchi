@@ -447,13 +447,15 @@ def _source_identity(preparation: Mapping[str, Any], role: str) -> dict[str, Any
 
 def _expected_build_command(
     item: Mapping[str, Any], preparation: Mapping[str, Any], role: str, variant: str,
+    cargo_path: Path,
 ) -> list[str]:
     command = item.get("command")
     if not isinstance(command, list) or not command:
         raise ValidationError(f"builds.{role}/{variant} command is missing")
     cargo = command[0]
-    if not isinstance(cargo, str) or not cargo or Path(cargo).name != "cargo":
+    if not isinstance(cargo, str) or not cargo:
         raise ValidationError(f"builds.{role}/{variant} cargo executable is not explicit")
+    _same(_path(cargo, f"builds.{role}/{variant} cargo executable"), cargo_path, f"builds.{role}/{variant} Cargo executable binding")
     endpoint = _mapping(
         preparation.get("baseline" if role == "before" else "candidate"),
         f"preparation.{role}",
@@ -517,7 +519,8 @@ def _validate_build(
         _same(item.get("variant"), variant, f"builds.{key} variant")
         expected_target = target_root / f"{role}-{variant}"
         _same(_path(item.get("target"), f"builds.{key} target"), expected_target, f"builds.{key} target")
-        expected_command = _expected_build_command(item, preparation, role, variant)
+        cargo_path = _path(_mapping(toolchain.get("cargo"), "toolchain.cargo").get("path"), "toolchain.cargo path")
+        expected_command = _expected_build_command(item, preparation, role, variant, cargo_path)
         _same(item.get("command"), expected_command, f"builds.{key} command")
         event = events[BUILD_KEYS.index(key)]
         _same(event.get("phase"), "build", f"build event {key} phase")
@@ -554,11 +557,21 @@ def _validate_build(
         _validate_log(event, "stderr", root)
         outputs = event.get("outputs")
         artifacts = _mapping(item.get("artifacts"), f"builds.{key}.artifacts")
-        if not isinstance(outputs, list) or set(Path(str(value.get("path"))).name for value in outputs if isinstance(value, Mapping)) != {"ole_w5_probe", "ole_package_clone_probe", "ole_owner_oracle"}:
+        expected_output_paths = [
+            str(expected_target / "release" / "examples" / name)
+            for name in ("ole_w5_probe", "ole_package_clone_probe", "ole_owner_oracle")
+        ]
+        if not isinstance(outputs, list) or not all(isinstance(value, Mapping) for value in outputs) or [value.get("path") for value in outputs] != expected_output_paths:
             raise ValidationError(f"build event {key} output set differs")
         for name in ("probe", "clone", "oracle"):
             artifact = _mapping(artifacts.get(name), f"builds.{key}.{name}")
             path = _path(artifact.get("path"), f"builds.{key}.{name}")
+            expected_artifact = expected_target / "release" / "examples" / {
+                "probe": "ole_w5_probe",
+                "clone": "ole_package_clone_probe",
+                "oracle": "ole_owner_oracle",
+            }[name]
+            _same(path, expected_artifact, f"artifact {key}/{name} path")
             digest, bytes_ = _sha256(path)
             _same(artifact.get("sha256"), digest, f"artifact {key}/{name} hash")
             _same(artifact.get("bytes"), bytes_, f"artifact {key}/{name} size")
@@ -961,8 +974,17 @@ def _validate_oracle_proofs(files: Mapping[str, Any], label: str) -> None:
         if len(fields) != 13 or fields[0] not in rows or fields[1] in rows[fields[0]]:
             raise ValidationError(f"{label} inventory row differs")
         rows[fields[0]][fields[1]] = fields[2:]
-    if any(not any(fields[0] != "2" for fields in side.values()) for side in rows.values()):
+    root_name = "Root Entry"
+    for kind, side in rows.items():
+        if root_name not in side or side[root_name][0] != "5":
+            raise ValidationError(f"{label} {kind} inventory omits the Root Entry storage identity")
+    source_nonstreams = {name for name, fields in rows["source"].items() if fields[0] != "2"}
+    replacement_nonstreams = {name for name, fields in rows["replacement"].items() if fields[0] != "2"}
+    _same(source_nonstreams, replacement_nonstreams, f"{label} non-stream identity")
+    if not source_nonstreams:
         raise ValidationError(f"{label} inventory omits root/storage metadata")
+    for name in source_nonstreams:
+        _same(rows["source"][name], rows["replacement"][name], f"{label} non-stream metadata {name}")
     expected_streams = {f"ole_w5_sibling_{index:03}" for index in range(64)} | {TARGET_NAME}
     if any(not expected_streams.issubset(side) for side in rows.values()):
         raise ValidationError(f"{label} inventory omits an expected stream")
@@ -982,28 +1004,36 @@ def _validate_oracle_proofs(files: Mapping[str, Any], label: str) -> None:
     doc_proof = (_path(files["doc-proof.tsv"]["path"], f"{label}.doc-proof")).read_text(encoding="utf-8").splitlines()
     if len(doc_proof) != 1 + 2 * 256 or doc_proof[0] != "kind\tindex\ttext":
         raise ValidationError(f"{label} DOC proof cardinality differs")
+    doc_indices: dict[str, list[int]] = {"source": [], "edit": []}
     for line in doc_proof[1:]:
         fields = line.split("\t")
         if len(fields) != 3 or fields[0] not in {"source", "edit"} or not fields[1].isdigit():
             raise ValidationError(f"{label} DOC proof row differs")
         index = int(fields[1])
+        doc_indices[fields[0]].append(index)
         expected = f"ole-w5 tracked paragraph {index:03}"
         if fields[0] == "edit" and index == 0:
             expected = f"ole-w5-tracked-revision {expected}"
         if index >= 256 or fields[2] != expected:
             raise ValidationError(f"{label} DOC untouched paragraph proof differs")
+    for kind in ("source", "edit"):
+        _same(doc_indices[kind], list(range(256)), f"{label} DOC {kind} indices")
     xls_proof = (_path(files["xls-proof.tsv"]["path"], f"{label}.xls-proof")).read_text(encoding="utf-8").splitlines()
     if len(xls_proof) != 1 + 2 * 256 + 1 or xls_proof[0] != "kind\trow\tvalue_bits":
         raise ValidationError(f"{label} XLS proof cardinality differs")
+    xls_indices: dict[str, list[int]] = {"source": [], "edit": []}
     for line in xls_proof[1:-1]:
         fields = line.split("\t")
         if len(fields) != 3 or fields[0] not in {"source", "edit"} or not fields[1].isdigit() or not fields[2].isdigit():
             raise ValidationError(f"{label} XLS proof row differs")
         row = int(fields[1])
+        xls_indices[fields[0]].append(row)
         value = 4242.0 if fields[0] == "edit" and row == 0 else float(row)
         expected_bits = struct.unpack("<Q", struct.pack("<d", value))[0]
         if row >= 256 or int(fields[2]) != expected_bits:
             raise ValidationError(f"{label} XLS untouched-cell proof differs")
+    for kind in ("source", "edit"):
+        _same(xls_indices[kind], list(range(256)), f"{label} XLS {kind} indices")
     _same(xls_proof[-1] if xls_proof else None, "opaque\tbytes\t98304", f"{label} XLS opaque proof")
     opaque_source = _path(files["xls-opaque-source.bin"]["path"], f"{label}.opaque-source")
     opaque_output = _path(files["xls-opaque-edit.bin"]["path"], f"{label}.opaque-edit")
@@ -1028,10 +1058,12 @@ def _validate_allocator_rows(lines: list[str], label: str) -> None:
     _same(header, expected, f"{label} header")
     if len(lines) != 1 + len(ALLOCATOR_ROUTES):
         raise ValidationError(f"{label} route count differs")
+    routes: list[str] = []
     for line in lines[1:]:
         fields = line.split("\t")
         if len(fields) != len(expected) or fields[0] not in ALLOCATOR_ROUTES:
             raise ValidationError(f"{label} route row differs")
+        routes.append(fields[0])
         values = {key: int(value) for key, value in zip(expected[1:], fields[1:])}
         if any(value < 0 for value in values.values()):
             raise ValidationError(f"{label} has a negative counter")
@@ -1046,6 +1078,7 @@ def _validate_allocator_rows(lines: list[str], label: str) -> None:
             raise ValidationError(f"{label} peak is below live state")
         expected_retained = (129, 128) if fields[0] in {"doc_history", "xls_history"} else (0, 0)
         _same((values["retained_packages"], values["retained_patches"]), expected_retained, f"{label} retained history count")
+    _same(routes, list(ALLOCATOR_ROUTES), f"{label} route order and uniqueness")
 
 
 def validate(

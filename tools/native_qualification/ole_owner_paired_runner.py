@@ -753,8 +753,7 @@ class PairedRunner:
             features += ",w5-counting-allocator"
         return features
 
-    def _build_command(self, role: str, variant: str) -> list[str]:
-        cargo = os.environ.get("CARGO", "cargo")
+    def _build_command(self, role: str, variant: str, *, cargo: str) -> list[str]:
         return [
             cargo,
             "build",
@@ -817,7 +816,7 @@ class PairedRunner:
                     target = self._target(role, variant)
                     target.mkdir()
                     binaries = self._binary_paths(role, variant)
-                    command = self._build_command(role, variant)
+                    command = self._build_command(role, variant, cargo=str(toolchain["cargo"]["path"]))
                     build_env = self._environment(role, variant)
                     event = self._run_process(
                         event_id=f"build-{role}-{variant}",
@@ -1211,8 +1210,16 @@ class PairedRunner:
             rows[fields[0]][fields[1]] = tuple(fields[2:])
         if len(rows["source"]) != 66 or len(rows["replacement"]) != 66:
             raise RunnerError(f"oracle OLE inventory does not include root/storage and all streams: {directory}")
-        if not any(fields[0] != "2" for fields in rows["source"].values()):
+        root_name = "Root Entry"
+        for kind, side in rows.items():
+            if root_name not in side or side[root_name][0] != "5":
+                raise RunnerError(f"oracle OLE inventory omits the {kind} Root Entry storage identity: {directory}")
+        source_nonstreams = {name for name, fields in rows["source"].items() if fields[0] != "2"}
+        replacement_nonstreams = {name for name, fields in rows["replacement"].items() if fields[0] != "2"}
+        if source_nonstreams != replacement_nonstreams or not source_nonstreams:
             raise RunnerError(f"oracle OLE inventory omitted non-stream metadata: {directory}")
+        if any(rows["source"][name] != rows["replacement"][name] for name in source_nonstreams):
+            raise RunnerError(f"oracle OLE non-stream metadata changed: {directory}")
         expected_streams = {f"ole_w5_sibling_{index:03}" for index in range(64)} | {TARGET_NAME}
         if not expected_streams.issubset(rows["source"]) or not expected_streams.issubset(rows["replacement"]):
             raise RunnerError(f"oracle OLE inventory omitted an expected stream: {directory}")
@@ -1227,30 +1234,38 @@ class PairedRunner:
         doc_proof = (directory / "doc-proof.tsv").read_text(encoding="utf-8").splitlines()
         if len(doc_proof) != 1 + 2 * 256 or doc_proof[0] != "kind\tindex\ttext":
             raise RunnerError(f"oracle DOC paragraph proof cardinality differs: {directory}")
+        doc_indices: dict[str, list[int]] = {"source": [], "edit": []}
         for line in doc_proof[1:]:
             fields = line.split("\t")
             if len(fields) != 3 or fields[0] not in {"source", "edit"} or not fields[1].isdigit():
                 raise RunnerError(f"oracle DOC paragraph proof row differs: {line!r}")
             index = int(fields[1])
+            doc_indices[fields[0]].append(index)
             expected = f"ole-w5 tracked paragraph {index:03}"
             if fields[0] == "edit" and index == 0:
                 expected = f"ole-w5-tracked-revision {expected}"
             if index >= 256 or fields[2] != expected:
                 raise RunnerError(f"oracle DOC paragraph proof value differs: {line!r}")
+        if any(doc_indices[kind] != list(range(256)) for kind in ("source", "edit")):
+            raise RunnerError(f"oracle DOC paragraph indices are incomplete or duplicated: {directory}")
         xls_proof = (directory / "xls-proof.tsv").read_text(encoding="utf-8").splitlines()
         if len(xls_proof) != 1 + 2 * 256 + 1 or xls_proof[0] != "kind\trow\tvalue_bits":
             raise RunnerError(f"oracle XLS cell proof cardinality differs: {directory}")
+        xls_indices: dict[str, list[int]] = {"source": [], "edit": []}
         for line in xls_proof[1:-1]:
             fields = line.split("\t")
             if len(fields) != 3 or fields[0] not in {"source", "edit"} or not fields[1].isdigit() or not fields[2].isdigit():
                 raise RunnerError(f"oracle XLS cell proof row differs: {line!r}")
             row, bits = int(fields[1]), int(fields[2])
+            xls_indices[fields[0]].append(row)
             # Compare the serialized IEEE bits without trusting a decimal
             # rendering.  The explicit values have stable bit patterns.
             expected_value = float(row) if fields[0] == "source" or row != 0 else 4242.0
             expected_bits = struct.unpack("<Q", struct.pack("<d", expected_value))[0]
             if row >= 256 or bits != expected_bits:
                 raise RunnerError(f"oracle XLS cell proof value differs: {line!r}")
+        if any(xls_indices[kind] != list(range(256)) for kind in ("source", "edit")):
+            raise RunnerError(f"oracle XLS cell indices are incomplete or duplicated: {directory}")
         if xls_proof[-1] != "opaque\tbytes\t98304":
             raise RunnerError(f"oracle XLS opaque proof differs: {directory}")
         opaque_source = directory / "xls-opaque-source.bin"
