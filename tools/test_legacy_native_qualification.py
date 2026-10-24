@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -32,6 +33,35 @@ class LegacyNativeQualificationTests(unittest.TestCase):
             preparation.LANES["legacy-rtf"]["probe_sha256"]["after"],
             digest,
         )
+
+    def test_reviewed_ole_adapter_materializes_the_candidate_probe_hash(self) -> None:
+        source = subprocess.check_output(
+            [
+                "git",
+                "show",
+                "fdb139197d08677d6fa0e14d536e798e380e4cb1:tools/perf-baseline/examples/ole_w5_probe.rs",
+            ],
+            cwd=ROOT,
+        ).decode("utf-8")
+        baseline = preparation.materialize_ole_baseline_adapter(source)
+        adapted = preparation.materialize_ole_adapter(source)
+        baseline_recipe = preparation.OLE_BASELINE_ADAPTER_RECIPE
+        candidate_recipe = preparation.OLE_ADAPTER_RECIPE
+        self.assertEqual(hashlib.sha256(source.encode()).hexdigest(), baseline_recipe["raw_sha256"])
+        self.assertEqual(hashlib.sha256(baseline.encode()).hexdigest(), baseline_recipe["adapted_sha256"])
+        self.assertEqual(hashlib.sha256(adapted.encode()).hexdigest(), candidate_recipe["after_sha256"])
+        self.assertEqual(
+            validator.REVIEWED_INPUTS["legacy-ole-properties"]["probe_sha256"],
+            {"before": baseline_recipe["adapted_sha256"], "after": candidate_recipe["after_sha256"]},
+        )
+        self.assertEqual(
+            preparation.OLE_ADAPTER_RECORD,
+            validator.REVIEWED_INPUTS["legacy-ole-properties"]["adapter"],
+        )
+        self.assertEqual(candidate_recipe["before_sha256"], hashlib.sha256(baseline.encode()).hexdigest())
+        self.assertIn('current-owner-api', baseline)
+        self.assertIn('current-property-api', baseline)
+        self.assertIn('legacy-property-api', baseline)
 
     def test_manifests_bind_reusable_drivers_and_contracts(self) -> None:
         expected = {

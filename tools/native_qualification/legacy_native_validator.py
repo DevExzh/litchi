@@ -49,12 +49,64 @@ REVIEWED_INPUTS: dict[str, dict[str, Any]] = {
         "fixture_id": "rtf-refusal-contract-v1",
     },
     "legacy-ole-properties": {
-        # This is the reviewed fdb139 probe, not the newer checkout copy.
+        # This is the reviewed fdb139 probe, not the newer checkout copy.  The
+        # baseline materialization selects the public owner API with the
+        # legacy property API; the candidate adds only the reviewed CFB cap.
         "probe_relative": "tools/perf-baseline/examples/ole_w5_probe.rs",
         "lock_relative": "tools/perf-baseline/Cargo.lock",
         "probe_sha256": {
-            "before": "3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f",
-            "after": "3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f",
+            "before": "6890d0524cf4466a96812eb9ba449d4d995b29e1db74888fe42b5a42e8a91aed",
+            "after": "e031d0adbc00a5784658c37472693ae1fe840ad88f84a5b785b48dd77a810782",
+        },
+        "adapter": {
+            "source_fence": "fdb139197d08677d6fa0e14d536e798e380e4cb1",
+            "relative_path": "tools/perf-baseline/examples/ole_w5_probe.rs",
+            "baseline": {
+                "source_fence": "fdb139197d08677d6fa0e14d536e798e380e4cb1",
+                "relative_path": "tools/perf-baseline/examples/ole_w5_probe.rs",
+                "raw_sha256": "3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f",
+                "adapted_sha256": "6890d0524cf4466a96812eb9ba449d4d995b29e1db74888fe42b5a42e8a91aed",
+                "replacements": [
+                    {
+                        "needle": "\n#[cfg(feature = \"current-api\")]\n",
+                        "replacement": "\n#[cfg(feature = \"current-owner-api\")]\n",
+                        "count": 2,
+                    },
+                    {
+                        "needle": "    #[cfg(feature = \"current-api\")]\n",
+                        "replacement": "    #[cfg(feature = \"current-owner-api\")]\n",
+                        "count": 3,
+                    },
+                    {
+                        "needle": "    #[cfg(feature = \"current-api\")]\n",
+                        "replacement": "    #[cfg(feature = \"current-property-api\")]\n",
+                        "count": 2,
+                    },
+                    {
+                        "needle": "\n#[cfg(all(feature = \"legacy-owner-api\", not(feature = \"current-api\")))]\n",
+                        "replacement": "\n#[cfg(all(feature = \"legacy-owner-api\", not(feature = \"current-owner-api\")))]\n",
+                        "count": 1,
+                    },
+                    {
+                        "needle": "    #[cfg(all(feature = \"legacy-owner-api\", not(feature = \"current-api\")))]\n",
+                        "replacement": "    #[cfg(all(feature = \"legacy-owner-api\", not(feature = \"current-owner-api\")))]\n",
+                        "count": 3,
+                    },
+                    {
+                        "needle": "    #[cfg(all(feature = \"legacy-property-api\", not(feature = \"current-api\")))]\n",
+                        "replacement": "    #[cfg(all(feature = \"legacy-property-api\", not(feature = \"current-property-api\")))]\n",
+                        "count": 2,
+                    },
+                ],
+            },
+            "candidate": {
+                "source_fence": "fdb139197d08677d6fa0e14d536e798e380e4cb1",
+                "relative_path": "tools/perf-baseline/examples/ole_w5_probe.rs",
+                "needle": "OleFile::open(Cursor::new(output))?",
+                "replacement": "OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default())?",
+                "before_sha256": "6890d0524cf4466a96812eb9ba449d4d995b29e1db74888fe42b5a42e8a91aed",
+                "after_sha256": "e031d0adbc00a5784658c37472693ae1fe840ad88f84a5b785b48dd77a810782",
+            },
         },
         "fixture_relatives": (),
         "fixture_id": "ole-w5-generated-corpus-v1",
@@ -263,6 +315,7 @@ def _validate_preparation_receipt(
     _expect(isinstance(reviewed, dict), "preparation reviewed inputs are missing")
     _expect(reviewed.get("probe_relative_path") == spec["probe_relative"], "preparation probe binding differs")
     _expect(reviewed.get("probe_sha256") == spec["probe_sha256"], "preparation probe hash binding differs")
+    _expect(reviewed.get("adapter", {}) == spec.get("adapter", {}), "preparation consumer-adapter recipe differs")
     _expect(reviewed.get("lock_relative_path") == spec["lock_relative"], "preparation lock binding differs")
     _expect(tuple(reviewed.get("fixture_relative_paths", ())) == tuple(spec["fixture_relatives"]), "preparation fixture binding differs")
     for leg in ("before", "after"):
@@ -347,7 +400,7 @@ def _expected_build_argv(lane: str, leg: str) -> list[str]:
     if lane == "legacy-rtf":
         return _normalize_cargo(["cargo", "build", "--release", "--manifest-path", "Cargo.toml", "-p", "litchi-rtf", "--example", "refusal_contract_bench"])
     if lane == "legacy-ole-properties":
-        features = "legacy-owner-api,legacy-property-api" if leg == "before" else "current-api"
+        features = "current-owner-api,legacy-property-api" if leg == "before" else "current-owner-api,current-property-api"
         return _normalize_cargo(["cargo", "build", "--release", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--no-default-features", "--features", features, "--example", "ole_w5_probe"])
     return _normalize_cargo(["cargo", "build", "--release", "--manifest-path", "Cargo.toml", "-p", "litchi-ops", "--no-default-features", "--features", "doc,xls,ppt", "--example", "ole_metadata_bench"])
 
@@ -692,6 +745,7 @@ def validate_directory(
             "runner": str(RUNNER_PATH),
             "preparer": str(PREPARER_PATH),
             "reviewed_probe_sha256": REVIEWED_INPUTS[lane]["probe_sha256"],
+            "consumer_adapter": REVIEWED_INPUTS[lane].get("adapter", {}),
             "fixture_id": REVIEWED_INPUTS[lane]["fixture_id"],
         },
         "quiet_and_caps": {

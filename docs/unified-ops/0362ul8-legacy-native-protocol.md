@@ -17,7 +17,7 @@ the existing executable drivers and the guarded process/identity runner:
 | lane | reusable executable and current source SHA-256 | source fence | protocol |
 | --- | --- | --- | --- |
 | RTF | `crates/litchi-rtf/examples/refusal_contract_bench.rs`, `70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585` (reviewed contract adapter) | original `86d708878fa537eab42fd4bd5ffbc0f79c606191`; candidate `$RTF_CANDIDATE_REVISION` | `legacy-rtf.json`, five guarded ABBA blocks |
-| OLE properties | existing `tools/perf-baseline/examples/ole_w5_probe.rs` from driver source fence `fdb139197d`, file SHA-256 `3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f` | original `604822b44107999aaddb0bffb96b705e9464f546`; candidate `$OLE_CANDIDATE_REVISION` | `legacy-ole-properties.json`, `read` and `edit` |
+| OLE properties | raw fdb139 probe SHA-256 `3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f`; baseline public-owner/legacy-property adapter SHA-256 `6890d0524cf4466a96812eb9ba449d4d995b29e1db74888fe42b5a42e8a91aed`; candidate split plus CFB-limit adapter SHA-256 `e031d0adbc00a5784658c37472693ae1fe840ad88f84a5b785b48dd77a810782` | original `604822b44107999aaddb0bffb96b705e9464f546`; candidate `$OLE_CANDIDATE_REVISION` | `legacy-ole-properties.json`, `read` and `edit` |
 | XLS properties/lazy entry | `crates/litchi-ops/examples/ole_metadata_bench.rs`, before `b840acb620c09644ca4b89cbe42927485da9d457f3bf93b578eff90fa1008173`, after `53b26136e915fa0bf88518fd1c05e494d55ce5e8f91012be04ac7adf476c1f10` | derived pre-lazy parent `509bf28e7531ad75f278eaec3a732714a243915a` (parent of lazy feature `4f08cdc5e8751243d50077ce1a2a2ea24a0d9c51`); candidate `$XLS_CANDIDATE_REVISION` | `legacy-xls-properties.json`, existing metadata benchmark |
 
 The XLS source parent is a provenance fence, not a historical performance
@@ -51,12 +51,25 @@ candidate into an original source tree.
   baseline probe overlay; its hash must be recorded again after the final
   candidate freeze.
 * OLE: materialize `604822b44107999aaddb0bffb96b705e9464f546`, copy the
-  reviewed `ole_w5_probe.rs` from driver source fence `fdb139197d`, and add
-  only the standalone feature declarations (`current-api`, `legacy-owner-api`,
-  and `legacy-property-api`) to `tools/perf-baseline/Cargo.toml`.  Build the
-  original-owner/property boundary with
-  `--no-default-features --features legacy-owner-api,legacy-property-api`;
-  build the candidate with `--no-default-features --features current-api`.
+  reviewed fdb139197d08677d6fa0e14d536e798e380e4cb1 `ole_w5_probe.rs`, and
+  retain its raw SHA-256
+  `3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f` as
+  the source pin.  For the baseline, apply only the recorded feature-guard
+  split (`current-owner-api` plus `legacy-property-api`), which selects the
+  public `Package::open_with_options`/`Package::edit` path while retaining the
+  legacy property `with_limits` calls; the materialized baseline SHA-256 is
+  `6890d0524cf4466a96812eb9ba449d4d995b29e1db74888fe42b5a42e8a91aed`.
+  For the candidate, use the same split with `current-owner-api` plus
+  `current-property-api`, then apply only
+  `OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default())?`.
+  Its SHA-256 must be
+  `e031d0adbc00a5784658c37472693ae1fe840ad88f84a5b785b48dd77a810782`;
+  no other probe/workload change or substitution of the newer `ad4c52c` source
+  is permitted.  Add only the standalone feature declarations
+  (`current-owner-api`, `current-property-api`, `legacy-owner-api`, and
+  `legacy-property-api`) to `tools/perf-baseline/Cargo.toml`.  Build the
+  baseline with `--no-default-features --features current-owner-api,legacy-property-api`;
+  build the candidate with `--no-default-features --features current-owner-api,current-property-api`.
   The historical final-20261021 OLE lock has SHA-256
   `bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a` and is
   provenance only; the final lane must bind the lock actually selected for
@@ -139,11 +152,14 @@ The manifest reuses `ole_w5_probe` for exactly `read` and `edit`, with
 `--warmup 20 --samples 500 --batch 1`, in one A-B-B-A block.  The reviewed
 fdb139 probe owns the six-property generated corpus, link-base/hyperlink read
 checks, edit publication and exact section-output check.  The validator binds
-probe SHA `3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f`,
-fixture ID `ole-w5-generated-corpus-v1`, exact route argv, and output size `3`
-for both `read` and `edit`.  It requires the exact CSV header, 500 ordered
-rows and all eight streams (two routes × four legs); nonzero child/error or
-fidelity failures remain fatal.
+raw probe SHA `3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f`,
+baseline adapter SHA `6890d0524cf4466a96812eb9ba449d4d995b29e1db74888fe42b5a42e8a91aed`,
+candidate adapter SHA `e031d0adbc00a5784658c37472693ae1fe840ad88f84a5b785b48dd77a810782`,
+source fence `fdb139197d08677d6fa0e14d536e798e380e4cb1`, the exact feature-split
+and one-line CFB recipes, fixture ID `ole-w5-generated-corpus-v1`, exact route
+argv, and output size `3` for both `read` and `edit`.  It requires the exact
+CSV header, 500 ordered rows and all eight streams (two routes × four legs);
+nonzero child/error or fidelity failures remain fatal.
 
 ### XLS properties/lazy entry
 
@@ -180,6 +196,21 @@ historical heap/callgrind result is promoted to native acceptance.  The final
 freeze must bind the source SHA, lock SHA, probe/fixture hashes, binary hashes,
 fresh output paths, CPU, and quiet/cap receipts together.
 
+## 0362ul8a return coverage
+
+This return preserves every earlier repair: the reusable RTF/OLE/XLS manifests
+and workload counts; source-preparation receipts with allow-listed overlays;
+manifest/runner/journal/argv/cwd/cap/target/binary provenance; exact RTF
+refusal kind, fixed reason and fidelity; strict OLE output bytes and XLS
+fixture IDs; and raw-path symlink/lock binding rejection.  It additionally
+separates the unchanged fdb139 OLE source
+(`3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f`) from
+the baseline public-owner/legacy-property feature adapter
+(`6890d0524cf4466a96812eb9ba449d4d995b29e1db74888fe42b5a42e8a91aed`) and
+the candidate's single consumer-only `OleFileLimits::default()` addition
+(`e031d0adbc00a5784658c37472693ae1fe840ad88f84a5b785b48dd77a810782`).  No
+production overlay, workload change, or newer `ad4c52c` probe is accepted.
+
 ## Build-free validation performed here
 
 No qualification Cargo build/release, native, allocator, heaptrack, or
@@ -189,7 +220,7 @@ validator, identity, route-shape and cap logic:
 
 ```text
 python3 -m unittest tools.test_legacy_native_qualification tools.test_native_qualification_runner
-Ran 30 tests
+Ran 31 tests
 OK
 
 python3 -m unittest tools.test_no_3rdparty_references

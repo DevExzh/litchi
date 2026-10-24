@@ -23,6 +23,68 @@ from typing import Any
 SCHEMA = "litchi.legacy-native-preparation.v1"
 ROOT = Path(__file__).resolve().parents[2]
 
+OLE_SOURCE_FENCE = "fdb139197d08677d6fa0e14d536e798e380e4cb1"
+OLE_RAW_SHA256 = "3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f"
+
+# The fdb139 probe has independent owner/property feature guards.  The
+# reviewed 604822 baseline has the migrated public Package owner API but the
+# legacy property API, so materialization selects those two APIs without
+# changing the measured owner/property operations.
+OLE_BASELINE_ADAPTER_RECIPE: dict[str, Any] = {
+    "source_fence": OLE_SOURCE_FENCE,
+    "relative_path": "tools/perf-baseline/examples/ole_w5_probe.rs",
+    "raw_sha256": OLE_RAW_SHA256,
+    "adapted_sha256": "6890d0524cf4466a96812eb9ba449d4d995b29e1db74888fe42b5a42e8a91aed",
+    "replacements": [
+        {
+            "needle": '\n#[cfg(feature = "current-api")]\n',
+            "replacement": '\n#[cfg(feature = "current-owner-api")]\n',
+            "count": 2,
+        },
+        {
+            "needle": '    #[cfg(feature = "current-api")]\n',
+            "replacement": '    #[cfg(feature = "current-owner-api")]\n',
+            "count": 3,
+        },
+        {
+            "needle": '    #[cfg(feature = "current-api")]\n',
+            "replacement": '    #[cfg(feature = "current-property-api")]\n',
+            "count": 2,
+        },
+        {
+            "needle": '\n#[cfg(all(feature = "legacy-owner-api", not(feature = "current-api")))]\n',
+            "replacement": '\n#[cfg(all(feature = "legacy-owner-api", not(feature = "current-owner-api")))]\n',
+            "count": 1,
+        },
+        {
+            "needle": '    #[cfg(all(feature = "legacy-owner-api", not(feature = "current-api")))]\n',
+            "replacement": '    #[cfg(all(feature = "legacy-owner-api", not(feature = "current-owner-api")))]\n',
+            "count": 3,
+        },
+        {
+            "needle": '    #[cfg(all(feature = "legacy-property-api", not(feature = "current-api")))]\n',
+            "replacement": '    #[cfg(all(feature = "legacy-property-api", not(feature = "current-property-api")))]\n',
+            "count": 2,
+        },
+    ],
+}
+
+OLE_ADAPTER_RECIPE: dict[str, str] = {
+    "source_fence": OLE_SOURCE_FENCE,
+    "relative_path": "tools/perf-baseline/examples/ole_w5_probe.rs",
+    "needle": "OleFile::open(Cursor::new(output))?",
+    "replacement": "OleFile::open(Cursor::new(output), litchi_cfb::OleFileLimits::default())?",
+    "before_sha256": OLE_BASELINE_ADAPTER_RECIPE["adapted_sha256"],
+    "after_sha256": "e031d0adbc00a5784658c37472693ae1fe840ad88f84a5b785b48dd77a810782",
+}
+
+OLE_ADAPTER_RECORD: dict[str, Any] = {
+    "source_fence": OLE_SOURCE_FENCE,
+    "relative_path": "tools/perf-baseline/examples/ole_w5_probe.rs",
+    "baseline": OLE_BASELINE_ADAPTER_RECIPE,
+    "candidate": OLE_ADAPTER_RECIPE,
+}
+
 LANES: dict[str, dict[str, Any]] = {
     "legacy-rtf": {
         "baseline": "86d708878fa537eab42fd4bd5ffbc0f79c606191",
@@ -42,9 +104,10 @@ LANES: dict[str, dict[str, Any]] = {
         "baseline": "604822b44107999aaddb0bffb96b705e9464f546",
         "probe": "tools/perf-baseline/examples/ole_w5_probe.rs",
         "probe_sha256": {
-            "before": "3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f",
-            "after": "3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f",
+            "before": OLE_BASELINE_ADAPTER_RECIPE["adapted_sha256"],
+            "after": OLE_ADAPTER_RECIPE["after_sha256"],
         },
+        "adapter": OLE_ADAPTER_RECORD,
         "lock": "tools/perf-baseline/Cargo.lock",
         "fixtures": [],
         "allowed_dirty": [
@@ -81,6 +144,56 @@ class PreparationError(ValueError):
 def _expect(condition: bool, message: str) -> None:
     if not condition:
         raise PreparationError(message)
+
+
+def materialize_ole_baseline_adapter(source: str) -> str:
+    """Select the public-owner/legacy-property APIs for the 604822 baseline."""
+
+    source_bytes = source.encode("utf-8")
+    recipe = OLE_BASELINE_ADAPTER_RECIPE
+    _expect(hashlib.sha256(source_bytes).hexdigest() == recipe["raw_sha256"], "OLE baseline adapter source is not the fdb139 probe")
+    adapted = source
+    for replacement in recipe["replacements"]:
+        needle = replacement["needle"]
+        expected_count = replacement["count"]
+        _expect(adapted.count(needle) >= expected_count, "OLE baseline adapter replacement count differs")
+        adapted = adapted.replace(needle, replacement["replacement"], expected_count)
+    _expect(hashlib.sha256(adapted.encode("utf-8")).hexdigest() == recipe["adapted_sha256"], "OLE baseline adapter output hash differs from the reviewed recipe")
+    return adapted
+
+
+def materialize_ole_adapter(source: str) -> str:
+    """Apply the reviewed baseline API split and candidate CFB adapter."""
+
+    baseline = materialize_ole_baseline_adapter(source)
+    recipe = OLE_ADAPTER_RECIPE
+    _expect(hashlib.sha256(baseline.encode("utf-8")).hexdigest() == recipe["before_sha256"], "OLE candidate adapter input differs from the reviewed baseline adapter")
+    _expect(baseline.count(recipe["needle"]) == 1, "OLE adapter needle is not unique")
+    adapted = baseline.replace(recipe["needle"], recipe["replacement"])
+    _expect(hashlib.sha256(adapted.encode("utf-8")).hexdigest() == recipe["after_sha256"], "OLE adapter output hash differs from the reviewed recipe")
+    return adapted
+
+
+def materialize_ole_adapter_file(source: Path, destination: Path) -> None:
+    """Materialize the adapter into a fresh candidate overlay file."""
+
+    source = source.resolve()
+    destination = destination.resolve()
+    _expect(source.is_file() and not source.is_symlink(), f"OLE adapter source is missing or symlinked: {source}")
+    _expect(not destination.exists() and not destination.is_symlink(), f"refusing to overwrite OLE adapter destination: {destination}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(materialize_ole_adapter(source.read_text(encoding="utf-8")), encoding="utf-8")
+
+
+def materialize_ole_baseline_adapter_file(source: Path, destination: Path) -> None:
+    """Materialize the public-owner baseline adapter into a fresh file."""
+
+    source = source.resolve()
+    destination = destination.resolve()
+    _expect(source.is_file() and not source.is_symlink(), f"OLE baseline adapter source is missing or symlinked: {source}")
+    _expect(not destination.exists() and not destination.is_symlink(), f"refusing to overwrite OLE baseline adapter destination: {destination}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(materialize_ole_baseline_adapter(source.read_text(encoding="utf-8")), encoding="utf-8")
 
 
 def _sha256(path: Path) -> tuple[str, int]:
@@ -138,6 +251,11 @@ def _source_identity(root: Path, lane: str, leg: str, spec: dict[str, Any]) -> d
     files = [_identity_file(root, relative) for relative in relative_files]
     probe_record = next(record for record in files if record["relative"] == spec["probe"])
     _expect(probe_record["sha256"] == spec["probe_sha256"][leg], f"{lane}/{leg} probe is not the reviewed generator")
+    if lane == "legacy-ole-properties":
+        if leg == "before":
+            _expect(probe_record["sha256"] == OLE_BASELINE_ADAPTER_RECIPE["adapted_sha256"], "OLE baseline must use the reviewed public-owner/legacy-property adapter")
+        else:
+            _expect(probe_record["sha256"] == OLE_ADAPTER_RECIPE["after_sha256"], "OLE candidate must use only the reviewed consumer adapter")
     file_digest = hashlib.sha256()
     for record in sorted(files, key=lambda item: (str(Path(item["path"]).parent), Path(item["path"]).name)):
         relative = Path(record["path"]).name
@@ -191,6 +309,7 @@ def prepare(lane: str, manifest: Path, before: Path, after: Path, output: Path) 
         "reviewed_inputs": {
             "probe_relative_path": spec["probe"],
             "probe_sha256": dict(spec["probe_sha256"]),
+            "adapter": dict(spec.get("adapter", {})),
             "lock_relative_path": spec["lock"],
             "fixture_relative_paths": list(spec["fixtures"]),
             "allowed_dirty_paths": list(spec["allowed_dirty"]),
