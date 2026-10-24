@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Validate one source-probe JSON receipt without running the probe."""
+"""Validate source-probe receipts without running the probe."""
 
 import argparse
 import json
 import math
 import pathlib
 import sys
+from typing import Any
 
 
 def fail(message: str) -> int:
@@ -13,39 +14,112 @@ def fail(message: str) -> int:
     return 1
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--json", required=True, type=pathlib.Path)
-    parser.add_argument("--scenario", required=True)
-    parser.add_argument("--samples", required=True, type=int)
-    parser.add_argument("--output-sha", required=True)
-    parser.add_argument("--min-operation-us", type=float, default=0.0)
-    args = parser.parse_args()
-    if not args.json.is_file():
-        return fail(f"missing receipt: {args.json}")
+def read_row(path: pathlib.Path) -> dict[str, Any] | None:
     try:
-        rows = json.loads(args.json.read_text())
+        rows = json.loads(path.read_text())
     except (OSError, ValueError) as error:
-        return fail(f"unreadable JSON: {error}")
+        fail(f"unreadable JSON {path}: {error}")
+        return None
     if not isinstance(rows, list) or len(rows) != 1:
-        return fail("receipt must contain exactly one scenario row")
+        fail(f"receipt must contain exactly one scenario row: {path}")
+        return None
     row = rows[0]
     if not isinstance(row, dict):
-        return fail("scenario row is not an object")
-    if row.get("scenario") != args.scenario:
-        return fail(f"scenario mismatch: {row.get('scenario')!r}")
-    if row.get("samples") != args.samples:
-        return fail(f"sample-count mismatch: {row.get('samples')!r} != {args.samples}")
-    if row.get("output_sha256") != args.output_sha:
-        return fail("output SHA-256 mismatch")
+        fail(f"scenario row is not an object: {path}")
+        return None
+    return row
+
+
+def validate_row(
+    row: dict[str, Any],
+    path: pathlib.Path,
+    scenario: str,
+    samples: int,
+    output_sha: str,
+) -> float | None:
+    if row.get("scenario") != scenario:
+        fail(f"scenario mismatch in {path}: {row.get('scenario')!r}")
+        return None
+    if row.get("samples") != samples:
+        fail(f"sample-count mismatch in {path}: {row.get('samples')!r} != {samples}")
+        return None
+    if row.get("output_sha256") != output_sha:
+        fail(f"output SHA-256 mismatch in {path}")
+        return None
+    values: list[float] = []
     for field in ("median_us", "min_us"):
         value = row.get(field)
-        if not isinstance(value, (int, float)) or not math.isfinite(value):
-            return fail(f"missing or invalid operation timing: {field}")
-        if value < args.min_operation_us:
-            return fail(
-                f"subthreshold operation timing: {field}={value} < {args.min_operation_us}"
-            )
+        if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
+            fail(f"missing or invalid operation timing in {path}: {field}")
+            return None
+        values.append(float(value))
+    if values[1] > values[0]:
+        fail(f"minimum exceeds median in {path}")
+        return None
+    # The source probe reports one median operation time for each fixed sample
+    # set. Multiplying by the reported sample count gives the bounded timed
+    # work represented by that receipt; it deliberately excludes process/setup
+    # wall time.
+    return values[0] * samples
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--json", type=pathlib.Path)
+    source.add_argument("--directory", type=pathlib.Path)
+    parser.add_argument("--scenario", required=True)
+    parser.add_argument("--samples", required=True, type=int)
+    parser.add_argument("--invocations", type=int)
+    parser.add_argument("--output-sha", required=True)
+    parser.add_argument("--min-aggregate-us", type=float, default=0.0)
+    return parser
+
+
+def main() -> int:
+    args = build_parser().parse_args()
+    if args.json is not None:
+        if not args.json.is_file():
+            return fail(f"missing receipt: {args.json}")
+        row = read_row(args.json)
+        if row is None:
+            return 1
+        if validate_row(row, args.json, args.scenario, args.samples, args.output_sha) is None:
+            return 1
+        return 0
+
+    if args.invocations is None or args.invocations <= 0:
+        return fail("--invocations must be positive for a directory")
+    if not args.directory.is_dir():
+        return fail(f"missing receipt directory: {args.directory}")
+    expected_paths = [args.directory / f"result-{index}.json" for index in range(1, args.invocations + 1)]
+    paths = list(args.directory.glob("result-*.json"))
+    if {path.name for path in paths} != {path.name for path in expected_paths}:
+        return fail(
+            f"invocation receipts must be exactly result-1.json through "
+            f"result-{args.invocations}.json"
+        )
+    paths = expected_paths
+    aggregate_us = 0.0
+    for path in paths:
+        row = read_row(path)
+        if row is None:
+            return 1
+        operation_us = validate_row(
+            row, path, args.scenario, args.samples, args.output_sha
+        )
+        if operation_us is None:
+            return 1
+        aggregate_us += operation_us
+    if not math.isfinite(aggregate_us) or aggregate_us < args.min_aggregate_us:
+        return fail(
+            f"subthreshold aggregate operation timing: {aggregate_us} < "
+            f"{args.min_aggregate_us}"
+        )
+    print(
+        f"0359qha validator: {args.scenario} invocations={args.invocations} "
+        f"samples={args.samples} aggregate_operation_us={aggregate_us:.1f}"
+    )
     return 0
 
 

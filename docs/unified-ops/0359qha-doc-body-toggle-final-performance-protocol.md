@@ -24,17 +24,22 @@ SHA-256 14bf15e41202cd610c8bcecb2d239d9ceef3256b354c9144b8b6aa1a808f4d21
 SHA-256 6419d8c05d8494abfc922883e62b34897ccd67a78d42f8e178d79a743587be90
 ~~~
 
-The source-bound DOC routes call `time_rounds(..., batch_rounds, ...)`
-directly, so the process argument `31` does not control their sample count.
-The final runner therefore sets both `ROUNDS=31` and
-`LITCHI_PROBE_BATCH_ROUNDS=31`, then validates the JSON `samples` field as
-exactly 31. Setting the environment to 7 would silently produce only seven
-samples. The runner uses a pinned CPU, a 20-GiB scope, and A-B-B-A twice.
-Process wall time is retained for diagnosis only; it includes fixture/setup
-work and cannot prove the operation timing threshold. The 250,000-us minimum
-is applied to the measured `min_us` and `median_us` fields of the
-`doc/batch1k_leaf_write` operation. The single-toggle `doc/leaf_write` route
-has no artificial 250-ms floor.
+The historical W5 schedule is recorded explicitly as 31 outer rounds and
+`LITCHI_PROBE_BATCH_ROUNDS=7`. The source-bound DOC routes call
+`time_rounds(..., batch_rounds, ...)` directly, so the process argument does
+not control their sample count. The final symmetric schedule therefore sets
+both `ROUNDS=31` and `LITCHI_PROBE_BATCH_ROUNDS=31`, then validates every JSON
+receipt's actual `samples` field as exactly 31; setting the environment to 7
+would silently produce only seven samples. The runner uses a pinned CPU, a
+20-GiB scope, and A-B-B-A twice.
+
+The 250,000-us minimum is aggregate timed work per native leg, not a
+per-operation floor. The leaf route uses 16 fixed 31-sample probe
+invocations, while the 1,000-toggle batch route uses one fixed 31-sample
+invocation; both endpoints use the same route schedule. The validator sums
+each receipt's reported `median_us * samples` and requires that bounded
+aggregate to reach 250,000 us. Process wall time is retained for diagnosis
+only because it includes fixture/setup work.
 
 ## Correct route meaning
 
@@ -70,13 +75,13 @@ The reviewed runner is tracked beside this record:
 
 ~~~text
 docs/unified-ops/results/0359qha/run.sh
-SHA-256 1f3eeacca4baf44cf5d4ebc8976c1853bf33e1c1b24217b07ac65b2f7c69b194
+SHA-256 2d854437d19e359c327b42b89727f581338b659f4c2ba1589131253893f43a61
 ~~~
 
 It performs no build. It refuses a pre-existing `RUN`, verifies every source,
-lock, probe, and binary hash, creates fresh per-leg/route TMP paths, validates
-every JSON scenario/sample/output digest, and writes a manifest outside the
-checkout. It has two phases:
+lock, probe, and binary hash, creates fresh per-leg/route/invocation TMP
+paths, validates every JSON scenario/sample/output digest and aggregate
+schedule, and writes a manifest outside the checkout. It has two phases:
 
 ~~~sh
 RUN_ID=replace-with-a-new-id
@@ -93,9 +98,13 @@ Callgrind/Massif output and annotations; this is allocation evidence, not the
 31-sample native result.
 
 The native phase first runs candidate and baseline calibration legs for each
-route with the final `31/31` settings. Calibration validates output and host
-quietness but does not use process wall time as an operation threshold. It
-then runs, for each route and for `block=1` and `block=2`, exactly:
+route with the final `31/31` settings and its fixed invocation count. The
+leaf calibration demonstrates that a fast operation can meet the aggregate
+floor through repeated bounded probe invocations; a genuinely short
+aggregate rejects. Calibration validates output, reported operation timing,
+aggregate count, and host quietness but does not use process wall time as the
+threshold. It then runs, for each route and for `block=1` and `block=2`,
+exactly:
 
 ~~~text
 baseline, candidate, candidate, baseline
@@ -111,7 +120,7 @@ The static executable-protocol test is:
 
 ~~~text
 docs/unified-ops/results/0359qha/test_protocol.sh
-SHA-256 8d09537ac9307bac4bc1ed4da22361660c25a977b79748c0eb29a595d4dfb10f
+SHA-256 323f0c94cba2abf920cef07ca18df1105b2cd261d92f843972857c50cfb3f18b
 ~~~
 
 It runs `bash -n` and checks the fixed 31/31 sample contract, two ABBA

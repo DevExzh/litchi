@@ -23,16 +23,23 @@ the tracked runner and its executable protocol test:
    crates/litchi-doc/src/tracked_revision/package.rs
    ```
 
-2. The selected DOC routes pass `batch_rounds` directly to the probe's
-   `time_rounds`. The runner sets both the process argument and
+2. The historical reviewed schedule is explicitly 31 outer rounds with
+   `LITCHI_PROBE_BATCH_ROUNDS=7`; the final symmetric schedule is 31/31. The
+   selected DOC routes pass `batch_rounds` directly to the probe's
+   `time_rounds`, so the runner sets both the process argument and
    `LITCHI_PROBE_BATCH_ROUNDS` to 31 and validates every JSON row's actual
    `samples == 31`. It no longer treats `/usr/bin/time` `%e` (which includes
    fixture/setup work and rounds to centiseconds) as an operation threshold.
 
-3. Operation timing is checked from the probe receipt. Every row must contain
-   finite `min_us` and `median_us`; `doc/batch1k_leaf_write` must have both at
-   least 250,000 us. The single-toggle `doc/leaf_write` route is still checked
-   for exact samples and output but has no artificial 250-ms floor.
+3. The 250,000-us minimum is aggregate timed work per leg. The leaf route uses
+   16 fixed 31-sample invocations and the batch route uses one fixed
+   31-sample invocation, identically for candidate and baseline. Every row
+   must contain finite `min_us` and `median_us`; the validator sums the
+   reported `median_us * samples` across the fixed invocation count and
+   applies the floor to that aggregate. Thus a legitimate 1,000-us leaf
+   operation passes its 16-invocation calibration, while a genuinely short
+   aggregate rejects. No individual 1–2 ms leaf operation is required to meet
+   250 ms.
 
 4. Allocation now fails if Callgrind or Massif output is absent, empty, or
    cannot be annotated (`callgrind_annotate`/`ms_print`). A `check-profile`
@@ -50,18 +57,19 @@ The protocol test is:
 
 ```text
 docs/unified-ops/results/0359qha/test_protocol.sh
-SHA-256 8d09537ac9307bac4bc1ed4da22361660c25a977b79748c0eb29a595d4dfb10f
+SHA-256 323f0c94cba2abf920cef07ca18df1105b2cd261d92f843972857c50cfb3f18b
 ```
 
 The repaired runner is SHA-256
-`1f3eeacca4baf44cf5d4ebc8976c1853bf33e1c1b24217b07ac65b2f7c69b194`; the
+`2d854437d19e359c327b42b89727f581338b659f4c2ba1589131253893f43a61`; the
 receipt validator is SHA-256
-`a3a8f696c0ad02c5707d50aed3f17c4365b52dee88cb4d78b98d80dc7f7dd80f`.
+`be5239ce2122cf654bc555a976ac3053d94c1996d135769494dc95f7a61a78d1`.
 
 It runs `bash -n`, the Python receipt validator, an early bad-hash check,
 exact profile artifact/annotation failure and success checks, missing-receipt,
-249,999-us subthreshold, and seven-sample count rejection cases. The runner,
-test, and validator hashes above bind this exact source-only packet.
+fast-leaf aggregate success, genuinely short aggregate rejection, and
+seven-sample count rejection cases. The runner, test, and validator hashes
+above bind this exact source-only packet.
 
 The source-bound identity and output hashes are the exact final-472b values
 already recorded in 0359qha; this record intentionally adds no large capture,

@@ -16,6 +16,9 @@ PHASE=${PHASE:-native}
 CPU=${CPU:?set CPU to the quiet pinned CPU}
 ROUNDS=31
 BATCH_ROUNDS=31
+LEAF_INVOCATIONS=16
+BATCH_INVOCATIONS=1
+MIN_AGGREGATE_US=250000
 PROFILE_ROUNDS=1
 PROFILE_BATCH_ROUNDS=1
 NATIVE_TIMEOUT_SECONDS=900
@@ -73,10 +76,26 @@ verify_source() {
 }
 
 validate_json() {
-  leg=$1; route=$2; samples=$3; json=$4; minimum_us=${5:-0}
+  leg=$1; route=$2; samples=$3; json=$4
   digest=$(expected_output "$leg" "$route") || return 1
   python3 "$VALIDATOR" --json "$json" --scenario "$route" --samples "$samples" \
-    --output-sha "$digest" --min-operation-us "$minimum_us"
+    --output-sha "$digest"
+}
+
+route_invocations() {
+  case "$1" in
+    doc/leaf_write) echo "$LEAF_INVOCATIONS" ;;
+    doc/batch1k_leaf_write) echo "$BATCH_INVOCATIONS" ;;
+    *) return 1 ;;
+  esac
+}
+
+validate_aggregate() {
+  leg=$1; route=$2; samples=$3; invocations=$4; dir=$5
+  digest=$(expected_output "$leg" "$route") || return 1
+  python3 "$VALIDATOR" --directory "$dir" --scenario "$route" \
+    --samples "$samples" --invocations "$invocations" --output-sha "$digest" \
+    --min-aggregate-us "$MIN_AGGREGATE_US"
 }
 
 require_profile_artifacts() {
@@ -133,26 +152,30 @@ native_leg() {
   name=$(route_name "$route")
   dir="$RUN/native/$kind/$name/$block/$ordinal-$leg"
   mkdir -p "$dir" "$RUN/native-tmp/$kind/$name/$block/$ordinal-$leg"
-  json="$dir/result.json"; time_log="$dir/time.log"; marker="$dir/running"
+  time_log="$dir/time.log"; marker="$dir/running"
   before="$dir/before.txt"; during="$dir/during.txt"; after="$dir/after.txt"
-  test ! -e "$json" || return 1
+  invocations=$(route_invocations "$route") || return 1
+  test ! -e "$dir/result-1.json" || return 1
   snapshot "$before"
   : >"$marker"
   watch_load "$marker" "$during" & watcher=$!
-  timeout --kill-after=30s "${NATIVE_TIMEOUT_SECONDS}s" \
-    systemd-run --user --scope --quiet --collect \
-      -p OOMPolicy=continue -p MemoryMax="$MEMORY_MAX" -p MemorySwapMax="$MEMORY_SWAP_MAX" -- \
-      /usr/bin/time -f "$leg $name block=$block run=$ordinal maxrss_kb=%M wall=%e" \
-      taskset -c "$CPU" env LITCHI_PROBE_ONLY="$route" \
-        LITCHI_PROBE_BATCH_ROUNDS="$BATCH_ROUNDS" \
-        TMPDIR="$RUN/native-tmp/$kind/$name/$block/$ordinal-$leg" "$bin" "$ROUNDS" \
-      >"$json" 2>"$time_log" || FAIL=1
+  for invocation in $(seq 1 "$invocations"); do
+    json="$dir/result-$invocation.json"
+    tmpdir="$RUN/native-tmp/$kind/$name/$block/$ordinal-$leg/$invocation"
+    mkdir -p "$tmpdir"
+    timeout --kill-after=30s "${NATIVE_TIMEOUT_SECONDS}s" \
+      systemd-run --user --scope --quiet --collect \
+        -p OOMPolicy=continue -p MemoryMax="$MEMORY_MAX" -p MemorySwapMax="$MEMORY_SWAP_MAX" -- \
+        /usr/bin/time -f "$leg $name block=$block run=$ordinal invocation=$invocation maxrss_kb=%M wall=%e" \
+        taskset -c "$CPU" env LITCHI_PROBE_ONLY="$route" \
+          LITCHI_PROBE_BATCH_ROUNDS="$BATCH_ROUNDS" \
+          TMPDIR="$tmpdir" "$bin" "$ROUNDS" \
+        >"$json" 2>>"$time_log" || FAIL=1
+  done
   rm -f "$marker"
   wait "$watcher" 2>/dev/null || true
   snapshot "$after"
-  minimum_us=0
-  test "$route" = doc/batch1k_leaf_write && minimum_us=250000
-  validate_json "$leg" "$route" "$BATCH_ROUNDS" "$json" "$minimum_us" || FAIL=1
+  validate_aggregate "$leg" "$route" "$BATCH_ROUNDS" "$invocations" "$dir" || FAIL=1
   check_quiet_file "$before" || QUIET_FAILURE=1
   check_quiet_file "$during" || QUIET_FAILURE=1
   check_quiet_file "$after" || QUIET_FAILURE=1
@@ -222,6 +245,8 @@ test ! -e "$RUN" || die "RUN already exists; choose a fresh external root: $RUN"
 mkdir -p "$RUN"
 {
   printf 'source_short=%s\nrounds=%s\nbatch_rounds=%s\n' "$SOURCE_SHORT" "$ROUNDS" "$BATCH_ROUNDS"
+  printf 'leaf_invocations=%s\nbatch_invocations=%s\nmin_aggregate_us=%s\n' \
+    "$LEAF_INVOCATIONS" "$BATCH_INVOCATIONS" "$MIN_AGGREGATE_US"
   printf 'cpu=%s\nmemory_max=%s\nmemory_swap_max=%s\n' "$CPU" "$MEMORY_MAX" "$MEMORY_SWAP_MAX"
   printf 'candidate_commit=%s\n' "$(git -C "$CAND_SRC" rev-parse HEAD)"
   printf 'baseline_commit=%s\n' "$(git -C "$BASE_SRC" rev-parse HEAD)"
