@@ -16,7 +16,7 @@ use super::views::{
 };
 use super::{Cache as SlicerCache, Definition as SlicerDefinition};
 use crate::error::{Error, Result};
-use crate::pivot::read_pivot_tables;
+use crate::pivot::reader::read_pivot_tables_limited;
 use crate::timelines::{
     Cache, CacheDefinition, Part as TimelinePart, TIMELINE_CACHE_CONTENT_TYPE,
     TIMELINE_CACHE_EXTENSION_URI, TIMELINE_CACHE_RELATIONSHIP_TYPE, TIMELINES_EXTENSION_URI, View,
@@ -890,7 +890,7 @@ fn validate_slicer_cache_pivot_links(
         .into_iter()
         .map(|sheet| (sheet.name, sheet.sheet_id))
         .collect();
-    let pivots = read_pivot_tables(package).map_err(|e| invalid(e.to_string()))?;
+    let pivots = read_pivot_tables_limited(package, limits).map_err(|e| invalid(e.to_string()))?;
     let bindings: HashSet<(u32, String)> = pivots
         .into_iter()
         .filter_map(|pivot| {

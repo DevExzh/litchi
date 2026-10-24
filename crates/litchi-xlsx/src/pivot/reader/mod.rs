@@ -16,3 +16,4 @@ pub use codec::{
     read_pivot_cache_definition, read_pivot_cache_records, read_pivot_table_definition,
 };
 pub use package::read_pivot_tables;
+pub(crate) use package::read_pivot_tables_limited;
