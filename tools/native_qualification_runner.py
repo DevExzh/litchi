@@ -1069,6 +1069,21 @@ def _validate_legacy_native_workload(data: Mapping[str, Any]) -> None:
         raise RunnerError(f"{lane} needs exactly one legacy-native-contract validator")
     if validators[0].get("outputs") != ["{output_dir}/summary.json"]:
         raise RunnerError(f"{lane} validator must write summary.json in the output directory")
+    validator_argv = validators[0].get("argv")
+    if not isinstance(validator_argv, list) or len(validator_argv) != 9:
+        raise RunnerError(f"{lane} validator must receive the explicit manifest path")
+    if validator_argv[0] != "python3" or validator_argv[-1] != "{manifest_path}":
+        raise RunnerError(f"{lane} validator is not bound to the current manifest path")
+    validator_script = validators[0].get("script")
+    expected_validator_script = (
+        Path(__file__).resolve().parent / "native_qualification/legacy_native_validator.py"
+    ).resolve()
+    if not isinstance(validator_script, str) or _resolve_path(validator_script) != expected_validator_script:
+        raise RunnerError(f"{lane} validator script is not bound to the active qualification source")
+    if validator_argv[1] != validator_script:
+        raise RunnerError(f"{lane} validator argv does not use its bound script")
+    if validators[0].get("cwd") != "{output_dir}":
+        raise RunnerError(f"{lane} validator cwd is not output-bound")
     environment = data.get("environment", {})
     if environment.get("CARGO_PROFILE_RELEASE_DEBUG") != "0":
         raise RunnerError(f"{lane} must disable release debug information")
@@ -1412,6 +1427,7 @@ class SafeRunner:
             "source_root": source,
             "target_dir": target,
             "output_dir": self.output,
+            "manifest_path": self.manifest_path,
             "leg": leg,
             "index": index,
             "rounds": int(self.manifest.get("rounds", 31)),
@@ -2407,7 +2423,7 @@ def _parse_args(argv: Sequence[str]) -> argparse.Namespace:
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv or sys.argv[1:])
     try:
-        manifest_path = args.manifest.resolve()
+        manifest_path = _resolve_path(args.manifest, base=Path.cwd())
         manifest = load_manifest(manifest_path)
         runner = SafeRunner(manifest, manifest_path, args.phase, args.cpu)
         if args.phase == "build":

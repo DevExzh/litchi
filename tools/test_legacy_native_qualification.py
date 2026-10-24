@@ -443,6 +443,10 @@ class LegacyNativeQualificationTests(unittest.TestCase):
             (output / "events-abba.jsonl").write_text(
                 "".join(json.dumps(event) + "\n" for event in events), encoding="utf-8"
             )
+            manifest_path = root / "legacy-rtf-final.json"
+            manifest_path.write_bytes(
+                (ROOT / "tools/native_qualification/manifests/legacy-rtf.json").read_bytes()
+            )
             with self.assertRaisesRegex(validator.ValidationError, "manifest path is not source-bound"):
                 validator.validate_directory(
                     output,
@@ -451,6 +455,101 @@ class LegacyNativeQualificationTests(unittest.TestCase):
                     source_heads["after"],
                     targets["before"],
                     targets["after"],
+                    manifest_path,
+                )
+
+    def test_validator_binds_external_manifest_hash_and_lane_before_receipt(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="legacy-native-manifest-binding-") as directory:
+            root = Path(directory)
+            manifest_path = root / "legacy-rtf-final.json"
+            manifest_path.write_bytes(
+                (ROOT / "tools/native_qualification/manifests/legacy-rtf.json").read_bytes()
+            )
+            output = root / "output"
+            output.mkdir()
+            receipt = {
+                "schema": validator.SCHEMA,
+                "status": "passed",
+                "phase": "build",
+                "lane": "legacy-rtf",
+                "abba_order": list(validator.ABBA_ORDER),
+                "abba_blocks": 5,
+                "limits": {
+                    "target_preflight_bytes": validator.TARGET_PRE_FLIGHT,
+                    "target_hard_bytes": validator.TARGET_HARD,
+                    "memory_bytes": validator.MEMORY_HARD,
+                },
+                "manifest": {
+                    "path": str(manifest_path),
+                    "sha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                },
+                "identities": {},
+            }
+            receipt_path = output / "build-receipt.json"
+
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            with self.assertRaisesRegex(validator.ValidationError, "runner path is not source-bound"):
+                validator._validate_build_receipt(
+                    output,
+                    "legacy-rtf",
+                    validator.CONTRACTS["legacy-rtf"],
+                    validator.CONTRACTS["legacy-rtf"]["baseline"],
+                    "1" * 40,
+                    root / "before-target",
+                    root / "after-target",
+                    manifest_path,
+                )
+
+            receipt["manifest"]["path"] = str(ROOT / "tools/native_qualification/manifests/legacy-rtf.json")
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            with self.assertRaisesRegex(validator.ValidationError, "manifest path is not source-bound"):
+                validator._validate_build_receipt(
+                    output,
+                    "legacy-rtf",
+                    validator.CONTRACTS["legacy-rtf"],
+                    validator.CONTRACTS["legacy-rtf"]["baseline"],
+                    "1" * 40,
+                    root / "before-target",
+                    root / "after-target",
+                    manifest_path,
+                )
+
+            receipt["manifest"]["path"] = str(manifest_path)
+            manifest_path.write_text(
+                manifest_path.read_text(encoding="utf-8") + "\n",
+                encoding="utf-8",
+            )
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            with self.assertRaisesRegex(validator.ValidationError, "manifest hash is not source-bound"):
+                validator._validate_build_receipt(
+                    output,
+                    "legacy-rtf",
+                    validator.CONTRACTS["legacy-rtf"],
+                    validator.CONTRACTS["legacy-rtf"]["baseline"],
+                    "1" * 40,
+                    root / "before-target",
+                    root / "after-target",
+                    manifest_path,
+                )
+
+            manifest_path.write_bytes(
+                (ROOT / "tools/native_qualification/manifests/legacy-rtf.json").read_bytes()
+            )
+            manifest_path.write_text(
+                manifest_path.read_text(encoding="utf-8").replace('"lane": "legacy-rtf"', '"lane": "legacy-xls-properties"'),
+                encoding="utf-8",
+            )
+            receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+            with self.assertRaisesRegex(validator.ValidationError, "qualification manifest lane mismatch"):
+                validator._validate_build_receipt(
+                    output,
+                    "legacy-rtf",
+                    validator.CONTRACTS["legacy-rtf"],
+                    validator.CONTRACTS["legacy-rtf"]["baseline"],
+                    "1" * 40,
+                    root / "before-target",
+                    root / "after-target",
+                    manifest_path,
                 )
 
     def test_text_executable_is_not_a_native_artifact(self) -> None:
