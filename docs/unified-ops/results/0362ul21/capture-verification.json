@@ -1,0 +1,167 @@
+{
+  "schema": "litchi.final-api-capture-verification.v2",
+  "verified_utc": "2026-10-24T18:20:53Z",
+  "scope": "fresh all-feature hidden-item rustdoc capture; external raw outputs; no source edit, blessing, or API classification",
+  "source": {
+    "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+    "commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "tree": "ebc1cee05f124c0c63977aff07a23288c19e7d00",
+    "clean": true,
+    "cargo_toml": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/Cargo.toml",
+      "bytes": 10672,
+      "sha256": "f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de"
+    },
+    "cargo_lock": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/Cargo.lock",
+      "bytes": 139606,
+      "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
+    }
+  },
+  "runner": {
+    "cargo_shim": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+      "sha256": "1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8"
+    },
+    "memory_cap_bytes": 20000000000,
+    "jobs": 1,
+    "offline": true,
+    "locked": true,
+    "reuse": false,
+    "target_cap_bytes": 20000000000,
+    "required_rustdoc_flags": [
+      "--all-features",
+      "--offline",
+      "--locked",
+      "--document-hidden-items"
+    ],
+    "environment_unset": [
+      "LITCHI_CAPPED",
+      "LITCHI_BLESS"
+    ],
+    "environment": {
+      "LITCHI_MEM_MAX": "20G",
+      "CARGO_BUILD_JOBS": "1",
+      "RUST_TEST_THREADS": "1",
+      "CARGO_INCREMENTAL": "0",
+      "CARGO_PROFILE_DEV_DEBUG": "0",
+      "CARGO_PROFILE_TEST_DEBUG": "0",
+      "CARGO_PROFILE_RELEASE_DEBUG": "0",
+      "CARGO_NET_OFFLINE": "true",
+      "LC_ALL": "C"
+    }
+  },
+  "capture": {
+    "output": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/output",
+    "target": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/target",
+    "run": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/output/run.json",
+      "bytes": 2103,
+      "sha256": "0bbb223325f181f996c0d6b3f42ff2e769c390a75b12468b5265d9b55ca24f61",
+      "status": "complete",
+      "phase": "complete",
+      "captured": 68,
+      "reused": 0
+    },
+    "package_count": 68,
+    "package_set_sha256": "afeface99e189880df1fea08aa4426b5ef10fa77b23f1a279bf665a20a1cdd8f",
+    "all_receipts_ok": true,
+    "receipt_count": 68,
+    "inventory_artifact_count": 68,
+    "log_count": 204,
+    "artifact_total_bytes": 1098606755,
+    "output_total_bytes": 1099012277,
+    "maximum_peak_rss_bytes": 2996432896,
+    "maximum_target_post_bytes": 3748156727,
+    "target_pre_bytes": 0,
+    "target_below_cap": true,
+    "capture_stdout": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/capture.stdout.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "manifest": {
+      "external_path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/receipt-manifest.tsv",
+      "external_bytes": 70707,
+      "external_sha256": "869fd070cdf63d5790fcadd334a09695fdd55716cb99fb75db0812bd3499be99",
+      "committed_path": "docs/unified-ops/results/0362ul21/receipt-manifest.tsv",
+      "columns_include": [
+        "package",
+        "status",
+        "source_commit",
+        "cargo_lock_sha256",
+        "receipt_path/bytes/sha256",
+        "artifact_path/bytes/sha256",
+        "stdout/stderr/time_path/bytes/sha256",
+        "peak_rss_bytes",
+        "target_pre_bytes",
+        "target_post_bytes"
+      ]
+    }
+  },
+  "inventory": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/output/inventory.tsv",
+    "bytes": 10174,
+    "sha256": "161754e5dbe5b7d149b8631a507e6c1a1b222bf2b780e14f84cb48cdec5039c8",
+    "committed_path": "docs/unified-ops/results/0362ul21/inventory-472b.tsv",
+    "rows": 84,
+    "category_counts": {
+      "mut_draft": 38,
+      "edit_type": 31,
+      "transaction_type": 13,
+      "mut_owner": 2
+    },
+    "recheck": {
+      "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/recheck-20261024-1817",
+      "inventory_sha256": "161754e5dbe5b7d149b8631a507e6c1a1b222bf2b780e14f84cb48cdec5039c8",
+      "disposition_sha256": "57d486415c0e940160a3e0ed29bee08b79b14b013773973a06827e2b17445529",
+      "inventory_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "byte_equal_capture": true
+    }
+  },
+  "blank_disposition": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/output/disposition.tsv",
+    "bytes": 12634,
+    "sha256": "57d486415c0e940160a3e0ed29bee08b79b14b013773973a06827e2b17445529",
+    "external_only": true,
+    "rows": 84,
+    "decision_counts": {
+      "UNASSIGNED_REQUIRED_REVIEW": 84
+    },
+    "blank_evidence": 84,
+    "blank_owner": 84,
+    "accepted_as_review": false
+  },
+  "reviewed_disposition": {
+    "path": "docs/unified-ops/results/0362ul14/reviewed-disposition-082.tsv",
+    "sha256": "3b0d48c38a4cc53e319c720d5e5ef4a1378631b10de5ec13190b03f5d3ad1a3e",
+    "rows": 84,
+    "identity_keys_match_fresh_inventory": true,
+    "decision_counts": {
+      "RAW_READER_METHOD": 38,
+      "WIRE_SCHEMA": 26,
+      "WIRE_REQUEST": 7,
+      "COMPOSITION_DESCRIPTOR": 4,
+      "OPC_SOURCE_PLAN_DESCRIPTOR": 4,
+      "AST_VALUE": 2,
+      "RAW_ARCHIVE_DESCRIPTOR": 1,
+      "RAW_WIRE_DESCRIPTOR": 1,
+      "OPC_XML_SPLICE_DESCRIPTOR": 1
+    },
+    "validator_result": "validated 84 disposition rows; no approval inferred"
+  },
+  "independent_review": {
+    "external_path": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/independent-review-472b.json",
+    "bytes": 7931,
+    "sha256": "6bd44bf07454ce459f9b0cfb27c91a0718bd12a2b9bc02b08a011e3c3ed2b2f3",
+    "committed_path": "docs/unified-ops/results/0362ul21/independent-review-472b.json",
+    "verdict": "READY",
+    "reviewed_roles": 84,
+    "blank_scaffold_not_accepted": true
+  },
+  "limitations": [
+    "The capture is API rustdoc evidence, not the full 53-step gate, native qualification, OfficeCLI corpus, or ABBA acceptance.",
+    "The 84-row semantic decisions are the reviewed 0362ul14 disposition, revalidated against this capture; the fresh output/disposition scaffold remains explicitly unaccepted.",
+    "The feature-specific glossary gate remains required; the supplemental all-feature JSON sweep is recorded separately."
+  ]
+}
