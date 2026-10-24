@@ -42,6 +42,31 @@ env CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/exhaustive-error-o
 ```
 
 It passed after the consumer migrations. `cargo fmt --all -- --check`,
-`git diff --check`, the no-3rdparty-reference test and the API glossary unit
-tests are run before commit. No fixture, compatibility alias, lint
-allowance, performance-sensitive route or redaction rule changed.
+`git diff --check`, and the three Python modules
+(`tools.test_check_api_glossary`, `tools.test_api_debt_inventory` and
+`tools.test_no_3rdparty_references`) also passed; the Python command ran 58
+tests with no failures.
+
+The six-package library test command used for this leaf completed without a
+failure. Its externally built test executables were rerun directly (without
+Cargo, so no second workspace build) to make the package results explicit:
+
+| Package | Passed | Failed | Ignored |
+| --- | ---: | ---: | ---: |
+| `litchi-doc` | 1,232 | 0 | 2 |
+| `litchi-iwa` | 1,697 | 0 | 0 |
+| `litchi-numbers` | 490 | 0 | 4 |
+| `litchi-ppt` | 1,256 | 0 | 1 |
+| `litchi-xls` | 1,327 | 0 | 0 |
+| `litchi-ops` | 1,005 | 0 | 0 |
+| **Total** | **7,007** | **0** | **7** |
+
+The ignored, untracked diagnostic `Cargo.lock` used for that check is 139,592
+bytes with SHA-256
+`6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`.
+It was generated offline for the diagnostic source at this leaf; it is not
+committed. The final composed check remains pending with the frozen 139,591
+byte lock SHA-256
+`52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`.
+No fixture, compatibility alias, lint allowance, performance-sensitive route
+or redaction rule changed.
