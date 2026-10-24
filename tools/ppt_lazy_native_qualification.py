@@ -12,12 +12,14 @@ candidate is frozen; ``--plan`` is the only mode that accepts that template.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import math
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 import time
 from typing import Any, Mapping, Sequence
@@ -77,6 +79,19 @@ BASELINE_COMPILE_FIXTURES = (
         69_471,
         "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb",
     ),
+)
+BASELINE_OVERLAY_STATUS = (
+    "M tools/perf-baseline/src/lib.rs\n"
+    "?? test-data/unified-ops/ppt-lazy-native-fixture.ppt\n"
+    "?? tools/perf-baseline/src/bin/ppt_lazy_native.rs\n"
+    "?? tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs\n"
+    "?? tools/perf-baseline/src/ppt_lazy_native.rs"
+)
+BASELINE_PROBE_PATHS = (
+    "tools/perf-baseline/src/ppt_lazy_native.rs",
+    "tools/perf-baseline/src/bin/ppt_lazy_native.rs",
+    "tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs",
+    "tools/perf-baseline/src/lib.rs",
 )
 ROUTES = (
     "primary_entry_drop",
@@ -209,6 +224,49 @@ def _strict_json(raw: bytes, label: str) -> Any:
                 reject_nonfinite(nested)
     reject_nonfinite(value)
     return value
+
+
+def _canonical_json(value: Mapping[str, Any]) -> bytes:
+    return (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
+
+
+def _build_input_projection_value(manifest: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the canonical manifest with only receipt content identity removed."""
+
+    value = copy.deepcopy(dict(manifest))
+    try:
+        receipt = value["build"]["receipt"]
+    except (KeyError, TypeError) as error:
+        raise RunFailure("manifest.build.receipt is missing") from error
+    if not isinstance(receipt, dict) or set(receipt) != {"path", "bytes", "sha256"}:
+        raise RunFailure("manifest.build.receipt identity fields differ")
+    del receipt["bytes"]
+    del receipt["sha256"]
+    return value
+
+
+def _validate_build_input_projection(
+    manifest: Mapping[str, Any],
+    manifest_path: Path,
+    projection_path: Path | None,
+) -> dict[str, Any] | None:
+    if projection_path is None:
+        return None
+    projection_path = _safe_path(projection_path.resolve(), "build-input projection", must_exist=True)
+    raw = projection_path.read_bytes()
+    projection = _strict_json(raw, "build-input projection")
+    if not isinstance(projection, dict):
+        raise RunFailure("build-input projection must be an object")
+    expected = _build_input_projection_value(manifest)
+    expected_raw = _canonical_json(expected)
+    if raw != expected_raw:
+        raise RunFailure("build-input projection differs outside receipt identity fields or is not canonical")
+    identity = _identity(projection_path)
+    return {
+        "path": str(projection_path),
+        "bytes": identity["bytes"],
+        "sha256": identity["sha256"],
+    }
 
 
 def _load_json(path: Path) -> dict[str, Any]:
@@ -393,14 +451,18 @@ def _load_manifest(path: Path, *, plan: bool) -> dict[str, Any]:
     sources = value.get("probe_sources")
     if not isinstance(sources, list) or not sources:
         raise RunFailure("manifest.probe_sources must be a non-empty list")
+    if [source.get("path") for source in sources] != list(BASELINE_PROBE_PATHS):
+        raise RunFailure("manifest.probe_sources differs from the fixed probe allowlist")
     for index, source in enumerate(sources):
         _identity_spec(source, f"manifest.probe_sources[{index}]", plan=plan)
     adapter = _object(value.get("baseline_adapter"), "manifest.baseline_adapter")
     _exact_keys(
         adapter,
-        {"overlay_paths", "registration", "fixture", "compile_fixtures"},
+        {"overlay_paths", "registration", "fixture", "compile_fixtures", "status"},
         "manifest.baseline_adapter",
     )
+    if adapter.get("status") != BASELINE_OVERLAY_STATUS:
+        raise RunFailure("manifest.baseline_adapter.status differs from the reviewed overlay")
     if adapter.get("overlay_paths") != [
         "tools/perf-baseline/src/ppt_lazy_native.rs",
         "tools/perf-baseline/src/bin/ppt_lazy_native.rs",
@@ -495,11 +557,15 @@ def _overlap(first: Path, second: Path) -> bool:
     return _under(first, second) or _under(second, first)
 
 
-def _git(root: Path, *args: str) -> str:
+def _git(root: Path, *args: str, no_optional_locks: bool = False) -> str:
     import subprocess
 
+    command = ["git", "-C", str(root)]
+    if no_optional_locks:
+        command.append("--no-optional-locks")
+    command.extend(args)
     result = subprocess.run(
-        ["git", "-C", str(root), *args],
+        command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -549,16 +615,74 @@ def _check_lock(spec: Mapping[str, Any], label: str, root: Path) -> dict[str, An
     return actual
 
 
-def _resolve_endpoint(raw: Mapping[str, Any], label: str, manifest_path: Path, roots: Sequence[Path]) -> dict[str, Any]:
+def _baseline_overlay_paths(adapter: Mapping[str, Any]) -> list[str]:
+    return sorted(
+        [
+            adapter["fixture"]["path"],
+            adapter["registration"]["path"],
+            *adapter["overlay_paths"],
+            *[item["path"] for item in adapter["compile_fixtures"]],
+        ]
+    )
+
+
+def _check_baseline_overlay_shape(root: Path, label: str, adapter: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate the intentionally sparse baseline without admitting a dirty root."""
+
+    top = _safe_path(Path(_git(root, "rev-parse", "--show-toplevel")), f"{label}.root")
+    if top != root:
+        raise RunFailure(f"{label}.root must be the Git worktree root")
+    sparse = _git(root, "config", "--get", "core.sparseCheckout")
+    if sparse.lower() not in {"true", "1", "yes", "on"}:
+        raise RunFailure(f"{label}.root must use the reviewed sparse baseline checkout")
+    status = _git(
+        root,
+        "status",
+        "--porcelain",
+        "--untracked-files=all",
+        no_optional_locks=True,
+    )
+    if status != adapter["status"]:
+        raise RunFailure(f"{label}.root changed outside the reviewed overlay closure")
+    for relative in _baseline_overlay_paths(adapter):
+        _safe_path(root / relative, f"{label} overlay {relative}", must_exist=True)
+    indexed = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "-v", "-z"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+        timeout=30,
+    )
+    if indexed.returncode != 0:
+        raise RunFailure(f"{label}.root cannot inspect sparse index")
+    for entry in indexed.stdout.split(b"\0"):
+        if entry and entry[:1] == b"h":
+            raise RunFailure(f"{label}.root contains an assume-unchanged tracked entry")
+    return {"root": str(root), "status": status, "overlay_paths": _baseline_overlay_paths(adapter)}
+
+
+def _resolve_endpoint(
+    raw: Mapping[str, Any],
+    label: str,
+    manifest_path: Path,
+    roots: Sequence[Path],
+    *,
+    baseline_adapter: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     root = _safe_path(_string(raw["root"], f"{label}.root"), manifest_path.parent, must_exist=True)
     if not root.is_dir():
         raise RunFailure(f"{label}.root is not a directory")
     top = _safe_path(_git(root, "rev-parse", "--show-toplevel"))
     if top != root:
         raise RunFailure(f"{label}.root is not a worktree top-level")
-    # Reuse the common worktree-shape validator.  A clean status alone does
-    # not reject sparse, assume-unchanged, or skip-worktree source bytes.
-    _check_worktree_shape(root, label)
+    # Reuse the common worktree-shape validator for the complete candidate.
+    # The baseline is intentionally sparse, but only through its exact
+    # manifest-bound overlay closure.
+    overlay_shape = (
+        _check_baseline_overlay_shape(root, label, baseline_adapter)
+        if baseline_adapter is not None
+        else _check_worktree_shape(root, label)
+    )
     head = _git(root, "rev-parse", "HEAD")
     tree = _git(root, "rev-parse", "HEAD^{tree}")
     if head != raw["ref"] or tree != raw["tree"]:
@@ -598,6 +722,8 @@ def _resolve_endpoint(raw: Mapping[str, Any], label: str, manifest_path: Path, r
         "allocator_binary": allocator_binary,
         "target_dir": target,
         "allocator_target_dir": allocator_target,
+        "overlay_shape": overlay_shape,
+        "overlay_adapter": baseline_adapter,
     }
 
 
@@ -637,12 +763,72 @@ def _relative_identity(path: Path, root: Path, label: str) -> dict[str, Any]:
     return {"path": relative.as_posix(), "bytes": identity["bytes"], "sha256": identity["sha256"]}
 
 
+def _validate_baseline_overlay_content(
+    manifest: Mapping[str, Any],
+    receipt: Mapping[str, Any],
+    baseline: Mapping[str, Any],
+    candidate: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind every reviewed overlay byte at both endpoint roots."""
+
+    adapter = _object(receipt.get("baseline_adapter"), "build receipt baseline_adapter")
+    expected = _object(manifest["baseline_adapter"], "manifest.baseline_adapter")
+    if adapter.get("overlay_paths") is None or adapter.get("compile_fixtures") is None:
+        raise RunFailure("build receipt baseline overlay closure is missing")
+    if sorted(
+        [
+            expected["fixture"]["path"],
+            expected["registration"]["path"],
+            *expected["overlay_paths"],
+            *[item["path"] for item in expected["compile_fixtures"]],
+        ]
+    ) != _baseline_overlay_paths(expected):
+        raise RunFailure("manifest baseline overlay closure is not canonical")
+    if baseline.get("overlay_shape", {}).get("status") != expected["status"]:
+        raise RunFailure("baseline overlay status is not the manifest-bound status")
+    root = baseline["root"]
+    candidate_root = candidate["root"]
+
+    def expected_identity(relative: str, bytes_: int, sha256: str, root_path: Path) -> dict[str, Any]:
+        return {"path": str(root_path / relative), "bytes": bytes_, "sha256": sha256}
+
+    checked: list[str] = []
+    registration = _object(adapter.get("registration"), "build receipt baseline_adapter.registration")
+    before = _object(registration.get("before"), "build receipt baseline registration.before")
+    actual = _identity(root / registration["path"])
+    if actual != expected_identity(registration["path"], before["bytes"], before["sha256"], root):
+        raise RunFailure("baseline registration overlay bytes differ from the receipt")
+    candidate_registration = _identity(candidate_root / registration["path"])
+    after = _object(registration.get("after"), "build receipt baseline registration.after")
+    if candidate_registration != expected_identity(registration["path"], after["bytes"], after["sha256"], candidate_root):
+        raise RunFailure("candidate registration overlay bytes differ from the receipt")
+    checked.append(registration["path"])
+
+    fixture = _object(adapter.get("fixture"), "build receipt baseline_adapter.fixture")
+    for root_path, name in ((root, "baseline"), (candidate_root, "candidate")):
+        actual = _identity(root_path / fixture["path"])
+        if actual != expected_identity(fixture["path"], fixture["bytes"], fixture["sha256"], root_path):
+            raise RunFailure(f"{name} PPT fixture overlay bytes differ from the receipt")
+    checked.append(fixture["path"])
+
+    for item in [*adapter["overlay_paths"], *adapter["compile_fixtures"]]:
+        relative = item["path"]
+        for root_path, name in ((root, "baseline"), (candidate_root, "candidate")):
+            actual = _identity(root_path / relative)
+            if actual != expected_identity(relative, item["bytes"], item["sha256"], root_path):
+                raise RunFailure(f"{name} overlay bytes differ for {relative}")
+        checked.append(relative)
+    return {"status": baseline["overlay_shape"]["status"], "paths": sorted(checked)}
+
+
 def _validate_build_receipt(
     manifest: Mapping[str, Any],
     manifest_path: Path,
     baseline: Mapping[str, Any],
     candidate: Mapping[str, Any],
     probe_sources: Sequence[Mapping[str, Any]],
+    *,
+    receipt_manifest_path: Path | None = None,
 ) -> dict[str, Any]:
     build = _object(manifest.get("build"), "manifest.build")
     preparation_spec = _identity_spec(build.get("preparation"), "manifest.build.preparation", plan=False)
@@ -696,8 +882,9 @@ def _validate_build_receipt(
     _exact_keys(receipt, expected_keys, "build receipt")
     if receipt.get("schema") != "litchi.ppt.lazy-native.build.v1" or receipt.get("status") != "passed":
         raise RunFailure("build receipt is not a passed PPT lazy-native build receipt")
-    manifest_identity = _identity(manifest_path)
-    if receipt.get("manifest") != str(manifest_path.resolve()) or receipt.get("manifest_sha256") != manifest_identity["sha256"]:
+    receipt_manifest_path = (receipt_manifest_path or manifest_path).resolve()
+    receipt_manifest_identity = _identity(receipt_manifest_path)
+    if receipt.get("manifest") != str(receipt_manifest_path) or receipt.get("manifest_sha256") != receipt_manifest_identity["sha256"]:
         raise RunFailure("build receipt is bound to a different manifest")
     if receipt["preparation"] != preparation_identity:
         raise RunFailure("build receipt preparation identity differs from the manifest")
@@ -716,16 +903,7 @@ def _validate_build_receipt(
     if prepared_candidate.get("ref") != candidate["head"] or prepared_candidate.get("tree") != candidate["tree"]:
         raise RunFailure("PPT preparation receipt candidate source identity differs")
     prepared_paths = prepared_baseline.get("overlay_paths")
-    expected_overlay_paths = sorted(
-        [
-            "tools/perf-baseline/src/ppt_lazy_native.rs",
-            "tools/perf-baseline/src/bin/ppt_lazy_native.rs",
-            "tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs",
-            "tools/perf-baseline/src/lib.rs",
-            "test-data/unified-ops/ppt-lazy-native-fixture.ppt",
-        ]
-        + [path for path, _, _ in BASELINE_COMPILE_FIXTURES]
-    )
+    expected_overlay_paths = _baseline_overlay_paths(manifest["baseline_adapter"])
     if prepared_paths != expected_overlay_paths:
         raise RunFailure("PPT preparation receipt overlay paths differ from the reviewed closure")
     prepared_fixture = _object(prepared_baseline.get("fixture"), "PPT preparation receipt.baseline.fixture")
@@ -888,6 +1066,7 @@ def _validate_build_receipt(
     }
     if receipt["binaries"] != expected_binaries:
         raise RunFailure("build receipt binary identities differ from the endpoints")
+    overlay = _validate_baseline_overlay_content(manifest, receipt, baseline, candidate)
     return {
         "path": str(receipt_path),
         "bytes": receipt_identity["bytes"],
@@ -897,6 +1076,13 @@ def _validate_build_receipt(
         "toolchain": external_inputs["toolchain"],
         "cargo_config": external_inputs["cargo_config"],
         "fixtures": fixture_identities,
+        "baseline_overlay": overlay,
+        "baseline_adapter": receipt["baseline_adapter"],
+        "manifest_binding": {
+            "path": str(receipt_manifest_path),
+            "bytes": receipt_manifest_identity["bytes"],
+            "sha256": receipt_manifest_identity["sha256"],
+        },
     }
 
 
@@ -1278,22 +1464,45 @@ def _recheck(
     manifest_path: Path,
     manifest_identity: Mapping[str, Any],
     phase: str,
+    projection_path: Path | None = None,
+    projection_identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     raw = endpoint["raw"]
     root = endpoint["root"]
     actual_manifest = _identity(manifest_path)
     if actual_manifest != manifest_identity:
         raise RunFailure(f"{phase}: qualification manifest changed")
+    if (projection_path is None) != (projection_identity is None):
+        raise RunFailure(f"{phase}: build-input projection binding is incomplete")
+    if projection_path is not None and _identity(projection_path) != projection_identity:
+        raise RunFailure(f"{phase}: build-input projection changed")
     probe_sources = (
         _check_probe_sources(protocol_sources, endpoint)
         if endpoint["name"] == "candidate"
         else []
     )
-    _check_worktree_shape(root, endpoint["name"])
-    status = _git(root, "status", "--porcelain", "--untracked-files=all")
+    if endpoint.get("overlay_adapter") is not None:
+        _check_baseline_overlay_shape(root, endpoint["name"], endpoint["overlay_adapter"])
+        if endpoint.get("overlay_receipt") is not None and endpoint.get("overlay_candidate") is not None:
+            _validate_baseline_overlay_content(
+                {"baseline_adapter": endpoint["overlay_adapter"]},
+                {"baseline_adapter": endpoint["overlay_receipt"]},
+                endpoint,
+                endpoint["overlay_candidate"],
+            )
+        status = endpoint["overlay_shape"]["status"]
+    else:
+        _check_worktree_shape(root, endpoint["name"])
+        status = _git(
+            root,
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+            no_optional_locks=True,
+        )
     head = _git(root, "rev-parse", "HEAD")
     tree = _git(root, "rev-parse", "HEAD^{tree}")
-    if status or head != endpoint["head"] or tree != endpoint["tree"]:
+    if (status and endpoint.get("overlay_adapter") is None) or head != endpoint["head"] or tree != endpoint["tree"]:
         raise RunFailure(f"{phase}: {endpoint['name']} source changed")
     lock = _check_lock(raw["lock"], f"{phase}.{endpoint['name']}.lock", root)
     normal = _check_identity(raw["normal_binary"], f"{phase}.{endpoint['name']}.normal_binary", manifest_path.parent, executable=True)
@@ -1327,6 +1536,61 @@ def _prepare_output(path: Path, roots: Sequence[Path]) -> Path:
     return path
 
 
+def _bind_inputs(
+    manifest: Mapping[str, Any],
+    manifest_path: Path,
+    projection_path: Path | None,
+) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]], dict[str, Any], dict[str, Any] | None]:
+    candidate_raw = _object(manifest.get("candidate"), "manifest.candidate")
+    projection_identity = _validate_build_input_projection(manifest, manifest_path, projection_path)
+    roots = [
+        _safe_path(_string(manifest["baseline"]["root"], "baseline.root"), manifest_path.parent),
+        _safe_path(_string(candidate_raw["root"], "candidate.root"), manifest_path.parent),
+    ]
+    if roots[0] == roots[1] or _overlap(roots[0], roots[1]):
+        raise RunFailure("baseline and candidate source roots must be distinct and non-nested")
+    baseline = _resolve_endpoint(
+        manifest["baseline"],
+        "baseline",
+        manifest_path,
+        roots,
+        baseline_adapter=manifest["baseline_adapter"],
+    )
+    candidate = _resolve_endpoint(candidate_raw, "candidate", manifest_path, roots)
+    if baseline["head"] == candidate["head"] or baseline["tree"] == candidate["tree"]:
+        raise RunFailure("baseline and candidate source identities must differ")
+    probe_sources = _check_probe_sources(manifest["probe_sources"], candidate)
+    build_receipt = _validate_build_receipt(
+        manifest,
+        manifest_path,
+        baseline,
+        candidate,
+        probe_sources,
+        receipt_manifest_path=projection_path,
+    )
+    baseline["overlay_receipt"] = build_receipt["baseline_adapter"]
+    baseline["overlay_candidate"] = candidate
+    return manifest, {"baseline": baseline, "candidate": candidate}, probe_sources, build_receipt, projection_identity
+
+
+def validate_inputs(manifest_path: Path, projection_path: Path | None = None) -> dict[str, Any]:
+    """Run the public source/receipt/endpoint lifecycle without a native child."""
+
+    manifest_path = manifest_path.resolve()
+    manifest = _load_manifest(manifest_path, plan=False)
+    _, endpoints, probe_sources, build_receipt, projection_identity = _bind_inputs(
+        manifest, manifest_path, projection_path.resolve() if projection_path is not None else None
+    )
+    return {
+        "manifest": _identity(manifest_path),
+        "build_input_projection": projection_identity,
+        "baseline": endpoints["baseline"],
+        "candidate": endpoints["candidate"],
+        "probe_sources": probe_sources,
+        "build_receipt": build_receipt,
+    }
+
+
 def _plan(manifest: Mapping[str, Any], path: Path, out_dir: Path) -> None:
     plan = {
         "schema": REPORT_SCHEMA,
@@ -1347,23 +1611,20 @@ def _plan(manifest: Mapping[str, Any], path: Path, out_dir: Path) -> None:
     (out_dir / "plan.json").write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correctness_only: bool) -> dict[str, Any]:
-    candidate_raw = _object(manifest.get("candidate"), "manifest.candidate")
+def _run(
+    manifest: Mapping[str, Any],
+    manifest_path: Path,
+    out_dir: Path,
+    correctness_only: bool,
+    projection_path: Path | None,
+) -> dict[str, Any]:
     manifest_identity = _identity(manifest_path)
-    roots = [
-        _safe_path(_string(manifest["baseline"]["root"], "baseline.root"), manifest_path.parent),
-        _safe_path(_string(candidate_raw["root"], "candidate.root"), manifest_path.parent),
-    ]
-    if roots[0] == roots[1]:
-        raise RunFailure("baseline and candidate roots must be distinct")
-    if _overlap(roots[0], roots[1]):
-        raise RunFailure("baseline and candidate source roots must not contain one another")
-    baseline = _resolve_endpoint(manifest["baseline"], "baseline", manifest_path, roots)
-    candidate = _resolve_endpoint(candidate_raw, "candidate", manifest_path, roots)
-    if baseline["head"] == candidate["head"] or baseline["tree"] == candidate["tree"]:
-        raise RunFailure("baseline and candidate source identities must differ")
-    probe_sources = _check_probe_sources(manifest["probe_sources"], candidate)
-    build_receipt = _validate_build_receipt(manifest, manifest_path, baseline, candidate, probe_sources)
+    _, endpoints, probe_sources, build_receipt, projection_identity = _bind_inputs(
+        manifest, manifest_path, projection_path
+    )
+    baseline = endpoints["baseline"]
+    candidate = endpoints["candidate"]
+    roots = [baseline["root"], candidate["root"]]
     protocol = manifest["protocol"]
     endpoints = {"baseline": baseline, "candidate": candidate}
     resource_paths = [out_dir]
@@ -1379,7 +1640,15 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
     identity = {
         "manifest": manifest_identity,
         "before_correctness": {
-            name: _recheck(endpoint, manifest["probe_sources"], manifest_path, manifest_identity, "before_correctness")
+            name: _recheck(
+                endpoint,
+                manifest["probe_sources"],
+                manifest_path,
+                manifest_identity,
+                "before_correctness",
+                projection_path,
+                projection_identity,
+            )
             for name, endpoint in endpoints.items()
         },
     }
@@ -1401,7 +1670,15 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
     if correctness["baseline"]["report"] != correctness["candidate"]["report"]:
         raise RunFailure("baseline and candidate correctness proofs differ")
     identity["after_correctness"] = {
-        name: _recheck(endpoint, manifest["probe_sources"], manifest_path, manifest_identity, "after_correctness")
+        name: _recheck(
+            endpoint,
+            manifest["probe_sources"],
+            manifest_path,
+            manifest_identity,
+            "after_correctness",
+            projection_path,
+            projection_identity,
+        )
         for name, endpoint in endpoints.items()
     }
     if correctness_only:
@@ -1410,6 +1687,7 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
             "status": "correctness_only",
             "claim_scope": "untimed correctness preflight only; no native timing or allocation claim",
             "manifest": str(manifest_path.resolve()),
+            "build_input_projection": projection_identity,
             "routes": list(ROUTES),
             "abba_order": list(ABBA_ORDER),
             "probe_sources": probe_sources,
@@ -1441,7 +1719,15 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
             )
             calibration_events.append(event)
     identity["after_calibration"] = {
-        name: _recheck(endpoint, manifest["probe_sources"], manifest_path, manifest_identity, "after_calibration")
+        name: _recheck(
+            endpoint,
+            manifest["probe_sources"],
+            manifest_path,
+            manifest_identity,
+            "after_calibration",
+            projection_path,
+            projection_identity,
+        )
         for name, endpoint in endpoints.items()
     }
     routes: dict[str, Any] = {}
@@ -1477,7 +1763,15 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
             blocks.append({"block": block, "abba_order": list(ABBA_ORDER), "normal": normal_rows, "allocation": allocation_rows})
         routes[route] = {"blocks": blocks}
     identity["after_abba"] = {
-        name: _recheck(endpoint, manifest["probe_sources"], manifest_path, manifest_identity, "after_abba")
+        name: _recheck(
+            endpoint,
+            manifest["probe_sources"],
+            manifest_path,
+            manifest_identity,
+            "after_abba",
+            projection_path,
+            projection_identity,
+        )
         for name, endpoint in endpoints.items()
     }
     return {
@@ -1485,6 +1779,7 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
         "status": "complete",
         "claim_scope": "native elapsed and operation-scoped allocator observations after exact correctness preflight",
         "manifest": str(manifest_path.resolve()),
+        "build_input_projection": projection_identity,
         "routes": list(ROUTES),
         "abba_order": list(ABBA_ORDER),
         "probe_sources": probe_sources,
@@ -1500,6 +1795,11 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument(
+        "--build-input-projection",
+        type=Path,
+        help="canonical manifest projection with only build.receipt bytes/sha256 removed",
+    )
     parser.add_argument("--out-dir", type=Path, required=True)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--plan", action="store_true")
@@ -1513,6 +1813,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         manifest_path = args.manifest.resolve()
         manifest = _load_manifest(manifest_path, plan=args.plan)
         if args.plan:
+            if args.build_input_projection is not None:
+                _validate_build_input_projection(manifest, manifest_path, args.build_input_projection.resolve())
             out_dir = _prepare_output(args.out_dir, ())
             _plan(manifest, manifest_path, out_dir)
             return 0
@@ -1524,7 +1826,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         if roots[0] == roots[1] or _overlap(roots[0], roots[1]):
             raise RunFailure("baseline and candidate source roots must be distinct and non-nested")
         out_dir = _prepare_output(args.out_dir, roots)
-        report = _run(manifest, manifest_path, out_dir, args.correctness_only)
+        report = _run(
+            manifest,
+            manifest_path,
+            out_dir,
+            args.correctness_only,
+            args.build_input_projection.resolve() if args.build_input_projection is not None else None,
+        )
         (out_dir / "report.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         return 0
     except RunFailure as error:

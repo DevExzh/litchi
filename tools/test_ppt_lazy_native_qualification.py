@@ -14,6 +14,106 @@ MANIFEST = ROOT / "tools" / "native_qualification" / "manifests" / "ppt-lazy-edi
 
 
 class PptLazyNativeProtocolTests(unittest.TestCase):
+    def test_public_cli_binds_canonical_build_input_projection(self):
+        manifest = protocol._load_manifest(MANIFEST, plan=True)
+        with tempfile.TemporaryDirectory(prefix="ppt-lazy-public-plan-") as temporary:
+            root = Path(temporary)
+            manifest_path = root / "manifest.json"
+            projection_path = root / "projection.json"
+            output = root / "output"
+            manifest_path.write_bytes(protocol._canonical_json(manifest))
+            projection_path.write_bytes(
+                protocol._canonical_json(protocol._build_input_projection_value(manifest))
+            )
+            self.assertEqual(
+                protocol.main(
+                    [
+                        "--manifest", str(manifest_path),
+                        "--build-input-projection", str(projection_path),
+                        "--plan", "--out-dir", str(output),
+                    ]
+                ),
+                0,
+            )
+            self.assertTrue((output / "plan.json").is_file())
+            changed = dict(manifest)
+            changed["protocol"] = dict(manifest["protocol"], cpu=29)
+            projection_path.write_bytes(
+                protocol._canonical_json(protocol._build_input_projection_value(changed))
+            )
+            with self.assertRaises(protocol.RunFailure):
+                protocol._validate_build_input_projection(manifest, manifest_path, projection_path)
+
+    def test_public_endpoint_lifecycle_rejects_target_lock_binary_and_worktree_mutations(self):
+        with tempfile.TemporaryDirectory(prefix="ppt-lazy-endpoint-") as temporary:
+            outer = Path(temporary)
+            root = outer / "candidate"
+            root.mkdir()
+            subprocess.run(["git", "-C", str(root), "init", "--quiet"], check=True)
+            subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(root), "config", "user.name", "PPT test"], check=True)
+            lock = root / "tools" / "perf-baseline" / "Cargo.lock"
+            lock.parent.mkdir(parents=True)
+            lock.write_bytes(b"candidate-lock-v1")
+            marker = root / "tracked.txt"
+            marker.write_bytes(b"candidate-source-v1")
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(root), "commit", "--quiet", "-m", "fixture"], check=True)
+            normal_target = outer / "normal-target" / "release"
+            allocator_target = outer / "allocator-target" / "release"
+            normal_target.mkdir(parents=True)
+            allocator_target.mkdir(parents=True)
+            normal = normal_target / "ppt_lazy_native"
+            allocator = allocator_target / "ppt_lazy_native_alloc"
+            normal.write_bytes(b"normal-v1")
+            allocator.write_bytes(b"allocator-v1")
+            os.chmod(normal, 0o755)
+            os.chmod(allocator, 0o755)
+            manifest_path = outer / "manifest.json"
+            manifest_path.write_bytes(b'{"manifest":"v1"}\n')
+
+            def git(*args: str) -> str:
+                return subprocess.run(
+                    ["git", "-C", str(root), *args], check=True,
+                    capture_output=True, text=True,
+                ).stdout.strip()
+
+            lock_identity = protocol._identity(lock)
+            raw = {
+                "root": str(root),
+                "ref": git("rev-parse", "HEAD"),
+                "tree": git("rev-parse", "HEAD^{tree}"),
+                "lock": {
+                    "path": "tools/perf-baseline/Cargo.lock",
+                    "bytes": lock_identity["bytes"],
+                    "sha256": lock_identity["sha256"],
+                },
+                "normal_binary": protocol._identity(normal),
+                "allocator_binary": protocol._identity(allocator),
+                "target_dir": str(normal_target),
+                "allocator_target_dir": str(allocator_target),
+            }
+            endpoint = protocol._resolve_endpoint(raw, "candidate", manifest_path, [root])
+            self.assertEqual(endpoint["target_dir"], normal_target)
+
+            nested = dict(raw, target_dir=str(root))
+            with self.assertRaises(protocol.RunFailure):
+                protocol._resolve_endpoint(nested, "candidate", manifest_path, [root])
+
+            lock.write_bytes(b"candidate-lock-tampered")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._resolve_endpoint(raw, "candidate", manifest_path, [root])
+            lock.write_bytes(b"candidate-lock-v1")
+
+            normal.write_bytes(b"normal-tampered")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._resolve_endpoint(raw, "candidate", manifest_path, [root])
+            normal.write_bytes(b"normal-v1")
+
+            marker.write_bytes(b"candidate-source-tampered")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._resolve_endpoint(raw, "candidate", manifest_path, [root])
+
     def test_parameterized_manifest_plan_is_build_free(self):
         manifest = protocol._load_manifest(MANIFEST, plan=True)
         self.assertEqual(manifest["baseline"]["ref"], protocol.BASELINE_REF)
@@ -30,6 +130,15 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
         )
         self.assertEqual(set(manifest["build"]["fixtures"]), set(protocol.FIXTURE_KEYS))
         self.assertEqual(manifest["build"]["fixture_routes"], protocol.ROUTE_FIXTURE_KEYS)
+
+        changed = dict(manifest)
+        changed["probe_sources"] = list(manifest["probe_sources"])
+        changed["probe_sources"][0] = dict(changed["probe_sources"][0], path="tools/perf-baseline/src/unreviewed.rs")
+        with tempfile.TemporaryDirectory(prefix="ppt-lazy-probe-allowlist-") as temporary:
+            path = Path(temporary) / "manifest.json"
+            path.write_bytes(protocol._canonical_json(changed))
+            with self.assertRaises(protocol.RunFailure):
+                protocol._load_manifest(path, plan=True)
         self.assertEqual(tuple(protocol.ROUTES), (
             "primary_entry_drop",
             "primary_noop_commit",
@@ -204,6 +313,8 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
 
             manifest_path = outer / "manifest.json"
             manifest_path.write_bytes(b'{"manifest":"v1"}\n')
+            projection_path = outer / "projection.json"
+            projection_path.write_bytes(b'{"projection":"v1"}\n')
             manifest_identity = protocol._identity(manifest_path)
             protocol._recheck(
                 candidate["endpoint"],
@@ -211,6 +322,8 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
                 manifest_path,
                 manifest_identity,
                 "before_candidate",
+                projection_path,
+                protocol._identity(projection_path),
             )
             protocol._recheck(
                 baseline["endpoint"],
@@ -230,6 +343,20 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
                     "after_manifest_mutation",
                 )
             manifest_path.write_bytes(b'{"manifest":"v1"}\n')
+
+            projection_identity = protocol._identity(projection_path)
+            projection_path.write_bytes(b'{"projection":"tampered"}\n')
+            with self.assertRaises(protocol.RunFailure):
+                protocol._recheck(
+                    candidate["endpoint"],
+                    [candidate["probe_spec"]],
+                    manifest_path,
+                    manifest_identity,
+                    "after_projection_mutation",
+                    projection_path,
+                    projection_identity,
+                )
+            projection_path.write_bytes(b'{"projection":"v1"}\n')
 
             candidate["probe"].write_bytes(b"candidate-probe-tampered")
             with self.assertRaises(protocol.RunFailure):
