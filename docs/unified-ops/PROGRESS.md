@@ -3213,3 +3213,50 @@ See [0063](0063-source-pptx-modern-comments.md).
   Source integration remains staging. Final full gates, all-68 inventory,
   corpus replay, glossary closure and native qualification remain required.
   Only comprehensive redaction audit 22 is deferred. Nothing is pushed.
+
+
+- Coordinator checkpoint (2026-10-24, iWork/XLSB merges and composed strict check):
+  Main integration reaches `1705371eb5`. Composed iWork source `a0bf134246`
+  and receipt `4441c86bbe` merge at `9ea602e0e1`. The coordinator verified
+  4,695 package tests, 96 doctests, 50 selected facade tests, strict Clippy,
+  operations targets, standalone fuzz and unified-batch checks, with exact
+  source boundaries, logs, locks and root configuration. Pages name,
+  appearance and merge edits preserve their charged budgets across failed
+  resolution and reuse them on retry; the changed Debug surface is redacted.
+  A missed fallible Keynote fuzz getter was migrated before the final check.
+
+  XLSB source `51c8628446` and final receipt `16ba8da04f` merge at
+  `0d35a83a31`. The coordinator verified 1,355 package tests including 42
+  doctests, strict checks through the facade/Python bindings, 126 operations
+  tests, 23 facade tests and nine standalone CRUD harness tests. Record
+  0362ugm binds all closed logs and distinguishes the standalone run's
+  documentation-only overlay from exact-clean runs. No native claim is made.
+
+  The composed strict consumer check found a missed PPTX find/replace benchmark
+  getter, fixed in `1f7c188087` under 0362ugka. The gate runner's detached-child,
+  retry-log and vanished-PID corrections are reviewed and merged, ending at
+  `f9cf4aa6d5`. The rerun passes at `0f007c4d74`: all-target/all-feature strict
+  Clippy for CLI, operations, facade and Python, with no owned build processes
+  remaining and stable target size 4,706,526,684 bytes. Its reduced receipt
+  binds the actual source, command, external logs, plan/state and policy.
+  This is one selected step, not the final 53-step gate.
+
+  The actual XLS metadata call path exposed three omitted cold-entry families:
+  metadata, property sets and sheet features. Required correction 0362ugea
+  covers their deferred state and every consumer; other public XLS Package
+  edit entries checked are already lazy. The follow-up also retains the
+  signed no-op/changed-write contract. Its fresh leaf now owns the released
+  coordinator build slot; PPT, XLSX and DOCX occupy the other three slots.
+  This constructor debt is not accepted as an exception.
+
+  Cleanup eighteen removes the merged PPTX leaf (362,854,381 apparent bytes).
+  Cleanup nineteen removes the merged Keynote, Numbers and Pages leaves
+  (1,237,053,440 apparent bytes). Branches, hash-quarantined locks, restoration
+  instructions and all external targets/evidence remain. Foreign searches
+  still hold XLS/XLSB leaves, which remain intact. Receipts were independently
+  verified and committed.
+
+  Source integration remains staging. Final source freeze, full gates,
+  all-68 inventory, corpus replay, glossary closure and native qualification
+  remain required. Only comprehensive redaction audit 22 is deferred.
+  Nothing is pushed.
