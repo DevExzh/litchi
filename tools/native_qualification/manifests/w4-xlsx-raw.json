@@ -34,7 +34,8 @@
       "tools/perf-baseline/unified-xlsx-raw-identity/src/bin/xlsx_raw_identity_alloc.rs",
       "tools/perf-baseline/unified-xlsx-raw-identity/src/bin/xlsx_raw_identity_native.rs",
       "tools/perf-baseline/src/allocation_metrics.rs",
-      "tools/perf-baseline/src/xlsx_raw_identity.rs"
+      "tools/perf-baseline/src/xlsx_raw_identity.rs",
+      "tools/perf-baseline/src/bin/support/counting_allocator.rs"
     ],
     "fixture_paths": []
   },

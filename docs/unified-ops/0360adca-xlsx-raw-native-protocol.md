@@ -1,7 +1,7 @@
 # 0360adca — XLSX raw paired-native qualification protocol
 
 Status: preparation packet from staging commit
-`ff3d39c33b2835e0bf2044d989fd9507d96b6e49`. This closes the runner gap
+`de9b5297c44d495ea19a4865eb2d937c97ea759e`. This closes the runner gap
 identified by the `0360adc` historical and candidate diagnostics. It adds no
 production-format change and records no timing or acceptance result.
 
@@ -66,12 +66,14 @@ export XLSX_AFTER_SOURCE=/external/sources/xlsx-final-candidate
 export XLSX_TARGET_ROOT=/external/xlsx-raw-native/targets/abba-20261024-01
 export XLSX_BEFORE_REVISION=0befb112d96d2409e6f40c9abfeb4813665905ad
 export XLSX_AFTER_REVISION=<final-assembled-candidate-sha>
-export XLSX_PREPARATION_RECEIPT=/external/xlsx-raw-native/abba-20261024-01/preparation.json
+export XLSX_PREPARATION_RECEIPT=/external/xlsx-raw-native/preparation.json
 
 # Both roots must be real Git worktrees. The preparation step copies only the
-# reviewed probe/manifest/lock adapter and records exact tree, diff, lock, and
-# probe hashes. It refuses a non-0bef baseline, a dirty candidate, or any
-# change outside the adapter allowlist.
+# reviewed probe/manifest/lock/allocator adapter and records exact tree, diff,
+# fixed reviewed input hashes, and source identities. It refuses a non-0bef
+# baseline, a dirty candidate, any unreviewed input hash, or any change outside
+# the adapter allowlist. Keep the receipt outside NATIVE_QUAL_OUTPUT: the
+# runner requires that output directory to be fresh and empty for build.
 git -C "$LITCHI_NATIVE_QUAL_ROOT" worktree add --detach \
   "$XLSX_BEFORE_SOURCE" "$XLSX_BEFORE_REVISION"
 git -C "$LITCHI_NATIVE_QUAL_ROOT" worktree add --detach \
@@ -91,8 +93,9 @@ python3 tools/native_qualification_runner.py \
 ```
 
 The preparation receipt binds both actual Git HEADs and trees, the baseline's
-allowed adapter diff, lock/probe hashes, and the candidate's clean tree. The
-runner and final validator re-check that receipt, so the source-revision
+allowed adapter diff, fixed reviewed lock/probe/allocator hashes, and the
+candidate's clean tree. The runner and final validator re-check that receipt,
+so the source-revision
 arguments cannot merely echo an untrusted environment value. It must not use
 the 5726 or ff86 source as a substitute baseline. Binaries, target trees,
 reports, event journals, and Callgrind captures remain outside the checkout.
@@ -120,7 +123,7 @@ python3 tools/test_xlsx_raw_native_qualification.py
 PASS — 9 tests
 
 python3 tools/test_prepare_xlsx_raw_inputs.py
-PASS — 3 tests
+PASS — 6 tests
 
 python3 tools/test_native_qualification_runner.py
 PASS — 22 tests

@@ -146,10 +146,17 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                     manifest["legs"]["after"]["programs"][0]["argv"][4],
                     environment["XLSX_AFTER_REVISION"],
                 )
+                self.assertIn(
+                    "tools/perf-baseline/src/bin/support/counting_allocator.rs",
+                    manifest["shared"]["probe_paths"],
+                )
                 runner._validate_xlsx_raw_workload(manifest)
                 manifest["validators"][0]["argv"][-1] = str(root / "other-receipt.json")
                 with self.assertRaisesRegex(runner.RunnerError, "bind its reports"):
                     runner._validate_xlsx_raw_workload(manifest)
+                os.environ["XLSX_PREPARATION_RECEIPT"] = str(root / "output" / "preparation.json")
+                with self.assertRaisesRegex(runner.RunnerError, "outside the fresh output"):
+                    runner.load_manifest(ROOT / "tools/native_qualification/manifests/w4-xlsx-raw.json")
             finally:
                 for key, value in old.items():
                     if value is None:

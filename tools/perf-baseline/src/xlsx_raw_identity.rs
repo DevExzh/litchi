@@ -1,8 +1,8 @@
 //! Matched XLSX raw-identity lifecycle probes for W4.
 //!
-//! This harness uses one API on both the original production revision
-//! (`0befb112d96d2409e6f40c9abfeb4813665905ad`) and the selected candidate
-//! revision supplied to the probe. It covers owned lazy open,
+//! This harness uses one API on both the immediate pre-repair revision
+//! (`0befb112d96d2409e6f40c9abfeb4813665905ad`) and candidate
+//! (`5726f03c7db2dd7dd539000b45f109f14ea8c33a`). It covers owned lazy open,
 //! first selected read, raw slicer/timeline insert, typed replacement, commit,
 //! replay, inverse, stale-patch refusal, no-op, native identity, untouched
 //! bytes, and deferred decode counters.

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import subprocess
 from pathlib import Path
 import sys
@@ -41,7 +42,22 @@ def _repo(root: Path, marker: str) -> str:
     return _git(root, "rev-parse", "HEAD")
 
 
+def _hashes(root: Path) -> dict[str, str]:
+    return {
+        relative: hashlib.sha256((root / relative).read_bytes()).hexdigest()
+        for relative in preparation.ADAPTER_PATHS
+    }
+
+
 class PrepareXlsxRawInputsTests(unittest.TestCase):
+    def test_fixed_reviewed_hashes_match_consumed_checkout_inputs(self) -> None:
+        for relative, expected in preparation.REVIEWED_ADAPTER_SHA256.items():
+            with self.subTest(path=relative):
+                self.assertEqual(
+                    hashlib.sha256((ROOT / relative).read_bytes()).hexdigest(),
+                    expected,
+                )
+
     def test_prepares_real_source_pair_and_binds_receipt(self) -> None:
         with tempfile.TemporaryDirectory(prefix="xlsx-raw-preparation-") as directory:
             root = Path(directory)
@@ -50,7 +66,11 @@ class PrepareXlsxRawInputsTests(unittest.TestCase):
             baseline_revision = _repo(baseline, "baseline")
             candidate_revision = _repo(candidate, "candidate")
             receipt = root / "preparation.json"
-            with mock.patch.object(preparation, "BASELINE_REVISION", baseline_revision):
+            with mock.patch.multiple(
+                preparation,
+                BASELINE_REVISION=baseline_revision,
+                REVIEWED_ADAPTER_SHA256=_hashes(candidate),
+            ):
                 preparation.prepare(baseline, candidate, candidate_revision, receipt)
                 preparation.validate_preparation_receipt(
                     receipt,
@@ -67,7 +87,11 @@ class PrepareXlsxRawInputsTests(unittest.TestCase):
             baseline_revision = _repo(baseline, "baseline")
             candidate_revision = _repo(candidate, "candidate")
             receipt = root / "preparation.json"
-            with mock.patch.object(preparation, "BASELINE_REVISION", baseline_revision):
+            with mock.patch.multiple(
+                preparation,
+                BASELINE_REVISION=baseline_revision,
+                REVIEWED_ADAPTER_SHA256=_hashes(candidate),
+            ):
                 preparation.prepare(baseline, candidate, candidate_revision, receipt)
                 (baseline / "unapproved.txt").write_text("changed\n", encoding="utf-8")
                 with self.assertRaisesRegex(preparation.PreparationError, "baseline preparation identity changed"):
@@ -86,7 +110,11 @@ class PrepareXlsxRawInputsTests(unittest.TestCase):
             baseline_revision = _repo(baseline, "baseline")
             candidate_revision = _repo(candidate, "candidate")
             receipt = root / "preparation.json"
-            with mock.patch.object(preparation, "BASELINE_REVISION", baseline_revision):
+            with mock.patch.multiple(
+                preparation,
+                BASELINE_REVISION=baseline_revision,
+                REVIEWED_ADAPTER_SHA256=_hashes(candidate),
+            ):
                 preparation.prepare(baseline, candidate, candidate_revision, receipt)
                 path = candidate / preparation.PROBE_PATHS[0]
                 path.write_text("candidate mutation\n", encoding="utf-8")
@@ -97,6 +125,48 @@ class PrepareXlsxRawInputsTests(unittest.TestCase):
                         candidate_root=candidate,
                         candidate_revision=candidate_revision,
                     )
+
+    def test_rejects_unreviewed_lock_hash_before_preparation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="xlsx-raw-preparation-") as directory:
+            root = Path(directory)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            baseline_revision = _repo(baseline, "baseline")
+            _repo(candidate, "candidate")
+            reviewed = _hashes(candidate)
+            lock = candidate / preparation.LOCK_PATHS[0]
+            lock.write_text("unreviewed lock\n", encoding="utf-8")
+            _git(candidate, "add", ".")
+            _git(candidate, "commit", "--quiet", "-m", "unreviewed lock")
+            candidate_revision = _git(candidate, "rev-parse", "HEAD")
+            with mock.patch.multiple(
+                preparation,
+                BASELINE_REVISION=baseline_revision,
+                REVIEWED_ADAPTER_SHA256=reviewed,
+            ):
+                with self.assertRaisesRegex(preparation.PreparationError, "candidate reviewed adapter hash mismatch"):
+                    preparation.prepare(baseline, candidate, candidate_revision, root / "preparation.json")
+
+    def test_rejects_unreviewed_counting_allocator_before_preparation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="xlsx-raw-preparation-") as directory:
+            root = Path(directory)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            baseline_revision = _repo(baseline, "baseline")
+            _repo(candidate, "candidate")
+            reviewed = _hashes(candidate)
+            allocator = candidate / preparation.PROBE_PATHS[-1]
+            allocator.write_text("unreviewed allocator\n", encoding="utf-8")
+            _git(candidate, "add", ".")
+            _git(candidate, "commit", "--quiet", "-m", "unreviewed allocator")
+            candidate_revision = _git(candidate, "rev-parse", "HEAD")
+            with mock.patch.multiple(
+                preparation,
+                BASELINE_REVISION=baseline_revision,
+                REVIEWED_ADAPTER_SHA256=reviewed,
+            ):
+                with self.assertRaisesRegex(preparation.PreparationError, "candidate reviewed adapter hash mismatch"):
+                    preparation.prepare(baseline, candidate, candidate_revision, root / "preparation.json")
 
 
 if __name__ == "__main__":

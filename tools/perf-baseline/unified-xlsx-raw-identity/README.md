@@ -10,7 +10,7 @@ the report; Cargo features select the source-compatible constructor.
 
 The current v2 harness is based on `a3b649ca857673c9c0ce62e04c7d44e7ba78c502`.
 After the cross-revision relationship-target fix its source-file SHA-256 is
-`0574f3b8de473e671866ee3706c1736b3059af1fd17ff73d67244bda9f9ede88`; the
+`a251f1199b5ba442dfd9664806b81f29c7832d071df66fc2d2d5f2ada6c97fd4`; the
 adapter block (the `open_opc` documentation, fallback, and explicit
 legacy-only branch) is
 `294827709997633b1c0c8568e07f7a3eae4f13103a0a9757efee236c641412d5`.
@@ -44,6 +44,21 @@ worktree and use `--locked` for every measured build. No result is qualified
 until the final candidate revision is also recorded in the preparation
 receipt.
 
+The preparation helper is the executable provenance gate for every consumed
+adapter input; it rejects any hash other than these reviewed values, and the
+runner/validator re-check the resulting receipt:
+
+| consumed input | SHA-256 |
+| --- | --- |
+| `tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml` | `30ff248844c9e21436fc3913baa4c4d363daffdc617e5e7d03404423410d5c70` |
+| `tools/perf-baseline/unified-xlsx-raw-identity/src/lib.rs` | `d65ce0630a50d1b972a0b2f93044091d1a5c50df1e9c8ef06e9c3ba65cf8a36a` |
+| `tools/perf-baseline/unified-xlsx-raw-identity/src/bin/xlsx_raw_identity_alloc.rs` | `c21cc9b947539078885ff099527ed8d291d631b39a27bf8a299c6553add9007c` |
+| `tools/perf-baseline/unified-xlsx-raw-identity/src/bin/xlsx_raw_identity_native.rs` | `71435d535e65996f2c62e9952ab3f595b8e3bd2342afc0f45092e8a407fc9ee9` |
+| `tools/perf-baseline/src/allocation_metrics.rs` | `0fcec3e5c4972031b23542fd359a38401e25f32a133c77ef4c6e75facf0710d5` |
+| `tools/perf-baseline/src/xlsx_raw_identity.rs` | `a251f1199b5ba442dfd9664806b81f29c7832d071df66fc2d2d5f2ada6c97fd4` |
+| `tools/perf-baseline/src/bin/support/counting_allocator.rs` | `80977e55c2213eeee2af9a3133295d70cff38505e663a68e4757bf7939c60068` |
+| `tools/perf-baseline/unified-xlsx-raw-identity/Cargo.lock` | `8b61b3c5e17b1c32d89139c97a26145117794afae83dd8fef3c9a7aff8765ee6` |
+
 The coordinator must keep captures, binaries, and targets outside the
 checkout. Every target used by the guarded runner must be absent or empty at
 the start of the build phase; the runner never reuses, cleans, or overwrites a
@@ -63,7 +78,8 @@ or directory without `.git`: the guarded runner uses Git HEAD/tree/status
 identity. Create it from the original production revision, create a clean
 detached candidate worktree at the selected final revision, and let the
 preparation command copy only the reviewed consumer-side adapter. Its receipt
-pins both trees, the exact allowed adapter diff, lock/probe hashes, and the
+pins both trees, the exact allowed adapter diff, fixed reviewed
+lock/probe/allocator hashes, and the
 candidate revision. No earlier raw branch or 5726-only result is an acceptable
 substitute:
 
@@ -92,7 +108,8 @@ python3 "$FINAL_CHECKOUT/tools/native_qualification/prepare_xlsx_raw_inputs.py" 
   --candidate-revision "$FINAL_CANDIDATE_REVISION" \
   --output "$PREPARATION_RECEIPT"
 
-# Verify the receipt's exact lockfile before using --locked below.
+# Optional evidence echo; the preparation helper above is the executable
+# fixed-hash gate and this manual check is not a substitute for it.
 source /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/env.sh
 sha256sum "$BASELINE_SOURCE/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.lock" \
   > "$EVIDENCE/raw-baseline-lock.sha256"

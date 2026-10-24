@@ -313,6 +313,14 @@ def load_manifest(path: Path) -> dict[str, Any]:
     if not isinstance(data.get("shared", {}), dict):
         raise RunnerError("shared must be an object")
     output = _resolve_path(str(data.get("output_dir", "")))
+    preparation_receipt: Path | None = None
+    if data.get("lane") == "w4-xlsx-raw":
+        value = data["shared"].get("preparation_receipt")
+        if not isinstance(value, str) or not value:
+            raise RunnerError("XLSX raw lane needs a preparation receipt")
+        preparation_receipt = _resolve_path(value)
+        if _under(preparation_receipt, output) or preparation_receipt == output:
+            raise RunnerError("XLSX preparation receipt must be outside the fresh output directory")
     source_roots: list[Path] = []
     for leg, spec in data["legs"].items():
         if not isinstance(spec, dict):
@@ -361,15 +369,17 @@ def load_manifest(path: Path) -> dict[str, Any]:
     if before_ids != after_ids:
         raise RunnerError("before and after program order must match")
     targets = [_resolve_path(str(data["legs"][leg]["target_dir"])) for leg in ("before", "after")]
-    _ensure_disjoint(
-        {
-            "source_before": source_roots[0],
-            "source_after": source_roots[1],
-            "target_before": targets[0],
-            "target_after": targets[1],
-            "output": output,
-        }
-    )
+    disjoint_paths = {
+        "source_before": source_roots[0],
+        "source_after": source_roots[1],
+        "target_before": targets[0],
+        "target_after": targets[1],
+        "output": output,
+    }
+    if preparation_receipt is not None:
+        disjoint_paths["preparation_receipt"] = preparation_receipt
+        _ensure_external(preparation_receipt, source_roots, "preparation receipt")
+    _ensure_disjoint(disjoint_paths)
     shared = data["shared"]
     for key in ("probe_paths", "fixture_paths"):
         if not isinstance(shared.get(key, []), list):

@@ -30,8 +30,22 @@ PROBE_PATHS = (
     "tools/perf-baseline/unified-xlsx-raw-identity/src/bin/xlsx_raw_identity_native.rs",
     "tools/perf-baseline/src/allocation_metrics.rs",
     "tools/perf-baseline/src/xlsx_raw_identity.rs",
+    "tools/perf-baseline/src/bin/support/counting_allocator.rs",
 )
 ADAPTER_PATHS = tuple((*LOCK_PATHS, *PROBE_PATHS))
+# These are the reviewed consumer-side inputs used by the historical and
+# candidate probes. Equality between the two worktrees is insufficient: a
+# pair of equally modified inputs would otherwise pass the preparation gate.
+REVIEWED_ADAPTER_SHA256 = {
+    "tools/perf-baseline/unified-xlsx-raw-identity/Cargo.lock": "8b61b3c5e17b1c32d89139c97a26145117794afae83dd8fef3c9a7aff8765ee6",
+    "tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml": "30ff248844c9e21436fc3913baa4c4d363daffdc617e5e7d03404423410d5c70",
+    "tools/perf-baseline/unified-xlsx-raw-identity/src/lib.rs": "d65ce0630a50d1b972a0b2f93044091d1a5c50df1e9c8ef06e9c3ba65cf8a36a",
+    "tools/perf-baseline/unified-xlsx-raw-identity/src/bin/xlsx_raw_identity_alloc.rs": "c21cc9b947539078885ff099527ed8d291d631b39a27bf8a299c6553add9007c",
+    "tools/perf-baseline/unified-xlsx-raw-identity/src/bin/xlsx_raw_identity_native.rs": "71435d535e65996f2c62e9952ab3f595b8e3bd2342afc0f45092e8a407fc9ee9",
+    "tools/perf-baseline/src/allocation_metrics.rs": "0fcec3e5c4972031b23542fd359a38401e25f32a133c77ef4c6e75facf0710d5",
+    "tools/perf-baseline/src/xlsx_raw_identity.rs": "a251f1199b5ba442dfd9664806b81f29c7832d071df66fc2d2d5f2ada6c97fd4",
+    "tools/perf-baseline/src/bin/support/counting_allocator.rs": "80977e55c2213eeee2af9a3133295d70cff38505e663a68e4757bf7939c60068",
+}
 
 
 class PreparationError(ValueError):
@@ -112,7 +126,9 @@ def _identity(root: Path) -> dict[str, Any]:
     }
 
 
-def _validate_adapter_paths(identity: Mapping[str, Any], *, label: str) -> None:
+def _validate_adapter_paths(
+    identity: Mapping[str, Any], *, label: str, require_reviewed_hashes: bool = False
+) -> None:
     statuses = identity.get("status_paths")
     _expect(isinstance(statuses, list), f"{label} status paths are missing")
     _expect(
@@ -121,6 +137,13 @@ def _validate_adapter_paths(identity: Mapping[str, Any], *, label: str) -> None:
     )
     hashes = identity.get("adapter_hashes")
     _expect(isinstance(hashes, dict) and set(hashes) == set(ADAPTER_PATHS), f"{label} adapter hashes are incomplete")
+    if require_reviewed_hashes:
+        for path, expected in REVIEWED_ADAPTER_SHA256.items():
+            value = hashes.get(path)
+            _expect(
+                isinstance(value, dict) and value.get("sha256") == expected,
+                f"{label} reviewed adapter hash mismatch: {path}",
+            )
 
 
 def _validate_receipt_data(
@@ -140,7 +163,7 @@ def _validate_receipt_data(
     _expect(Path(str(baseline.get("root"))).resolve(strict=False) == baseline_root, "receipt baseline root mismatch")
     _expect(Path(str(candidate.get("root"))).resolve(strict=False) == candidate_root, "receipt candidate root mismatch")
     for label, identity in (("baseline", baseline), ("candidate", candidate)):
-        _validate_adapter_paths(identity, label=label)
+        _validate_adapter_paths(identity, label=label, require_reviewed_hashes=True)
     _expect(baseline.get("head") == BASELINE_REVISION, "receipt baseline HEAD is not original 0bef")
     _expect(candidate.get("head") == candidate_revision, "receipt candidate HEAD is not the selected revision")
     _expect(candidate.get("status_paths") == [], "candidate source must be clean")
@@ -149,6 +172,10 @@ def _validate_receipt_data(
         "baseline status contains an unapproved path",
     )
     _expect(receipt.get("allowed_adapter_diff") == list(ADAPTER_PATHS), "receipt allowed diff is not exact")
+    _expect(
+        receipt.get("reviewed_adapter_sha256") == REVIEWED_ADAPTER_SHA256,
+        "receipt reviewed adapter hashes are not the fixed reviewed inputs",
+    )
     _expect(
         receipt.get("adapter_diff_paths") == baseline.get("status_paths"),
         "receipt adapter diff paths differ from the recorded baseline worktree",
@@ -235,8 +262,8 @@ def prepare(
         shutil.copyfile(source, target)
     baseline = _identity(baseline_root)
     candidate = _identity(candidate_root)
-    _validate_adapter_paths(baseline, label="baseline")
-    _validate_adapter_paths(candidate, label="candidate")
+    _validate_adapter_paths(candidate, label="candidate", require_reviewed_hashes=True)
+    _validate_adapter_paths(baseline, label="baseline", require_reviewed_hashes=True)
     _expect(baseline["head"] == BASELINE_REVISION, "baseline HEAD changed during preparation")
     _expect(candidate["head"] == candidate_revision, "candidate HEAD changed during preparation")
     _expect(candidate["status_paths"] == [], "candidate became dirty during preparation")
@@ -248,6 +275,7 @@ def prepare(
         "candidate_revision": candidate_revision,
         "adapter_paths": list(ADAPTER_PATHS),
         "allowed_adapter_diff": list(ADAPTER_PATHS),
+        "reviewed_adapter_sha256": dict(REVIEWED_ADAPTER_SHA256),
         "adapter_diff_paths": list(baseline["status_paths"]),
         "lock_paths": list(LOCK_PATHS),
         "probe_paths": list(PROBE_PATHS),
