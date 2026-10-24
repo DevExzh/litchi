@@ -86,7 +86,12 @@ impl Edit {
 
     fn inner_mut(&self) -> Result<RefMut<'_, record::GlossaryBatchEdit>, Error> {
         self.ensure_inner()?;
-        Ok(self.inner.borrow_mut())
+        RefMut::filter_map(self.inner.borrow_mut(), Option::as_mut).map_err(|_| {
+            Error::Document(crate::Error::internal(
+                "glossary_text.edit",
+                "glossary-text edit materializer is unavailable",
+            ))
+        })
     }
 
     fn into_inner(mut self) -> Result<record::GlossaryBatchEdit, Error> {

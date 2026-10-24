@@ -46,7 +46,7 @@ impl Package {
     fn materialize_edit(
         package: &Self,
         options: crate::document::EditOptions,
-    ) -> Result<crate::document::transaction::Edit, crate::document::Error> {
+    ) -> Result<crate::document::TransactionEdit, crate::document::Error> {
         package
             .document_snapshot_with_options(Some(&options))
             .map(|snapshot| snapshot.edit())

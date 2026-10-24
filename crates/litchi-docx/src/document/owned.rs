@@ -374,11 +374,11 @@ impl<P: Clone> Edit<P> {
     /// # Errors
     /// Returns a common composition bound or identifier error.
     pub fn prepare(
-        mut self,
+        self,
         limits: CompositionLimits,
         identifier: impl Into<String>,
     ) -> Result<super::composition::Prepared> {
-        self.inner_mut()?.prepare(limits, identifier)
+        self.into_inner()?.prepare(limits, identifier)
     }
 
     /// Change the direct properties of the paragraph at `path`.

@@ -256,7 +256,7 @@ impl Package {
     fn materialize_document_edit(
         package: &Self,
         options: crate::document::EditOptions,
-    ) -> TransactionResult<crate::document::transaction::Edit> {
+    ) -> TransactionResult<crate::document::TransactionEdit> {
         package
             .main_document_snapshot_with_before("edit", true, None, Some(&options))
             .map(|(_, snapshot)| snapshot.edit())

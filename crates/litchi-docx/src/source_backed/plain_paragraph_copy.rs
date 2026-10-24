@@ -106,7 +106,7 @@ impl Edit {
             .edit())
     }
 
-    fn ensure_inner(&self) -> Result<()> {
+    fn ensure_inner(&self) -> Result<(), Error> {
         let mut inner = self.inner.borrow_mut();
         if inner.is_none() {
             *inner = Some(self.materialize()?);
@@ -114,12 +114,13 @@ impl Edit {
         Ok(())
     }
 
-    fn inner_mut(&self) -> Result<RefMut<'_, record::Edit>> {
+    fn inner_mut(&self) -> Result<RefMut<'_, record::Edit>, Error> {
         self.ensure_inner()?;
-        Ok(self.inner.borrow_mut())
+        RefMut::filter_map(self.inner.borrow_mut(), Option::as_mut)
+            .map_err(|_| Error::InvalidDurable)
     }
 
-    fn into_inner(mut self) -> Result<record::Edit> {
+    fn into_inner(mut self) -> Result<record::Edit, Error> {
         if self.inner.get_mut().is_none() {
             let inner = self.materialize()?;
             *self.inner.get_mut() = Some(inner);
@@ -137,7 +138,7 @@ impl Edit {
 
     /// The projected main story.
     #[must_use]
-    pub fn projected(&self) -> Result<raw::Tree> {
+    pub fn projected(&self) -> Result<raw::Tree, Error> {
         Ok(raw::Tree::from_record(
             self.inner_mut()?.projected().clone(),
         ))

@@ -683,7 +683,7 @@ fn source_backed_existing_section_layout_is_exact_and_cell_safe() {
         Ownership::BodyFinal
     );
     assert_eq!(source.inventory().sections()[0].columns().unwrap().count, 1);
-    let mut unavailable = package
+    let unavailable = package
         .edit_section_layout(Selector::paragraph(litchi_core::Position::new(1)))
         .unwrap();
     assert!(unavailable.page_size().is_err());

@@ -1083,7 +1083,7 @@ fn budget_managed_snapshots_refuse_the_formatting_operations() {
     )
     .unwrap();
     let mut edit = package.edit().unwrap();
-    assert!(edit.projected().is_managed());
+    assert!(edit.projected().unwrap().is_managed());
     assert!(matches!(
         edit.format_run(Position::new(0), Position::new(0), |run| run.bold =
             Some(true)),

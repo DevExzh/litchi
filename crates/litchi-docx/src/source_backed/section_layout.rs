@@ -178,7 +178,12 @@ impl Edit {
 
     fn inner_mut(&self) -> Result<RefMut<'_, record::Edit>> {
         self.ensure_inner()?;
-        Ok(self.inner.borrow_mut())
+        RefMut::filter_map(self.inner.borrow_mut(), Option::as_mut).map_err(|_| {
+            crate::Error::internal(
+                "section_layout.edit",
+                "section-layout edit materializer is unavailable",
+            )
+        })
     }
 
     fn into_inner(mut self) -> Result<record::Edit> {

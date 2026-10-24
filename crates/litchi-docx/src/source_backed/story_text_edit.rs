@@ -86,7 +86,12 @@ impl Edit {
 
     fn inner_mut(&self) -> Result<RefMut<'_, record::Edit>, Error> {
         self.ensure_inner()?;
-        Ok(self.inner.borrow_mut())
+        RefMut::filter_map(self.inner.borrow_mut(), Option::as_mut).map_err(|_| {
+            Error::Document(crate::Error::internal(
+                "story_text.edit",
+                "story-text edit materializer is unavailable",
+            ))
+        })
     }
 
     fn into_inner(mut self) -> Result<record::Edit, Error> {

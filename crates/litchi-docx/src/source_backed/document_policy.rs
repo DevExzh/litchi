@@ -43,6 +43,13 @@ const SETTINGS_TARGET_MEMORY_HEADROOM: u64 = 4_096;
 /// bounded policy scanner run.  Exact no-op callers deliberately do not invoke
 /// this function.
 pub(super) fn validate_changed_document(package: &Package) -> Result<()> {
+    // A main-document overlay changes the package artifact just as any other
+    // semantic publication does.  Check the retained source inventory before
+    // constructing a topology so a detached patch cannot bypass the signed
+    // source policy merely because it carries no source XML provenance.
+    if package.physical_package()?.has_signature_infrastructure() {
+        return Err(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy.into());
+    }
     if let Some(topology) = &package.effective {
         return validate_changed_effective_document(topology);
     }

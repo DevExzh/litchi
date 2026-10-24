@@ -63,7 +63,7 @@ impl Edit {
 
     /// The staged graph.
     #[must_use]
-    pub const fn package(&self) -> &OpcPackage {
+    pub fn package(&self) -> &OpcPackage {
         match &self.candidate {
             Some(candidate) => candidate,
             None => self.source.opc_package(),

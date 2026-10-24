@@ -111,7 +111,7 @@ impl EditOptions {
     }
 }
 
-struct State {
+pub(super) struct State {
     package: Arc<OpcPackage>,
     binding: Binding,
     snapshot: Snapshot,
@@ -309,10 +309,11 @@ impl Edit {
         payload: Prepared,
         fallback: Option<FallbackImage>,
     ) -> Result<bool> {
-        let annotation =
-            self.base_state()?.snapshot.get(position).ok_or_else(|| {
-                Error::Invalid("DOCX Ink annotation selector is out of range".into())
-            })?;
+        let base = self.base_state()?;
+        let annotation = base
+            .snapshot
+            .get(position)
+            .ok_or_else(|| Error::Invalid("DOCX Ink annotation selector is out of range".into()))?;
         if self.removals.binary_search(&position.get()).is_ok() {
             return Err(unsupported(
                 "an annotation cannot be both removed and replaced",
