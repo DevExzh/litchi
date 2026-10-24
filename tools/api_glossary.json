@@ -7860,6 +7860,13 @@
         "litchi_drawingml::ink::actions",
         "litchi_drawingml::ink::actions::edit"
       ],
+      "immutable_owners": [
+        "litchi_drawingml::chart::Package",
+        "litchi_drawingml::chart::edit::Package",
+        "litchi_drawingml::transform::Package",
+        "litchi_drawingml::theme::family::Package",
+        "litchi_drawingml::ink::Prepared"
+      ],
       "shared_types": [
         {"path": "litchi_drawingml::chart::Commit", "target": "litchi_core::edit::Commit"},
         {"path": "litchi_drawingml::chart::Diagnostics", "target": "litchi_core::edit::Diagnostics"},

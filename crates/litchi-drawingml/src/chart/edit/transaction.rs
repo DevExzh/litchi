@@ -394,8 +394,8 @@ impl Patch {
 impl Package {
     /// Replay a patch against this exact package and publish a commit triad.
     ///
-    /// The retained source allocation is reused for an exact no-op. Changed
-    /// patches are decoded and validated before they become visible.
+    /// Exact no-op bytes remain unchanged; the resulting package is reparsed
+    /// and validated before it becomes visible, just like a changed patch.
     pub fn apply(&self, patch: &Patch) -> Result<Commit> {
         let package = patch.apply(self)?;
         Ok(Commit::new(
