@@ -13,7 +13,12 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{io::Read, path::Path, sync::Arc};
+use std::{
+    collections::{BTreeMap, btree_map::Entry},
+    io::Read,
+    path::Path,
+    sync::Arc,
+};
 
 /// Whether a commit changed the workbook bytes.
 pub use litchi_core::edit::Diagnostics;
@@ -397,14 +402,9 @@ impl Workbook {
 
     fn edit_core(&self) -> Result<Edit> {
         let limits = self.state.limits;
-        let mut staged = Vec::new();
-        staged
-            .try_reserve_exact(self.state.sheets.len())
-            .map_err(|_error| invalid("flat ODS transaction allocation failed"))?;
-        staged.resize_with(self.state.sheets.len(), || None);
         Ok(Edit {
             base: self.clone(),
-            staged,
+            staged: BTreeMap::new(),
             limits,
         })
     }
@@ -429,7 +429,7 @@ fn select<'s>(sheets: &'s [Sheet], selector: SheetSelector<'_>) -> Result<Option
 /// A detached, failure-atomic edit bound to an immutable source workbook.
 pub struct Edit {
     base: Workbook,
-    staged: Vec<Option<Sheet>>,
+    staged: BTreeMap<usize, Sheet>,
     limits: Limits,
 }
 
@@ -442,9 +442,7 @@ impl Edit {
 
     /// Discards every staged change in place.
     pub fn reset(&mut self) {
-        for staged in &mut self.staged {
-            *staged = None;
-        }
+        self.staged.clear();
     }
 
     ///
@@ -459,7 +457,7 @@ impl Edit {
     ) -> FamilyResult<Option<()>> {
         let index = match selector.into() {
             SheetSelector::Index(index) => {
-                if index >= self.staged.len() {
+                if index >= self.base.sheets().len() {
                     return Ok(None);
                 }
                 index
@@ -482,12 +480,10 @@ impl Edit {
                 index
             },
         };
-        if self.staged[index].is_none() {
-            self.staged[index] = Some(clone_sheet_fallible(&self.base.sheets()[index])?);
-        }
-        let staged_sheet = self.staged[index]
-            .as_mut()
-            .ok_or_else(|| invalid("flat ODS staged sheet initialization failed"))?;
+        let staged_sheet = match self.staged.entry(index) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => entry.insert(clone_sheet_fallible(&self.base.sheets()[index])?),
+        };
         staged_sheet.set_cell(row, column, cell)?;
         Ok(Some(()))
     }
@@ -505,7 +501,7 @@ impl Edit {
     }
 
     fn commit_core(self) -> Result<Commit> {
-        if self.staged.iter().all(Option::is_none) {
+        if self.staged.is_empty() {
             let patch = Patch {
                 before: self.base.state.source.clone(),
                 after: self.base.state.source.clone(),
@@ -513,7 +509,14 @@ impl Edit {
             return Ok(Commit::new(self.base, patch, Diagnostics::UNCHANGED));
         }
         ensure_compact(&self.base.state.source, self.limits.output_bytes)?;
-        let staged = self.staged.iter().map(Option::as_ref).collect::<Vec<_>>();
+        let mut staged = Vec::new();
+        staged
+            .try_reserve_exact(self.base.sheets().len())
+            .map_err(|_error| invalid("flat ODS transaction allocation failed"))?;
+        staged.resize(self.base.sheets().len(), None);
+        for (index, sheet) in &self.staged {
+            staged[*index] = Some(sheet);
+        }
         crate::worksheet::package::validate_owned_link_delta_partial(self.base.sheets(), &staged)?;
         let xml = crate::worksheet::package::replace_changed_rows(
             &self.base.state.source,
@@ -524,11 +527,8 @@ impl Edit {
         ensure_compact(&xml, self.limits.output_bytes)?;
         let after: Arc<str> = Arc::from(xml);
         let snapshot = Workbook::from_source(after.clone(), self.limits)?;
-        for (index, staged) in self.staged.iter().enumerate() {
-            if staged
-                .as_ref()
-                .is_some_and(|expected| snapshot.sheets().get(index) != Some(expected))
-            {
+        for (index, expected) in &self.staged {
+            if snapshot.sheets().get(*index) != Some(expected) {
                 return Err(invalid(
                     "flat ODS typed readback does not match the staged edit",
                 ));

@@ -30,7 +30,7 @@ crate::scoped::family!("route slip");
 #[derive(Clone)]
 pub struct Edit {
     base: crate::scoped::Base,
-    inner: Editor,
+    inner: Option<Editor>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -44,32 +44,52 @@ impl std::fmt::Debug for Edit {
 
 impl Edit {
     fn open(base: crate::scoped::Base) -> Result<Self> {
-        let bytes = base.to_vec();
-        let options = base.options();
-        let inner = Editor::open_with_options(bytes, options)?;
-        Ok(Self { base, inner })
+        Ok(Self { base, inner: None })
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut Editor> {
+        if self.inner.is_none() {
+            let bytes = self.base.to_vec()?;
+            let options = self.base.options();
+            self.inner = Some(Editor::open_with_options(bytes, options)?);
+        }
+        self.inner.as_mut().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "route slip edit was not initialized".into(),
+            ))
+        })
+    }
+
+    fn take_inner(&mut self) -> Result<Editor> {
+        self.inner_mut()?;
+        self.inner.take().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "route slip edit was not initialized".into(),
+            ))
+        })
     }
 
     /// Returns the current route-slip metadata, when present.
-    #[must_use]
-    pub fn metadata(&self) -> Option<&Metadata> {
-        self.inner.metadata()
+    pub fn metadata(&mut self) -> Result<Option<&Metadata>> {
+        Ok(self.inner_mut()?.metadata())
     }
 
     /// Returns the current immutable route-slip semantic snapshot.
-    #[must_use]
-    pub fn route_slip(&self) -> &TransactionSnapshot {
-        self.inner.route_slip()
+    pub fn route_slip(&mut self) -> Result<&TransactionSnapshot> {
+        Ok(self.inner_mut()?.route_slip())
     }
 
     /// Sets or replaces the complete route-slip metadata.
     pub fn set(&mut self, metadata: Metadata) -> Result<()> {
-        self.inner.set(metadata).map(|_| ()).map_err(Error::from)
+        self.inner_mut()?
+            .set(metadata)
+            .map(|_| ())
+            .map_err(Error::from)
     }
 
     /// Replaces existing route-slip metadata, rejecting an absent range.
     pub fn replace(&mut self, metadata: Metadata) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .replace(metadata)
             .map(|_| ())
             .map_err(Error::from)
@@ -77,7 +97,7 @@ impl Edit {
 
     /// Applies and publishes a semantic transaction atomically.
     pub fn apply(&mut self, transaction: RecordEdit) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .apply(transaction)
             .map(|_| ())
             .map_err(Error::from)
@@ -85,7 +105,7 @@ impl Edit {
 
     /// Sets the current recipient stage and stages the edit.
     pub fn set_stage(&mut self, selector: RecipientSelector<'_>) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_stage(selector)
             .map(|_| ())
             .map_err(Error::from)
@@ -93,12 +113,15 @@ impl Edit {
 
     /// Advances to the next recipient and publishes the lifecycle edit.
     pub fn advance_stage(&mut self) -> Result<()> {
-        self.inner.advance_stage().map(|_| ()).map_err(Error::from)
+        self.inner_mut()?
+            .advance_stage()
+            .map(|_| ())
+            .map_err(Error::from)
     }
 
     /// Adds a recipient and stages the edit.
     pub fn add_recipient(&mut self, recipient: super::model::Recipient) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .add_recipient(recipient)
             .map(|_| ())
             .map_err(Error::from)
@@ -110,7 +133,7 @@ impl Edit {
         selector: RecipientSelector<'_>,
         recipient: super::model::Recipient,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .replace_recipient(selector, recipient)
             .map(|_| ())
             .map_err(Error::from)
@@ -118,7 +141,7 @@ impl Edit {
 
     /// Removes a selected recipient and stages the edit.
     pub fn remove_recipient(&mut self, selector: RecipientSelector<'_>) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .remove_recipient(selector)
             .map(|_| ())
             .map_err(Error::from)
@@ -126,12 +149,15 @@ impl Edit {
 
     /// Clears the route-slip range and its semantic metadata.
     pub fn clear(&mut self) -> Result<()> {
-        self.inner.clear().map(|_| ()).map_err(Error::from)
+        self.inner_mut()?.clear().map(|_| ()).map_err(Error::from)
     }
 
     /// Completes routing by clearing the route-slip FIB range.
     pub fn complete(&mut self) -> Result<()> {
-        self.inner.complete().map(|_| ()).map_err(Error::from)
+        self.inner_mut()?
+            .complete()
+            .map(|_| ())
+            .map_err(Error::from)
     }
 
     /// Validate the staged edits and publish them as a new package.
@@ -141,8 +167,8 @@ impl Edit {
     /// Returns an error when the edited part fails validation, the package
     /// cannot be republished, or [`Error::Signed`] for a changed signed
     /// package.
-    pub fn commit(self) -> Result<Commit> {
-        let after = self.inner.finish()?;
+    pub fn commit(mut self) -> Result<Commit> {
+        let after = self.take_inner()?.finish()?;
         Ok(published(self.base.publish(after)?))
     }
 }

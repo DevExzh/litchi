@@ -28226,7 +28226,7 @@ fn profile_doc_open(
 ) -> Result<
     (
         litchi_doc::Package,
-        litchi_doc::Edit,
+        litchi_doc::Edit<'static>,
         DocPhaseDurations,
         u64,
     ),
@@ -28249,13 +28249,20 @@ fn profile_doc_open(
         |event| recorder.observe(event),
         |_| {},
     )?;
+    // `edit_profiled` is lazy just like the ordinary edit. Deliberately make
+    // the first body access inside this measured open interval so the phase
+    // recorder observes the real owner/public-reader/source-retention work,
+    // rather than silently recording an empty open.
+    let mut edit = edit;
+    let _ = edit.source_bytes()?.len();
+    let edit = edit.into_unprofiled()?;
     let outer_ns = elapsed_ns(started.elapsed())?;
     let phases = recorder.finish(&expected)?;
     Ok((package, edit, phases, outer_ns))
 }
 
 fn profile_doc_changed_commit(
-    edit: litchi_doc::Edit,
+    edit: litchi_doc::Edit<'static>,
 ) -> Result<(litchi_doc::Commit, DocPhaseDurations, u64), Box<dyn Error>> {
     use litchi_doc::body_text::DiagnosticPhase;
 
@@ -28420,7 +28427,7 @@ fn run_doc_owner_public_phases(
     let mut elapsed = Vec::with_capacity(samples);
     let mut summary = DocOwnerPublicPhaseSummary {
         implementation: "litchi-doc::Package::edit_profiled/Edit::commit_profiled owner-public seam",
-        timing_scope: "measured_total_ns covers native DOC owner/public validation, in-memory owner rendering, and output materialization; deterministic replacement text is prepared before the lifecycle timer; same-lineage patch apply and first source/target FNV-1a fingerprint demand are timed after that boundary as workflow extensions",
+        timing_scope: "measured_total_ns covers the profiled first body access (the lazy edit's owner/public-reader/source-retention open), native DOC owner/public commit validation, in-memory owner rendering, and output materialization; deterministic replacement text is prepared before the lifecycle timer; same-lineage patch apply and first source/target FNV-1a fingerprint demand are timed after that boundary as workflow extensions",
         performance_claim: "attribution-only correctness and deferred-work accounting; measured_total_ns is the established lifecycle boundary, synchronous observer overhead is included, and no speedup, I/O, allocation, RSS, cold-start, or producer claim is made",
         selected_paragraph: selected,
         source_bytes: u64::try_from(corpus.archive.len())?,
@@ -28842,10 +28849,6 @@ fn xls_comment_value(
         format!("{author_state} {index:03}"),
         format!("comment {state} {index:03}"),
     )?)
-}
-
-fn xls_comment_opaque_stream_name(index: usize) -> String {
-    format!("Payload{index:03}")
 }
 
 fn build_xls_comments_edit_corpus() -> Result<Corpus, Box<dyn Error>> {

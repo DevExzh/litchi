@@ -92,11 +92,11 @@ fn package_edit_round_trips_document_facade_and_exact_fib_payload() {
     let original = base_doc();
     let package = Package::from_bytes(&original).unwrap();
     let mut edit = package.edit_route_slip().unwrap();
-    assert!(edit.metadata().is_none());
+    assert!(edit.metadata().expect("route-slip metadata").is_none());
 
     let source = route(Protection::Off);
     edit.set(source.clone()).unwrap();
-    assert_eq!(edit.metadata(), Some(&source));
+    assert_eq!(edit.metadata().expect("route-slip metadata"), Some(&source));
 
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
@@ -142,29 +142,59 @@ fn lifecycle_edits_are_snapshot_based_and_clear_the_fib_range() {
     edit.set(route(Protection::Off)).unwrap();
 
     edit.set_stage(RecipientSelector::Name(b"Bob")).unwrap();
-    assert_eq!(edit.metadata().unwrap().stage, 1);
+    assert_eq!(
+        edit.metadata()
+            .expect("route-slip metadata")
+            .expect("route-slip value")
+            .stage,
+        1
+    );
 
     let added = recipient(b"Carol");
     edit.add_recipient(added.clone()).unwrap();
-    assert_eq!(edit.metadata().unwrap().recipients.last(), Some(&added));
+    assert_eq!(
+        edit.metadata()
+            .expect("route-slip metadata")
+            .expect("route-slip value")
+            .recipients
+            .last(),
+        Some(&added)
+    );
 
     edit.advance_stage().unwrap();
-    assert_eq!(edit.metadata().unwrap().stage, 2);
+    assert_eq!(
+        edit.metadata()
+            .expect("route-slip metadata")
+            .expect("route-slip value")
+            .stage,
+        2
+    );
     assert!(edit.advance_stage().is_err());
     edit.set_stage(RecipientSelector::Index(0)).unwrap();
     edit.advance_stage().unwrap();
-    assert_eq!(edit.metadata().unwrap().stage, 1);
+    assert_eq!(
+        edit.metadata()
+            .expect("route-slip metadata")
+            .expect("route-slip value")
+            .stage,
+        1
+    );
 
     edit.replace_recipient(RecipientSelector::Current, recipient(b"Bobby"))
         .unwrap();
     edit.remove_recipient(RecipientSelector::Index(0)).unwrap();
     assert_eq!(
-        edit.metadata().unwrap().recipients[0].name.as_bytes(),
+        edit.metadata()
+            .expect("route-slip metadata")
+            .expect("route-slip value")
+            .recipients[0]
+            .name
+            .as_bytes(),
         b"Bobby"
     );
 
     edit.complete().unwrap();
-    assert!(edit.metadata().is_none());
+    assert!(edit.metadata().expect("route-slip metadata").is_none());
     let bytes = edit.commit().unwrap().patch().after_bytes().to_vec();
     let mut reader = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
     assert!(reader.document().unwrap().route_slip().unwrap().is_none());
@@ -180,11 +210,11 @@ fn protected_package_lifecycle_edit_is_rejected_atomically() {
     let package = Package::from_bytes(&base_doc()).unwrap();
     let mut edit = package.edit_route_slip().unwrap();
     edit.set(route(Protection::Annotation)).unwrap();
-    let before = edit.route_slip().clone();
+    let before = edit.route_slip().expect("route-slip snapshot").clone();
 
     let error = edit.clear().unwrap_err();
     assert!(error.to_string().contains("protected"));
-    assert_eq!(edit.route_slip(), &before);
+    assert_eq!(edit.route_slip().expect("route-slip snapshot"), &before);
 }
 
 #[test]

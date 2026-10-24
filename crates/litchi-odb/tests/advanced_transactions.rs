@@ -21,6 +21,24 @@ fn limits() -> CompositionLimits {
     CompositionLimits::new(16, 16, 64, 16)
 }
 
+#[test]
+#[expect(clippy::unwrap_used, reason = "fixed lazy-edit fixture construction")]
+fn edit_borrows_content_until_first_mutation() {
+    let database = source();
+    let source_content = database.database().content_xml();
+    let mut edit = database.edit();
+
+    // Edit construction keeps the source XML borrowed.  This is the
+    // allocation proof for the O(1) entry path; the first mutation is where
+    // copy-on-write must materialize the staged buffer.
+    assert_eq!(edit.staged_content_xml().as_ptr(), source_content.as_ptr());
+    assert_eq!(edit.staged_content_xml().len(), source_content.len());
+
+    edit.add_query(Query::new("lazy", "SELECT 1")).unwrap();
+    assert_ne!(edit.staged_content_xml().as_ptr(), source_content.as_ptr());
+    assert_ne!(edit.staged_content_xml(), source_content);
+}
+
 #[expect(
     clippy::unwrap_used,
     reason = "fixed semantic patch fixture construction"

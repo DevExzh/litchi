@@ -175,7 +175,7 @@ fn producer_fixtures_append_only_when_their_layout_is_supported() {
             editor.add(options(id)).unwrap();
             match editor.finish() {
                 Ok(output) => {
-                    let reopened =
+                    let mut reopened =
                         open_objects(output.clone(), ProtectionPolicy::default()).unwrap();
                     assert!(
                         reopened

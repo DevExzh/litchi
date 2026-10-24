@@ -25,7 +25,7 @@ impl From<RecordError> for Error {
 #[derive(Clone)]
 pub struct Edit {
     base: crate::scoped::Base,
-    inner: Transaction,
+    inner: Option<Transaction>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -39,13 +39,32 @@ impl std::fmt::Debug for Edit {
 
 impl Edit {
     fn open(base: crate::scoped::Base) -> Result<Self> {
-        let snapshot = Snapshot::open_with_policy(
-            base.to_vec(),
-            base.options().revision_limits_value(),
-            base.options().protection_policy_value(),
-        )?;
-        let inner = snapshot.edit()?;
-        Ok(Self { base, inner })
+        Ok(Self { base, inner: None })
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut Transaction> {
+        if self.inner.is_none() {
+            let snapshot = Snapshot::open_with_policy(
+                self.base.to_vec()?,
+                self.base.options().revision_limits_value(),
+                self.base.options().protection_policy_value(),
+            )?;
+            self.inner = Some(snapshot.edit()?);
+        }
+        self.inner.as_mut().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "tracked revision edit was not initialized".into(),
+            ))
+        })
+    }
+
+    fn take_inner(&mut self) -> Result<Transaction> {
+        self.inner_mut()?;
+        self.inner.take().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "tracked revision edit was not initialized".into(),
+            ))
+        })
     }
 
     /// The staged revisions in source order.
@@ -53,14 +72,13 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the staged revision tables cannot be read.
-    pub fn revisions(&self) -> Result<Vec<Revision>> {
-        Ok(self.inner.revisions()?)
+    pub fn revisions(&mut self) -> Result<Vec<Revision>> {
+        Ok(self.inner_mut()?.revisions()?)
     }
 
     /// The staged revision-author table in its stored order.
-    #[must_use]
-    pub fn authors(&self) -> &[String] {
-        self.inner.authors()
+    pub fn authors(&mut self) -> Result<&[String]> {
+        Ok(self.inner_mut()?.authors())
     }
 
     /// Adds a revision mark to an existing main-story range.
@@ -76,7 +94,7 @@ impl Edit {
         kind: RevisionKind,
         metadata: RevisionMetadata,
     ) -> Result<Revision> {
-        Ok(self.inner.add(start_cp, end_cp, kind, metadata)?)
+        Ok(self.inner_mut()?.add(start_cp, end_cp, kind, metadata)?)
     }
 
     /// Inserts inert plain text and marks it as an insertion or move target.
@@ -95,7 +113,7 @@ impl Edit {
         kind: RevisionKind,
         metadata: RevisionMetadata,
     ) -> Result<Revision> {
-        Ok(self.inner.add_text(cp, text, kind, metadata)?)
+        Ok(self.inner_mut()?.add_text(cp, text, kind, metadata)?)
     }
 
     /// Replaces one revision's typed metadata without touching unrelated
@@ -105,7 +123,7 @@ impl Edit {
     ///
     /// Returns an error for an out-of-range index or invalid metadata.
     pub fn replace(&mut self, index: usize, metadata: RevisionMetadata) -> Result<Revision> {
-        Ok(self.inner.replace(index, metadata)?)
+        Ok(self.inner_mut()?.replace(index, metadata)?)
     }
 
     /// Removes one revision mark while retaining its text and current
@@ -115,7 +133,7 @@ impl Edit {
     ///
     /// Returns an error for an out-of-range index.
     pub fn remove(&mut self, index: usize) -> Result<Revision> {
-        Ok(self.inner.remove(index)?)
+        Ok(self.inner_mut()?.remove(index)?)
     }
 
     /// Accepts one revision using Word redline semantics.
@@ -124,7 +142,7 @@ impl Edit {
     ///
     /// Returns an error for an out-of-range index or an unsupported mark.
     pub fn accept(&mut self, index: usize) -> Result<Revision> {
-        Ok(self.inner.accept(index)?)
+        Ok(self.inner_mut()?.accept(index)?)
     }
 
     /// Rejects one revision using Word redline semantics.
@@ -133,7 +151,7 @@ impl Edit {
     ///
     /// Returns an error for an out-of-range index or an unsupported mark.
     pub fn reject(&mut self, index: usize) -> Result<Revision> {
-        Ok(self.inner.reject(index)?)
+        Ok(self.inner_mut()?.reject(index)?)
     }
 
     /// Validate the staged edits and publish them as a new package.
@@ -143,8 +161,8 @@ impl Edit {
     /// Returns an error when the protection policy refuses a changed write,
     /// the package cannot be republished, or [`Error::Signed`] for a changed
     /// signed package.
-    pub fn commit(self) -> Result<Commit> {
-        let after = self.inner.commit()?.into_snapshot().finish();
+    pub fn commit(mut self) -> Result<Commit> {
+        let after = self.take_inner()?.commit()?.into_snapshot().finish();
         Ok(published(self.base.publish(after)?))
     }
 }

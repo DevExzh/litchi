@@ -236,7 +236,8 @@ fn signed_sources_are_read_only_for_media_batches() {
         source.security_policy().unwrap(),
         edit::SecurityPolicy::SignedReadOnly
     );
-    assert!(source.edit().is_err());
+    let transaction = source.edit().unwrap();
+    assert!(transaction.commit().is_err());
 }
 
 #[test]
@@ -252,7 +253,8 @@ fn every_signature_owner_name_is_read_only() {
         source.security_policy().unwrap(),
         edit::SecurityPolicy::SignedReadOnly
     );
-    assert!(source.edit().is_err());
+    let transaction = source.edit().unwrap();
+    assert!(transaction.commit().is_err());
 }
 
 #[test]
@@ -275,7 +277,8 @@ fn zip_encryption_is_classified_by_the_owned_package() {
         source.security_policy().unwrap(),
         edit::SecurityPolicy::EncryptedReadOnly
     );
-    assert!(source.edit().is_err());
+    let transaction = source.edit().unwrap();
+    assert!(transaction.commit().is_err());
 }
 
 #[test]

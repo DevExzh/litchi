@@ -101,7 +101,7 @@ pub(crate) struct Published {
 #[derive(Clone)]
 pub(crate) struct Base {
     package: Package,
-    bytes: Arc<[u8]>,
+    bytes: Arc<std::sync::Mutex<Option<Arc<[u8]>>>>,
     options: EditOptions,
 }
 
@@ -126,22 +126,35 @@ impl Base {
         package: &Package,
         options: EditOptions,
     ) -> Result<Self, Failure> {
-        let bytes: Arc<[u8]> = Arc::from(package.to_bytes()?);
         Ok(Self {
             package: package.clone(),
-            bytes,
+            bytes: Arc::new(std::sync::Mutex::new(None)),
             options: package.constrained_edit_options(options),
         })
     }
 
-    /// The exact source package bytes.
-    pub(crate) fn bytes(&self) -> &[u8] {
-        &self.bytes
+    /// Materialize the exact source package bytes on first use.
+    ///
+    /// Capturing an edit only retains the immutable package and its effective
+    /// options. The source fence and bounded copy are deliberately kept at the
+    /// first operation that needs bytes, so a dropped or untouched edit is
+    /// constant-time and allocation-free in the artifact size.
+    pub(crate) fn bytes(&self) -> Result<Arc<[u8]>, PackageError> {
+        let mut memo = self
+            .bytes
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(bytes) = memo.as_ref() {
+            return Ok(Arc::clone(bytes));
+        }
+        let bytes: Arc<[u8]> = Arc::from(self.package.to_bytes()?);
+        *memo = Some(Arc::clone(&bytes));
+        Ok(bytes)
     }
 
     /// The exact source package bytes as an owned buffer.
-    pub(crate) fn to_vec(&self) -> Vec<u8> {
-        self.bytes.to_vec()
+    pub(crate) fn to_vec(&self) -> Result<Vec<u8>, PackageError> {
+        Ok(self.bytes()?.to_vec())
     }
 
     /// The edit options granted to this edit.
@@ -151,10 +164,11 @@ impl Base {
 
     /// Publish whole candidate package bytes.
     pub(crate) fn publish(self, after: Vec<u8>) -> Result<Published, Failure> {
-        if after.as_slice() == self.bytes.as_ref() {
-            return Ok(self.unchanged());
+        let before = self.bytes().map_err(Failure::Package)?;
+        if after.as_slice() == before.as_ref() {
+            return self.unchanged();
         }
-        if is_signed(&self.bytes)? {
+        if is_signed(&before)? {
             return Err(Failure::Signed);
         }
         let package = Package::from_bytes_with_options(&after, open_options(&self.package))?
@@ -162,7 +176,7 @@ impl Base {
         Ok(Published {
             package,
             patch: BytePatch {
-                before: self.bytes,
+                before,
                 after: Arc::from(after),
             },
             diagnostics: Diagnostics::CHANGED,
@@ -170,28 +184,30 @@ impl Base {
     }
 
     /// The exact no-op publication: the source package unchanged.
-    pub(crate) fn unchanged(self) -> Published {
-        Published {
+    pub(crate) fn unchanged(self) -> Result<Published, Failure> {
+        let bytes = self.bytes().map_err(Failure::Package)?;
+        Ok(Published {
             patch: BytePatch {
-                before: Arc::clone(&self.bytes),
-                after: self.bytes,
+                before: Arc::clone(&bytes),
+                after: bytes,
             },
             package: self.package,
             diagnostics: Diagnostics::UNCHANGED,
-        }
+        })
     }
 }
 
 /// Replay an exact byte patch onto the package it was made from.
 pub(crate) fn apply(package: &Package, patch: &BytePatch) -> Result<Published, Failure> {
     let base = Base::capture(package)?;
-    if base.bytes() != patch.before() {
+    let bytes = base.bytes().map_err(Failure::Package)?;
+    if bytes.as_ref() != patch.before() {
         return Err(Failure::PatchConflict);
     }
     if !patch.is_noop() {
         // A replayed change is a write: the receiving package's protection
         // policy authorizes it exactly as it authorizes a staged edit.
-        let protection = crate::package::property_set::classify_host(base.bytes())?;
+        let protection = crate::package::property_set::classify_host(&bytes)?;
         base.options()
             .protection_policy_value()
             .authorize(protection)?;
