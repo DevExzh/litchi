@@ -90,3 +90,35 @@ seconds with an empty log, no owned builders after exit, and stable target
 size 4,706,734,564 bytes. This covers the composed XLS fallible consumers and
 PPTX refusal classification. It is one selected step, not the full 53-step
 gate, and predates the separate W8 baseline-adapter binding correction.
+
+
+## Refreshed candidate
+
+IWA fixture binding `4dae391375` merges at `494f399c74`; review confirms
+that the fixture generator slice is byte-identical across its test-consumer
+migration. W8 binding and pristine-baseline consumer correction
+`d714aee19d` merges at `b6732d02b241705ba153c1a2cb9ff03bf0a13f93`.
+The W8 adapter removes only the three deferred XLSB resolution chains that
+the original f2 API does not expose, in addition to its four existing result
+accessor translations. The resulting baseline probe is byte-identical to the
+previously reviewed d39 adapter; its portable regression pins that size/hash.
+The 109-route workload and timing/proof boundaries remain unchanged.
+
+On clean `b6732d02b241705ba153c1a2cb9ff03bf0a13f93`, the six-module native
+protocol command recorded above now passes 65 tests, with zero failures or
+skips. The external `native-protocol-tests-b673.log` is 752 bytes, SHA-256
+`933f6d49522fcc92db37fe66e6e4fd7ac6133cd9dd4a76c04199e6556ab31e42`.
+The explicit iWork native protocol command passes 20 tests; its 119-byte
+`iwa-native-protocol-tests-b673.log` has SHA-256
+`992669421ab4a90e4dc1b7b52d73d5d61c3518a59586510f8174fcd0d9e06051`.
+Both logs are under `.coord/final-acceptance-2026-10-24/`. These are protocol
+checks, with no native measurement claim.
+
+The full 53-step gate restarted on the same clean frozen source, using
+`.coord/replay-integration/gate-safe/run_safe_gate.py` without `--only` or
+`--start-at`, target `.coord/budget-validation/target`, and state directory
+`.coord/final-acceptance-2026-10-24/full-gate-b6732d02b2`. Formatting passes
+in 70.764 seconds and the composed strict consumer step passes in 17.547
+seconds. The remaining steps continue. This is an in-progress acceptance
+attempt, not a full-gate pass. The separate all-68 rustdoc inventory and quiet
+native qualification remain required.
