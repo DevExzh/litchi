@@ -203,7 +203,11 @@ impl fmt::Debug for Edit<'_> {
         formatter
             .debug_struct("Edit")
             .field("resolved", &self.target.is_some())
-            .field("name", &self.name)
+            .field("name_present", &self.name.is_some())
+            .field(
+                "name_bytes",
+                &self.name.as_ref().map_or(0, |name| name.as_str().len()),
+            )
             .finish_non_exhaustive()
     }
 }
@@ -216,8 +220,21 @@ impl Edit<'_> {
                 None => table_lock::WireBudget::new(self.source.state.source.limits())
                     .map_err(map_lock_error)?,
             };
-            let target = resolve_target_owned(self.source, &self.selector, &mut budget)?;
-            let before = resolved_name_at_target_with_budget(self.source, &target, &mut budget)?;
+            let target = match resolve_target_owned(self.source, &self.selector, &mut budget) {
+                Ok(target) => target,
+                Err(error) => {
+                    self.budget = Some(budget);
+                    return Err(error);
+                },
+            };
+            let before =
+                match resolved_name_at_target_with_budget(self.source, &target, &mut budget) {
+                    Ok(before) => before,
+                    Err(error) => {
+                        self.budget = Some(budget);
+                        return Err(error);
+                    },
+                };
             if self.name.is_none() {
                 self.name = Some(before.clone());
             }
@@ -1814,4 +1831,56 @@ fn map_package_error(error: PackageError) -> Error {
 
 fn usize_to_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, LimitKind, Package, Refusal};
+    use crate::selector::BodyTableSelector;
+
+    fn fixture() -> Result<Package, Box<dyn std::error::Error>> {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/pages/body-table-visible.pages");
+        Ok(Package::open(path)?)
+    }
+
+    #[test]
+    fn edit_debug_redacts_staged_table_name() -> Result<(), Box<dyn std::error::Error>> {
+        let package = fixture()?;
+        let mut edit = package
+            .edit_body_table_name(BodyTableSelector::index(0))?
+            .set_name("body-table-debug-sentinel")?;
+        edit.name()?;
+
+        let debug = format!("{edit:?}");
+        assert!(!debug.contains("body-table-debug-sentinel"));
+        assert!(debug.contains("name_present: true"));
+        assert!(debug.contains("name_bytes:"));
+        Ok(())
+    }
+
+    #[test]
+    fn deferred_resolution_preserves_wire_budget_after_failure()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let package = fixture()?;
+        let mut edit = package.edit_body_table_name(BodyTableSelector::index(usize::MAX))?;
+
+        assert!(matches!(
+            edit.path(),
+            Err(Error::Refused(Refusal::TableNotFound))
+        ));
+        let budget = edit
+            .budget
+            .as_mut()
+            .expect("a failed lazy resolution retains its wire budget");
+        budget.maximum_payload_work = budget.payload_work;
+        assert!(matches!(
+            edit.path(),
+            Err(Error::Limit {
+                kind: LimitKind::PayloadBytes,
+                ..
+            })
+        ));
+        Ok(())
+    }
 }

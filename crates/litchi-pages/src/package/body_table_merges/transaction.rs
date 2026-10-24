@@ -48,11 +48,24 @@ impl Edit<'_> {
     fn resolve(&mut self) -> Result<(), Error> {
         if self.target.is_none() {
             let mut budget = transaction_budget(self.source)?;
-            let target = self
+            let target = match self
                 .selector
                 .resolve_with_budget(self.source, &mut budget)
-                .map_err(map_lock_error)?;
-            let before = read_regions(self.source, &target, &mut budget)?;
+                .map_err(map_lock_error)
+            {
+                Ok(target) => target,
+                Err(error) => {
+                    self.budget = Some(budget);
+                    return Err(error);
+                },
+            };
+            let before = match read_regions(self.source, &target, &mut budget) {
+                Ok(before) => before,
+                Err(error) => {
+                    self.budget = Some(budget);
+                    return Err(error);
+                },
+            };
             if self.before.is_none() {
                 self.before = Some(before.clone());
                 self.regions = before;
@@ -965,5 +978,43 @@ fn map_page_layout_error(error: page_layout::Error) -> Error {
         page_layout::Error::Allocation { amount } => Error::Allocation { amount },
         page_layout::Error::Verification => Error::Verification,
         page_layout::Error::PatchConflict => Error::PatchConflict,
+    }
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::{Error, LimitKind, Package};
+    use crate::selector::BodyTableSelector;
+    use crate::table::merge::transaction::Refusal;
+
+    fn fixture() -> Result<Package, Box<dyn std::error::Error>> {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/pages/body-table-visible.pages");
+        Ok(Package::open(path)?)
+    }
+
+    #[test]
+    fn deferred_resolution_preserves_wire_budget_after_failure()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let package = fixture()?;
+        let mut edit = package.edit_body_table_merges(BodyTableSelector::index(usize::MAX))?;
+
+        assert!(matches!(
+            edit.regions(),
+            Err(Error::Refused(Refusal::TableNotFound))
+        ));
+        let budget = edit
+            .budget
+            .as_mut()
+            .expect("a failed lazy resolution retains its wire budget");
+        budget.maximum_payload_work = budget.payload_work;
+        assert!(matches!(
+            edit.regions(),
+            Err(Error::Limit {
+                kind: LimitKind::PayloadBytes,
+                ..
+            })
+        ));
+        Ok(())
     }
 }

@@ -216,7 +216,14 @@ impl Edit<'_> {
                     BodyTableSelector::Position(*position)
                 },
             };
-            let target = resolve_target_with_budget(self.source, selector, &mut budget, true)?;
+            let target = match resolve_target_with_budget(self.source, selector, &mut budget, true)
+            {
+                Ok(target) => target,
+                Err(error) => {
+                    self.budget = Some(budget);
+                    return Err(error);
+                },
+            };
             let before = target.appearance;
             if self.appearance.is_none() {
                 self.appearance = Some(before);
@@ -3805,5 +3812,42 @@ fn map_core_error(error: litchi_iwa_core::Error, path: Path) -> Error {
             path,
         },
         _ => Error::InvalidSource { path },
+    }
+}
+
+#[cfg(test)]
+mod budget_tests {
+    use super::{Error, LimitKind, Package, Refusal};
+    use crate::selector::BodyTableSelector;
+
+    fn fixture() -> Result<Package, Box<dyn std::error::Error>> {
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/pages/body-table-visible.pages");
+        Ok(Package::open(path)?)
+    }
+
+    #[test]
+    fn deferred_resolution_preserves_transaction_budget_after_failure()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let package = fixture()?;
+        let mut edit = package.edit_body_table_appearance(BodyTableSelector::index(usize::MAX))?;
+
+        assert!(matches!(
+            edit.path(),
+            Err(Error::Refused(Refusal::TableNotFound))
+        ));
+        let budget = edit
+            .budget
+            .as_mut()
+            .expect("a failed lazy resolution retains its transaction budget");
+        budget.remaining_transaction_work = 0;
+        assert!(matches!(
+            edit.path(),
+            Err(Error::Limit {
+                kind: LimitKind::TransactionWork,
+                ..
+            })
+        ));
+        Ok(())
     }
 }
