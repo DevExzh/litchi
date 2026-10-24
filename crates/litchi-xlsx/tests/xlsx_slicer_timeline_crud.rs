@@ -77,6 +77,66 @@ fn slicer_and_timeline_edit_entries_defer_cache_parsing() {
     assert!(timelines.commit().is_err());
 }
 
+#[test]
+fn slicer_pivot_validation_preserves_typed_nested_limits_and_staging() {
+    let (mut package, _) = package();
+    let workbook_uri = PackURI::new("/xl/workbook.xml").unwrap();
+    let pivot_cache_uri = PackURI::new("/xl/pivotCache/pivotCacheDefinition1.xml").unwrap();
+    let workbook_xml = String::from_utf8(package.get_part(&workbook_uri).unwrap().blob().to_vec())
+        .unwrap()
+        .replace(
+            "</sheets>",
+            r#"</sheets><pivotCaches><pivotCache cacheId="5" r:id="rIdPivotCache"/></pivotCaches>"#,
+        );
+    package
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .set_blob(workbook_xml.into_bytes());
+    package.add_part(Box::new(BlobPart::new(
+        pivot_cache_uri.clone(),
+        ct::SML_PIVOT_CACHE_DEFINITION.into(),
+        vec![b'x'; 4096],
+    )));
+    package
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            rt::PIVOT_CACHE_DEFINITION.into(),
+            pivot_cache_uri.relative_ref("/xl/").into(),
+            "rIdPivotCache".into(),
+            false,
+        );
+    let workbook_bytes = package.get_part(&workbook_uri).unwrap().blob().len();
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let limits = SourceLimits::builder()
+        .max_part_bytes((workbook_bytes + 1) as u64)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source
+        .edit_slicers_with_options(slicer::EditOptions::default().limits(limits))
+        .unwrap();
+
+    let error = edit
+        .add_cache(slicer_cache("NestedLimit", "State"))
+        .expect_err("nested pivot validation must honor the effective limit");
+    assert!(matches!(
+        error,
+        Error::Package(OpcError::Limit {
+            kind: SourceLimitKind::PartBytes,
+            observed,
+            maximum,
+        }) if observed > maximum
+    ));
+    assert!(edit.cache("NestedLimit").unwrap().is_none());
+    assert!(
+        edit.opc()
+            .get_part(&PackURI::new("/xl/slicerCaches/slicerCache1.xml").unwrap())
+            .is_err()
+    );
+}
+
 fn misdeclare_member(mut bytes: Vec<u8>, wanted: &str) -> Vec<u8> {
     let eocd = bytes
         .windows(4)

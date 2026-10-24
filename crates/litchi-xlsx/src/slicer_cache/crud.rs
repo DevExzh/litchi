@@ -890,7 +890,7 @@ fn validate_slicer_cache_pivot_links(
         .into_iter()
         .map(|sheet| (sheet.name, sheet.sheet_id))
         .collect();
-    let pivots = read_pivot_tables_limited(package, limits).map_err(|e| invalid(e.to_string()))?;
+    let pivots = read_pivot_tables_limited(package, limits)?;
     let bindings: HashSet<(u32, String)> = pivots
         .into_iter()
         .filter_map(|pivot| {
