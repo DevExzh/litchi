@@ -9,7 +9,7 @@ ROOT=${PROTO_ROOT:-$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)}
 W8_PREP=${W8_PREP:-}
 W8_BASELINE_ROOT=${W8_BASELINE_ROOT:-}
 W8_BASELINE_ARCHIVE=${W8_BASELINE_ARCHIVE:-}
-CANDIDATE_SOURCE=${CANDIDATE_SOURCE:-$ROOT}
+CANDIDATE_SOURCE=${CANDIDATE_SOURCE:-}
 CARGO=${CARGO:-cargo}
 CARGO_BIN=
 RUSTC_BIN=
@@ -17,6 +17,18 @@ TARGET=x86_64-unknown-linux-gnu
 PROFILE=release
 FINAL_COMMIT=472b6705475b073e7fe08f6e11ee17fb1e29f838
 BASELINE_COMMIT=f2bbbc8d07ab5da26c180f1ff74813d39f632d54
+CANDIDATE_LOCK_BYTES=139606
+CANDIDATE_LOCK_SHA256=4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1
+CANDIDATE_WORKSPACE_BYTES=10672
+CANDIDATE_WORKSPACE_SHA256=f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de
+CANDIDATE_PACKAGE_BYTES=13718
+CANDIDATE_PACKAGE_SHA256=004d3b3cba8c035d209665a76c9cfe3932f12a9c198a4aea9fa314ef8ebb3a39
+CANDIDATE_TOOLCHAIN_BYTES=86
+CANDIDATE_TOOLCHAIN_SHA256=e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310
+CANDIDATE_PROBE_BYTES=75035
+CANDIDATE_PROBE_SHA256=21c8e3833c96411a612a2631f98093bd70cf0a5c28b2952c3d15873f464e54b0
+CANDIDATE_SOURCE_BYTES=6634147840
+CANDIDATE_SOURCE_SHA256=44c11e933974c8fa3d6a67b46739bedeef866e60fbd4360ffe7f3bb8a4dc2274
 PROBE_REL=crates/litchi-ops/examples/file_w8_qualified_probe.rs
 BASE_ADAPTER_REL=crates/litchi-ops/examples/file_w8_original_baseline_probe.rs
 PROVENANCE="$ROOT/tools/w8_file_provenance.py"
@@ -47,6 +59,80 @@ require_inputs() {
   : "${W8_PREP:?set W8_PREP to an external scratch directory}"
   : "${W8_BASELINE_ROOT:?set W8_BASELINE_ROOT to the immutable f2 workspace}"
   : "${W8_BASELINE_ARCHIVE:?set W8_BASELINE_ARCHIVE to the immutable f2 source archive}"
+  : "${CANDIDATE_SOURCE:?set CANDIDATE_SOURCE to the absolute clean 472b checkout}"
+  case "$CANDIDATE_SOURCE" in
+    /*) ;;
+    *) echo "CANDIDATE_SOURCE must be an absolute path" >&2; return 2 ;;
+  esac
+  CANDIDATE_SOURCE=$(realpath -- "$CANDIDATE_SOURCE")
+  test "$BASE_TARGET" != "$FINAL_TARGET" || { echo "before/after target directories must differ" >&2; return 2; }
+  verify_candidate_source
+}
+
+verify_artifact_identity() {
+  local path=$1 expected_bytes=$2 expected_sha256=$3 actual_bytes actual_sha256
+  test -f "$path" && ! test -L "$path" || { echo "artifact is not a regular file: $path" >&2; return 2; }
+  actual_bytes=$(stat -c '%s' "$path")
+  test "$actual_bytes" = "$expected_bytes" || {
+    echo "artifact byte identity differs: $path ($actual_bytes != $expected_bytes)" >&2
+    return 2
+  }
+  actual_sha256=$(sha256sum "$path" | awk '{print $1}')
+  test "$actual_sha256" = "$expected_sha256" || {
+    echo "artifact hash identity differs: $path ($actual_sha256 != $expected_sha256)" >&2
+    return 2
+  }
+}
+
+verify_candidate_source() {
+  case "$CANDIDATE_SOURCE" in
+    /*) ;;
+    *) echo "CANDIDATE_SOURCE must be an absolute path" >&2; return 2 ;;
+  esac
+  test -d "$CANDIDATE_SOURCE" || { echo "candidate source is not a directory: $CANDIDATE_SOURCE" >&2; return 2; }
+  local git_root head status
+  git_root=$(git -C "$CANDIDATE_SOURCE" rev-parse --show-toplevel 2>/dev/null) || {
+    echo "candidate source is not a git checkout: $CANDIDATE_SOURCE" >&2
+    return 2
+  }
+  git_root=$(realpath -- "$git_root")
+  test "$git_root" = "$CANDIDATE_SOURCE" || {
+    echo "candidate source git root differs from requested checkout" >&2
+    return 2
+  }
+  head=$(git -C "$CANDIDATE_SOURCE" rev-parse --verify HEAD^{commit} 2>/dev/null) || {
+    echo "candidate source HEAD is unavailable" >&2
+    return 2
+  }
+  test "$head" = "$FINAL_COMMIT" || {
+    echo "candidate source HEAD is not the reviewed 472b commit: $head" >&2
+    return 2
+  }
+  status=$(git -C "$CANDIDATE_SOURCE" status --porcelain=v1 --untracked-files=all) || return 2
+  test -z "$status" || {
+    echo "candidate source checkout is dirty" >&2
+    return 2
+  }
+  verify_artifact_identity "$CANDIDATE_SOURCE/Cargo.lock" "$CANDIDATE_LOCK_BYTES" "$CANDIDATE_LOCK_SHA256"
+  verify_artifact_identity "$CANDIDATE_SOURCE/Cargo.toml" "$CANDIDATE_WORKSPACE_BYTES" "$CANDIDATE_WORKSPACE_SHA256"
+  verify_artifact_identity "$CANDIDATE_SOURCE/crates/litchi-ops/Cargo.toml" "$CANDIDATE_PACKAGE_BYTES" "$CANDIDATE_PACKAGE_SHA256"
+  verify_artifact_identity "$CANDIDATE_SOURCE/rust-toolchain.toml" "$CANDIDATE_TOOLCHAIN_BYTES" "$CANDIDATE_TOOLCHAIN_SHA256"
+  verify_artifact_identity "$CANDIDATE_SOURCE/$PROBE_REL" "$CANDIDATE_PROBE_BYTES" "$CANDIDATE_PROBE_SHA256"
+}
+
+verify_candidate_archive() {
+  verify_artifact_identity "$1" "$CANDIDATE_SOURCE_BYTES" "$CANDIDATE_SOURCE_SHA256"
+}
+
+ensure_empty_target() {
+  local target=$1
+  if test -e "$target"; then
+    test -d "$target" || { echo "target path is not a directory: $target" >&2; return 2; }
+    if find "$target" -mindepth 1 -print -quit | grep -q .; then
+      echo "target directory must be empty before a provenance-bound build: $target" >&2
+      return 2
+    fi
+  fi
 }
 
 resolve_tools() {
@@ -79,9 +165,13 @@ prepare() {
     --source-archive "$W8_BASELINE_ARCHIVE" \
     --output-dir "$BASE_OUT" --target "$TARGET" --profile "$PROFILE"
 
-  test ! -e "$FINAL_OUT/472b-source.tar"
+  test ! -e "$FINAL_OUT/472b-source.tar" && test ! -L "$FINAL_OUT/472b-source.tar" || {
+    echo "refusing to overwrite an existing candidate source archive" >&2
+    return 2
+  }
   git -C "$CANDIDATE_SOURCE" archive --format=tar \
     --output="$FINAL_OUT/472b-source.tar" "$FINAL_COMMIT"
+  verify_candidate_archive "$FINAL_OUT/472b-source.tar"
   python3 "$PROVENANCE" fixture \
     --probe "$CANDIDATE_SOURCE/$PROBE_REL" --output "$FINAL_FIXTURE"
   python3 "$PROVENANCE" dependency \
@@ -101,6 +191,9 @@ prepare() {
 
 build() {
   require_inputs
+  verify_candidate_archive "$FINAL_OUT/472b-source.tar"
+  ensure_empty_target "$BASE_TARGET"
+  ensure_empty_target "$FINAL_TARGET"
   build_commands
   (cd "$W8_BASELINE_ROOT" && \
     CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR="$BASE_TARGET" "$CARGO_BIN" \
@@ -136,6 +229,7 @@ build() {
 
 validate() {
   require_inputs
+  verify_candidate_archive "$FINAL_OUT/472b-source.tar"
   build_commands
   test -s "$W8_PREP/build-before.json" || { echo "missing complete before build receipt; run build first" >&2; return 2; }
   test -s "$W8_PREP/build-after.json" || { echo "missing complete after build receipt; run build first" >&2; return 2; }
@@ -181,6 +275,7 @@ validate() {
 
 pair() {
   require_inputs
+  verify_candidate_archive "$FINAL_OUT/472b-source.tar"
   python3 "$ROOT/tools/w8_projection_policy.py" pair \
     --policy "$POLICY" --before-manifest "$BASE_MANIFEST" \
     --after-manifest "$FINAL_MANIFEST" --output "$PAIR_RECEIPT"
@@ -188,6 +283,7 @@ pair() {
 
 abba() {
   require_inputs
+  verify_candidate_archive "$FINAL_OUT/472b-source.tar"
   CPU=${CPU:-$(python3 -c 'import os; print(min(os.sched_getaffinity(0)))')}
   ROUNDS=${ROUNDS:-5}
   bash "$RUNNER" "$BASE_BIN" "$FINAL_BIN" "$ABBA_OUT" "$ROUNDS" "$CPU" \
@@ -202,7 +298,9 @@ allocator() {
   return 2
 }
 
-case "${1:-}" in
-  prepare|build|validate|pair|abba|allocator) "$1" ;;
-  *) echo "usage: $0 {prepare|build|validate|pair|abba|allocator}" >&2; exit 2 ;;
-esac
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  case "${1:-}" in
+    prepare|build|validate|pair|abba|allocator) "$1" ;;
+    *) echo "usage: $0 {prepare|build|validate|pair|abba|allocator}" >&2; exit 2 ;;
+  esac
+fi

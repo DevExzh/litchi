@@ -74,6 +74,11 @@ both complete build receipts through `w8_file_provenance.py build-receipt`
 before validation.  A no-Cargo contract test exercises receipt creation and
 the command flags; the prior c796 script is retained non-executable and marked
 historical/superseded.
+Every stage requires an explicit absolute, clean checkout at the full 472b
+commit, verifies the candidate manifests/probe and the 139,606-byte lock
+(`4100b1…`), rehashes the 6.63-GiB source archive, and refuses nonempty target
+directories so a binary from another checkout cannot be paired with this
+source identity.
 
 This is a protocol/provenance record only.  It performs no Cargo build, native
 qualification, timing run, or inventory acceptance.  The `472b` source remains
@@ -86,9 +91,10 @@ record after the runner had admitted the original-to-final mode. Follow-up
 fixed endpoint artifacts, complete route order and recomputed projection
 proof; ordinary analysis remains unchanged. `e814e4512f` registers the full
 109-route, five-round regression in the existing projection-policy test
-module. All three registered W8 modules now run 40 tests, including rejection
-of source, projection and lock tampering. The reviewed packet merges at
-`54398757b8`; these are synthetic analyzer tests, not native measurements.
+module. The c796 packet ran 41 focused tests; this 472b follow-up runs 45
+focused tests, including rejection of source, projection, lock, checkout and
+receipt-command tampering. The reviewed packet merges at `54398757b8`; these
+are synthetic analyzer tests, not native measurements.
 
 The prior c796 protocol packet is preserved by commit `83da60ed68`; its
 external source archive is historical and must not be relabeled.  Any receipt

@@ -35,6 +35,11 @@ class QualificationRecipe(unittest.TestCase):
         self.assertIn('--compiler-artifact "rustc=$RUSTC_BIN"', source)
         self.assertIn('BASE_BUILD_COMMAND="CARGO_BUILD_JOBS=1', source)
         self.assertIn('--target $TARGET --release', source)
+        self.assertIn('CANDIDATE_SOURCE=${CANDIDATE_SOURCE:-}', source)
+        self.assertIn('candidate source HEAD is not the reviewed 472b commit', source)
+        self.assertIn('CANDIDATE_LOCK_SHA256=4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1', source)
+        self.assertIn('verify_candidate_archive "$FINAL_OUT/472b-source.tar"', source)
+        self.assertIn('ensure_empty_target "$FINAL_TARGET"', source)
         self.assertNotIn('"$CARGO" \\\n      build', source)
 
     def test_c796_recipe_is_not_presented_as_current_executable(self):
@@ -42,151 +47,70 @@ class QualificationRecipe(unittest.TestCase):
         self.assertIn("HISTORICAL/SUPERSEDED", source)
         self.assertFalse(os.access(HISTORICAL_RECIPE, os.X_OK))
 
-    def test_build_stage_mock_creates_both_receipts_without_cargo(self):
+    def test_candidate_source_fence_rejects_wrong_head_dirty_and_wrong_lock(self):
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            before = root / "before"
-            after = root / "after"
-            prep = root / "prep"
-            for workspace in (before, after):
-                package_dir = workspace / "crates/litchi-ops"
-                package_dir.mkdir(parents=True)
-                (workspace / "Cargo.toml").write_text(
-                    "[workspace]\n[workspace.package]\nversion = \"0.0.1\"\n",
-                    encoding="utf-8",
-                )
-                (workspace / "rust-toolchain.toml").write_text(
-                    "[toolchain]\nchannel = \"1.95.0\"\n",
-                    encoding="utf-8",
-                )
-                (package_dir / "Cargo.toml").write_text(
-                    "[package]\nname = \"litchi-ops\"\nversion.workspace = true\n"
-                    "[features]\ndocx = []\nxlsx = []\n",
-                    encoding="utf-8",
-                )
-                (workspace / "Cargo.lock").write_text(
-                    "version = 4\n\n[[package]]\nname = \"litchi-ops\"\nversion = \"0.0.1\"\n",
-                    encoding="utf-8",
-                )
-                probe = workspace / provenance.PROBE_RELATIVE
-                probe.parent.mkdir(parents=True, exist_ok=True)
-                probe.write_bytes(PROBE.read_bytes())
-
-            before_fixture = prep / "baseline/provenance/litchi_w8_fixture_descriptor.json"
-            after_fixture = prep / "candidate/fixture.json"
-            before_projection = prep / "baseline/provenance/litchi_w8_dependency_projection.json"
-            after_projection = prep / "candidate/projection.json"
-            before_fixture.parent.mkdir(parents=True)
-            after_fixture.parent.mkdir(parents=True)
-            before_fixture.write_bytes(provenance.canonical(provenance.fixture_descriptor(before / provenance.PROBE_RELATIVE)))
-            after_fixture.write_bytes(provenance.canonical(provenance.fixture_descriptor(after / provenance.PROBE_RELATIVE)))
-            for workspace, fixture, projection_path in (
-                (before, before_fixture, before_projection),
-                (after, after_fixture, after_projection),
-            ):
-                projection_args = argparse.Namespace(
-                    workspace=workspace,
-                    package_manifest=workspace / provenance.PACKAGE_MANIFEST_RELATIVE,
-                    lock=workspace / "Cargo.lock",
-                    toolchain=workspace / "rust-toolchain.toml",
-                    probe=workspace / provenance.PROBE_RELATIVE,
-                    fixture=fixture,
-                    features=[],
-                    all_features=True,
-                    target="x86_64-unknown-linux-gnu",
-                    profile="release",
-                )
-                projection_path.parent.mkdir(parents=True, exist_ok=True)
-                projection_path.write_bytes(provenance.canonical(provenance.dependency_projection(projection_args)))
-
-            baseline_source = prep / "baseline.tar"
-            final_source = prep / "candidate/472b-source.tar"
-            baseline_source.write_bytes(b"mock f2 source archive")
-            final_source.write_bytes(b"mock 472b source archive")
-            adapter_patch = prep / "baseline.patch"
-            adapter_patch.write_bytes(b"mock consumer adapter patch")
-            before_assembly = prep / "baseline/provenance/original-baseline-source-assembly.json"
-            after_assembly = prep / "candidate/source-assembly.json"
-            before_assembly.write_bytes(
-                provenance.canonical(
-                    provenance.source_assembly(
-                        argparse.Namespace(
-                            source=baseline_source,
-                            source_commit="f2bbbc8d07ab5da26c180f1ff74813d39f632d54",
-                            overlay_kind="compatibility",
-                            overlay_base_commit="f2bbbc8d07ab5da26c180f1ff74813d39f632d54",
-                            overlay_patch=adapter_patch,
-                            description="mock consumer-only adapter",
-                        )
-                    )
-                )
+            candidate = Path(tmp) / "candidate"
+            subprocess.run(["git", "clone", "--shared", "--no-checkout", str(ROOT), str(candidate)], check=True, capture_output=True)
+            subprocess.run(["git", "-C", str(candidate), "sparse-checkout", "init", "--no-cone"], check=True, capture_output=True)
+            subprocess.run(
+                [
+                    "git", "-C", str(candidate), "sparse-checkout", "set",
+                    "Cargo.lock", "Cargo.toml", "rust-toolchain.toml",
+                    "crates/litchi-ops/Cargo.toml", provenance.PROBE_RELATIVE.as_posix(),
+                ],
+                check=True,
+                capture_output=True,
             )
-            after_assembly.write_bytes(
-                provenance.canonical(
-                    provenance.source_assembly(
-                        argparse.Namespace(
-                            source=final_source,
-                            source_commit="472b6705475b073e7fe08f6e11ee17fb1e29f838",
-                            overlay_kind="none",
-                            overlay_base_commit=None,
-                            overlay_patch=None,
-                            description="mock 472b production source",
-                        )
-                    )
-                )
+            subprocess.run(
+                ["git", "-C", str(candidate), "checkout", "--detach", "472b6705475b073e7fe08f6e11ee17fb1e29f838"],
+                check=True,
+                capture_output=True,
+            )
+            (candidate / "Cargo.lock").write_bytes(
+                (ROOT / "docs/unified-ops/results/0362yh/images/after/Cargo.lock").read_bytes()
             )
 
-            fake_bin = root / "bin"
-            fake_bin.mkdir()
-            fake_cargo = fake_bin / "cargo-shim"
-            fake_rustc = fake_bin / "rustc"
-            fake_cargo.write_text(
-                "#!/bin/sh\n"
-                "set -eu\n"
-                "example=\n"
-                "previous=\n"
-                "for arg in \"$@\"; do\n"
-                "  if [ \"$previous\" = --example ]; then example=$arg; fi\n"
-                "  previous=$arg\n"
-                "done\n"
-                "mkdir -p \"$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/examples\"\n"
-                "printf '#!/bin/sh\\nexit 0\\n' > \"$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/examples/$example\"\n"
-                "chmod +x \"$CARGO_TARGET_DIR/x86_64-unknown-linux-gnu/release/examples/$example\"\n",
-                encoding="utf-8",
-            )
-            fake_rustc.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-            os.chmod(fake_cargo, 0o755)
-            os.chmod(fake_rustc, 0o755)
+            def check(expected: bool) -> subprocess.CompletedProcess[str]:
+                env = os.environ.copy()
+                env["CANDIDATE_SOURCE"] = str(candidate)
+                completed = subprocess.run(
+                    ["bash", "-c", 'source "$1"; verify_candidate_source', "source-check", str(QUALIFICATION_RECIPE)],
+                    env=env,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                if expected:
+                    self.assertEqual(completed.returncode, 0, completed.stderr)
+                else:
+                    self.assertNotEqual(completed.returncode, 0)
+                return completed
+
             env = os.environ.copy()
-            env.update(
-                {
-                    "W8_PREP": str(prep),
-                    "W8_BASELINE_ROOT": str(before),
-                    "W8_BASELINE_ARCHIVE": str(baseline_source),
-                    "CANDIDATE_SOURCE": str(after),
-                    "CARGO": str(fake_cargo),
-                    "PATH": f"{fake_bin}:{env['PATH']}",
-                }
-            )
-            completed = subprocess.run(
-                [str(QUALIFICATION_RECIPE), "build"],
-                cwd=ROOT,
+            env["CANDIDATE_SOURCE"] = "relative-candidate"
+            relative = subprocess.run(
+                ["bash", "-c", 'source "$1"; verify_candidate_source', "source-check", str(QUALIFICATION_RECIPE)],
                 env=env,
                 text=True,
                 capture_output=True,
-                check=True,
             )
-            self.assertEqual(completed.returncode, 0)
-            for name, commit in (
-                ("build-before.json", "f2bbbc8d07ab5da26c180f1ff74813d39f632d54"),
-                ("build-after.json", "472b6705475b073e7fe08f6e11ee17fb1e29f838"),
-            ):
-                receipt = json.loads((prep / name).read_text(encoding="utf-8"))
-                self.assertEqual(receipt["source_commit"], commit)
-                self.assertEqual(receipt["target"], "x86_64-unknown-linux-gnu")
-                self.assertEqual(receipt["profile"], "release")
-                self.assertIn("--offline --locked --target x86_64-unknown-linux-gnu --release", receipt["build_command"])
-                self.assertEqual(receipt["cargo"]["path"], str(fake_cargo.resolve()))
+            self.assertNotEqual(relative.returncode, 0)
+            check(True)
+            subprocess.run(["git", "-C", str(candidate), "checkout", "--detach", "c796d0acc24c7c6e6fd08980b9e31af6bb86b18b"], check=True, capture_output=True)
+            check(False)
+            subprocess.run(["git", "-C", str(candidate), "checkout", "--detach", "472b6705475b073e7fe08f6e11ee17fb1e29f838"], check=True, capture_output=True)
+            workspace_manifest = candidate / "Cargo.toml"
+            original_workspace = workspace_manifest.read_bytes()
+            workspace_manifest.write_bytes(original_workspace + b"\n")
+            check(False)
+            workspace_manifest.write_bytes(original_workspace)
+            check(True)
+            lock = candidate / "Cargo.lock"
+            original_lock = lock.read_bytes()
+            lock.write_bytes(original_lock + b"\n")
+            check(False)
+            lock.write_bytes(original_lock)
+            check(True)
 
 
 class FixtureDescriptor(unittest.TestCase):
