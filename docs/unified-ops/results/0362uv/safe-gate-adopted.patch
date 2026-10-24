@@ -1,0 +1,28 @@
+--- a/run_safe_gate.py
++++ b/run_safe_gate.py
+@@ -252,2 +251,0 @@
+-    root = Path(ownership["root"])
+-    target = Path(ownership["target"])
+@@ -260 +257,0 @@
+-            and _path_related(row, root, target)
+@@ -396,2 +393,12 @@
+-def direct(name: str, argv: list[str], *, isolated: bool = False, env: dict[str, str] | None = None) -> dict:
+-    return {"name": name, "kind": "argv", "argv": argv, "isolated": isolated, "env": env or {}}
++def direct(
++    name: str,
++    argv: list[str],
++    *,
++    isolated: bool = False,
++    env: dict[str, str] | None = None,
++    pass_fds: tuple[int, ...] = (),
++) -> dict:
++    step = {"name": name, "kind": "argv", "argv": argv, "isolated": isolated, "env": env or {}}
++    if pass_fds:
++        step["pass_fds"] = list(pass_fds)
++    return step
+@@ -492 +499 @@
+-        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
++        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True, pass_fds=tuple(step.get("pass_fds", ())))
+@@ -495 +502 @@
+-        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
++        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True, pass_fds=tuple(step.get("pass_fds", ())))

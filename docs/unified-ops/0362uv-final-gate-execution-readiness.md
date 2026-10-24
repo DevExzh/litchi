@@ -6,38 +6,56 @@ must capture all 68 direct libraries with all features and hidden items;
 the glossary's 55 profiles cover 41 packages and cannot replace it.
 
 The runner now clears inherited `LITCHI_CAPPED` before invoking its Cargo
-wrapper. A resource or provenance exception preserves existing child output
-and writes a separate `.blocked.log`, with both hashes in the failure row.
-It no longer overwrites useful command output when post-command checks fail.
+wrapper. Every child runs in a fresh process group. On Linux the runner also
+becomes a child subreaper and captures PID/start-time identities while the
+top-level child is alive, so a fast fork that calls `setsid` remains owned
+after reparenting. After top-level exit, the runner rejects owned builders,
+waits for owned descendants to disappear, and samples the selected target
+until it is stable, including after the final step. A resource or provenance
+exception preserves existing child output and writes a separate
+attempt-specific `.blocked.log`, with both hashes in the failure row. Retries
+receive unique current logs and target traces, so an earlier attempt cannot be
+credited.
 This is execution readiness, not a completed gate or performance receipt.
 
 ## Runner identity and reproduction
 
 The external runner is
 `/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py`.
-The preserved predecessor is `run_safe_gate-before-0362uv.py` beside it.
+The preserved predecessor for the current successor is
+`run_safe_gate-before-0362uv-adopted.py` beside it. Earlier post-exit
+successors and their predecessors remain beside them for provenance.
 
 | Artifact | Bytes | SHA-256 |
 | --- | ---: | --- |
-| Predecessor | 22,130 | `592ff5f7ad8493641ba6df7308bd66a97bddced35fc616c5803aacc5d30dcd2c` |
-| Repaired runner | 22,721 | `d513002381419a3c09fe0457c644db1231eb8f8bb3094896525c8e8545f90c84` |
-| `results/0362uv/safe-gate.patch` | 1,629 | `45a8b8fb8c8fdcc334d357e72b832330acfebe2ed6fe410b9b2905e65de93822` |
+| Current predecessor | 32,676 | `c905af1f10b313a8e834a5576709640adf0a32370f698b5aa9cac39ececfc3c2` |
+| Current repaired runner | 32,771 | `8fedc488825e893f4101f855e9305775e8e9641aa405c790e76b75920ffce9c1` |
+| `results/0362uv/safe-gate-adopted.patch` | 1,503 | `d238e9df0e0914525c4775e32bee9d771131a73734991684dc1db4f6165034d0` |
+| Prior detached-tracking patch | 9,571 | `895e7331634dccf2b0d69fe2e923e2c7ebf4caf3bc85ab8b1f3c30013c3e4682` |
+| Earlier predecessor | 22,721 | `d513002381419a3c09fe0457c644db1231eb8f8bb3094896525c8e8545f90c84` |
+| `results/0362uv/safe-gate-postexit.patch` | 7,482 | `657a87d0f3952ae473c261bb7d21e83e4fa87a79c916b430c98ddc48341b4dc5` |
 
-To reconstruct the repaired source, copy the preserved predecessor to a fresh
-external directory as `run_safe_gate.py`, then apply the tracked patch there
-with `patch -p1 --input <absolute-path-to-safe-gate.patch>`. The runner keeps
+To reconstruct the current source, copy the current predecessor to a fresh
+external directory as `run_safe_gate.py`, then apply
+`results/0362uv/safe-gate-adopted.patch` there with
+`patch -p1 --input <absolute-path-to-safe-gate-adopted.patch>`. The runner keeps
 using its preserved sibling `safe_chunked_tests.py` and `bin/cargo`; a real
 gate launch records all three source hashes in its plan.
 
 The build-free regression command passes:
 
 ```text
-python3 docs/unified-ops/results/0362uv/verify_safe_gate.py --runner /home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py --root /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration --scratch /home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/verification-tmp
+python3 docs/unified-ops/results/0362uv/verify_safe_gate.py --runner /home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/run_safe_gate.py --root /home/zhuhe/code/litchi-worktrees/uo2-coordinator-metadata-integration --scratch /home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe/verification-tmp-adopted-final
 ```
 
 It verifies the 53-step plan, inventory test registration, cap-marker
-isolation, and preservation of exact child output after an injected
-post-command resource failure, including both recorded log identities.
+isolation, a real forked-and-`setsid` target mutation through an inherited
+target file descriptor after `chdir("/")` with no target path in argv, the
+pathless adopted-child branch, pre-existing direct-child lineage exclusion,
+the owned-builder rejection branch, exact child output after an injected
+post-command resource failure, and two blocked retries with distinct current
+log identities. The predecessor fails this detached-helper assertion; the
+current runner passes it.
 
 ## Remaining phases
 
@@ -69,10 +87,8 @@ documentation-only `947b98f94f` commit; all tested tool sources are unchanged
 from `a2f0984719`. The iWork suite ran on the clean successor. Independent
 review confirms the runner patch and its regression proof.
 
-The coordinator must additionally verify that no gate-owned build children
-remain and remeasure target size after the gate exits, before accepting the
-final receipt or starting a measurement. The runner's per-step size sample
-alone does not prove that a detached child has exited. A blocked retry may
-retain prior child output beside its new failure log; that row is not a new
-command pass. Use a fresh state directory when a distinct attempt receipt is
-needed rather than attributing previous output to a new execution.
+The final gate and native/corpus receipts remain separate acceptance phases;
+this record does not claim that any of them has passed. The repaired runner's
+post-exit guard is part of every step, including the final one, and its
+attempt-specific receipt paths are the identity used when resuming or
+retrying.
