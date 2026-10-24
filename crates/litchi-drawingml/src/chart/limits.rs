@@ -10,8 +10,10 @@
 use crate::chart::authoring::Spec;
 use crate::chart::data::{NumericData, StringData, TitleText};
 use crate::chart::model::Chart;
+use crate::chart::series::{DataLabel, DataLabels};
 use crate::chart::style::{ColorDocument, Document};
 use crate::{Error, LimitKind, Result};
+use quick_xml::XmlVersion;
 use quick_xml::encoding::Decoder;
 
 /// Count the bytes quick-xml will retain for one normalized attribute value.
@@ -77,6 +79,90 @@ pub(crate) fn decoded_attribute_value_bytes(
         length = length
             .checked_add(amount)
             .ok_or_else(|| "decoded XML attribute value length overflow".to_owned())?;
+    }
+    Ok(length)
+}
+
+/// Count the UTF-8 bytes retained by quick-xml for one text event.
+///
+/// Text admission must use the decoded value rather than the lexical source
+/// length.  In particular, line-ending normalization can shrink a source
+/// event, while an XML entity is delivered as a separate `GeneralRef` event.
+/// Decoding and normalization are therefore measured before the owner asks
+/// quick-xml for an owned `Cow`; this keeps a rejected event from first
+/// materializing a large normalized string.
+pub(crate) fn decoded_text_value_bytes(
+    raw: &[u8],
+    decoder: Decoder,
+    version: XmlVersion,
+) -> std::result::Result<usize, String> {
+    let decoded = decoder.decode(raw).map_err(|error| error.to_string())?;
+    normalized_text_bytes(decoded.as_ref(), version)
+}
+
+/// Count the bytes retained by a decoder for a CDATA event. CDATA has no XML
+/// entity expansion and the style codec intentionally does not normalize its
+/// line endings, so this is kept separate from ordinary text admission.
+pub(crate) fn decoded_cdata_value_bytes(
+    raw: &[u8],
+    decoder: Decoder,
+) -> std::result::Result<usize, String> {
+    decoder
+        .decode(raw)
+        .map(|decoded| decoded.len())
+        .map_err(|error| error.to_string())
+}
+
+/// Count the bytes produced by `String::from_utf8_lossy` without first
+/// allocating its replacement string.
+pub(crate) fn lossy_utf8_value_bytes(raw: &[u8]) -> usize {
+    let mut remaining = raw;
+    let mut length = 0usize;
+    while !remaining.is_empty() {
+        match std::str::from_utf8(remaining) {
+            Ok(value) => {
+                length = length.saturating_add(value.len());
+                break;
+            },
+            Err(error) => {
+                length = length.saturating_add(error.valid_up_to());
+                // `from_utf8_lossy` emits one U+FFFD for each malformed
+                // sequence, including a truncated sequence at EOF.
+                length = length.saturating_add(char::REPLACEMENT_CHARACTER.len_utf8());
+                let invalid = error
+                    .error_len()
+                    .unwrap_or_else(|| remaining.len().saturating_sub(error.valid_up_to()));
+                let skip = error.valid_up_to().saturating_add(invalid);
+                remaining = remaining.get(skip..).unwrap_or_default();
+            },
+        }
+    }
+    length
+}
+
+fn normalized_text_bytes(value: &str, version: XmlVersion) -> std::result::Result<usize, String> {
+    let mut length = 0usize;
+    let mut chars = value.chars().peekable();
+    while let Some(character) = chars.next() {
+        let amount = if character == '\r' {
+            if chars.peek() == Some(&'\n') {
+                chars.next();
+            } else if matches!(version, XmlVersion::Explicit1_1)
+                && chars.peek() == Some(&'\u{0085}')
+            {
+                chars.next();
+            }
+            1
+        } else if matches!(version, XmlVersion::Explicit1_1)
+            && matches!(character, '\u{0085}' | '\u{2028}')
+        {
+            1
+        } else {
+            character.len_utf8()
+        };
+        length = length
+            .checked_add(amount)
+            .ok_or_else(|| "decoded XML text value length overflow".to_owned())?;
     }
     Ok(length)
 }
@@ -328,6 +414,20 @@ impl Limits {
     pub(crate) fn validate_chart(self, chart: &Chart) -> Result<()> {
         let _ = self.validate()?;
         check_title_text(self, chart.title.as_ref())?;
+        if let Some(formats) = chart.pivot_formats.as_ref() {
+            check_count(LimitKind::ChartPoints, formats.len(), self.max_points)?;
+            let mut indexes = std::collections::HashSet::new();
+            for format in formats {
+                if !indexes.insert(format.index) {
+                    return Err(Error::Invalid(
+                        "chart contains duplicate pivot-format index".into(),
+                    ));
+                }
+                if let Some(label) = format.data_label.as_ref() {
+                    check_data_label(self, label)?;
+                }
+            }
+        }
         if let Some(language) = &chart.language {
             check_count(
                 LimitKind::ChartTextBytes,
@@ -392,6 +492,9 @@ impl Limits {
         let mut series = 0usize;
         let mut total_points = 0usize;
         for group in &chart.plot_area.type_groups {
+            if let Some(labels) = &group.common().data_labels {
+                check_data_labels(self, labels)?;
+            }
             series = series
                 .checked_add(group.common().series.len())
                 .ok_or_else(|| Error::limit(LimitKind::ChartSeries, usize::MAX, self.max_series))?;
@@ -463,20 +566,7 @@ impl Limits {
                     }
                 }
                 if let Some(labels) = &value.data_labels {
-                    if let Some(separator) = &labels.separator {
-                        check_count(
-                            LimitKind::ChartTextBytes,
-                            separator.len(),
-                            self.max_text_bytes,
-                        )?;
-                    }
-                    if let Some(number_format) = &labels.number_format {
-                        check_count(
-                            LimitKind::ChartTextBytes,
-                            number_format.format_code.len(),
-                            self.max_text_bytes,
-                        )?;
-                    }
+                    check_data_labels(self, labels)?;
                 }
                 for trendline in &value.trendlines {
                     if let Some(name) = &trendline.name {
@@ -701,6 +791,57 @@ fn check_title_text(limits: Limits, title: Option<&TitleText>) -> Result<()> {
         TitleText::Reference(reference) => &reference.formula,
     };
     check_count(LimitKind::ChartTextBytes, text.len(), limits.max_text_bytes)
+}
+
+fn check_data_label(limits: Limits, label: &DataLabel) -> Result<()> {
+    check_title_text(limits, label.text.as_ref())?;
+    if let Some(number_format) = &label.number_format {
+        check_count(
+            LimitKind::ChartTextBytes,
+            number_format.format_code.len(),
+            limits.max_text_bytes,
+        )?;
+    }
+    if let Some(separator) = &label.separator {
+        check_count(
+            LimitKind::ChartTextBytes,
+            separator.len(),
+            limits.max_text_bytes,
+        )?;
+    }
+    Ok(())
+}
+
+fn check_data_labels(limits: Limits, labels: &DataLabels) -> Result<()> {
+    check_count(
+        LimitKind::ChartPoints,
+        labels.labels.len(),
+        limits.max_points,
+    )?;
+    let mut indexes = std::collections::HashSet::new();
+    for label in &labels.labels {
+        if !indexes.insert(label.index) {
+            return Err(Error::Invalid(
+                "chart data labels contain duplicate point index".into(),
+            ));
+        }
+        check_data_label(limits, label)?;
+    }
+    if let Some(number_format) = &labels.number_format {
+        check_count(
+            LimitKind::ChartTextBytes,
+            number_format.format_code.len(),
+            limits.max_text_bytes,
+        )?;
+    }
+    if let Some(separator) = &labels.separator {
+        check_count(
+            LimitKind::ChartTextBytes,
+            separator.len(),
+            limits.max_text_bytes,
+        )?;
+    }
+    Ok(())
 }
 
 fn check_string_data(limits: Limits, data: &StringData) -> Result<()> {

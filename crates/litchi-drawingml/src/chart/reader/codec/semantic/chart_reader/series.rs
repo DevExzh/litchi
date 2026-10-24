@@ -8,6 +8,7 @@ use super::{
     parse_marker_style, parse_number_format, parse_picture_options, required_enum_attr,
     required_f64_attr, required_nonnegative_f64_attr, required_u32_attr, set_chart_lines,
 };
+use std::collections::HashSet;
 
 pub(crate) fn parse_series<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<Option<Series>> {
     reader.begin_series()?;
@@ -442,6 +443,7 @@ pub(crate) fn parse_data_point<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Re
 
 pub(crate) fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<DataLabels> {
     let mut labels = DataLabels::new();
+    let mut indexes = HashSet::new();
     let mut saw_number_format = false;
     let mut saw_delete = false;
     let mut saw_shared_settings = false;
@@ -449,12 +451,22 @@ pub(crate) fn parse_data_labels<R: BufRead>(reader: &mut ChartXmlReader<R>) -> R
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"dLbl" => {
+                let count = labels.labels.len().checked_add(1).ok_or_else(|| {
+                    Error::limit(
+                        crate::LimitKind::ChartPoints,
+                        usize::MAX,
+                        reader.max_points(),
+                    )
+                })?;
+                if count > reader.max_points() {
+                    return Err(Error::limit(
+                        crate::LimitKind::ChartPoints,
+                        count,
+                        reader.max_points(),
+                    ));
+                }
                 let label = parse_data_label(reader)?;
-                if labels
-                    .labels
-                    .iter()
-                    .any(|existing| existing.index == label.index)
-                {
+                if !indexes.insert(label.index) {
                     return Err(Error::Invalid(format!(
                         "chart data labels contain duplicate point index {}",
                         label.index

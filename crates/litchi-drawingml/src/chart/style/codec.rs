@@ -6,7 +6,9 @@ use super::model::{
     Transform, TransformKind, Variation,
 };
 use crate::chart::Limits;
-use crate::chart::limits::decoded_attribute_value_bytes;
+use crate::chart::limits::{
+    decoded_attribute_value_bytes, decoded_cdata_value_bytes, decoded_text_value_bytes,
+};
 use crate::{Error, LimitKind, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
@@ -659,7 +661,13 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                 append_node(node, &mut stack, &mut root)?;
             },
             Event::Text(value) => {
-                preflight_strings(strings, value.len(), limits.max_style_string_bytes)?;
+                let decoded_length = decoded_text_value_bytes(
+                    value.as_ref(),
+                    reader.decoder(),
+                    XmlVersion::Implicit1_0,
+                )
+                .map_err(Error::Xml)?;
+                preflight_strings(strings, decoded_length, limits.max_style_string_bytes)?;
                 let value = value
                     .xml_content(XmlVersion::Implicit1_0)
                     .map_err(xml_error)?
@@ -672,7 +680,9 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                 }
             },
             Event::CData(value) => {
-                preflight_strings(strings, value.len(), limits.max_style_string_bytes)?;
+                let decoded_length = decoded_cdata_value_bytes(value.as_ref(), reader.decoder())
+                    .map_err(Error::Xml)?;
+                preflight_strings(strings, decoded_length, limits.max_style_string_bytes)?;
                 let value = reader
                     .decoder()
                     .decode(value.as_ref())

@@ -44,7 +44,9 @@ use crate::chart::authoring::{
     Appearance, Binding, Bins, Kind, Labels, ParentLabels, Parsed, QuartileMethod, Series, Spec,
     Variant, column_name,
 };
-use crate::chart::limits::decoded_attribute_value_bytes;
+use crate::chart::limits::{
+    decoded_attribute_value_bytes, decoded_text_value_bytes, lossy_utf8_value_bytes,
+};
 use crate::chart::types::{DataLabelPosition, LegendPosition};
 use crate::{Error, Result};
 
@@ -489,6 +491,15 @@ pub(crate) fn write_with_limits(
     limits: &Limits,
 ) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
+    if let Some(id) = external_data {
+        if id.len() > limits.max_attribute_value_bytes {
+            return Err(Error::limit(
+                crate::LimitKind::AttributeValueBytes,
+                id.len(),
+                limits.max_attribute_value_bytes,
+            ));
+        }
+    }
     spec.validate()?;
     limits.validate_spec_for_chart(spec)?;
     let kind = spec.variant().kind;
@@ -988,31 +999,21 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                 }
             },
             Event::Text(text) => {
-                if let Some(node) = stack.last_mut() {
-                    let raw_length = node.text.len().checked_add(text.len()).ok_or_else(|| {
-                        Error::limit(
-                            crate::LimitKind::ChartTextBytes,
-                            usize::MAX,
-                            limits.max_text_bytes,
-                        )
-                    })?;
-                    if raw_length > limits.max_text_bytes {
-                        return Err(Error::limit(
-                            crate::LimitKind::ChartTextBytes,
-                            raw_length,
-                            limits.max_text_bytes,
-                        ));
-                    }
-                    let text = text
-                        .xml_content(XmlVersion::Implicit1_0)
-                        .map_err(|error| Error::Xml(error.to_string()))?;
-                    append_text(node, &text, limits)?;
-                } else if !text
+                let added = decoded_text_value_bytes(
+                    text.as_ref(),
+                    reader.decoder(),
+                    XmlVersion::Implicit1_0,
+                )
+                .map_err(Error::Xml)?;
+                if let Some(node) = stack.last() {
+                    admit_text_bytes(node.text.len(), added, limits.max_text_bytes)?;
+                }
+                let text = text
                     .xml_content(XmlVersion::Implicit1_0)
-                    .map_err(|error| Error::Xml(error.to_string()))?
-                    .trim()
-                    .is_empty()
-                {
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                if let Some(node) = stack.last_mut() {
+                    append_text(node, &text, limits)?;
+                } else if !text.trim().is_empty() {
                     return Err(Error::Invalid(
                         "chartex XML contains text outside its root".into(),
                     ));
@@ -1046,20 +1047,8 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                         "chartex XML contains data outside its root".into(),
                     ));
                 };
-                let raw_length = node.text.len().checked_add(data.len()).ok_or_else(|| {
-                    Error::limit(
-                        crate::LimitKind::ChartTextBytes,
-                        usize::MAX,
-                        limits.max_text_bytes,
-                    )
-                })?;
-                if raw_length > limits.max_text_bytes {
-                    return Err(Error::limit(
-                        crate::LimitKind::ChartTextBytes,
-                        raw_length,
-                        limits.max_text_bytes,
-                    ));
-                }
+                let added = lossy_utf8_value_bytes(data.as_ref());
+                admit_text_bytes(node.text.len(), added, limits.max_text_bytes)?;
                 let text = String::from_utf8_lossy(&data);
                 append_text(node, &text, limits)?;
             },
@@ -1093,6 +1082,20 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
         return Err(Error::Invalid("the part is not a cx:chartSpace".into()));
     }
     Ok(root)
+}
+
+fn admit_text_bytes(current: usize, added: usize, maximum: usize) -> Result<()> {
+    let observed = current
+        .checked_add(added)
+        .ok_or_else(|| Error::limit(crate::LimitKind::ChartTextBytes, usize::MAX, maximum))?;
+    if observed > maximum {
+        return Err(Error::limit(
+            crate::LimitKind::ChartTextBytes,
+            observed,
+            maximum,
+        ));
+    }
+    Ok(())
 }
 
 /// The `RRGGBB` or `AARRGGBB` of a `cx:spPr` solid fill.

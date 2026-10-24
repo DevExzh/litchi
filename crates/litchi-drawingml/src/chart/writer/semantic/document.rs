@@ -285,7 +285,7 @@ fn write_chart_protection<W: Write>(
 }
 
 fn write_pivot_formats<W: Write>(writer: &mut W, formats: &[PivotFormat]) -> std::io::Result<()> {
-    let mut indexes = std::collections::HashSet::with_capacity(formats.len());
+    let mut indexes = std::collections::HashSet::new();
     write!(writer, "<c:pivotFmts>")?;
     for format in formats {
         if !indexes.insert(format.index) {
