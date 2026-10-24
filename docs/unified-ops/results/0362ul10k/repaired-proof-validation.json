@@ -1,0 +1,93 @@
+{
+  "source_parent": "01fbcf9a280875ca02ee6143ddcd22d974f4c259",
+  "source_files": {
+    "tools/native_qualification/ole_owner_paired_runner.py": {
+      "bytes": 80700,
+      "sha256": "5435a342cdcff67526b9cd27bac12be9c9a650ceaa17351dc38990c63844c3e3"
+    },
+    "tools/native_qualification/validate_ole_owner_run.py": {
+      "bytes": 83227,
+      "sha256": "3e31f32831c650d46f370db41a175d0f6ef270467192eb670a060b2b03bef0f1"
+    },
+    "tools/test_validate_ole_owner_run.py": {
+      "bytes": 42850,
+      "sha256": "f562ca5e1a1c1df943e7e7e9901d5cee51ede0ca8156c095694be8b3e1908ce8"
+    }
+  },
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "tools.test_ole_owner_paired_runner",
+    "tools.test_prepare_ole_owner_inputs",
+    "tools.test_validate_ole_owner_run",
+    "tools.test_legacy_native_qualification",
+    "tools.test_native_qualification_runner"
+  ],
+  "exit_code": 0,
+  "seconds": 28.04733591999684,
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/ole-oracle-metadata-repair/tooling.log",
+  "log_bytes": 400,
+  "log_sha256": "35ea09759cbfced73f6ad4764a1c6bb7de6100af7e0e5bdfff373d13d4d306a8",
+  "actual_oracle_validation": [
+    {
+      "role": "baseline",
+      "variant": "normal",
+      "oracle_directory": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-native-29f/oracle-baseline",
+      "files_verified": 18,
+      "allocator_routes": [],
+      "diagnostic_receipt": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-native-29f/diagnostic-receipt.json",
+      "diagnostic_bytes": 19308,
+      "diagnostic_sha256": "c1d21a96a7f68a3b8d6933be92ebea22db065e2f412faa9565a49016503e0de9",
+      "native_proof_validation": "PASS"
+    },
+    {
+      "role": "candidate",
+      "variant": "normal",
+      "oracle_directory": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-native-29f/oracle-candidate",
+      "files_verified": 18,
+      "allocator_routes": [],
+      "diagnostic_receipt": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-native-29f/diagnostic-receipt.json",
+      "diagnostic_bytes": 19308,
+      "diagnostic_sha256": "c1d21a96a7f68a3b8d6933be92ebea22db065e2f412faa9565a49016503e0de9",
+      "native_proof_validation": "PASS"
+    },
+    {
+      "role": "after",
+      "variant": "allocator",
+      "oracle_directory": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/after-allocator",
+      "files_verified": 18,
+      "allocator_routes": [
+        "read",
+        "edit",
+        "xls_cells",
+        "xls_cells_stage",
+        "doc_history",
+        "xls_history"
+      ],
+      "diagnostic_receipt": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/diagnostic-receipt.json",
+      "diagnostic_bytes": 49094,
+      "diagnostic_sha256": "0657212732c9fd2f5f9fb56cd9ecd014de6d05552dfeaae885686579a2efefca",
+      "native_proof_validation": "PASS"
+    },
+    {
+      "role": "before",
+      "variant": "allocator",
+      "oracle_directory": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/oracle/before-allocator",
+      "files_verified": 18,
+      "allocator_routes": [
+        "read",
+        "edit",
+        "xls_cells",
+        "xls_cells_stage",
+        "doc_history",
+        "xls_history"
+      ],
+      "diagnostic_receipt": "/home/zhuhe/.cache/litchi-api-contract/ole-owner-allocator-29f/diagnostic-receipt.json",
+      "diagnostic_bytes": 49094,
+      "diagnostic_sha256": "0657212732c9fd2f5f9fb56cd9ecd014de6d05552dfeaae885686579a2efefca",
+      "native_proof_validation": "PASS"
+    }
+  ],
+  "claim_scope": "actual retained correctness/allocator proof parsing and tooling regression tests; no native timing, clone execution or full qualification acceptance"
+}
