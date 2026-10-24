@@ -285,6 +285,8 @@ impl Edit {
         self.ensure_prepared()?;
         let value = self
             .draft
+            .as_mut()
+            .ok_or_else(|| invalid("rich-value refresh edit is not prepared"))?
             .get_mut(type_index)
             .ok_or_else(|| invalid("rich-value type index is out of range"))?;
         if value.intervals == intervals {
