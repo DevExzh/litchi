@@ -1152,6 +1152,7 @@ impl Snapshot {
         limits: Limits,
         transaction_limits: TransactionLimits,
         source_limits: crate::package::SourceLimits,
+        protection_policy: ProtectionPolicy,
         observer: impl FnMut(DiagnosticEvent),
         cfb_observer: impl FnMut(CfbParseEvent),
     ) -> Result<Self> {
@@ -1160,6 +1161,7 @@ impl Snapshot {
             limits,
             transaction_limits,
             source_limits,
+            protection_policy,
             observer,
             cfb_observer,
         )
@@ -1171,6 +1173,7 @@ impl Snapshot {
         limits: Limits,
         transaction_limits: TransactionLimits,
         source_limits: crate::package::SourceLimits,
+        protection_policy: ProtectionPolicy,
         mut observer: impl FnMut(DiagnosticEvent),
         mut cfb_observer: impl FnMut(CfbParseEvent),
     ) -> Result<Self> {
@@ -1185,6 +1188,7 @@ impl Snapshot {
                 let strict_result = RevisionEditor::open_with_ole_file_profiled_with_admission(
                     bytes.clone(),
                     limits,
+                    protection_policy.clone(),
                     |event| {
                         failed_strict_events.push(event);
                     },
@@ -1219,6 +1223,7 @@ impl Snapshot {
                             RevisionEditor::open_with_ole_file_profiled_with_admission(
                                 candidate.to_vec(),
                                 limits,
+                                protection_policy.clone(),
                                 cfb_observer,
                                 |ole| {
                                     crate::package::preflight_declared_streams(ole, source_limits)
@@ -1251,7 +1256,7 @@ impl Snapshot {
             limits,
             source_limits,
             transaction_limits,
-            protection_policy: ProtectionPolicy::default(),
+            protection_policy,
         })
     }
 
@@ -3179,6 +3184,7 @@ impl Edit {
                 self.source.limits,
                 self.source.transaction_limits,
                 self.source.source_limits,
+                self.source.protection_policy.clone(),
                 &mut observer,
                 &mut cfb_observer,
             )
@@ -6461,6 +6467,7 @@ mod tests {
             Limits::default(),
             TransactionLimits::default(),
             crate::package::SourceLimits::default(),
+            ProtectionPolicy::default(),
             |event| events.push(event),
             |event| cfb_events.push(event),
         )
@@ -6517,6 +6524,7 @@ mod tests {
             Limits::default(),
             TransactionLimits::default(),
             crate::package::SourceLimits::default(),
+            ProtectionPolicy::default(),
             |event| events.push(event),
             |event| cfb_events.push(event),
         );
@@ -6561,6 +6569,7 @@ mod tests {
             Limits::default(),
             TransactionLimits::default(),
             source_limits,
+            ProtectionPolicy::default(),
             |event| events.push(event),
             |event| cfb_events.push(event),
         );
@@ -6711,6 +6720,7 @@ mod tests {
             Limits::default(),
             TransactionLimits::default(),
             source_limits,
+            ProtectionPolicy::default(),
             |event| events.push(event),
             |event| cfb_events.push(event),
         );
@@ -6773,6 +6783,7 @@ mod tests {
             strict_limits,
             TransactionLimits::default(),
             source_limits,
+            ProtectionPolicy::default(),
             |event| events.push(event),
             |event| cfb_events.push(event),
         )
@@ -6836,6 +6847,7 @@ mod tests {
             Limits::default(),
             TransactionLimits::default(),
             crate::package::SourceLimits::default(),
+            ProtectionPolicy::default(),
             |event| events.push(event),
             |event| cfb_events.push(event),
         )
@@ -6886,6 +6898,7 @@ mod tests {
             Limits::default(),
             TransactionLimits::default(),
             crate::package::SourceLimits::default(),
+            ProtectionPolicy::default(),
             |event| events.push(event),
             |event| cfb_events.push(event),
         )

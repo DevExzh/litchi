@@ -1049,6 +1049,7 @@ impl RevisionEditor {
     pub(crate) fn open_with_ole_file_profiled_with_admission<F>(
         bytes: Vec<u8>,
         limits: Limits,
+        policy: ProtectionPolicy,
         observer: impl FnMut(CfbParseEvent),
         admission: F,
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)>
@@ -1063,8 +1064,7 @@ impl RevisionEditor {
             observer,
             admission,
         )?;
-        let editor =
-            Self::open_from_package(package.edit()?, &mut ole, ProtectionPolicy::default())?;
+        let editor = Self::open_from_package(package.edit()?, &mut ole, policy)?;
         Ok((editor, ole))
     }
 

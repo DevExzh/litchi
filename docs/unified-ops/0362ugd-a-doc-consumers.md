@@ -28,7 +28,10 @@ state continues to accept caller-scoped, non-`Send` callbacks. The package
 profiling helper explicitly performs the first body access while its recorder
 is live, then converts to the ordinary edit before the recorder is finished;
 the open phase therefore measures real lazy materialization instead of zero
-events.
+events. Failed profiled opens retain both observers for a later attempt, and
+the profiled strict/fallback path receives the selected protection policy just
+like the ordinary path. The DOC transaction coordinator propagates the
+fallible coalesced snapshot charge without swallowing its error.
 
 ## Checks
 

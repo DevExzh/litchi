@@ -258,30 +258,21 @@ impl DeferredOpenState for OrdinaryEditState {
 /// Deferred observer state for a profiled package edit.
 #[doc(hidden)]
 pub struct ProfiledOpen<'a> {
-    observer: Option<Box<dyn FnMut(body_text::DiagnosticEvent) + 'a>>,
-    cfb_observer: Option<Box<dyn FnMut(body_text::CfbParseEvent) + 'a>>,
+    observer: Box<dyn FnMut(body_text::DiagnosticEvent) + 'a>,
+    cfb_observer: Box<dyn FnMut(body_text::CfbParseEvent) + 'a>,
 }
 
 #[cfg(feature = "performance-diagnostics")]
 impl<'a> DeferredOpenState for ProfiledOpen<'a> {
     fn open(&mut self, package: &Package, options: &EditOptions) -> Result<body_text::Edit> {
-        let observer = self.observer.take().ok_or_else(|| {
-            Error::Package(PackageError::InvalidFormat(
-                "DOC profiled edit was opened more than once".into(),
-            ))
-        })?;
-        let cfb_observer = self.cfb_observer.take().ok_or_else(|| {
-            Error::Package(PackageError::InvalidFormat(
-                "DOC profiled edit was opened more than once".into(),
-            ))
-        })?;
         let snapshot = body_text::Snapshot::open_bounded_profiled_with_cfb_observer(
             package.to_bytes().map_err(Error::Package)?,
             options.revision_limits,
             options.transaction_limits,
             package.source_limits(),
-            observer,
-            cfb_observer,
+            options.protection_policy.clone(),
+            &mut *self.observer,
+            &mut *self.cfb_observer,
         )
         .map_err(Error::from)?;
         snapshot
@@ -518,8 +509,8 @@ impl<'a> Edit<'a, ProfiledOpen<'a>> {
             options,
             inner: None,
             state: ProfiledOpen {
-                observer: Some(Box::new(observer)),
-                cfb_observer: Some(Box::new(cfb_observer)),
+                observer: Box::new(observer),
+                cfb_observer: Box::new(cfb_observer),
             },
             _profile: std::marker::PhantomData,
         }
