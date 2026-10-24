@@ -6,6 +6,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -159,6 +160,7 @@ class ProjectionPolicyTests(unittest.TestCase):
                 return policy.artifact(path)
 
             source = write("source.tar", b"source archive")
+            alternate_source = write("alternate-source.tar", b"source archive")
             lock = write("Cargo.lock", b"lock")
             probe = write("probe.rs", b"probe")
             fixture = write("fixture.json", b"fixture")
@@ -166,6 +168,12 @@ class ProjectionPolicyTests(unittest.TestCase):
             package = write("litchi-ops.Cargo.toml", b"package")
             toolchain = write("rust-toolchain.toml", b"toolchain")
             projection = write("projection.json", b"projection")
+            binary_path = root / "endpoint"
+            binary_path.write_bytes(b"binary")
+            os.chmod(binary_path, 0o755)
+            binary = policy.artifact(binary_path)
+            build = write("build.json", b"build receipt")
+            validation = write("validation.json", b"validation receipt")
             patch_path = root / "adapter.patch"
             patch = write("adapter.patch", b"adapter")
             assembly = {
@@ -198,12 +206,16 @@ class ProjectionPolicyTests(unittest.TestCase):
                 "package_manifest": package,
                 "toolchain": toolchain,
                 "source_assembly": assembly_artifact,
+                "binary": binary,
+                "build_receipt": build,
+                "validation": validation,
             }
             fields = policy._make_validated_endpoint({
                 "manifest": policy.artifact(manifest_path),
                 "source_commit": policy.BASELINE_COMMIT,
                 "dependency_projection_sha256": projection["sha256"],
                 "source": source,
+                "binary": binary,
                 "lock": lock,
                 "probe": probe,
                 "fixture": fixture,
@@ -233,6 +245,26 @@ class ProjectionPolicyTests(unittest.TestCase):
                 mock.patch.object(policy, "FIXTURE_BYTES", fixture["bytes"]), \
                 mock.patch.object(policy, "FIXTURE_SHA256", fixture["sha256"]):
                 policy._check_fields_fixed(endpoint, fields, "before")
+                original_source_archive = dict(assembly["source_archive"])
+                assembly["source_archive"] = dict(alternate_source)
+                assembly_path.write_bytes(policy.canonical(assembly))
+                endpoint["source_assembly"] = policy.artifact(assembly_path)
+                with self.assertRaises(policy.ProjectionPolicyError):
+                    policy._check_fields_fixed(endpoint, fields, "before")
+                assembly["source_archive"] = original_source_archive
+                assembly_path.write_bytes(policy.canonical(assembly))
+                endpoint["source_assembly"] = policy.artifact(assembly_path)
+                for path, payload in ((binary_path, b"mutated binary"), (root / "build.json", b"mutated build"), (root / "validation.json", b"mutated validation")):
+                    path.write_bytes(payload)
+                    with self.assertRaises(policy.ProjectionPolicyError):
+                        policy._check_fields_fixed(endpoint, fields, "before")
+                    if path == binary_path:
+                        path.write_bytes(b"binary")
+                        os.chmod(path, 0o755)
+                    elif path.name == "build.json":
+                        path.write_bytes(b"build receipt")
+                    else:
+                        path.write_bytes(b"validation receipt")
                 patch_path.write_bytes(b"tampered adapter")
                 with self.assertRaises(policy.ProjectionPolicyError):
                     policy._check_fields_fixed(endpoint, fields, "before")

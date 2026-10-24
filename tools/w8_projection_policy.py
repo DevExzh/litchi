@@ -24,6 +24,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
 import sys
@@ -513,15 +514,22 @@ def _check_fields_fixed(endpoint: dict[str, Any], fields: dict[str, Any], side: 
             if (actual["bytes"], actual["sha256"]) != (row.get("bytes"), row.get("sha256")):
                 raise fail(f"{side} source assembly artifact identity is stale")
             return row
+        if name in ("build_receipt", "validation"):
+            actual = artifact(Path(row["path"]))
+            if (actual["bytes"], actual["sha256"]) != (row.get("bytes"), row.get("sha256")):
+                raise fail(f"{side} {name} artifact identity is stale")
+            return row
         field = fields.get(name, {})
         if not isinstance(field, dict) or (row.get("bytes"), row.get("sha256")) != (field.get("bytes"), field.get("sha256")):
             raise fail(f"{side} endpoint {name} identity differs from the runner fields")
         actual = artifact(Path(row["path"]))
         if (actual["bytes"], actual["sha256"]) != (row.get("bytes"), row.get("sha256")):
             raise fail(f"{side} {name} artifact identity is stale")
+        if name == "binary" and not os.access(Path(row["path"]), os.X_OK):
+            raise fail(f"{side} endpoint binary is no longer executable")
         return row
 
-    for name in ("source", "lock", "probe", "fixture", "workspace_manifest", "package_manifest", "toolchain"):
+    for name in ("source", "lock", "probe", "fixture", "dependency_projection", "workspace_manifest", "package_manifest", "toolchain", "binary", "build_receipt", "validation", "source_assembly"):
         endpoint_row(name)
     projection = endpoint_row("dependency_projection")
     if projection.get("sha256") != fields["dependency_projection_sha256"]:
@@ -537,6 +545,11 @@ def _check_fields_fixed(endpoint: dict[str, Any], fields: dict[str, Any], side: 
     source_archive = assembly.get("source_archive")
     if not isinstance(source_archive, dict) or (source_archive.get("bytes"), source_archive.get("sha256")) != (fields["source"]["bytes"], fields["source"]["sha256"]):
         raise fail(f"{side} source assembly archive differs from the endpoint source")
+    try:
+        if Path(source_archive["path"]).resolve() != Path(fields["source"]["path"]).resolve():
+            raise fail(f"{side} source assembly archive path differs from the endpoint source")
+    except (KeyError, OSError) as error:
+        raise fail(f"{side} source assembly archive path is unavailable") from error
     overlay = assembly.get("overlay")
     fixed_assembly = expected["source_assembly"]
     if not isinstance(overlay, dict) or overlay.get("kind") != fixed_assembly["overlay_kind"]:
