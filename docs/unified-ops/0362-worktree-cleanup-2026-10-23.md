@@ -1362,3 +1362,27 @@ Evidence remains under
 This helper requires the worktree to be recreated before invocation; it has
 no `--dry-run` option. No payload restoration is needed for this empty leaf.
 No cache artifacts or measurements were deleted by this cleanup.
+
+## Thirty-sixth cleanup: reviewed inventory and W8 leaves
+
+After merges `54398757b8` and `fae96321e3`, the coordinator removed
+`uo2-w8-final-rebind` at `e814e4512f7414d3e3136699b8a98e37e09710a5`
+and `uo2-inventory-delegated-globs` at
+`2099c66520cace074d788e1e3b5ac5b12ade1587`. Both branch refs remain.
+The 15 ignored files, totaling 598,662 bytes, were quarantined; the
+coordinator independently verified every hash and mode. Removal was
+non-forced. The first preflight stopped on a lingering W8 audit pipeline;
+its owner identified and terminated only that owned process group before
+cleanup rechecked the exact leaf paths. Active repair leaves and targets
+were untouched.
+
+Evidence directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave36/`.
+The 20,692-byte manifest has SHA-256
+`34e8f18483af99f0319f4ee3c210035ce6c244ff758ed74fab6836682f60a2c0`;
+the 21,242-byte receipt has SHA-256
+`7be76f199d9c4488966445a455ed9102847c718397b9defeccf9ceb11834354e`.
+The 4,849-byte restore helper has SHA-256
+`92737064528012e0d8404846876fbf149f5590f3d2da1e00a86d773b5c1c6fe9`.
+Its CLI is `python3 restore.py [leaf]`, after recreating the selected
+worktree; it has no `--dry-run` option.

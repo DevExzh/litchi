@@ -3571,6 +3571,11 @@ See [0063](0063-source-pptx-modern-comments.md).
   at `fae96321e3`; the W8 policy remains preparation only, pending the next
   production source and native qualification.
 
+  Cleanup thirty-six removes the two reviewed inventory/W8 leaves, retaining
+  both branches and all 15 ignored files (598,662 bytes) in verified
+  quarantine. The three leaves removed in this checkpoint are no longer
+  active worktrees; current API repair worktrees and targets remain intact.
+
   Inventory-driven engineering is now split into the six remaining format
   limits entry points, DrawingML and Markdown publication families, nineteen
   public error enums, four iWork wire-request compatibility aliases, and
