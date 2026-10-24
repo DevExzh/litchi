@@ -59,7 +59,34 @@
       "path": "test-data/unified-ops/ppt-lazy-native-fixture.ppt",
       "bytes": 14848,
       "sha256": "02fa44ca76903943e80a3a2da1f9dbd326c7a4a047540c3aa9cf211e34ef617c"
-    }
+    },
+    "compile_fixtures": [
+      {
+        "path": "test-data/poi/test-data/slideshow/ppt_with_embeded.ppt",
+        "bytes": 180736,
+        "sha256": "afa1dd5adc36765e6e40725a133b0330e5ad1febd1506ca93ceae8c5c5400b53"
+      },
+      {
+        "path": "test-data/unified-ops/0294/video.ppt",
+        "bytes": 43520,
+        "sha256": "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a"
+      },
+      {
+        "path": "test-data/poi/test-data/slideshow/bug61881.ppt",
+        "bytes": 74752,
+        "sha256": "ba2bf551e87f5fd7667dec52ac19005396bdf9af00f0006f9a247a9fede2e8ee"
+      },
+      {
+        "path": "test-data/poi/test-data/spreadsheet/54016.xls",
+        "bytes": 984576,
+        "sha256": "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a"
+      },
+      {
+        "path": "test-data/rtf/watermark.rtf",
+        "bytes": 69471,
+        "sha256": "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb"
+      }
+    ]
   },
   "build": {
     "preparation": {

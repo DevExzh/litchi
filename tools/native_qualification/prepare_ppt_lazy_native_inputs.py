@@ -30,6 +30,37 @@ BASELINE_LOCK_SHA256 = "4def018e9c1d5f409b8c60d6cc0b8f114c486ab3f8fed2c7a4e9c7ba
 FIXTURE_PATH = Path("test-data/unified-ops/ppt-lazy-native-fixture.ppt")
 FIXTURE_BYTES = 14_848
 FIXTURE_SHA256 = "02fa44ca76903943e80a3a2da1f9dbd326c7a4a047540c3aa9cf211e34ef617c"
+# The historical standalone perf-baseline crate compiles its complete library
+# even for the PPT probe bin.  These are the other tracked include_bytes!
+# inputs in that library/probe closure.  They are copied only into the
+# external baseline adapter; no production tree is changed.
+COMPILE_FIXTURES = (
+    (
+        Path("test-data/poi/test-data/slideshow/ppt_with_embeded.ppt"),
+        180_736,
+        "afa1dd5adc36765e6e40725a133b0330e5ad1febd1506ca93ceae8c5c5400b53",
+    ),
+    (
+        Path("test-data/unified-ops/0294/video.ppt"),
+        43_520,
+        "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a",
+    ),
+    (
+        Path("test-data/poi/test-data/slideshow/bug61881.ppt"),
+        74_752,
+        "ba2bf551e87f5fd7667dec52ac19005396bdf9af00f0006f9a247a9fede2e8ee",
+    ),
+    (
+        Path("test-data/poi/test-data/spreadsheet/54016.xls"),
+        984_576,
+        "2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a",
+    ),
+    (
+        Path("test-data/rtf/watermark.rtf"),
+        69_471,
+        "48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb",
+    ),
+)
 PROBE_PATHS = (
     Path("tools/perf-baseline/src/ppt_lazy_native.rs"),
     Path("tools/perf-baseline/src/bin/ppt_lazy_native.rs"),
@@ -168,6 +199,10 @@ def _copy_new(source: Path, destination: Path, label: str) -> dict[str, Any]:
     }
 
 
+def _reviewed_fixture_specs() -> tuple[tuple[Path, int, str], ...]:
+    return ((FIXTURE_PATH, FIXTURE_BYTES, FIXTURE_SHA256), *COMPILE_FIXTURES)
+
+
 def _add_registration(root: Path, candidate: Path) -> dict[str, Any]:
     destination = _resolve(root / REGISTRATION_PATH, must_exist=True)
     candidate_registration = _tracked_regular(root=candidate, relative=REGISTRATION_PATH, label="candidate registration")
@@ -238,24 +273,31 @@ def prepare(
     if candidate_lock_identity["sha256"] != candidate_lock_sha256:
         raise PreparationError("candidate Cargo.lock differs from its supplied identity")
 
-    fixture_source = _tracked_regular(candidate_root, FIXTURE_PATH, "reviewed PPT fixture")
-    fixture_identity = _identity(fixture_source)
-    if fixture_identity["bytes"] != FIXTURE_BYTES or fixture_identity["sha256"] != FIXTURE_SHA256:
-        raise PreparationError("candidate PPT fixture differs from the reviewed fixture")
-    fixture_destination = baseline_root / FIXTURE_PATH
-    if fixture_destination.exists() or fixture_destination.is_symlink():
-        raise PreparationError("baseline PPT fixture destination must be absent before preparation")
-
     overlays = []
     for relative in PROBE_PATHS:
         source = _tracked_regular(candidate_root, relative, f"candidate probe {relative}")
         destination = baseline_root / relative
         overlays.append(_copy_new(source, destination, f"baseline probe {relative}"))
     registration = _add_registration(baseline_root, candidate_root)
-    fixture_overlay = _copy_new(fixture_source, fixture_destination, "baseline PPT fixture")
+    fixture_overlays: dict[str, dict[str, Any]] = {}
+    fixture_identities: dict[str, dict[str, Any]] = {}
+    for relative, expected_bytes, expected_sha256 in _reviewed_fixture_specs():
+        source = _tracked_regular(candidate_root, relative, f"reviewed PPT fixture {relative}")
+        identity = _identity(source)
+        if identity["bytes"] != expected_bytes or identity["sha256"] != expected_sha256:
+            raise PreparationError(f"candidate reviewed fixture differs: {relative}")
+        destination = baseline_root / relative
+        overlay = _copy_new(source, destination, f"baseline reviewed fixture {relative}")
+        key = str(relative)
+        fixture_overlays[key] = overlay
+        fixture_identities[key] = identity
 
     baseline_after = _source_state(baseline_root)
-    expected_status = sorted([str(path) for path in PROBE_PATHS] + [str(REGISTRATION_PATH), str(FIXTURE_PATH)])
+    expected_status = sorted(
+        [str(path) for path in PROBE_PATHS]
+        + [str(REGISTRATION_PATH)]
+        + [str(path) for path, _, _ in _reviewed_fixture_specs()]
+    )
     observed_status = sorted(_status_paths(baseline_after["status"]))
     if observed_status != expected_status:
         raise PreparationError(f"baseline overlay changed unexpected paths: {observed_status!r}")
@@ -276,14 +318,20 @@ def prepare(
             "overlay_paths": expected_status,
             "probes": overlays,
             "registration": registration,
-            "fixture": fixture_overlay,
+            "fixture": fixture_overlays[str(FIXTURE_PATH)],
+            "compile_fixtures": [
+                fixture_overlays[str(path)] for path, _, _ in COMPILE_FIXTURES
+            ],
         },
         "candidate": {
             "state": candidate,
             "ref": candidate["ref"],
             "tree": candidate["tree"],
             "lock": candidate_lock_identity,
-            "fixture": fixture_identity,
+            "fixture": fixture_identities[str(FIXTURE_PATH)],
+            "compile_fixtures": [
+                fixture_identities[str(path)] for path, _, _ in COMPILE_FIXTURES
+            ],
             "probes": [_identity(_tracked_regular(candidate_root, path, f"candidate probe {path}")) for path in PROBE_PATHS],
         },
         "claim_scope": "source preparation identity only; no build, correctness, timing, or acceptance claim",

@@ -24,7 +24,13 @@ def git(root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def repository(root: Path, *, baseline: bool, fixture: bytes | None = None) -> str:
+def repository(
+    root: Path,
+    *,
+    baseline: bool,
+    fixture: bytes | None = None,
+    compile_fixtures: dict[Path, bytes] | None = None,
+) -> str:
     root.mkdir(parents=True)
     git(root, "init", "-q", "--initial-branch=main")
     git(root, "config", "user.email", "ppt-prep@example.invalid")
@@ -44,6 +50,10 @@ def repository(root: Path, *, baseline: bool, fixture: bytes | None = None) -> s
         destination = root / prep.FIXTURE_PATH
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(fixture)
+    for relative, value in (compile_fixtures or {}).items():
+        destination = root / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(value)
     git(root, "add", ".")
     git(root, "commit", "-qm", "fixture")
     return git(root, "rev-parse", "HEAD")
@@ -52,13 +62,18 @@ def repository(root: Path, *, baseline: bool, fixture: bytes | None = None) -> s
 class PptPreparationTests(unittest.TestCase):
     def test_materializes_and_binds_the_reviewed_fixture(self) -> None:
         fixture = b"reviewed fixture\n"
+        compile_fixture_values = {
+            Path(f"test-data/compile-fixture-{index}.bin"): f"compile fixture {index}\n".encode()
+            for index in range(2)
+        }
+        compile_fixtures = tuple(
+            (path, len(value), hashlib.sha256(value).hexdigest())
+            for path, value in compile_fixture_values.items()
+        )
         with tempfile.TemporaryDirectory(prefix="ppt-prep-") as directory:
             root = Path(directory)
             baseline = root / "baseline"
             candidate = root / "candidate"
-            baseline_ref = repository(baseline, baseline=True)
-            candidate_ref = repository(candidate, baseline=False, fixture=fixture)
-            baseline_tree = git(baseline, "rev-parse", "HEAD^{tree}")
             old_values = (
                 prep.BASELINE_REF,
                 prep.BASELINE_TREE,
@@ -66,7 +81,17 @@ class PptPreparationTests(unittest.TestCase):
                 prep.BASELINE_LOCK_SHA256,
                 prep.FIXTURE_BYTES,
                 prep.FIXTURE_SHA256,
+                prep.COMPILE_FIXTURES,
             )
+            prep.COMPILE_FIXTURES = compile_fixtures
+            baseline_ref = repository(baseline, baseline=True)
+            candidate_ref = repository(
+                candidate,
+                baseline=False,
+                fixture=fixture,
+                compile_fixtures=compile_fixture_values,
+            )
+            baseline_tree = git(baseline, "rev-parse", "HEAD^{tree}")
             prep.BASELINE_REF = baseline_ref
             prep.BASELINE_TREE = baseline_tree
             prep.BASELINE_LOCK_BYTES = len(b"baseline lock\n")
@@ -90,6 +115,7 @@ class PptPreparationTests(unittest.TestCase):
                     prep.BASELINE_LOCK_SHA256,
                     prep.FIXTURE_BYTES,
                     prep.FIXTURE_SHA256,
+                    prep.COMPILE_FIXTURES,
                 ) = old_values
             materialized = baseline / prep.FIXTURE_PATH
             self.assertEqual(materialized.read_bytes(), fixture)
@@ -98,6 +124,13 @@ class PptPreparationTests(unittest.TestCase):
                 receipt["baseline"]["fixture"]["destination"]["sha256"],
                 hashlib.sha256(fixture).hexdigest(),
             )
+            self.assertEqual(len(receipt["baseline"]["compile_fixtures"]), len(compile_fixtures))
+            for index, (path, value) in enumerate(compile_fixture_values.items()):
+                overlay = receipt["baseline"]["compile_fixtures"][index]
+                self.assertEqual(overlay["source"]["path"], str(candidate / path))
+                self.assertEqual(overlay["destination"]["path"], str(baseline / path))
+                self.assertEqual(overlay["destination"]["bytes"], len(value))
+                self.assertEqual(overlay["destination"]["sha256"], hashlib.sha256(value).hexdigest())
             self.assertEqual(receipt["baseline"]["tree"], baseline_tree)
             self.assertEqual(
                 json.loads(output.read_text(encoding="utf-8"))["claim_scope"],
@@ -105,7 +138,11 @@ class PptPreparationTests(unittest.TestCase):
             )
             self.assertEqual(
                 sorted(prep._status_paths(receipt["baseline"]["after_overlay"]["status"])),
-                sorted([str(path) for path in prep.PROBE_PATHS] + [str(prep.REGISTRATION_PATH), str(prep.FIXTURE_PATH)]),
+                sorted(
+                    [str(path) for path in prep.PROBE_PATHS]
+                    + [str(prep.REGISTRATION_PATH), str(prep.FIXTURE_PATH)]
+                    + [str(path) for path, _, _ in compile_fixtures]
+                ),
             )
 
     def test_rejects_a_changed_reviewed_fixture(self) -> None:
@@ -113,9 +150,6 @@ class PptPreparationTests(unittest.TestCase):
             root = Path(directory)
             baseline = root / "baseline"
             candidate = root / "candidate"
-            baseline_ref = repository(baseline, baseline=True)
-            candidate_ref = repository(candidate, baseline=False, fixture=b"fixture\n")
-            baseline_tree = git(baseline, "rev-parse", "HEAD^{tree}")
             old_values = (
                 prep.BASELINE_REF,
                 prep.BASELINE_TREE,
@@ -123,7 +157,12 @@ class PptPreparationTests(unittest.TestCase):
                 prep.BASELINE_LOCK_SHA256,
                 prep.FIXTURE_BYTES,
                 prep.FIXTURE_SHA256,
+                prep.COMPILE_FIXTURES,
             )
+            prep.COMPILE_FIXTURES = ()
+            baseline_ref = repository(baseline, baseline=True)
+            candidate_ref = repository(candidate, baseline=False, fixture=b"fixture\n")
+            baseline_tree = git(baseline, "rev-parse", "HEAD^{tree}")
             prep.BASELINE_REF = baseline_ref
             prep.BASELINE_TREE = baseline_tree
             prep.BASELINE_LOCK_BYTES = len(b"baseline lock\n")
@@ -147,6 +186,7 @@ class PptPreparationTests(unittest.TestCase):
                     prep.BASELINE_LOCK_SHA256,
                     prep.FIXTURE_BYTES,
                     prep.FIXTURE_SHA256,
+                    prep.COMPILE_FIXTURES,
                 ) = old_values
 
 

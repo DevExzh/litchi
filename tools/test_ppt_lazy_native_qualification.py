@@ -21,6 +21,13 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
         self.assertEqual(manifest["baseline"]["lock"]["bytes"], protocol.BASELINE_LOCK_BYTES)
         self.assertEqual(manifest["baseline"]["lock"]["sha256"], protocol.BASELINE_LOCK_SHA256)
         self.assertIsNone(manifest["candidate"])
+        self.assertEqual(
+            manifest["baseline_adapter"]["compile_fixtures"],
+            [
+                {"path": path, "bytes": bytes_, "sha256": sha256}
+                for path, bytes_, sha256 in protocol.BASELINE_COMPILE_FIXTURES
+            ],
+        )
         self.assertEqual(set(manifest["build"]["fixtures"]), set(protocol.FIXTURE_KEYS))
         self.assertEqual(manifest["build"]["fixture_routes"], protocol.ROUTE_FIXTURE_KEYS)
         self.assertEqual(tuple(protocol.ROUTES), (

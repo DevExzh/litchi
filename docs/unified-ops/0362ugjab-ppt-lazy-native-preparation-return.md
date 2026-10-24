@@ -2,13 +2,14 @@
 
 This return corrects the preparation gap in 0362ugja. The first baseline
 release-build attempt copied the three probe sources and the temporary
-`src/lib.rs` registration, but did not materialize the reviewed default PPT
-fixture in the historical checkout. The compiler therefore failed at the
-`include_bytes!` boundary. The corrected preparer now copies and hashes that
-fixture into the external baseline endpoint, records its source and
-destination identities, and preserves the unchanged historical production
-tree. The fixture is never added to the historical Git commit or to a
-production overlay.
+`src/lib.rs` registration, but did not materialize the reviewed PPT fixture
+closure in the historical checkout. The compiler therefore failed at the
+`include_bytes!` boundary. The corrected preparer now copies and hashes every
+tracked external `include_bytes!` input needed by the standalone
+`perf-baseline` library and PPT probe into the external baseline endpoint,
+records each source and destination identity, and preserves the unchanged
+historical production tree. These files are never added to the historical
+Git commit or to a production overlay.
 
 ## Source-only correction
 
@@ -16,8 +17,8 @@ The new external-only preparer is
 `tools/native_qualification/prepare_ppt_lazy_native_inputs.py`. It requires
 the exact pre-lazy baseline ref/tree and standalone lock, a clean candidate
 worktree, ordinary tracked candidate probe and fixture files, and a new
-receipt path outside both worktrees. It materializes exactly these five
-temporary paths in the baseline endpoint:
+receipt path outside both worktrees. It materializes exactly these temporary
+paths in the baseline endpoint:
 
 ```text
 tools/perf-baseline/src/ppt_lazy_native.rs
@@ -25,16 +26,23 @@ tools/perf-baseline/src/bin/ppt_lazy_native.rs
 tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs
 tools/perf-baseline/src/lib.rs
 test-data/unified-ops/ppt-lazy-native-fixture.ppt
+test-data/poi/test-data/slideshow/ppt_with_embeded.ppt
+test-data/unified-ops/0294/video.ppt
+test-data/poi/test-data/slideshow/bug61881.ppt
+test-data/poi/test-data/spreadsheet/54016.xls
+test-data/rtf/watermark.rtf
 ```
 
 The first three are copied byte-for-byte; `lib.rs` receives only the guarded
-`pub mod ppt_lazy_native;` insertion; and the fixture is copied byte-for-byte
-from the candidate's ordinary tracked file. The receipt records the
-candidate and baseline ref/tree, lock, source and destination identities,
-registration before/after hashes, the five-path allowlist, and the baseline
-production-tree digest. It claims preparation identity only. The runtime
-runner's build-receipt validator now requires this preparation receipt and
-the exact fixture binding before accepting a correctness report.
+`pub mod ppt_lazy_native;` insertion; and all six fixtures are copied
+byte-for-byte from the candidate's ordinary tracked files. The two
+`include_str!("lib.rs")` uses remain self-contained source reads and require
+no external fixture. The receipt records the candidate and baseline ref/tree,
+lock, every source and destination identity, registration before/after
+hashes, the complete path allowlist, and the baseline production-tree digest.
+It claims preparation identity only. The runtime runner's build-receipt
+validator now requires this preparation receipt and the complete fixture
+binding before accepting a correctness report.
 
 The regression is covered by:
 
@@ -67,6 +75,18 @@ candidate source is the explicitly selected coordinator staging source, not
 the old 4fb checkout; its final ref, source archive/root identity, lock and
 build receipt must be filled together for the bounded rebuild. No dependency
 graph is regenerated implicitly.
+
+The first corrected baseline retry used the default fixture but still lacked
+the rest of the tracked compile closure. It was therefore preserved as a
+failed build, not relabelled as a qualification result:
+
+| endpoint | source ref/tree | command | exit | log (bytes; SHA-256) |
+| --- | --- | --- | ---: | --- |
+| baseline retry r2 | `8779d059add6c90c74552801372c44f770db9f0f` / `27e0b56e2f8e3ab11b00c119604b5636f358dfe2` | `cargo build --release --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --bin ppt_lazy_native` | 101 | `/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs/baseline-8779-r2-normal-build.log` (12,637; `d3727cdaed9fc186df484f5434b5fb72c9455cf34a1a93db4094625e187942b4`) |
+
+Its diagnostics identified the five additional tracked inputs now bound by
+the preparer: `ppt_with_embeded.ppt`, `video.ppt`, `bug61881.ppt`, `54016.xls`
+and `watermark.rtf`.
 
 ## Bounded rebuild boundary
 
