@@ -276,7 +276,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             self.assertEqual(qualified["lane"], "w5-legacy")
             self.assertEqual(qualified["analysis"], analysis)
 
-    def test_w5_source_overlay_replaces_only_the_recorded_routes_module(self) -> None:
+    def test_w5_source_overlay_translates_common_api_and_retains_doc_controls(self) -> None:
         candidate = (ROOT / "crates/litchi-ops/examples/legacy_w5_source_probe.rs").read_text(encoding="utf-8")
         routes = (ROOT / "docs/unified-ops/results/0359a/routes_before.rs").read_text(encoding="utf-8")
         adapted = source_prep._adapt_w5_probe(candidate, routes)
@@ -284,6 +284,21 @@ class NativeQualificationRunnerTests(unittest.TestCase):
         self.assertIn("source_backed::Package::from_bytes", candidate)
         self.assertEqual(adapted.count("mod routes {"), 1)
         self.assertIn("PLAN_ONLY_ROUTE: bool = true", adapted)
+        self.assertIn(".edit_with_limits(&limits,", adapted)
+        self.assertIn("black_box(commit.file);", adapted)
+        self.assertNotIn("litchi_ops::EditOptions", adapted)
+        self.assertNotIn("commit.file()", adapted)
+        self.assertEqual(adapted.count("pub(super) fn doc_batch_leaf_write"), 1)
+        self.assertEqual(adapted.count("pub(super) fn doc_leaf_write"), 1)
+        with self.assertRaisesRegex(source_prep.PreparationError, "doc_leaf_write"):
+            source_prep._adapt_w5_probe(
+                candidate.replace(
+                    "pub(super) fn doc_leaf_write",
+                    "pub(super) fn removed_doc_leaf_write",
+                    1,
+                ),
+                routes,
+            )
 
     def test_w4b_crud_overlay_is_only_the_recorded_trait_import(self) -> None:
         baseline = "use litchi::sheet::{WorkbookTrait, Worksheet};\nfn main() {}\n"
@@ -299,6 +314,46 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                     "fn main", "use litchi_core::sheet::Cell as _;\nfn main"
                 )
             )
+
+    def test_w4b_probe_overlay_translates_exactly_three_lazy_resolutions(self) -> None:
+        candidate = "".join(
+            [
+                "fn first() {\n",
+                "    let edit = package\n",
+                "        .edit_cell_values(0_usize)\n",
+                "        .expect(\"cell edit\")\n",
+                "        .resolve()\n",
+                "        .expect(\"worksheet resolution\")\n",
+                "        .expect(\"worksheet\");\n",
+                "}\n",
+                "fn second() {\n",
+                "        let edit = package\n",
+                "            .edit_cell_values(0_usize)\n",
+                "            .expect(\"cell edit\")\n",
+                "            .resolve()\n",
+                "            .expect(\"worksheet resolution\")\n",
+                "            .expect(\"worksheet\");\n",
+                "}\n",
+                "fn third() {\n",
+                "        let edit = package\n",
+                "            .edit_cell_values(0_usize)\n",
+                "            .expect(\"cell edit\")\n",
+                "            .resolve()\n",
+                "            .expect(\"worksheet resolution\")\n",
+                "            .expect(\"worksheet\");\n",
+                "}\n",
+                "fn commit_result(commit: litchi_ops::transaction::Commit) {\n",
+                "    black_box(commit.into_file());\n",
+                "}\n",
+            ]
+        )
+        adapted = source_prep._adapt_w4b_probe(candidate)
+        self.assertEqual(adapted.count(".resolve()"), 0)
+        self.assertEqual(adapted.count('.expect("worksheet");'), 3)
+        self.assertNotIn("commit.into_file()", adapted)
+        self.assertIn("commit.file", adapted)
+        with self.assertRaisesRegex(source_prep.PreparationError, "exactly three"):
+            source_prep._adapt_w4b_probe(candidate.replace(".resolve()", "", 1))
 
     def test_source_preparation_requires_external_disjoint_provenance(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-qual-prep-paths-") as directory:
@@ -317,6 +372,37 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             after = root / "after"
             baseline_crud = "use litchi::sheet::{WorkbookTrait, Worksheet};\nfn main() {}\n"
             candidate_crud = baseline_crud + "// candidate API body\n"
+            candidate_probe = "".join(
+                [
+                    "fn first() {\n",
+                    "    let edit = package\n",
+                    "        .edit_cell_values(0_usize)\n",
+                    "        .expect(\"cell edit\")\n",
+                    "        .resolve()\n",
+                    "        .expect(\"worksheet resolution\")\n",
+                    "        .expect(\"worksheet\");\n",
+                    "}\n",
+                    "fn second() {\n",
+                    "    let edit = package\n",
+                    "        .edit_cell_values(0_usize)\n",
+                    "        .expect(\"cell edit\")\n",
+                    "        .resolve()\n",
+                    "        .expect(\"worksheet resolution\")\n",
+                    "        .expect(\"worksheet\");\n",
+                    "}\n",
+                    "fn third() {\n",
+                    "    let edit = package\n",
+                    "        .edit_cell_values(0_usize)\n",
+                    "        .expect(\"cell edit\")\n",
+                    "        .resolve()\n",
+                    "        .expect(\"worksheet resolution\")\n",
+                    "        .expect(\"worksheet\");\n",
+                    "}\n",
+                    "fn commit_result(commit: litchi_ops::transaction::Commit) {\n",
+                    "    black_box(commit.into_file());\n",
+                    "}\n",
+                ]
+            )
 
             def git(repo: Path, *args: str) -> str:
                 result = subprocess.run(
@@ -338,7 +424,8 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                 crud_path.write_text(crud, encoding="utf-8")
                 probe_path = repo / source_prep.W4B_PROBE
                 probe_path.parent.mkdir(parents=True, exist_ok=True)
-                probe_path.write_text("fn main() {}\n", encoding="utf-8")
+                if repo == after:
+                    probe_path.write_text(candidate_probe, encoding="utf-8")
                 git(repo, "add", ".")
                 git(repo, "commit", "--quiet", "-m", "source pair")
 
@@ -346,6 +433,13 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             with mock.patch.object(source_prep, "W4B_BASE_TREE", baseline_tree):
                 prepared = source_prep._prepare_w4b(before, after)
 
+            adapted_probe = (before / source_prep.W4B_PROBE).read_text(encoding="utf-8")
+            self.assertEqual(adapted_probe.count(".resolve()"), 0)
+            self.assertEqual(adapted_probe.count('.expect("worksheet");'), 3)
+            self.assertEqual(
+                prepared["overlays"][0]["adaptation"],
+                "recorded three-call historical selector-resolution and commit-field translations",
+            )
             adapted = (before / source_prep.W4B_CRUD).read_text(encoding="utf-8")
             self.assertEqual(adapted, source_prep._adapt_w4b_crud(baseline_crud))
             crud_overlay = prepared["overlays"][1]

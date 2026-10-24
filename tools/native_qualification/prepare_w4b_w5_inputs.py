@@ -6,7 +6,7 @@ or a timing command.  The accepted W4b baseline is a synthetic merge tree
 because the record measured the pre-W4b code after combining the W4-XLSX tree
 with trunk.  The accepted W5 baseline predates the source-backed probe.  Both
 baselines therefore need the exact probe consumers from the candidate tree,
-with the recorded W5 route module substituted for the old API.
+with the recorded W4b/W5 compatibility overlays applied for the old APIs.
 """
 
 from __future__ import annotations
@@ -207,6 +207,49 @@ def _adapt_w4b_crud(baseline_crud: str) -> str:
     return baseline_crud.replace(marker, f"{marker}\n{import_line}", 1)
 
 
+def _adapt_w4b_probe(candidate_probe: str) -> str:
+    """Translate the candidate-only calls for the historical W4b API."""
+
+    # The candidate's edit_cell_values returns a lazy Edit and therefore
+    # exposes Edit::resolve. The fixed synthetic baseline resolves the
+    # selector at the package entry point and returns Result<Option<Edit>>.
+    # Keep this overlay exact and fail closed if the candidate probe changes.
+    pattern = re.compile(
+        r'^(?P<indent> *)\.edit_cell_values\(0_usize\)\n'
+        r'(?P=indent)\.expect\("cell edit"\)\n'
+        r'(?P=indent)\.resolve\(\)\n'
+        r'(?P=indent)\.expect\("worksheet resolution"\)\n'
+        r'(?P=indent)\.expect\("worksheet"\);',
+        re.MULTILINE,
+    )
+    translated, replacements = pattern.subn(
+        lambda match: (
+            f'{match.group("indent")}.edit_cell_values(0_usize)\n'
+            f'{match.group("indent")}.expect("cell edit")\n'
+            f'{match.group("indent")}.expect("worksheet");'
+        ),
+        candidate_probe,
+    )
+    if candidate_probe.count(".resolve()") != 3 or replacements != 3:
+        raise PreparationError(
+            "W4b probe must contain exactly three historical selector-resolution calls"
+        )
+    if ".resolve()" in translated:
+        raise PreparationError("W4b baseline probe retained a candidate-only resolve call")
+    if candidate_probe.count("commit.into_file()") != 1:
+        raise PreparationError(
+            "W4b probe must contain exactly one candidate commit into_file call"
+        )
+    translated = translated.replace(
+        "black_box(commit.into_file());",
+        "black_box(commit.file);",
+        1,
+    )
+    if "commit.into_file()" in translated:
+        raise PreparationError("W4b baseline probe retained a candidate-only commit accessor")
+    return translated
+
+
 def _prepare_w4b(before: Path, after: Path) -> dict[str, Any]:
     before_state = _source_state(before)
     after_state = _source_state(after)
@@ -216,7 +259,14 @@ def _prepare_w4b(before: Path, after: Path) -> dict[str, Any]:
         )
     _require_clean(before_state, "W4b baseline")
     _require_clean(after_state, "W4b candidate")
-    probe = _write_exact(after / W4B_PROBE, before / W4B_PROBE)
+    probe_source = (after / W4B_PROBE).read_text(encoding="utf-8")
+    probe_text = _adapt_w4b_probe(probe_source)
+    probe = _write_text_exact(before / W4B_PROBE, probe_text, after / W4B_PROBE)
+    probe["candidate_sha256"] = _sha256(after / W4B_PROBE)[0]
+    probe["candidate_bytes"] = len(probe_source.encode("utf-8"))
+    probe["adaptation"] = (
+        "recorded three-call historical selector-resolution and commit-field translations"
+    )
 
     crud_source = after / W4B_CRUD
     crud_destination = before / W4B_CRUD
@@ -239,6 +289,16 @@ def _prepare_w4b(before: Path, after: Path) -> dict[str, Any]:
 
 
 def _adapt_w5_probe(candidate_probe: str, routes_before: str) -> str:
+    """Translate the recorded W5 probe onto the historical public APIs.
+
+    The source-backed route module is intentionally replaced by the exact
+    0359a ``routes_before.rs`` module.  The follow-up DOC publication controls
+    were added after that module was recorded, though, so retain those two
+    route bodies from the candidate and append them to the historical module.
+    They use the historical DOC package API unchanged.  The only common
+    consumer translation is the old ``File::edit_with_limits`` entry point and
+    its public ``Commit::file`` field.
+    """
     marker = '\n#[cfg(all(feature = "doc", feature = "xls", feature = "rtf"))]\nmod routes {'
     start = candidate_probe.rfind(marker)
     if start < 0:
@@ -246,10 +306,68 @@ def _adapt_w5_probe(candidate_probe: str, routes_before: str) -> str:
     main = candidate_probe.find("\nfn main() {", start)
     if main < 0:
         raise PreparationError("W5 candidate probe has no main after routes module")
-    return (
-        candidate_probe[:start].rstrip()
+
+    # These two functions are the DOC publication controls introduced after
+    # the pinned 0359 tip.  Extract only the known route span and fail closed
+    # if the candidate changes its shape or count; silently dropping a route
+    # would invalidate the matched workload.
+    leaf_start_marker = "\n    /// Run the 1k leaf body-toggle workload through complete DOC publication."
+    leaf_end_marker = "\n    fn workbook("
+    leaf_start = candidate_probe.find(leaf_start_marker, start, main)
+    leaf_end = candidate_probe.find(leaf_end_marker, leaf_start, main)
+    if leaf_start < 0 or leaf_end < 0 or leaf_end <= leaf_start:
+        raise PreparationError("W5 candidate probe has no complete DOC publication controls")
+    leaf_functions = candidate_probe[leaf_start + 1 : leaf_end].rstrip()
+    expected_leaf_functions = (
+        "pub(super) fn doc_batch_leaf_write",
+        "pub(super) fn doc_leaf_write",
+    )
+    for function in expected_leaf_functions:
+        if leaf_functions.count(function) != 1:
+            raise PreparationError(f"W5 probe must contain exactly one {function} route")
+    if "pub(super) fn doc_" not in leaf_functions or leaf_functions.count("pub(super) fn doc_") != 2:
+        raise PreparationError("W5 probe has an unexpected DOC route in the compatibility span")
+    if routes_before.count("pub(super) fn doc_batch_leaf_write") != 0:
+        raise PreparationError("W5 historical routes unexpectedly contain the DOC batch route")
+    if routes_before.count("pub(super) fn doc_leaf_write") != 0:
+        raise PreparationError("W5 historical routes unexpectedly contain the DOC leaf route")
+    historical_routes = routes_before.rstrip()
+    if not historical_routes.endswith("}"):
+        raise PreparationError("W5 historical routes module has no closing brace")
+    historical_routes = (
+        historical_routes[:-1].rstrip()
         + "\n\n"
-        + routes_before.strip()
+        + leaf_functions
+        + "\n}"
+    )
+
+    translated = candidate_probe[:start].rstrip()
+    options_pattern = re.compile(
+        r"^(?P<indent> +)\.edit_with_options\(\n"
+        r" +litchi_ops::EditOptions::new\(\)\.semantic_limits\(limits\),$",
+        re.MULTILINE,
+    )
+    translated, options_replacements = options_pattern.subn(
+        lambda match: f'{match.group("indent")}.edit_with_limits(&limits,',
+        translated,
+    )
+    if options_replacements != 1:
+        raise PreparationError(
+            "W5 probe must contain exactly one unified File options entry point"
+        )
+    if translated.count("commit.file()") != 1:
+        raise PreparationError("W5 probe must contain exactly one unified Commit::file accessor")
+    translated = translated.replace("black_box(commit.file());", "black_box(commit.file);", 1)
+    if "litchi_ops::EditOptions" in translated or "commit.file()" in translated:
+        raise PreparationError("W5 baseline probe retained a candidate-only ops API")
+    if translated.count("`File::edit_with_options`") != 1:
+        raise PreparationError("W5 probe API documentation marker changed unexpectedly")
+    translated = translated.replace("`File::edit_with_options`", "`File::edit_with_limits`", 1)
+
+    return (
+        translated
+        + "\n\n"
+        + historical_routes
         + "\n\n"
         + candidate_probe[main:].lstrip()
         + "\n"
