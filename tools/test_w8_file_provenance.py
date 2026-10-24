@@ -40,6 +40,10 @@ class QualificationRecipe(unittest.TestCase):
         self.assertIn('CANDIDATE_LOCK_SHA256=4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1', source)
         self.assertIn('verify_candidate_archive "$FINAL_OUT/472b-source.tar"', source)
         self.assertIn('ensure_empty_target "$FINAL_TARGET"', source)
+        self.assertIn('BASE_VALIDATION_RECEIPT="$W8_PREP/validation-before.json/receipt.json"', source)
+        self.assertIn('FINAL_VALIDATION_RECEIPT="$W8_PREP/validation-after.json/receipt.json"', source)
+        self.assertIn('--validation-receipt "$BASE_VALIDATION_RECEIPT"', source)
+        self.assertIn('--validation-receipt "$FINAL_VALIDATION_RECEIPT"', source)
         self.assertNotIn('"$CARGO" \\\n      build', source)
 
     def test_c796_recipe_is_not_presented_as_current_executable(self):
