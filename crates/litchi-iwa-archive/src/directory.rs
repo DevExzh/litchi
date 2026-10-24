@@ -3237,7 +3237,9 @@ mod tests {
         use std::os::unix::fs::symlink;
         use std::os::unix::net::UnixListener;
 
-        let temp = Temp::new()?;
+        // Unix socket paths are bounded by SUN_LEN; keep this fixture's
+        // parent under /tmp even when the test harness has a long TMPDIR.
+        let temp = tempfile::tempdir_in("/tmp")?;
         fs::write(
             temp.path().join("Index.zip"),
             index_zip(&[("Index/Document.iwa", iwa(1, 10_000)?)])?,
@@ -3576,7 +3578,9 @@ mod tests {
     fn rejects_special_nodes_in_loose_index() -> Result<()> {
         use std::os::unix::net::UnixListener;
 
-        let temp = Temp::new()?;
+        // Unix socket paths are bounded by SUN_LEN; keep this fixture's
+        // parent under /tmp even when the test harness has a long TMPDIR.
+        let temp = tempfile::tempdir_in("/tmp")?;
         fs::create_dir(temp.path().join("Index"))?;
         fs::write(temp.path().join("Index/Document.iwa"), iwa(1, 10_000)?)?;
         let _socket = UnixListener::bind(temp.path().join("Index/socket.iwa"))?;

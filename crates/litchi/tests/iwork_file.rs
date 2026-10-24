@@ -185,7 +185,9 @@ fn path_failures_are_typed() {
 fn special_nodes_are_refused_without_blocking() {
     use std::os::unix::net::UnixListener;
 
-    let temp = tempfile::tempdir().unwrap();
+    // Unix socket paths are bounded by SUN_LEN; keep this fixture's parent
+    // under /tmp even when the test harness has a long TMPDIR.
+    let temp = tempfile::tempdir_in("/tmp").unwrap();
     let socket = temp.path().join("socket.pages");
     let _listener = UnixListener::bind(&socket).unwrap();
     assert!(litchi::open(&socket).is_err());
