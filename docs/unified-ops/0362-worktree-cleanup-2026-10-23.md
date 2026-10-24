@@ -942,3 +942,65 @@ The adjacent 2,096-byte manifest has SHA-256
 the 1,639-byte restore helper has SHA-256
 `86e0fa2c95a4902ddc2707578922ab5214e06ebb17b2ead763fe3776d4230300`.
 Recreate the leaves from their retained branches, then run `restore.py`.
+
+
+## Twenty-fourth cleanup, 2026-10-24
+
+Fresh checks against `f64213a09b` permitted removal of four merged leaves:
+W8 footnote limits, DOCX raw, DOCX SVG and DOCX variables. Their retained tips
+are `660205a29cdc384646dbeadad1a34e8ca1a89cf2`,
+`b96137acb4d0db0405f99f846e185022c3534bab`,
+`135a7b6e635c4ac679b19897e49ea416cc78efa3` and
+`7dae046af8de8426fd78beded6bdbc8da312c774`. Removal used no force. The
+pre-relocation checkout total was 32,152,076,288 apparent bytes. The
+coordinator independently verified all 5,266 preserved entries by size,
+SHA-256 and mode, plus branch tips, ancestry, removed paths and retained
+external roots. The 2,028,289,001-byte regular-file sum includes hardlinks;
+quarantine occupies 1,974,628,352 allocated bytes. These artifacts remain
+preserved and are not claimed as reclaimed space.
+
+Story-text remains because foreign source handles appeared during final
+checks. ODraw remains because its tip is not an integration ancestor.
+
+External directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/twenty-fourth-wave/`.
+Its final receipt is 4,041 bytes, SHA-256
+`bbbff01f5383a711426f67f47d89c8e6daabf8565859d119cdd57d0db45aff82`.
+The 1,463,756-byte `manifest.json` remains outside Git, SHA-256
+`8387b2ab354bd763d223ccf4b551a0daa8b92354bf0d3cf360d1f3c3f321b49f`.
+The generating command was `python3` with the adjacent `move_w8.py`
+(3,317 bytes, SHA-256
+`4cb3f314c264daa3167cbc6535f9247d97199aafcc3c5c433954d885bedd7f1f`),
+a wrapper around the retained cleanup22 mover. Regeneration requires
+recreating the retained branches and restoring their ignored files first,
+using the exact commands in the receipt. The adjacent `restore.py` is
+2,066 bytes, SHA-256
+`68c4d97a3148e3799e390b6036b72da7dd8426b5e16987caf039dbf0b23b33d7`.
+The corrected wave label and receipt digest typo preserve earlier metadata
+copies alongside the final files; no payload changed.
+
+
+## Twenty-fifth cleanup, 2026-10-24
+
+After review and merge at `2dfc4f134d`, the XLS property/feature leaf was
+removed without force. Its retained branch tip is
+`9d38e2c4f28e28be4532823e66a13de5637bb916`; the source checkout measured
+7,551,512,576 apparent bytes before relocation. Three ignored files totaling
+203,491 bytes were quarantined; their 225,280 allocated bytes are preserved,
+not reclaimed. The external target and evidence root remains intact.
+
+The coordinator found and returned a quarantine-layout mismatch before
+acceptance: the payloads were directly under `ignored/`, while the manifest
+and restore helper expected `ignored/xls-property/`. The mover owner corrected
+the layout and the coordinator independently reverified every size/hash,
+retained ref, ancestry, removed path and external-root existence.
+
+External directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/twenty-fifth-wave/`.
+The final receipt is 3,323 bytes, SHA-256
+`6d628526eff3d42fb4ab457c8ca21c977cf2b7f26629a848a7ff5ca7b892ed9c`.
+The 973-byte manifest has SHA-256
+`5692ff8c58a16cbd0f712ed169bf2c21c51d2136301b5522a5af5d3b91dc9ad2`;
+the 1,639-byte restore helper has SHA-256
+`5a78eef2210c991dafcfed01ece0b829c195a261c8d296c0ade4643c64226004`.
+Recreate the leaf from its retained branch, then run the adjacent `restore.py`.

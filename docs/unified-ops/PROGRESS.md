@@ -3317,3 +3317,45 @@ See [0063](0063-source-pptx-modern-comments.md).
   all-68 inventory, actual corpus replay, glossary closure and native
   qualification remain required. Only comprehensive redaction audit 22
   is deferred. Nothing is pushed.
+
+
+- Coordinator checkpoint (2026-10-24, XLS closure and acceptance restart):
+  Reviewed XLS source `3ae7b83140` and receipt `9d38e2c4f2` merge at
+  `2dfc4f134d`. Metadata, property sets and worksheet features retain cold
+  edit entry, signed exact no-ops and typed refusal mapping. Both candidate
+  admission and worksheet rendering now preserve SourceChanged precedence;
+  each has stable-error and post-leading-source-change controls. The
+  coordinator verified all source-bound test receipts and retained all DOC,
+  XLS and PPT fallible metadata benchmark consumers.
+
+  The first full gate at `2dfc4f134d` stopped at formatting. Ten files were
+  formatted, and the composed all-target/all-feature strict CLI, operations,
+  facade and Python check passes at `97817cb75f` in 167.272 seconds with a
+  stable 4,706,734,564-byte target and no remaining owned builders (0362ugu).
+
+  Native protocol checks returned stale ODF/W8 probe and IWA fixture source
+  bindings. Reviewed corrections preserve the actual fixture generator and
+  workload. W8 also required a pristine-f2 adapter for three deferred XLSB
+  selector calls; the corrected adapter is byte-identical to the previously
+  reviewed baseline consumer. Its test no longer requires historical Git
+  objects. All 65 general native protocol checks and 20 iWork checks pass at
+  frozen candidate `b6732d02b241705ba153c1a2cb9ff03bf0a13f93`.
+
+  The full 53-step gate is running on that fixed candidate in the diagnostic
+  worktree. Formatting and combined strict consumers pass; remaining steps
+  are pending. ODG, iWork and W4b/W5 native endpoint preparation/builds have
+  three capped slots, with timing held until the host is quiet. The fixed ODG
+  baseline accepts the candidate lock; all 228 external dependency rows
+  match, independently verified. No native acceptance is claimed.
+
+  Cleanups twenty-four and twenty-five remove five more merged leaves,
+  retaining branches, external targets/evidence, and hash-quarantined ignored
+  artifacts. The coordinator verified all 5,266 cleanup24 payloads and all
+  three XLS payloads. A restore-layout mismatch was corrected before cleanup25
+  acceptance. Story-text and ODraw leaves remain because of live foreign
+  handles and missing integration ancestry, respectively.
+
+  Source integration remains staging. Completion still requires the full
+  gate, all-68 inventory, actual corpus replay, glossary closure and quiet
+  native qualification. Only comprehensive redaction audit22 is deferred.
+  Nothing is pushed.
