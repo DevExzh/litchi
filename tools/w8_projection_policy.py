@@ -681,4 +681,3 @@ if __name__ == "__main__":
     except ProjectionPolicyError as error:
         print(f"w8 projection policy: {error}", file=sys.stderr)
         raise SystemExit(2)
-
