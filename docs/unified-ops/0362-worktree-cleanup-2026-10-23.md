@@ -1004,3 +1004,27 @@ The 973-byte manifest has SHA-256
 the 1,639-byte restore helper has SHA-256
 `5a78eef2210c991dafcfed01ece0b829c195a261c8d296c0ade4643c64226004`.
 Recreate the leaf from its retained branch, then run the adjacent `restore.py`.
+
+
+## Twenty-sixth cleanup, 2026-10-24
+
+The final IWA fixture-binding and W8 probe-binding leaves were removed without
+force after fresh checks against frozen `b6732d02b2`. Their retained tips are
+`4dae391375523d08672f2115a8011fb5628d2cfa` and
+`d714aee19d052da58d732b0483b06b60d504f9a5`. Pre-relocation checkouts measured
+7,552,303,104 and 8,093,696 apparent bytes. Seven ignored bytecode files were
+hash-quarantined under the manifest-prescribed leaf prefixes; the coordinator
+verified all payload sizes/hashes, refs, ancestry and removed source paths.
+Their 454,656 allocated bytes remain preserved, not reclaimed. External
+protocol logs, native endpoints and all targets remain untouched.
+
+External directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/twenty-sixth-wave/`.
+The 2,177-byte receipt has SHA-256
+`a2fe626527f62fcd40ec635369c4d515f0c5f38ae2c12155dbb26e5b4e84362a`.
+The 2,038-byte manifest has SHA-256
+`3a3946537cd75e25a0a53c0ccbcf5394a4b8a58c03b91aa57c5fc147f9968b15`;
+the 1,639-byte restore helper has SHA-256
+`f5b3ad7169441de455310d76374f0c8bce50b1d07299b6368fd16686a6f8050d`.
+Recreate the leaves from their retained branches, then run the adjacent
+`restore.py`.
