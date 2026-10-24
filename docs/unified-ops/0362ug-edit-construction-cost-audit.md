@@ -10,7 +10,7 @@ not accepted performance exceptions.
 This audit starts from assembled source `7559f44aa975254bd96f6e28eee17366b0ebeb6a`.
 ODG and ODB/ODM were assembled at `8779d059ad`. Reviewed DOC and the ODS
 resource-admission successor are assembled at `3676e21cfa`; reviewed ODP
-entry/admission follows at `d316d04291`. Other rows below
+entry/admission follows at `d316d04291`, and reviewed XLS at `50d4f4b88d`. Other rows below
 remain open; this is source integration, not final performance acceptance.
 
 ## Confirmed scopes
@@ -22,7 +22,7 @@ remain open; this is source integration, not final performance acceptance.
 | ODP | Package edit builds a complete mutable presentation and copies validated slides/source fragments; flat edit clones the slide vector. | 0362uga, reviewed and validated correction merged at `d316d04291`. The already-lazy tail-append entry is not this finding. |
 | ODS | Source cells construct protection state; DDE and sheet-metadata constructors load source projections; package resource-count validation enumerates archive members; flat edits allocate per-sheet staging. | 0362ugc merged at `f144cd6029`; reviewed and validated 0362ugca merged at `3676e21cfa`, removing the added open/edit census while retaining admission at staging, commit and replay. |
 | DOC | Primary/profiled and scoped families serialize/copy the source at entry; paragraph source-backed entry scans the source prefix. | 0362ugd and 0362ugd-a, reviewed and validated source/consumer correction merged at `cf7def80df`. |
-| XLS | Primary and source-backed cells copy/index source state; scoped capture serializes the archive for comments, visibility, objects, names, charts and pivots. | 0362uge, correction in progress. |
+| XLS | Primary and source-backed cells copy/index source state; scoped capture serializes the archive for comments, visibility, objects, names, charts and pivots. | 0362uge, reviewed and validated source/freshness correction merged at `50d4f4b88d`. |
 | XLSX source-backed | Worksheet and defined-name/cell constructors load and decode selected parts or workbook state before staging. | 0362ugf, source correction under validation; baseline reproduction is required for the three remaining slicer failures. |
 | XLSX pivot | Pivot cache/table/data entries load graphs and clone semantic drafts before an operation. | 0362ugn, separate correction assigned from `8bf4833ae5`. |
 | XLSX graph families | Metadata, calculation properties, connections, custom data, external links, data model and XML maps load selected graphs or snapshots at entry. | 0362ugo, separate correction assigned from `8bf4833ae5`. |
@@ -143,9 +143,18 @@ identifies the exact clean source and tested two-file overlay; its hash matches
 the committed final consumer delta. The original 1,222-test receipt remains
 historical. No native timing claim is made.
 
-Other returns remain required before merging their leaves. XLS must retain the
-recipient source fence across independent content-matching replay and
-preserve typed source-change precedence during primary handoff. Pages must
+XLS source `b8ed2d46bb` now clears review and is merged with receipt
+`8c2b79f7c5` at `50d4f4b88d`. Independent content-matching replay retains the
+recipient's deferred source fence. Both admission and later primary guards
+promote in-flight composed-target errors to the original typed SourceChanged
+when appropriate. Chart/pivot failures preserve retry state. The coordinator
+verified 1,870 passing tests across 100 suites, strict Clippy, all-feature
+facade checks and four metadata consumer tests. The one existing ignored test
+writes an evidence workbook. Focused owner/source tests and the deterministic
+admission regression also pass; raw logs and root configuration were verified.
+Published-example doctests remain part of the composed validation below.
+
+Other returns remain required before merging their leaves. Pages must
 retain cumulative wire budgets, admit owned selector/text memory before
 retention, avoid repeated payload copies, and migrate standalone fuzz
 consumers. Numbers' named-selector scans are deferred in `86c762d2a7`, but review
@@ -179,3 +188,41 @@ at `d14748b233` for separate review and a fresh validation run. The pivot
 correction at `a99de1d698` is under source review; graph and object corrections
 remain in progress. These later commits do not inherit acceptance from the
 earlier source-backed test receipt.
+
+## Composed validation assemblies, 2026-10-24
+
+The coordinator assembled reviewed Pages, Numbers and Keynote corrections
+with integration `164b0508db` in the existing Pages leaf. Initial composition
+is `3ae5fdf0ff`; subsequent compile/test corrections retain the shared Footnote
+Arc, fix a qualified test name and a merge-region fixture, and complete the
+Keynote selector-kind mapping. Independent review confirms the Arc correction
+has no payload-copy or failure-state regression. Full combined validation,
+standalone consumers and doctests are in progress under record 0362ugr; those
+corrections are not yet merged into main integration.
+
+The XLSX assembly at `7ed6fb0ca7` includes integration through XLS
+`50d4f4b88d`, source/catalog families, initial-batch deferred staging, pivot
+`83a1b6a090`, graph `672b7498e8` and object `2ea78edd48` corrections. Nested
+pivot validation now receives effective edit limits and preserves the typed
+crate error; its new public regression distinguishes the 4,096-byte nested
+part from earlier candidate serialization. Source reviews are clear and
+combined Cargo/consumer/doctest validation is assigned under record 0362ugs.
+The sparse checkout's omitted tracked `.cargo/config.toml` was materialized;
+all actual root configuration now matches the composed source before builds.
+The omitted file contains the lint alias, not compiler flags.
+
+Reviewed ODF shared-triad tooling `7f85a0dd5d` is included in that assembly so
+its Rust probe will be compiled in the all-feature facade checks. The
+coordinator's three ODF unittest modules pass 18 tests; external log
+`/home/zhuhe/code/litchi-worktrees/.coord/odf-protocol-review-7f85/tests.log`
+is 117 bytes, SHA-256
+`f10ec9ad7e06e8c5f41a75ab1f59b65505def0a0a9d05a795a2c958278cdb60e`.
+Review covers normalized manifest/ZIP proofs, allocator observation boundaries,
+actual source/config closure, per-endpoint toolchain context, journal ordering
+and fresh outputs. No actual build or native measurement is credited by these
+Python checks. The separate ODG protocol still has returned source-byte,
+effective-environment and final target-limit gaps at `8037019b33`.
+
+The four owned build slots now cover composed iWork, composed XLSX, XLSB and
+PPTX. PPT and DOCX runtime validation remains queued. Native endpoints stay
+unresolved until final source freeze; no required engineering work is waived.
