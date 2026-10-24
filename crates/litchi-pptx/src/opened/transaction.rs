@@ -4007,7 +4007,7 @@ mod compaction_tests {
         let package = Package::from_reader(std::io::Cursor::new(bytes))?;
         let snapshot = package.opened_presentation()?;
         let mut witnessed = 0usize;
-        for slide in &snapshot.slides {
+        for slide in snapshot.slides.as_ref() {
             let xml = snapshot.package.get_part(&slide.part_name)?.blob();
             let compacted = super::super::xml::compact_changed_slide_xml(xml)?;
             if compacted.root_unchanged {
