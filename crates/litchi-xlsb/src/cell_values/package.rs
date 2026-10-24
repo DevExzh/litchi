@@ -19,6 +19,7 @@ use crate::package::error::{Error, Result};
 use crate::package::shared_strings::{PhoneticRun, SharedString, SharedStringRun};
 use crate::sheet::Selector;
 use litchi_opc::{OpcPackage, PackURI, PackageWriter};
+use std::borrow::Cow;
 use std::io::{self, Write};
 use std::mem::size_of;
 use std::sync::Arc;
@@ -113,7 +114,9 @@ impl Scalar {
 #[derive(Debug, Clone)]
 pub struct Edit {
     base: Package,
-    worksheet: PackURI,
+    selector: Selector<'static>,
+    worksheet: Option<PackURI>,
+    resolved: bool,
     worksheet_limits: Limits,
     raw: Option<super::worksheet::Draft>,
     transfer_limits: TransferLimits,
@@ -209,13 +212,15 @@ impl StylesDraft {
 impl Edit {
     fn new(
         base: Package,
-        worksheet: PackURI,
+        selector: Selector<'static>,
         worksheet_limits: Limits,
         transfer_limits: TransferLimits,
     ) -> Self {
         Self {
             base,
-            worksheet,
+            selector,
+            worksheet: None,
+            resolved: false,
             worksheet_limits,
             raw: None,
             transfer_limits,
@@ -225,13 +230,47 @@ impl Edit {
         }
     }
 
+    /// Resolve the selected tab against the workbook catalog.
+    ///
+    /// Construction of an edit is deliberately cold, including when the
+    /// package came from [`litchi_opc::OpcPackage`] without a parsed workbook
+    /// projection.  This first fallible resolution performs the catalog scan
+    /// and preserves the selector's missing-tab capability as `Ok(None)`.
+    /// A chart, dialog, macro, or otherwise non-grid tab is reported as the
+    /// same typed refusal as an operation that reaches it through `commit`.
+    pub fn resolve(mut self) -> Result<Option<Self>> {
+        if self.resolve_selector()?.is_some() {
+            Ok(Some(self))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn resolve_selector(&mut self) -> Result<Option<PackURI>> {
+        if !self.resolved {
+            self.worksheet = resolve_worksheet(&self.base, &self.selector)?;
+            self.resolved = true;
+        }
+        Ok(self.worksheet.clone())
+    }
+
+    fn worksheet_not_found(&self) -> Error {
+        match &self.selector {
+            Selector::Name(_) => Error::WorksheetNotFound(None),
+            Selector::Position(position) => Error::WorksheetNotFound(Some(position.get())),
+        }
+    }
+
     fn ensure_prepared(&mut self) -> Result<()> {
+        let worksheet = self
+            .resolve_selector()?
+            .ok_or_else(|| self.worksheet_not_found())?;
         if self.raw.is_some() {
             return Ok(());
         }
         let snapshot = workbook::read_with_limits_and_leniency(
             self.base.opc_package(),
-            &self.worksheet,
+            &worksheet,
             self.worksheet_limits,
             self.base.leniency(),
         )?;
@@ -292,7 +331,7 @@ impl Edit {
     /// let mut writer = Builder::new();
     /// writer.add_worksheet(sheet);
     /// let package = writer.build()?;
-    /// let mut edit = package.edit_cell_values(0)?.expect("worksheet");
+    /// let mut edit = package.edit_cell_values(0)?.resolve()?.expect("worksheet");
     /// edit.set_scalar(Reference::new(0, 0)?, Scalar::Number(2.0))?;
     /// let _commit = edit.commit()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -423,7 +462,7 @@ impl Edit {
     /// use litchi_xlsb::cell_values::{Format, Reference};
     ///
     /// let package = Package::new()?;
-    /// let mut edit = package.edit_cell_values(0)?.expect("worksheet");
+    /// let mut edit = package.edit_cell_values(0)?.resolve()?.expect("worksheet");
     /// let mut format = Format::default();
     /// format.bold = Some(true);
     /// assert!(edit.set_format(Reference::new(0, 0)?, &format)?);
@@ -726,8 +765,12 @@ impl Edit {
         let worksheet_limits = raw.limits();
         let raw_commit = raw.commit_with_change_limit(self.transfer_limits.changes())?;
         validate_transfer_limits(raw_commit.patch(), self.transfer_limits)?;
+        let worksheet = self
+            .worksheet
+            .clone()
+            .ok_or_else(|| self.worksheet_not_found())?;
         let retained = size_of::<Patch>()
-            .saturating_add(self.worksheet.as_str().len())
+            .saturating_add(worksheet.as_str().len())
             .saturating_add(worksheet_retained_bytes(raw_commit.patch()));
         let image_budget = remaining_image_budget(retained, self.transfer_limits)?;
         let before: Arc<[u8]> = Arc::from(serialize_package(&self.base, image_budget)?);
@@ -747,7 +790,7 @@ impl Edit {
         };
         let applied = workbook::apply_retaining_parse(
             styled.as_ref().unwrap_or_else(|| self.base.opc_package()),
-            &self.worksheet,
+            &worksheet,
             &raw_commit,
             self.base.external_link_limits(),
             self.base.drawing_load_policy(),
@@ -780,7 +823,7 @@ impl Edit {
         let patch = Patch {
             before,
             after,
-            worksheet: self.worksheet,
+            worksheet,
             worksheet_patch,
             transfer_limits: self.transfer_limits,
         };
@@ -944,9 +987,13 @@ fn retained_shared_string_bytes(value: &SharedString) -> usize {
 }
 
 impl Package {
-    /// Start a detached cell-values edit selected from the complete tab
-    /// catalog using the default worksheet and transfer policies.
-    pub fn edit_cell_values<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<Edit>> {
+    /// Start a detached cell-values edit carrying a selector and the default
+    /// worksheet and transfer policies.
+    ///
+    /// The selector is owned but resolved lazily.  Call [`Edit::resolve`] when
+    /// the caller needs to distinguish a missing tab before staging the first
+    /// cell operation; ordinary operations and `commit` resolve it on demand.
+    pub fn edit_cell_values<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Edit> {
         self.edit_cell_values_with_options(selector, EditOptions::default())
     }
 
@@ -959,19 +1006,16 @@ impl Package {
         &self,
         selector: impl Into<Selector<'a>>,
         options: EditOptions,
-    ) -> Result<Option<Edit>> {
+    ) -> Result<Edit> {
         let worksheet_limits = options.limits;
         let transfer_limits = options.transfer_limits;
         validate_limits(transfer_limits)?;
-        let Some(worksheet) = resolve_worksheet(self, selector)? else {
-            return Ok(None);
-        };
-        Ok(Some(Edit::new(
+        Ok(Edit::new(
             self.clone(),
-            worksheet,
+            own_selector(selector.into()),
             worksheet_limits,
             transfer_limits,
-        )))
+        ))
     }
 
     /// Apply an exact-source cell-values patch to a new package; this one is
@@ -990,13 +1034,9 @@ impl Package {
     }
 }
 
-fn resolve_worksheet<'a>(
-    package: &Package,
-    selector: impl Into<Selector<'a>>,
-) -> Result<Option<PackURI>> {
+fn resolve_worksheet<'a>(package: &Package, selector: &Selector<'a>) -> Result<Option<PackURI>> {
     let workbook = package.workbook()?;
-    let selector = selector.into();
-    if let Selector::Name(name) = &selector {
+    if let Selector::Name(name) = selector {
         let matches = workbook
             .sheets()
             .filter(|tab| crate::package::formula::excel_name_eq(tab.name(), name.as_ref()))
@@ -1007,7 +1047,7 @@ fn resolve_worksheet<'a>(
             ));
         }
     }
-    let Some(tab) = workbook.sheet(selector)? else {
+    let Some(tab) = workbook.sheet(selector.clone())? else {
         return Ok(None);
     };
     let Some(position) = tab.worksheet_position() else {
@@ -1018,6 +1058,13 @@ fn resolve_worksheet<'a>(
         ));
     };
     workbook.worksheet_uri(position.get()).map(Some)
+}
+
+fn own_selector<'a>(selector: Selector<'a>) -> Selector<'static> {
+    match selector {
+        Selector::Name(name) => Selector::Name(Cow::Owned(name.into_owned())),
+        Selector::Position(position) => Selector::Position(position),
+    }
 }
 
 fn has_calculation_chain(package: &OpcPackage) -> Result<bool> {
@@ -1178,4 +1225,20 @@ fn validate_limits(limits: TransferLimits) -> Result<()> {
         ));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selector_resolution_is_deferred_for_cold_packages() {
+        let cold = Package::from(Package::new().expect("package").into_opc());
+        assert!(!cold.projection_cached());
+
+        let edit = cold.edit_cell_values("missing").expect("edit entry");
+        assert!(!cold.projection_cached());
+        assert!(edit.resolve().expect("selector resolution").is_none());
+        assert!(cold.projection_cached());
+    }
 }

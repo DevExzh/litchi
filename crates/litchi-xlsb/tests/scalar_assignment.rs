@@ -178,6 +178,8 @@ fn assigns_scalars_and_inserts_missing_cells() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     edit.set_scalar(a1(), Scalar::Number(2.5)).expect("number");
     edit.set_scalar(b1(), Scalar::Boolean(false))
@@ -220,6 +222,8 @@ fn same_value_sst_assignment_is_an_exact_noop() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     edit.set_scalar(c1(), Scalar::Text("same".to_owned()))
         .expect("same shared string");
@@ -236,6 +240,8 @@ fn family_changes_keep_style_and_phonetic_flag() {
     let mut seed = source
         .edit_cell_values(0)
         .expect("selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     seed.set_style(a1(), style_zero()).expect("style");
     seed.set_show_phonetic(a1(), true).expect("phonetic flag");
@@ -244,6 +250,8 @@ fn family_changes_keep_style_and_phonetic_flag() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     edit.set_scalar(a1(), Scalar::Text("text".to_owned()))
         .expect("number to text");
@@ -258,6 +266,8 @@ fn family_changes_keep_style_and_phonetic_flag() {
     let mut clear = package
         .edit_cell_values(0)
         .expect("selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     clear.set_scalar(a1(), Scalar::Blank).expect("clear scalar");
     let cleared = clear.commit().expect("clear commit").into_package();
@@ -287,6 +297,8 @@ fn invalid_scalar_is_rejected_before_mutation() {
             )),
         )
         .expect("selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     assert!(edit.set_scalar(a1(), Scalar::Number(f64::NAN)).is_err());
     assert!(
@@ -306,6 +318,8 @@ fn ordinary_formula_equal_scalar_materializes_direct_value() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     edit.set_scalar(a1(), Scalar::Number(2.0))
         .expect("equal cached value");
@@ -322,6 +336,8 @@ fn ordinary_formula_changed_scalar_and_clear_materialize_direct_values() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     edit.set_scalar(a1(), Scalar::Number(3.0))
         .expect("changed cached value");
@@ -331,6 +347,8 @@ fn ordinary_formula_changed_scalar_and_clear_materialize_direct_values() {
     let mut clear = changed
         .edit_cell_values(0)
         .expect("selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     clear
         .set_scalar(a1(), Scalar::Blank)
@@ -345,6 +363,8 @@ fn formula_cache_equal_scalars_materialize_direct_typed_values() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     edit.set_scalar(a1(), Scalar::Number(1.0))
         .expect("equal numeric cache");
@@ -368,6 +388,8 @@ fn scalar_assignment_refuses_grouped_formula_cells() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     assert!(edit.set_scalar(a1(), Scalar::Number(4.0)).is_err());
     assert!(edit.set_scalar(b1(), Scalar::Blank).is_err());
@@ -384,6 +406,8 @@ fn scalar_assignment_refuses_missing_group_follower() {
     let mut edit = source
         .edit_cell_values(0)
         .expect("selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("worksheet");
     assert!(edit.set_scalar(b1(), Scalar::Number(4.0)).is_err());
     assert!(edit.set_scalar(b1(), Scalar::Blank).is_err());
@@ -424,6 +448,8 @@ fn formula_assignment_refuses_transitional_and_strict_calculation_chains() {
         let mut edit = source
             .edit_cell_values(0)
             .expect("edit")
+            .resolve()
+            .expect("worksheet resolution")
             .expect("worksheet");
         let error = edit
             .set_scalar(a1(), Scalar::Number(2.0))
@@ -453,7 +479,12 @@ fn formula_assignment_refuses_transitional_and_strict_calculation_chains() {
 fn removal_is_idempotent_and_inverse_restores_exact_package() {
     let source = package_with_scalars();
     let before = source.to_bytes().expect("source bytes");
-    let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
+    let mut edit = source
+        .edit_cell_values(0)
+        .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
+        .expect("sheet");
     assert!(!edit.remove(e1()).expect("absent coordinate"));
     assert!(edit.remove(a1()).expect("number"));
     assert!(!edit.remove(a1()).expect("repeated removal"));
@@ -491,7 +522,12 @@ fn removal_is_idempotent_and_inverse_restores_exact_package() {
 fn removal_of_missing_cells_and_cancelled_insertions_is_exact() {
     let source = package_with_scalars();
     let before = source.to_bytes().expect("bytes");
-    let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
+    let mut edit = source
+        .edit_cell_values(0)
+        .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
+        .expect("sheet");
     assert!(!edit.remove(e1()).expect("missing"));
     edit.set_scalar(e1(), Scalar::Number(9.0)).expect("insert");
     assert!(edit.remove(e1()).expect("remove insertion"));
@@ -508,7 +544,12 @@ fn removal_refuses_formula_group_members_including_absent_followers() {
         package_with_missing_group_follower(),
     ] {
         let before = source.to_bytes().expect("bytes");
-        let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
+        let mut edit = source
+            .edit_cell_values(0)
+            .expect("edit")
+            .resolve()
+            .expect("worksheet resolution")
+            .expect("sheet");
         for reference in [a1(), b1()] {
             assert!(edit.remove(reference).is_err());
         }
@@ -520,7 +561,12 @@ fn removal_refuses_formula_group_members_including_absent_followers() {
 #[test]
 fn ordinary_formula_removal_drops_the_complete_record() {
     let source = package_with_typed_formula_caches();
-    let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
+    let mut edit = source
+        .edit_cell_values(0)
+        .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
+        .expect("sheet");
     for reference in [a1(), b1(), c1()] {
         assert!(edit.remove(reference).expect("formula removal"));
     }
@@ -558,7 +604,12 @@ fn semantic_mutation_refuses_unmodeled_cell_families_without_guessing_coordinate
     opc.get_part_mut(&uri).expect("sheet").set_blob(output);
     let source = Package::from_opc(opc).expect("opaque source");
     let before = source.to_bytes().expect("bytes");
-    let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
+    let mut edit = source
+        .edit_cell_values(0)
+        .expect("edit")
+        .resolve()
+        .expect("worksheet resolution")
+        .expect("sheet");
     assert!(matches!(
         edit.remove(e1()),
         Err(litchi_xlsb::package::PackageError::Refused(_))

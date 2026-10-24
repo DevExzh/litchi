@@ -192,6 +192,8 @@ fn import_xlsb(bytes: &[u8], table: &[Row], source: &[u8], rounds: usize) -> Val
             let mut edit = package
                 .edit_cell_values(0usize)
                 .expect("edit")
+                .resolve()
+                .expect("worksheet resolution")
                 .expect("first sheet");
             let mut date = Format::default();
             date.number_format = Some("yyyy-mm-dd".to_owned());

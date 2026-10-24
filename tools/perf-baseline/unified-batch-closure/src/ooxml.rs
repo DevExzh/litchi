@@ -225,8 +225,8 @@ fn column_name(mut col: u32) -> String {
 /// (32 columns wide). Both coalesce into one leaf edit.
 #[cfg(feature = "xlsb")]
 fn xlsb(counts: &[usize]) -> Result<Vec<Case<'static>>> {
-    use litchi_xlsb::cell_values::{Reference, Scalar};
     use litchi_xlsb::builder::{self, Builder};
+    use litchi_xlsb::cell_values::{Reference, Scalar};
     let max = counts.iter().copied().max().unwrap_or(0);
     let mut writer = Builder::new();
     let mut sheet = builder::Worksheet::new("Sheet1");
@@ -244,7 +244,10 @@ fn xlsb(counts: &[usize]) -> Result<Vec<Case<'static>>> {
         native: &litchi_xlsb::Package,
         refs: &[(u32, u32)],
     ) -> Result<litchi_xlsb::Package> {
-        let mut edit = native.edit_cell_values(0usize)?.ok_or("no sheet")?;
+        let mut edit = native
+            .edit_cell_values(0usize)?
+            .resolve()?
+            .ok_or("no sheet")?;
         for (i, &(row, col)) in refs.iter().enumerate() {
             edit.set_scalar(Reference::new(row, col)?, Scalar::Number(-(i as f64) - 1.0))?;
         }
@@ -254,7 +257,10 @@ fn xlsb(counts: &[usize]) -> Result<Vec<Case<'static>>> {
         native: &litchi_xlsb::Package,
         refs: &[(u32, u32)],
     ) -> Result<litchi_xlsb::Package> {
-        let mut edit = native.edit_cell_values(0usize)?.ok_or("no sheet")?;
+        let mut edit = native
+            .edit_cell_values(0usize)?
+            .resolve()?
+            .ok_or("no sheet")?;
         for &(row, col) in refs {
             if !edit.remove(Reference::new(row, col)?)? {
                 return Err("leaf removal staged nothing".into());

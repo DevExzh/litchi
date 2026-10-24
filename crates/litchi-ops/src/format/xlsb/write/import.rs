@@ -74,6 +74,8 @@ pub(crate) fn import(
                 NativeCellOptions::new().transfer_limits(native_limits),
             )
             .map_err(native_error)?
+            .resolve()
+            .map_err(native_error)?
             .ok_or_else(|| {
                 Error::new(
                     Code::OutOfRange,

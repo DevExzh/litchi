@@ -13,6 +13,14 @@ Custom Data, and threaded comments.  Fallible accessors retain the existing
 typed errors where a read-only staged projection must materialize a source
 snapshot; no dummy values or panic-based lazy state are introduced.
 
+The package cell-values entry owns a selector rather than retaining a
+resolved worksheet URI. `Package::{edit_cell_values,
+edit_cell_values_with_options}` therefore return a cold `Edit`; callers that
+need the missing-tab capability call `Edit::resolve()`, which returns
+`Ok(None)` for a missing tab and performs the catalog scan only at that first
+fallible resolution. Ordinary staging operations and `commit()` resolve the
+selector on demand.
+
 The existing replay, exact no-op, inverse, signature-policy, bounded-limit and
 publication behavior remains on the same first-use/commit paths.  Constructor
 and drop tests prove that a cold package projection remains cold for the

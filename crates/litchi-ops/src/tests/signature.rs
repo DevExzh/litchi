@@ -397,6 +397,8 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
             let mut edit = package
                 .edit_cell_values(0)
                 .unwrap()
+                .resolve()
+                .unwrap()
                 .expect("worksheet selector resolves");
             edit.insert(
                 Reference::new(100, 0).unwrap(),
@@ -602,6 +604,8 @@ fn assert_exact_noop(input: &Input) {
             let package = litchi_xlsb::Package::from_bytes(bytes).unwrap();
             let commit = package
                 .edit_cell_values(0)
+                .unwrap()
+                .resolve()
                 .unwrap()
                 .expect("worksheet selector resolves")
                 .commit()

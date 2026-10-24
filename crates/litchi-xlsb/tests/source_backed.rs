@@ -1020,6 +1020,8 @@ fn eager_grid_selectors_share_the_owner_cache_and_survive_republication() {
     let mut edit = package
         .edit_cell_values(name.as_str())
         .unwrap()
+        .resolve()
+        .unwrap()
         .expect("worksheet selector");
     edit.insert(inserted, StyleIndex::new(0).unwrap(), Value::Number(1.0))
         .unwrap();

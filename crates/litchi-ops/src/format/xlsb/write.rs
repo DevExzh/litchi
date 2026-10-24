@@ -394,6 +394,8 @@ fn canonical_cell_patch(base: &Xlsb, sheet: usize, limits: TransferLimits) -> Re
             NativeCellOptions::new().transfer_limits(limits),
         )
         .map_err(native_error)?
+        .resolve()
+        .map_err(native_error)?
         .ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
@@ -713,6 +715,8 @@ pub(crate) fn remove_with_limits(
                 NativeSelector::from(sheet),
                 NativeCellOptions::new().transfer_limits(native_limits),
             )
+            .map_err(native_error)?
+            .resolve()
             .map_err(native_error)?
             .ok_or_else(|| {
                 Error::new(
@@ -1191,6 +1195,8 @@ fn set_cells_with_limits(
                 NativeSelector::from(sheet),
                 NativeCellOptions::new().transfer_limits(native_limits),
             )
+            .map_err(native_error)?
+            .resolve()
             .map_err(native_error)?
             .ok_or_else(|| {
                 Error::new(
@@ -3020,6 +3026,8 @@ pub(crate) mod coalesce {
                     NativeCellOptions::new().transfer_limits(native_limits),
                 )
                 .map_err(native_error)?
+                .resolve()
+                .map_err(native_error)?
                 .ok_or_else(|| {
                     Error::new(
                         Code::OutOfRange,
@@ -3157,6 +3165,8 @@ pub(crate) mod coalesce {
                                 NativeCellOptions::new().transfer_limits(native_limits),
                             )
                             .map_err(native_error)?
+                            .resolve()
+                            .map_err(native_error)?
                             .ok_or_else(|| {
                                 Error::new(
                                     Code::OutOfRange,
@@ -3281,6 +3291,8 @@ pub(crate) mod coalesce {
                 NativeSelector::from(first.plan.target.sheet),
                 NativeCellOptions::new().transfer_limits(limits),
             )
+            .map_err(native_error)?
+            .resolve()
             .map_err(native_error)?
             .ok_or_else(|| {
                 Error::new(

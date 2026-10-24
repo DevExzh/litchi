@@ -90,6 +90,8 @@ fn changed_commit(source: &Package) -> litchi_xlsb::cell_values::Commit {
     let mut edit = source
         .edit_cell_values(0)
         .expect("worksheet selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("Sheet1 worksheet");
     edit.insert(a1(), style_zero(), Value::Number(42.0))
         .expect("insert numeric cell");
@@ -191,6 +193,8 @@ fn no_op_cell_commit_projection_preserves_the_exact_source() {
     let commit = source
         .edit_cell_values("Sheet1")
         .expect("worksheet selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("Sheet1 worksheet")
         .commit()
         .expect("no-op commit");
@@ -230,6 +234,8 @@ fn changed_cell_commit_retains_tolerant_cached_number_policy() {
     let mut edit = package
         .edit_cell_values(0)
         .expect("worksheet selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("Numbers worksheet");
     edit.set_number(b1(), 3.5).expect("change B1");
     let commit = edit.commit().expect("tolerant cell commit");
@@ -283,6 +289,8 @@ fn changed_cell_commit_retains_read_limits_and_skipped_drawing_policy() {
     let mut edit = package
         .edit_cell_values(0)
         .expect("worksheet selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("Numbers worksheet");
     edit.set_number(b1(), 7.5).expect("change B1");
     let commit = edit.commit().expect("bounded cell commit");

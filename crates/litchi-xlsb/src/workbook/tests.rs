@@ -1810,6 +1810,8 @@ fn exact_noop_cell_value_commit_publishes_nothing() {
     let edit = package
         .edit_cell_values(name)
         .unwrap()
+        .resolve()
+        .unwrap()
         .expect("worksheet selector");
     let commit = edit.commit().unwrap();
     assert!(
@@ -1840,6 +1842,8 @@ fn cell_value_publication_installs_the_parse_that_validated_it() {
     let name = workbook.worksheet_names()[0].clone();
     let mut edit = package
         .edit_cell_values(name)
+        .unwrap()
+        .resolve()
         .unwrap()
         .expect("worksheet selector");
     edit.insert(
@@ -1874,6 +1878,8 @@ fn refused_cell_value_publication_leaves_the_workbook_unchanged() {
     let name = workbook.worksheet_names()[0].clone();
     let mut edit = package
         .edit_cell_values(name)
+        .unwrap()
+        .resolve()
         .unwrap()
         .expect("worksheet selector");
     edit.insert(

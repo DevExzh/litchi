@@ -48,6 +48,8 @@ mod probe {
         let mut edit = package
             .edit_cell_values(0_usize)
             .expect("cell edit")
+            .resolve()
+            .expect("worksheet resolution")
             .expect("worksheet");
         for row in 0..ROWS {
             for column in 0..COLUMNS {
@@ -137,6 +139,8 @@ mod probe {
             let mut edit = package
                 .edit_cell_values(0_usize)
                 .expect("cell edit")
+                .resolve()
+                .expect("worksheet resolution")
                 .expect("worksheet");
             edit.set_scalar(c5, Scalar::Number(42.0)).expect("scalar");
             edit.commit().expect("commit").into_package()
@@ -151,6 +155,8 @@ mod probe {
             let mut edit = package
                 .edit_cell_values(0_usize)
                 .expect("cell edit")
+                .resolve()
+                .expect("worksheet resolution")
                 .expect("worksheet");
             for reference in &references {
                 edit.set_scalar(*reference, Scalar::Number(7.0))

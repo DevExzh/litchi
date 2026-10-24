@@ -94,6 +94,8 @@ pub(crate) fn refresh(
                     NativeCellOptions::new().transfer_limits(native_limits),
                 )
                 .map_err(native_error)?
+                .resolve()
+                .map_err(native_error)?
             else {
                 for (_, _, index) in caches {
                     refuse(&mut fields[index]);

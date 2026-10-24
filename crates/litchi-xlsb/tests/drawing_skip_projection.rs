@@ -172,6 +172,8 @@ fn skipped_projection_cell_noop_and_scalar_change_keep_malformed_drawings_opaque
     let no_op = package
         .edit_cell_values(name)
         .expect("cell no-op selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("cell no-op edit")
         .commit()
         .expect("cell no-op commit");
@@ -194,6 +196,8 @@ fn skipped_projection_cell_noop_and_scalar_change_keep_malformed_drawings_opaque
     let mut edit = package
         .edit_cell_values(name)
         .expect("scalar selector")
+        .resolve()
+        .expect("worksheet resolution")
         .expect("scalar edit");
     edit.set_number(reference, replacement)
         .expect("replace finite number");

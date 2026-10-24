@@ -64,7 +64,12 @@ fn format_all() -> Format {
 #[test]
 fn a_format_change_is_interned_and_reads_back() {
     let source = package();
-    let mut edit = source.edit_cell_values(0_usize).unwrap().unwrap();
+    let mut edit = source
+        .edit_cell_values(0_usize)
+        .unwrap()
+        .resolve()
+        .unwrap()
+        .unwrap();
     assert!(edit.set_format(at(0, 0), &format_all()).unwrap());
     // A blank coordinate becomes a formatted blank cell with the same XF.
     assert!(edit.set_format(at(4, 4), &format_all()).unwrap());
@@ -136,10 +141,20 @@ fn a_format_change_is_interned_and_reads_back() {
 #[test]
 fn a_partial_change_keeps_every_other_attribute() {
     let source = package();
-    let mut first = source.edit_cell_values(0_usize).unwrap().unwrap();
+    let mut first = source
+        .edit_cell_values(0_usize)
+        .unwrap()
+        .resolve()
+        .unwrap()
+        .unwrap();
     first.set_format(at(0, 0), &format_all()).unwrap();
     let styled = first.commit().unwrap().into_package();
-    let mut second = styled.edit_cell_values(0_usize).unwrap().unwrap();
+    let mut second = styled
+        .edit_cell_values(0_usize)
+        .unwrap()
+        .resolve()
+        .unwrap()
+        .unwrap();
     let mut format = Format::default();
     format.bold = Some(false);
     format.border_bottom = Some(None);
@@ -170,10 +185,20 @@ fn a_partial_change_keeps_every_other_attribute() {
 #[test]
 fn an_equal_format_is_an_exact_no_op() {
     let source = package();
-    let mut first = source.edit_cell_values(0_usize).unwrap().unwrap();
+    let mut first = source
+        .edit_cell_values(0_usize)
+        .unwrap()
+        .resolve()
+        .unwrap()
+        .unwrap();
     first.set_format(at(0, 0), &format_all()).unwrap();
     let styled = first.commit().unwrap().into_package();
-    let mut again = styled.edit_cell_values(0_usize).unwrap().unwrap();
+    let mut again = styled
+        .edit_cell_values(0_usize)
+        .unwrap()
+        .resolve()
+        .unwrap()
+        .unwrap();
     assert!(!again.set_format(at(0, 0), &format_all()).unwrap());
     assert!(!again.set_format(at(0, 0), &Format::default()).unwrap());
     let commit = again.commit().unwrap();
@@ -188,7 +213,12 @@ fn an_equal_format_is_an_exact_no_op() {
 #[test]
 fn built_in_number_formats_keep_their_identifier_and_invalid_values_are_refused() {
     let source = package();
-    let mut edit = source.edit_cell_values(0_usize).unwrap().unwrap();
+    let mut edit = source
+        .edit_cell_values(0_usize)
+        .unwrap()
+        .resolve()
+        .unwrap()
+        .unwrap();
     let mut format = Format::default();
     format.number_format = Some("0.00%".to_owned());
     edit.set_format(at(0, 0), &format).unwrap();
@@ -201,7 +231,12 @@ fn built_in_number_formats_keep_their_identifier_and_invalid_values_are_refused(
         .clone();
     assert_eq!(xf.num_fmt_id, 10);
 
-    let mut edit = source.edit_cell_values(0_usize).unwrap().unwrap();
+    let mut edit = source
+        .edit_cell_values(0_usize)
+        .unwrap()
+        .resolve()
+        .unwrap()
+        .unwrap();
     for invalid in [
         {
             let mut f = Format::default();
@@ -243,7 +278,12 @@ fn formula(workbook: &Workbook, row: u32, column: u32) -> (String, Option<CellVa
 #[test]
 fn formula_text_compiles_into_new_value_and_formula_cells() {
     let source = package();
-    let mut edit = source.edit_cell_values(0_usize).unwrap().unwrap();
+    let mut edit = source
+        .edit_cell_values(0_usize)
+        .unwrap()
+        .resolve()
+        .unwrap()
+        .unwrap();
     assert!(edit.set_formula_text(at(2, 0), "=SUM(A1:A2)*2").unwrap());
     assert!(edit.set_formula_text(at(1, 0), "A1+1").unwrap());
     let after = edit.commit().unwrap().into_package();
@@ -259,7 +299,12 @@ fn formula_text_compiles_into_new_value_and_formula_cells() {
     assert_eq!(sheet.get_cell(2, 0).unwrap().formula_flags(), Some(0x0002));
 
     // Replacing the formula text keeps the cache; the same text is a no-op.
-    let mut edit = after.edit_cell_values(0_usize).unwrap().unwrap();
+    let mut edit = after
+        .edit_cell_values(0_usize)
+        .unwrap()
+        .resolve()
+        .unwrap()
+        .unwrap();
     assert!(!edit.set_formula_text(at(1, 0), "A1+1").unwrap());
     assert!(edit.set_formula_text(at(1, 0), "A1+2").unwrap());
     let replaced = edit.commit().unwrap().into_package();
@@ -271,7 +316,12 @@ fn formula_text_compiles_into_new_value_and_formula_cells() {
 #[test]
 fn formulas_needing_workbook_context_are_refused_before_staging() {
     let source = package();
-    let mut edit = source.edit_cell_values(0_usize).unwrap().unwrap();
+    let mut edit = source
+        .edit_cell_values(0_usize)
+        .unwrap()
+        .resolve()
+        .unwrap()
+        .unwrap();
     for text in ["Other!A1", "SUM(Missing)", "=("] {
         let error = edit.set_formula_text(at(3, 3), text).unwrap_err();
         assert!(
