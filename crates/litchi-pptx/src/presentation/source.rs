@@ -459,7 +459,6 @@ fn reserve_source_text_box(
     let amount = input_scene
         .checked_add(output_scene)
         .and_then(|size| size.checked_add(transient))
-        .filter(|amount| *amount <= maximum)
         .ok_or(Error::Limit {
             resource: "source-backed text-box admission bytes",
             limit: maximum,
