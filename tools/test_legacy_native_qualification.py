@@ -38,11 +38,15 @@ class LegacyNativeQualificationTests(unittest.TestCase):
                 (ROOT / "tools/native_qualification/manifests" / name).read_text(encoding="utf-8")
             )
             self.assertEqual(data["lane"], lane)
+            self.assertIn("preparation_receipt", data)
             self.assertEqual(data.get("abba_blocks", 1), blocks)
             self.assertEqual([item["id"] for item in data["legs"]["before"]["programs"]], programs)
             self.assertEqual([item["id"] for item in data["legs"]["after"]["programs"]], programs)
+            for leg in ("before", "after"):
+                self.assertTrue(data["legs"][leg]["allow_dirty"])
+                self.assertTrue(data["legs"][leg]["allowed_dirty_paths"])
 
-    def test_validator_accepts_five_block_rtf_receipt(self) -> None:
+    def test_validator_rejects_fabricated_five_block_receipt_without_provenance(self) -> None:
         with tempfile.TemporaryDirectory(prefix="legacy-native-rft-") as directory:
             root = Path(directory)
             output = root / "output"
@@ -130,16 +134,23 @@ class LegacyNativeQualificationTests(unittest.TestCase):
             (output / "events-abba.jsonl").write_text(
                 "".join(json.dumps(event) + "\n" for event in events), encoding="utf-8"
             )
-            summary = validator.validate_directory(
-                output,
-                "legacy-rtf",
-                source_heads["before"],
-                source_heads["after"],
-                targets["before"],
-                targets["after"],
-            )
-            self.assertEqual(len(summary["reports"]), 20)
-            self.assertFalse(summary["performance_claim"])
+            with self.assertRaisesRegex(validator.ValidationError, "manifest path is not source-bound"):
+                validator.validate_directory(
+                    output,
+                    "legacy-rtf",
+                    source_heads["before"],
+                    source_heads["after"],
+                    targets["before"],
+                    targets["after"],
+                )
+
+    def test_text_executable_is_not_a_native_artifact(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="legacy-native-text-artifact-") as directory:
+            path = Path(directory) / "probe"
+            path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            path.chmod(0o755)
+            with self.assertRaisesRegex(validator.ValidationError, "ELF executable"):
+                validator._validate_hash_record(_record(path), "artifact", require_executable=True)
 
     def test_validator_rejects_missing_rtf_route(self) -> None:
         with tempfile.TemporaryDirectory(prefix="legacy-native-rft-invalid-") as directory:
@@ -148,7 +159,27 @@ class LegacyNativeQualificationTests(unittest.TestCase):
             # without running a native process.
             path = Path(directory) / "routes.jsonl"
             path.write_text(json.dumps({"scenario": "open_1k", "median_us": 1.0}) + "\n", encoding="utf-8")
-            with self.assertRaisesRegex(validator.ValidationError, "route/output set"):
+            with self.assertRaisesRegex(validator.ValidationError, "workload identity"):
+                validator._validate_rtf_log(path, validator.CONTRACTS["legacy-rtf"]["routes"])
+
+    def test_rtf_parser_requires_exact_refusal_kind_reason_and_fidelity(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="legacy-native-rft-contract-") as directory:
+            path = Path(directory) / "routes.jsonl"
+            rows = []
+            for scenario in validator.CONTRACTS["legacy-rtf"]["routes"]:
+                row = {
+                    "scenario": scenario,
+                    "median_us": 1.0,
+                    "workload": "rtf-refusal-contract-v1",
+                    **validator.RTF_ROUTE_CONTRACT[scenario],
+                }
+                rows.append(row)
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+            report = validator._validate_rtf_log(path, validator.CONTRACTS["legacy-rtf"]["routes"])
+            self.assertEqual(report["fixture_id"], "rtf-refusal-contract-v1")
+            rows[-1]["reason"] = "different"
+            path.write_text("".join(json.dumps(row) + "\n" for row in rows), encoding="utf-8")
+            with self.assertRaisesRegex(validator.ValidationError, "fixed refusal contract"):
                 validator._validate_rtf_log(path, validator.CONTRACTS["legacy-rtf"]["routes"])
 
     def test_csv_parser_requires_all_retained_samples(self) -> None:

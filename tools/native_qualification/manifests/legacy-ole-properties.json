@@ -9,6 +9,7 @@
     "CARGO_PROFILE_RELEASE_DEBUG": "0",
     "TMPDIR": "$OLE_NATIVE_TMP"
   },
+  "preparation_receipt": "$OLE_NATIVE_PREPARATION_RECEIPT",
   "validators": [
     {
       "id": "legacy-native-contract",
@@ -37,6 +38,11 @@
       "source_root": "$OLE_BEFORE_SOURCE",
       "target_dir": "$OLE_TARGET_ROOT/before",
       "allow_dirty": true,
+      "allowed_dirty_paths": [
+        "tools/perf-baseline/Cargo.toml",
+        "tools/perf-baseline/Cargo.lock",
+        "tools/perf-baseline/examples/ole_w5_probe.rs"
+      ],
       "lock_paths": ["tools/perf-baseline/Cargo.lock"],
       "build": [
         {
@@ -81,6 +87,11 @@
       "source_root": "$OLE_AFTER_SOURCE",
       "target_dir": "$OLE_TARGET_ROOT/after",
       "allow_dirty": true,
+      "allowed_dirty_paths": [
+        "tools/perf-baseline/Cargo.toml",
+        "tools/perf-baseline/Cargo.lock",
+        "tools/perf-baseline/examples/ole_w5_probe.rs"
+      ],
       "lock_paths": ["tools/perf-baseline/Cargo.lock"],
       "build": [
         {

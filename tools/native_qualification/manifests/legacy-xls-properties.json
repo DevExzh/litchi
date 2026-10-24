@@ -9,6 +9,7 @@
     "CARGO_PROFILE_RELEASE_DEBUG": "0",
     "TMPDIR": "$XLS_NATIVE_TMP"
   },
+  "preparation_receipt": "$XLS_NATIVE_PREPARATION_RECEIPT",
   "validators": [
     {
       "id": "legacy-native-contract",
@@ -41,6 +42,10 @@
       "source_root": "$XLS_BEFORE_SOURCE",
       "target_dir": "$XLS_TARGET_ROOT/before",
       "allow_dirty": true,
+      "allowed_dirty_paths": [
+        "Cargo.lock",
+        "crates/litchi-ops/examples/ole_metadata_bench.rs"
+      ],
       "lock_paths": ["Cargo.lock"],
       "build": [
         {
@@ -78,6 +83,10 @@
       "source_root": "$XLS_AFTER_SOURCE",
       "target_dir": "$XLS_TARGET_ROOT/after",
       "allow_dirty": true,
+      "allowed_dirty_paths": [
+        "Cargo.lock",
+        "crates/litchi-ops/examples/ole_metadata_bench.rs"
+      ],
       "lock_paths": ["Cargo.lock"],
       "build": [
         {

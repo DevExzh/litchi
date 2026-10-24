@@ -10,6 +10,7 @@
     "CARGO_PROFILE_RELEASE_DEBUG": "0",
     "TMPDIR": "$RTF_NATIVE_TMP"
   },
+  "preparation_receipt": "$RTF_NATIVE_PREPARATION_RECEIPT",
   "validators": [
     {
       "id": "legacy-native-contract",
@@ -38,6 +39,10 @@
       "source_root": "$RTF_BEFORE_SOURCE",
       "target_dir": "$RTF_TARGET_ROOT/before",
       "allow_dirty": true,
+      "allowed_dirty_paths": [
+        "Cargo.lock",
+        "crates/litchi-rtf/examples/refusal_contract_bench.rs"
+      ],
       "lock_paths": ["Cargo.lock"],
       "build": [
         {
@@ -72,6 +77,10 @@
       "source_root": "$RTF_AFTER_SOURCE",
       "target_dir": "$RTF_TARGET_ROOT/after",
       "allow_dirty": true,
+      "allowed_dirty_paths": [
+        "Cargo.lock",
+        "crates/litchi-rtf/examples/refusal_contract_bench.rs"
+      ],
       "lock_paths": ["Cargo.lock"],
       "build": [
         {

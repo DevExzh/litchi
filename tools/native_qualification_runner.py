@@ -231,6 +231,19 @@ def _source_identity(spec: Mapping[str, Any], shared: Mapping[str, Any]) -> dict
     status = _git(root, "status", "--porcelain=v1", "--untracked-files=all")
     if status and not bool(spec.get("allow_dirty", False)):
         raise RunnerError(f"source worktree is dirty: {root}\n{status}")
+    status_paths: list[str] = []
+    allowed_dirty = spec.get("allowed_dirty_paths")
+    if status and isinstance(allowed_dirty, list):
+        allowed = {str(value) for value in allowed_dirty}
+        for line in status.splitlines():
+            if len(line) < 4:
+                raise RunnerError(f"malformed git status entry in {root}: {line!r}")
+            value = line[3:].strip()
+            if " -> " in value:
+                value = value.split(" -> ", 1)[1]
+            status_paths.append(value)
+            if value not in allowed:
+                raise RunnerError(f"unreviewed dirty path in {root}: {value}")
     diff = _git(root, "diff", "--no-ext-diff", "--binary")
     lock_values = spec.get("lock_paths", ["Cargo.lock"])
     if not isinstance(lock_values, list) or not lock_values:
@@ -251,6 +264,7 @@ def _source_identity(spec: Mapping[str, Any], shared: Mapping[str, Any]) -> dict
         "tree": tree,
         "source_tree_sha256": _sha256_bytes((tree + "\0" + status + "\0" + diff).encode("utf-8")),
         "clean": not bool(status),
+        "status_paths": status_paths,
         "status_sha256": _sha256_bytes(status.encode("utf-8")),
         "diff_sha256": _sha256_bytes(diff.encode("utf-8")),
         "lock_paths": [str(path) for path in locks],
@@ -481,6 +495,9 @@ def _validate_legacy_native_workload(data: Mapping[str, Any]) -> None:
     """
 
     lane = str(data["lane"])
+    preparation_receipt = data.get("preparation_receipt")
+    if not isinstance(preparation_receipt, str) or not preparation_receipt:
+        raise RunnerError(f"{lane} must bind a source-preparation receipt")
     contracts: dict[str, dict[str, Any]] = {
         "legacy-rtf": {
             "probe": ["crates/litchi-rtf/examples/refusal_contract_bench.rs"],
@@ -574,6 +591,13 @@ def _validate_legacy_native_workload(data: Mapping[str, Any]) -> None:
     if shared.get("probe_paths") != contract["probe"] or shared.get("fixture_paths", []) != contract.get("fixtures", []):
         raise RunnerError(f"{lane} does not bind the reviewed reusable probe")
     for leg, spec in data["legs"].items():
+        allowed_dirty = spec.get("allowed_dirty_paths")
+        if not isinstance(allowed_dirty, list) or not all(
+            isinstance(value, str) and value and not Path(value).is_absolute() for value in allowed_dirty
+        ):
+            raise RunnerError(f"{leg} must declare relative allowed_dirty_paths")
+        if spec.get("allow_dirty") is not True:
+            raise RunnerError(f"{leg} must retain the reviewed preparation overlay mode")
         if spec.get("lock_paths") != [contract["lock"]]:
             raise RunnerError(f"{leg} does not bind the reviewed {lane} lock path")
         commands = spec["build"]
@@ -835,7 +859,86 @@ class SafeRunner:
                 f"output already contains {phase} receipt/journal; choose a fresh output_dir: {self.output}"
             )
         self.shared = manifest.get("shared", {})
+        self.preparation: dict[str, Any] | None = None
+        self.preparation_path: Path | None = None
+        if str(manifest.get("lane", "")).startswith("legacy-"):
+            self.preparation_path = _resolve_path(str(manifest["preparation_receipt"]))
+            self.preparation = self._load_preparation_receipt()
         self.recorded_events: list[dict[str, Any]] = []
+
+    def _load_preparation_receipt(self) -> dict[str, Any]:
+        if self.preparation_path is None:
+            raise RunnerError("legacy lane has no preparation receipt path")
+        path = self.preparation_path
+        if path.is_symlink() or not path.is_file():
+            raise RunnerError(f"legacy preparation receipt is missing or symlinked: {path}")
+        try:
+            receipt = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise RunnerError(f"cannot read legacy preparation receipt: {error}") from error
+        if not isinstance(receipt, dict) or receipt.get("schema") != "litchi.legacy-native-preparation.v1":
+            raise RunnerError("legacy preparation receipt schema mismatch")
+        if receipt.get("lane") != self.manifest.get("lane"):
+            raise RunnerError("legacy preparation receipt lane mismatch")
+        manifest_record = receipt.get("manifest")
+        if not isinstance(manifest_record, dict) or manifest_record.get("path") != str(self.manifest_path):
+            raise RunnerError("legacy preparation receipt is bound to a different manifest")
+        manifest_hash, manifest_bytes = _sha256_file(self.manifest_path)
+        if manifest_record.get("sha256") != manifest_hash or manifest_record.get("bytes", manifest_bytes) != manifest_bytes:
+            raise RunnerError("legacy preparation receipt manifest identity changed")
+        preparer = receipt.get("preparer")
+        preparer_path = Path(__file__).resolve().parent / "native_qualification" / "prepare_legacy_native_inputs.py"
+        if not isinstance(preparer, dict) or preparer.get("path") != str(preparer_path):
+            raise RunnerError("legacy preparation receipt was produced by a different preparer")
+        preparer_hash, _ = _sha256_file(preparer_path)
+        if preparer.get("sha256") != preparer_hash:
+            raise RunnerError("legacy preparation preparer identity changed")
+        identities = receipt.get("identities")
+        if not isinstance(identities, dict) or set(identities) != {"before", "after"}:
+            raise RunnerError("legacy preparation receipt identities are incomplete")
+        reviewed = receipt.get("reviewed_inputs")
+        if not isinstance(reviewed, dict):
+            raise RunnerError("legacy preparation reviewed inputs are missing")
+        for leg in ("before", "after"):
+            allowed = self.manifest["legs"][leg].get("allowed_dirty_paths")
+            if reviewed.get("allowed_dirty_paths") != allowed:
+                raise RunnerError(f"legacy preparation dirty-path allow-list differs for {leg}")
+        return receipt
+
+    def _validate_preparation_identity(self, leg: str, identity: Mapping[str, Any]) -> None:
+        if self.preparation is None:
+            return
+        expected = self.preparation.get("identities", {}).get(leg)
+        if not isinstance(expected, dict):
+            raise RunnerError(f"legacy preparation identity is missing for {leg}")
+        for key in (
+            "source_root",
+            "head",
+            "tree",
+            "source_tree_sha256",
+            "clean",
+            "status_paths",
+            "status_sha256",
+            "diff_sha256",
+            "identity_sha256",
+            "lock_paths",
+            "probe_paths",
+            "fixture_paths",
+        ):
+            if identity.get(key) != expected.get(key):
+                raise RunnerError(f"legacy preparation identity differs for {leg}: {key}")
+        expected_files = {
+            str(item.get("path")): (item.get("bytes"), item.get("sha256"))
+            for item in expected.get("identity_files", [])
+            if isinstance(item, dict)
+        }
+        actual_files = {
+            str(item.get("path")): (item.get("bytes"), item.get("sha256"))
+            for item in identity.get("identity_files", [])
+            if isinstance(item, dict)
+        }
+        if actual_files != expected_files:
+            raise RunnerError(f"legacy preparation identity files differ for {leg}")
 
     def _context(
         self,
@@ -1238,6 +1341,13 @@ class SafeRunner:
                 "count": len(self.recorded_events),
             },
         }
+        if self.preparation_path is not None and self.preparation is not None:
+            preparation_hash, preparation_bytes = _sha256_file(self.preparation_path)
+            receipt["preparation"] = {
+                "path": str(self.preparation_path),
+                "bytes": preparation_bytes,
+                "sha256": preparation_hash,
+            }
         if error is not None:
             receipt["error"] = error
         if self.receipt_path.is_symlink() or self.receipt_path.exists():
@@ -1256,6 +1366,7 @@ class SafeRunner:
                 self._check_target(target, preflight=True)
             for leg in ("before", "after"):
                 identity = self._identity(leg)
+                self._validate_preparation_identity(leg, identity)
                 target = _resolve_path(str(identity["target_dir"]))
                 identity["target_initial_bytes"] = self._check_target(target, preflight=True)
                 identities[leg] = identity
@@ -1349,6 +1460,13 @@ class SafeRunner:
         runner_hash, _ = _sha256_file(Path(__file__).resolve())
         if not isinstance(runner, dict) or runner.get("path") != runner_path or runner.get("sha256") != runner_hash:
             raise RunnerError("build receipt was produced by a different runner")
+        if self.preparation_path is not None:
+            preparation = receipt.get("preparation")
+            if not isinstance(preparation, dict) or preparation.get("path") != str(self.preparation_path):
+                raise RunnerError("build receipt preparation path does not match the current preparation")
+            preparation_hash, preparation_bytes = _sha256_file(self.preparation_path)
+            if preparation.get("sha256") != preparation_hash or preparation.get("bytes") != preparation_bytes:
+                raise RunnerError("build receipt preparation identity differs from the current receipt")
         limits = receipt.get("limits")
         expected_limits = {
             "target_preflight_bytes": TARGET_PREFLIGHT_BYTES,
@@ -1500,6 +1618,7 @@ class SafeRunner:
         self._validate_build_handoff(expected_command_logs)
         for leg in ("before", "after"):
             current = self._identity(leg)
+            self._validate_preparation_identity(leg, current)
             recorded = identities.get(leg)
             if not isinstance(recorded, dict):
                 raise RunnerError(f"missing identity for {leg}")
@@ -1531,6 +1650,7 @@ class SafeRunner:
             build_receipt = self._load_build_receipt()
             for leg in ("before", "after"):
                 identity = self._identity(leg)
+                self._validate_preparation_identity(leg, identity)
                 recorded = build_receipt.get("identities", {}).get(leg, {})
                 if (
                     identity.get("head") != recorded.get("head")

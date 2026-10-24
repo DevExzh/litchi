@@ -1,4 +1,4 @@
-# 0362ul8 — legacy native qualification protocol preparation
+# 0362ul8a — legacy native qualification protocol repair
 
 This source-only slice closes the missing driver/manifest boundary for the
 RTF refusal/replay lane and the OLE/XLS-properties lanes.  It does not contain
@@ -16,9 +16,9 @@ the existing executable drivers and the guarded process/identity runner:
 
 | lane | reusable executable and current source SHA-256 | source fence | protocol |
 | --- | --- | --- | --- |
-| RTF | `crates/litchi-rtf/examples/refusal_contract_bench.rs`, `9d9e91c639e47ccc94f154464f6f97a0dc0002a3b2fb37251f61b17bf71cdb22` | original `86d708878fa537eab42fd4bd5ffbc0f79c606191`; candidate `$RTF_CANDIDATE_REVISION` | `legacy-rtf.json`, five guarded ABBA blocks |
+| RTF | `crates/litchi-rtf/examples/refusal_contract_bench.rs`, `c5deeaff97e028134d378dccbdd423963eeaceec45f93b7c83285b9b799b6bea` (reviewed contract adapter) | original `86d708878fa537eab42fd4bd5ffbc0f79c606191`; candidate `$RTF_CANDIDATE_REVISION` | `legacy-rtf.json`, five guarded ABBA blocks |
 | OLE properties | existing `tools/perf-baseline/examples/ole_w5_probe.rs` from driver source fence `fdb139197d`, file SHA-256 `3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f` | original `604822b44107999aaddb0bffb96b705e9464f546`; candidate `$OLE_CANDIDATE_REVISION` | `legacy-ole-properties.json`, `read` and `edit` |
-| XLS properties/lazy entry | `crates/litchi-ops/examples/ole_metadata_bench.rs`, `53b26136e915fa0bf88518fd1c05e494d55ce5e8f91012be04ac7adf476c1f10` | derived pre-lazy parent `509bf28e7531ad75f278eaec3a732714a243915a` (parent of lazy feature `4f08cdc5e8751243d50077ce1a2a2ea24a0d9c51`); candidate `$XLS_CANDIDATE_REVISION` | `legacy-xls-properties.json`, existing metadata benchmark |
+| XLS properties/lazy entry | `crates/litchi-ops/examples/ole_metadata_bench.rs`, before `b840acb620c09644ca4b89cbe42927485da9d457f3bf93b578eff90fa1008173`, after `53b26136e915fa0bf88518fd1c05e494d55ce5e8f91012be04ac7adf476c1f10` | derived pre-lazy parent `509bf28e7531ad75f278eaec3a732714a243915a` (parent of lazy feature `4f08cdc5e8751243d50077ce1a2a2ea24a0d9c51`); candidate `$XLS_CANDIDATE_REVISION` | `legacy-xls-properties.json`, existing metadata benchmark |
 
 The XLS source parent is a provenance fence, not a historical performance
 baseline: the authoritative catalog says that no XLS native baseline or probe
@@ -75,9 +75,13 @@ candidate into an original source tree.
   the frozen paired endpoints.
 
 Every endpoint must be a full, clean materialized HEAD tree apart from these
-explicit preparation overlays.  The runner records HEAD/tree/status, lock,
-probe and fixture hashes, and the validator refuses a different source or
-binary identity.  `$RTF_CANDIDATE_REVISION`, `$OLE_CANDIDATE_REVISION`, and
+explicit preparation overlays.  `prepare_legacy_native_inputs.py` emits a
+source-only `litchi.legacy-native-preparation.v1` receipt: it binds the
+manifest and preparer hashes, baseline/candidate HEADs, exact status/diff
+digests, reviewed dirty-path allow-lists, lock/probe/fixture paths and file
+hashes.  The runner and validator require that receipt and compare it again
+after each build/run event; a fabricated event, arbitrary hash path, or text
+file marked executable is rejected.  `$RTF_CANDIDATE_REVISION`, `$OLE_CANDIDATE_REVISION`, and
 `$XLS_CANDIDATE_REVISION` are required full 40-character SHAs at execution;
 no historical diagnostic tip is a substitute.
 
@@ -109,8 +113,9 @@ Litchi Cargo/compiler/profiler workload.
 
 ### RTF
 
-The existing probe internally asserts all eight route dispositions and their
-output/error/fidelity behavior:
+The reviewed probe emits the fixed `rtf-refusal-contract-v1` workload.  It
+internally asserts all eight route dispositions and the validator independently
+requires their exact output/error/fidelity fields:
 
 `open_1k`, `noop_1k`, `text_commit_1k`, `text_commit_save_1k`, `replay_1k`,
 `tail_commit_1k`, `unsupported_content`, and `protected_commit`.
@@ -120,19 +125,25 @@ The manifest runs the same executable in five separate
 run retains the probe's fixed three warmups and 31 samples and reports one
 median per route.  The validator requires exactly those eight JSON rows in
 every stream, positive finite medians, all block/leg identities, and the
-runner's quiet/cap evidence.  The unsupported-content and protected refusals
-remain content-free and are validated by the probe's existing assertions;
-the protocol does not reinterpret their error class.
+runner's quiet/cap evidence.  `unsupported_content` must be
+`RefusalKind::unsupported_content`, operation `edit`, fixed reason `underline
+edits require non-empty text within one paragraph`, and `unchanged` fidelity.
+`protected_commit` must be `RefusalKind::protected`, operation `edit`, fixed
+reason `document protection refuses changed publication`, and `unchanged`
+fidelity.  Successful routes must report `exact` fidelity.  All refusal text
+remains content-free.
 
 ### OLE properties
 
 The manifest reuses `ole_w5_probe` for exactly `read` and `edit`, with
-`--warmup 20 --samples 500 --batch 1`, in one A-B-B-A block.  The probe owns
-the six-property fixture, link-base/hyperlink read checks, edit publication
-and exact section-output check.  The validator requires the exact CSV header,
-500 ordered rows, positive output bytes and route identity for all eight
-streams (two routes × four legs); nonzero child/error or fidelity failures
-remain fatal.
+`--warmup 20 --samples 500 --batch 1`, in one A-B-B-A block.  The reviewed
+fdb139 probe owns the six-property generated corpus, link-base/hyperlink read
+checks, edit publication and exact section-output check.  The validator binds
+probe SHA `3b7cde72762a74796250df572704206baf9e438cca3d9ed11119af783fc8488f`,
+fixture ID `ole-w5-generated-corpus-v1`, exact route argv, and output size `3`
+for both `read` and `edit`.  It requires the exact CSV header, 500 ordered
+rows and all eight streams (two routes × four legs); nonzero child/error or
+fidelity failures remain fatal.
 
 ### XLS properties/lazy entry
 
@@ -142,8 +153,10 @@ cell-history routes.  It builds `litchi-ops` with `--no-default-features
 block.  The driver constructs the tracked DOC/XLS/PPT fixtures and performs
 the native `Package::edit_metadata` property write beside the unified
 metadata write; its byte-equivalence assertion remains inside the timed
-driver.  The validator requires the ordered `doc`, `xls`, and `ppt` JSON rows,
-positive byte/repetition/elapsed fields, and all source/fixture identities.
+driver.  The validator binds fixture ID `ole-metadata-fixtures-v1`, exact
+fixture hashes and sizes (DOC 27136, XLS 13824, PPT 125440), and requires
+ordered `doc`, `xls`, and `ppt` JSON rows with exactly 50 repeats and those
+expected input byte counts.  It also binds all source/fixture identities.
 This lane is explicitly a source-parent comparison, not a claim that a
 historical XLS native latency baseline exists.
 
@@ -176,7 +189,7 @@ validator, identity, route-shape and cap logic:
 
 ```text
 python3 -m unittest tools.test_legacy_native_qualification tools.test_native_qualification_runner
-Ran 26 tests
+Ran 28 tests
 OK
 ```
 
