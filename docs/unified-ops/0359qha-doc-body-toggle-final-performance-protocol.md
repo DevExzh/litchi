@@ -36,10 +36,12 @@ would silently produce only seven samples. The runner uses a pinned CPU, a
 The 250,000-us minimum is aggregate timed work per native leg, not a
 per-operation floor. The leaf route uses 16 fixed 31-sample probe
 invocations, while the 1,000-toggle batch route uses one fixed 31-sample
-invocation; both endpoints use the same route schedule. The validator sums
-each receipt's reported `median_us * samples` and requires that bounded
-aggregate to reach 250,000 us. Process wall time is retained for diagnosis
-only because it includes fixture/setup work.
+invocation; both endpoints use the same route schedule. For each exact
+31-sample receipt, the validator certifies the conservative lower bound
+`16*median_us + 15*min_us` (the sorted median is sample 15), then sums those
+bounds across invocations and requires at least 250,000 us. This is a
+certified lower bound, not an actual sample sum. Process wall time is retained
+for diagnosis only because it includes fixture/setup work.
 
 ## Correct route meaning
 
@@ -120,14 +122,14 @@ The static executable-protocol test is:
 
 ~~~text
 docs/unified-ops/results/0359qha/test_protocol.sh
-SHA-256 323f0c94cba2abf920cef07ca18df1105b2cd261d92f843972857c50cfb3f18b
+SHA-256 ced8ddcb6f3eed942d893773ee3703e7532be3c9a6606c0d3bb5d2b8191887dd
 ~~~
 
 It runs `bash -n` and checks the fixed 31/31 sample contract, two ABBA
 blocks, order, per-route TMP, fresh-root guard, output validation,
 CPU/cgroup, timeout, profile artifact presence/annotation, early source-hash
-failure, operation timing, and before/during/after quiet checks. It passed in
-this turn:
+failure, certified aggregate timing, and before/during/after quiet checks. It
+passed in this turn:
 
 ~~~text
 0359qha protocol static checks passed

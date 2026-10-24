@@ -34,12 +34,15 @@ the tracked runner and its executable protocol test:
 3. The 250,000-us minimum is aggregate timed work per leg. The leaf route uses
    16 fixed 31-sample invocations and the batch route uses one fixed
    31-sample invocation, identically for candidate and baseline. Every row
-   must contain finite `min_us` and `median_us`; the validator sums the
-   reported `median_us * samples` across the fixed invocation count and
-   applies the floor to that aggregate. Thus a legitimate 1,000-us leaf
-   operation passes its 16-invocation calibration, while a genuinely short
-   aggregate rejects. No individual 1–2 ms leaf operation is required to meet
-   250 ms.
+   must contain finite, non-negative `min_us` and `median_us`, with
+   `min_us <= median_us`. For each exact 31-sample receipt, the validator
+   certifies the conservative sorted-sample lower bound
+   `16*median_us + 15*min_us`, then applies the floor to the sum across the
+   fixed invocation count. This is a certified lower bound, not the actual
+   sample sum. A legitimate 1,000-us leaf operation passes its
+   16-invocation calibration, while a genuinely short aggregate rejects; the
+   counterexample where `median_us*31` passes but this bound fails is tested.
+   No individual 1–2 ms leaf operation is required to meet 250 ms.
 
 4. Allocation now fails if Callgrind or Massif output is absent, empty, or
    cannot be annotated (`callgrind_annotate`/`ms_print`). A `check-profile`
@@ -57,13 +60,13 @@ The protocol test is:
 
 ```text
 docs/unified-ops/results/0359qha/test_protocol.sh
-SHA-256 323f0c94cba2abf920cef07ca18df1105b2cd261d92f843972857c50cfb3f18b
+SHA-256 ced8ddcb6f3eed942d893773ee3703e7532be3c9a6606c0d3bb5d2b8191887dd
 ```
 
 The repaired runner is SHA-256
 `2d854437d19e359c327b42b89727f581338b659f4c2ba1589131253893f43a61`; the
 receipt validator is SHA-256
-`be5239ce2122cf654bc555a976ac3053d94c1996d135769494dc95f7a61a78d1`.
+`5a22f9503831e03b6766143cc07a00271ef2c439225f0fdf6fe7bbbcd541e750`.
 
 It runs `bash -n`, the Python receipt validator, an early bad-hash check,
 exact profile artifact/annotation failure and success checks, missing-receipt,

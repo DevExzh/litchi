@@ -88,6 +88,12 @@ GOOD=$TMP/good.json
 printf '[{"scenario":"doc/batch1k_leaf_write","samples":31,"median_us":8000,"min_us":7000,"output_sha256":"%s"}]\n' "$EXPECTED_BATCH" >"$GOOD"
 python3 "$VALIDATOR" --json "$GOOD" --scenario doc/batch1k_leaf_write \
   --samples 31 --output-sha "$EXPECTED_BATCH"
+BATCH=$TMP/batch
+mkdir -p "$BATCH"
+printf '[{"scenario":"doc/batch1k_leaf_write","samples":31,"median_us":10000,"min_us":9000,"output_sha256":"%s"}]\n' \
+  "$EXPECTED_BATCH" >"$BATCH/result-1.json"
+python3 "$VALIDATOR" --directory "$BATCH" --scenario doc/batch1k_leaf_write \
+  --samples 31 --invocations 1 --output-sha "$EXPECTED_BATCH" --min-aggregate-us 250000
 
 # A missing receipt and wrong sample count reject.
 if python3 "$VALIDATOR" --json "$TMP/missing.json" --scenario doc/batch1k_leaf_write \
@@ -95,9 +101,18 @@ if python3 "$VALIDATOR" --json "$TMP/missing.json" --scenario doc/batch1k_leaf_w
   echo 'missing receipt was accepted' >&2
   exit 1
 fi
+NEGATIVE=$TMP/negative.json
+printf '[{"scenario":"doc/batch1k_leaf_write","samples":31,"median_us":1,"min_us":-1,"output_sha256":"%s"}]\n' \
+  "$EXPECTED_BATCH" >"$NEGATIVE"
+if python3 "$VALIDATOR" --json "$NEGATIVE" --scenario doc/batch1k_leaf_write \
+  --samples 31 --output-sha "$EXPECTED_BATCH" >/dev/null 2>&1; then
+  echo 'negative operation timing was accepted' >&2
+  exit 1
+fi
 
 # The fast leaf operation is valid when its reported 31-sample work is
-# repeated on the fixed 16-invocation calibration schedule: 16*31*1000 us.
+# repeated on the fixed 16-invocation calibration schedule. Its certified
+# lower bound is 16*(16*1000 + 15*500) = 376,000 us.
 EXPECTED_LEAF=6bb97058e47f747c29e568395eea01db1226aa5ab8962087e1d78a1b9b82ff11
 FAST=$TMP/fast-leaf
 mkdir -p "$FAST"
@@ -120,6 +135,21 @@ if python3 "$VALIDATOR" --directory "$SHORT" --scenario doc/leaf_write \
   --samples 31 --invocations 16 --output-sha "$EXPECTED_LEAF" \
   --min-aggregate-us 250000 >/dev/null 2>&1; then
   echo 'short aggregate operation timing was accepted' >&2
+  exit 1
+fi
+
+# Counterexample: median_us*31 would report 297,600 us for this leg, but the
+# valid sorted-sample lower bound is only 16*16*600 = 153,600 us.
+COUNTER=$TMP/median-counterexample
+mkdir -p "$COUNTER"
+for invocation in $(seq 1 16); do
+  printf '[{"scenario":"doc/leaf_write","samples":31,"median_us":600,"min_us":0,"output_sha256":"%s"}]\n' \
+    "$EXPECTED_LEAF" >"$COUNTER/result-$invocation.json"
+done
+if python3 "$VALIDATOR" --directory "$COUNTER" --scenario doc/leaf_write \
+  --samples 31 --invocations 16 --output-sha "$EXPECTED_LEAF" \
+  --min-aggregate-us 250000 >/dev/null 2>&1; then
+  echo 'median-only aggregate overclaim was accepted' >&2
   exit 1
 fi
 COUNT=$TMP/count.json

@@ -52,15 +52,18 @@ def validate_row(
         if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
             fail(f"missing or invalid operation timing in {path}: {field}")
             return None
+        if value < 0:
+            fail(f"negative operation timing in {path}: {field}")
+            return None
         values.append(float(value))
     if values[1] > values[0]:
         fail(f"minimum exceeds median in {path}")
         return None
-    # The source probe reports one median operation time for each fixed sample
-    # set. Multiplying by the reported sample count gives the bounded timed
-    # work represented by that receipt; it deliberately excludes process/setup
-    # wall time.
-    return values[0] * samples
+    # The source probe sorts 31 samples and reports sample[15] as the median
+    # and sample[0] as the minimum. Therefore at least 16 samples are >= the
+    # median and the remaining 15 are >= the minimum. This is a conservative
+    # certified lower bound on timed work, not the actual sample sum.
+    return 16 * values[0] + 15 * values[1]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -100,25 +103,28 @@ def main() -> int:
             f"result-{args.invocations}.json"
         )
     paths = expected_paths
-    aggregate_us = 0.0
+    if args.samples != 31:
+        return fail("aggregate certification requires exactly 31 samples")
+    certified_lower_bound_us = 0.0
     for path in paths:
         row = read_row(path)
         if row is None:
             return 1
-        operation_us = validate_row(
+        operation_lower_bound_us = validate_row(
             row, path, args.scenario, args.samples, args.output_sha
         )
-        if operation_us is None:
+        if operation_lower_bound_us is None:
             return 1
-        aggregate_us += operation_us
-    if not math.isfinite(aggregate_us) or aggregate_us < args.min_aggregate_us:
+        certified_lower_bound_us += operation_lower_bound_us
+    if not math.isfinite(certified_lower_bound_us) or certified_lower_bound_us < args.min_aggregate_us:
         return fail(
-            f"subthreshold aggregate operation timing: {aggregate_us} < "
+            f"subthreshold certified aggregate lower bound: {certified_lower_bound_us} < "
             f"{args.min_aggregate_us}"
         )
     print(
         f"0359qha validator: {args.scenario} invocations={args.invocations} "
-        f"samples={args.samples} aggregate_operation_us={aggregate_us:.1f}"
+        f"samples={args.samples} certified_lower_bound_us="
+        f"{certified_lower_bound_us:.1f}"
     )
     return 0
 
