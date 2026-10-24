@@ -3,6 +3,7 @@
   "status": "correctness_allocation_preflight_passed",
   "claim_scope": "correctness and allocator-instrumentation preflight only; no calibration, timing, ABBA, or performance acceptance claim",
   "artifact_root": "/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024",
+  "external_receipt": {"path": "qualification-receipt-472b670547-corrected.json", "bytes": 7646, "sha256": "fbe59be89acb3a588b659c217f05ddf3c6ac49cdbeee2dce03c821e469714db8"},
   "candidate": {
     "root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
     "head": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
@@ -19,7 +20,7 @@
       "sha256": "2748bf8c56d6395b39ed2b189acbc3e37b7b22359a3e82b4b1f34389423850c6"
     },
     "probe_sources": [
-      {"path": "tools/perf-baseline/src/ppt_lazy_native.rs", "bytes": 24586, "sha256": "68d77fad390dc681ed248b2348b26f319d2e646d1f0b006796ecd89cae62e"},
+      {"path": "tools/perf-baseline/src/ppt_lazy_native.rs", "bytes": 24586, "sha256": "68d77fad390dc681ed248b2348b26f319d2e646d1f0b006796ecd89c49cae62e"},
       {"path": "tools/perf-baseline/src/bin/ppt_lazy_native.rs", "bytes": 146, "sha256": "04df53920b036911e9002df152b9e07b1e0392ac6a1a545b285807108d808d12"},
       {"path": "tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs", "bytes": 203, "sha256": "661e94115adc418de1c25ee6dd5481e4399e43eee26e011a49d1fb9d1ce56201"},
       {"path": "tools/perf-baseline/src/lib.rs", "bytes": 3088216, "sha256": "280d61ae1f714af78be6cecf21a4432a9ea2a27478e89c237b5d358bc02db02a"}
