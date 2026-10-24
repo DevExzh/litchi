@@ -15,10 +15,10 @@ The probe now:
   lengths before the first warmup, and compares that receipt across every
   paired baseline and candidate leg;
 - compares typed semantic models after a write, retaining exact-source checks
-  only for formatcode2, SVG blips, and theme-family values/parts. InkML action
-  output is canonicalized by its writer, so its receipt is semantic/model
-  fidelity rather than a false source-identity claim; the image blip lane is
-  explicitly scanner-only;
+  for formatcode2, SVG blips, theme-family values/parts, and InkML action
+  profiles. `write_profile_to` retains the profile source, so its receipt
+  proves exact unchanged and changed bytes as well as semantic fidelity; the
+  image blip lane is explicitly scanner-only;
 - uses the production SVG contextual writer for its output-limit preflight,
   with an unbounded observation sink. Every current typed output limit,
   including Vec/String routes, receives an actual refusal check; chart's
@@ -32,9 +32,10 @@ The probe now:
   RSS/timing children. The SVG preflight intentionally uses a contextual
   parsed value and contextual writer; the normal Vec and bounded-sink rows and
   the outside-clock fidelity check use that same contextual route. The
-  standalone route remains covered by the entry-reader row as an explicitly
-  additional route; the existing post-run validator comparison across all
-  qualified reports is retained as a second handoff check;
+  standalone reader/writer is checked outside timing over the completed
+  contextual documents as an explicitly additional route; the existing
+  post-run validator comparison across all qualified reports is retained as a
+  second handoff check;
 - mutates parsed, source-backed formatcode2 and Theme Family values. Their
   changed receipts verify the untouched lexical source splice and decoded
   semantic change. Complete Theme-part add/replace receipts parse the result

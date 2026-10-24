@@ -362,7 +362,12 @@ enum PreparedValue {
     FormatCode(dml::chart::extension::formatcode2::Element),
     Diagram {
         source: Vec<u8>,
-        outline: dml::diagram::edit::Outline,
+        /// The source-edit target is selected before the timed writer.  The
+        /// timed route must not walk `entries` just to recover its first
+        /// content node.
+        entry_id: String,
+        entry_text: String,
+        drawing_relationship: Option<String>,
     },
     TextBody(dml::text::body::Body),
     SvgBlip(dml::svg_blip::SvgBlip),
@@ -370,7 +375,13 @@ enum PreparedValue {
     Blip(String),
     Theme(dml::theme::Theme),
     ThemeFamily(dml::theme::family::Family),
-    ThemeFamilyPart(dml::theme::family::part::Snapshot),
+    ThemeFamilyPart {
+        snapshot: dml::theme::family::part::Snapshot,
+        /// The recognized owner is selected before timing.  Complete Theme
+        /// mutations are source-edit plus serialization, not a detached
+        /// writer, but the family lookup itself is still preparation.
+        family: dml::theme::family::Family,
+    },
     InkActions(dml::ink::actions::Profile),
     Geometry(dml::geometry::CustomGeometry),
     Color(dml::color::Value),
@@ -388,6 +399,7 @@ struct PreparedPart {
     /// contextual object.
     contextual_source: Option<dml::svg_blip::SvgBlip>,
     contextual_changed: Option<dml::svg_blip::SvgBlip>,
+    contextual_namespace: Option<dml::svg_blip::NamespaceContext>,
     contextual_source_output_bytes: Option<usize>,
     contextual_changed_output_bytes: Option<usize>,
     output_payload_bytes: Option<usize>,
@@ -470,6 +482,17 @@ struct RawFidelityReceipt {
     source_preserving_expected: bool,
     source_output_exact: bool,
     changed_output_exact: bool,
+    /// Contextual SVG keeps the inherited fragment as `raw_source`; its
+    /// exported output necessarily inserts the inherited declarations.  The
+    /// raw-source receipt therefore proves exact source retention while the
+    /// changed exported bytes remain a dirty contextual serialization.
+    source_raw_sha256: String,
+    source_raw_exact: bool,
+    changed_output_exact_expected: bool,
+    /// The contextual route is the measured normal path for inherited host
+    /// fragments.  This separate flag records the additional standalone
+    /// reader/writer check on the completed contextual output.
+    standalone_route_checked: bool,
     read_write_route: &'static str,
     fidelity_mode: &'static str,
     source_semantic_sha256: String,
@@ -479,6 +502,12 @@ struct RawFidelityReceipt {
     source_semantic_equal: bool,
     changed_semantic_equal: bool,
     semantic_changed_differs: bool,
+    /// Independent source-slice/splice evidence for the non-canonical
+    /// source-backed formatcode2 and Theme-family fixtures.  This is kept
+    /// separate from production read/write equality so a generated output
+    /// cannot serve as its own oracle.
+    splice_oracle_checked: bool,
+    splice_oracle_passed: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -513,6 +542,10 @@ struct ThemeFamilyMutationReceipt {
     observed_id: Option<String>,
     observed_variant_id: Option<String>,
     requested_identity_matches: bool,
+    source_name: Option<String>,
+    source_id: Option<String>,
+    source_variant_id: Option<String>,
+    source_identity_matches: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1222,13 +1255,12 @@ fn body_roundtrip(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
 
 #[cfg(feature = "drawingml-raw-current")]
 fn read_svg_value(bytes: &[u8]) -> Result<dml::svg_blip::SvgBlip, ProbeFailure> {
-    dml::svg_blip::read(bytes, dml::svg_blip::Limits::DEFAULT)
-        .map_err(|error| classify(error, bytes.len()))
+    read_svg_contextual_value(bytes)
 }
 
 #[cfg(not(feature = "drawingml-raw-current"))]
 fn read_svg_value(bytes: &[u8]) -> Result<dml::svg_blip::SvgBlip, ProbeFailure> {
-    dml::svg_blip::read(bytes).map_err(|error| classify(error, bytes.len()))
+    read_svg_contextual_value(bytes)
 }
 
 fn write_svg_value<W: Write>(
@@ -1242,27 +1274,83 @@ fn write_svg_value<W: Write>(
     result.map_err(|error| classify(error, 0))
 }
 
-fn read_svg(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
-    let value = read_svg_value(bytes)?;
+#[cfg(feature = "drawingml-raw-current")]
+fn read_svg_standalone_value(
+    bytes: &[u8],
+) -> Result<dml::svg_blip::SvgBlip, ProbeFailure> {
+    dml::svg_blip::read(bytes, dml::svg_blip::Limits::DEFAULT)
+        .map_err(|error| classify(error, bytes.len()))
+}
+
+#[cfg(not(feature = "drawingml-raw-current"))]
+fn read_svg_standalone_value(
+    bytes: &[u8],
+) -> Result<dml::svg_blip::SvgBlip, ProbeFailure> {
+    dml::svg_blip::read(bytes).map_err(|error| classify(error, bytes.len()))
+}
+
+/// Run the standalone SVG API only on a completed contextual document.  The
+/// inherited-fragment fixture itself must use `read_contextual`; this extra
+/// route proves that the normal self-contained reader/writer remains covered
+/// without changing the timed contextual workload.
+fn standalone_svg_roundtrip(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
+    let value = read_svg_standalone_value(bytes)?;
     let mut output = Vec::new();
     write_svg_value(&mut output, &value)?;
     Ok(output)
 }
 
+fn read_svg(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
+    let value = read_svg_value(bytes)?;
+    write_svg_contextual_default(&value)
+}
+
+/// The SVG lane models a fragment selected from a host XML part.  Its root
+/// intentionally omits declarations and relies on this inherited scope; a
+/// fresh empty context would only prove the self-contained fast path.
+fn svg_fixture_context() -> Result<dml::svg_blip::NamespaceContext, ProbeFailure> {
+    use dml::svg_blip::{Namespace, NamespaceContext};
+    NamespaceContext::empty()
+        .child([
+            Namespace::new(Some("asvg"), dml::svg_blip::NAMESPACE)
+                .map_err(|error| fail(error.to_string()))?,
+            Namespace::new(Some("r"), dml::svg_blip::RELATIONSHIP_NAMESPACE)
+                .map_err(|error| fail(error.to_string()))?,
+            Namespace::new(Some("future"), "urn:litchi:drawingml:future")
+                .map_err(|error| fail(error.to_string()))?,
+            Namespace::new(Some("opaque"), "urn:litchi:drawingml:opaque")
+                .map_err(|error| fail(error.to_string()))?,
+        ])
+        .map_err(|error| fail(error.to_string()))
+}
+
+#[cfg(feature = "drawingml-raw-current")]
+fn read_svg_contextual_value_with(
+    bytes: &[u8],
+    context: &dml::svg_blip::NamespaceContext,
+) -> Result<dml::svg_blip::SvgBlip, ProbeFailure> {
+    dml::svg_blip::read_contextual(bytes, context, dml::svg_blip::Limits::DEFAULT)
+        .map_err(|error| classify(error, bytes.len()))
+}
+
+#[cfg(not(feature = "drawingml-raw-current"))]
+fn read_svg_contextual_value_with(
+    bytes: &[u8],
+    context: &dml::svg_blip::NamespaceContext,
+) -> Result<dml::svg_blip::SvgBlip, ProbeFailure> {
+    dml::svg_blip::read_contextual(bytes, context).map_err(|error| classify(error, bytes.len()))
+}
+
 #[cfg(feature = "drawingml-raw-current")]
 fn read_svg_contextual_value(bytes: &[u8]) -> Result<dml::svg_blip::SvgBlip, ProbeFailure> {
-    dml::svg_blip::read_contextual(
-        bytes,
-        &dml::svg_blip::NamespaceContext::empty(),
-        dml::svg_blip::Limits::DEFAULT,
-    )
-    .map_err(|error| classify(error, bytes.len()))
+    let context = svg_fixture_context()?;
+    read_svg_contextual_value_with(bytes, &context)
 }
 
 #[cfg(not(feature = "drawingml-raw-current"))]
 fn read_svg_contextual_value(bytes: &[u8]) -> Result<dml::svg_blip::SvgBlip, ProbeFailure> {
-    dml::svg_blip::read_contextual(bytes, &dml::svg_blip::NamespaceContext::empty())
-        .map_err(|error| classify(error, bytes.len()))
+    let context = svg_fixture_context()?;
+    read_svg_contextual_value_with(bytes, &context)
 }
 
 #[cfg(feature = "drawingml-raw-current")]
@@ -1496,8 +1584,9 @@ fn complete_theme_family_part(family: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
         )
     })?;
     Ok(format!(
-        "<!--theme-part-before--><a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:thm15=\"{}\" name=\"Office\"><a:themeElements/><!--theme-part-opaque--><a:extLst><a:ext uri=\"{}\"> {family} </a:ext></a:extLst><!--theme-part-after--></a:theme>",
+        "<!--theme-part-before--><a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:thm15=\"{}\" name=\"{}\"><a:themeElements/><!--theme-part-opaque--><a:extLst><a:ext uri=\"{}\"> {family} </a:ext></a:extLst><!--theme-part-after--></a:theme>",
         dml::theme::family::NAMESPACE,
+        THEME_FAMILY_FIXTURE_NAME,
         dml::theme::family::NAMESPACE,
     )
     .into_bytes())
@@ -1643,9 +1732,18 @@ fn prepare_value(kind: PartKind, bytes: &[u8]) -> Result<PreparedValue, ProbeFai
     Ok(match kind {
         PartKind::Chart => PreparedValue::Chart(read_chart_value(bytes)?),
         PartKind::FormatCode => PreparedValue::FormatCode(read_format_code_value(bytes)?),
-        PartKind::Diagram => PreparedValue::Diagram {
-            source: bytes.to_vec(),
-            outline: read_diagram_value(bytes)?,
+        PartKind::Diagram => {
+            let outline = read_diagram_value(bytes)?;
+            let entry = outline
+                .entries
+                .first()
+                .ok_or_else(|| fail("diagram data model has no content entry"))?;
+            PreparedValue::Diagram {
+                source: bytes.to_vec(),
+                entry_id: entry.id.clone(),
+                entry_text: entry.text.clone(),
+                drawing_relationship: outline.drawing_relationship.clone(),
+            }
         },
         PartKind::TextBody => PreparedValue::TextBody(read_text_value(bytes)?),
         PartKind::SvgBlip => PreparedValue::SvgBlip(read_svg_value(bytes)?),
@@ -1654,7 +1752,12 @@ fn prepare_value(kind: PartKind, bytes: &[u8]) -> Result<PreparedValue, ProbeFai
         PartKind::Theme => PreparedValue::Theme(read_theme_value(bytes)?),
         PartKind::ThemeFamily => PreparedValue::ThemeFamily(read_family_value(bytes)?),
         PartKind::ThemeFamilyPart => {
-            PreparedValue::ThemeFamilyPart(read_theme_family_part_value(bytes)?)
+            let snapshot = read_theme_family_part_value(bytes)?;
+            let family = snapshot
+                .family()
+                .cloned()
+                .ok_or_else(|| fail("theme family part has no direct family owner"))?;
+            PreparedValue::ThemeFamilyPart { snapshot, family }
         },
         PartKind::InkActions => PreparedValue::InkActions(read_ink_value(bytes)?),
         PartKind::Geometry => PreparedValue::Geometry(read_geometry_value(bytes)?),
@@ -1673,13 +1776,18 @@ fn write_prepared_to<W: Write>(
         (PartKind::FormatCode, PreparedValue::FormatCode(value)) => {
             write_format_code_value(writer, value)
         },
-        (PartKind::Diagram, PreparedValue::Diagram { source, outline }) => {
-            let entry = outline
-                .entries
-                .first()
-                .ok_or_else(|| fail("diagram data model has no content entry"))?;
-            let output = set_diagram_text(source, &entry.id, &entry.text)?;
-            let output = set_diagram_reference(&output, outline.drawing_relationship.as_deref())?;
+        (
+            PartKind::Diagram,
+            PreparedValue::Diagram {
+                source,
+                entry_id,
+                entry_text,
+                drawing_relationship,
+                ..
+            },
+        ) => {
+            let output = set_diagram_text(source, entry_id, entry_text)?;
+            let output = set_diagram_reference(&output, drawing_relationship.as_deref())?;
             writer
                 .write_all(&output)
                 .map_err(|error| io_failure(error, output.len()))
@@ -1707,10 +1815,10 @@ fn write_prepared_to<W: Write>(
             let result = dml::theme::family::write_to(writer, value);
             result.map_err(|error| classify(error, 0))
         },
-        (PartKind::ThemeFamilyPart, PreparedValue::ThemeFamilyPart(snapshot)) => {
-            let family = snapshot
-                .family()
-                .ok_or_else(|| fail("theme family part has no direct family owner"))?;
+        (
+            PartKind::ThemeFamilyPart,
+            PreparedValue::ThemeFamilyPart { snapshot, family },
+        ) => {
             let output = theme_family_replace(snapshot, family)
                 .map_err(|error| classify(error, snapshot.xml_bytes().len()))?;
             writer
@@ -1863,28 +1971,24 @@ fn diagram_limits_with_output(maximum: usize) -> dml::diagram::Limits {
 #[cfg(feature = "drawingml-raw-current")]
 fn write_diagram_value_limited(
     source: &[u8],
-    outline: &dml::diagram::edit::Outline,
+    entry_id: &str,
+    entry_text: &str,
+    drawing_relationship: Option<&str>,
     maximum: usize,
 ) -> Result<Vec<u8>, ProbeFailure> {
-    let entry = outline
-        .entries
-        .first()
-        .ok_or_else(|| fail("diagram data model has no content entry"))?;
     let limits = diagram_limits_with_output(maximum);
-    let output = dml::diagram::edit::set_text(source, &entry.id, &entry.text, &limits)
+    let output = dml::diagram::edit::set_text(source, entry_id, entry_text, &limits)
         .map_err(|error| classify(error, maximum.saturating_add(1)))?;
-    dml::diagram::edit::set_drawing_reference(
-        &output,
-        outline.drawing_relationship.as_deref(),
-        &limits,
-    )
+    dml::diagram::edit::set_drawing_reference(&output, drawing_relationship, &limits)
     .map_err(|error| classify(error, maximum.saturating_add(1)))
 }
 
 #[cfg(not(feature = "drawingml-raw-current"))]
 fn write_diagram_value_limited(
     _source: &[u8],
-    _outline: &dml::diagram::edit::Outline,
+    _entry_id: &str,
+    _entry_text: &str,
+    _drawing_relationship: Option<&str>,
     _maximum: usize,
 ) -> Result<Vec<u8>, ProbeFailure> {
     Err(fail(
@@ -1995,11 +2099,9 @@ fn write_family_value_limited<W: Write>(
 #[cfg(feature = "drawingml-theme-family-current")]
 fn write_theme_family_part_limited(
     snapshot: &dml::theme::family::part::Snapshot,
+    family: &dml::theme::family::Family,
     maximum: usize,
 ) -> Result<Vec<u8>, ProbeFailure> {
-    let family = snapshot
-        .family()
-        .ok_or_else(|| fail("theme family part has no direct family owner"))?;
     snapshot
         .replace_family(family, dml::theme::family::part::Limits::new(maximum))
         .map_err(|error| classify(error, maximum.saturating_add(1)))
@@ -2008,6 +2110,7 @@ fn write_theme_family_part_limited(
 #[cfg(not(feature = "drawingml-theme-family-current"))]
 fn write_theme_family_part_limited(
     _snapshot: &dml::theme::family::part::Snapshot,
+    _family: &dml::theme::family::Family,
     _maximum: usize,
 ) -> Result<Vec<u8>, ProbeFailure> {
     Err(fail(
@@ -2137,8 +2240,24 @@ fn output_limit_result(
         (PartKind::FormatCode, PreparedValue::FormatCode(value)) => {
             write_format_code_value_limited(&mut sink, value, maximum)
         },
-        (PartKind::Diagram, PreparedValue::Diagram { source, outline }) => {
-            write_diagram_value_limited(source, outline, maximum).map(|_| ())
+        (
+            PartKind::Diagram,
+            PreparedValue::Diagram {
+                source,
+                entry_id,
+                entry_text,
+                drawing_relationship,
+                ..
+            },
+        ) => {
+            write_diagram_value_limited(
+                source,
+                entry_id,
+                entry_text,
+                drawing_relationship.as_deref(),
+                maximum,
+            )
+            .map(|_| ())
         },
         (PartKind::TextBody, PreparedValue::TextBody(value)) => {
             write_text_value_limited(value, maximum).map(|_| ())
@@ -2159,8 +2278,11 @@ fn output_limit_result(
         (PartKind::ThemeFamily, PreparedValue::ThemeFamily(value)) => {
             write_family_value_limited(&mut sink, value, maximum)
         },
-        (PartKind::ThemeFamilyPart, PreparedValue::ThemeFamilyPart(value)) => {
-            write_theme_family_part_limited(value, maximum).map(|_| ())
+        (
+            PartKind::ThemeFamilyPart,
+            PreparedValue::ThemeFamilyPart { snapshot, family },
+        ) => {
+            write_theme_family_part_limited(snapshot, family, maximum).map(|_| ())
         },
         (PartKind::InkActions, PreparedValue::InkActions(value)) => {
             write_ink_value_limited(&mut sink, value, maximum)
@@ -2256,19 +2378,44 @@ fn output_limit_timed(part: &Part, prepared: &PreparedPart, maximum: usize, sink
                 ));
             }
         }
-        (PartKind::Diagram, PreparedValue::Diagram { source, outline }) => {
+        (
+            PartKind::Diagram,
+            PreparedValue::Diagram {
+                source,
+                entry_id,
+                entry_text,
+                drawing_relationship,
+                ..
+            },
+        ) => {
             #[cfg(feature = "drawingml-raw-current")]
             {
-                let entry = outline.entries.first();
-                if let Some(entry) = entry {
-                    let limits = diagram_limits_with_output(maximum);
-                    black_box(dml::diagram::edit::set_text(
-                        source,
-                        &entry.id,
-                        &entry.text,
+                let limits = diagram_limits_with_output(maximum);
+                let result = dml::diagram::edit::set_text(
+                    source,
+                    entry_id,
+                    entry_text,
+                    &limits,
+                );
+                let result = result.and_then(|output| {
+                    dml::diagram::edit::set_drawing_reference(
+                        &output,
+                        drawing_relationship.as_deref(),
                         &limits,
-                    ));
-                }
+                    )
+                });
+                black_box(result);
+            }
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            {
+                let result = dml::diagram::edit::set_text(source, entry_id, entry_text);
+                let result = result.and_then(|output| {
+                    dml::diagram::edit::set_drawing_reference(
+                        &output,
+                        drawing_relationship.as_deref(),
+                    )
+                });
+                black_box(result);
             }
         }
         (PartKind::TextBody, PreparedValue::TextBody(value)) => {
@@ -2326,14 +2473,15 @@ fn output_limit_timed(part: &Part, prepared: &PreparedPart, maximum: usize, sink
                 dml::theme::family::Limits::new(maximum),
             ));
         }
-        (PartKind::ThemeFamilyPart, PreparedValue::ThemeFamilyPart(snapshot)) => {
+        (
+            PartKind::ThemeFamilyPart,
+            PreparedValue::ThemeFamilyPart { snapshot, family },
+        ) => {
             #[cfg(feature = "drawingml-theme-family-current")]
-            if let Some(family) = snapshot.family() {
-                black_box(snapshot.replace_family(
-                    family,
-                    dml::theme::family::part::Limits::new(maximum),
-                ));
-            }
+            black_box(snapshot.replace_family(
+                family,
+                dml::theme::family::part::Limits::new(maximum),
+            ));
         }
         (PartKind::InkActions, PreparedValue::InkActions(value)) => {
             #[cfg(any(
@@ -2575,7 +2723,7 @@ fn format_code_part(fixture: &FixtureLane) -> Result<Part, ProbeFailure> {
         .ok_or_else(|| fail("formatcode2 detached fixture has no root opening tag"))?;
     let root_open = &canonical_text[..=open_end];
     let source = format!(
-        "<!--formatcode2-before-->\n{root_open}<![CDATA[0.00]]><!--formatcode2-opaque--> </c16r2:formatcode2>\n<!--formatcode2-after-->"
+        "<!--formatcode2-before-->\n{root_open}<![CDATA[0.00]]><!--formatcode2-opaque--></c16r2:formatcode2>\n<!--formatcode2-after-->"
     )
     .into_bytes();
     let mut value = read_format_code_value(&source)?;
@@ -2651,16 +2799,20 @@ fn text_media_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
     body.paragraphs[0].runs[0].text = format!("{} changed", fixture.mutation);
     let mut changed = Vec::new();
     write_text_value(&mut changed, &body)?;
-    let svg_wire = br#"<asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rIdSvg"/>"#.to_vec();
-    let svg_source = read_svg(&svg_wire)?;
-    let mut svg = read_svg_value(&svg_source)?;
+    // This is intentionally a host fragment: all four prefixes are inherited
+    // from the surrounding part and the root carries no xmlns declarations.
+    // The contextual reader below is therefore required for both the source
+    // and changed fixtures; a self-declaring root would not exercise the
+    // namespace-scope API.
+    let svg_source = br#"<asvg:svgBlip r:embed="rIdSvg" future:marker="opaque:value"><opaque:payload opaque:kind="future"/></asvg:svgBlip>"#.to_vec();
+    let svg_context = svg_fixture_context()?;
+    let mut svg = read_svg_contextual_value_with(&svg_source, &svg_context)?;
     svg.set_reference(
         dml::svg_blip::Reference::embedded("rIdSvgChanged")
             .map_err(|error| fail(error.to_string()))?,
     )
     .map_err(|error| classify(error, svg_source.len()))?;
-    let mut svg_changed = Vec::new();
-    write_svg_value(&mut svg_changed, &svg)?;
+    let svg_changed = write_svg_contextual_default(&svg)?;
     let model_wire = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rIdModel" r:link="rIdLinked"><m3d:spPr/><m3d:camera/><m3d:trans/><m3d:raster rName="Office Renderer" rVer="17.0"><m3d:blip r:embed="rIdRaster"/></m3d:raster><m3d:objViewport/></m3d:model3d>"#.to_vec();
     let model_source = read_model3d(&model_wire)?;
     let mut metadata = read_model3d_value(&model_source)?;
@@ -2715,6 +2867,18 @@ fn text_media_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
     ])
 }
 
+const THEME_FAMILY_FIXTURE_NAME: &str = "Office";
+const THEME_FAMILY_FIXTURE_ID: &str = "{11111111-1111-1111-1111-111111111111}";
+const THEME_FAMILY_FIXTURE_VARIANT_ID: &str = "{22222222-2222-2222-2222-222222222222}";
+
+fn theme_family_fixture_identity() -> (&'static str, &'static str, &'static str) {
+    (
+        THEME_FAMILY_FIXTURE_NAME,
+        THEME_FAMILY_FIXTURE_ID,
+        THEME_FAMILY_FIXTURE_VARIANT_ID,
+    )
+}
+
 fn theme_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
     use dml::theme::{Color, Face, FontSet, Palette, Slot};
     let mut palette = Palette::new("Office");
@@ -2744,9 +2908,9 @@ fn theme_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
         fonts,
     })?;
     let family = dml::theme::family::Family::new(
-        "Office",
-        "{11111111-1111-1111-1111-111111111111}",
-        "{22222222-2222-2222-2222-222222222222}",
+        THEME_FAMILY_FIXTURE_NAME,
+        THEME_FAMILY_FIXTURE_ID,
+        THEME_FAMILY_FIXTURE_VARIANT_ID,
     )
     .map_err(|error| classify(error, 0))?;
     let family_canonical = write_family_value(&family)?;
@@ -2771,6 +2935,15 @@ fn theme_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
         .family()
         .cloned()
         .ok_or_else(|| fail("complete Theme fixture has no direct family owner"))?;
+    let (expected_name, expected_id, expected_variant_id) = theme_family_fixture_identity();
+    if source_family.name() != expected_name
+        || source_family.id().to_string() != expected_id
+        || source_family.variant_id().to_string() != expected_variant_id
+    {
+        return Err(fail(
+            "complete Theme fixture source identity does not match its bound name/id/variant",
+        ));
+    }
     let family_part_changed = theme_family_replace(&family_part_snapshot, &family_value)
         .map_err(|error| classify(error, family_part_source.len()))?;
     if source_family == family_value {
@@ -2963,13 +3136,28 @@ fn make_case(lane: &str, fixture: &FixtureLane) -> Result<LaneCase, ProbeFailure
     let mut prepared = parts
         .iter()
         .map(|part| {
+            let contextual_namespace = if part.kind == PartKind::SvgBlip {
+                Some(svg_fixture_context()?)
+            } else {
+                None
+            };
             let contextual_source = if part.kind == PartKind::SvgBlip {
-                Some(read_svg_contextual_value(&part.source)?)
+                Some(read_svg_contextual_value_with(
+                    &part.source,
+                    contextual_namespace
+                        .as_ref()
+                        .ok_or_else(|| fail("SVG namespace context was not prepared"))?,
+                )?)
             } else {
                 None
             };
             let contextual_changed = if part.kind == PartKind::SvgBlip {
-                Some(read_svg_contextual_value(&part.changed)?)
+                Some(read_svg_contextual_value_with(
+                    &part.changed,
+                    contextual_namespace
+                        .as_ref()
+                        .ok_or_else(|| fail("SVG namespace context was not prepared"))?,
+                )?)
             } else {
                 None
             };
@@ -2989,6 +3177,7 @@ fn make_case(lane: &str, fixture: &FixtureLane) -> Result<LaneCase, ProbeFailure
                 changed: prepare_value(part.kind, &part.changed)?,
                 contextual_source,
                 contextual_changed,
+                contextual_namespace,
                 contextual_source_output_bytes,
                 contextual_changed_output_bytes,
                 output_payload_bytes: None,
@@ -3830,7 +4019,8 @@ fn semantic_mode(kind: PartKind) -> &'static str {
         PartKind::FormatCode
         | PartKind::SvgBlip
         | PartKind::ThemeFamily
-        | PartKind::ThemeFamilyPart => "source_exact",
+        | PartKind::ThemeFamilyPart
+        | PartKind::InkActions => "source_exact",
         PartKind::Blip => "scanner",
         _ => "model",
     }
@@ -3852,9 +4042,11 @@ fn semantic_key(kind: PartKind, bytes: &[u8]) -> Result<String, ProbeFailure> {
         PartKind::SvgBlip => {
             let value = read_svg_value(bytes)?;
             format!(
-                "reference={:?};namespaces={:?};attributes={:?};children={:?}",
+                // Contextual export may materialize inherited declarations on
+                // the standalone root.  Compare the effective typed/opaque
+                // payload, not the spelling of that namespace completion.
+                "reference={:?};attributes={:?};children={:?}",
                 value.reference(),
-                value.namespaces(),
                 value.attributes(),
                 value.children(),
             )
@@ -3914,6 +4106,90 @@ fn semantic_equal(kind: PartKind, left: &[u8], right: &[u8]) -> Result<bool, Pro
     })
 }
 
+/// Prove a changed source-backed fixture retained its untouched lexical
+/// slices without asking the production writer to generate an expected byte
+/// string.  The replacement region is deliberately treated as opaque here;
+/// semantic readback and the requested mutation prove what changed in that
+/// region separately.
+fn splice_oracle(source: &[u8], changed: &[u8], marker: &[u8]) -> bool {
+    fn root_span(bytes: &[u8], marker: &[u8]) -> Option<(usize, usize)> {
+        let start = bytes
+            .windows(marker.len())
+            .position(|window| window == marker)?;
+        let tail = &bytes[start..];
+        let end = if let Some(relative) = tail.windows(2).position(|window| window == b"/>") {
+            start + relative + 2
+        } else {
+            let close = b"</thm15:themeFamily>";
+            let relative = tail.windows(close.len()).position(|window| window == close)?;
+            start + relative + close.len()
+        };
+        Some((start, end))
+    }
+
+    let (source_start, source_end) = if marker == b"<![CDATA[" {
+        let Some(start) = source
+            .windows(marker.len())
+            .position(|window| window == marker)
+        else {
+            return false;
+        };
+        let value_start = start + marker.len();
+        let suffix = b"]]>";
+        let Some(relative) = source[value_start..]
+            .windows(suffix.len())
+            .position(|window| window == suffix)
+        else {
+            return false;
+        };
+        (value_start, value_start + relative)
+    } else {
+        let Some(span) = root_span(source, marker) else {
+            return false;
+        };
+        span
+    };
+    let (changed_start, changed_end) = if marker == b"<![CDATA[" {
+        let Some(start) = changed
+            .windows(marker.len())
+            .position(|window| window == marker)
+        else {
+            return false;
+        };
+        let value_start = start + marker.len();
+        let suffix = b"]]>";
+        let Some(relative) = changed[value_start..]
+            .windows(suffix.len())
+            .position(|window| window == suffix)
+        else {
+            return false;
+        };
+        (value_start, value_start + relative)
+    } else {
+        let Some(span) = root_span(changed, marker) else {
+            return false;
+        };
+        span
+    };
+    source[..source_start] == changed[..changed_start]
+        && source[source_end..] == changed[changed_end..]
+        && source[source_start..source_end] != changed[changed_start..changed_end]
+}
+
+fn independent_splice_oracle(
+    kind: PartKind,
+    source: &[u8],
+    changed: &[u8],
+) -> (bool, bool) {
+    match kind {
+        PartKind::FormatCode => (true, splice_oracle(source, changed, b"<![CDATA[")),
+        PartKind::ThemeFamily | PartKind::ThemeFamilyPart => {
+            (true, splice_oracle(source, changed, b"<thm15:themeFamily"))
+        },
+        _ => (false, true),
+    }
+}
+
 fn raw_fidelity(case: &LaneCase) -> Result<Vec<RawFidelityReceipt>, ProbeFailure> {
     case.parts
         .iter()
@@ -3962,6 +4238,20 @@ fn raw_fidelity(case: &LaneCase) -> Result<Vec<RawFidelityReceipt>, ProbeFailure
                     ));
                 }
             }
+            let standalone_route_checked = if part.kind == PartKind::SvgBlip {
+                let standalone_source = standalone_svg_roundtrip(&source_output)?;
+                let standalone_changed = standalone_svg_roundtrip(&changed_output)?;
+                if !semantic_equal(PartKind::SvgBlip, &source_output, &standalone_source)?
+                    || !semantic_equal(PartKind::SvgBlip, &changed_output, &standalone_changed)?
+                {
+                    return Err(fail(
+                        "standalone SVG route changed the contextual semantic model",
+                    ));
+                }
+                true
+            } else {
+                false
+            };
             let source_semantic = semantic_key(part.kind, &part.source)?;
             let source_output_semantic = semantic_key(part.kind, &source_output)?;
             let changed_semantic = semantic_key(part.kind, &part.changed)?;
@@ -3981,23 +4271,64 @@ fn raw_fidelity(case: &LaneCase) -> Result<Vec<RawFidelityReceipt>, ProbeFailure
                     part.id
                 )));
             }
+            let source_sha256 = sha256(&part.source);
+            let changed_sha256 = sha256(&part.changed);
+            let malformed_sha256 = sha256(&part.malformed);
             let source_preserving_expected = source_preserving(part.kind);
-            if source_preserving_expected && source_output != part.source {
+            let source_raw_sha256 = if part.kind == PartKind::SvgBlip {
+                let prepared = case
+                    .prepared
+                    .iter()
+                    .find(|value| value.id == part.id)
+                    .ok_or_else(|| fail("SVG contextual fixture was not prepared"))?;
+                let source_value = prepared
+                    .contextual_source
+                    .as_ref()
+                    .ok_or_else(|| fail("SVG contextual source was not prepared"))?;
+                let raw = source_value
+                    .raw_source()
+                    .ok_or_else(|| fail("SVG contextual source lost its raw fragment"))?;
+                sha256(raw)
+            } else {
+                source_sha256.clone()
+            };
+            let source_raw_exact = if part.kind == PartKind::SvgBlip {
+                let prepared = case
+                    .prepared
+                    .iter()
+                    .find(|value| value.id == part.id)
+                    .ok_or_else(|| fail("SVG contextual fixture was not prepared"))?;
+                let source_value = prepared
+                    .contextual_source
+                    .as_ref()
+                    .ok_or_else(|| fail("SVG contextual source was not prepared"))?;
+                source_value.raw_source() == Some(part.source.as_slice())
+            } else {
+                source_output == part.source
+            };
+            if source_preserving_expected && !source_raw_exact {
                 return Err(fail(format!(
                     "{} canonical source changed under a promised source-preserving route",
                     part.id
                 )));
             }
             let changed_output_exact = changed_output == part.changed;
-            if source_preserving_expected && !changed_output_exact {
+            let changed_output_exact_expected = source_preserving_expected
+                && part.kind != PartKind::SvgBlip;
+            if changed_output_exact_expected && !changed_output_exact {
                 return Err(fail(format!(
                     "{} changed source changed under a promised source-preserving route",
                     part.id
                 )));
             }
-            let source_sha256 = sha256(&part.source);
-            let changed_sha256 = sha256(&part.changed);
-            let malformed_sha256 = sha256(&part.malformed);
+            let (splice_oracle_checked, splice_oracle_passed) =
+                independent_splice_oracle(part.kind, &part.source, &part.changed);
+            if splice_oracle_checked && !splice_oracle_passed {
+                return Err(fail(format!(
+                    "{} changed fixture did not preserve its independent untouched slices",
+                    part.id
+                )));
+            }
             Ok(RawFidelityReceipt {
                 part_id: part.id,
                 fixture_identity_sha256: fixture_part_identity(
@@ -4016,6 +4347,12 @@ fn raw_fidelity(case: &LaneCase) -> Result<Vec<RawFidelityReceipt>, ProbeFailure
                 source_preserving_expected,
                 source_output_exact: source_output == part.source,
                 changed_output_exact,
+                source_raw_sha256,
+                source_raw_exact,
+                changed_output_exact_expected,
+                standalone_route_checked,
+                splice_oracle_checked,
+                splice_oracle_passed,
                 read_write_route,
                 fidelity_mode: semantic_mode(part.kind),
                 source_semantic_sha256: sha256(source_semantic.as_bytes()),
@@ -4037,6 +4374,7 @@ fn source_preserving(kind: PartKind) -> bool {
             | PartKind::SvgBlip
             | PartKind::ThemeFamily
             | PartKind::ThemeFamilyPart
+            | PartKind::InkActions
     )
 }
 
@@ -4203,44 +4541,48 @@ fn part_has_input_limit(kind: PartKind) -> bool {
     input_limit(kind).is_some()
 }
 
-fn parse_geometry(bytes: &[u8]) -> Result<dml::geometry::CustomGeometry, ProbeFailure> {
+fn geometry_invalid(message: impl Into<String>) -> dml::Error {
+    dml::Error::Invalid(message.into())
+}
+
+/// Parse custom geometry with the native DrawingML error boundary intact.
+/// The timed entry row calls this function directly and black-boxes its
+/// `dml::Result`; only the untimed detail pass maps that result into the
+/// probe's refusal receipt.
+fn parse_geometry_native(bytes: &[u8]) -> dml::Result<dml::geometry::CustomGeometry> {
     use dml::geometry::reader::{CustomGeometryBuilder, GeometryElement};
     let mut reader = Reader::from_reader(bytes);
     reader.config_mut().trim_text(true);
     let mut buffer = Vec::new();
     #[cfg(feature = "drawingml-raw-current")]
-    let mut builder = CustomGeometryBuilder::new(dml::geometry::Limits::DEFAULT)
-        .map_err(|error| classify(error, bytes.len()))?;
+    let mut builder = CustomGeometryBuilder::new(dml::geometry::Limits::DEFAULT)?;
     #[cfg(not(feature = "drawingml-raw-current"))]
     let mut builder = CustomGeometryBuilder::new();
     let mut stack = Vec::new();
     loop {
         let event = reader
             .read_event_into(&mut buffer)
-            .map_err(|error| invalid_input(error.to_string(), bytes.len()))?
+            .map_err(dml::Error::from)?
             .into_owned();
         match event {
             Event::Start(element) => {
                 let local = element.local_name().as_ref().to_vec();
                 if stack.is_empty() {
                     if local.as_slice() != b"custGeom" {
-                        return Err(invalid_input("geometry root is not custGeom", bytes.len()));
+                        return Err(geometry_invalid("geometry root is not custGeom"));
                     }
                     stack.push(GeometryElement::CustomGeometry);
                 } else {
                     let parent = *stack
                         .last()
-                        .ok_or_else(|| invalid_input("geometry stack is empty", bytes.len()))?;
-                    let child = builder
-                        .open(parent, &local, &element, reader.decoder())
-                        .map_err(|error| classify(error, bytes.len()))?;
+                        .ok_or_else(|| geometry_invalid("geometry stack is empty"))?;
+                    let child = builder.open(parent, &local, &element, reader.decoder())?;
                     let child = child.ok_or_else(|| {
-                        invalid_input(
+                        geometry_invalid(
                             format!(
                                 "unsupported geometry child {:?}",
                                 String::from_utf8_lossy(&local)
                             ),
-                            bytes.len(),
                         )
                     })?;
                     stack.push(child);
@@ -4249,59 +4591,48 @@ fn parse_geometry(bytes: &[u8]) -> Result<dml::geometry::CustomGeometry, ProbeFa
             Event::Empty(element) => {
                 let local = element.local_name().as_ref().to_vec();
                 if stack.is_empty() {
-                    return Err(invalid_input(
-                        "empty geometry root is unsupported",
-                        bytes.len(),
-                    ));
+                    return Err(geometry_invalid("empty geometry root is unsupported"));
                 }
                 let parent = *stack
                     .last()
-                    .ok_or_else(|| invalid_input("geometry stack is empty", bytes.len()))?;
-                let child = builder
-                    .open(parent, &local, &element, reader.decoder())
-                    .map_err(|error| classify(error, bytes.len()))?;
+                    .ok_or_else(|| geometry_invalid("geometry stack is empty"))?;
+                let child = builder.open(parent, &local, &element, reader.decoder())?;
                 let child = child.ok_or_else(|| {
-                    invalid_input(
+                    geometry_invalid(
                         format!(
                             "unsupported geometry child {:?}",
                             String::from_utf8_lossy(&local)
                         ),
-                        bytes.len(),
                     )
                 })?;
-                builder
-                    .close(child)
-                    .map_err(|error| classify(error, bytes.len()))?;
+                builder.close(child)?;
             },
             Event::End(_) => {
                 let element = stack
                     .pop()
-                    .ok_or_else(|| invalid_input("geometry close underflow", bytes.len()))?;
-                builder
-                    .close(element)
-                    .map_err(|error| classify(error, bytes.len()))?;
+                    .ok_or_else(|| geometry_invalid("geometry close underflow"))?;
+                builder.close(element)?;
                 if stack.is_empty() {
                     break;
                 }
             },
-            Event::Eof => return Err(invalid_input("geometry root is unterminated", bytes.len())),
+            Event::Eof => return Err(geometry_invalid("geometry root is unterminated")),
             Event::Text(_)
             | Event::CData(_)
             | Event::Comment(_)
             | Event::Decl(_)
             | Event::PI(_) => {},
             Event::DocType(_) | Event::GeneralRef(_) => {
-                return Err(invalid_input(
-                    "geometry contains forbidden markup",
-                    bytes.len(),
-                ));
+                return Err(geometry_invalid("geometry contains forbidden markup"));
             },
         }
         buffer.clear();
     }
-    builder
-        .finish()
-        .map_err(|error| classify(error, bytes.len()))
+    builder.finish()
+}
+
+fn parse_geometry(bytes: &[u8]) -> Result<dml::geometry::CustomGeometry, ProbeFailure> {
+    parse_geometry_native(bytes).map_err(|error| classify(error, bytes.len()))
 }
 
 fn read_shared_value(part: &SharedPart) -> Result<PreparedValue, ProbeFailure> {
@@ -4340,9 +4671,12 @@ fn read_shared_value(part: &SharedPart) -> Result<PreparedValue, ProbeFailure> {
             );
             #[cfg(not(feature = "drawingml-raw-current"))]
             let value = dml::theme::family::part::read_shared(std::sync::Arc::clone(&part.source));
-            Ok(PreparedValue::ThemeFamilyPart(
-                value.map_err(|error| classify(error, part.source.len()))?,
-            ))
+            let snapshot = value.map_err(|error| classify(error, part.source.len()))?;
+            let family = snapshot
+                .family()
+                .cloned()
+                .ok_or_else(|| fail("shared Theme part has no direct family owner"))?;
+            Ok(PreparedValue::ThemeFamilyPart { snapshot, family })
         },
         _ => Err(fail(format!("{} has no shared-reader route", part.id))),
     }
@@ -4406,7 +4740,7 @@ fn shared_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, Prob
                 output
             },
             PreparedValue::ThemeFamily(value) => write_family_value(value)?,
-            PreparedValue::ThemeFamilyPart(value) => value.xml_bytes().to_vec(),
+            PreparedValue::ThemeFamilyPart { snapshot, .. } => snapshot.xml_bytes().to_vec(),
             _ => return Err(fail("shared-reader returned an unsupported value")),
         };
         sink.write_all(&output)
@@ -4506,6 +4840,23 @@ fn theme_family_mutations(
         .family()
         .cloned()
         .ok_or_else(|| fail("changed Theme part has no direct family owner"))?;
+    let source_family = source_snapshot
+        .family()
+        .cloned()
+        .ok_or_else(|| fail("source Theme part has no direct family owner"))?;
+    let (expected_source_name, expected_source_id, expected_source_variant_id) =
+        theme_family_fixture_identity();
+    let source_identity_matches = source_family.name() == expected_source_name
+        && source_family.id().to_string() == expected_source_id
+        && source_family.variant_id().to_string() == expected_source_variant_id;
+    if !source_identity_matches {
+        return Err(fail(
+            "Theme-part mutation source identity does not match its bound name/id/variant",
+        ));
+    }
+    let source_name = Some(source_family.name().to_owned());
+    let source_id = Some(source_family.id().to_string());
+    let source_variant_id = Some(source_family.variant_id().to_string());
     let source_sha256 = sha256(&part.source);
     let replaced = theme_family_replace(&source_snapshot, &changed_family)
         .map_err(|error| classify(error, part.source.len()))?;
@@ -4559,6 +4910,10 @@ fn theme_family_mutations(
             observed_id: Some(replaced_family.id().to_string()),
             observed_variant_id: Some(replaced_family.variant_id().to_string()),
             requested_identity_matches: replaced_identity_matches,
+            source_name: source_name.clone(),
+            source_id: source_id.clone(),
+            source_variant_id: source_variant_id.clone(),
+            source_identity_matches,
         },
         ThemeFamilyMutationReceipt {
             operation: "remove_family",
@@ -4573,6 +4928,10 @@ fn theme_family_mutations(
             observed_id: None,
             observed_variant_id: None,
             requested_identity_matches: removed_snapshot.family().is_none(),
+            source_name: source_name.clone(),
+            source_id: source_id.clone(),
+            source_variant_id: source_variant_id.clone(),
+            source_identity_matches,
         },
         ThemeFamilyMutationReceipt {
             operation: "add_family",
@@ -4587,6 +4946,10 @@ fn theme_family_mutations(
             observed_id: Some(added_family.id().to_string()),
             observed_variant_id: Some(added_family.variant_id().to_string()),
             requested_identity_matches: added_identity_matches,
+            source_name,
+            source_id,
+            source_variant_id,
+            source_identity_matches,
         },
     ])
 }
@@ -4693,7 +5056,15 @@ fn production_preflight(case: &LaneCase) -> Result<(), ProbeFailure> {
         if boundary_kind(part.kind) == "none" {
             continue;
         }
-        timed_entry_read(part.kind, &part.over);
+        let prepared = case
+            .prepared
+            .iter()
+            .find(|prepared| prepared.id == part.id);
+        timed_entry_read(
+            part.kind,
+            &part.over,
+            prepared.and_then(|prepared| prepared.contextual_namespace.as_ref()),
+        );
     }
     for (part, prepared) in case.parts.iter().zip(&case.prepared) {
         let Some(output_limit) = prepared.output_limit else {
@@ -4709,8 +5080,12 @@ fn production_preflight(case: &LaneCase) -> Result<(), ProbeFailure> {
 /// serialize a JSON receipt or calculate a digest until the outside-clock
 /// detail pass.
 fn malformed_production(case: &LaneCase) -> Result<(), ProbeFailure> {
-    for part in &case.parts {
-        timed_entry_read(part.kind, &part.malformed);
+    for (part, prepared) in case.parts.iter().zip(&case.prepared) {
+        timed_entry_read(
+            part.kind,
+            &part.malformed,
+            prepared.contextual_namespace.as_ref(),
+        );
     }
     Ok(())
 }
@@ -4798,7 +5173,11 @@ fn normal_write(case: &LaneCase, timed: bool) -> Result<OperationValue, ProbeFai
 /// Call the raw readers directly for the timed entry row.  Each arm leaves
 /// its native production `Result` opaque to the optimizer; no common probe
 /// error or refusal receipt is built on the clock.
-fn timed_entry_read(kind: PartKind, bytes: &[u8]) {
+fn timed_entry_read(
+    kind: PartKind,
+    bytes: &[u8],
+    contextual_namespace: Option<&dml::svg_blip::NamespaceContext>,
+) {
     match kind {
         PartKind::Chart => {
             #[cfg(feature = "drawingml-raw-current")]
@@ -4839,10 +5218,16 @@ fn timed_entry_read(kind: PartKind, bytes: &[u8]) {
             ));
         }
         PartKind::SvgBlip => {
-            #[cfg(feature = "drawingml-raw-current")]
-            black_box(dml::svg_blip::read(bytes, dml::svg_blip::Limits::DEFAULT));
-            #[cfg(not(feature = "drawingml-raw-current"))]
-            black_box(dml::svg_blip::read(bytes));
+            if let Some(context) = contextual_namespace {
+                #[cfg(feature = "drawingml-raw-current")]
+                black_box(dml::svg_blip::read_contextual(
+                    bytes,
+                    context,
+                    dml::svg_blip::Limits::DEFAULT,
+                ));
+                #[cfg(not(feature = "drawingml-raw-current"))]
+                black_box(dml::svg_blip::read_contextual(bytes, context));
+            }
         }
         PartKind::Model3d => {
             #[cfg(feature = "drawingml-raw-current")]
@@ -4896,10 +5281,11 @@ fn timed_entry_read(kind: PartKind, bytes: &[u8]) {
             black_box(dml::ink::actions::read_profile(bytes));
         }
         PartKind::Geometry => {
-            // Geometry's public reader is the bounded builder walk used by
-            // `parse_geometry`; retain that production Result without
-            // converting it into a timed probe refusal.
-            black_box(parse_geometry(bytes));
+            // Keep the native geometry Result opaque.  `parse_geometry` is
+            // the untimed receipt adapter; normalizing it to ProbeFailure in
+            // this row would measure harness error construction instead of
+            // the production builder walk.
+            black_box(parse_geometry_native(bytes));
         }
         PartKind::Color => {
             #[cfg(feature = "drawingml-raw-current")]
@@ -4921,8 +5307,12 @@ fn timed_entry_read(kind: PartKind, bytes: &[u8]) {
 
 fn entry_read_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, ProbeFailure> {
     if timed {
-        for part in &case.parts {
-            timed_entry_read(part.kind, &part.source);
+        for (part, prepared) in case.parts.iter().zip(&case.prepared) {
+            timed_entry_read(
+                part.kind,
+                &part.source,
+                prepared.contextual_namespace.as_ref(),
+            );
         }
         return Ok(OperationValue::Timed);
     }
@@ -4963,39 +5353,39 @@ fn timed_write_prepared_vec(kind: PartKind, value: &PreparedValue) {
             #[cfg(not(feature = "drawingml-raw-current"))]
             black_box(dml::chart::extension::formatcode2::write_to(&mut output, value));
         }
-        (PartKind::Diagram, PreparedValue::Diagram { source, outline }) => {
-            if let Some(entry) = outline.entries.first() {
-                #[cfg(feature = "drawingml-raw-current")]
-                {
-                    let limits = dml::diagram::Limits::DEFAULT;
-                    let result = dml::diagram::edit::set_text(
-                        source,
-                        &entry.id,
-                        &entry.text,
+        (
+            PartKind::Diagram,
+            PreparedValue::Diagram {
+                source,
+                entry_id,
+                entry_text,
+                drawing_relationship,
+                ..
+            },
+        ) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            {
+                let limits = dml::diagram::Limits::DEFAULT;
+                let result = dml::diagram::edit::set_text(source, entry_id, entry_text, &limits);
+                let result = result.and_then(|output| {
+                    dml::diagram::edit::set_drawing_reference(
+                        &output,
+                        drawing_relationship.as_deref(),
                         &limits,
-                    );
-                    let result = match result {
-                        Ok(output) => dml::diagram::edit::set_drawing_reference(
-                            &output,
-                            outline.drawing_relationship.as_deref(),
-                            &limits,
-                        ),
-                        Err(error) => Err(error),
-                    };
-                    black_box(result);
-                }
-                #[cfg(not(feature = "drawingml-raw-current"))]
-                {
-                    let result = dml::diagram::edit::set_text(source, &entry.id, &entry.text);
-                    let result = match result {
-                        Ok(output) => dml::diagram::edit::set_drawing_reference(
-                            &output,
-                            outline.drawing_relationship.as_deref(),
-                        ),
-                        Err(error) => Err(error),
-                    };
-                    black_box(result);
-                }
+                    )
+                });
+                black_box(result);
+            }
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            {
+                let result = dml::diagram::edit::set_text(source, entry_id, entry_text);
+                let result = result.and_then(|output| {
+                    dml::diagram::edit::set_drawing_reference(
+                        &output,
+                        drawing_relationship.as_deref(),
+                    )
+                });
+                black_box(result);
             }
         }
         (PartKind::TextBody, PreparedValue::TextBody(value)) => {
@@ -5051,19 +5441,20 @@ fn timed_write_prepared_vec(kind: PartKind, value: &PreparedValue) {
             #[cfg(not(feature = "drawingml-raw-current"))]
             black_box(dml::theme::family::write(value));
         }
-        (PartKind::ThemeFamilyPart, PreparedValue::ThemeFamilyPart(snapshot)) => {
-            if let Some(family) = snapshot.family() {
-                #[cfg(feature = "drawingml-theme-family-current")]
-                black_box(snapshot.replace_family(
-                    family,
-                    dml::theme::family::part::Limits::DEFAULT,
-                ));
-                #[cfg(not(feature = "drawingml-theme-family-current"))]
-                black_box(snapshot.replace_family_with_limit(
-                    family,
-                    dml::theme::family::part::MAX_XML_BYTES,
-                ));
-            }
+        (
+            PartKind::ThemeFamilyPart,
+            PreparedValue::ThemeFamilyPart { snapshot, family },
+        ) => {
+            #[cfg(feature = "drawingml-theme-family-current")]
+            black_box(snapshot.replace_family(
+                family,
+                dml::theme::family::part::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-theme-family-current"))]
+            black_box(snapshot.replace_family_with_limit(
+                family,
+                dml::theme::family::part::MAX_XML_BYTES,
+            ));
         }
         (PartKind::InkActions, PreparedValue::InkActions(value)) => {
             let mut output = Vec::new();

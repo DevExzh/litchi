@@ -22,7 +22,9 @@ typed output coverage. Chart's bounded partial-output behavior is unchanged.
 SVG contextual reads are prepared for both source and changed fixtures. The
 normal Vec and bounded-sink rows and the outside-clock fidelity check use the
 production contextual read/write route; the standalone reader/writer remains
-an explicitly additional entry-read route.
+an explicitly additional outside-clock route over the completed contextual
+documents. Its semantic roundtrip is checked separately and is not folded
+into the timed contextual workload.
 
 The formatcode2 and Theme Family fixtures are non-canonical source-backed
 fixtures. The probe parses each source, mutates the parsed value, and checks
@@ -31,8 +33,8 @@ add/replace mutations parse their output and verify the requested family name,
 id, and variant id. Input-limit boundary fixtures retain a valid source and
 append XML-permitted trailing whitespace before crossing the typed byte limit,
 so a malformed-input refusal cannot mask the limit refusal. InkML action output
-is reported as model-semantic fidelity, not source-exact fidelity, because
-that writer canonicalizes its output.
+is reported as exact retained-source plus semantic fidelity because the
+writer preserves the parsed profile source, including the changed fixture.
 
 The validator requires the contextual route receipt, the complete Theme-part
 identity receipt, and the corrected InkML fidelity mode. No benchmark output,
