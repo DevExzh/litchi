@@ -28,7 +28,7 @@ docs/unified-ops/results/0362ul24/test_validate_signed_native.py
 The current six-suite discovery covers 68 tests: 19, 8, 7, 5, 3 and 26.
 The existing reconciliation receipt remains external at
 `.coord/tooling-coverage-reconciliation-1c2ce1f7d5.json` (8,456 bytes,
-SHA-256 `835eba64e99b0801d630eb75fd7a2da4ad3c1ab100517c9be8fa4112fd801a4`).
+SHA-256 `835eba64e99b0801d630eb75fd7a2da4ad3c1ab100517c9be8fa4112fd801a4d`).
 
 ## Combined-run repair
 
@@ -49,7 +49,7 @@ positive PID before refreshing ownership. It retains the escaped-child
 identity assertion and the subsequent cleanup/reap assertions; it does not
 skip, relax, or suppress the lifecycle check.
 
-The exact combined command then passed all 68 tests in 19.068 seconds. The
+The exact combined command then passed all 68 tests in 19.812 seconds. The
 committed repair tip was rerun unchanged; its external log is:
 
 ```text
