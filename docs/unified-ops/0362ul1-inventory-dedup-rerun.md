@@ -54,3 +54,13 @@ passed. The existing semantic report remains the pre-dedup 442-row diagnostic
 (`semantic-review-full.md`, 97,720 bytes, SHA-256
 `6661513aa140eb4db50be2d456f4dbf03c66264fd0a083bab6c8754494ffb8e8`); it is
 not a disposition or closure record.
+
+After integration at `fae96321e3`, the coordinator ran the inventory,
+disposition, capture, glossary and three registered W8 test modules together:
+119 tests passed in 5.065 seconds. The command was
+`python3 -B -m unittest tools.test_api_debt_inventory tools.test_validate_api_disposition tools.test_final_api_inventory tools.test_check_api_glossary tools.test_w8_projection_policy tools.test_w8_file_provenance tools.test_w8_original_baseline`.
+The external 297-byte log is
+`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/composed-inventory-w8-fae96321e3.log`,
+SHA-256 `24485e6f6c74b3528fe1e66c39af7348174d1c86eee620542ffd21ceb51a3e0c`.
+This validates the composed tooling; the 440 diagnostic findings still need
+repairs or exact semantic dispositions and final-source regeneration.

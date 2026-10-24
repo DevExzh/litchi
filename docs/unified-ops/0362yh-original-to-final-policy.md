@@ -58,3 +58,17 @@ This is a protocol/provenance record only.  It performs no Cargo build, native
 qualification, timing run, or inventory acceptance.  The `49c` source remains
 a candidate production pin until the final source inventory review, endpoint
 builds, untimed validation, pair receipt, and native ABBA review complete.
+
+Review found that the analyzer still required the ordinary shared-identity
+record after the runner had admitted the original-to-final mode. Follow-up
+`c7a982b97f` adds mode-specific verification of the canonical pair receipt,
+fixed endpoint artifacts, complete route order and recomputed projection
+proof; ordinary analysis remains unchanged. `e814e4512f` registers the full
+109-route, five-round regression in the existing projection-policy test
+module. All three registered W8 modules now run 40 tests, including rejection
+of source, projection and lock tampering. The reviewed packet merges at
+`54398757b8`; these are synthetic analyzer tests, not native measurements.
+
+The subsequent inventory-driven API repairs require a new candidate source
+binding before qualification. The 49c archive and receipt remain historical
+preparation evidence and must not be relabeled as that later source.

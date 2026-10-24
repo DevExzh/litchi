@@ -3547,3 +3547,44 @@ See [0063](0063-source-pptx-modern-comments.md).
   completion on this source, all-68 closure, actual OfficeCLI corpus replay,
   glossary closure and quiet native qualification remain required. Only
   comprehensive redaction audit 22 is deferred. Nothing is pushed.
+
+- Coordinator checkpoint (2026-10-24, complete capture and inventory findings):
+  All 68 frozen-49c rustdoc artifacts pass independent identity and hash
+  verification. The failed aggregate run remains unchanged. Reviewed repair
+  `2099c66520` merges at `fae96321e3`: the inventory follows explicitly
+  delegated facade roots, requires their JSON inputs, retains local facade
+  findings, and removes only exact duplicate rows. The diagnostic rerun
+  produces 440 unique rows from the 442 pre-dedup findings. Record 0362ul1
+  distinguishes the captured source from the repaired tooling; this is not
+  final-source inventory closure or a disposition waiver.
+
+  Reviewed OPC protocol `80983c725d` merges at `945eb1d6b9`. Its exact and
+  4 KiB forward-read oracles, bounded builds, source identities and quiet-host
+  validation are explicit; no measurement has run. Cleanup thirty-five
+  removes its merged leaf with zero payloads and retains the branch.
+  Reviewed W8 packet `e814e4512f` merges at `54398757b8`: the candidate
+  binding uses 49c and preserves the pristine f2 baseline and historical
+  lock. Its analyzer now validates the original-to-final pair mode, with a
+  complete 109-route regression in the existing registered test module.
+  The coordinator independently hashes the external 6,630,123,520-byte
+  candidate archive. All 119 composed inventory, glossary and W8 tests pass
+  at `fae96321e3`; the W8 policy remains preparation only, pending the next
+  production source and native qualification.
+
+  Inventory-driven engineering is now split into the six remaining format
+  limits entry points, DrawingML and Markdown publication families, nineteen
+  public error enums, four iWork wire-request compatibility aliases, and
+  replay/type-resolution coverage. The alias repair keeps generated protobuf
+  schema names and wire layouts intact. Diagnostic review identifies 262
+  replay rows requiring policy registration, nine ODF external generic-commit
+  resolution cases and two File owner-registration cases. The File triad's
+  `file`/`into_file` names are explicitly required by 0351 §2.6; they are not
+  new naming exceptions. Raw-value and transport findings require exact
+  semantic evidence before final disposition.
+
+  The full 53-step gate has not been launched on 49c after this capture.
+  Required API repairs will change production source, so final capture,
+  corpus replay, gate, glossary closure and native qualification must bind
+  the resulting assembled source. The documentation pass on 49c remains
+  valid evidence for that revision. Only redaction audit 22 is deferred.
+  Nothing is pushed.
