@@ -865,9 +865,13 @@ crate::record::record_family!("Data Model");
 /// discards it; [`Self::commit`] publishes a new package.
 pub struct Edit {
     target: crate::record::Source,
+    limits: Limits,
+    loaded: Option<Loaded>,
+}
+
+struct Loaded {
     before: Snapshot,
     draft: Option<ModelView>,
-    limits: Limits,
 }
 
 impl crate::Package {
@@ -905,25 +909,32 @@ impl crate::Package {
 
 impl Edit {
     fn start(target: crate::record::Source, limits: Limits) -> Result<Self> {
-        let before = Snapshot::load(&target)?;
         Ok(Self {
-            draft: before.model.clone(),
             target,
-            before,
             limits,
+            loaded: None,
         })
     }
 
+    fn ensure_loaded(&mut self) -> Result<&mut Loaded> {
+        if self.loaded.is_none() {
+            let before = Snapshot::load(&self.target)?;
+            self.loaded = Some(Loaded {
+                draft: before.model.clone(),
+                before,
+            });
+        }
+        Ok(self.loaded.as_mut().expect("Data Model graph loaded"))
+    }
+
     /// Read the source snapshot captured at transaction start.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        Ok(&self.ensure_loaded()?.before)
     }
 
     /// Read the currently staged model, if any.
-    #[must_use]
-    pub fn model(&self) -> Option<&ModelView> {
-        self.draft.as_ref()
+    pub fn model(&mut self) -> Result<Option<&ModelView>> {
+        Ok(self.ensure_loaded()?.draft.as_ref())
     }
 
     /// Replace the complete model after validating its descriptor, payload,
@@ -939,19 +950,39 @@ impl Edit {
     /// Imported opaque extensions acquire explicit namespace context for the
     /// destination workbook; inspect [`Self::model`] for the staged definition.
     pub fn set(&mut self, model: Model) -> Result<bool> {
+        self.ensure_loaded()?;
         let model = into_shared_model(model)?;
-        if self.draft.as_ref() == Some(&model) {
+        if self
+            .loaded
+            .as_ref()
+            .expect("Data Model graph loaded")
+            .draft
+            .as_ref()
+            == Some(&model)
+        {
             return Ok(false);
         }
         self.check_structure(&model)?;
         let model = if model.definition.extension_list.is_some()
             && !self
+                .loaded
+                .as_ref()
+                .expect("Data Model graph loaded")
                 .before
                 .model
                 .as_ref()
                 .is_some_and(|before| same_structure(&before.definition, &model.definition))
         {
-            prepare_import(&self.target, &self.before.workbook_name, model)?
+            prepare_import(
+                &self.target,
+                &self
+                    .loaded
+                    .as_ref()
+                    .expect("Data Model graph loaded")
+                    .before
+                    .workbook_name,
+                model,
+            )?
         } else {
             model
         };
@@ -959,11 +990,27 @@ impl Edit {
     }
 
     fn set_shared(&mut self, model: ModelView) -> Result<bool> {
-        if self.draft.as_ref() == Some(&model) {
+        self.ensure_loaded()?;
+        if self
+            .loaded
+            .as_ref()
+            .expect("Data Model graph loaded")
+            .draft
+            .as_ref()
+            == Some(&model)
+        {
             return Ok(false);
         }
         self.check_structure(&model)?;
-        require_unchanged_model_time_groupings(self.before.model.as_ref(), &model)?;
+        require_unchanged_model_time_groupings(
+            self.loaded
+                .as_ref()
+                .expect("Data Model graph loaded")
+                .before
+                .model
+                .as_ref(),
+            &model,
+        )?;
         // A payload-only replacement can invalidate the identities and
         // derivation closure even when the outer descriptor is byte-for-byte
         // unchanged. Reprove the retained extension against the candidate
@@ -973,8 +1020,15 @@ impl Edit {
             model.payload(),
             model.definition.model_time_groupings()?.as_ref(),
         )?;
-        validate_model(&self.target, &self.before.workbook_name, &model)?;
-        self.draft = Some(model);
+        let workbook_name = self
+            .loaded
+            .as_ref()
+            .expect("Data Model graph loaded")
+            .before
+            .workbook_name
+            .clone();
+        validate_model(&self.target, &workbook_name, &model)?;
+        self.loaded.as_mut().expect("Data Model graph loaded").draft = Some(model);
         Ok(true)
     }
 
@@ -982,7 +1036,8 @@ impl Edit {
         // A complete replacement must not disguise an unverified inner XLDM
         // structural change by supplying different opaque payload bytes. Check
         // the original as well, so remove/set cannot bypass this refusal.
-        for previous in [self.before.model.as_ref(), self.draft.as_ref()]
+        let loaded = self.loaded.as_ref().expect("Data Model graph loaded");
+        for previous in [loaded.before.model.as_ref(), loaded.draft.as_ref()]
             .into_iter()
             .flatten()
         {
@@ -1003,6 +1058,7 @@ impl Edit {
         edit: impl FnOnce(&mut Definition) -> Result<()>,
     ) -> Result<bool> {
         let current = self
+            .ensure_loaded()?
             .draft
             .as_ref()
             .ok_or_else(|| invalid("workbook has no Data Model to edit"))?;
@@ -1021,6 +1077,7 @@ impl Edit {
     /// identity before the edit is staged.
     pub fn edit_model_time_groupings(&mut self, value: Option<ModelTimeGroupings>) -> Result<bool> {
         let current = self
+            .ensure_loaded()?
             .draft
             .as_ref()
             .ok_or_else(|| invalid("workbook has no Data Model to edit"))?;
@@ -1037,33 +1094,42 @@ impl Edit {
             candidate.payload(),
             candidate.definition.model_time_groupings()?.as_ref(),
         )?;
-        validate_model(&self.target, &self.before.workbook_name, &candidate)?;
-        self.draft = Some(candidate);
+        let workbook_name = self
+            .loaded
+            .as_ref()
+            .expect("Data Model graph loaded")
+            .before
+            .workbook_name
+            .clone();
+        validate_model(&self.target, &workbook_name, &candidate)?;
+        self.loaded.as_mut().expect("Data Model graph loaded").draft = Some(candidate);
         Ok(true)
     }
 
     /// Remove the staged Data Model graph.
     pub fn remove(&mut self) -> Result<bool> {
-        if self.draft.is_none() {
+        if self.ensure_loaded()?.draft.is_none() {
             return Ok(false);
         }
-        self.draft = None;
+        self.loaded.as_mut().expect("Data Model graph loaded").draft = None;
         Ok(true)
     }
 
     /// Whether the typed model or payload differs from the source snapshot.
-    fn changed(&self) -> bool {
-        !self.before.same_semantics(self.draft.as_ref())
+    fn changed(loaded: &Loaded) -> bool {
+        !loaded.before.same_semantics(loaded.draft.as_ref())
     }
 
     #[cfg(test)]
-    pub(crate) fn is_changed(&self) -> bool {
-        self.changed()
+    pub(crate) fn is_changed(&mut self) -> Result<bool> {
+        Ok(Self::changed(self.ensure_loaded()?))
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.draft.clone_from(&self.before.model);
+    pub fn reset(&mut self) -> Result<()> {
+        let loaded = self.ensure_loaded()?;
+        loaded.draft.clone_from(&loaded.before.model);
+        Ok(())
     }
 
     /// Validate the source closure and publish the staged model as a new
@@ -1079,19 +1145,26 @@ impl Edit {
     }
 
     /// [`Self::commit`], keeping the published snapshot.
-    fn publish(self) -> Result<(Commit, Snapshot)> {
-        if !self.changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone(), self.limits);
+    fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        let unchanged = {
+            let loaded = self.ensure_loaded()?;
+            !Self::changed(loaded)
+        };
+        if unchanged {
+            let loaded = self.loaded.take().expect("Data Model graph loaded");
+            let patch = Patch::new(loaded.before.clone(), loaded.before.clone(), self.limits);
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
-                self.before,
+                loaded.before,
             ));
         }
+        let loaded = self.loaded.take().expect("Data Model graph loaded");
+        let Loaded { before, draft } = loaded;
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
         let current = Snapshot::load(&self.target)?;
-        if !current.same_source(&self.before) {
+        if !current.same_source(&before) {
             return Err(Error::PatchConflict {
                 part: "Data Model source closure".into(),
             });
@@ -1099,15 +1172,15 @@ impl Edit {
         let mut candidate = OpcPackage::clone(&self.target);
         publish_data_model(
             &mut candidate,
-            &self.before.workbook_name,
-            self.draft.as_ref(),
+            &before.workbook_name,
+            draft.as_ref(),
             self.limits,
         )?;
         let snapshot = Snapshot::load(&candidate)?;
-        if !snapshot.same_semantics(self.draft.as_ref()) {
+        if !snapshot.same_semantics(draft.as_ref()) {
             return Err(invalid("Data Model publication changed staged semantics"));
         }
-        let patch = Patch::new(self.before, snapshot.clone(), self.limits);
+        let patch = Patch::new(before, snapshot.clone(), self.limits);
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),
@@ -1737,7 +1810,12 @@ mod tests {
         let mut transaction = Transaction::new(&mut package).unwrap();
         transaction.set(expected).unwrap();
         assert_eq!(
-            transaction.model().unwrap().payload().as_ptr(),
+            transaction
+                .model()
+                .unwrap()
+                .unwrap()
+                .payload()
+                .as_ptr(),
             payload_pointer
         );
         let commit = transaction.commit().unwrap();
@@ -1815,7 +1893,7 @@ mod tests {
         let mut package = as_source(&package);
         let before = Snapshot::load(&package).unwrap();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        let mut owned = transaction.model().unwrap().to_owned();
+        let mut owned = transaction.model().unwrap().unwrap().to_owned();
         assert!(!transaction.set(owned.clone()).unwrap());
         owned.definition.min_version_load = 8;
         transaction.set(owned).unwrap();
@@ -2109,7 +2187,7 @@ mod tests {
             Err(Error::Unsupported { feature })
                 if feature.contains("inner XLDM table, column, and calculated-column identity closure")
         ));
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         drop(transaction);
         assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
         assert_eq!(
@@ -2149,7 +2227,7 @@ mod tests {
                 .edit_model_time_groupings(Some(grouping.clone()))
                 .unwrap()
         );
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         let commit = transaction.commit().unwrap();
         assert!(!commit.changed());
 
@@ -2259,7 +2337,7 @@ mod tests {
                     if feature.contains("inner XLDM table, column, and calculated-column identity closure")
                         || feature.contains("unknown modelTimeGrouping contentType")
             ));
-            assert!(!transaction.is_changed());
+            assert!(!transaction.is_changed().unwrap());
         }
         assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
     }
@@ -2294,7 +2372,7 @@ mod tests {
             Err(Error::Unsupported { feature })
                 if feature.contains("structural Data Model edits require validated inner XLDM identity closure")
         ));
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         drop(transaction);
         assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
     }
@@ -2391,7 +2469,7 @@ mod tests {
             transaction.edit_model_time_groupings(Some(changed)),
             Err(Error::Unsupported { .. })
         ));
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         drop(transaction);
         assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
     }
@@ -2434,14 +2512,14 @@ mod tests {
         remove_low_level_signature(&mut package);
 
         let mut transaction = Transaction::new(&mut package).unwrap();
-        let mut replacement = transaction.model().unwrap().to_owned();
+        let mut replacement = transaction.model().unwrap().unwrap().to_owned();
         replacement.payload.data = payload_with_equivalent_object_id_case();
         assert!(transaction.set(replacement).unwrap());
         assert!(matches!(transaction.commit(), Err(Error::Signed)));
 
         package.unsign();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        let mut replacement = transaction.model().unwrap().to_owned();
+        let mut replacement = transaction.model().unwrap().unwrap().to_owned();
         replacement.payload.data = payload_with_equivalent_object_id_case();
         assert!(transaction.set(replacement).unwrap());
         assert!(transaction.commit().is_ok());
@@ -2474,14 +2552,14 @@ mod tests {
 
         let before = package.get_part(&workbook).unwrap().blob().to_vec();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        let mut replacement = transaction.model().unwrap().to_owned();
+        let mut replacement = transaction.model().unwrap().unwrap().to_owned();
         replacement.payload.data = payload_with_equivalent_object_id_case();
         assert!(matches!(
             transaction.set(replacement),
             Err(Error::Unsupported { feature })
                 if feature.contains("inner XLDM table, column, and calculated-column identity closure")
         ));
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         drop(transaction);
         assert_eq!(package.get_part(&workbook).unwrap().blob(), before);
     }
@@ -2503,13 +2581,19 @@ mod tests {
         assert!(Arc::ptr_eq(&payload, &snapshot.model().unwrap().data));
 
         let mut edit = Transaction::new(&mut package).unwrap();
-        assert_eq!(edit.model().unwrap().payload().as_ptr(), payload.as_ptr());
+        assert_eq!(
+            edit.model().unwrap().unwrap().payload().as_ptr(),
+            payload.as_ptr()
+        );
         edit.edit_definition(|definition| {
             definition.min_version_load += 1;
             Ok(())
         })
         .unwrap();
-        assert_eq!(edit.model().unwrap().payload().as_ptr(), payload.as_ptr());
+        assert_eq!(
+            edit.model().unwrap().unwrap().payload().as_ptr(),
+            payload.as_ptr()
+        );
         let commit = edit.commit().unwrap();
         assert!(Arc::ptr_eq(
             &payload,
@@ -2551,20 +2635,20 @@ mod tests {
                 }),
                 Err(Error::Unsupported { .. })
             ));
-            assert!(!edit.is_changed());
+            assert!(!edit.is_changed().unwrap());
 
-            let mut owned = edit.model().unwrap().to_owned();
+            let mut owned = edit.model().unwrap().unwrap().to_owned();
             change(&mut owned.definition);
             assert!(matches!(
                 edit.set(owned.clone()),
                 Err(Error::Unsupported { .. })
             ));
-            assert!(!edit.is_changed());
+            assert!(!edit.is_changed().unwrap());
 
             // Removing the draft must not hide its original payload identity.
             edit.remove().unwrap();
             assert!(matches!(edit.set(owned), Err(Error::Unsupported { .. })));
-            assert!(edit.model().is_none());
+            assert!(edit.model().unwrap().is_none());
             drop(edit);
             assert!(Arc::ptr_eq(
                 &before,

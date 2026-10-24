@@ -17,7 +17,7 @@
 //! # fn main() -> litchi_xlsx::Result<()> {
 //! let package = Package::new()?;
 //! let mut edit = package.edit_calculation_metadata()?;
-//! edit.set_properties(Properties::new().with_calculation_id(Some(191_029)));
+//! edit.set_properties(Properties::new().with_calculation_id(Some(191_029)))?;
 //! let (after, patch) = edit.commit()?.into_parts();
 //! let calculation_id = after
 //!     .calculation_metadata()?
@@ -103,10 +103,19 @@ impl EditOptions {
 /// discards it.
 pub struct Edit {
     target: crate::record::Source,
+    loaded: Option<Loaded>,
+    limits: Limits,
+}
+
+/// The source graph and semantic draft are loaded together on the first
+/// operation that needs them. Keeping this as one unit is important: a
+/// failed source load leaves `Edit::loaded` empty, so a caller can retry
+/// after a transient source/managed-part failure without retaining a partial
+/// snapshot or a partially cloned draft.
+struct Loaded {
     before: Snapshot,
     properties: Option<Properties>,
     features: Option<Features>,
-    limits: Limits,
 }
 
 impl crate::Package {
@@ -131,12 +140,9 @@ impl crate::Package {
             .limits
             .unwrap_or_else(|| self.semantic_limits().calculation_properties_value());
         let target = crate::record::Source::new(self, "edit_calculation_metadata")?;
-        let before = Snapshot::load_with_limits(&target, &limits)?;
         Ok(Edit {
             target,
-            properties: before.properties().cloned(),
-            features: before.features().cloned(),
-            before,
+            loaded: None,
             limits,
         })
     }
@@ -155,31 +161,43 @@ impl crate::Package {
 }
 
 impl Edit {
+    fn ensure_loaded(&mut self) -> Result<&mut Loaded> {
+        if self.loaded.is_none() {
+            let before = Snapshot::load_with_limits(&self.target, &self.limits)?;
+            let properties = before.properties().cloned();
+            let features = before.features().cloned();
+            self.loaded = Some(Loaded {
+                before,
+                properties,
+                features,
+            });
+        }
+        Ok(self.loaded.as_mut().expect("calculation metadata loaded"))
+    }
+
     /// Exact immutable source captured when the transaction began.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        Ok(&self.ensure_loaded()?.before)
     }
 
     /// Currently staged exact-authored `calcPr` state.
-    #[must_use]
-    pub fn properties(&self) -> Option<&Properties> {
-        self.properties.as_ref()
+    pub fn properties(&mut self) -> Result<Option<&Properties>> {
+        Ok(self.ensure_loaded()?.properties.as_ref())
     }
 
     /// Currently staged ordered calculation features.
-    #[must_use]
-    pub fn features(&self) -> Option<&Features> {
-        self.features.as_ref()
+    pub fn features(&mut self) -> Result<Option<&Features>> {
+        Ok(self.ensure_loaded()?.features.as_ref())
     }
 
     /// Replace the staged `calcPr` state.
-    pub fn set_properties(&mut self, properties: Properties) -> bool {
-        if same_properties(self.properties(), Some(&properties)) {
-            return false;
+    pub fn set_properties(&mut self, properties: Properties) -> Result<bool> {
+        let loaded = self.ensure_loaded()?;
+        if same_properties(loaded.properties.as_ref(), Some(&properties)) {
+            return Ok(false);
         }
-        self.properties = Some(properties);
-        true
+        loaded.properties = Some(properties);
+        Ok(true)
     }
 
     /// Clone-edit `calcPr`, creating an empty exact-authored value if absent.
@@ -187,23 +205,24 @@ impl Edit {
         &mut self,
         edit: impl FnOnce(&mut Properties) -> Result<()>,
     ) -> Result<bool> {
-        let mut draft = self.properties.clone().unwrap_or_default();
+        let mut draft = self.ensure_loaded()?.properties.clone().unwrap_or_default();
         edit(&mut draft)?;
-        Ok(self.set_properties(draft))
+        self.set_properties(draft)
     }
 
     /// Remove `calcPr` from the staged workbook.
-    pub fn remove_properties(&mut self) -> bool {
-        self.properties.take().is_some()
+    pub fn remove_properties(&mut self) -> Result<bool> {
+        Ok(self.ensure_loaded()?.properties.take().is_some())
     }
 
     /// Replace the staged calculation-feature collection.
-    pub fn set_features(&mut self, features: Features) -> bool {
-        if self.features.as_ref() == Some(&features) {
-            return false;
+    pub fn set_features(&mut self, features: Features) -> Result<bool> {
+        let loaded = self.ensure_loaded()?;
+        if loaded.features.as_ref() == Some(&features) {
+            return Ok(false);
         }
-        self.features = Some(features);
-        true
+        loaded.features = Some(features);
+        Ok(true)
     }
 
     /// Clone-edit the existing calculation-feature collection.
@@ -212,28 +231,31 @@ impl Edit {
         edit: impl FnOnce(&mut Features) -> Result<()>,
     ) -> Result<bool> {
         let mut draft = self
+            .ensure_loaded()?
             .features
             .clone()
             .ok_or_else(|| invalid("workbook has no calculation features to edit"))?;
         edit(&mut draft)?;
-        Ok(self.set_features(draft))
+        self.set_features(draft)
     }
 
     /// Remove calculation features from the staged workbook.
-    pub fn remove_features(&mut self) -> bool {
-        self.features.take().is_some()
+    pub fn remove_features(&mut self) -> Result<bool> {
+        Ok(self.ensure_loaded()?.features.take().is_some())
     }
 
     /// Whether the exact authored semantic state differs from the source.
-    fn changed(&self) -> bool {
-        !same_properties(self.before.properties(), self.properties())
-            || self.before.features() != self.features()
+    fn changed(loaded: &Loaded) -> bool {
+        !same_properties(loaded.before.properties(), loaded.properties.as_ref())
+            || loaded.before.features() != loaded.features.as_ref()
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.properties = self.before.properties().cloned();
-        self.features = self.before.features().cloned();
+    pub fn reset(&mut self) -> Result<()> {
+        let loaded = self.ensure_loaded()?;
+        loaded.properties = loaded.before.properties().cloned();
+        loaded.features = loaded.before.features().cloned();
+        Ok(())
     }
 
     /// Validate the staged metadata and publish it as a new package. An
@@ -249,29 +271,43 @@ impl Edit {
     }
 
     /// [`Self::commit`], keeping the published snapshot.
-    pub(crate) fn publish(self) -> Result<(Commit, Snapshot)> {
-        if !self.changed() {
-            let patch = Patch(super::Patch::new(self.before.clone(), self.before.clone()));
+    pub(crate) fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        let unchanged = {
+            let loaded = self.ensure_loaded()?;
+            !Self::changed(loaded)
+        };
+        if unchanged {
+            let loaded = self.loaded.take().expect("calculation metadata loaded");
+            let patch = Patch(super::Patch::new(
+                loaded.before.clone(),
+                loaded.before.clone(),
+            ));
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
-                self.before,
+                loaded.before,
             ));
         }
         if self.target.is_signed() {
             return Err(Error::Signed);
         }
 
-        if !self.before.matches_current_source(&self.target) {
+        let loaded = self.loaded.take().expect("calculation metadata loaded");
+        let Loaded {
+            before,
+            properties,
+            features,
+        } = loaded;
+        if !before.matches_current_source(&self.target) {
             return Err(Error::PatchConflict {
-                part: self.before.workbook_part_name().to_string(),
+                part: before.workbook_part_name().to_string(),
             });
         }
 
-        let inspection = inspect(self.before.source_xml(), &self.limits)?;
+        let inspection = inspect(before.source_xml(), &self.limits)?;
         let output = match rewrite(
             &inspection,
-            self.properties.as_ref(),
-            self.features.as_ref(),
+            properties.as_ref(),
+            features.as_ref(),
             &self.limits,
         )? {
             Cow::Owned(output) => output,
@@ -284,15 +320,15 @@ impl Edit {
 
         let mut candidate = OpcPackage::clone(&self.target);
         candidate
-            .get_part_mut(self.before.workbook_part_name())?
+            .get_part_mut(before.workbook_part_name())?
             .set_blob(output);
         let snapshot = Snapshot::load_with_limits(&candidate, &self.limits)?;
-        if !snapshot.same_semantics(self.properties.as_ref(), self.features.as_ref()) {
+        if !snapshot.same_semantics(properties.as_ref(), features.as_ref()) {
             return Err(invalid(
                 "calculation metadata publication changed the staged semantics",
             ));
         }
-        let patch = Patch(super::Patch::new(self.before, snapshot.clone()));
+        let patch = Patch(super::Patch::new(before, snapshot.clone()));
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),
@@ -387,13 +423,13 @@ mod tests {
     fn set_and_remove_publish_exact_authored_state() {
         let mut package = crate::package::build_minimal_package().unwrap();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        assert!(transaction.set_properties(properties(91)));
+        assert!(transaction.set_properties(properties(91)).unwrap());
         let commit = transaction.commit().unwrap();
         assert!(commit.changed());
         assert_eq!(commit.snapshot().properties().unwrap().calculation_id(), 91);
 
         let mut transaction = Transaction::new(&mut package).unwrap();
-        assert!(transaction.remove_properties());
+        assert!(transaction.remove_properties().unwrap());
         let commit = transaction.commit().unwrap();
         assert!(commit.changed());
         assert!(commit.snapshot().properties().is_none());
@@ -413,7 +449,7 @@ mod tests {
             .unwrap();
         let source = package.main_document_part().unwrap().blob_arc();
         let mut transaction = Transaction::new(&mut package).unwrap();
-        transaction.set_properties(properties(4));
+        transaction.set_properties(properties(4)).unwrap();
         assert!(matches!(transaction.commit(), Err(Error::Signed)));
         assert!(std::sync::Arc::ptr_eq(
             &source,

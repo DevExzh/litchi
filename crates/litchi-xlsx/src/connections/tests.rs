@@ -582,7 +582,11 @@ fn extension_owner_transaction_projection_handles_compact_pi_mce_and_foreign_con
             .unwrap()
             .blob();
         let reopened = snapshot(&package).unwrap();
-        let extension = reopened.connections().unwrap().connections[0]
+        let extension = reopened
+            .connections()
+            .unwrap()
+            .unwrap()
+            .connections[0]
             .extension_xml
             .as_deref()
             .unwrap();
@@ -706,7 +710,12 @@ fn large_transaction_scalar_commit_reopens_with_stable_ids() {
     assert!(transaction.commit().unwrap().changed());
     let reopened = snapshot(&package).unwrap();
     assert_eq!(
-        reopened.connections().unwrap().connections.len(),
+        reopened
+            .connections()
+            .unwrap()
+            .unwrap()
+            .connections
+            .len(),
         COUNT as usize
     );
     assert_eq!(
@@ -731,12 +740,16 @@ fn large_transaction_reorder_publishes_the_requested_order() {
         .unwrap()
         .set_blob(many_connections_source(COUNT));
     let mut transaction = Transaction::new(&mut package).unwrap();
-    let mut reordered = transaction.connections().unwrap().clone();
+    let mut reordered = transaction
+        .connections()
+        .unwrap()
+        .unwrap()
+        .clone();
     reordered.connections.reverse();
     assert!(transaction.replace(Some(reordered)).unwrap());
     assert!(transaction.commit().unwrap().changed());
     let reopened = snapshot(&package).unwrap();
-    let connections = &reopened.connections().unwrap().connections;
+    let connections = &reopened.connections().unwrap().unwrap().connections;
     assert_eq!(connections.first().unwrap().id, COUNT);
     assert_eq!(connections.last().unwrap().id, 1);
 }

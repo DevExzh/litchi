@@ -38,7 +38,7 @@ fn signed_package() -> Package {
 /// metadata family and commit.
 fn set_custom_props(package: &Package, props: Props) -> Result<Package, metadata::Error> {
     let mut edit = package.edit_metadata()?;
-    edit.set_custom_props(props);
+    edit.set_custom_props(props)?;
     Ok(edit.commit()?.into_package())
 }
 

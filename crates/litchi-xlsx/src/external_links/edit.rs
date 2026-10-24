@@ -15,6 +15,11 @@ use crate::error::{Result, invalid};
 #[derive(Debug, Clone)]
 pub struct Edit {
     target: crate::record::Source,
+    loaded: Option<Loaded>,
+}
+
+#[derive(Debug, Clone)]
+struct Loaded {
     before: Snapshot,
     draft: Vec<super::package::Entry>,
     next_relationship_id: String,
@@ -25,29 +30,36 @@ pub struct Edit {
 impl Edit {
     /// Start an edit after validating and capturing the workbook graph.
     fn start(target: crate::record::Source) -> Result<Self> {
-        let limits = target.read_limits();
-        let before = Snapshot::load(&target, &limits)?;
-        let next_part_uri = next_part_uri(&target)?;
         Ok(Self {
             target,
-            draft: before.entries().to_vec(),
-            next_relationship_id: before.next_relationship_id().to_owned(),
-            first_part_uri: next_part_uri.clone(),
-            next_part_uri,
-            before,
+            loaded: None,
         })
     }
 
+    fn ensure_loaded(&mut self) -> Result<&mut Loaded> {
+        if self.loaded.is_none() {
+            let limits = self.target.read_limits();
+            let before = Snapshot::load(&self.target, &limits)?;
+            let next_part_uri = next_part_uri(&self.target)?;
+            self.loaded = Some(Loaded {
+                draft: before.entries().to_vec(),
+                next_relationship_id: before.next_relationship_id().to_owned(),
+                first_part_uri: next_part_uri.clone(),
+                next_part_uri,
+                before,
+            });
+        }
+        Ok(self.loaded.as_mut().expect("external-link graph loaded"))
+    }
+
     /// Immutable source snapshot used for conflict checks and inverse patches.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        Ok(&self.ensure_loaded()?.before)
     }
 
     /// Borrow the currently staged external-link entries.
-    #[must_use]
-    pub fn entries(&self) -> &[super::package::Entry] {
-        &self.draft
+    pub fn entries(&mut self) -> Result<&[super::package::Entry]> {
+        Ok(&self.ensure_loaded()?.draft)
     }
 
     /// Apply a checked mutation to one existing inert link.
@@ -56,17 +68,32 @@ impl Edit {
         index: usize,
         edit: impl FnOnce(&mut Link) -> Result<()>,
     ) -> Result<bool> {
-        let mut draft = self.draft.clone();
+        let mut draft = self.ensure_loaded()?.draft.clone();
         let entry = draft
             .get_mut(index)
             .ok_or_else(|| invalid(format!("external-link index {index} is absent")))?;
         edit(&mut entry.link)?;
         let limits = self.target.read_limits();
-        validation::link(&entry.link, self.before.conformance(), &limits)?;
-        if draft == self.draft {
+        let conformance = self
+            .loaded
+            .as_ref()
+            .expect("external-link graph loaded")
+            .before
+            .conformance();
+        validation::link(&entry.link, conformance, &limits)?;
+        if draft
+            == self
+                .loaded
+                .as_ref()
+                .expect("external-link graph loaded")
+                .draft
+        {
             return Ok(false);
         }
-        self.draft = draft;
+        self.loaded
+            .as_mut()
+            .expect("external-link graph loaded")
+            .draft = draft;
         Ok(true)
     }
 
@@ -101,59 +128,81 @@ impl Edit {
 
     /// Insert a new link with an allocated workbook relationship and part URI.
     pub fn insert(&mut self, link: Link) -> Result<usize> {
+        self.ensure_loaded()?;
         let limits = self.target.read_limits();
-        validation::link(&link, self.before.conformance(), &limits)?;
-        let mut relationship_id = self.next_relationship_id.clone();
-        while self
+        let loaded = self.loaded.as_ref().expect("external-link graph loaded");
+        validation::link(&link, loaded.before.conformance(), &limits)?;
+        let mut relationship_id = loaded.next_relationship_id.clone();
+        while loaded
             .draft
             .iter()
             .any(|entry| entry.relationship_id == relationship_id)
         {
             relationship_id = next_relationship_id_after(&relationship_id);
         }
-        self.next_relationship_id = next_relationship_id_after(&relationship_id);
-        let part_uri = self.next_part_uri.clone();
-        self.next_part_uri = next_part_uri_after(&part_uri, &self.target)?;
-        let index = self.draft.len();
+        let next_relationship_id = next_relationship_id_after(&relationship_id);
+        let part_uri = loaded.next_part_uri.clone();
+        let next_part_uri = next_part_uri_after(&part_uri, &self.target)?;
+        let index = loaded.draft.len();
         let wire_index =
             u32::try_from(index).map_err(|_source| invalid("external-link index exceeds u32"))?;
-        self.draft.push(super::package::Entry {
+        let mut draft = loaded.draft.clone();
+        draft.push(super::package::Entry {
             index: wire_index,
             relationship_id,
             part_uri,
             link,
         });
         let limits = self.target.read_limits();
-        validation::entries(&self.draft, self.before.conformance(), &limits)?;
+        validation::entries(&draft, loaded.before.conformance(), &limits)?;
+        let loaded = self.loaded.as_mut().expect("external-link graph loaded");
+        loaded.next_relationship_id = next_relationship_id;
+        loaded.next_part_uri = next_part_uri;
+        loaded.draft = draft;
         Ok(index)
     }
 
     /// Remove one link from the staged catalog.
     pub fn remove(&mut self, index: usize) -> Result<Option<super::package::Entry>> {
-        if index >= self.draft.len() {
+        self.ensure_loaded()?;
+        let mut draft = self
+            .loaded
+            .as_ref()
+            .expect("external-link graph loaded")
+            .draft
+            .clone();
+        if index >= draft.len() {
             return Ok(None);
         }
-        let removed = self.draft.remove(index);
-        for (index, entry) in self.draft.iter_mut().enumerate() {
+        let removed = draft.remove(index);
+        for (index, entry) in draft.iter_mut().enumerate() {
             entry.index = u32::try_from(index)
                 .map_err(|_source| invalid("external-link index exceeds u32"))?;
         }
         let limits = self.target.read_limits();
-        validation::entries(&self.draft, self.before.conformance(), &limits)?;
+        let loaded = self.loaded.as_ref().expect("external-link graph loaded");
+        validation::entries(&draft, loaded.before.conformance(), &limits)?;
+        self.loaded
+            .as_mut()
+            .expect("external-link graph loaded")
+            .draft = draft;
         Ok(Some(removed))
     }
 
-    fn changed(&self) -> bool {
-        self.before.entries() != self.draft.as_slice()
+    fn changed(loaded: &Loaded) -> bool {
+        loaded.before.entries() != loaded.draft.as_slice()
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.draft = self.before.entries().to_vec();
-        self.before
+    pub fn reset(&mut self) -> Result<()> {
+        let loaded = self.ensure_loaded()?;
+        loaded.draft = loaded.before.entries().to_vec();
+        loaded
+            .before
             .next_relationship_id()
-            .clone_into(&mut self.next_relationship_id);
-        self.next_part_uri.clone_from(&self.first_part_uri);
+            .clone_into(&mut loaded.next_relationship_id);
+        loaded.next_part_uri.clone_from(&loaded.first_part_uri);
+        Ok(())
     }
 
     /// Validate and publish the staged graph as a new package. An unchanged
@@ -168,36 +217,44 @@ impl Edit {
     }
 
     /// [`Self::commit`], keeping the published snapshot.
-    pub(super) fn publish(self) -> Result<(Commit, Snapshot)> {
-        if !self.changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
+    pub(super) fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        let unchanged = {
+            let loaded = self.ensure_loaded()?;
+            !Self::changed(loaded)
+        };
+        if unchanged {
+            let loaded = self.loaded.take().expect("external-link graph loaded");
+            let patch = Patch::new(loaded.before.clone(), loaded.before.clone());
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
-                self.before,
+                loaded.before,
             ));
         }
+
+        let loaded = self.loaded.take().expect("external-link graph loaded");
+        let Loaded { before, draft, .. } = loaded;
 
         let mut candidate = OpcPackage::clone(&self.target);
         let limits = candidate.read_limits();
         let current = Snapshot::load(&candidate, &limits)?;
-        if !current.same_source(&self.before) {
+        if !current.same_source(&before) {
             return Err(crate::error::Error::PatchConflict {
-                part: self.before.workbook_part_name().to_owned(),
+                part: before.workbook_part_name().to_owned(),
             });
         }
         apply_entries(
             &mut candidate,
-            self.before.entries(),
-            &self.draft,
-            self.before.conformance(),
+            before.entries(),
+            &draft,
+            before.conformance(),
         )?;
         let snapshot = Snapshot::load(&candidate, &limits)?;
-        if snapshot.entries() != self.draft.as_slice() {
+        if snapshot.entries() != draft.as_slice() {
             return Err(invalid(
                 "external-link publication changed the staged graph",
             ));
         }
-        let patch = Patch::new(self.before, snapshot.clone());
+        let patch = Patch::new(before, snapshot.clone());
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),

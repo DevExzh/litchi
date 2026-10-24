@@ -192,23 +192,47 @@ impl EditOptions {
 #[derive(Debug)]
 pub struct Edit {
     package: Package,
-    inner: properties::Edit,
+    options: EditOptions,
+    inner: Option<properties::Edit>,
 }
 
 impl Edit {
+    fn ensure_inner(&mut self) -> Result<&mut properties::Edit> {
+        if self.inner.is_none() {
+            let snapshot = Snapshot::read(self.package.opc(), Host::Excel)?;
+            let common_options = self
+                .options
+                .max_retained_bytes_value()
+                .map_or_else(properties::EditOptions::default, |maximum| {
+                    properties::EditOptions::new().max_retained_bytes(maximum)
+                });
+            let common_options = if self.options.max_retained_bytes_value().is_some() {
+                common_options.with_owner_admission(owner_admission(&self.package, &snapshot)?)
+            } else {
+                common_options
+            };
+            self.inner = Some(properties::Edit::new_with_snapshot(
+                self.package.opc(),
+                snapshot,
+                common_options,
+            ));
+        }
+        Ok(self.inner.as_mut().expect("metadata edit loaded"))
+    }
+
     /// The staged metadata.
     ///
     /// # Errors
     ///
     /// Returns the decoding errors of the application-properties part.
-    pub fn metadata(&self) -> Result<Metadata> {
-        self.inner.metadata()
+    pub fn metadata(&mut self) -> Result<Metadata> {
+        self.ensure_inner()?.metadata()
     }
 
     /// Stage the complete metadata.
-    pub fn set(&mut self, metadata: Metadata) -> &mut Self {
-        self.inner.set_metadata(metadata);
-        self
+    pub fn set(&mut self, metadata: Metadata) -> Result<&mut Self> {
+        self.ensure_inner()?.set_metadata(metadata);
+        Ok(self)
     }
 
     /// Stage a change of the metadata, starting from the staged value.
@@ -217,27 +241,26 @@ impl Edit {
     ///
     /// Returns the decoding errors of the application-properties part.
     pub fn update(&mut self, update: impl FnOnce(&mut Metadata)) -> Result<&mut Self> {
-        self.inner.update_metadata(update)?;
+        self.ensure_inner()?.update_metadata(update)?;
         Ok(self)
     }
 
     /// Stage the complete application properties; `None` removes the part.
-    pub fn set_app_props(&mut self, props: Option<app::Props>) -> &mut Self {
-        self.inner.set_app_props(props);
-        self
+    pub fn set_app_props(&mut self, props: Option<app::Props>) -> Result<&mut Self> {
+        self.ensure_inner()?.set_app_props(props);
+        Ok(self)
     }
 
     /// The staged custom properties.
-    #[must_use]
-    pub fn custom_props(&self) -> &custom::Props {
-        self.inner.custom_props()
+    pub fn custom_props(&mut self) -> Result<&custom::Props> {
+        Ok(self.ensure_inner()?.custom_props())
     }
 
     /// Stage the complete custom properties; an empty collection removes the
     /// part.
-    pub fn set_custom_props(&mut self, props: custom::Props) -> &mut Self {
-        self.inner.set_custom_props(props);
-        self
+    pub fn set_custom_props(&mut self, props: custom::Props) -> Result<&mut Self> {
+        self.ensure_inner()?.set_custom_props(props);
+        Ok(self)
     }
 
     /// Compute the patch and publish it to a new snapshot.
@@ -250,8 +273,10 @@ impl Edit {
     /// [`Error::Invalid`] or [`Error::Limit`] for a value the families
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// workbook.
-    pub fn commit(self) -> Result<Commit> {
-        let commit = self.inner.commit()?;
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_inner()?;
+        let inner = self.inner.take().expect("metadata edit loaded");
+        let commit = inner.commit()?;
         let diagnostics = commit.diagnostics().clone();
         let (opc, patch) = commit.into_parts();
         let package = if patch.is_noop() {
@@ -341,23 +366,10 @@ impl Package {
 
     /// Start a metadata edit under an explicit source, target, and patch ceiling.
     pub fn edit_metadata_with_options(&self, options: EditOptions) -> Result<Edit> {
-        let snapshot = Snapshot::read(self.opc(), Host::Excel)?;
-        let common_options = options
-            .max_retained_bytes_value()
-            .map_or_else(properties::EditOptions::default, |maximum| {
-                properties::EditOptions::new().max_retained_bytes(maximum)
-            });
-        if options.max_retained_bytes_value().is_some() {
-            let common_options =
-                common_options.with_owner_admission(owner_admission(self, &snapshot)?);
-            return Ok(Edit {
-                package: self.clone(),
-                inner: properties::Edit::new_with_snapshot(self.opc(), snapshot, common_options),
-            });
-        }
         Ok(Edit {
             package: self.clone(),
-            inner: properties::Edit::new_with_snapshot(self.opc(), snapshot, common_options),
+            options,
+            inner: None,
         })
     }
 

@@ -652,7 +652,7 @@ fn check_native_model_descriptor_round_trip(raw: OpcPackage) {
     );
     // The refusal staged nothing.
     let mut refused = transaction;
-    refused.reset();
+    refused.reset().unwrap();
     let mut transaction = refused;
     assert!(
         transaction

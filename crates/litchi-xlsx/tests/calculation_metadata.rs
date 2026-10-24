@@ -23,8 +23,8 @@ fn set_metadata(package: &mut Package, properties: Properties, features: Feature
     let mut edit = package
         .edit_calculation_metadata()
         .expect("calculation metadata edit");
-    assert!(edit.set_properties(properties));
-    assert!(edit.set_features(features));
+    assert!(edit.set_properties(properties).expect("properties"));
+    assert!(edit.set_features(features).expect("features"));
     let commit = edit.commit().expect("calculation metadata commit");
     assert!(commit.diagnostics().changed());
     let (after, patch) = commit.into_parts();
@@ -128,7 +128,9 @@ fn patch_inverse_restores_exact_source_and_stale_application_is_atomic() {
 
     let mut stale = baseline;
     let mut stale_edit = stale.edit_calculation_metadata().expect("stale edit");
-    stale_edit.set_properties(Properties::new().with_calculation_id(Some(99)));
+    stale_edit
+        .set_properties(Properties::new().with_calculation_id(Some(99)))
+        .unwrap();
     stale = stale_edit
         .commit()
         .expect("publish stale source")
@@ -186,7 +188,8 @@ fn feature_name_and_output_limits_fail_without_partial_publication() {
     let mut edit = package
         .edit_calculation_metadata_with_options(EditOptions::default().limits(limits))
         .expect("bounded edit");
-    edit.set_properties(Properties::new().with_calculation_id(Some(8)));
+    edit.set_properties(Properties::new().with_calculation_id(Some(8)))
+        .unwrap();
     assert!(edit.commit().is_err());
     assert_eq!(
         package
@@ -235,8 +238,8 @@ fn metadata_removal_restores_workbook_markup_and_preserves_unrelated_part_bytes(
         Features::new(Feature::new("temporary").unwrap()),
     );
     let mut remove = package.edit_calculation_metadata().expect("remove edit");
-    assert!(remove.remove_properties());
-    assert!(remove.remove_features());
+    assert!(remove.remove_properties().unwrap());
+    assert!(remove.remove_features().unwrap());
     package = remove.commit().expect("remove metadata").into_package();
     assert_eq!(
         package
@@ -307,7 +310,9 @@ fn signed_no_op_is_exact_but_changed_metadata_is_refused() {
     ));
 
     let mut changed = package.edit_calculation_metadata().unwrap();
-    changed.set_properties(Properties::new().with_calculation_id(Some(1)));
+    changed
+        .set_properties(Properties::new().with_calculation_id(Some(1)))
+        .unwrap();
     assert!(matches!(changed.commit(), Err(Error::Signed)));
     assert_eq!(
         package.calculation_metadata().unwrap().source_xml(),
@@ -319,14 +324,16 @@ fn signed_no_op_is_exact_but_changed_metadata_is_refused() {
 fn formula_edit_exposes_recalculation_invalidation_through_workbook_owner() {
     let mut package = Package::new().expect("package");
     let mut metadata = package.edit_calculation_metadata().unwrap();
-    metadata.set_properties(
+    metadata
+        .set_properties(
         Properties::new()
             .with_calculation_id(Some(123))
             .with_calculation_mode(Some(Mode::Manual))
             .with_full_calculation_on_load(Some(false))
             .with_calculation_completed(Some(true))
             .with_force_full_calculation(Some(false)),
-    );
+        )
+        .unwrap();
     package = metadata.commit().unwrap().into_package();
     let workbook = package;
     let mut edit = workbook.edit().expect("workbook edit");
@@ -404,7 +411,8 @@ fn encrypted_source_refuses_metadata_mutation_until_explicit_plain_reopen() {
     let explicit_plaintext = opened.to_plain_bytes().expect("explicit plaintext output");
     let mut plain = Package::from_bytes(&explicit_plaintext).expect("explicit plain reopen");
     let mut edit = plain.edit_calculation_metadata().expect("plain edit");
-    edit.set_properties(Properties::new().with_calculation_id(Some(11)));
+    edit.set_properties(Properties::new().with_calculation_id(Some(11)))
+        .unwrap();
     plain = edit.commit().expect("plain metadata commit").into_package();
     assert_eq!(
         plain
