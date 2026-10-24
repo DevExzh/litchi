@@ -63,32 +63,75 @@ def main() -> None:
         }
         gate.source_state = lambda root: source
         late_writer = (
-            "import os,sys,time\n"
-            "target=sys.argv[1]\n"
+            "import os,time\n"
+            "target_fd=int(os.environ['LITCHI_TEST_TARGET_FD'])\n"
             "pid=os.fork()\n"
             "if pid:\n"
             "    os._exit(0)\n"
             "os.setsid()\n"
+            "os.chdir('/')\n"
             "os.close(1); os.close(2)\n"
             "time.sleep(0.25)\n"
-            "with open(os.path.join(target,'late-child'),'wb') as stream:\n"
-            "    stream.write(b'x')\n"
+            "fd=os.open('late-child', os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o600, dir_fd=target_fd)\n"
+            "os.write(fd,b'x')\n"
+            "os.close(fd)\n"
             "time.sleep(0.10)\n"
             "os._exit(0)\n"
         )
-        controlled = gate.direct(
-            "controlled-final",
-            [sys.executable, "-c", late_writer, str(target)],
-        )
-        controlled_row = gate.run_step(
-            controlled, temporary, target, state, source, 0, 1, "controlled-final"
-        )
+        target_fd = os.open(target, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            controlled = gate.direct(
+                "controlled-final",
+                [sys.executable, "-c", late_writer],
+                env={"LITCHI_TEST_TARGET_FD": str(target_fd)},
+            )
+            controlled["pass_fds"] = (target_fd,)
+            assert str(target) not in controlled["argv"]
+            controlled_row = gate.run_step(
+                controlled, temporary, target, state, source, 0, 1, "controlled-final"
+            )
+        finally:
+            os.close(target_fd)
         assert controlled_row["status"] == "passed"
         assert controlled_row["attempt"] == "controlled-final"
         assert (target / "late-child").read_bytes() == b"x"
         sizes = [sample["target_bytes"] for sample in controlled_row["post_exit"]["samples"]]
         assert sizes[0] < sizes[-1]
         assert controlled_row["post_exit"]["target_bytes"] == gate.target_bytes(target)
+
+        # A direct child that existed before the step is not owned merely
+        # because it remains a child of the runner. A newly adopted child is
+        # owned even when it has no source/target path in cwd or argv.
+        runner_pid = os.getpid()
+        preexisting = {
+            9001: {
+                "pid": 9001, "ppid": runner_pid, "pgrp": 9001,
+                "start_time": 10, "command": "preexisting", "executable": "python3", "cwd": "/",
+            }
+        }
+        launch = {
+            9002: {
+                "pid": 9002, "ppid": runner_pid, "pgrp": 9002,
+                "start_time": 11, "command": "step", "executable": "python3", "cwd": "/",
+            }
+        }
+        ownership = gate.new_ownership(9002, temporary, target, preexisting, launch)
+        synthetic = {
+            **launch,
+            9001: preexisting[9001],
+            9003: {
+                "pid": 9003, "ppid": 9001, "pgrp": 9001,
+                "start_time": 12, "command": "preexisting-child", "executable": "python3", "cwd": "/",
+            },
+            9004: {
+                "pid": 9004, "ppid": runner_pid, "pgrp": 9004,
+                "start_time": 13, "command": "detached-helper", "executable": "python3", "cwd": "/",
+            },
+        }
+        gate._capture_owned(ownership, synthetic)
+        owned_ids = {identity[0] for identity in ownership["known"]}
+        assert 9004 in owned_ids
+        assert 9001 not in owned_ids and 9003 not in owned_ids
 
         # Exercise the owned-builder branch without launching a compiler or
         # touching a foreign process. A synthetic process table is sufficient
