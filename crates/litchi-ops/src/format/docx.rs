@@ -274,6 +274,13 @@ impl Docx {
         self.0.retain_source
     }
 
+    /// Whether the eager owner came from an encrypted package whose
+    /// publication still needs an explicit re-encryption profile.
+    #[cfg(feature = "encryption")]
+    pub(crate) fn requires_reencryption(&self) -> bool {
+        matches!(&self.0.owner, DocxOwner::Eager(package) if package.encryption().is_some())
+    }
+
     /// The OPC ingress policy retained by this handle for raw re-admission.
     pub(crate) fn ooxml_read_limits(&self) -> SourceLimits {
         self.0.ooxml_limits
@@ -835,6 +842,14 @@ impl Docx {
             )
             .with_format(FileFormat::Docx)
             .with_suggestion("reopen the document without `OpenOptions::retain_source(false)`"));
+        }
+        #[cfg(feature = "encryption")]
+        if self.requires_reencryption() {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "an unlocked encrypted DOCX document cannot be edited, signed or not",
+            )
+            .with_format(FileFormat::Docx));
         }
         Ok(())
     }
