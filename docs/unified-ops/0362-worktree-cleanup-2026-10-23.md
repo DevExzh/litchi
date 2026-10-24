@@ -1496,3 +1496,53 @@ The independent coordinator receipt is `root-verification.json`, SHA-256
 Recreate a selected worktree at its retained branch, then run
 `python3 restore.py <leaf>` in this evidence directory. A later cleanup must
 repeat holder and identity checks.
+
+## Fortieth and forty-first cleanup: XLSX protocol and CFB
+
+Two clean merged leaves were removed non-forced. Their branch refs remain:
+
+| Wave | Removed worktree | Retained branch tip | Files | Bytes |
+| --- | --- | --- | ---: | ---: |
+| 40 | `uo2-xlsx-raw-native-protocol` | `5e6555d8406709382e26ecbcdd6cb18ded449e31` | 8 | 277300 |
+| 41 | `uo2-cfb-explicit-limits` | `bf7f48741bc02d1f5e736a7a732c25808d28af36` | 6 | 327678 |
+
+All fourteen ignored payloads (604,978 apparent bytes; 679,936 allocated
+bytes) remain in quarantine. Restoration verifies every hash and mode.
+The coordinator independently verifies payload bytes, modes, retained branch
+tips, merge ancestry, removed paths and the protected trunk constructor probe.
+External targets and active source endpoints remain untouched. Source
+pre-removal allocated sizes are accounting only; exact physical reclamation
+was not measured and retained payloads are not claimed as reclaimed.
+
+Wave forty removed the XLSX leaf and then recorded an immutable engine
+`aborted` status because staging advanced concurrently from `dcc7cfbdef` to
+`4624f4bea6` before its final HEAD check. The separate verification preserves
+that failure and confirms the old HEAD and leaf remain ancestors, the path
+is absent, and every retained payload and reference is correct. It does not
+rewrite the original receipt. The CFB leaf was initially held by an obsolete
+audit pipeline; its author identified and terminated only that owned process
+group. Fresh holder checks were empty before wave forty-one, which completed
+with staging held at `4624f4bea6`. Cleanup itself sent no signals.
+
+Evidence directories are outside Git under
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/`:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `wave40/manifest.json` | 61161 | `8b0dac0f87a8275cbc20d913466775260716f76bf94be47971ebda35ed547509` |
+| `wave40/receipt.json` | 56738 | `dab8ea11a0084dcb06250e61c53af0c9655e613b2018480b4cddd5e31423cce5` |
+| `wave40/prepare_cleanup.py` | 6465 | `afd51d155bca8c6065f9e30242d6534c36d9585789f26596110d51a23fd16a9e` |
+| `wave40/restore.py` | 4804 | `59db544ba29628c0f0bdc1f05a7373aa50c8d3672b92ebd5ea9f06834e61f9a0` |
+| `wave40/coordinator-verification.json` | 2660 | `0bc7a661a7f4187ca25d5201b17fff15601d41ad3d366ed4cfdb49733194a837` |
+| `wave40/root-verification.json` | 715 | `6b19841e129bf0cac384b154c6684da2a068a159150a10c4433a7d49057a66a8` |
+| `wave41/manifest.json` | 60017 | `fb70656c83192506ba267ab204df059133cd8d0b68b846ca9d47c771c5180dad` |
+| `wave41/receipt.json` | 112375 | `6bc232904e703055f9cd6445cb7fd07823ba49eb4430b693f7e25e120d3c2837` |
+| `wave41/prepare_cleanup.py` | 6395 | `c811ff3c732566c953e7435aed8d3669e52c99b1d65997697d58478612bc4fde` |
+| `wave41/restore.py` | 4804 | `55b4cec2d79a818ba81b60b70d332f4dafbdb93c67dfca195ed37d1bcf5ea8d7` |
+| `wave41/coordinator-verification.json` | 2652 | `9fb2aa41b05ee512c7bc1f7896b0d3096a8bc35d883a9aabdf42305f7d206fb7` |
+| `wave41/root-verification.json` | 715 | `0b7c0a49db089cec9667ee29f220366803f770edda981dd0d1cd2aa77570284a` |
+
+Recreate the selected worktree at its retained branch, then run
+`python3 restore.py <leaf>` in its evidence directory. The recorded preparation
+helper regenerates a manifest from restored leaves; any later removal must
+repeat holder and identity checks.

@@ -3737,3 +3737,36 @@ See [0063](0063-source-pptx-modern-comments.md).
   New paired DrawingML and full OLE owner/history protocols are active work;
   the earlier 17-lane catalog does not close those obligations. Only audit 22
   remains deferred. Nothing is pushed.
+
+- Coordinator continuation (2026-10-24, executable legacy handoff):
+  Corrected legacy qualification packet `e8d51bb07a` merges at `4624f4bea6`.
+  The shared runner retains both XLSX and legacy receipt validation, with
+  mutually exclusive receipt selection and explicit source/target separation.
+  All 67 combined tooling tests pass. Independent review also runs the real
+  XLS preparation CLI and proves the runner consumes that receipt before
+  refusing the absent build receipt. Record 0362ul8a distinguishes this
+  preparation evidence from the still-required native builds and execution.
+
+  Text/media `e1d9ab1e29` passes independent source review after collision-safe
+  namespace emission and typed admission repairs. Its focused leaf tests pass;
+  integration waits for the common DrawingML owner/harness prerequisite and
+  the other raw lanes. Geometry/color/transform/formatcode2 receives a further
+  return for mapping a scene's output budget onto input parsing; `00fb949e54`
+  corrects both transform and text-body readers and adds asymmetric-policy
+  regressions. Those new tests still need coordinated Cargo execution.
+
+  Actual PPT baseline and candidate release-build attempts both fail: the
+  baseline preparation omits the fixed probe fixture, and the older candidate
+  hits the VBA match already repaired in staging. Neither produces qualifying
+  native evidence. The preparer repair and properly pinned current-candidate
+  build remain required. Full OLE owner/history and DrawingML native protocols
+  also remain under engineering review; source-only tests do not qualify them.
+
+  Cleanup waves forty and forty-one remove the merged XLSX protocol and CFB
+  leaves non-forced, retaining both branches and all fourteen payloads
+  (604,978 bytes). Restoration and independent hash/mode/ancestry checks pass.
+  Wave forty's immutable engine receipt records its final-check abort after
+  the coordinator advanced staging; separate verification confirms the
+  completed removal and preserved payloads. Final assembled capture, gate,
+  corpus and native qualification remain pending. Only audit 22 is deferred.
+  Nothing is pushed.
