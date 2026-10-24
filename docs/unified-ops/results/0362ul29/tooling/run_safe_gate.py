@@ -233,6 +233,43 @@ def _descendant_pids(info: dict[int, dict], roots: set[int]) -> set[int]:
     return descendants
 
 
+def _runner_ancestry(info: dict[int, dict], runner_pid: int) -> tuple[set[int], set[tuple[int, int | None]]]:
+    """Return the runner and its pre-existing parent chain.
+
+    Ownership is allowed to follow children adopted by the runner, but it
+    must never infer ownership of the runner itself (or of a coordinator
+    above it) from a process-group match.  Keep both PID and ``(PID,
+    start_time)`` identities: the PID set is a conservative no-signal guard
+    if an ancestor disappears, while the identity set retains the usual PID
+    reuse protection for rows that remain observable.
+    """
+    pids = {runner_pid}
+    identities: set[tuple[int, int | None]] = set()
+    current = runner_pid
+    visited: set[int] = set()
+    while current not in visited:
+        visited.add(current)
+        row = info.get(current)
+        if row is None:
+            break
+        pids.add(current)
+        identities.add(process_key(row))
+        parent = int(row.get("ppid", 0))
+        if parent <= 0:
+            break
+        current = parent
+    return pids, identities
+
+
+def _protected_runner_process(ownership: dict, row: dict) -> bool:
+    """Whether a row belongs to this runner or one of its ancestors."""
+    pid = int(row["pid"])
+    return (
+        pid in ownership.get("protected_runner_pids", set())
+        or process_key(row) in ownership.get("protected_runner_identities", set())
+    )
+
+
 def new_ownership(
     process_pid: int,
     root: Path,
@@ -242,9 +279,15 @@ def new_ownership(
 ) -> dict:
     """Create identities used to follow a step across reparenting and setsid."""
     root_row = launch.get(process_pid)
+    runner_pid = os.getpid()
+    ancestry_info = dict(prelaunch)
+    ancestry_info.update(launch)
+    protected_runner_pids, protected_runner_identities = _runner_ancestry(ancestry_info, runner_pid)
     return {
         "process_pid": process_pid,
-        "runner_pid": os.getpid(),
+        "runner_pid": runner_pid,
+        "protected_runner_pids": protected_runner_pids,
+        "protected_runner_identities": protected_runner_identities,
         "root_identity": process_key(root_row) if root_row else (process_pid, None),
         "root_pgrps": {root_row["pgrp"]} if root_row else {process_pid},
         "known": {},
@@ -280,6 +323,8 @@ def _capture_owned_unlocked(ownership: dict, info: dict[int, dict]) -> None:
     runner_pid = ownership["runner_pid"]
     for pid, row in info.items():
         identity = process_key(row)
+        if _protected_runner_process(ownership, row):
+            continue
         adopted = (
             row["ppid"] == runner_pid
             and identity not in ownership["preexisting_runner_children"]
@@ -296,6 +341,8 @@ def _capture_owned_unlocked(ownership: dict, info: dict[int, dict]) -> None:
         changed = False
         for pid, row in info.items():
             identity = process_key(row)
+            if _protected_runner_process(ownership, row):
+                continue
             parent = info.get(row["ppid"])
             parent_known = parent is not None and process_key(parent) in ownership["known"]
             if parent_known and identity not in ownership["known"]:
@@ -325,7 +372,8 @@ def owned_processes(
     return [
         process_output(row)
         for row in info.values()
-        if process_key(row) in known or row["pgrp"] in ownership["pgrps"]
+        if not _protected_runner_process(ownership, row)
+        and (process_key(row) in known or row["pgrp"] in ownership["pgrps"])
     ]
 
 
@@ -342,6 +390,8 @@ def owned_builders(
     rows = []
     for row in info.values():
         if row["executable"] not in BUILDER_EXECUTABLES:
+            continue
+        if ownership is not None and _protected_runner_process(ownership, row):
             continue
         if process_key(row) in owned or _path_related(row, root, target):
             rows.append(process_output(row))
