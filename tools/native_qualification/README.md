@@ -166,14 +166,18 @@ python3 tools/native_qualification/prepare_ole_owner_inputs.py \
   --candidate-ref "$OLE_AFTER_REF" \
   --reviewed-probe /external/inputs/ole_w5_probe-ad4c.rs \
   --clone-probe /external/inputs/ole_package_clone_probe.rs \
+  --oracle-probe tools/perf-baseline/examples/ole_owner_oracle.rs \
   --lock /external/inputs/Cargo.lock \
   --drivers-root /external/native-final/ole-owner-drivers \
   --output /external/native-final/ole-owner-preparation.json
 ```
 
 After coordinator review of that receipt, the build phase creates four fresh
-normal/allocator targets and records every Cargo event, source identity, lock,
-driver input, toolchain and executable hash.  The ABBA phase calibrates all
+normal/allocator targets (each also builds the correctness oracle) and records
+every Cargo event, source identity, lock, driver input, toolchain and executable
+hash.  Preparation checks the selected source's actual one-argument baseline
+CFB API versus the candidate's two-argument explicit-limits API; the historical
+artifact labels and probe hashes are not accepted on their own.  The ABBA phase calibrates all
 eleven routes and both clone sizes to a 500 ms target, rejects every leg below
 250 ms, runs five `before,after,after,before` blocks on a pinned CPU, and then
 runs the paired non-claimable allocator capture for ordinary property reads and
@@ -198,4 +202,25 @@ python3 tools/native_qualification/ole_owner_paired_runner.py \
 ```
 
 The measurements and receipts remain external evidence.  The runner's output
-is evidence for coordinator review, not a performance acceptance claim.
+is evidence for coordinator review, not a performance acceptance claim.  It
+runs `ole_owner_oracle` before calibration, outside every timed loop.  The
+oracle's complete source/no-op/replacement OLE bytes, all 64 untouched sibling
+metadata and payloads, exact property values, explicit DOC revision metadata,
+and explicit XLS cell values are hashed independently and compared across both
+endpoints.  Its instrumented consumer variant records alloc/dealloc/realloc
+old/new bytes, live/peak state, and the actual retained 129-package/128-patch
+history; the normal oracle remains uninstrumented.
+
+The independent post-run validator consumes the preparation, build and ABBA
+receipts, journals, logs, immutable build-receipt hash, oracle files and
+measurements without invoking Cargo or runner parsing helpers:
+
+```sh
+python3 tools/native_qualification/validate_ole_owner_run.py \
+  --manifest tools/native_qualification/manifests/ole-owner.json \
+  --preparation /external/native-final/ole-owner-preparation.json \
+  --build-receipt /external/native-final/ole-owner-run1/build-receipt.json \
+  --abba-receipt /external/native-final/ole-owner-run1/abba-receipt.json \
+  --measurements /external/native-final/ole-owner-run1/measurements.json \
+  --runner tools/native_qualification/ole_owner_paired_runner.py
+```

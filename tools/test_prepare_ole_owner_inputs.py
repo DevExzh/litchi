@@ -15,6 +15,7 @@ from tools.native_qualification import prepare_ole_owner_inputs as preparation
 
 PROBE_MARKERS = "\n".join(preparation.REQUIRED_PROBE_MARKERS) + "\n"
 CLONE_MARKERS = "\n".join(preparation.REQUIRED_CLONE_MARKERS) + "\n"
+ORACLE_MARKERS = "fn check_ole_outputs\nallocator_evidence\nowner_target\n"
 
 
 def _git(root: Path, *arguments: str) -> str:
@@ -34,6 +35,19 @@ def _source(root: Path, *, marker: str) -> str:
     _git(root, "config", "user.email", "ole-owner-protocol@test.invalid")
     _git(root, "config", "user.name", "OLE owner protocol test")
     (root / "source.txt").write_text(marker + "\n", encoding="utf-8")
+    cfb_source = root / preparation.CFB_SOURCE_PATH
+    cfb_source.parent.mkdir(parents=True)
+    if marker == "baseline":
+        cfb_source.write_text(
+            "pub fn open(reader: R) -> Result<Self, OleError> {\n"
+            "pub fn open_with_limits(mut reader: R, limits: OleFileLimits) {\n",
+            encoding="utf-8",
+        )
+    else:
+        cfb_source.write_text(
+            "pub fn open(mut reader: R, limits: OleFileLimits) -> Result<Self, OleError> {\n",
+            encoding="utf-8",
+        )
     _git(root, "add", ".")
     _git(root, "commit", "--quiet", "-m", "source")
     return _git(root, "rev-parse", "HEAD")
@@ -47,16 +61,23 @@ class PrepareOleOwnerInputsTests(unittest.TestCase):
         candidate_ref = _source(candidate, marker="candidate")
         candidate_probe = candidate / preparation.PROBE_PATH
         candidate_probe.parent.mkdir(parents=True)
-        candidate_probe.write_text(PROBE_MARKERS, encoding="utf-8")
+        candidate_probe.write_text(
+            PROBE_MARKERS
+            + "OleFile::open(\n        Cursor::new(package.into_inner()),\n        OleFileLimits::default(),\n"
+            + "OleFileLimits::default()\n",
+            encoding="utf-8",
+        )
         _git(candidate, "add", ".")
         _git(candidate, "commit", "--quiet", "-m", "reviewed adapter")
         candidate_ref = _git(candidate, "rev-parse", "HEAD")
         reviewed = root / "reviewed.rs"
-        reviewed.write_text(PROBE_MARKERS, encoding="utf-8")
+        reviewed.write_text(PROBE_MARKERS + "OleFile::open(Cursor::new(package.into_inner()))\n", encoding="utf-8")
         clone = root / "clone.rs"
         clone.write_text(CLONE_MARKERS, encoding="utf-8")
         lock = root / "Cargo.lock"
         lock.write_text("reviewed lock\n", encoding="utf-8")
+        oracle = root / "ole_owner_oracle.rs"
+        oracle.write_text(ORACLE_MARKERS, encoding="utf-8")
         drivers = root / "drivers"
         receipt = root / "preparation.json"
         values = {
@@ -64,6 +85,7 @@ class PrepareOleOwnerInputsTests(unittest.TestCase):
             "REVIEWED_PROBE_SHA256": hashlib.sha256(reviewed.read_bytes()).hexdigest(),
             "CANDIDATE_ADAPTER_SHA256": hashlib.sha256(candidate_probe.read_bytes()).hexdigest(),
             "CLONE_PROBE_SHA256": hashlib.sha256(clone.read_bytes()).hexdigest(),
+            "ORACLE_SOURCE_SHA256": hashlib.sha256(oracle.read_bytes()).hexdigest(),
             "LOCK_SHA256": hashlib.sha256(lock.read_bytes()).hexdigest(),
         }
         with mock.patch.multiple(preparation, **values):
@@ -73,6 +95,7 @@ class PrepareOleOwnerInputsTests(unittest.TestCase):
                 candidate_ref=candidate_ref,
                 reviewed_probe=reviewed,
                 clone_probe=clone,
+                oracle_probe=oracle,
                 lock=lock,
                 drivers_root=drivers,
                 output=receipt,
@@ -86,6 +109,7 @@ class PrepareOleOwnerInputsTests(unittest.TestCase):
             self.assertEqual(_git(baseline, "status", "--porcelain"), "")
             self.assertEqual(_git(candidate, "status", "--porcelain"), "")
             self.assertEqual(sorted(path.name for path in (drivers / "baseline" / "examples").iterdir()), [
+                "ole_owner_oracle.rs",
                 "ole_package_clone_probe.rs",
                 "ole_w5_probe.rs",
             ])
@@ -111,7 +135,11 @@ class PrepareOleOwnerInputsTests(unittest.TestCase):
                 with self.assertRaisesRegex(preparation.PreparationError, "driver file identity changed"):
                     preparation.validate_preparation_receipt(receipt)
 
-            driver_probe.write_text(PROBE_MARKERS, encoding="utf-8")
+            driver_probe.write_text(
+                PROBE_MARKERS
+                + "OleFile::open(Cursor::new(package.into_inner()))\n",
+                encoding="utf-8",
+            )
             (drivers / "candidate" / "unexpected.txt").write_text("no\n", encoding="utf-8")
             with mock.patch.multiple(preparation, **pins):
                 with self.assertRaisesRegex(preparation.PreparationError, "unexpected or missing"):

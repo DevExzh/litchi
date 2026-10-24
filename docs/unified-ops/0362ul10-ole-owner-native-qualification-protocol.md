@@ -3,7 +3,8 @@
 - Date: 2026-10-24.
 - Source lane: W5 OLE owner and retained-history follow-up from 0359j.
 - Status: executable source/build protocol committed; native qualification and
-  performance acceptance remain pending coordinator execution.
+  performance acceptance remain pending coordinator execution.  The handoff,
+  fidelity and independent-validator repair is recorded in 0362ul10a.
 
 The existing W5 source and allocation lanes did not provide a paired native
 qualification for the complete owner/property selector set.  This packet adds

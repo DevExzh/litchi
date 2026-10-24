@@ -30,8 +30,28 @@ REVIEWED_PROBE_SHA256 = "ad4c52c01333fbc13c7b3cca18e2c0a0d2ccf89d5c07972e2e453fa
 CANDIDATE_ADAPTER_SHA256 = "dc11e6533c43434c314bd359ad68e458555291f4c134b44b13c1f3ce29fb4508"
 CLONE_PROBE_SHA256 = "0a23c99ed8958e0df1aa51e5f37e7a949328149074b2096613c972d2b8cf6e98"
 LOCK_SHA256 = "bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a"
+ORACLE_SOURCE_SHA256 = "e1f57ab1112badb2fc6c4160fecc359dc9e261eeb6cf603701d6133d6d148bf8"
 PROBE_PATH = Path("tools/perf-baseline/examples/ole_w5_probe.rs")
 CLONE_PATH = Path("tools/perf-baseline/examples/ole_package_clone_probe.rs")
+ORACLE_PATH = Path("tools/perf-baseline/examples/ole_owner_oracle.rs")
+CFB_SOURCE_PATH = Path("crates/litchi-cfb/src/file.rs")
+# These are provenance labels, not trust anchors.  The preparer reads the
+# selected source and probe bytes below and binds their actual hashes in the
+# receipt; a historical label alone can never admit a build.
+REVIEWED_PROBE_SOURCE = (
+    "external matched-harness artifact from 0359j; "
+    "historical source a84650cd70390641f7734dc1f3362bcb9cd1e025 "
+    "tools/perf-baseline/examples/ole_w5_probe.rs"
+)
+CLONE_PROBE_SOURCE = (
+    "external matched-harness artifact from 0359j; "
+    "historical source a84650cd70390641f7734dc1f3362bcb9cd1e025 "
+    "tools/perf-baseline/examples/ole_package_clone_probe.rs"
+)
+LOCK_SOURCE = (
+    "external matched-harness lock retained by 0359j W5 qualification; "
+    "Cargo.lock from the reviewed current driver"
+)
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 HASH = re.compile(r"^[0-9a-f]{64}$")
 UPSTREAM_COMPONENT = "3rd" + "party"
@@ -63,6 +83,10 @@ path = \"examples/ole_w5_probe.rs\"
 [[example]]
 name = \"ole_package_clone_probe\"
 path = \"examples/ole_package_clone_probe.rs\"
+
+[[example]]
+name = \"ole_owner_oracle\"
+path = \"examples/ole_owner_oracle.rs\"
 
 [dependencies]
 litchi-cfb = { path = \"@SOURCE_ROOT@/crates/litchi-cfb\", features = [\"write\"] }
@@ -103,6 +127,10 @@ REQUIRED_CLONE_MARKERS = (
     "clone_drop",
     "black_box(&clone)",
 )
+BASELINE_CFB_OPEN = "pub fn open(reader: R) -> Result<Self, OleError>"
+BASELINE_CFB_LIMITED_OPEN = "pub fn open_with_limits(mut reader: R, limits: OleFileLimits)"
+CANDIDATE_CFB_OPEN = "pub fn open(mut reader: R, limits: OleFileLimits) -> Result<Self, OleError>"
+CANDIDATE_CFB_NO_DEFAULT_OPEN = "pub fn open(reader: R) -> Result<Self, OleError>"
 
 
 class PreparationError(RuntimeError):
@@ -232,6 +260,64 @@ def _check_markers(path: Path, markers: tuple[str, ...], label: str) -> None:
         raise PreparationError(f"{label} is missing reviewed workload markers: {missing!r}")
 
 
+def _cfb_api_binding(root: Path, *, baseline: bool) -> dict[str, Any]:
+    """Bind the probe's CFB call arity to the actual selected source API.
+
+    The baseline and candidate probes are intentionally different only at the
+    CFB limits call site.  A probe hash and a Git revision are not sufficient
+    evidence for that claim: a dirty generated source tree, stale adapter, or
+    feature mismatch could otherwise compile a different API than the receipt
+    describes.  Keep this check deliberately textual and narrow so preparation
+    remains build-free while still checking the public function signatures.
+    """
+
+    source = _resolve(CFB_SOURCE_PATH, base=root)
+    try:
+        text = source.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise PreparationError(f"cannot read selected CFB API source: {error}") from error
+    if baseline:
+        required = BASELINE_CFB_OPEN
+        if required not in text or BASELINE_CFB_LIMITED_OPEN not in text:
+            raise PreparationError(
+                "baseline CFB source does not expose the reviewed one-argument open plus open_with_limits API"
+            )
+        if CANDIDATE_CFB_OPEN in text:
+            raise PreparationError("baseline CFB source unexpectedly exposes the current two-argument open API")
+        return {
+            "source_path": str(source),
+            "open_signature": required,
+            "limited_open_signature": BASELINE_CFB_LIMITED_OPEN,
+            "api_generation": "pre-owner explicit open_with_limits",
+        }
+    required = CANDIDATE_CFB_OPEN
+    if required not in text or CANDIDATE_CFB_NO_DEFAULT_OPEN in text:
+        raise PreparationError(
+            "candidate CFB source does not expose only the reviewed two-argument open API"
+        )
+    return {
+        "source_path": str(source),
+        "open_signature": required,
+        "api_generation": "current explicit-limits open",
+    }
+
+
+def _probe_api_binding(path: Path, *, baseline: bool) -> dict[str, Any]:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise PreparationError(f"cannot read selected probe API adapter: {error}") from error
+    if baseline:
+        if "OleFile::open(Cursor::new(package.into_inner()))" not in text:
+            raise PreparationError("reviewed baseline probe does not use the one-argument CFB open")
+        if "OleFileLimits::default()" in text:
+            raise PreparationError("reviewed baseline probe unexpectedly contains a CFB limits argument")
+        return {"open_call": "OleFile::open(reader)", "adapter": "immutable historical baseline"}
+    if text.count("OleFileLimits::default()") < 2 or "OleFile::open(\n        Cursor::new(package.into_inner())," not in text:
+        raise PreparationError("candidate probe is not the reviewed explicit-CFB-limits adapter")
+    return {"open_call": "OleFile::open(reader, OleFileLimits::default())", "adapter": "CFB limits arity only"}
+
+
 def _render_manifest(source_root: Path) -> str:
     # The source roots are resolved absolute paths.  Only POSIX paths are
     # admitted by the surrounding worktree; escaping backslashes keeps this
@@ -260,6 +346,7 @@ def _write_driver(
     source_root: Path,
     probe: Path,
     clone_probe: Path,
+    oracle_probe: Path,
     lock: Path,
 ) -> dict[str, Any]:
     _fresh_directory(destination, "driver root")
@@ -269,10 +356,12 @@ def _write_driver(
     lock_destination = destination / "Cargo.lock"
     probe_destination = examples / PROBE_PATH.name
     clone_destination = examples / CLONE_PATH.name
+    oracle_destination = examples / ORACLE_PATH.name
     manifest.write_text(_render_manifest(source_root), encoding="utf-8")
     shutil.copyfile(lock, lock_destination)
     shutil.copyfile(probe, probe_destination)
     shutil.copyfile(clone_probe, clone_destination)
+    shutil.copyfile(oracle_probe, oracle_destination)
     return {
         "root": str(destination),
         "source_root": str(source_root),
@@ -281,6 +370,7 @@ def _write_driver(
             _file_record(lock_destination),
             _file_record(probe_destination),
             _file_record(clone_destination),
+            _file_record(oracle_destination),
         ],
     }
 
@@ -288,8 +378,8 @@ def _write_driver(
 def _driver_files(driver: Mapping[str, Any]) -> list[Path]:
     root = _resolve(str(driver["root"]))
     files = driver.get("files")
-    if not isinstance(files, list) or len(files) != 4:
-        raise PreparationError("driver must record exactly four input files")
+    if not isinstance(files, list) or len(files) != 5:
+        raise PreparationError("driver must record exactly five input files")
     result: list[Path] = []
     for record in files:
         if not isinstance(record, Mapping):
@@ -306,9 +396,10 @@ def _driver_files(driver: Mapping[str, Any]) -> list[Path]:
         root / "Cargo.lock",
         root / "examples" / PROBE_PATH.name,
         root / "examples" / CLONE_PATH.name,
+        root / "examples" / ORACLE_PATH.name,
     }
     if set(result) != expected:
-        raise PreparationError("driver file set differs from Cargo manifest, lock and two probes")
+        raise PreparationError("driver file set differs from Cargo manifest, lock, probes, and oracle")
     actual_files = {
         path
         for path in root.rglob("*")
@@ -349,6 +440,7 @@ def prepare(
     candidate_ref: str,
     reviewed_probe: Path,
     clone_probe: Path,
+    oracle_probe: Path,
     lock: Path,
     drivers_root: Path,
     output: Path,
@@ -357,6 +449,7 @@ def prepare(
     candidate_root = _resolve(candidate_root)
     reviewed_probe = _resolve(reviewed_probe)
     clone_probe = _resolve(clone_probe)
+    oracle_probe = _resolve(oracle_probe)
     lock = _resolve(lock)
     drivers_root = _resolve(drivers_root)
     output = _resolve(output)
@@ -378,11 +471,14 @@ def prepare(
         raise PreparationError("preparation receipt must be outside the driver directory")
     reviewed_hash, reviewed_bytes = _sha256(reviewed_probe)
     clone_hash, clone_bytes = _sha256(clone_probe)
+    oracle_hash, oracle_bytes = _sha256(oracle_probe)
     lock_hash, lock_bytes = _sha256(lock)
     if reviewed_hash != REVIEWED_PROBE_SHA256:
         raise PreparationError("reviewed immutable probe hash differs from ad4c input")
     if clone_hash != CLONE_PROBE_SHA256:
         raise PreparationError("clone probe hash differs from reviewed input")
+    if oracle_hash != ORACLE_SOURCE_SHA256:
+        raise PreparationError("oracle source hash differs from reviewed input")
     if lock_hash != LOCK_SHA256:
         raise PreparationError("Cargo.lock hash differs from the pinned W5 lock")
     candidate_probe = _resolve(PROBE_PATH, base=candidate_root)
@@ -392,12 +488,17 @@ def prepare(
     _check_markers(reviewed_probe, REQUIRED_PROBE_MARKERS, "reviewed immutable probe")
     _check_markers(candidate_probe, REQUIRED_PROBE_MARKERS, "candidate probe adapter")
     _check_markers(clone_probe, REQUIRED_CLONE_MARKERS, "clone probe")
+    baseline_cfb = _cfb_api_binding(baseline_root, baseline=True)
+    candidate_cfb = _cfb_api_binding(candidate_root, baseline=False)
+    baseline_probe_binding = _probe_api_binding(reviewed_probe, baseline=True)
+    candidate_probe_binding = _probe_api_binding(candidate_probe, baseline=False)
     _fresh_directory(drivers_root, "drivers root")
     baseline_driver = _write_driver(
         destination=drivers_root / "baseline",
         source_root=baseline_root,
         probe=reviewed_probe,
         clone_probe=clone_probe,
+        oracle_probe=oracle_probe,
         lock=lock,
     )
     candidate_driver = _write_driver(
@@ -405,6 +506,7 @@ def prepare(
         source_root=candidate_root,
         probe=candidate_probe,
         clone_probe=clone_probe,
+        oracle_probe=oracle_probe,
         lock=lock,
     )
     after_baseline = _source_state(baseline_root)
@@ -441,6 +543,7 @@ def prepare(
                 "path": str(reviewed_probe),
                 "sha256": reviewed_hash,
                 "bytes": reviewed_bytes,
+                "provenance": REVIEWED_PROBE_SOURCE,
             },
             "fixture": {
                 "kind": "probe-owned deterministic OLE/DOC/XLS corpus",
@@ -448,8 +551,29 @@ def prepare(
                 "candidate_generator_sha256": candidate_probe_hash,
                 "external_path": None,
             },
-            "clone_probe": {"path": str(clone_probe), "sha256": clone_hash, "bytes": clone_bytes},
-            "lock": {"path": str(lock), "sha256": lock_hash, "bytes": lock_bytes},
+            "clone_probe": {
+                "path": str(clone_probe),
+                "sha256": clone_hash,
+                "bytes": clone_bytes,
+                "provenance": CLONE_PROBE_SOURCE,
+            },
+            "oracle_probe": {
+                "path": str(oracle_probe),
+                "sha256": oracle_hash,
+                "bytes": oracle_bytes,
+                "provenance": "tracked source-only correctness oracle; compiled in both endpoint drivers",
+            },
+            "lock": {
+                "path": str(lock),
+                "sha256": lock_hash,
+                "bytes": lock_bytes,
+                "provenance": LOCK_SOURCE,
+            },
+            "api_binding": {
+                "baseline": {"cfb": baseline_cfb, "probe": baseline_probe_binding},
+                "candidate": {"cfb": candidate_cfb, "probe": candidate_probe_binding},
+                "policy": "the baseline one-argument open and candidate explicit-limits open are checked against source text; no implementation overlay",
+            },
             "routes": [
                 "open",
                 "begin_edit",
@@ -540,14 +664,30 @@ def validate_preparation_receipt(
     reviewed = shared.get("reviewed_probe")
     fixture = shared.get("fixture")
     clone = shared.get("clone_probe")
+    oracle = shared.get("oracle_probe")
     lock = shared.get("lock")
-    if not isinstance(reviewed, Mapping) or not isinstance(fixture, Mapping) or not isinstance(clone, Mapping) or not isinstance(lock, Mapping):
+    if (
+        not isinstance(reviewed, Mapping)
+        or not isinstance(fixture, Mapping)
+        or not isinstance(clone, Mapping)
+        or not isinstance(oracle, Mapping)
+        or not isinstance(lock, Mapping)
+    ):
         raise PreparationError("shared probe/fixture/clone/lock identities are missing")
+    if reviewed.get("provenance") != REVIEWED_PROBE_SOURCE:
+        raise PreparationError("reviewed probe provenance is not the reviewed external artifact")
+    if clone.get("provenance") != CLONE_PROBE_SOURCE:
+        raise PreparationError("clone probe provenance is not the reviewed external artifact")
+    if lock.get("provenance") != LOCK_SOURCE:
+        raise PreparationError("Cargo.lock provenance is not the reviewed external artifact")
+    if oracle.get("provenance") != "tracked source-only correctness oracle; compiled in both endpoint drivers":
+        raise PreparationError("oracle provenance is missing")
     if fixture.get("kind") != "probe-owned deterministic OLE/DOC/XLS corpus" or fixture.get("external_path") is not None:
         raise PreparationError("fixture must remain probe-owned and external-path free")
     for record, expected, label in (
         (reviewed, REVIEWED_PROBE_SHA256, "reviewed probe"),
         (clone, CLONE_PROBE_SHA256, "clone probe"),
+        (oracle, ORACLE_SOURCE_SHA256, "oracle probe"),
         (lock, LOCK_SHA256, "Cargo.lock"),
     ):
         if record.get("sha256") != expected:
@@ -568,6 +708,25 @@ def validate_preparation_receipt(
     _check_markers(_resolve(str(reviewed["path"])), REQUIRED_PROBE_MARKERS, "reviewed immutable probe")
     _check_markers(candidate_probe_path, REQUIRED_PROBE_MARKERS, "candidate probe adapter")
     _check_markers(_resolve(str(clone["path"])), REQUIRED_CLONE_MARKERS, "clone probe")
+    _check_markers(_resolve(str(oracle["path"])), ("fn check_ole_outputs", "allocator_evidence", "owner_target"), "oracle probe")
+    api_binding = shared.get("api_binding")
+    if not isinstance(api_binding, Mapping) or api_binding.get("policy") != (
+        "the baseline one-argument open and candidate explicit-limits open are checked against source text; no implementation overlay"
+    ):
+        raise PreparationError("source API binding policy is missing")
+    for endpoint, root, probe, is_baseline in (
+        ("baseline", baseline, _resolve(str(reviewed["path"])), True),
+        ("candidate", candidate, candidate_probe_path, False),
+    ):
+        recorded = api_binding.get(endpoint)
+        if not isinstance(recorded, Mapping):
+            raise PreparationError(f"source API binding is missing for {endpoint}")
+        current_cfb = _cfb_api_binding(_resolve(str(root["root"])), baseline=is_baseline)
+        if current_cfb != recorded.get("cfb"):
+            raise PreparationError(f"{endpoint} CFB API binding changed")
+        current_probe = _probe_api_binding(probe, baseline=is_baseline)
+        if current_probe != recorded.get("probe"):
+            raise PreparationError(f"{endpoint} probe API binding changed")
     for endpoint in (baseline, candidate):
         driver = endpoint.get("driver")
         if not isinstance(driver, Mapping):
@@ -575,13 +734,15 @@ def validate_preparation_receipt(
         files = _driver_files(driver)
         probe_path = next(path for path in files if path.name == PROBE_PATH.name)
         clone_path = next(path for path in files if path.name == CLONE_PATH.name)
+        oracle_path = next(path for path in files if path.name == ORACLE_PATH.name)
         lock_path = next(path for path in files if path.name == "Cargo.lock")
         manifest_path = next(path for path in files if path.name == "Cargo.toml")
         probe_digest, _ = _sha256(probe_path)
         clone_digest, _ = _sha256(clone_path)
+        oracle_digest, _ = _sha256(oracle_path)
         lock_digest, _ = _sha256(lock_path)
-        if clone_digest != CLONE_PROBE_SHA256 or lock_digest != LOCK_SHA256:
-            raise PreparationError("driver clone or lock differs from fixed input")
+        if clone_digest != CLONE_PROBE_SHA256 or oracle_digest != ORACLE_SOURCE_SHA256 or lock_digest != LOCK_SHA256:
+            raise PreparationError("driver clone, oracle, or lock differs from fixed input")
         expected_probe = REVIEWED_PROBE_SHA256 if endpoint is baseline else CANDIDATE_ADAPTER_SHA256
         if probe_digest != expected_probe:
             raise PreparationError("driver probe does not match its endpoint adapter")
@@ -599,6 +760,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--candidate-ref", required=True)
     parser.add_argument("--reviewed-probe", type=Path, required=True)
     parser.add_argument("--clone-probe", type=Path, required=True)
+    parser.add_argument("--oracle-probe", type=Path, required=True)
     parser.add_argument("--lock", type=Path, required=True)
     parser.add_argument("--drivers-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
@@ -610,6 +772,7 @@ def main(argv: list[str] | None = None) -> int:
             candidate_ref=args.candidate_ref,
             reviewed_probe=args.reviewed_probe,
             clone_probe=args.clone_probe,
+            oracle_probe=args.oracle_probe,
             lock=args.lock,
             drivers_root=args.drivers_root,
             output=args.output,

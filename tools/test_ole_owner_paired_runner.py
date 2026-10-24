@@ -79,6 +79,23 @@ class OleOwnerPairedRunnerTests(unittest.TestCase):
             with self.assertRaisesRegex(runner.RunnerError, "clone small rows"):
                 probe._parse_clone(path, 2, samples=1)
 
+    def test_oracle_allocator_parser_enforces_byte_conservation_and_retained_history(self) -> None:
+        header = "\t".join(runner.ALLOCATOR_EVIDENCE_FIELDS)
+        rows = [
+            f"{route}\t10\t100\t2\t20\t1\t5\t6\t100\t1000\t108\t1081\t110\t1100\t{('129\t128' if route in {'doc_history', 'xls_history'} else '0\t0')}"
+            for route in runner.ALLOCATOR_ROUTES
+        ]
+        with tempfile.TemporaryDirectory(prefix="ole-owner-output-") as directory:
+            path = Path(directory) / "allocator.tsv"
+            path.write_text("\n".join([header, *rows]) + "\n", encoding="utf-8")
+            parsed = runner.PairedRunner._parse_oracle_allocator(path)
+            self.assertEqual(len(parsed), len(runner.ALLOCATOR_ROUTES))
+            broken = rows.copy()
+            broken[0] = broken[0].replace("\t1081\t", "\t1080\t")
+            path.write_text("\n".join([header, *broken]) + "\n", encoding="utf-8")
+            with self.assertRaisesRegex(runner.RunnerError, "conservation"):
+                runner.PairedRunner._parse_oracle_allocator(path)
+
 
 if __name__ == "__main__":
     unittest.main()

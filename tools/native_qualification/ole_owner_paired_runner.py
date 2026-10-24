@@ -99,6 +99,36 @@ ALLOCATOR_FIELDS = (
     "base_peak_calls",
     "base_peak_bytes",
 )
+ALLOCATOR_EVIDENCE_FIELDS = (
+    "route",
+    "alloc_calls",
+    "alloc_bytes",
+    "dealloc_calls",
+    "dealloc_bytes",
+    "realloc_calls",
+    "realloc_old_bytes",
+    "realloc_new_bytes",
+    "base_live_calls",
+    "base_live_bytes",
+    "live_calls",
+    "live_bytes",
+    "peak_calls",
+    "peak_bytes",
+    "retained_packages",
+    "retained_patches",
+)
+ORACLE_FILES = (
+    "ole-source.bin",
+    "ole-noop.bin",
+    "ole-replacement.bin",
+    "properties.tsv",
+    "doc-source.bin",
+    "doc-edit.bin",
+    "xls-source.bin",
+    "xls-edit.bin",
+    "oracle.tsv",
+    "allocator.tsv",
+)
 
 
 class RunnerError(RuntimeError):
@@ -237,6 +267,12 @@ def _load_manifest(path: Path) -> tuple[dict[str, Any], str]:
         raise RunnerError("manifest allocator routes/history differ")
     if allocator.get("retained_packages") != 129 or allocator.get("retained_patches") != 128:
         raise RunnerError("manifest retained history cardinality differs")
+    if allocator.get("oracle_evidence_file") != "allocator.tsv" or allocator.get("oracle_evidence_fields") != list(ALLOCATOR_EVIDENCE_FIELDS):
+        raise RunnerError("manifest allocator oracle evidence schema differs")
+    if allocator.get("conservation") != (
+        "live_calls=base_live_calls+alloc_calls-dealloc_calls; live_bytes=base_live_bytes+alloc_bytes-dealloc_bytes-realloc_old_bytes+realloc_new_bytes; peak is at least live; retained history is 129 packages and 128 patches only on history routes"
+    ):
+        raise RunnerError("manifest allocator conservation policy differs")
     if allocator.get("elapsed_claimable") is not False:
         raise RunnerError("allocator elapsed values must be non-claimable")
     quiet = _require_mapping(document.get("quiet"), "manifest.quiet")
@@ -254,9 +290,18 @@ def _load_manifest(path: Path) -> tuple[dict[str, Any], str]:
         "candidate_adapter_sha256": preparation.CANDIDATE_ADAPTER_SHA256,
         "clone_probe_sha256": preparation.CLONE_PROBE_SHA256,
         "lock_sha256": preparation.LOCK_SHA256,
+        "oracle_source_sha256": preparation.ORACLE_SOURCE_SHA256,
     }.items():
         if pins.get(key) != expected:
             raise RunnerError(f"manifest input pin differs: {key}")
+    if pins.get("reviewed_probe_provenance") != preparation.REVIEWED_PROBE_SOURCE:
+        raise RunnerError("manifest reviewed probe provenance differs")
+    if pins.get("candidate_adapter_policy") != "CFB limits arity only; no implementation overlay":
+        raise RunnerError("manifest candidate adapter policy differs")
+    if pins.get("clone_probe_provenance") != preparation.CLONE_PROBE_SOURCE:
+        raise RunnerError("manifest clone probe provenance differs")
+    if pins.get("lock_provenance") != preparation.LOCK_SOURCE:
+        raise RunnerError("manifest lock provenance differs")
     return document, digest
 
 
@@ -400,7 +445,7 @@ class PairedRunner:
                 raise RunnerError(f"{role} source identity changed: {key}")
         driver = _require_mapping(recorded.get("driver"), f"preparation.{role}.driver")
         files = driver.get("files")
-        if not isinstance(files, list) or len(files) != 4:
+        if not isinstance(files, list) or len(files) != 5:
             raise RunnerError(f"{role} driver file identity is incomplete")
         driver_files: list[dict[str, Any]] = []
         for record in files:
@@ -426,6 +471,7 @@ class PairedRunner:
         return {
             "probe": target / "release" / "examples" / "ole_w5_probe",
             "clone": target / "release" / "examples" / "ole_package_clone_probe",
+            "oracle": target / "release" / "examples" / "ole_owner_oracle",
         }
 
     def _toolchain(self, env: Mapping[str, str]) -> dict[str, Any]:
@@ -714,6 +760,8 @@ class PairedRunner:
             "ole_w5_probe",
             "--example",
             "ole_package_clone_probe",
+            "--example",
+            "ole_owner_oracle",
         ]
 
     def _write_receipt(self, status: str, *, error: str | None = None, extra: Mapping[str, Any] | None = None) -> None:
@@ -1054,6 +1102,148 @@ class PairedRunner:
         )
         return stdout, event
 
+    def _oracle_paths(self, role: str, variant: str) -> tuple[Path, list[Path]]:
+        directory = self.output / "oracle" / f"{role}-{variant}"
+        if directory.exists():
+            raise RunnerError(f"oracle output already exists: {directory}")
+        directory.mkdir(parents=True)
+        return directory, [directory / name for name in ORACLE_FILES]
+
+    def _run_oracle(self, role: str, variant: str) -> dict[str, Any]:
+        binary = self.artifacts[role][variant]["oracle"]
+        directory, expected_outputs = self._oracle_paths(role, variant)
+        env = self._environment(role, variant)
+        stdout = self.output / "runs" / f"oracle-{role}-{variant}.stdout"
+        stderr = self.output / "runs" / f"oracle-{role}-{variant}.stderr"
+        event = self._run_process(
+            event_id=f"oracle-{role}-{variant}",
+            role=role,
+            variant=variant,
+            argv=[str(binary), "--output", str(directory)],
+            cwd=self.driver_roots[role],
+            env=env,
+            stdout_path=stdout,
+            stderr_path=stderr,
+            expected_outputs=expected_outputs,
+            require_stdout=True,
+        )
+        actual = {
+            path.name: {"path": str(path), "bytes": _sha256_file(path)[1], "sha256": _sha256_file(path)[0]}
+            for path in expected_outputs
+        }
+        if {
+            path.name
+            for path in directory.iterdir()
+            if path.is_file() and not path.is_symlink()
+        } != set(ORACLE_FILES):
+            raise RunnerError(f"oracle output contains an unexpected file: {directory}")
+        return {"role": role, "variant": variant, "directory": str(directory), "files": actual, "event_id": event["event_id"]}
+
+    @staticmethod
+    def _oracle_metadata(directory: Path) -> dict[str, str]:
+        path = directory / "oracle.tsv"
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError) as error:
+            raise RunnerError(f"cannot read oracle metadata {path}: {error}") from error
+        if lines != [
+            "schema\t1",
+            "owner_streams\t65",
+            "owner_target\tole_w5_edit_target.bin",
+            "owner_original_bytes\t15",
+            "owner_replacement_bytes\t19",
+            "properties\tvalidated",
+            "doc\trevision\tInsertion\t0\t24\tW5Oracle",
+            "xls\tCells\t0\t0\t4242",
+        ]:
+            raise RunnerError(f"oracle metadata is not the explicit expected-value record: {path}")
+        properties = (directory / "properties.tsv").read_text(encoding="utf-8").splitlines()
+        if properties != [
+            "link_base\thttps://example.invalid/base/",
+            "hyperlinks\t1",
+            "hyperlink\t7\t11\t0\thttps://example.invalid/target\tbookmark",
+            "opaque_property\t42\t128",
+        ]:
+            raise RunnerError(f"oracle property values are not the explicit expected record: {directory}")
+        return {line.split("\t", 1)[0]: line for line in lines}
+
+    @staticmethod
+    def _parse_oracle_allocator(path: Path) -> list[dict[str, int | str]]:
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError) as error:
+            raise RunnerError(f"cannot read oracle allocator evidence {path}: {error}") from error
+        if lines == ["status\tnative-uninstrumented"]:
+            raise RunnerError("allocator oracle must be the instrumented consumer variant")
+        if not lines or lines[0].split("\t") != list(ALLOCATOR_EVIDENCE_FIELDS):
+            raise RunnerError(f"oracle allocator header differs: {path}")
+        if len(lines) != len(ALLOCATOR_ROUTES) + 1:
+            raise RunnerError(f"oracle allocator route count differs: {path}")
+        rows: list[dict[str, int | str]] = []
+        for line in lines[1:]:
+            fields = line.split("\t")
+            if len(fields) != len(ALLOCATOR_EVIDENCE_FIELDS) or fields[0] not in ALLOCATOR_ROUTES:
+                raise RunnerError(f"oracle allocator route row differs: {line!r}")
+            row: dict[str, int | str] = {"route": fields[0]}
+            try:
+                row.update({key: int(value) for key, value in zip(ALLOCATOR_EVIDENCE_FIELDS[1:], fields[1:])})
+            except ValueError as error:
+                raise RunnerError(f"oracle allocator counter is not an integer: {line!r}") from error
+            if any(int(row[key]) < 0 for key in ALLOCATOR_EVIDENCE_FIELDS[1:]):
+                raise RunnerError(f"oracle allocator contains a negative counter: {line!r}")
+            expected_calls = int(row["base_live_calls"]) + int(row["alloc_calls"]) - int(row["dealloc_calls"])
+            expected_bytes = (
+                int(row["base_live_bytes"]) + int(row["alloc_bytes"]) - int(row["dealloc_bytes"])
+                - int(row["realloc_old_bytes"]) + int(row["realloc_new_bytes"])
+            )
+            if int(row["live_calls"]) != expected_calls or int(row["live_bytes"]) != expected_bytes:
+                raise RunnerError(f"oracle allocator live-state conservation failed: {line!r}")
+            if int(row["peak_calls"]) < int(row["live_calls"]) or int(row["peak_bytes"]) < int(row["live_bytes"]):
+                raise RunnerError(f"oracle allocator peak is below live state: {line!r}")
+            expected_retained = (129, 128) if str(row["route"]) in {"doc_history", "xls_history"} else (0, 0)
+            if (int(row["retained_packages"]), int(row["retained_patches"])) != expected_retained:
+                raise RunnerError(f"oracle allocator retained history differs: {line!r}")
+            rows.append(row)
+        if [str(row["route"]) for row in rows] != list(ALLOCATOR_ROUTES):
+            raise RunnerError("oracle allocator routes are missing or reordered")
+        return rows
+
+    def _oracle_phase(self) -> dict[str, Any]:
+        reports: dict[str, Any] = {}
+        for role in ROLES:
+            for variant in VARIANTS:
+                report = self._run_oracle(role, variant)
+                directory = _resolve(str(report["directory"]))
+                self._oracle_metadata(directory)
+                if variant == "allocator":
+                    report["allocation"] = self._parse_oracle_allocator(directory / "allocator.tsv")
+                else:
+                    try:
+                        marker = (directory / "allocator.tsv").read_text(encoding="utf-8").splitlines()
+                    except (OSError, UnicodeDecodeError) as error:
+                        raise RunnerError(f"cannot read native allocator marker {directory}: {error}") from error
+                    if marker != ["status\tnative-uninstrumented"]:
+                        raise RunnerError(f"normal oracle unexpectedly contains allocator instrumentation: {directory}")
+                reports[f"{role}/{variant}"] = report
+        required_equal = tuple(name for name in ORACLE_FILES if name != "allocator.tsv")
+        baseline = reports["before/normal"]["files"]
+        for key in ("before/allocator", "after/normal", "after/allocator"):
+            selected = reports[key]["files"]
+            for name in required_equal:
+                if selected[name]["sha256"] != baseline[name]["sha256"] or selected[name]["bytes"] != baseline[name]["bytes"]:
+                    raise RunnerError(f"oracle cross-endpoint output digest differs for {name}: {key}")
+        for key in ("before/normal", "before/allocator", "after/normal", "after/allocator"):
+            selected = reports[key]["files"]
+            if selected["ole-source.bin"]["sha256"] != selected["ole-noop.bin"]["sha256"]:
+                raise RunnerError(f"oracle no-op digest differs from source: {key}")
+        return {
+            "status": "preflight-validated",
+            "files": reports,
+            "cross_endpoint_digest_files": list(required_equal),
+            "timing_boundary": "oracle runs before calibration and ABBA; no oracle checks occur inside timed probe loops",
+            "claim_scope": "correctness and identity preflight only; no performance acceptance claim",
+        }
+
     def _calibrate_route(self, role: str, route: str) -> int:
         batch = ROUTE_SEEDS[route]
         attempt = 0
@@ -1171,6 +1361,7 @@ class PairedRunner:
 
     def abba(self) -> None:
         try:
+            oracle = self._oracle_phase()
             timing = self._timing_phase()
             allocation = self._allocator_phase()
             measurements = {
@@ -1184,6 +1375,7 @@ class PairedRunner:
                 "minimum_span_ns": MIN_SPAN_NS,
                 "timing": timing,
                 "allocation": allocation,
+                "oracle": oracle,
                 "claim_scope": "raw paired evidence only; no performance acceptance claim",
             }
             self._write_measurement("measurements.json", measurements)

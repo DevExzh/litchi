@@ -10,9 +10,14 @@
   },
   "input_pins": {
     "reviewed_probe_sha256": "ad4c52c01333fbc13c7b3cca18e2c0a0d2ccf89d5c07972e2e453fa9bd8d713a",
+    "reviewed_probe_provenance": "external matched-harness artifact from 0359j; historical source a84650cd70390641f7734dc1f3362bcb9cd1e025 tools/perf-baseline/examples/ole_w5_probe.rs",
     "candidate_adapter_sha256": "dc11e6533c43434c314bd359ad68e458555291f4c134b44b13c1f3ce29fb4508",
+    "candidate_adapter_policy": "CFB limits arity only; no implementation overlay",
     "clone_probe_sha256": "0a23c99ed8958e0df1aa51e5f37e7a949328149074b2096613c972d2b8cf6e98",
-    "lock_sha256": "bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a"
+    "clone_probe_provenance": "external matched-harness artifact from 0359j; historical source a84650cd70390641f7734dc1f3362bcb9cd1e025 tools/perf-baseline/examples/ole_package_clone_probe.rs",
+    "lock_sha256": "bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a",
+    "lock_provenance": "external matched-harness lock retained by 0359j W5 qualification; Cargo.lock from the reviewed current driver",
+    "oracle_source_sha256": "e1f57ab1112badb2fc6c4160fecc359dc9e261eeb6cf603701d6133d6d148bf8"
   },
   "routes": [
     "open",
@@ -59,6 +64,26 @@
       "deallocation_path",
       "reallocation_path"
     ],
+    "oracle_evidence_file": "allocator.tsv",
+    "oracle_evidence_fields": [
+      "route",
+      "alloc_calls",
+      "alloc_bytes",
+      "dealloc_calls",
+      "dealloc_bytes",
+      "realloc_calls",
+      "realloc_old_bytes",
+      "realloc_new_bytes",
+      "base_live_calls",
+      "base_live_bytes",
+      "live_calls",
+      "live_bytes",
+      "peak_calls",
+      "peak_bytes",
+      "retained_packages",
+      "retained_patches"
+    ],
+    "conservation": "live_calls=base_live_calls+alloc_calls-dealloc_calls; live_bytes=base_live_bytes+alloc_bytes-dealloc_bytes-realloc_old_bytes+realloc_new_bytes; peak is at least live; retained history is 129 packages and 128 patches only on history routes",
     "elapsed_claimable": false
   },
   "quiet": {
