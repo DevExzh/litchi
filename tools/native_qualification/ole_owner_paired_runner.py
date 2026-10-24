@@ -312,7 +312,9 @@ def _load_manifest(path: Path) -> tuple[dict[str, Any], str]:
         "reviewed_probe_sha256": preparation.REVIEWED_PROBE_SHA256,
         "candidate_adapter_sha256": preparation.CANDIDATE_ADAPTER_SHA256,
         "clone_probe_sha256": preparation.CLONE_PROBE_SHA256,
-        "lock_sha256": preparation.LOCK_SHA256,
+        "reviewed_lock_sha256": preparation.REVIEWED_LOCK_SHA256,
+        "baseline_lock_sha256": preparation.BASELINE_LOCK_SHA256,
+        "candidate_lock_sha256": preparation.CANDIDATE_LOCK_SHA256,
         "oracle_source_sha256": preparation.ORACLE_SOURCE_SHA256,
     }.items():
         if pins.get(key) != expected:
@@ -325,6 +327,8 @@ def _load_manifest(path: Path) -> tuple[dict[str, Any], str]:
         raise RunnerError("manifest clone probe provenance differs")
     if pins.get("lock_provenance") != preparation.LOCK_SOURCE:
         raise RunnerError("manifest lock provenance differs")
+    if pins.get("lock_patch_policy") != preparation.LOCK_PATCH_POLICY:
+        raise RunnerError("manifest lock patch policy differs")
     return document, digest
 
 

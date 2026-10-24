@@ -20,6 +20,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tomllib
 from typing import Any, Mapping
 
 
@@ -29,7 +30,9 @@ BASELINE_COMMIT = "0ce4bb8b61f03a1e5497633f51b954e76f98aa8c"
 REVIEWED_PROBE_SHA256 = "ad4c52c01333fbc13c7b3cca18e2c0a0d2ccf89d5c07972e2e453fa9bd8d713a"
 CANDIDATE_ADAPTER_SHA256 = "dc11e6533c43434c314bd359ad68e458555291f4c134b44b13c1f3ce29fb4508"
 CLONE_PROBE_SHA256 = "0a23c99ed8958e0df1aa51e5f37e7a949328149074b2096613c972d2b8cf6e98"
-LOCK_SHA256 = "bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a"
+REVIEWED_LOCK_SHA256 = "bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a"
+BASELINE_LOCK_SHA256 = "450f43c6b74536ef552bd5e9a19e321a3c0dea745f645fecc0aa9abe37868e14"
+CANDIDATE_LOCK_SHA256 = "5a07adc1d62dea06dbac60986faa020007882506523dde49e4605708e1276aaf"
 ORACLE_SOURCE_SHA256 = "60b506c1bfc277c260933730ce2f754e59f4745d40c753ffa95900b49d276daf"
 PROBE_PATH = Path("tools/perf-baseline/examples/ole_w5_probe.rs")
 CLONE_PATH = Path("tools/perf-baseline/examples/ole_package_clone_probe.rs")
@@ -50,8 +53,17 @@ CLONE_PROBE_SOURCE = (
 )
 LOCK_SOURCE = (
     "external matched-harness lock retained by 0359j W5 qualification; "
-    "Cargo.lock from the reviewed current driver"
+    "each driver lock is the reviewed base plus only its pinned local dependency edges"
 )
+LOCK_PATCH_POLICY: dict[str, dict[str, dict[str, list[str]]]] = {
+    "baseline": {
+        "litchi-perf-baseline": {"added": ["sha2 0.11.0"], "removed": []},
+    },
+    "candidate": {
+        "litchi-odraw": {"added": ["litchi-core"], "removed": []},
+        "litchi-perf-baseline": {"added": ["sha2 0.11.0"], "removed": []},
+    },
+}
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 HASH = re.compile(r"^[0-9a-f]{64}$")
 UPSTREAM_COMPONENT = "3rd" + "party"
@@ -188,6 +200,94 @@ def _sha256(path: Path) -> tuple[str, int]:
 def _file_record(path: Path) -> dict[str, Any]:
     digest, size = _sha256(path)
     return {"path": str(path), "bytes": size, "sha256": digest}
+
+
+def _lock_document(path: Path, label: str) -> dict[str, Any]:
+    try:
+        return tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
+        raise PreparationError(f"cannot read {label} as Cargo.lock TOML: {error}") from error
+
+
+def _lock_packages(document: Mapping[str, Any], label: str) -> dict[tuple[str, str, str | None], Mapping[str, Any]]:
+    packages = document.get("package")
+    if not isinstance(packages, list) or not packages:
+        raise PreparationError(f"{label} has no Cargo.lock packages")
+    result: dict[tuple[str, str, str | None], Mapping[str, Any]] = {}
+    for index, package in enumerate(packages):
+        if not isinstance(package, Mapping):
+            raise PreparationError(f"{label} package {index} is not an object")
+        name = package.get("name")
+        version = package.get("version")
+        source = package.get("source")
+        if not isinstance(name, str) or not isinstance(version, str) or (source is not None and not isinstance(source, str)):
+            raise PreparationError(f"{label} package {index} identity is malformed")
+        key = (name, version, source)
+        if key in result:
+            raise PreparationError(f"{label} contains duplicate package identity {key!r}")
+        result[key] = package
+    return result
+
+
+def _lock_registry_identity(packages: Mapping[tuple[str, str, str | None], Mapping[str, Any]], label: str) -> tuple[tuple[str, str, str, str], ...]:
+    identity: list[tuple[str, str, str, str]] = []
+    for (name, version, source), package in packages.items():
+        if source is None:
+            continue
+        if not source.startswith("registry+"):
+            raise PreparationError(f"{label} has an unreviewed non-registry source: {name} {version}")
+        checksum = package.get("checksum")
+        if not isinstance(checksum, str) or not HASH.fullmatch(checksum):
+            raise PreparationError(f"{label} registry package lacks a valid checksum: {name} {version}")
+        identity.append((name, version, source, checksum))
+    return tuple(sorted(identity))
+
+
+def _lock_patch(base: Path, selected: Path, role: str) -> dict[str, Any]:
+    if role not in LOCK_PATCH_POLICY:
+        raise PreparationError(f"unknown driver lock role: {role}")
+    base_document = _lock_document(base, "reviewed base lock")
+    selected_document = _lock_document(selected, f"{role} driver lock")
+    base_packages = _lock_packages(base_document, "reviewed base lock")
+    selected_packages = _lock_packages(selected_document, f"{role} driver lock")
+    if _lock_registry_identity(base_packages, "reviewed base lock") != _lock_registry_identity(selected_packages, f"{role} driver lock"):
+        raise PreparationError(f"{role} driver lock changes a registry package identity")
+    if set(base_packages) != set(selected_packages):
+        raise PreparationError(f"{role} driver lock changes the package identity set")
+    expected = LOCK_PATCH_POLICY[role]
+    observed: dict[str, dict[str, list[str]]] = {}
+    for key in base_packages:
+        base_package = base_packages[key]
+        selected_package = selected_packages[key]
+        base_metadata = {name: value for name, value in base_package.items() if name != "dependencies"}
+        selected_metadata = {name: value for name, value in selected_package.items() if name != "dependencies"}
+        if base_metadata != selected_metadata:
+            raise PreparationError(f"{role} driver lock changes package metadata for {key[0]} {key[1]}")
+        base_dependencies = base_package.get("dependencies", [])
+        selected_dependencies = selected_package.get("dependencies", [])
+        if not isinstance(base_dependencies, list) or not isinstance(selected_dependencies, list):
+            raise PreparationError(f"{role} driver lock dependency list is malformed for {key[0]} {key[1]}")
+        allowed = expected.get(key[0], {"added": [], "removed": []})
+        added = sorted(set(selected_dependencies) - set(base_dependencies))
+        removed = sorted(set(base_dependencies) - set(selected_dependencies))
+        observed[key[0]] = {"added": added, "removed": removed}
+        if added != sorted(allowed["added"]) or removed != sorted(allowed["removed"]):
+            raise PreparationError(
+                f"{role} driver lock dependency patch differs for {key[0]}: "
+                f"added={added!r}, removed={removed!r}"
+            )
+        selected_without_added = [item for item in selected_dependencies if item not in allowed["added"]]
+        if selected_without_added != base_dependencies:
+            raise PreparationError(f"{role} driver lock reorders or duplicates dependencies for {key[0]}")
+    unexpected = set(observed) - set(expected)
+    if any(observed[name] != {"added": [], "removed": []} for name in unexpected):
+        raise PreparationError(f"{role} driver lock contains an unreviewed dependency patch")
+    return {
+        "base_sha256": REVIEWED_LOCK_SHA256,
+        "role": role,
+        "patches": observed,
+        "policy": expected,
+    }
 
 
 def _git(root: Path, *args: str) -> str:
@@ -442,7 +542,9 @@ def prepare(
     reviewed_probe: Path,
     clone_probe: Path,
     oracle_probe: Path,
-    lock: Path,
+    reviewed_lock: Path,
+    baseline_lock: Path,
+    candidate_lock: Path,
     drivers_root: Path,
     output: Path,
 ) -> dict[str, Any]:
@@ -451,7 +553,9 @@ def prepare(
     reviewed_probe = _resolve(reviewed_probe)
     clone_probe = _resolve(clone_probe)
     oracle_probe = _resolve(oracle_probe)
-    lock = _resolve(lock)
+    reviewed_lock = _resolve(reviewed_lock)
+    baseline_lock = _resolve(baseline_lock)
+    candidate_lock = _resolve(candidate_lock)
     drivers_root = _resolve(drivers_root)
     output = _resolve(output)
     _require_commit(candidate_ref, "candidate_ref")
@@ -473,15 +577,23 @@ def prepare(
     reviewed_hash, reviewed_bytes = _sha256(reviewed_probe)
     clone_hash, clone_bytes = _sha256(clone_probe)
     oracle_hash, oracle_bytes = _sha256(oracle_probe)
-    lock_hash, lock_bytes = _sha256(lock)
+    reviewed_lock_hash, reviewed_lock_bytes = _sha256(reviewed_lock)
+    baseline_lock_hash, baseline_lock_bytes = _sha256(baseline_lock)
+    candidate_lock_hash, candidate_lock_bytes = _sha256(candidate_lock)
     if reviewed_hash != REVIEWED_PROBE_SHA256:
         raise PreparationError("reviewed immutable probe hash differs from ad4c input")
     if clone_hash != CLONE_PROBE_SHA256:
         raise PreparationError("clone probe hash differs from reviewed input")
     if oracle_hash != ORACLE_SOURCE_SHA256:
         raise PreparationError("oracle source hash differs from reviewed input")
-    if lock_hash != LOCK_SHA256:
-        raise PreparationError("Cargo.lock hash differs from the pinned W5 lock")
+    if reviewed_lock_hash != REVIEWED_LOCK_SHA256:
+        raise PreparationError("reviewed base Cargo.lock hash differs from the pinned W5 lock")
+    if baseline_lock_hash != BASELINE_LOCK_SHA256:
+        raise PreparationError("baseline driver Cargo.lock hash differs from the pinned role lock")
+    if candidate_lock_hash != CANDIDATE_LOCK_SHA256:
+        raise PreparationError("candidate driver Cargo.lock hash differs from the pinned role lock")
+    baseline_lock_patch = _lock_patch(reviewed_lock, baseline_lock, "baseline")
+    candidate_lock_patch = _lock_patch(reviewed_lock, candidate_lock, "candidate")
     candidate_probe = _resolve(PROBE_PATH, base=candidate_root)
     candidate_probe_hash, candidate_probe_bytes = _sha256(candidate_probe)
     if candidate_probe_hash != CANDIDATE_ADAPTER_SHA256:
@@ -500,7 +612,7 @@ def prepare(
         probe=reviewed_probe,
         clone_probe=clone_probe,
         oracle_probe=oracle_probe,
-        lock=lock,
+        lock=baseline_lock,
     )
     candidate_driver = _write_driver(
         destination=drivers_root / "candidate",
@@ -508,7 +620,7 @@ def prepare(
         probe=candidate_probe,
         clone_probe=clone_probe,
         oracle_probe=oracle_probe,
-        lock=lock,
+        lock=candidate_lock,
     )
     after_baseline = _source_state(baseline_root)
     if after_baseline["tree"] != baseline["tree"] or after_baseline["status_paths"]:
@@ -524,12 +636,26 @@ def prepare(
             "after_preparation": after_baseline,
             "commit": BASELINE_COMMIT,
             "api_features": ["legacy-owner-api", "legacy-property-api"],
+            "driver_lock": {
+                "path": str(baseline_lock),
+                "sha256": baseline_lock_hash,
+                "bytes": baseline_lock_bytes,
+                "provenance": LOCK_SOURCE,
+                **baseline_lock_patch,
+            },
             "driver": baseline_driver,
         },
         "candidate": {
             **candidate,
             "commit": candidate_ref,
             "api_features": ["current-api"],
+            "driver_lock": {
+                "path": str(candidate_lock),
+                "sha256": candidate_lock_hash,
+                "bytes": candidate_lock_bytes,
+                "provenance": LOCK_SOURCE,
+                **candidate_lock_patch,
+            },
             "probe": {
                 "path": str(candidate_probe),
                 "sha256": candidate_probe_hash,
@@ -564,11 +690,27 @@ def prepare(
                 "bytes": oracle_bytes,
                 "provenance": "tracked source-only correctness oracle; compiled in both endpoint drivers",
             },
-            "lock": {
-                "path": str(lock),
-                "sha256": lock_hash,
-                "bytes": lock_bytes,
+            "reviewed_lock": {
+                "path": str(reviewed_lock),
+                "sha256": reviewed_lock_hash,
+                "bytes": reviewed_lock_bytes,
                 "provenance": LOCK_SOURCE,
+            },
+            "driver_locks": {
+                "baseline": {
+                    "path": str(baseline_lock),
+                    "sha256": baseline_lock_hash,
+                    "bytes": baseline_lock_bytes,
+                    "provenance": LOCK_SOURCE,
+                    **baseline_lock_patch,
+                },
+                "candidate": {
+                    "path": str(candidate_lock),
+                    "sha256": candidate_lock_hash,
+                    "bytes": candidate_lock_bytes,
+                    "provenance": LOCK_SOURCE,
+                    **candidate_lock_patch,
+                },
             },
             "api_binding": {
                 "baseline": {"cfb": baseline_cfb, "probe": baseline_probe_binding},
@@ -666,21 +808,25 @@ def validate_preparation_receipt(
     fixture = shared.get("fixture")
     clone = shared.get("clone_probe")
     oracle = shared.get("oracle_probe")
-    lock = shared.get("lock")
+    reviewed_lock = shared.get("reviewed_lock")
+    driver_locks = shared.get("driver_locks")
     if (
         not isinstance(reviewed, Mapping)
         or not isinstance(fixture, Mapping)
         or not isinstance(clone, Mapping)
         or not isinstance(oracle, Mapping)
-        or not isinstance(lock, Mapping)
+        or not isinstance(reviewed_lock, Mapping)
+        or not isinstance(driver_locks, Mapping)
     ):
         raise PreparationError("shared probe/fixture/clone/lock identities are missing")
+    if set(driver_locks) != {"baseline", "candidate"}:
+        raise PreparationError("driver lock identities must contain exactly baseline and candidate")
     if reviewed.get("provenance") != REVIEWED_PROBE_SOURCE:
         raise PreparationError("reviewed probe provenance is not the reviewed external artifact")
     if clone.get("provenance") != CLONE_PROBE_SOURCE:
         raise PreparationError("clone probe provenance is not the reviewed external artifact")
-    if lock.get("provenance") != LOCK_SOURCE:
-        raise PreparationError("Cargo.lock provenance is not the reviewed external artifact")
+    if reviewed_lock.get("provenance") != LOCK_SOURCE:
+        raise PreparationError("reviewed Cargo.lock provenance is not the reviewed external artifact")
     if oracle.get("provenance") != "tracked source-only correctness oracle; compiled in both endpoint drivers":
         raise PreparationError("oracle provenance is missing")
     if fixture.get("kind") != "probe-owned deterministic OLE/DOC/XLS corpus" or fixture.get("external_path") is not None:
@@ -689,7 +835,7 @@ def validate_preparation_receipt(
         (reviewed, REVIEWED_PROBE_SHA256, "reviewed probe"),
         (clone, CLONE_PROBE_SHA256, "clone probe"),
         (oracle, ORACLE_SOURCE_SHA256, "oracle probe"),
-        (lock, LOCK_SHA256, "Cargo.lock"),
+        (reviewed_lock, REVIEWED_LOCK_SHA256, "reviewed Cargo.lock"),
     ):
         if record.get("sha256") != expected:
             raise PreparationError(f"{label} pin differs")
@@ -729,6 +875,26 @@ def validate_preparation_receipt(
         if current_probe != recorded.get("probe"):
             raise PreparationError(f"{endpoint} probe API binding changed")
     for endpoint in (baseline, candidate):
+        role = "baseline" if endpoint is baseline else "candidate"
+        driver_lock = driver_locks.get(role)
+        if not isinstance(driver_lock, Mapping):
+            raise PreparationError(f"preparation {role} driver lock identity is missing")
+        expected_lock_hash = BASELINE_LOCK_SHA256 if role == "baseline" else CANDIDATE_LOCK_SHA256
+        if driver_lock.get("provenance") != LOCK_SOURCE:
+            raise PreparationError(f"preparation {role} driver lock provenance differs")
+        if driver_lock.get("sha256") != expected_lock_hash:
+            raise PreparationError(f"preparation {role} driver lock pin differs")
+        if driver_lock.get("base_sha256") != REVIEWED_LOCK_SHA256 or driver_lock.get("role") != role:
+            raise PreparationError(f"preparation {role} driver lock base or role differs")
+        if driver_lock.get("policy") != LOCK_PATCH_POLICY[role]:
+            raise PreparationError(f"preparation {role} driver lock policy differs")
+        lock_input = _resolve(str(driver_lock.get("path", "")))
+        lock_digest, lock_size = _sha256(lock_input)
+        if lock_digest != expected_lock_hash or lock_size != driver_lock.get("bytes"):
+            raise PreparationError(f"preparation {role} driver lock identity changed")
+        lock_patch = _lock_patch(_resolve(str(reviewed_lock.get("path", ""))), lock_input, role)
+        if lock_patch != {key: driver_lock[key] for key in ("base_sha256", "role", "patches", "policy")}:
+            raise PreparationError(f"preparation {role} driver lock graph differs")
         driver = endpoint.get("driver")
         if not isinstance(driver, Mapping):
             raise PreparationError("endpoint driver is missing")
@@ -742,7 +908,7 @@ def validate_preparation_receipt(
         clone_digest, _ = _sha256(clone_path)
         oracle_digest, _ = _sha256(oracle_path)
         lock_digest, _ = _sha256(lock_path)
-        if clone_digest != CLONE_PROBE_SHA256 or oracle_digest != ORACLE_SOURCE_SHA256 or lock_digest != LOCK_SHA256:
+        if clone_digest != CLONE_PROBE_SHA256 or oracle_digest != ORACLE_SOURCE_SHA256 or lock_digest != expected_lock_hash:
             raise PreparationError("driver clone, oracle, or lock differs from fixed input")
         expected_probe = REVIEWED_PROBE_SHA256 if endpoint is baseline else CANDIDATE_ADAPTER_SHA256
         if probe_digest != expected_probe:
@@ -762,7 +928,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reviewed-probe", type=Path, required=True)
     parser.add_argument("--clone-probe", type=Path, required=True)
     parser.add_argument("--oracle-probe", type=Path, required=True)
-    parser.add_argument("--lock", type=Path, required=True)
+    parser.add_argument("--reviewed-lock", type=Path, required=True)
+    parser.add_argument("--baseline-lock", type=Path, required=True)
+    parser.add_argument("--candidate-lock", type=Path, required=True)
     parser.add_argument("--drivers-root", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -774,7 +942,9 @@ def main(argv: list[str] | None = None) -> int:
             reviewed_probe=args.reviewed_probe,
             clone_probe=args.clone_probe,
             oracle_probe=args.oracle_probe,
-            lock=args.lock,
+            reviewed_lock=args.reviewed_lock,
+            baseline_lock=args.baseline_lock,
+            candidate_lock=args.candidate_lock,
             drivers_root=args.drivers_root,
             output=args.output,
         )

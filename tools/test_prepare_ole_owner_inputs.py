@@ -74,8 +74,35 @@ class PrepareOleOwnerInputsTests(unittest.TestCase):
         reviewed.write_text(PROBE_MARKERS + "OleFile::open(Cursor::new(package.into_inner()))\n", encoding="utf-8")
         clone = root / "clone.rs"
         clone.write_text(CLONE_MARKERS, encoding="utf-8")
-        lock = root / "Cargo.lock"
-        lock.write_text("reviewed lock\n", encoding="utf-8")
+        reviewed_lock = root / "reviewed.Cargo.lock"
+        reviewed_lock.write_text(
+            "version = 4\n\n"
+            "[[package]]\nname = \"bitflags\"\nversion = \"2.0.0\"\n"
+            "source = \"registry+https://example.invalid/index\"\n"
+            "checksum = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n\n"
+            "[[package]]\nname = \"sha2\"\nversion = \"0.11.0\"\n"
+            "source = \"registry+https://example.invalid/index\"\n"
+            "checksum = \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\n\n"
+            "[[package]]\nname = \"litchi-core\"\nversion = \"0.0.1\"\n\n"
+            "[[package]]\nname = \"litchi-odraw\"\nversion = \"0.0.1\"\ndependencies = [\n \"bitflags\",\n]\n\n"
+            "[[package]]\nname = \"litchi-perf-baseline\"\nversion = \"0.1.0\"\ndependencies = [\n \"litchi-odraw\",\n]\n",
+            encoding="utf-8",
+        )
+        baseline_lock = root / "baseline.Cargo.lock"
+        baseline_lock.write_text(
+            reviewed_lock.read_text(encoding="utf-8").replace(
+                ' "litchi-odraw",\n]\n', ' "litchi-odraw",\n "sha2 0.11.0",\n]\n'
+            ),
+            encoding="utf-8",
+        )
+        candidate_lock = root / "candidate.Cargo.lock"
+        candidate_lock.write_text(
+            baseline_lock.read_text(encoding="utf-8").replace(
+                'name = "litchi-odraw"\nversion = "0.0.1"\ndependencies = [\n "bitflags",\n]',
+                'name = "litchi-odraw"\nversion = "0.0.1"\ndependencies = [\n "bitflags",\n "litchi-core",\n]'
+            ),
+            encoding="utf-8",
+        )
         oracle = root / "ole_owner_oracle.rs"
         oracle.write_text(ORACLE_MARKERS, encoding="utf-8")
         drivers = root / "drivers"
@@ -86,7 +113,9 @@ class PrepareOleOwnerInputsTests(unittest.TestCase):
             "CANDIDATE_ADAPTER_SHA256": hashlib.sha256(candidate_probe.read_bytes()).hexdigest(),
             "CLONE_PROBE_SHA256": hashlib.sha256(clone.read_bytes()).hexdigest(),
             "ORACLE_SOURCE_SHA256": hashlib.sha256(oracle.read_bytes()).hexdigest(),
-            "LOCK_SHA256": hashlib.sha256(lock.read_bytes()).hexdigest(),
+            "REVIEWED_LOCK_SHA256": hashlib.sha256(reviewed_lock.read_bytes()).hexdigest(),
+            "BASELINE_LOCK_SHA256": hashlib.sha256(baseline_lock.read_bytes()).hexdigest(),
+            "CANDIDATE_LOCK_SHA256": hashlib.sha256(candidate_lock.read_bytes()).hexdigest(),
         }
         with mock.patch.multiple(preparation, **values):
             preparation.prepare(
@@ -96,7 +125,9 @@ class PrepareOleOwnerInputsTests(unittest.TestCase):
                 reviewed_probe=reviewed,
                 clone_probe=clone,
                 oracle_probe=oracle,
-                lock=lock,
+                reviewed_lock=reviewed_lock,
+                baseline_lock=baseline_lock,
+                candidate_lock=candidate_lock,
                 drivers_root=drivers,
                 output=receipt,
             )
@@ -156,6 +187,28 @@ class PrepareOleOwnerInputsTests(unittest.TestCase):
                 with self.assertRaisesRegex(preparation.PreparationError, "production overlay"):
                     preparation.validate_preparation_receipt(receipt)
             (baseline / "unapproved.txt").write_text("changed\n", encoding="utf-8")
+
+    def test_lock_patch_rejects_registry_identity_or_unreviewed_edge(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ole-owner-preparation-") as directory:
+            root = Path(directory)
+            self._prepare(root)
+            reviewed = root / "reviewed.Cargo.lock"
+            candidate = root / "candidate.Cargo.lock"
+            mutated_registry = root / "candidate-registry.Cargo.lock"
+            mutated_registry.write_text(
+                candidate.read_text(encoding="utf-8").replace("b" * 64, "c" * 64),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(preparation.PreparationError, "registry package identity"):
+                preparation._lock_patch(reviewed, mutated_registry, "candidate")
+
+            mutated_edge = root / "candidate-edge.Cargo.lock"
+            mutated_edge.write_text(
+                candidate.read_text(encoding="utf-8").replace(' "litchi-core",', ' "unreviewed-edge",'),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(preparation.PreparationError, "dependency patch differs"):
+                preparation._lock_patch(reviewed, mutated_edge, "candidate")
 
 
 if __name__ == "__main__":

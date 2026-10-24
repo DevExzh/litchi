@@ -86,15 +86,44 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
         clone.write_text("\n".join(preparation.REQUIRED_CLONE_MARKERS), encoding="utf-8")
         oracle = root / "oracle.rs"
         oracle.write_text("fn check_ole_outputs\nallocator_evidence\nowner_target\n", encoding="utf-8")
-        lock = root / "Cargo.lock"
-        lock.write_text("fixture lock\n", encoding="utf-8")
+        reviewed_lock = root / "reviewed.Cargo.lock"
+        reviewed_lock.write_text(
+            "version = 4\n\n"
+            "[[package]]\nname = \"bitflags\"\nversion = \"2.0.0\"\n"
+            "source = \"registry+https://example.invalid/index\"\n"
+            "checksum = \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\"\n\n"
+            "[[package]]\nname = \"sha2\"\nversion = \"0.11.0\"\n"
+            "source = \"registry+https://example.invalid/index\"\n"
+            "checksum = \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"\n\n"
+            "[[package]]\nname = \"litchi-core\"\nversion = \"0.0.1\"\n\n"
+            "[[package]]\nname = \"litchi-odraw\"\nversion = \"0.0.1\"\ndependencies = [\n \"bitflags\",\n]\n\n"
+            "[[package]]\nname = \"litchi-perf-baseline\"\nversion = \"0.1.0\"\ndependencies = [\n \"litchi-odraw\",\n]\n",
+            encoding="utf-8",
+        )
+        baseline_lock = root / "baseline.Cargo.lock"
+        baseline_lock.write_text(
+            reviewed_lock.read_text(encoding="utf-8").replace(
+                ' "litchi-odraw",\n]\n', ' "litchi-odraw",\n "sha2 0.11.0",\n]\n'
+            ),
+            encoding="utf-8",
+        )
+        candidate_lock = root / "candidate.Cargo.lock"
+        candidate_lock.write_text(
+            baseline_lock.read_text(encoding="utf-8").replace(
+                'name = "litchi-odraw"\nversion = "0.0.1"\ndependencies = [\n "bitflags",\n]',
+                'name = "litchi-odraw"\nversion = "0.0.1"\ndependencies = [\n "bitflags",\n "litchi-core",\n]'
+            ),
+            encoding="utf-8",
+        )
         pins = {
             "BASELINE_COMMIT": baseline_ref,
             "REVIEWED_PROBE_SHA256": _sha(reviewed)[0],
             "CANDIDATE_ADAPTER_SHA256": _sha(candidate_probe)[0],
             "CLONE_PROBE_SHA256": _sha(clone)[0],
             "ORACLE_SOURCE_SHA256": _sha(oracle)[0],
-            "LOCK_SHA256": _sha(lock)[0],
+            "REVIEWED_LOCK_SHA256": _sha(reviewed_lock)[0],
+            "BASELINE_LOCK_SHA256": _sha(baseline_lock)[0],
+            "CANDIDATE_LOCK_SHA256": _sha(candidate_lock)[0],
         }
         prep_path = root / "preparation.json"
         with mock.patch.multiple(preparation, **pins):
@@ -105,7 +134,9 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
                 reviewed_probe=reviewed,
                 clone_probe=clone,
                 oracle_probe=oracle,
-                lock=lock,
+                reviewed_lock=reviewed_lock,
+                baseline_lock=baseline_lock,
+                candidate_lock=candidate_lock,
                 drivers_root=root / "drivers",
                 output=prep_path,
             )
@@ -116,7 +147,9 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             "candidate_adapter_sha256": pins["CANDIDATE_ADAPTER_SHA256"],
             "clone_probe_sha256": pins["CLONE_PROBE_SHA256"],
             "oracle_source_sha256": pins["ORACLE_SOURCE_SHA256"],
-            "lock_sha256": pins["LOCK_SHA256"],
+            "reviewed_lock_sha256": pins["REVIEWED_LOCK_SHA256"],
+            "baseline_lock_sha256": pins["BASELINE_LOCK_SHA256"],
+            "candidate_lock_sha256": pins["CANDIDATE_LOCK_SHA256"],
         })
         manifest_path = root / "manifest.json"
         manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
@@ -374,7 +407,9 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             CANDIDATE_ADAPTER_SHA256=pins["candidate_adapter_sha256"],
             CLONE_PROBE_SHA256=pins["clone_probe_sha256"],
             ORACLE_SOURCE_SHA256=pins["oracle_source_sha256"],
-            LOCK_SHA256=pins["lock_sha256"],
+            REVIEWED_LOCK_SHA256=pins["reviewed_lock_sha256"],
+            BASELINE_LOCK_SHA256=pins["baseline_lock_sha256"],
+            CANDIDATE_LOCK_SHA256=pins["candidate_lock_sha256"],
         ):
             with mock.patch.multiple(
                 runner.preparation,
@@ -382,12 +417,20 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
                 CANDIDATE_ADAPTER_SHA256=pins["candidate_adapter_sha256"],
                 CLONE_PROBE_SHA256=pins["clone_probe_sha256"],
                 ORACLE_SOURCE_SHA256=pins["oracle_source_sha256"],
-                LOCK_SHA256=pins["lock_sha256"],
+                REVIEWED_LOCK_SHA256=pins["reviewed_lock_sha256"],
+                BASELINE_LOCK_SHA256=pins["baseline_lock_sha256"],
+                CANDIDATE_LOCK_SHA256=pins["candidate_lock_sha256"],
             ):
-                return validator.validate(
-                    manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
-                    abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
-                )
+                with mock.patch.multiple(
+                    validator,
+                    REVIEWED_LOCK_SHA256=pins["reviewed_lock_sha256"],
+                    BASELINE_LOCK_SHA256=pins["baseline_lock_sha256"],
+                    CANDIDATE_LOCK_SHA256=pins["candidate_lock_sha256"],
+                ):
+                    return validator.validate(
+                        manifest_path=paths["manifest"], preparation_path=paths["preparation"], build_path=paths["build"],
+                        abba_path=paths["abba"], measurements_path=paths["measurements"], runner_path=runner_path,
+                    )
 
     def test_build_free_preparation_to_validator_round_trip(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
@@ -438,6 +481,20 @@ class ValidateOleOwnerRunTests(unittest.TestCase):
             artifact.write_bytes(b"arbitrary replacement bytes")
             with self.assertRaisesRegex(validator.ValidationError, "oracle.before/normal.ole-source.bin SHA-256"):
                 self._validate_fixture(paths, runner_path)
+
+    def test_independent_lock_check_rejects_registry_mutation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
+            root = Path(directory)
+            self._fixture(root)
+            reviewed = root / "reviewed.Cargo.lock"
+            candidate = root / "candidate.Cargo.lock"
+            mutated = root / "candidate-mutated.Cargo.lock"
+            mutated.write_text(
+                candidate.read_text(encoding="utf-8").replace("b" * 64, "c" * 64),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(validator.ValidationError, "registry package identity"):
+                validator._validate_lock_patch(reviewed, mutated, "candidate")
 
     def test_rejects_oracle_report_without_journal_event_link(self) -> None:
         with tempfile.TemporaryDirectory(prefix="ole-owner-validator-") as directory:
