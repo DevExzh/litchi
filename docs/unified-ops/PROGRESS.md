@@ -3436,6 +3436,13 @@ See [0063](0063-source-pptx-modern-comments.md).
   files and reports zero unreached claimed CRUD cells. The fidelity TSV's
   empty final fields are retained as data.
 
+  Cleanup thirty subsequently found an undeclared local corpus target above
+  20 billion apparent bytes. The unblessed/focused results retain their
+  content evidence, but their claimed bounded-build provenance is returned
+  for correction. A fresh leaf is rerunning them with explicit external
+  target paths, command environments and before/after measurements; the
+  earlier cache and receipts remain quarantined.
+
   Selected f6fe diagnostics pass 332 core tests, the iWork leaf API check,
   the non-iWork gate and static corpus dispositions. Facade testing returns
   only the repaired socket fixture failure (208 passed, one failed). The
@@ -3458,6 +3465,13 @@ See [0063](0063-source-pptx-modern-comments.md).
   projection checks remain strict. Its f6fe candidate is diagnostic until
   the new final freeze. The composed inventory, ODG, glossary and matrix
   tooling selection also passes all 113 tests at that merge.
+
+  Reviewed gate packet `8a795fb769` prepares a separate next runner under
+  0362uva. It retains all 53 steps and registers both inventory modules and
+  all three W8 modules, preserving the original nine tooling modules once
+  each. Independent verification confirms the one-line command change,
+  unchanged wrappers, process/cap checks and active runner hash. Adoption
+  waits until the currently running diagnostic gate exits.
 
   Cleanups twenty-eight and twenty-nine remove three merged leaves after
   independent payload/ref/ancestry/restore-layout verification. Branches,

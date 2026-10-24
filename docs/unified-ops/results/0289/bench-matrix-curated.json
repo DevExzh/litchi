@@ -3058,6 +3058,10 @@
   {
    "record": "0362yh",
    "reason": "W8 original-to-final projection policy, immutable endpoint capability and pair-receipt protocol checks only; no Cargo build, native qualification, ABBA timing, or leaf-versus-unified performance pair. The f6fe pins remain diagnostic until the final production source freeze is selected."
+  },
+  {
+   "record": "0362uva",
+   "reason": "Safe-gate tooling registration patch and build-free runner verification only: the 53 steps, process isolation and existing failure receipts remain enforced. No Cargo build or leaf-versus-unified performance measurement is recorded."
   }
  ]
 }
