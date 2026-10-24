@@ -3534,8 +3534,16 @@ See [0063](0063-source-pptx-modern-comments.md).
   unchanged. The reviewed 0362uva runner is adopted from its separate path.
   Isolated workspace documentation passes with warnings denied in 1,057.472
   seconds, with no competing builds and a 4,504,969,096-byte final target.
-  The fresh all-68 library inventory is now running sequentially on the same
-  source; every row still needs semantic disposition review. Full gate
+  All 68 fresh library rustdoc captures subsequently pass on the same source:
+  1,094,716,714 JSON bytes, maximum per-command RSS 2,997,526,528 bytes, and
+  maximum target size 5,644,910,073 bytes. The coordinator verifies every
+  artifact and receipt; raw JSON stays external under the reduced 0362uma
+  capture receipt. The final inventory generator then fails on the facade's
+  foreign module glob `litchi_core::detection`, before emitting findings.
+  The process exits 2 and the run remains explicitly incomplete. Header-only
+  output is not zero debt; resolver repair and independent coverage review
+  are required before the full gate launch. Every row still needs semantic
+  disposition review. Full gate
   completion on this source, all-68 closure, actual OfficeCLI corpus replay,
   glossary closure and quiet native qualification remain required. Only
   comprehensive redaction audit 22 is deferred. Nothing is pushed.

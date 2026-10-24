@@ -115,11 +115,24 @@ process isolation and 4,504,969,096-byte final target are bound by the
 retains all 53 steps; this selection completes only workspace documentation.
 The f6fe diagnostic results are not relabeled as acceptance on the new freeze.
 
-The fresh all-68 library inventory has now started sequentially on that same
-source, under `/home/zhuhe/.cache/litchi-api-contract/49c25ef67f62a8bb943e7c6a0bf464e49ae87d07/`.
-It uses all features, includes hidden public items, and records every package,
-source/lock/toolchain identity, JSON hash and resource log. Its output and
-per-row dispositions remain pending; the old inventories are not closure.
+All 68 fresh library rustdoc captures subsequently passed on that same source,
+under `/home/zhuhe/.cache/litchi-api-contract/49c25ef67f62a8bb943e7c6a0bf464e49ae87d07/`.
+They use all features, include hidden public items, and record every package,
+source/lock/toolchain identity, JSON hash and resource log. The coordinator
+verified all 68 receipts and artifact hashes: 1,094,716,714 JSON bytes,
+maximum per-command RSS 2,997,526,528 bytes, and maximum target size
+5,644,910,073 bytes. The raw JSON remains external; the
+[reduced capture receipt](results/0362uma/all-68-inventory-capture.json)
+binds each artifact and command log, the source tools and regeneration command.
+
+The final inventory generator then failed before emitting findings:
+`ValueError: glob target requires module rustdoc data: litchi_core::detection`.
+The raw `run.json` remains `incomplete`, the process exits 2, and the TSV
+contains only its header. This is a required public re-export coverage repair,
+not zero API debt or an accepted exception. The failed run and every successful
+capture remain unchanged for validating the repair. Semantic dispositions and
+final inventory closure remain outstanding; the full gate launch waits for
+the resolver repair and review.
 
 These are required engineering corrections. No performance regression,
 capability loss or API-contract debt is accepted as an exception. Only the
