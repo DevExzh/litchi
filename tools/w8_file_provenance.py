@@ -35,7 +35,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 FULL_COMMIT = re.compile(r"^[0-9a-f]{40}$")
-REVIEWED_PROBE_SHA256 = "3a01dd2cbb971b4eba54e2eccffa99e1b3c4557db14af03e61869f99f0a0cc27"
+REVIEWED_PROBE_SHA256 = "21c8e3833c96411a612a2631f98093bd70cf0a5c28b2952c3d15873f464e54b0"
 PACKAGE_NAME = "litchi-ops"
 PACKAGE_MANIFEST_RELATIVE = Path("crates/litchi-ops/Cargo.toml")
 PROBE_RELATIVE = Path("crates/litchi-ops/examples/file_w8_qualified_probe.rs")

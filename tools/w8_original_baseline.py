@@ -35,12 +35,12 @@ from tools import w8_file_provenance as provenance
 
 
 BASELINE_COMMIT = "f2bbbc8d07ab5da26c180f1ff74813d39f632d54"
-PROBE_SOURCE_COMMIT = "d39d179353b5fd1ce82ca479b16cee2fc4dc8ffb"
+PROBE_SOURCE_COMMIT = "56dbd37551ba204e99199feeaf61a8dab848046d"
 PROBE_RELATIVE = Path("crates/litchi-ops/examples/file_w8_qualified_probe.rs")
 ADAPTER_RELATIVE = Path("crates/litchi-ops/examples/file_w8_original_baseline_probe.rs")
 LOCK_RELATIVE = Path("Cargo.lock")
-REVIEWED_PROBE_SHA256 = "3a01dd2cbb971b4eba54e2eccffa99e1b3c4557db14af03e61869f99f0a0cc27"
-REVIEWED_PROBE_BYTES = 74_747
+REVIEWED_PROBE_SHA256 = "21c8e3833c96411a612a2631f98093bd70cf0a5c28b2952c3d15873f464e54b0"
+REVIEWED_PROBE_BYTES = 75_035
 TARGET = "x86_64-unknown-linux-gnu"
 PROFILE = "release"
 W8_FEATURES = (
