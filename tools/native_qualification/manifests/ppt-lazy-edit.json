@@ -67,10 +67,57 @@
       "bytes": null,
       "sha256": null
     },
-    "fixture": {
-      "path": "../../../test-data/unified-ops/ppt-lazy-native-fixture.ppt",
-      "bytes": 14848,
-      "sha256": "02fa44ca76903943e80a3a2da1f9dbd326c7a4a047540c3aa9cf211e34ef617c"
+    "fixtures": {
+      "default": {
+        "path": "../../../test-data/unified-ops/ppt-lazy-native-fixture.ppt",
+        "bytes": 14848,
+        "sha256": "02fa44ca76903943e80a3a2da1f9dbd326c7a4a047540c3aa9cf211e34ef617c"
+      },
+      "objects": {
+        "path": "../../../test-data/poi/test-data/slideshow/ppt_with_embeded.ppt",
+        "bytes": 180736,
+        "sha256": "afa1dd5adc36765e6e40725a133b0330e5ad1febd1506ca93ceae8c5c5400b53"
+      },
+      "external_media": {
+        "path": "../../../test-data/unified-ops/0294/video.ppt",
+        "bytes": 43520,
+        "sha256": "f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a"
+      },
+      "picture_bullets": {
+        "path": "../../../test-data/poi/test-data/slideshow/bug61881.ppt",
+        "bytes": 74752,
+        "sha256": "ba2bf551e87f5fd7667dec52ac19005396bdf9af00f0006f9a247a9fede2e8ee"
+      }
+    },
+    "fixture_routes": {
+      "primary_entry_drop": "default",
+      "primary_noop_commit": "default",
+      "metadata_entry_drop": "default",
+      "metadata_noop_commit": "default",
+      "animations_entry_drop": "default",
+      "animations_noop_commit": "default",
+      "broadcast_entry_drop": "default",
+      "broadcast_noop_commit": "default",
+      "client_data_entry_drop": "default",
+      "client_data_noop_commit": "default",
+      "diagrams_entry_drop": "default",
+      "diagrams_noop_commit": "default",
+      "document_comparison_entry_drop": "default",
+      "document_comparison_noop_commit": "default",
+      "objects_entry_drop": "objects",
+      "objects_noop_commit": "objects",
+      "external_media_entry_drop": "external_media",
+      "external_media_noop_commit": "external_media",
+      "fonts_entry_drop": "default",
+      "fonts_noop_commit": "default",
+      "master_metadata_entry_drop": "default",
+      "master_metadata_noop_commit": "default",
+      "master_layout_entry_drop": "default",
+      "master_layout_noop_commit": "default",
+      "picture_bullets_entry_drop": "picture_bullets",
+      "picture_bullets_noop_commit": "picture_bullets",
+      "slide_sync_entry_drop": "default",
+      "slide_sync_noop_commit": "default"
     },
     "toolchain": {
       "path": "PARAMETERIZED_EXTERNAL_TOOLCHAIN",

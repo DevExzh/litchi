@@ -81,6 +81,20 @@ ROUTES = (
     "slide_sync_entry_drop",
     "slide_sync_noop_commit",
 )
+FIXTURE_GENERATOR = "litchi-ppt-lazy-native-fixture-v2"
+FIXTURE_KEYS = ("default", "objects", "external_media", "picture_bullets")
+ROUTE_FIXTURE_KEYS = {
+    route: (
+        "objects"
+        if route.startswith("objects_")
+        else "external_media"
+        if route.startswith("external_media_")
+        else "picture_bullets"
+        if route.startswith("picture_bullets_")
+        else "default"
+    )
+    for route in ROUTES
+}
 ABBA_ORDER = ("a1", "b1", "b2", "a2")
 ROLE_ENDPOINT = {"a1": "baseline", "a2": "baseline", "b1": "candidate", "b2": "candidate"}
 MAX_MANIFEST_BYTES = 256 * 1024
@@ -239,7 +253,8 @@ def _build_spec(value: Any, *, plan: bool) -> dict[str, Any]:
         {
             "receipt",
             "source_archive",
-            "fixture",
+            "fixtures",
+            "fixture_routes",
             "toolchain",
             "cargo_config",
             "profile",
@@ -290,6 +305,14 @@ def _build_spec(value: Any, *, plan: bool) -> dict[str, Any]:
     }
     if features != expected_features:
         raise RunFailure("manifest.build.features differs from the fixed native probes")
+    fixtures = _object(build.get("fixtures"), "manifest.build.fixtures")
+    _exact_keys(fixtures, set(FIXTURE_KEYS), "manifest.build.fixtures")
+    for key in FIXTURE_KEYS:
+        _identity_spec(fixtures.get(key), f"manifest.build.fixtures.{key}", plan=plan)
+    fixture_routes = _object(build.get("fixture_routes"), "manifest.build.fixture_routes")
+    _exact_keys(fixture_routes, set(ROUTES), "manifest.build.fixture_routes")
+    if fixture_routes != ROUTE_FIXTURE_KEYS:
+        raise RunFailure("manifest.build.fixture_routes differs from the reviewed route matrix")
     environment = _object(build.get("environment"), "manifest.build.environment")
     if environment != {
         "CARGO_BUILD_JOBS": "1",
@@ -596,7 +619,8 @@ def _validate_build_receipt(
         "cargo_config",
         "baseline",
         "candidate",
-        "fixture",
+        "fixtures",
+        "fixture_routes",
         "probe_sources",
         "baseline_adapter",
         "commands",
@@ -630,13 +654,27 @@ def _validate_build_receipt(
             raise RunFailure(f"build receipt {name} identity differs from the manifest")
         external_inputs[name] = actual
 
-    fixture_spec = _identity_spec(build.get("fixture"), "manifest.build.fixture", plan=False)
-    fixture_path = _safe_path(fixture_spec["path"], manifest_path.parent, must_exist=True)
-    fixture_identity = _identity(fixture_path)
-    if fixture_identity != {"path": str(fixture_path), "bytes": fixture_spec["bytes"], "sha256": fixture_spec["sha256"]}:
-        raise RunFailure("qualification fixture identity differs from the manifest")
-    if receipt["fixture"] != fixture_identity:
-        raise RunFailure("build receipt fixture identity differs from the manifest")
+    fixture_identities: dict[str, dict[str, Any]] = {}
+    for key in FIXTURE_KEYS:
+        fixture_spec = _identity_spec(
+            build["fixtures"].get(key), f"manifest.build.fixtures.{key}", plan=False
+        )
+        fixture_path = _safe_path(fixture_spec["path"], manifest_path.parent, must_exist=True)
+        if any(_overlap(fixture_path, root) for root in roots):
+            raise RunFailure(f"manifest.build.fixtures.{key} must be outside both source roots")
+        fixture_identity = _identity(fixture_path)
+        expected_fixture = {
+            "path": str(fixture_path),
+            "bytes": fixture_spec["bytes"],
+            "sha256": fixture_spec["sha256"],
+        }
+        if fixture_identity != expected_fixture:
+            raise RunFailure(f"qualification fixture {key} identity differs from the manifest")
+        fixture_identities[key] = fixture_identity
+    if receipt["fixtures"] != fixture_identities:
+        raise RunFailure("build receipt fixture identities differ from the manifest")
+    if receipt["fixture_routes"] != build["fixture_routes"]:
+        raise RunFailure("build receipt fixture route bindings differ from the manifest")
 
     for name, endpoint in (("baseline", baseline), ("candidate", candidate)):
         expected_endpoint = {"ref": endpoint["head"], "tree": endpoint["tree"], "lock": endpoint["lock"]}
@@ -710,6 +748,7 @@ def _validate_build_receipt(
         "source_archive": external_inputs["source_archive"],
         "toolchain": external_inputs["toolchain"],
         "cargo_config": external_inputs["cargo_config"],
+        "fixtures": fixture_identities,
     }
 
 
@@ -929,6 +968,7 @@ def _validate_route_proof(
     proof_value: Any,
     route: str,
     fixture: Mapping[str, Any],
+    fixture_key: str,
     label: str,
 ) -> dict[str, Any]:
     proof = _object(proof_value, label)
@@ -941,11 +981,18 @@ def _validate_route_proof(
         "patch_before_exact",
         "patch_after_exact",
         "entry",
+        "fixture",
     }
     if set(proof) != expected_fields:
         raise RunFailure(f"{label}: proof fields differ from the protocol")
     if _digest_object(proof["output"], f"{label}.output") != dict(fixture):
         raise RunFailure(f"{label}: output differs from the reviewed fixture")
+    proof_fixture = _object(proof["fixture"], f"{label}.fixture")
+    _exact_keys(proof_fixture, {"key", "output"}, f"{label}.fixture")
+    if proof_fixture["key"] != fixture_key:
+        raise RunFailure(f"{label}: route is bound to the wrong fixture")
+    if _digest_object(proof_fixture["output"], f"{label}.fixture.output") != dict(fixture):
+        raise RunFailure(f"{label}: route fixture digest differs")
     expected_entry = "commit" if route.endswith("noop_commit") else "drop"
     if proof["source_exact"] is not True or proof["changed"] is not False or proof["entry"] != expected_entry:
         raise RunFailure(f"{label}: exact no-op/drop semantics failed")
@@ -961,23 +1008,41 @@ def _validate_route_proof(
     return proof
 
 
-def _validate_verify(report: Mapping[str, Any], label: str) -> dict[str, Any]:
-    if set(report) != {"schema", "mode", "fixture", "routes", "allocation"}:
+def _validate_verify(
+    report: Mapping[str, Any],
+    label: str,
+    expected_fixtures: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, Any]:
+    if set(report) != {"schema", "mode", "fixtures", "routes", "allocation"}:
         raise RunFailure(f"{label}: verify report fields differ from the protocol")
     if report.get("schema") != PROBE_SCHEMA or report.get("mode") != "verify":
         raise RunFailure(f"{label}: verify report identity is invalid")
-    fixture = _object(report.get("fixture"), f"{label}.fixture")
-    if set(fixture) != {"generator", "output"} or fixture.get("generator") != "litchi-ppt-lazy-native-fixture-v1":
-        raise RunFailure(f"{label}: reviewed fixture identity is invalid")
-    source = _digest_object(fixture.get("output"), f"{label}.fixture.output")
+    fixtures = _object(report.get("fixtures"), f"{label}.fixtures")
+    if set(fixtures) != set(FIXTURE_KEYS):
+        raise RunFailure(f"{label}: fixture set differs from the reviewed matrix")
+    sources: dict[str, dict[str, Any]] = {}
+    for key in FIXTURE_KEYS:
+        fixture = _object(fixtures[key], f"{label}.fixtures.{key}")
+        if set(fixture) != {"generator", "output"} or fixture.get("generator") != FIXTURE_GENERATOR:
+            raise RunFailure(f"{label}: reviewed fixture {key} identity is invalid")
+        sources[key] = _digest_object(fixture.get("output"), f"{label}.fixtures.{key}.output")
+        if expected_fixtures is not None:
+            expected = expected_fixtures[key]
+            expected_digest = {
+                "bytes": _positive_int(expected.get("bytes"), f"manifest.build.fixtures.{key}.bytes"),
+                "sha256": _digest_value(expected.get("sha256"), f"manifest.build.fixtures.{key}.sha256"),
+            }
+            if sources[key] != expected_digest:
+                raise RunFailure(f"{label}: fixture {key} output differs from its manifest source")
     if report.get("allocation") != {"status": "unavailable", "scope": "operation_global_system_allocator"}:
         raise RunFailure(f"{label}: normal verify probe must report allocator metrics as unavailable")
     routes = _object(report.get("routes"), f"{label}.routes")
     if set(routes) != set(ROUTES):
         raise RunFailure(f"{label}: route set differs from {ROUTES!r}")
     for route in ROUTES:
-        _validate_route_proof(routes[route], route, source, f"{label}.{route}")
-    return {"fixture": source, "routes": routes}
+        fixture_key = ROUTE_FIXTURE_KEYS[route]
+        _validate_route_proof(routes[route], route, sources[fixture_key], fixture_key, f"{label}.{route}")
+    return {"fixtures": sources, "routes": routes}
 
 
 def _validate_calibration(
@@ -985,6 +1050,7 @@ def _validate_calibration(
     route: str,
     protocol: Mapping[str, Any],
     fixture: Mapping[str, Any],
+    fixture_key: str,
     label: str,
 ) -> int:
     if set(report) != {"schema", "mode", "route", "target_ns", "iterations", "elapsed_ns", "fixture", "postcondition"}:
@@ -997,9 +1063,11 @@ def _validate_calibration(
         raise RunFailure(f"{label}: calibration target or bound differs")
     if _positive_int(report.get("elapsed_ns"), f"{label}.elapsed_ns") < report["target_ns"]:
         raise RunFailure(f"{label}: calibration did not reach its target")
-    if _digest_object(report.get("fixture"), f"{label}.fixture") != dict(fixture):
+    report_fixture = _object(report.get("fixture"), f"{label}.fixture")
+    _exact_keys(report_fixture, {"key", "output"}, f"{label}.fixture")
+    if report_fixture["key"] != fixture_key or _digest_object(report_fixture["output"], f"{label}.fixture.output") != dict(fixture):
         raise RunFailure(f"{label}: calibration fixture differs from correctness")
-    _validate_route_proof(report.get("postcondition"), route, fixture, f"{label}.postcondition")
+    _validate_route_proof(report.get("postcondition"), route, fixture, fixture_key, f"{label}.postcondition")
     return iterations
 
 
@@ -1010,15 +1078,18 @@ def _validate_timed(
     allocator: bool,
     protocol: Mapping[str, Any],
     fixture: Mapping[str, Any],
+    fixture_key: str,
     label: str,
 ) -> dict[str, Any]:
     if set(report) != {"schema", "mode", "route", "samples", "fixture", "postcondition"}:
         raise RunFailure(f"{label}: timed fields differ from the protocol")
     if report.get("schema") != PROBE_SCHEMA or report.get("mode") != "timed" or report.get("route") != route:
         raise RunFailure(f"{label}: timed identity differs")
-    if _digest_object(report.get("fixture"), f"{label}.fixture") != dict(fixture):
+    report_fixture = _object(report.get("fixture"), f"{label}.fixture")
+    _exact_keys(report_fixture, {"key", "output"}, f"{label}.fixture")
+    if report_fixture["key"] != fixture_key or _digest_object(report_fixture["output"], f"{label}.fixture.output") != dict(fixture):
         raise RunFailure(f"{label}: timed fixture differs from correctness")
-    _validate_route_proof(report.get("postcondition"), route, fixture, f"{label}.postcondition")
+    _validate_route_proof(report.get("postcondition"), route, fixture, fixture_key, f"{label}.postcondition")
     samples = report.get("samples")
     if not isinstance(samples, list) or not samples:
         raise RunFailure(f"{label}: timed samples are empty")
@@ -1117,6 +1188,8 @@ def _plan(manifest: Mapping[str, Any], path: Path, out_dir: Path) -> None:
         "baseline": {"ref": manifest["baseline"]["ref"], "tree": manifest["baseline"]["tree"], "lock": manifest["baseline"]["lock"]},
         "candidate": manifest["candidate"],
         "routes": list(ROUTES),
+        "fixtures": manifest["build"]["fixtures"],
+        "fixture_routes": manifest["build"]["fixture_routes"],
         "abba_order": list(ABBA_ORDER),
         "allocation": {"binary": "ppt_lazy_native_alloc", "scope": "operation_global_system_allocator"},
         "limits": {"target_preflight_bytes": TARGET_PREFLIGHT_BYTES, "target_hard_limit_bytes": TARGET_HARD_LIMIT_BYTES, "memory_hard_limit_bytes": MEMORY_HARD_LIMIT_BYTES, "max_child_output": MAX_CHILD_OUTPUT},
@@ -1172,7 +1245,10 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
             endpoint["target_dir"],
             ("--mode", "verify"),
         )
-        correctness[name] = {"report": _validate_verify(report, f"correctness.{name}"), "event": event}
+        correctness[name] = {
+            "report": _validate_verify(report, f"correctness.{name}", manifest["build"]["fixtures"]),
+            "event": event,
+        }
     if correctness["baseline"]["report"] != correctness["candidate"]["report"]:
         raise RunFailure("baseline and candidate correctness proofs differ")
     identity["after_correctness"] = {
@@ -1210,7 +1286,8 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
                 report,
                 route,
                 protocol,
-                correctness["baseline"]["report"]["fixture"],
+                correctness["baseline"]["report"]["fixtures"][ROUTE_FIXTURE_KEYS[route]],
+                ROUTE_FIXTURE_KEYS[route],
                 f"calibration.{name}.{route}",
             )
             calibration_events.append(event)
@@ -1237,7 +1314,7 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
                     endpoint["target_dir"],
                     ("--mode", "timed", "--route", route, "--iterations", str(iterations), "--samples", "1", "--warmups", str(protocol["warmups"]), "--max-iterations", str(protocol["max_iterations"])),
                 )
-                normal_rows.append({"role": role, "endpoint": name, "report": _validate_timed(normal_report, route, iterations, False, protocol, correctness["baseline"]["report"]["fixture"], f"timed.{route}.{role}.{block}"), "event": normal_event})
+                normal_rows.append({"role": role, "endpoint": name, "report": _validate_timed(normal_report, route, iterations, False, protocol, correctness["baseline"]["report"]["fixtures"][ROUTE_FIXTURE_KEYS[route]], ROUTE_FIXTURE_KEYS[route], f"timed.{route}.{role}.{block}"), "event": normal_event})
                 allocation_report, allocation_event = _run_child(
                     endpoint,
                     protocol,
@@ -1247,7 +1324,7 @@ def _run(manifest: Mapping[str, Any], manifest_path: Path, out_dir: Path, correc
                     endpoint["allocator_target_dir"],
                     ("--mode", "timed", "--route", route, "--iterations", str(iterations), "--samples", "1", "--warmups", str(protocol["warmups"]), "--max-iterations", str(protocol["max_iterations"])),
                 )
-                allocation_rows.append({"role": role, "endpoint": name, "report": _validate_timed(allocation_report, route, iterations, True, protocol, correctness["baseline"]["report"]["fixture"], f"allocation.{route}.{role}.{block}"), "event": allocation_event})
+                allocation_rows.append({"role": role, "endpoint": name, "report": _validate_timed(allocation_report, route, iterations, True, protocol, correctness["baseline"]["report"]["fixtures"][ROUTE_FIXTURE_KEYS[route]], ROUTE_FIXTURE_KEYS[route], f"allocation.{route}.{role}.{block}"), "event": allocation_event})
             blocks.append({"block": block, "abba_order": list(ABBA_ORDER), "normal": normal_rows, "allocation": allocation_rows})
         routes[route] = {"blocks": blocks}
     identity["after_abba"] = {

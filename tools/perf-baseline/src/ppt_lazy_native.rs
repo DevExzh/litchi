@@ -19,7 +19,24 @@ use sha2::{Digest, Sha256};
 use crate::allocation_metrics;
 
 const SCHEMA: &str = "litchi.ppt.lazy-native.probe.v1";
-const FIXTURE: &[u8] = include_bytes!("../../../test-data/unified-ops/ppt-lazy-native-fixture.ppt");
+const DEFAULT_FIXTURE_KEY: &str = "default";
+const OBJECTS_FIXTURE_KEY: &str = "objects";
+const EXTERNAL_MEDIA_FIXTURE_KEY: &str = "external_media";
+const PICTURE_BULLETS_FIXTURE_KEY: &str = "picture_bullets";
+const FIXTURE_KEYS: [&str; 4] = [
+    DEFAULT_FIXTURE_KEY,
+    OBJECTS_FIXTURE_KEY,
+    EXTERNAL_MEDIA_FIXTURE_KEY,
+    PICTURE_BULLETS_FIXTURE_KEY,
+];
+const DEFAULT_FIXTURE: &[u8] =
+    include_bytes!("../../../test-data/unified-ops/ppt-lazy-native-fixture.ppt");
+const OBJECTS_FIXTURE: &[u8] =
+    include_bytes!("../../../test-data/poi/test-data/slideshow/ppt_with_embeded.ppt");
+const EXTERNAL_MEDIA_FIXTURE: &[u8] =
+    include_bytes!("../../../test-data/unified-ops/0294/video.ppt");
+const PICTURE_BULLETS_FIXTURE: &[u8] =
+    include_bytes!("../../../test-data/poi/test-data/slideshow/bug61881.ppt");
 const ROUTES: [&str; 28] = [
     "primary_entry_drop",
     "primary_noop_commit",
@@ -124,6 +141,15 @@ impl Family {
             Self::SlideSync => ROUTES[27],
         }
     }
+
+    const fn fixture_key(self) -> &'static str {
+        match self {
+            Self::Objects => OBJECTS_FIXTURE_KEY,
+            Self::ExternalMedia => EXTERNAL_MEDIA_FIXTURE_KEY,
+            Self::PictureBullets => PICTURE_BULLETS_FIXTURE_KEY,
+            _ => DEFAULT_FIXTURE_KEY,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -155,6 +181,26 @@ impl Route {
     const fn is_commit(self) -> bool {
         matches!(self, Self::NoopCommit(_))
     }
+
+    const fn fixture_key(self) -> &'static str {
+        match self {
+            Self::EntryDrop(family) | Self::NoopCommit(family) => family.fixture_key(),
+        }
+    }
+}
+
+fn fixture_bytes(key: &str) -> Result<&'static [u8], Box<dyn Error>> {
+    match key {
+        DEFAULT_FIXTURE_KEY => Ok(DEFAULT_FIXTURE),
+        OBJECTS_FIXTURE_KEY => Ok(OBJECTS_FIXTURE),
+        EXTERNAL_MEDIA_FIXTURE_KEY => Ok(EXTERNAL_MEDIA_FIXTURE),
+        PICTURE_BULLETS_FIXTURE_KEY => Ok(PICTURE_BULLETS_FIXTURE),
+        _ => Err(format!("unknown PPT lazy fixture {key:?}").into()),
+    }
+}
+
+fn fixture_source(key: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+    Ok(Package::from_bytes(fixture_bytes(key)?)?.to_bytes()?)
 }
 
 struct OperationResult {
@@ -338,15 +384,20 @@ fn assert_noop(
     }))
 }
 
-fn verify_route(package: &Package, source: &[u8], route: Route) -> Result<Value, Box<dyn Error>> {
+fn verify_route(
+    package: &Package,
+    source: &[u8],
+    route: Route,
+    fixture_key: &str,
+) -> Result<Value, Box<dyn Error>> {
     let result = run_once(package, route)?;
-    if route.is_commit() {
-        assert_noop(source, route, result)
+    let mut proof = if route.is_commit() {
+        assert_noop(source, route, result)?
     } else {
         if result.changed || result.patch_noop.is_some() || result.published.is_some() {
             return Err(format!("{} unexpectedly published", route.name()).into());
         }
-        Ok(json!({
+        json!({
             "output": digest(source),
             "source_exact": true,
             "changed": false,
@@ -355,8 +406,10 @@ fn verify_route(package: &Package, source: &[u8], route: Route) -> Result<Value,
             "patch_before_exact": Value::Null,
             "patch_after_exact": Value::Null,
             "entry": "drop",
-        }))
-    }
+        })
+    };
+    proof["fixture"] = json!({"key": fixture_key, "output": digest(source)});
+    Ok(proof)
 }
 
 fn allocation_delta(
@@ -540,22 +593,37 @@ where
         allocation_metrics::enable();
     }
     let args = arguments(values)?;
-    let package = Package::from_bytes(FIXTURE)?;
-    let source = package.to_bytes()?;
-    let source_digest = digest(&source);
     let output = match args.mode.as_str() {
         "verify" => {
             let routes = ROUTES
                 .iter()
                 .map(|name| {
                     let route = Route::parse(name)?;
-                    Ok::<_, Box<dyn Error>>((name, verify_route(&package, &source, route)?))
+                    let fixture_key = route.fixture_key();
+                    let source = fixture_source(fixture_key)?;
+                    let package = Package::from_bytes(&source)?;
+                    Ok::<_, Box<dyn Error>>((
+                        name,
+                        verify_route(&package, &source, route, fixture_key)?,
+                    ))
                 })
                 .collect::<Result<Vec<_>, _>>()?;
+            let fixtures = FIXTURE_KEYS
+                .iter()
+                .map(|key| {
+                    Ok::<_, Box<dyn Error>>((
+                        (*key).to_owned(),
+                        json!({
+                            "generator": "litchi-ppt-lazy-native-fixture-v2",
+                            "output": digest(&fixture_source(key)?),
+                        }),
+                    ))
+                })
+                .collect::<Result<serde_json::Map<_, _>, _>>()?;
             json!({
                 "schema": SCHEMA,
                 "mode": "verify",
-                "fixture": {"generator": "litchi-ppt-lazy-native-fixture-v1", "output": source_digest},
+                "fixtures": fixtures,
                 "routes": routes
                     .into_iter()
                     .map(|(name, proof)| ((*name).to_owned(), proof))
@@ -565,6 +633,9 @@ where
         },
         "calibrate" => {
             let route = args.route.ok_or("calibrate requires --route")?;
+            let fixture_key = route.fixture_key();
+            let source = fixture_source(fixture_key)?;
+            let package = Package::from_bytes(&source)?;
             let mut iterations = 1usize;
             let started = Instant::now();
             loop {
@@ -586,16 +657,19 @@ where
                 "target_ns": args.target_ns,
                 "iterations": iterations,
                 "elapsed_ns": started.elapsed().as_nanos(),
-                "fixture": source_digest,
-                "postcondition": verify_route(&package, &source, route)?,
+                "fixture": {"key": fixture_key, "output": digest(&source)},
+                "postcondition": verify_route(&package, &source, route, fixture_key)?,
             })
         },
         "timed" => {
             let route = args.route.ok_or("timed requires --route")?;
+            let fixture_key = route.fixture_key();
+            let source = fixture_source(fixture_key)?;
+            let package = Package::from_bytes(&source)?;
             let report = timed(&package, &args, route, allocator)?;
-            let proof = verify_route(&package, &source, route)?;
+            let proof = verify_route(&package, &source, route, fixture_key)?;
             let mut report = report;
-            report["fixture"] = source_digest;
+            report["fixture"] = json!({"key": fixture_key, "output": digest(&source)});
             report["postcondition"] = proof;
             report
         },

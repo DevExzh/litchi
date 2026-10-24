@@ -36,20 +36,33 @@ document_comparison, objects, external_media, fonts, master_metadata,
 master_layout, picture_bullets, slide_sync
 ```
 
-The fixture has one slide with two text shapes, client data, a PPT9 broadcast
-record, a PPT10 diagram build list, and a valid main master. It is tracked at
-`test-data/unified-ops/ppt-lazy-native-fixture.ppt`; its SHA-256 is
+The default fixture has one slide with two text shapes, client data, a PPT9
+broadcast record, a PPT10 diagram build list, and a valid main master. It is
+tracked at `test-data/unified-ops/ppt-lazy-native-fixture.ppt`; its SHA-256 is
 `02fa44ca76903943e80a3a2da1f9dbd326c7a4a047540c3aa9cf211e34ef617c` and its
-size is 14,848 bytes. Thus every position/target/kind selector is exercised
-against a real non-empty owner. Drop proofs publish nothing; commit proofs
-require unchanged diagnostics, a no-op patch, and byte-identical output. The
-primary proof additionally requires zero operation count and exact patch
-before/after endpoints; metadata requires exact `before_bytes`/
-`after_bytes` endpoints.
+size is 14,848 bytes. Three owner-specific routes use additional tracked,
+non-empty representatives: `objects` uses Apache POI's
+`test-data/poi/test-data/slideshow/ppt_with_embeded.ppt` (180,736 bytes,
+`afa1dd5adc36765e6e40725a133b0330e5ad1febd1506ca93ceae8c5c5400b53`) with a
+real `ExObjListContainer` and `Pictures` stream; `external_media` uses
+`test-data/unified-ops/0294/video.ppt` (43,520 bytes,
+`f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a`) with a
+real movie object; and `picture_bullets` uses Apache POI's
+`test-data/poi/test-data/slideshow/bug61881.ppt` (74,752 bytes,
+`ba2bf551e87f5fd7667dec52ac19005396bdf9af00f0006f9a247a9fede2e8ee`) with a
+real `BlipCollection9Container` (record 2040) and `Pictures` stream. The
+manifest binds every route to one of these four exact fixture identities, and
+each proof repeats its fixture key and digest. Thus every
+position/target/kind selector is exercised against a real non-empty owner.
+Drop proofs publish nothing; commit proofs require unchanged diagnostics, a
+no-op patch, and byte-identical output. The primary proof additionally
+requires zero operation count and exact patch before/after endpoints; metadata
+requires exact `before_bytes`/`after_bytes` endpoints.
 
-`--mode verify` runs all 28 routes once and emits the fixture generator identity
-plus byte count/SHA-256. `--mode calibrate` doubles a route-local operation
-batch to a fixed target and repeats the verified fixture digest and route proof.
+`--mode verify` runs all 28 routes once and emits all four fixture generator
+identities plus byte count/SHA-256. `--mode calibrate` doubles a route-local
+operation batch to a fixed target and repeats the verified route fixture digest
+and route proof.
 `--mode timed` runs warmups outside the clock and returns one elapsed batch
 sample per request; a postcondition proof is performed outside the timed
 interval. The allocator binary uses the existing `allocation_metrics`
@@ -84,7 +97,8 @@ For each endpoint it requires:
 
 The checked-in manifest is intentionally parameterized. It pins the true
 baseline ref/tree and exact lock path, the reviewed relative probe closure, the
-fixture, the baseline overlay paths and `src/lib.rs` registration, and the
+four fixture identities and exact route map, the baseline overlay paths and
+`src/lib.rs` registration, and the
 release build commands. The normal and allocator builds use the package
 defaults explicitly recorded as `current-api,current-xlsx-raw-opc` (the
 commands omit `--no-default-features` and therefore select those defaults).
@@ -128,7 +142,8 @@ tools/perf-baseline/src/lib.rs  (add `pub mod ppt_lazy_native;` only for the tem
 ```
 
 The manifest's retained build receipt must bind the source archive, toolchain,
-Cargo configuration, exact source/lock/tree identities, fixture, all four
+Cargo configuration, exact source/lock/tree identities, all four fixture
+identities and their route map, all four
 candidate probe files, the three-file baseline overlay plus the exact
 `src/lib.rs` registration diff, commands, environment, release target/profile,
 features, target paths, and both resulting executable hashes. Remove only the

@@ -1,5 +1,6 @@
 import json
 import hashlib
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -20,6 +21,8 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
         self.assertEqual(manifest["baseline"]["lock"]["bytes"], protocol.BASELINE_LOCK_BYTES)
         self.assertEqual(manifest["baseline"]["lock"]["sha256"], protocol.BASELINE_LOCK_SHA256)
         self.assertIsNone(manifest["candidate"])
+        self.assertEqual(set(manifest["build"]["fixtures"]), set(protocol.FIXTURE_KEYS))
+        self.assertEqual(manifest["build"]["fixture_routes"], protocol.ROUTE_FIXTURE_KEYS)
         self.assertEqual(tuple(protocol.ROUTES), (
             "primary_entry_drop",
             "primary_noop_commit",
@@ -121,6 +124,103 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
             with self.assertRaises(protocol.RunFailure):
                 protocol._check_probe_sources(spec, endpoint)
 
+    def test_recheck_binds_actual_manifest_lock_probe_and_binary_bytes(self):
+        with tempfile.TemporaryDirectory(prefix="ppt-lazy-recheck-") as temporary:
+            outer = Path(temporary)
+            root = outer / "candidate"
+            root.mkdir()
+            subprocess.run(["git", "-C", str(root), "init", "--quiet"], check=True)
+            subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
+            subprocess.run(["git", "-C", str(root), "config", "user.name", "PPT test"], check=True)
+            lock = root / "tools" / "perf-baseline" / "Cargo.lock"
+            lock.parent.mkdir(parents=True)
+            lock.write_bytes(b"lock-v1")
+            probe = root / "probe.rs"
+            probe.write_bytes(b"probe-v1")
+            subprocess.run(["git", "-C", str(root), "add", "tools/perf-baseline/Cargo.lock", "probe.rs"], check=True)
+            subprocess.run(["git", "-C", str(root), "commit", "--quiet", "-m", "fixture"], check=True)
+
+            target = outer / "normal-target" / "release"
+            allocator_target = outer / "allocator-target" / "release"
+            target.mkdir(parents=True)
+            allocator_target.mkdir(parents=True)
+            normal = target / "ppt_lazy_native"
+            allocator = allocator_target / "ppt_lazy_native_alloc"
+            normal.write_bytes(b"normal-binary-v1")
+            allocator.write_bytes(b"allocator-binary-v1")
+            os.chmod(normal, 0o755)
+            os.chmod(allocator, 0o755)
+
+            manifest_path = outer / "manifest.json"
+            manifest_path.write_bytes(b'{"manifest":"v1"}\n')
+            manifest_identity = protocol._identity(manifest_path)
+            git = lambda *args: subprocess.run(
+                ["git", "-C", str(root), *args],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            lock_identity = protocol._identity(lock)
+            lock_spec = {
+                "path": "tools/perf-baseline/Cargo.lock",
+                "bytes": lock_identity["bytes"],
+                "sha256": lock_identity["sha256"],
+            }
+            probe_identity = protocol._identity(probe)
+            probe_spec = {
+                "path": "probe.rs",
+                "bytes": probe_identity["bytes"],
+                "sha256": probe_identity["sha256"],
+            }
+            normal_spec = protocol._identity(normal)
+            allocator_spec = protocol._identity(allocator)
+            raw = {
+                "lock": lock_spec,
+                "normal_binary": normal_spec,
+                "allocator_binary": allocator_spec,
+            }
+            endpoint = {
+                "name": "candidate",
+                "raw": raw,
+                "root": root,
+                "head": git("rev-parse", "HEAD"),
+                "tree": git("rev-parse", "HEAD^{tree}"),
+                "target_dir": target.parent,
+                "allocator_target_dir": allocator_target.parent,
+            }
+            protocol._recheck(
+                endpoint,
+                [probe_spec],
+                manifest_path,
+                manifest_identity,
+                "before_timing",
+            )
+
+            manifest_path.write_bytes(b'{"manifest":"tampered"}\n')
+            with self.assertRaises(protocol.RunFailure):
+                protocol._recheck(endpoint, [probe_spec], manifest_path, manifest_identity, "after_manifest_mutation")
+            manifest_path.write_bytes(b'{"manifest":"v1"}\n')
+
+            probe.write_bytes(b"probe-tampered")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._recheck(endpoint, [probe_spec], manifest_path, manifest_identity, "after_probe_mutation")
+            probe.write_bytes(b"probe-v1")
+
+            lock.write_bytes(b"lock-tampered")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._check_lock(lock_spec, "candidate.lock", root)
+            lock.write_bytes(b"lock-v1")
+
+            normal.write_bytes(b"normal-binary-tampered")
+            with self.assertRaises(protocol.RunFailure):
+                protocol._recheck(
+                    endpoint,
+                    [probe_spec],
+                    manifest_path,
+                    manifest_identity,
+                    "after_binary_mutation",
+                )
+
     def test_manifest_rejects_nonfinite_numeric_limits_and_wrong_lock_path(self):
         source = MANIFEST.read_text(encoding="utf-8")
         with tempfile.TemporaryDirectory(prefix="ppt-lazy-invalid-manifest-") as temporary:
@@ -150,18 +250,24 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
             "patch_before_exact": None,
             "patch_after_exact": None,
             "entry": "drop",
+            "fixture": {"key": "default", "output": fixture},
         }
         with self.assertRaises(protocol.RunFailure):
             protocol._validate_route_proof(
                 dict(proof, output={"bytes": 2, "sha256": "0" * 64}),
                 "primary_entry_drop",
                 fixture,
+                "default",
                 "wrong-workload",
             )
+        fixtures = {
+            key: {"generator": protocol.FIXTURE_GENERATOR, "output": fixture}
+            for key in protocol.FIXTURE_KEYS
+        }
         report = {
             "schema": protocol.PROBE_SCHEMA,
             "mode": "verify",
-            "fixture": {"generator": "litchi-ppt-lazy-native-fixture-v1", "output": fixture},
+            "fixtures": fixtures,
             "routes": {"primary_entry_drop": proof},
             "allocation": {"status": "unavailable", "scope": "operation_global_system_allocator"},
         }
@@ -171,7 +277,7 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
             "schema": protocol.PROBE_SCHEMA,
             "mode": "timed",
             "route": "primary_entry_drop",
-            "fixture": fixture,
+            "fixture": {"key": "default", "output": fixture},
             "postcondition": proof,
             "samples": [{
                 "elapsed_ns": 150_000_000,
@@ -200,6 +306,7 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
                 False,
                 manifest["protocol"],
                 fixture,
+                "default",
                 "normal-allocator-mismatch",
             )
 
@@ -220,6 +327,7 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
                 False,
                 manifest["protocol"],
                 {"bytes": 1, "sha256": "0" * 64},
+                "default",
                 "short",
             )
         proof = {
@@ -231,8 +339,9 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
             "patch_before_exact": None,
             "patch_after_exact": None,
             "entry": "drop",
+            "fixture": {"key": "default", "output": {"bytes": 1, "sha256": "0" * 64}},
         }
-        valid = dict(report_base, fixture={"bytes": 1, "sha256": "0" * 64}, postcondition=proof,
+        valid = dict(report_base, fixture={"key": "default", "output": {"bytes": 1, "sha256": "0" * 64}}, postcondition=proof,
                      samples=[{"elapsed_ns": 150_000_000, "iterations": 1, "allocation": allocation}])
         result = protocol._validate_timed(
             valid,
@@ -241,6 +350,7 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
             False,
             manifest["protocol"],
             {"bytes": 1, "sha256": "0" * 64},
+            "default",
             "valid",
         )
         self.assertEqual(result["samples"][0]["elapsed_ns"], 150_000_000)
@@ -265,7 +375,7 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
             "schema": protocol.PROBE_SCHEMA,
             "mode": "timed",
             "route": "primary_entry_drop",
-            "fixture": {"bytes": 1, "sha256": "0" * 64},
+            "fixture": {"key": "default", "output": {"bytes": 1, "sha256": "0" * 64}},
             "postcondition": {
                 "output": {"bytes": 1, "sha256": "0" * 64},
                 "source_exact": True,
@@ -275,6 +385,7 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
                 "patch_before_exact": None,
                 "patch_after_exact": None,
                 "entry": "drop",
+                "fixture": {"key": "default", "output": {"bytes": 1, "sha256": "0" * 64}},
             },
             "samples": [{"elapsed_ns": 150_000_000, "iterations": 1, "allocation": allocation}],
         }
@@ -286,6 +397,7 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
                 True,
                 manifest["protocol"],
                 {"bytes": 1, "sha256": "0" * 64},
+                "default",
                 "broken-allocation",
             )
 
@@ -310,7 +422,7 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
             "schema": protocol.PROBE_SCHEMA,
             "mode": "timed",
             "route": "primary_entry_drop",
-            "fixture": digest,
+            "fixture": {"key": "default", "output": digest},
             "postcondition": {
                 "output": digest,
                 "source_exact": True,
@@ -320,6 +432,7 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
                 "patch_before_exact": None,
                 "patch_after_exact": None,
                 "entry": "drop",
+                "fixture": {"key": "default", "output": digest},
             },
             "samples": [{"elapsed_ns": 150_000_000, "iterations": 1, "allocation": allocation}],
         }
@@ -330,6 +443,7 @@ class PptLazyNativeProtocolTests(unittest.TestCase):
             True,
             manifest["protocol"],
             digest,
+            "default",
             "reallocation-only",
         )
 
