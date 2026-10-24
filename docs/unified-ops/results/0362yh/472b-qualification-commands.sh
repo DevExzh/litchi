@@ -11,6 +11,8 @@ W8_BASELINE_ROOT=${W8_BASELINE_ROOT:-}
 W8_BASELINE_ARCHIVE=${W8_BASELINE_ARCHIVE:-}
 CANDIDATE_SOURCE=${CANDIDATE_SOURCE:-$ROOT}
 CARGO=${CARGO:-cargo}
+CARGO_BIN=
+RUSTC_BIN=
 TARGET=x86_64-unknown-linux-gnu
 PROFILE=release
 FINAL_COMMIT=472b6705475b073e7fe08f6e11ee17fb1e29f838
@@ -45,6 +47,23 @@ require_inputs() {
   : "${W8_PREP:?set W8_PREP to an external scratch directory}"
   : "${W8_BASELINE_ROOT:?set W8_BASELINE_ROOT to the immutable f2 workspace}"
   : "${W8_BASELINE_ARCHIVE:?set W8_BASELINE_ARCHIVE to the immutable f2 source archive}"
+}
+
+resolve_tools() {
+  CARGO_BIN=$(command -v "$CARGO" || true)
+  RUSTC_BIN=$(command -v rustc || true)
+  test -n "$CARGO_BIN" || { echo "cargo shim is not on PATH: $CARGO" >&2; return 2; }
+  test -n "$RUSTC_BIN" || { echo "rustc is not on PATH" >&2; return 2; }
+  CARGO_BIN=$(realpath -- "$CARGO_BIN")
+  RUSTC_BIN=$(realpath -- "$RUSTC_BIN")
+  test -x "$CARGO_BIN" || { echo "cargo shim is not executable: $CARGO_BIN" >&2; return 2; }
+  test -x "$RUSTC_BIN" || { echo "rustc is not executable: $RUSTC_BIN" >&2; return 2; }
+}
+
+build_commands() {
+  resolve_tools
+  BASE_BUILD_COMMAND="CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=$BASE_TARGET $CARGO_BIN build --offline --locked --target $TARGET --release -p litchi-ops --all-features --example file_w8_original_baseline_probe"
+  FINAL_BUILD_COMMAND="CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=$FINAL_TARGET $CARGO_BIN build --offline --locked --target $TARGET --release -p litchi-ops --all-features --example file_w8_qualified_probe"
 }
 
 prepare() {
@@ -82,23 +101,47 @@ prepare() {
 
 build() {
   require_inputs
+  build_commands
   (cd "$W8_BASELINE_ROOT" && \
-    CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR="$BASE_TARGET" "$CARGO" \
-      build --offline --locked -p litchi-ops --all-features \
+    CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR="$BASE_TARGET" "$CARGO_BIN" \
+      build --offline --locked --target "$TARGET" --release -p litchi-ops --all-features \
       --example file_w8_original_baseline_probe)
+  python3 "$PROVENANCE" build-receipt \
+    --source "$W8_BASELINE_ARCHIVE" --source-assembly "$BASE_ASSEMBLY" \
+    --binary "$BASE_BIN" --lock "$W8_BASELINE_ROOT/Cargo.lock" \
+    --probe "$W8_BASELINE_ROOT/$PROBE_REL" --fixture "$BASE_FIXTURE" \
+    --dependency-projection "$BASE_PROJECTION" --workspace "$W8_BASELINE_ROOT" \
+    --workspace-manifest "$W8_BASELINE_ROOT/Cargo.toml" \
+    --package-manifest "$W8_BASELINE_ROOT/crates/litchi-ops/Cargo.toml" \
+    --toolchain "$W8_BASELINE_ROOT/rust-toolchain.toml" --cargo "$CARGO_BIN" \
+    --compiler-artifact "rustc=$RUSTC_BIN" --source-commit "$BASELINE_COMMIT" \
+    --build-command "$BASE_BUILD_COMMAND" --all-features --target "$TARGET" \
+    --profile "$PROFILE" --output "$W8_PREP/build-before.json"
   (cd "$CANDIDATE_SOURCE" && \
-    CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR="$FINAL_TARGET" "$CARGO" \
-      build --offline --locked -p litchi-ops --all-features \
+    CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR="$FINAL_TARGET" "$CARGO_BIN" \
+      build --offline --locked --target "$TARGET" --release -p litchi-ops --all-features \
       --example file_w8_qualified_probe)
+  python3 "$PROVENANCE" build-receipt \
+    --source "$FINAL_OUT/472b-source.tar" --source-assembly "$FINAL_ASSEMBLY" \
+    --binary "$FINAL_BIN" --lock "$CANDIDATE_SOURCE/Cargo.lock" \
+    --probe "$CANDIDATE_SOURCE/$PROBE_REL" --fixture "$FINAL_FIXTURE" \
+    --dependency-projection "$FINAL_PROJECTION" --workspace "$CANDIDATE_SOURCE" \
+    --workspace-manifest "$CANDIDATE_SOURCE/Cargo.toml" \
+    --package-manifest "$CANDIDATE_SOURCE/crates/litchi-ops/Cargo.toml" \
+    --toolchain "$CANDIDATE_SOURCE/rust-toolchain.toml" --cargo "$CARGO_BIN" \
+    --compiler-artifact "rustc=$RUSTC_BIN" --source-commit "$FINAL_COMMIT" \
+    --build-command "$FINAL_BUILD_COMMAND" --all-features --target "$TARGET" \
+    --profile "$PROFILE" --output "$W8_PREP/build-after.json"
 }
 
 validate() {
   require_inputs
+  build_commands
+  test -s "$W8_PREP/build-before.json" || { echo "missing complete before build receipt; run build first" >&2; return 2; }
+  test -s "$W8_PREP/build-after.json" || { echo "missing complete after build receipt; run build first" >&2; return 2; }
   # The before binary compiles the generated consumer adapter.  The corrected
   # probe remains the shared workload identity in the endpoint; the source
   # assembly and adapter patch bind the compiled adapter to that workload.
-  BASE_BUILD_COMMAND="CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=$BASE_TARGET $CARGO build --offline --locked -p litchi-ops --all-features --example file_w8_original_baseline_probe"
-  FINAL_BUILD_COMMAND="CARGO_BUILD_JOBS=1 CARGO_TARGET_DIR=$FINAL_TARGET $CARGO build --offline --locked -p litchi-ops --all-features --example file_w8_qualified_probe"
   python3 -B "$VALIDATOR" \
     --source "$W8_BASELINE_ARCHIVE" --probe "$W8_BASELINE_ROOT/$PROBE_REL" \
     --lock "$W8_BASELINE_ROOT/Cargo.lock" --source-commit "$BASELINE_COMMIT" \

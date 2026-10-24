@@ -68,6 +68,12 @@ The executable, build-free-to-native handoff is
 receipts and ABBA output external, uses one offline locked build job, invokes
 the complete untimed validator and pair receipt before guarded ABBA, and
 fails closed for allocator because this probe has no allocator variant.
+Its build stage resolves and records the cargo shim and rustc artifacts, uses
+`--target x86_64-unknown-linux-gnu --release --offline --locked`, and creates
+both complete build receipts through `w8_file_provenance.py build-receipt`
+before validation.  A no-Cargo contract test exercises receipt creation and
+the command flags; the prior c796 script is retained non-executable and marked
+historical/superseded.
 
 This is a protocol/provenance record only.  It performs no Cargo build, native
 qualification, timing run, or inventory acceptance.  The `472b` source remains

@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# HISTORICAL/SUPERSEDED: this c796 recipe is retained only for provenance.
+# Use 472b-qualification-commands.sh for the current candidate; do not use or
+# relabel c796 receipts, binaries or source archives as 472b.
 # Reproducible W8 c796 qualification recipe.  All outputs, target trees,
 # binaries and receipts stay outside the repository.  This file only runs a
 # selected stage; it never chooses a source overlay or a baseline implicitly.
