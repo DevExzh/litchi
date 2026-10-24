@@ -109,6 +109,7 @@ macro_rules! source_family {
             }
         }
 
+        #[allow(dead_code, reason = "the cell family supplies its own deferred helper")]
         fn published(
             before: &crate::SourceBackedWorkbook,
             plan: litchi_cfb::ValidatedOverlayPlan,

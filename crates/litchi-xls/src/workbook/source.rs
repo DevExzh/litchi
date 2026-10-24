@@ -1352,33 +1352,6 @@ impl SourceBackedWorkbook {
         Ok(Self { inner })
     }
 
-    /// The options this workbook was opened with.
-    pub(crate) fn options(&self) -> SourceBackedOptions {
-        SourceBackedOptions::new()
-            .limits(self.inner.limits)
-            .leniency(self.inner.leniency)
-    }
-
-    /// The workbook a source-backed family commit publishes: opened under
-    /// this workbook's options over the composed source of `plan`, writing
-    /// `plan` on output. Nothing is written here.
-    pub(crate) fn committed(&self, plan: ValidatedOverlayPlan) -> Result<Self> {
-        if plan.is_noop() {
-            return Ok(self.clone());
-        }
-        let composed = plan
-            .composed_source()
-            .map_err(|error| SourceBackedError::Parse(error.into()))?;
-        let mut workbook = Self::from_read_at_with_options(Arc::new(composed), self.options())?;
-        let inner = Arc::get_mut(&mut workbook.inner).ok_or(SourceBackedError::Parse(
-            Error::Internal("a freshly opened source-backed workbook is already shared"),
-        ))?;
-        inner.pending = Some(Arc::new(plan));
-        inner.source_fence = self.inner.handoff_source_fence();
-        inner.deferred = false;
-        Ok(workbook)
-    }
-
     /// Publishes a fixed-width cell overlay without opening the composed
     /// workbook until a semantic read needs it. The numeric cell publisher
     /// has already validated the target over a positional reader, so retaining
