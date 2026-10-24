@@ -195,6 +195,7 @@ pub struct Edit<'a> {
     target: Option<table_lock::BodyTableTarget>,
     before: Option<Name>,
     name: Option<Name>,
+    budget: Option<table_lock::WireBudget>,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -210,8 +211,11 @@ impl fmt::Debug for Edit<'_> {
 impl Edit<'_> {
     fn resolve(&mut self) -> Result<(), Error> {
         if self.target.is_none() {
-            let mut budget = table_lock::WireBudget::new(self.source.state.source.limits())
-                .map_err(map_lock_error)?;
+            let mut budget = match self.budget.take() {
+                Some(budget) => budget,
+                None => table_lock::WireBudget::new(self.source.state.source.limits())
+                    .map_err(map_lock_error)?,
+            };
             let target = resolve_target_owned(self.source, &self.selector, &mut budget)?;
             let before = resolved_name_at_target_with_budget(self.source, &target, &mut budget)?;
             if self.name.is_none() {
@@ -219,6 +223,7 @@ impl Edit<'_> {
             }
             self.before = Some(before);
             self.target = Some(target);
+            self.budget = Some(budget);
         }
         Ok(())
     }
@@ -462,11 +467,12 @@ impl Package {
     ) -> Result<Edit<'_>, Error> {
         Ok(Edit {
             source: self,
-            selector: table_lock::OwnedBodyTableSelector::try_from(selector.into())
+            selector: table_lock::OwnedBodyTableSelector::try_from(self, selector.into())
                 .map_err(map_lock_error)?,
             target: None,
             before: None,
             name: None,
+            budget: None,
         })
     }
 
@@ -527,8 +533,7 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let target = edit.target.ok_or(Error::InvalidSource)?;
     let before = edit.before.ok_or(Error::InvalidSource)?;
     let name = edit.name.ok_or(Error::InvalidSource)?;
-    let mut budget =
-        table_lock::WireBudget::new(source.state.source.limits()).map_err(map_lock_error)?;
+    let mut budget = edit.budget.ok_or(Error::InvalidSource)?;
     charge_fingerprint(source.source_bytes(), &mut budget)?;
     let source_preview_count = preview_count_with_budget(source, &mut budget)?;
     let source_bytes: Arc<[u8]> = source.state.source.shared_source();

@@ -466,6 +466,11 @@ impl Edit<'_> {
             let records = discover_slots_with_budget(self.source, &mut budget)?;
             let selected = select_record(&records, canonical, &mut budget)?;
             if self.before.is_none() {
+                budget.charge(LimitKind::Allocations, 2)?;
+                budget.charge(
+                    LimitKind::RetainedBytes,
+                    selected.text.len().saturating_mul(2),
+                )?;
                 self.before = Some(selected.text.clone());
                 self.after = selected.text.clone();
             }
@@ -724,10 +729,16 @@ impl fmt::Debug for DeferredSelector {
 }
 
 impl DeferredSelector {
-    fn try_from_public(selector: HeaderFooterSelector<'_>) -> Result<Self, Error> {
+    fn try_from_public(
+        source: &Package,
+        selector: HeaderFooterSelector<'_>,
+    ) -> Result<Self, Error> {
         let (section_position, section_name) = match selector.section() {
             SectionSelector::Position(position) => (Some(position), None),
             SectionSelector::Name(name) => {
+                let mut budget = TransactionBudget::new(source)?;
+                budget.charge(LimitKind::TextBytes, name.len())?;
+                budget.charge(LimitKind::RetainedBytes, name.len())?;
                 let mut owned = String::new();
                 owned
                     .try_reserve_exact(name.len())
@@ -939,7 +950,7 @@ impl Package {
     ) -> Result<Edit<'_>, Error> {
         Ok(Edit {
             source: self,
-            selector: DeferredSelector::try_from_public(selector)?,
+            selector: DeferredSelector::try_from_public(self, selector)?,
             resolved: None,
             before: None,
             after: String::new(),

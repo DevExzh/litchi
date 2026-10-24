@@ -133,8 +133,14 @@ fn exercise_package(package: &Package, data: &[u8]) {
     };
     black_box(&notes);
 
-    let missing = package.edit_body_footnote(Selector::index(notes.len()));
-    if let Err(error) = missing {
+    let mut missing = match package.edit_body_footnote(Selector::index(notes.len())) {
+        Ok(edit) => edit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    if let Err(error) = missing.before() {
         assert!(matches!(
             error,
             BodyFootnoteError::Refused(
@@ -143,7 +149,14 @@ fn exercise_package(package: &Package, data: &[u8]) {
         ));
         observe_error(error);
     }
-    if let Err(error) = package.edit_body_footnote(Selector::Anchor(Position::ZERO)) {
+    let mut missing_anchor = match package.edit_body_footnote(Selector::Anchor(Position::ZERO)) {
+        Ok(edit) => edit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    if let Err(error) = missing_anchor.before() {
         if !notes.iter().any(|note| note.position == Position::ZERO) {
             assert!(matches!(
                 error,
@@ -198,7 +211,12 @@ fn exercise_insert(package: &Package, data: &[u8], source_before: &[u8]) {
         .package()
         .edit_body_footnote(Selector::Anchor(position))
         .unwrap_or_else(|error| panic!("inserted footnote must be selectable: {error}"));
-    assert_eq!(remove.before(), &expected);
+    assert_eq!(
+        remove
+            .before()
+            .unwrap_or_else(|error| panic!("inserted footnote read failed: {error}")),
+        &expected
+    );
     remove.clear();
     let removed = remove
         .commit()
@@ -333,7 +351,10 @@ fn exercise_existing_remove(
             return;
         },
     };
-    let before = edit.before().clone();
+    let before = edit
+        .before()
+        .unwrap_or_else(|error| panic!("existing footnote read failed: {error}"))
+        .clone();
     edit.clear();
     let removed = match edit.commit() {
         Ok(commit) => commit,
@@ -382,7 +403,14 @@ fn exercise_authored_rejections(package: &Package, source_before: &[u8]) {
     }
     assert_eq!(package_bytes(package), source_before);
 
-    if let Err(error) = package.edit_body_footnote(Selector::index(usize::MAX)) {
+    let mut missing = match package.edit_body_footnote(Selector::index(usize::MAX)) {
+        Ok(edit) => edit,
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    };
+    if let Err(error) = missing.before() {
         observe_error(error);
     }
 }

@@ -285,7 +285,7 @@ impl Package {
     {
         Ok(Edit {
             source: self,
-            selector: table_lock::OwnedBodyTableSelector::try_from(selector.into())
+            selector: table_lock::OwnedBodyTableSelector::try_from(self, selector.into())
                 .map_err(map_lock_error)?,
             target: None,
             regions: Vec::new(),

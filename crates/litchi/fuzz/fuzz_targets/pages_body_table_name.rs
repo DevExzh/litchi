@@ -271,9 +271,33 @@ fn exercise_package_with_source(
             return;
         },
     };
-    black_box(edit.path());
-    assert_eq!(edit.before().as_str(), before.as_str());
-    assert_eq!(edit.name().as_str(), before.as_str());
+    let path = match edit.path() {
+        Ok(path) => path,
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source_before);
+            return;
+        },
+    };
+    black_box(path);
+    let source_name = match edit.before() {
+        Ok(name) => name.as_str(),
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source_before);
+            return;
+        },
+    };
+    assert_eq!(source_name, before.as_str());
+    let staged_name = match edit.name() {
+        Ok(name) => name.as_str(),
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source_before);
+            return;
+        },
+    };
+    assert_eq!(staged_name, before.as_str());
 
     // Exercise both the typed Name setter and the validated string setter.
     // A no-op command preserves the exact source; all other commands use a
@@ -293,8 +317,16 @@ fn exercise_package_with_source(
             },
         };
     }
+    let staged_name = match edit.name() {
+        Ok(name) => name.as_str(),
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source_before);
+            return;
+        },
+    };
     assert_eq!(
-        edit.name().as_str(),
+        staged_name,
         if control(data, 0) & 3 == 0 {
             before.as_str()
         } else {

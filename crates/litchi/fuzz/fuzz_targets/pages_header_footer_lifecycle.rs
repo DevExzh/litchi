@@ -117,7 +117,14 @@ fn exercise_package(package: &Package, data: &[u8]) {
         assert_source_unchanged(package, &source);
         return;
     }
-    let expected = edit.text().to_owned();
+    let expected = match edit.text() {
+        Ok(text) => text.to_owned(),
+        Err(error) => {
+            observe_error(error);
+            assert_source_unchanged(package, &source);
+            return;
+        },
+    };
     let commit = match edit.commit() {
         Ok(commit) => commit,
         Err(error) => {
@@ -205,7 +212,7 @@ fn replace_middle(
     edit: &mut litchi::pages::header_footer::text::Edit<'_>,
     replacement: &str,
 ) -> Result<(), HeaderFooterTextError> {
-    let units = edit.text().encode_utf16().count();
+    let units = edit.text()?.encode_utf16().count();
     let end = units.min(usize::from(
         replacement.as_bytes().first().copied().unwrap_or(0),
     ));

@@ -206,9 +206,14 @@ pub(crate) enum OwnedBodyTableSelector {
 }
 
 impl OwnedBodyTableSelector {
-    pub(crate) fn try_from(selector: BodyTableSelector<'_>) -> Result<Self, Error> {
+    pub(crate) fn try_from(
+        package: &Package,
+        selector: BodyTableSelector<'_>,
+    ) -> Result<Self, Error> {
         match selector {
             BodyTableSelector::Name(name) => {
+                let mut budget = WireBudget::new(package.state.source.limits())?;
+                budget.admit_selector_name(name.len())?;
                 let mut owned = String::new();
                 owned
                     .try_reserve_exact(name.len())
@@ -2770,6 +2775,16 @@ impl WireBudget {
             self.physical_limits.max_input_bytes(),
             LimitKind::InputBytes,
         )
+    }
+
+    /// Admit a caller-owned selector name before retaining its bytes.
+    ///
+    /// This is intentionally limited to scalar byte ceilings.  Rooted table
+    /// discovery remains deferred until the edit is first used.
+    pub(crate) fn admit_selector_name(&mut self, amount: usize) -> Result<(), Error> {
+        self.charge_input_bytes(amount)?;
+        self.charge_payload_bytes(amount)?;
+        self.charge_total_payload_bytes(amount)
     }
 
     pub(crate) fn charge_output_bytes(&mut self, amount: usize) -> Result<(), Error> {

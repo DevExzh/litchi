@@ -514,10 +514,14 @@ impl From<Refusal> for Error {
 pub struct Edit<'a> {
     source: &'a Package,
     selector: Selector,
-    position: Option<Position>,
-    before: Option<Footnote>,
-    after: Option<Footnote>,
+    resolved: std::sync::OnceLock<ResolvedSource>,
+    after: Option<Arc<Footnote>>,
     staged: bool,
+}
+
+struct ResolvedSource {
+    position: Position,
+    before: Arc<Footnote>,
 }
 
 /// Immutable semantic body-footnote values projected from one Pages package.
@@ -602,27 +606,38 @@ impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("position", &self.position)
+            .field(
+                "resolved",
+                &self.resolved.get().map(|source| source.position),
+            )
             .finish_non_exhaustive()
     }
 }
 
 impl<'a> Edit<'a> {
+    fn resolve_source(&self) -> Result<ResolvedSource, Error> {
+        let snapshot = self
+            .source
+            .body_footnote_snapshot()
+            .map_err(|_| Error::InvalidSource)?;
+        let before = snapshot
+            .select(self.selector)
+            .ok_or(Error::Refused(Refusal::NotFound))?;
+        Ok(ResolvedSource {
+            position: before.position,
+            before: Arc::new(before.clone()),
+        })
+    }
+
     fn resolve(&mut self) -> Result<(), Error> {
-        if self.position.is_none() {
-            let snapshot = self
-                .source
-                .body_footnote_snapshot()
+        if self.resolved.get().is_none() {
+            self.resolved
+                .set(self.resolve_source()?)
                 .map_err(|_| Error::InvalidSource)?;
-            let before = snapshot
-                .select(self.selector)
-                .ok_or(Error::Refused(Refusal::NotFound))?
-                .clone();
-            self.position = Some(before.position);
-            self.before = Some(before.clone());
-            if !self.staged {
-                self.after = Some(before);
-            }
+        }
+        if !self.staged && self.after.is_none() {
+            let resolved = self.resolved.get().ok_or(Error::InvalidSource)?;
+            self.after = Some(Arc::clone(&resolved.before));
         }
         Ok(())
     }
@@ -631,8 +646,7 @@ impl<'a> Edit<'a> {
         Ok(Self {
             source,
             selector,
-            position: None,
-            before: None,
+            resolved: std::sync::OnceLock::new(),
             after: None,
             staged: false,
         })
@@ -641,19 +655,25 @@ impl<'a> Edit<'a> {
     /// Return the checked UTF-16 anchor position, resolving on first access.
     pub fn position(&mut self) -> Result<Position, Error> {
         self.resolve()?;
-        self.position.ok_or(Error::InvalidSource)
+        self.resolved
+            .get()
+            .map(|resolved| resolved.position)
+            .ok_or(Error::InvalidSource)
     }
 
     /// Borrow the original semantic footnote.
     pub fn before(&mut self) -> Result<&Footnote, Error> {
         self.resolve()?;
-        self.before.as_ref().ok_or(Error::InvalidSource)
+        self.resolved
+            .get()
+            .map(|resolved| resolved.before.as_ref())
+            .ok_or(Error::InvalidSource)
     }
 
     /// Borrow the staged semantic result. `None` represents graph removal.
     pub fn after(&mut self) -> Result<Option<&Footnote>, Error> {
         self.resolve()?;
-        Ok(self.after.as_ref())
+        Ok(self.after.as_deref())
     }
 
     /// Stage replacement of the selected footnote text.
@@ -663,7 +683,7 @@ impl<'a> Edit<'a> {
         let Some(after) = self.after.as_mut() else {
             return Err(Error::Refused(Refusal::UnsupportedDependency));
         };
-        after.text = try_boxed(text)?;
+        Arc::make_mut(after).text = try_boxed(text)?;
         self.staged = true;
         Ok(self)
     }
@@ -681,14 +701,13 @@ impl<'a> Edit<'a> {
         let Some(after) = self.after.as_mut() else {
             return Err(Error::Refused(Refusal::UnsupportedDependency));
         };
-        after.custom_mark = custom_mark.map(try_boxed).transpose()?;
+        Arc::make_mut(after).custom_mark = custom_mark.map(try_boxed).transpose()?;
         self.staged = true;
         Ok(self)
     }
 
     /// Stage complete removal of the selected body-footnote graph.
     pub fn clear(&mut self) -> &mut Self {
-        let _ = self.resolve();
         self.after = None;
         self.staged = true;
         self
@@ -696,60 +715,78 @@ impl<'a> Edit<'a> {
 
     /// Validate and atomically publish the staged lifecycle change.
     pub fn commit(&self) -> Result<Commit, Error> {
-        let mut resolved = Self {
-            source: self.source,
-            selector: self.selector,
-            position: self.position,
-            before: self.before.clone(),
-            after: self.after.clone(),
-            staged: self.staged,
-        };
-        resolved.resolve()?;
-        let position = resolved.position.ok_or(Error::InvalidSource)?;
-        let before = resolved.before.ok_or(Error::InvalidSource)?;
-        let after = resolved.after;
-        self.source.validate().map_err(map_package_error)?;
-        let current = current_footnote(self.source, position)?;
-        if current != before {
-            return Err(Error::PatchConflict);
-        }
-        let Some(after) = after.as_ref() else {
-            return publish_rewrite(self.source, position, None, Some(&before));
-        };
-        if *after == before {
-            return noop_commit(self.source, position, Some(&before));
-        }
-        let mut text_edit = self
-            .source
-            .edit_body_footnote_text(Selector::Anchor(position))
-            .map_err(map_text_error)?;
-        text_edit.set(&after.text).map_err(map_text_error)?;
-        text_edit
-            .set_custom_mark(after.custom_mark.as_deref())
-            .map_err(map_text_error)?;
-        let text_commit = text_edit.commit().map_err(map_text_error)?;
-        let source_bytes: Arc<[u8]> = self.source.state.source.shared_source();
-        let target_bytes = text_commit.package().state.source.shared_source();
-        let source_fingerprint = super::section_transaction::fingerprint(&source_bytes);
-        let target_fingerprint = super::section_transaction::fingerprint(&target_bytes);
-        let target_sequence = footnote_sequence(text_commit.package())?;
-        let package = text_commit.into_package();
-        Ok(Commit {
-            package,
-            patch: Patch {
-                source_bytes,
-                target_bytes,
-                source_sequence: footnote_sequence(self.source)?,
-                target_sequence,
-                source_fingerprint,
-                target_fingerprint,
-                position,
-                before: Some(before.clone()),
-                after: Some(after.clone()),
+        let resolved = match self.resolved.get() {
+            Some(resolved) => resolved,
+            None => {
+                let resolved = self.resolve_source()?;
+                return commit_resolved(
+                    self.source,
+                    &resolved,
+                    if self.staged {
+                        self.after.as_ref()
+                    } else {
+                        Some(&resolved.before)
+                    },
+                );
             },
-            diagnostics: Diagnostics::published(1),
-        })
+        };
+        let after = if self.staged {
+            self.after.as_ref()
+        } else {
+            Some(&resolved.before)
+        };
+        commit_resolved(self.source, resolved, after)
     }
+}
+
+fn commit_resolved(
+    source: &Package,
+    resolved: &ResolvedSource,
+    after: Option<&Arc<Footnote>>,
+) -> Result<Commit, Error> {
+    let position = resolved.position;
+    let before = resolved.before.as_ref();
+    source.validate().map_err(map_package_error)?;
+    let current = current_footnote(source, position)?;
+    if &current != before {
+        return Err(Error::PatchConflict);
+    }
+    let Some(after) = after else {
+        return publish_rewrite(source, position, None, Some(&resolved.before));
+    };
+    let after = after.as_ref();
+    if after == before {
+        return noop_commit(source, position, Some(&resolved.before));
+    }
+    let mut text_edit = source
+        .edit_body_footnote_text(Selector::Anchor(position))
+        .map_err(map_text_error)?;
+    text_edit.set(&after.text).map_err(map_text_error)?;
+    text_edit
+        .set_custom_mark(after.custom_mark.as_deref())
+        .map_err(map_text_error)?;
+    let text_commit = text_edit.commit().map_err(map_text_error)?;
+    let source_bytes: Arc<[u8]> = source.state.source.shared_source();
+    let target_bytes = text_commit.package().state.source.shared_source();
+    let source_fingerprint = super::section_transaction::fingerprint(&source_bytes);
+    let target_fingerprint = super::section_transaction::fingerprint(&target_bytes);
+    let target_sequence = footnote_sequence(text_commit.package())?;
+    let package = text_commit.into_package();
+    Ok(Commit {
+        package,
+        patch: Patch {
+            source_bytes,
+            target_bytes,
+            source_sequence: footnote_sequence(source)?,
+            target_sequence,
+            source_fingerprint,
+            target_fingerprint,
+            position,
+            before: Some(Arc::clone(&resolved.before)),
+            after: Some(Arc::clone(after)),
+        },
+        diagnostics: Diagnostics::published(1),
+    })
 }
 
 /// An exact-source-checked reversible body-footnote lifecycle patch.
@@ -762,8 +799,8 @@ pub struct Patch {
     pub(super) source_fingerprint: u64,
     pub(super) target_fingerprint: u64,
     position: Position,
-    before: Option<Footnote>,
-    after: Option<Footnote>,
+    before: Option<Arc<Footnote>>,
+    after: Option<Arc<Footnote>>,
 }
 
 impl fmt::Debug for Patch {
@@ -784,14 +821,14 @@ impl Patch {
 
     /// Borrow the optional semantic source value.
     #[must_use]
-    pub const fn before(&self) -> Option<&Footnote> {
-        self.before.as_ref()
+    pub fn before(&self) -> Option<&Footnote> {
+        self.before.as_deref()
     }
 
     /// Borrow the optional semantic target value.
     #[must_use]
-    pub const fn after(&self) -> Option<&Footnote> {
-        self.after.as_ref()
+    pub fn after(&self) -> Option<&Footnote> {
+        self.after.as_deref()
     }
 
     /// Return the compact source fingerprint used for diagnostics.
@@ -825,8 +862,8 @@ impl Patch {
             source_fingerprint: self.target_fingerprint,
             target_fingerprint: self.source_fingerprint,
             position: self.position,
-            before: self.after.clone(),
-            after: self.before.clone(),
+            before: self.after.as_ref().map(Arc::clone),
+            after: self.before.as_ref().map(Arc::clone),
         }
     }
 }
@@ -1072,7 +1109,7 @@ fn footnote_sequence(package: &Package) -> Result<Arc<[Footnote]>, Error> {
 fn noop_commit(
     package: &Package,
     position: Position,
-    value: Option<&Footnote>,
+    value: Option<&Arc<Footnote>>,
 ) -> Result<Commit, Error> {
     let source: Arc<[u8]> = package.state.source.shared_source();
     let fingerprint = super::section_transaction::fingerprint(&source);
@@ -1086,8 +1123,8 @@ fn noop_commit(
             source_fingerprint: fingerprint,
             target_fingerprint: fingerprint,
             position,
-            before: value.cloned(),
-            after: value.cloned(),
+            before: value.map(Arc::clone),
+            after: value.map(Arc::clone),
         },
         diagnostics: Diagnostics::unchanged(),
     })
@@ -1096,8 +1133,8 @@ fn noop_commit(
 fn publish_rewrite(
     source: &Package,
     position: Position,
-    after: Option<&Footnote>,
-    before: Option<&Footnote>,
+    after: Option<&Arc<Footnote>>,
+    before: Option<&Arc<Footnote>>,
 ) -> Result<Commit, Error> {
     let target = rewrite_remove(source, position)?;
     let source_bytes: Arc<[u8]> = source.state.source.shared_source();
@@ -1113,8 +1150,8 @@ fn publish_rewrite(
             source_sequence: footnote_sequence(source)?,
             target_sequence,
             position,
-            before: before.cloned(),
-            after: after.cloned(),
+            before: before.map(Arc::clone),
+            after: after.map(Arc::clone),
         },
         diagnostics: Diagnostics::published(1),
     })
@@ -2239,7 +2276,7 @@ fn insert_lifecycle(
             target_sequence,
             position,
             before: None,
-            after: Some(expected),
+            after: Some(Arc::new(expected)),
         },
         diagnostics: Diagnostics::published(1),
     })

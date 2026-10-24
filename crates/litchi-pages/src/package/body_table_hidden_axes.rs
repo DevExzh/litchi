@@ -325,10 +325,11 @@ impl Edit<'_> {
             };
             let graph = resolve_graph(self.source, selector, &mut budget)?;
             if self.before.is_none() {
-                self.before = Some(graph.before.clone());
+                let before = graph.before;
                 if !self.staged {
-                    self.axes = graph.before.clone();
+                    self.axes = before.clone();
                 }
+                self.before = Some(before);
             }
             self.target = Some(graph.target);
         }
@@ -705,7 +706,7 @@ impl Package {
     ) -> Result<Edit<'_>, Error> {
         Ok(Edit {
             source: self,
-            selector: table_lock::OwnedBodyTableSelector::try_from(selector.into())
+            selector: table_lock::OwnedBodyTableSelector::try_from(self, selector.into())
                 .map_err(map_lock_error)?,
             target: None,
             before: None,

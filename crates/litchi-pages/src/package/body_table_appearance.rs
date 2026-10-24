@@ -456,7 +456,7 @@ impl Package {
     ) -> Result<Edit<'_>, Error> {
         Ok(Edit {
             source: self,
-            selector: table_lock::OwnedBodyTableSelector::try_from(selector.into())
+            selector: table_lock::OwnedBodyTableSelector::try_from(self, selector.into())
                 .map_err(|error| map_lock_error(error, Path::Package))?,
             before: None,
             appearance: None,
