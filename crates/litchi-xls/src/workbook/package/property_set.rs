@@ -700,8 +700,7 @@ mod tests {
     #[test]
     fn signed_sources_allow_exact_noops_but_refuse_changes() {
         let source = package_bytes(Some("DigitalSignature"));
-        let mut transaction =
-            Edit::detached(Snapshot::from_bytes(source.clone()).unwrap()).unwrap();
+        let transaction = Edit::detached(Snapshot::from_bytes(source.clone()).unwrap()).unwrap();
         let (patch, changed) = transaction.finish().unwrap();
         assert!(!changed);
         assert_eq!(patch.before(), source.as_slice());
