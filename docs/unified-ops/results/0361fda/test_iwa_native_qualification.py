@@ -26,7 +26,9 @@ RUNNER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RUNNER)
 
 
-def _fake_probe(path: Path, *, owner: bool, valid: bool = True) -> None:
+def _fake_probe(
+    path: Path, *, owner: bool, valid: bool = True, allocation: bool = False
+) -> None:
     source = "a" * 64
     output = "b" * 64
     if owner:
@@ -57,6 +59,15 @@ def _fake_probe(path: Path, *, owner: bool, valid: bool = True) -> None:
             "output_differs": True,
             "correctness": correctness,
         }
+        if allocation:
+            body.update(
+                {
+                    "peak": 8,
+                    "retained": 4,
+                    "allocated": 16,
+                    "allocations": 2,
+                }
+            )
     else:
         body = {
             "schema": "litchi.iwa.constructor.probe.v3",
@@ -724,6 +735,57 @@ class NativeQualificationTests(unittest.TestCase):
         with self.assertRaises(RUNNER.QualificationError):
             RUNNER._strict_probe_value(value, "owner", "numbers_headers", 3)
 
+    def test_allocation_probe_requires_typed_metrics(self) -> None:
+        value = {
+            "schema": "litchi.iwa.owner.probe.v2",
+            "route": "numbers_headers",
+            "iterations": 3,
+            "ns": 10,
+            "checksum": 1,
+            "output_bytes": 12,
+            "source_sha256": "a" * 64,
+            "output_sha256": "b" * 64,
+            "output_differs": True,
+            "correctness": {
+                "status": "ok",
+                "replay_matches_changed": True,
+                "inverse_matches_source": True,
+                "noop_is_noop": True,
+                "noop_matches_expected": True,
+                "semantic_ok": True,
+                "changed_sha256": "b" * 64,
+                "replay_sha256": "b" * 64,
+                "inverse_sha256": "a" * 64,
+                "noop_sha256": "a" * 64,
+                "source_bytes": 12,
+                "changed_bytes": 12,
+                "noop_bytes": 12,
+            },
+        }
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER._strict_probe_value(
+                value, "owner", "numbers_headers", 3, require_allocations=True
+            )
+        value.update({"peak": 8, "retained": 4, "allocated": 16, "allocations": 2})
+        self.assertIs(
+            RUNNER._strict_probe_value(
+                value, "owner", "numbers_headers", 3, require_allocations=True
+            ),
+            value,
+        )
+
+    def test_allocation_abba_requires_pairwise_metric_identity(self) -> None:
+        values = [
+            {"checksum": 1, "output_sha256": "b", "source_sha256": "a", **dict.fromkeys(RUNNER.ALLOCATION_METRICS, 4)},
+            {"checksum": 1, "output_sha256": "b", "source_sha256": "a", **dict.fromkeys(RUNNER.ALLOCATION_METRICS, 5)},
+            {"checksum": 1, "output_sha256": "b", "source_sha256": "a", **dict.fromkeys(RUNNER.ALLOCATION_METRICS, 5)},
+            {"checksum": 1, "output_sha256": "b", "source_sha256": "a", **dict.fromkeys(RUNNER.ALLOCATION_METRICS, 4)},
+        ]
+        RUNNER._allocation_abba_equal(values)
+        values[3]["peak"] = 9
+        with self.assertRaises(RUNNER.QualificationError):
+            RUNNER._allocation_abba_equal(values)
+
     def test_invoke_records_receipt_and_rejects_wrong_identity(self) -> None:
         binary = self.directory / "probe.py"
         _fake_probe(binary, owner=False)
@@ -744,6 +806,25 @@ class NativeQualificationTests(unittest.TestCase):
         receipt = RUNNER.load_json(self.directory / "field_path.receipt.json")
         self.assertEqual(receipt["exit_code"], 0)
         self.assertEqual(receipt["binary"], expected)
+
+    def test_invoke_allocation_requires_metrics(self) -> None:
+        binary = self.directory / "probe.py"
+        _fake_probe(binary, owner=True, allocation=True)
+        expected = RUNNER.artifact(binary)
+        with mock.patch.object(RUNNER, "host_snapshot"):
+            value = RUNNER.invoke(
+                self.directory,
+                "owner",
+                "numbers_headers-allocation",
+                binary,
+                "numbers_headers",
+                1,
+                min(RUNNER.os.sched_getaffinity(0)),
+                self.directory,
+                expected,
+                allocation=True,
+            )
+        self.assertEqual(value["allocations"], 2)
 
     def test_invoke_fails_closed_on_owner_correctness(self) -> None:
         binary = self.directory / "probe.py"

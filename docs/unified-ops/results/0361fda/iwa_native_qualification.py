@@ -17,8 +17,10 @@ Examples (all generated files are external to the checkout)::
       constructor /outside/0361fda
   python3 docs/unified-ops/results/0361fda/iwa_native_qualification.py run \
       constructor /outside/0361fda --cpu 29
+  python3 docs/unified-ops/results/0361fda/iwa_native_qualification.py allocation \
+      constructor /outside/0361fda --cpu 29 --attempt allocation-a1
 
-The owner build and run take ``--fixtures``.  The fixture directory is an
+The owner build, allocation, and run take ``--fixtures``.  The fixture directory is an
 external copy of the tracked test-data fixtures; this harness never reaches
 into an untracked third-party checkout.
 """
@@ -80,6 +82,9 @@ ROUTES = {
     ),
 }
 START_COUNTS = {"constructor": 1_000, "owner": 10}
+ALLOCATION_ITERATIONS = 100
+ALLOCATION_ORDER = "ABBA"
+ALLOCATION_METRICS = ("peak", "retained", "allocated", "allocations")
 TARGET_NS = 500_000_000
 MINIMUM_NS = 150_000_000
 MAX_ITERATIONS = 1_000_000_000
@@ -1690,7 +1695,7 @@ def collect(args: argparse.Namespace) -> None:
             or run_manifest.get("family") != family
             or run_manifest.get("status") != "complete"
         ):
-            raise QualificationError("native attempt is not a complete matching run")
+            raise QualificationError("attempt is not a complete matching run")
         if run_manifest.get("build") != artifact(output / "build.json"):
             raise QualificationError("native attempt does not match the build manifest")
         if run_manifest.get("validation") != artifact(output / "validation.json"):
@@ -1701,7 +1706,46 @@ def collect(args: argparse.Namespace) -> None:
         for label in ("base", "candidate"):
             if run_manifest.get("sources", {}).get(label) != build["endpoints"][label]["source"]:
                 raise QualificationError(f"native attempt source identity changed: {label}")
-        run_value = {"manifest": artifact(attempt / "manifest.json"), "qualified": run_manifest.get("qualified")}
+        phase = run_manifest.get("phase", "native")
+        if phase not in ("native", "allocation"):
+            raise QualificationError(f"unknown qualification attempt phase: {phase}")
+        if phase == "allocation":
+            protocol = run_manifest.get("protocol")
+            if (
+                not isinstance(protocol, Mapping)
+                or protocol.get("iterations") != ALLOCATION_ITERATIONS
+                or protocol.get("order") != ALLOCATION_ORDER
+                or protocol.get("routes") != list(ROUTES[family])
+                or protocol.get("timeout_s") != FIXED_TIMEOUT_S
+            ):
+                raise QualificationError("allocation attempt does not retain the fixed protocol")
+            cases = run_manifest.get("cases")
+            if not isinstance(cases, list) or len(cases) != len(ROUTES[family]):
+                raise QualificationError("allocation attempt does not cover every route")
+            for route, case in zip(ROUTES[family], cases):
+                if (
+                    not isinstance(case, Mapping)
+                    or case.get("route") != route
+                    or case.get("iterations") != ALLOCATION_ITERATIONS
+                    or case.get("order") != ALLOCATION_ORDER
+                ):
+                    raise QualificationError("allocation attempt route schedule is malformed")
+                legs = case.get("legs")
+                if not isinstance(legs, list) or len(legs) != len(ALLOCATION_ORDER):
+                    raise QualificationError("allocation attempt is missing an ABBA leg")
+                values = [leg.get("value") for leg in legs if isinstance(leg, Mapping)]
+                if len(values) != len(ALLOCATION_ORDER):
+                    raise QualificationError("allocation attempt contains a malformed ABBA leg")
+                _allocation_abba_equal(values)
+                for value in values:
+                    _verify_allocation_receipt(value)
+            if run_manifest.get("qualified") is not True:
+                raise QualificationError("allocation attempt is not qualified")
+        run_value = {
+            "manifest": artifact(attempt / "manifest.json"),
+            "phase": phase,
+            "qualified": run_manifest.get("qualified"),
+        }
     result = {
         "schema": SCHEMA,
         "family": family,
@@ -1795,7 +1839,14 @@ def host_snapshot(output: Path, label: str, child: int | None = None) -> None:
         raise QualificationError(f"host overlap at {label}; timing is unqualified")
 
 
-def _strict_probe_value(value: Any, family: str, route: str, count: int) -> dict[str, Any]:
+def _strict_probe_value(
+    value: Any,
+    family: str,
+    route: str,
+    count: int,
+    *,
+    require_allocations: bool = False,
+) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise QualificationError("probe did not emit one JSON object")
     expected_schema = f"litchi.iwa.{family}.probe.v2" if family == "owner" else "litchi.iwa.constructor.probe.v3"
@@ -1840,6 +1891,15 @@ def _strict_probe_value(value: Any, family: str, route: str, count: int) -> dict
     else:
         if correctness.get("roundtrip") is not True or value.get("output_matches_source") is not True:
             raise QualificationError("constructor probe did not prove exact roundtrip")
+    if require_allocations:
+        for key in ALLOCATION_METRICS:
+            metric = value.get(key)
+            if type(metric) is not int or metric < 0:
+                raise QualificationError(f"probe has an invalid allocation metric {key}")
+        if value["peak"] < value["retained"]:
+            raise QualificationError("probe allocation peak is below retained bytes")
+        if family == "owner" and (value["allocated"] <= 0 or value["allocations"] <= 0):
+            raise QualificationError("owner allocation probe did not instrument the edit")
     return value
 
 
@@ -1884,6 +1944,8 @@ def invoke(
     fixtures: Path | None,
     expected_binary: Mapping[str, Any],
     timeout_s: float = FIXED_TIMEOUT_S,
+    *,
+    allocation: bool = False,
 ) -> dict[str, Any]:
     if not math.isfinite(timeout_s) or timeout_s <= 0:
         raise QualificationError("timed child timeout must be finite and positive")
@@ -1963,7 +2025,7 @@ def invoke(
         value = load_json(stdout)
     except QualificationError as error:
         raise QualificationError(f"probe stdout is not strict JSON for {label}") from error
-    value = _strict_probe_value(value, family, route, count)
+    value = _strict_probe_value(value, family, route, count, require_allocations=allocation)
     value["_receipt"] = {
         "receipt": artifact(receipt_path),
         "binary": receipt["binary"],
@@ -1982,6 +2044,24 @@ def _ratios_equal(values: list[dict[str, Any]]) -> None:
     sources = {value["source_sha256"] for value in values}
     if len(checksums) != 1 or len(outputs) != 1 or len(sources) != 1:
         raise QualificationError("ABBA semantic or output identities disagree")
+
+
+def _allocation_abba_equal(values: list[dict[str, Any]]) -> None:
+    if len(values) != len(ALLOCATION_ORDER):
+        raise QualificationError("allocation packet does not contain one ABBA value per leg")
+    for value in values:
+        if not isinstance(value, Mapping):
+            raise QualificationError("allocation packet contains a malformed probe value")
+        for key in ALLOCATION_METRICS:
+            metric = value.get(key)
+            if type(metric) is not int or metric < 0:
+                raise QualificationError(f"allocation packet has an invalid metric {key}")
+        if value["peak"] < value["retained"]:
+            raise QualificationError("allocation packet peak is below retained bytes")
+    _ratios_equal(values)
+    for key in ALLOCATION_METRICS:
+        if values[0][key] != values[3][key] or values[1][key] != values[2][key]:
+            raise QualificationError(f"allocation metric {key} changed across its ABBA pair")
 
 
 def _protocol(args: argparse.Namespace, family: str, routes: tuple[str, ...]) -> dict[str, Any]:
@@ -2030,6 +2110,151 @@ def _verify_timing_receipt(value: Mapping[str, Any]) -> None:
         raise QualificationError("retained timing receipt is not successful")
     if receipt.get("timed_out") is not False:
         raise QualificationError("retained timing receipt exceeded its bound")
+
+
+def _verify_allocation_receipt(value: Mapping[str, Any]) -> None:
+    _verify_timing_receipt(value)
+    for key in ALLOCATION_METRICS:
+        metric = value.get(key)
+        if type(metric) is not int or metric < 0:
+            raise QualificationError(f"retained allocation value has an invalid metric {key}")
+    if value["peak"] < value["retained"]:
+        raise QualificationError("retained allocation peak is below retained bytes")
+
+
+def run_allocations(args: argparse.Namespace) -> None:
+    """Collect operation allocation metrics in a guarded, non-timing ABBA packet."""
+
+    family = require_family(args.family)
+    output = outside_checkout(args.output)
+    build = load_build(output, family)
+    validation = load_validation(output, family, build)
+    fixtures = outside_checkout(args.fixtures) if args.fixtures is not None else None
+    fixture_manifest = None
+    if family == "owner" and fixtures is None:
+        raise QualificationError("owner allocation measurements require --fixtures")
+    if fixtures is not None:
+        fixture_manifest = fixture_identity(fixtures, regenerate=True)
+        if validation.get("fixtures") != fixture_manifest:
+            raise QualificationError(
+                "allocation fixtures do not match correctness-validation fixtures"
+            )
+    try:
+        affinity = os.sched_getaffinity(0)
+    except AttributeError as error:
+        raise QualificationError("cannot prove CPU affinity on this host") from error
+    if args.cpu not in affinity:
+        raise QualificationError(f"CPU {args.cpu} is outside the runner affinity {sorted(affinity)}")
+    if args.iterations != ALLOCATION_ITERATIONS or args.timeout_s != FIXED_TIMEOUT_S:
+        raise QualificationError(
+            f"allocation protocol requires {ALLOCATION_ITERATIONS} iterations and a {FIXED_TIMEOUT_S:g}s timeout"
+        )
+    allocation = {
+        "A": build["endpoints"]["base"]["binaries"]["allocation"],
+        "B": build["endpoints"]["candidate"]["binaries"]["allocation"],
+    }
+    for row in allocation.values():
+        verify_artifact(row)
+    attempt = new_external_directory(output / args.attempt)
+    manifest: dict[str, Any] = {
+        "schema": SCHEMA,
+        "family": family,
+        "phase": "allocation",
+        "status": "running",
+        "qualified": False,
+        "acceptance_eligible": True,
+        "build": artifact(output / "build.json"),
+        "validation": artifact(output / "validation.json"),
+        "runner": artifact(Path(__file__)),
+        "probe": artifact(PROBES[family]),
+        "comparison": build["comparison"],
+        "resolved_refs": build["resolved_refs"],
+        "source_delta": build["source_delta"],
+        "lock_delta": build["lock_delta"],
+        "sources": {
+            label: build["endpoints"][label]["source"] for label in ("base", "candidate")
+        },
+        "binaries": allocation,
+        "fixtures": fixture_manifest,
+        "protocol": {
+            "iterations": args.iterations,
+            "order": ALLOCATION_ORDER,
+            "routes": list(ROUTES[family]),
+            "timeout_s": args.timeout_s,
+        },
+        "cpu": args.cpu,
+        "cases": [],
+    }
+    save_json(attempt / "manifest.json", manifest)
+    try:
+        for route in ROUTES[family]:
+            values = []
+            for index, side in enumerate(ALLOCATION_ORDER):
+                values.append(
+                    invoke(
+                        attempt,
+                        family,
+                        f"{route}-alloc-{index}-{side}",
+                        Path(allocation[side]["path"]),
+                        route,
+                        args.iterations,
+                        args.cpu,
+                        fixtures,
+                        allocation[side],
+                        args.timeout_s,
+                        allocation=True,
+                    )
+                )
+            _allocation_abba_equal(values)
+            manifest["cases"].append(
+                {
+                    "route": route,
+                    "iterations": args.iterations,
+                    "order": ALLOCATION_ORDER,
+                    "legs": [
+                        {"index": index, "side": side, "value": value}
+                        for index, (side, value) in enumerate(zip(ALLOCATION_ORDER, values))
+                    ],
+                }
+            )
+            save_json(attempt / "manifest.json", manifest)
+        host_snapshot(attempt, "final")
+        final_build = load_build(output, family)
+        final_validation = load_validation(output, family, final_build)
+        if artifact(Path(__file__)) != manifest["runner"]:
+            raise QualificationError("allocation runner changed during collection")
+        if artifact(PROBES[family]) != manifest["probe"]:
+            raise QualificationError("allocation probe changed during collection")
+        if artifact(output / "build.json") != manifest["build"]:
+            raise QualificationError("build manifest changed during allocation collection")
+        if artifact(output / "validation.json") != manifest["validation"]:
+            raise QualificationError("validation manifest changed during allocation collection")
+        for label in ("base", "candidate"):
+            if final_build["endpoints"][label]["source"] != manifest["sources"][label]:
+                raise QualificationError(f"{label} source identity changed during allocation collection")
+        for key in ("comparison", "resolved_refs", "source_delta", "lock_delta"):
+            if final_build.get(key) != manifest[key]:
+                raise QualificationError(f"{key} changed during allocation collection")
+        if family == "owner":
+            if fixtures is None or fixture_identity(fixtures, regenerate=True) != manifest["fixtures"]:
+                raise QualificationError("owner fixture identity changed during allocation collection")
+            if final_validation.get("fixtures") != manifest["fixtures"]:
+                raise QualificationError("validation fixture identity changed during allocation collection")
+        for case in manifest["cases"]:
+            _allocation_abba_equal([leg["value"] for leg in case["legs"]])
+            for leg in case["legs"]:
+                _verify_allocation_receipt(leg["value"])
+        for side, row in allocation.items():
+            if artifact(Path(row["path"])) != row:
+                raise QualificationError(f"protected {side} allocation binary changed during collection")
+        manifest["qualified"] = True
+        manifest["status"] = "complete"
+        save_json(attempt / "manifest.json", manifest)
+    except Exception as error:
+        manifest["status"] = "aborted"
+        manifest["error"] = str(error)
+        save_json(attempt / "manifest.json", manifest)
+        raise
 
 
 def run_native(args: argparse.Namespace) -> None:
@@ -2278,6 +2503,12 @@ def parser() -> argparse.ArgumentParser:
         help="run a non-fixed route/protocol subset without producing an acceptance result",
     )
     run_parser.add_argument("--routes", nargs="*")
+    allocation_parser = sub.add_parser("allocation", parents=[common])
+    allocation_parser.add_argument("--fixtures", type=Path)
+    allocation_parser.add_argument("--attempt", default="allocation-a1")
+    allocation_parser.add_argument("--cpu", type=int, default=29)
+    allocation_parser.add_argument("--iterations", type=int, default=ALLOCATION_ITERATIONS)
+    allocation_parser.add_argument("--timeout-s", type=float, default=FIXED_TIMEOUT_S)
     collect_parser = sub.add_parser("collect", parents=[common])
     collect_parser.add_argument("--attempt")
     collect_parser.add_argument("--out", type=Path)
@@ -2297,6 +2528,8 @@ def main(argv: list[str] | None = None) -> int:
             collect(args)
         elif args.phase == "prepare-fixtures":
             prepare_fixtures(args.output)
+        elif args.phase == "allocation":
+            run_allocations(args)
         else:
             if args.start_count is None:
                 args.start_count = START_COUNTS[args.family]
