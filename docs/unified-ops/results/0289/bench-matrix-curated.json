@@ -3018,6 +3018,42 @@
   {
    "record": "0362z",
    "reason": "DOCX SVG family validation and coordinator-integration receipts: focused tests, Clippy, rustdoc/profile hashes and source/replay correctness only. The record explicitly makes no benchmark or native timing claim."
+  },
+  {
+   "record": "0362uga",
+   "reason": "ODP edit-construction source repair validation only: the receipt records tests, target-size observations and explicit native_timing=false/baseline_build=false flags, with no leaf-versus-unified operation pair."
+  },
+  {
+   "record": "0362ugka",
+   "reason": "PPTX benchmark-consumer compiler check only. The receipt's elapsed seconds are command runtimes for Clippy and do not compare a leaf operation with its unified operation; no performance qualification is claimed."
+  },
+  {
+   "record": "0362ugsa",
+   "reason": "ODF probe-consumer compiler check only. The receipt records source-bound Clippy command completion and target observations, not a leaf-versus-unified operation pair or performance acceptance."
+  },
+  {
+   "record": "0362ugu",
+   "reason": "Composed strict-consumer and interrupted-gate receipts contain compile/test gate results and target/process provenance only. They contain no leaf-versus-unified operation measurement and explicitly leave the full gate open."
+  },
+  {
+   "record": "0362ugx",
+   "reason": "Feature-profile gate correction and operational-rejection receipt only: strict profile commands and source/provenance checks contain no leaf-versus-unified timing or allocation pair, and no native qualification is claimed."
+  },
+  {
+   "record": "0362ugy",
+   "reason": "W4b/W5 historical probe-adapter and native-protocol preparation receipts compare compatibility/protocol correctness, not a leaf-versus-unified operation pair; native timing remains unqualified."
+  },
+  {
+   "record": "0362uma",
+   "reason": "Interrupted full-gate and selected diagnostic-check receipts contain partial format, strict-profile and operations-test logs only. They record no leaf-versus-unified benchmark pair and explicitly are not acceptance results."
+  },
+  {
+   "record": "0362up",
+   "reason": "Native budget diagnostic assembly contains test/Clippy command runtimes, correctness summaries and stopped/returned attempts, but no leaf-versus-unified operation pair; native performance qualification remains required."
+  },
+  {
+   "record": "0362uv",
+   "reason": "Final-gate runner/readiness protocol, tooling checks and source/provenance verification only. The receipt contains no leaf-versus-unified operation measurement or performance acceptance."
   }
  ]
 }

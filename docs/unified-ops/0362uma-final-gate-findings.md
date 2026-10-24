@@ -1,4 +1,4 @@
-# 0362um1 — final gate findings and required repairs
+# 0362uma — final gate findings and required repairs
 
 The full gate on `f6fe430a4d19d94aa360c0e9ed03ebd757265225` passed
 formatting, combined strict consumers and every per-format strict profile:
@@ -8,7 +8,7 @@ both runner processes had exited and no Cargo process still used the gate
 checkout or target. The operations step did not finalize a result row.
 This is an interrupted, failing attempt, not a full gate pass.
 
-[The retained receipt](results/0362um1/interrupted-full-gate.json) binds the
+[The retained receipt](results/0362uma/interrupted-full-gate.json) binds the
 plan/state, all 25 completed steps and the five existing operations-test
 chunk logs. It preserves the partial results without assigning a successful
 status to the unfinished step.
@@ -26,7 +26,7 @@ a test executable compiled for that checkout: its manifest path is embedded
 in the executable.
 
 Separate selected diagnostic runs retain the remaining observations without
-overwriting the interrupted attempt. [Their reduced receipt](results/0362um1/selected-diagnostics.json)
+overwriting the interrupted attempt. [Their reduced receipt](results/0362uma/selected-diagnostics.json)
 binds all completed steps, external state/plan/log identities, source/locks,
 runner policy and individual test chunks. The coordinator verified the
 recorded log sizes and hashes.
@@ -50,7 +50,7 @@ The final observed target size is 18,446,285,179 bytes, below the 20-GB cap.
 Every completed step retains stable post-exit observations with no remaining
 owned builders. These selected results do not establish full acceptance.
 Once the required corrections are reviewed and composed, a fresh complete
-gate is required on the new source. This record uses suffix `0362um1` to
+gate is required on the new source. This record uses suffix `0362uma` to
 distinguish it from the pre-existing 0362um OPC consumer record.
 
 The final inventory review also found that its owner-name heuristic omitted
