@@ -46,11 +46,11 @@ fn codec_reports_typed_prepared_size_limit_at_the_adapter_boundary() {
 }
 
 #[test]
-fn codec_writes_alternate_prefixes_with_stable_bindings_and_roundtrips() {
+fn codec_writes_alternate_prefixes_with_existing_bindings_and_roundtrips() {
     let xml = br#"<am3d:model3d xmlns:am3d="http://schemas.microsoft.com/office/drawing/2017/model3d" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:f="urn:future" rel:embed="rIdModel"><am3d:spPr/><am3d:camera/><am3d:trans/><am3d:objViewport/><f:future f:value="keep"/></am3d:model3d>"#;
     let scene = codec::read(xml, codec::Limits::DEFAULT).expect("alternate-prefix scene");
     let output = codec::write(&scene, codec::Limits::DEFAULT).expect("scene must serialize");
-    assert!(output.starts_with(b"<m3d:model3d"));
+    assert!(output.starts_with(b"<am3d:model3d"));
     assert!(
         output
             .windows(b"xmlns:am3d=".len())
@@ -62,12 +62,12 @@ fn codec_writes_alternate_prefixes_with_stable_bindings_and_roundtrips() {
             .any(|window| window == b"xmlns:rel=")
     );
     assert!(
-        output
+        !output
             .windows(b"xmlns:m3d=".len())
             .any(|window| window == b"xmlns:m3d=")
     );
     assert!(
-        output
+        !output
             .windows(b"xmlns:r=".len())
             .any(|window| window == b"xmlns:r=")
     );
@@ -83,7 +83,58 @@ fn codec_writes_alternate_prefixes_with_stable_bindings_and_roundtrips() {
 }
 
 #[test]
-fn codec_counts_injected_bindings_before_alternate_prefix_output_refusal() {
+fn codec_preserves_foreign_colliding_prefixes_in_opaque_children() {
+    let xml = br#"<am3d:model3d xmlns:m3d="urn:foreign-model" xmlns:am3d="http://schemas.microsoft.com/office/drawing/2017/model3d" xmlns:r="urn:foreign-relationship" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships" rel:embed="rIdModel"><am3d:spPr/><am3d:camera/><am3d:trans/><am3d:objViewport/><m3d:foreign/><r:foreign/></am3d:model3d>"#;
+    let scene = codec::read(xml, codec::Limits::DEFAULT).expect("colliding-prefix scene");
+    let unknown = scene
+        .unknown_children()
+        .map(|value| (value.local_name(), value.namespace()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        unknown,
+        vec![
+            ("foreign", "urn:foreign-model"),
+            ("foreign", "urn:foreign-relationship"),
+        ]
+    );
+
+    let output = codec::write(&scene, codec::Limits::DEFAULT).expect("scene must serialize");
+    assert!(output.starts_with(b"<am3d:model3d"));
+    assert_eq!(
+        output
+            .windows(b"xmlns:m3d=".len())
+            .filter(|window| *window == b"xmlns:m3d=")
+            .count(),
+        1
+    );
+    assert_eq!(
+        output
+            .windows(b"xmlns:r=".len())
+            .filter(|window| *window == b"xmlns:r=")
+            .count(),
+        1
+    );
+    assert!(
+        output
+            .windows(b"<m3d:foreign/>".len())
+            .any(|window| window == b"<m3d:foreign/>")
+    );
+    assert!(
+        output
+            .windows(b"<r:foreign/>".len())
+            .any(|window| window == b"<r:foreign/>")
+    );
+
+    let reparsed = codec::read(&output, codec::Limits::DEFAULT).expect("collision-safe output");
+    let reparsed_unknown = reparsed
+        .unknown_children()
+        .map(|value| (value.local_name(), value.namespace()))
+        .collect::<Vec<_>>();
+    assert_eq!(reparsed_unknown, unknown);
+}
+
+#[test]
+fn codec_counts_selected_prefix_output_before_alternate_prefix_refusal() {
     let xml = br#"<am3d:model3d xmlns:am3d="http://schemas.microsoft.com/office/drawing/2017/model3d" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships" rel:embed="rIdModel"><am3d:spPr/><am3d:camera/><am3d:trans/><am3d:objViewport/></am3d:model3d>"#;
     let scene = codec::read(xml, codec::Limits::DEFAULT).expect("alternate-prefix scene");
     let output = codec::write(&scene, codec::Limits::DEFAULT).expect("scene must serialize");

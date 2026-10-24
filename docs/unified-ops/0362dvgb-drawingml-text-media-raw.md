@@ -2,7 +2,7 @@
 
 - Date: 2026-10-24.
 - Parent: 0362dvga, 0362dvg, 0362dv.
-- Status: source repairs complete; coordinator validation is pending rescheduling.
+- Status: source repairs and focused validation complete; coordinator review pending.
 
 The second independent review found two adapter-boundary issues:
 
@@ -46,3 +46,22 @@ the follow-up commit), using `Cargo.lock` SHA-256
 
 The external generated target was cleaned after validation; no generated
 target files are part of the commit.
+
+The final review then found a valid collision case where a retained foreign
+`m3d:` or `r:` declaration prevented the canonical spelling from being
+redeclared safely. The writer now builds one bounded prefix plan before size
+preflight: it reuses a safe existing nonempty model/relationship prefix, or
+selects a fresh prefix that is absent from root, raster, and blip declarations.
+The plan is propagated to model3d roots, raster/blip names, relationship
+attributes, closing tags, and both counting and streaming writers. Retained
+opaque bytes and their foreign bindings remain unchanged.
+
+Final collision coverage includes PPTX round-trip fixtures with foreign
+`m3d:`/`r:` bindings and opaque children, plus a shared-codec default-namespace
+fixture that selects fresh prefixes and verifies the narrow output admission
+boundary. With the same lock and capped offline setup:
+
+- `cargo test --lib -p litchi-pptx 'model3d::tests::codec_'`: 7 passed.
+- `cargo test --lib -p litchi-drawingml`: 242 passed.
+- `cargo test -p litchi-drawingml --test svg_blip`: 24 passed.
+- `cargo check -p litchi-spreadsheet-drawing -p litchi-docx -p litchi-pptx -p litchi-xlsx`: passed.

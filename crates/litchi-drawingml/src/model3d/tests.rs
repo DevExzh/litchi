@@ -49,6 +49,76 @@ fn preserves_unknown_children_and_namespace_declarations_on_round_trip() {
 }
 
 #[test]
+fn writer_picks_fresh_prefixes_around_foreign_bindings() {
+    let xml = br#"<model3d xmlns="http://schemas.microsoft.com/office/drawing/2017/model3d" xmlns:m3d="urn:foreign-model" xmlns:r="urn:foreign-relationship" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships" rel:embed="rIdModel"><spPr/><camera/><trans/><objViewport/><m3d:foreign/><r:foreign/></model3d>"#;
+    let metadata = read(xml, Limits::DEFAULT).expect("default-prefix scene must parse");
+    let unknown = metadata
+        .children
+        .iter()
+        .filter_map(|child| match child {
+            super::Child::Opaque(value) if value.namespace().starts_with("urn:") => {
+                Some((value.local_name(), value.namespace()))
+            },
+            super::Child::Raster(_) => None,
+            super::Child::Opaque(_) => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        unknown,
+        vec![
+            ("foreign", "urn:foreign-model"),
+            ("foreign", "urn:foreign-relationship"),
+        ]
+    );
+
+    let encoded = write(&metadata, Limits::DEFAULT).expect("fresh-prefix scene must serialize");
+    assert!(encoded.starts_with(b"<m3d1:model3d"));
+    assert!(
+        encoded
+            .windows(b"xmlns:m3d1=".len())
+            .any(|window| window == b"xmlns:m3d1=")
+    );
+    assert_eq!(
+        encoded
+            .windows(b"xmlns:m3d=".len())
+            .filter(|window| *window == b"xmlns:m3d=")
+            .count(),
+        1
+    );
+    assert_eq!(
+        encoded
+            .windows(b"xmlns:r=".len())
+            .filter(|window| *window == b"xmlns:r=")
+            .count(),
+        1
+    );
+    let reparsed = read(&encoded, Limits::DEFAULT).expect("fresh-prefix output must parse");
+    let reparsed_unknown = reparsed
+        .children
+        .iter()
+        .filter_map(|child| match child {
+            super::Child::Opaque(value) if value.namespace().starts_with("urn:") => {
+                Some((value.local_name(), value.namespace()))
+            },
+            super::Child::Raster(_) => None,
+            super::Child::Opaque(_) => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(reparsed_unknown, unknown);
+
+    let mut narrow = Limits::DEFAULT;
+    narrow.max_output_bytes = encoded.len() - 1;
+    assert!(matches!(
+        write(&metadata, narrow),
+        Err(crate::Error::Limit {
+            kind: crate::LimitKind::OutputBytes,
+            observed,
+            maximum,
+        }) if observed == encoded.len() && maximum + 1 == observed
+    ));
+}
+
+#[test]
 fn rejects_invalid_sequence_and_duplicate_raster_blip() {
     let missing = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d"><m3d:spPr/><m3d:camera/></m3d:model3d>"#;
     assert!(

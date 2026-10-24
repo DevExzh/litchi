@@ -1,6 +1,6 @@
 //! Namespace-aware XML reader and deterministic writer for `model3d`.
 
-use std::io::Write;
+use std::{borrow::Cow, io::Write};
 
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::{relationships, xml::unqualified_attribute_value};
@@ -14,8 +14,8 @@ use quick_xml::{
 use crate::{Error, LimitKind, Result};
 
 use super::super::{
-    Blip, Child, Id, Inert, Metadata, NAMESPACE, Namespace, RELATIONSHIP_NAMESPACE,
-    RELATIONSHIP_NAMESPACE_STRICT, Raster, RasterChild, Reference,
+    Blip, Child, Id, Inert, MAX_NAMESPACE_TEXT_BYTES, Metadata, NAMESPACE, Namespace,
+    RELATIONSHIP_NAMESPACE, RELATIONSHIP_NAMESPACE_STRICT, Raster, RasterChild, Reference,
 };
 use super::Limits;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -256,7 +256,8 @@ pub fn opaque(xml: &[u8], limits: Limits) -> Result<Inert> {
 pub fn write(metadata: &Metadata, limits: Limits) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
     crate::model3d::validation::validate(metadata).map_err(|error| validation_error(&error))?;
-    let size = output_size(metadata)?;
+    let prefixes = Prefixes::for_metadata(metadata)?;
+    let size = output_size(metadata, &prefixes)?;
     if size > limits.max_output_bytes {
         return Err(limit(LimitKind::OutputBytes, size, limits.max_output_bytes));
     }
@@ -264,7 +265,7 @@ pub fn write(metadata: &Metadata, limits: Limits) -> Result<Vec<u8>> {
     output
         .try_reserve_exact(size)
         .map_err(|error| invalid(format!("model3d output allocation failed: {error}")))?;
-    write_inner(&mut output, metadata).map_err(Error::Io)?;
+    write_inner(&mut output, metadata, &prefixes).map_err(Error::Io)?;
     debug_assert_eq!(output.len(), size);
     Ok(output)
 }
@@ -277,11 +278,12 @@ pub fn write(metadata: &Metadata, limits: Limits) -> Result<Vec<u8>> {
 pub fn write_to<W: Write>(writer: &mut W, metadata: &Metadata, limits: Limits) -> Result<()> {
     let limits = limits.validate()?;
     crate::model3d::validation::validate(metadata).map_err(|error| validation_error(&error))?;
-    let size = output_size(metadata)?;
+    let prefixes = Prefixes::for_metadata(metadata)?;
+    let size = output_size(metadata, &prefixes)?;
     if size > limits.max_output_bytes {
         return Err(limit(LimitKind::OutputBytes, size, limits.max_output_bytes));
     }
-    write_inner(writer, metadata).map_err(Error::Io)?;
+    write_inner(writer, metadata, &prefixes).map_err(Error::Io)?;
     Ok(())
 }
 
@@ -538,43 +540,180 @@ fn parse_blip(xml: &[u8], inherited: &[Namespace], limits: Limits) -> Result<Bli
     Ok(Blip::from_wire(reference, children, local_namespaces))
 }
 
-fn write_inner<W: Write>(output: &mut W, metadata: &Metadata) -> std::io::Result<()> {
-    output.write_all(b"<m3d:model3d")?;
-    // The writer uses the stable `m3d:` and `r:` spellings below.  An input
-    // document may bind the same URIs under alternate prefixes, but those
-    // bindings do not make the prefixes emitted here usable.  Keep every
-    // retained declaration and add only the binding required by the emitted
-    // spelling.  `output_size` calls this same path, so injected declarations
-    // are included in the output admission count without cloning the wire.
-    let mut has_model_prefix = false;
-    let mut has_rel_prefix = false;
+struct SelectedPrefix<'a> {
+    value: Cow<'a, str>,
+    injected: bool,
+}
+
+struct Prefixes<'a> {
+    model: SelectedPrefix<'a>,
+    relationship: SelectedPrefix<'a>,
+}
+
+impl<'a> Prefixes<'a> {
+    fn for_metadata(metadata: &'a Metadata) -> Result<Self> {
+        let model = select_prefix(metadata, is_model_namespace, "m3d", None)?;
+        let relationship = select_prefix(
+            metadata,
+            is_relationship_namespace,
+            "r",
+            Some(model.value.as_ref()),
+        )?;
+        Ok(Self {
+            model,
+            relationship,
+        })
+    }
+}
+
+fn select_prefix<'a>(
+    metadata: &'a Metadata,
+    namespace: fn(&str) -> bool,
+    stem: &str,
+    reserved: Option<&str>,
+) -> Result<SelectedPrefix<'a>> {
+    if let Some(prefix) = metadata.namespaces.iter().find_map(|declaration| {
+        let prefix = declaration.prefix()?;
+        (prefix_is_safe(metadata, prefix, namespace) && namespace(declaration.uri()))
+            .then_some(prefix)
+    }) {
+        return Ok(SelectedPrefix {
+            value: Cow::Borrowed(prefix),
+            injected: false,
+        });
+    }
+
+    let mut suffix = 0usize;
+    loop {
+        let candidate = if suffix == 0 {
+            stem.to_owned()
+        } else {
+            format!("{stem}{suffix}")
+        };
+        if candidate.len() > MAX_NAMESPACE_TEXT_BYTES {
+            return Err(limit(
+                LimitKind::NamespacePrefixBytes,
+                candidate.len(),
+                MAX_NAMESPACE_TEXT_BYTES,
+            ));
+        }
+        if !prefix_is_in_use(metadata, candidate.as_str()) && reserved != Some(candidate.as_str()) {
+            return Ok(SelectedPrefix {
+                value: Cow::Owned(candidate),
+                injected: true,
+            });
+        }
+        suffix = suffix.checked_add(1).ok_or_else(|| {
+            limit(
+                LimitKind::NamespacePrefixBytes,
+                usize::MAX,
+                MAX_NAMESPACE_TEXT_BYTES,
+            )
+        })?;
+    }
+}
+
+fn is_model_namespace(uri: &str) -> bool {
+    uri == NAMESPACE
+}
+
+fn is_relationship_namespace(uri: &str) -> bool {
+    uri == RELATIONSHIP_NAMESPACE || uri == RELATIONSHIP_NAMESPACE_STRICT
+}
+
+fn prefix_is_safe(metadata: &Metadata, prefix: &str, namespace: fn(&str) -> bool) -> bool {
+    let mut safe = true;
+    visit_namespaces(metadata, |declaration| {
+        if declaration.prefix() == Some(prefix) && !namespace(declaration.uri()) {
+            safe = false;
+        }
+    });
+    safe
+}
+
+fn prefix_is_in_use(metadata: &Metadata, prefix: &str) -> bool {
+    let mut in_use = false;
+    visit_namespaces(metadata, |declaration| {
+        in_use |= declaration.prefix() == Some(prefix);
+    });
+    in_use
+}
+
+fn visit_namespaces(metadata: &Metadata, mut visit: impl FnMut(&Namespace)) {
     for declaration in &metadata.namespaces {
-        has_model_prefix |= declaration.prefix() == Some("m3d") && declaration.uri() == NAMESPACE;
-        has_rel_prefix |= declaration.prefix() == Some("r")
-            && (declaration.uri() == RELATIONSHIP_NAMESPACE
-                || declaration.uri() == RELATIONSHIP_NAMESPACE_STRICT);
+        visit(declaration);
+    }
+    for child in &metadata.children {
+        let Child::Raster(raster) = child else {
+            continue;
+        };
+        for declaration in &raster.namespaces {
+            visit(declaration);
+        }
+        for raster_child in &raster.children {
+            let RasterChild::Blip(blip) = raster_child else {
+                continue;
+            };
+            for declaration in &blip.namespaces {
+                visit(declaration);
+            }
+        }
+    }
+}
+
+fn write_inner<W: Write>(
+    output: &mut W,
+    metadata: &Metadata,
+    prefixes: &Prefixes<'_>,
+) -> std::io::Result<()> {
+    // Typed names and relationship attributes use one selected prefix each.
+    // A valid alternate binding is reused; otherwise the selected fresh name
+    // is injected only after all retained declarations, avoiding duplicate
+    // namespace attributes and preserving opaque child bindings.  The same
+    // plan is used by `output_size`, so admission counts every emitted byte
+    // without cloning the wire.
+    output.write_all(b"<")?;
+    output.write_all(prefixes.model.value.as_bytes())?;
+    output.write_all(b":model3d")?;
+    for declaration in &metadata.namespaces {
         write_namespace(output, declaration)?;
     }
-    if !has_model_prefix {
-        write_namespace_value(output, Some("m3d"), NAMESPACE)?;
+    if prefixes.model.injected {
+        write_namespace_value(output, Some(prefixes.model.value.as_ref()), NAMESPACE)?;
     }
-    if !has_rel_prefix {
-        write_namespace_value(output, Some("r"), RELATIONSHIP_NAMESPACE)?;
+    if prefixes.relationship.injected {
+        write_namespace_value(
+            output,
+            Some(prefixes.relationship.value.as_ref()),
+            RELATIONSHIP_NAMESPACE,
+        )?;
     }
-    write_reference(output, &metadata.reference)?;
+    write_reference(
+        output,
+        &metadata.reference,
+        prefixes.relationship.value.as_ref(),
+    )?;
     output.write_all(b">")?;
     for child in &metadata.children {
         match child {
             Child::Opaque(value) => output.write_all(value.as_bytes())?,
-            Child::Raster(value) => write_raster(output, value)?,
+            Child::Raster(value) => write_raster(output, value, prefixes)?,
         }
     }
-    output.write_all(b"</m3d:model3d>")?;
+    output.write_all(b"</")?;
+    output.write_all(prefixes.model.value.as_bytes())?;
+    output.write_all(b":model3d>")?;
     Ok(())
 }
 
-fn write_raster<W: Write>(output: &mut W, raster: &Raster) -> std::io::Result<()> {
-    output.write_all(b"<m3d:raster rName=\"")?;
+fn write_raster<W: Write>(
+    output: &mut W,
+    raster: &Raster,
+    prefixes: &Prefixes<'_>,
+) -> std::io::Result<()> {
+    output.write_all(b"<")?;
+    output.write_all(prefixes.model.value.as_bytes())?;
+    output.write_all(b":raster rName=\"")?;
     push_escaped(output, &raster.renderer_name)?;
     output.write_all(b"\" rVer=\"")?;
     push_escaped(output, &raster.renderer_version)?;
@@ -585,20 +724,32 @@ fn write_raster<W: Write>(output: &mut W, raster: &Raster) -> std::io::Result<()
     output.write_all(b">")?;
     for child in &raster.children {
         match child {
-            RasterChild::Blip(value) => write_blip(output, value)?,
+            RasterChild::Blip(value) => write_blip(output, value, prefixes)?,
             RasterChild::Opaque(value) => output.write_all(value.as_bytes())?,
         }
     }
-    output.write_all(b"</m3d:raster>")?;
+    output.write_all(b"</")?;
+    output.write_all(prefixes.model.value.as_bytes())?;
+    output.write_all(b":raster>")?;
     Ok(())
 }
 
-fn write_blip<W: Write>(output: &mut W, blip: &Blip) -> std::io::Result<()> {
-    output.write_all(b"<m3d:blip")?;
+fn write_blip<W: Write>(
+    output: &mut W,
+    blip: &Blip,
+    prefixes: &Prefixes<'_>,
+) -> std::io::Result<()> {
+    output.write_all(b"<")?;
+    output.write_all(prefixes.model.value.as_bytes())?;
+    output.write_all(b":blip")?;
     for declaration in &blip.namespaces {
         write_namespace(output, declaration)?;
     }
-    write_reference(output, &blip.reference)?;
+    write_reference(
+        output,
+        &blip.reference,
+        prefixes.relationship.value.as_ref(),
+    )?;
     if blip.children.is_empty() {
         output.write_all(b"/>")?;
     } else {
@@ -606,19 +757,29 @@ fn write_blip<W: Write>(output: &mut W, blip: &Blip) -> std::io::Result<()> {
         for child in &blip.children {
             output.write_all(child.as_bytes())?;
         }
-        output.write_all(b"</m3d:blip>")?;
+        output.write_all(b"</")?;
+        output.write_all(prefixes.model.value.as_bytes())?;
+        output.write_all(b":blip>")?;
     }
     Ok(())
 }
 
-fn write_reference<W: Write>(output: &mut W, reference: &Reference) -> std::io::Result<()> {
+fn write_reference<W: Write>(
+    output: &mut W,
+    reference: &Reference,
+    relationship_prefix: &str,
+) -> std::io::Result<()> {
     if let Some(id) = &reference.embedded {
-        output.write_all(b" r:embed=\"")?;
+        output.write_all(b" ")?;
+        output.write_all(relationship_prefix.as_bytes())?;
+        output.write_all(b":embed=\"")?;
         push_escaped(output, id.as_str())?;
         output.write_all(b"\"")?;
     }
     if let Some(id) = &reference.linked {
-        output.write_all(b" r:link=\"")?;
+        output.write_all(b" ")?;
+        output.write_all(relationship_prefix.as_bytes())?;
+        output.write_all(b":link=\"")?;
         push_escaped(output, id.as_str())?;
         output.write_all(b"\"")?;
     }
@@ -650,9 +811,9 @@ fn push_escaped<W: Write>(output: &mut W, value: &str) -> std::io::Result<()> {
     output.write_all(escaped.as_bytes())
 }
 
-fn output_size(metadata: &Metadata) -> Result<usize> {
+fn output_size(metadata: &Metadata, prefixes: &Prefixes<'_>) -> Result<usize> {
     let mut counter = CountingWriter::default();
-    write_inner(&mut counter, metadata).map_err(Error::Io)?;
+    write_inner(&mut counter, metadata, prefixes).map_err(Error::Io)?;
     Ok(counter.bytes)
 }
 
