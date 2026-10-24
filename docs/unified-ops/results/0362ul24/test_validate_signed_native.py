@@ -17,6 +17,12 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC and SPEC.loader
 VALIDATE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(VALIDATE)
+QUALIFICATION_SPEC = importlib.util.spec_from_file_location(
+    "signed_native_qualification", HERE / "signed_native_qualification.py"
+)
+assert QUALIFICATION_SPEC and QUALIFICATION_SPEC.loader
+QUALIFICATION = importlib.util.module_from_spec(QUALIFICATION_SPEC)
+QUALIFICATION_SPEC.loader.exec_module(QUALIFICATION)
 
 
 def fixture_row(index: int = 0) -> dict:
@@ -30,6 +36,7 @@ def fixture_row(index: int = 0) -> dict:
         "cryptographic_verification": "not_performed",
         "input_sha256": "a" * 64,
         "signed_sha256": "b" * 64,
+        "relative_path": f"test-data/fixture-{index}.bin",
         "target": "/body/p[1]",
         "property": "text",
     }
@@ -142,6 +149,72 @@ def receipt(route: str, **overrides: object) -> dict:
     return value
 
 
+def final_only_manifest() -> dict:
+    rows = []
+    for route in VALIDATE.TIMED:
+        leaf_route = route if route.startswith("signed_leaf/") else "signed_leaf/" + route.split("/", 1)[1]
+        facade_route = route if route.startswith("signed_facade/") else "signed_facade/" + route.split("/", 1)[1]
+        value = lambda actual: {
+            "schema": VALIDATE.SCHEMA,
+            "route": actual,
+            "mode": "measure",
+            "calls": 1,
+            "elapsed_ns": VALIDATE.TARGET_NS,
+            "operations": 1,
+        }
+        blocks = [
+            {
+                "legs": [
+                    {"side": "leaf", "value": value(leaf_route)},
+                    {"side": "facade", "value": value(facade_route)},
+                    {"side": "facade", "value": value(facade_route)},
+                    {"side": "leaf", "value": value(leaf_route)},
+                ]
+            }
+            for _ in range(5)
+        ]
+        rows.append(
+            {
+                "route": route,
+                "paired_route": facade_route if route.startswith("signed_leaf/") else leaf_route,
+                "baseline": "leaf_facade",
+                "comparison": "final_leaf_vs_facade",
+                "calls": 1,
+                "calibration": {
+                    "leaf": {
+                        "schema": VALIDATE.SCHEMA,
+                        "route": leaf_route,
+                        "mode": "calibrate",
+                        "common_calls": 1,
+                        "elapsed_ns": VALIDATE.TARGET_NS,
+                        "operations": 1,
+                        "target_ns": VALIDATE.TARGET_NS,
+                    },
+                    "facade": {
+                        "schema": VALIDATE.SCHEMA,
+                        "route": facade_route,
+                        "mode": "calibrate",
+                        "common_calls": 1,
+                        "elapsed_ns": VALIDATE.TARGET_NS,
+                        "operations": 1,
+                        "target_ns": VALIDATE.TARGET_NS,
+                    },
+                },
+                "blocks": blocks,
+                "leaf_ns_per_call": float(VALIDATE.TARGET_NS),
+                "facade_ns_per_call": float(VALIDATE.TARGET_NS),
+                "facade_leaf_ratio": 1.0,
+            }
+        )
+    return {
+        "schema": "litchi_signed_native_qualification.v1",
+        "rounds": 5,
+        "target_ns": VALIDATE.TARGET_NS,
+        "minimum_sample_ns": VALIDATE.MIN_SAMPLE_NS,
+        "routes": rows,
+    }
+
+
 class SignedNativeValidatorTests(unittest.TestCase):
     def test_fixture_manifest_requires_all_seven_signed_formats(self) -> None:
         VALIDATE.load_fixture_manifest(fixture_manifest())
@@ -155,6 +228,13 @@ class SignedNativeValidatorTests(unittest.TestCase):
         invalid["fixtures"][0]["cryptographic_verification"] = "verified"
         with self.assertRaises(ValueError):
             VALIDATE.load_fixture_manifest(invalid)
+
+    def test_fixture_manifest_rejects_absolute_and_traversal_paths(self) -> None:
+        for invalid_path in ("/tmp/signed.bin", "../signed.bin", "test-data/../signed.bin"):
+            invalid = fixture_manifest()
+            invalid["fixtures"][0]["relative_path"] = invalid_path
+            with self.assertRaises(ValueError):
+                VALIDATE.load_fixture_manifest(invalid)
 
     def test_signed_noop_requires_exact_bytes_and_native_noop(self) -> None:
         route = "signed_leaf/noop_commit"
@@ -171,6 +251,13 @@ class SignedNativeValidatorTests(unittest.TestCase):
         timed["fixtures"][0]["status"] = "ok"
         with self.assertRaises(ValueError):
             VALIDATE.validate_correctness_receipt(timed, route)
+
+    def test_refusal_and_budget_must_not_publish_output(self) -> None:
+        for route in ("signed_leaf/refusal", "signed_leaf/budget"):
+            invalid = receipt(route)
+            invalid["fixtures"][0]["output_published"] = True
+            with self.assertRaises(ValueError):
+                VALIDATE.validate_correctness_receipt(invalid, route)
 
     def test_unsign_requires_signature_absence_and_a_real_change(self) -> None:
         route = "signed_leaf/unsign_write"
@@ -201,6 +288,25 @@ class SignedNativeValidatorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             VALIDATE.validate_correctness_receipt(value, route, endpoint="final")
 
+    def test_not_applicable_is_explicit_and_route_scoped(self) -> None:
+        route = "signed_leaf/budget"
+        value = receipt(
+            route,
+            capability="not_applicable",
+            fixtures=[
+                route_row(
+                    route,
+                    status="not_applicable",
+                    disposition="requires_signed_noop_admission",
+                    reason="the historical endpoint cannot construct a signed no-op base",
+                )
+            ],
+            native_preflight=[],
+        )
+        VALIDATE.validate_correctness_receipt(value, route, endpoint="before")
+        with self.assertRaises(ValueError):
+            VALIDATE.validate_correctness_receipt(value, route, endpoint="final")
+
     def test_calibration_and_samples_fail_closed(self) -> None:
         route = "signed_leaf/noop_write"
         calibration = {
@@ -208,10 +314,14 @@ class SignedNativeValidatorTests(unittest.TestCase):
             "route": route,
             "mode": "calibrate",
             "common_calls": 10,
-            "elapsed_ns": VALIDATE.MIN_SAMPLE_NS,
+            "elapsed_ns": VALIDATE.TARGET_NS,
             "target_ns": VALIDATE.TARGET_NS,
+            "operations": 10,
         }
         self.assertEqual(VALIDATE.validate_calibration(calibration, route), 10)
+        calibration["elapsed_ns"] = VALIDATE.MIN_SAMPLE_NS
+        with self.assertRaises(ValueError):
+            VALIDATE.validate_calibration(calibration, route)
         sample = {
             "schema": VALIDATE.SCHEMA,
             "route": route,
@@ -226,20 +336,79 @@ class SignedNativeValidatorTests(unittest.TestCase):
             VALIDATE.validate_measure(sample, route, 10)
 
     def test_manifest_rejects_an_incomplete_abba(self) -> None:
-        manifest = {
-            "schema": "litchi_signed_native_qualification.v1",
-            "rounds": 5,
-            "routes": [
-                {
-                    "route": "signed_leaf/noop_commit",
-                    "baseline": "capability_missing",
-                }
-            ],
-        }
+        manifest = final_only_manifest()
         VALIDATE.validate_abba(manifest)
+        del manifest["routes"][-1]
+        with self.assertRaises(ValueError):
+            VALIDATE.validate_abba(manifest)
+        manifest = final_only_manifest()
         manifest["rounds"] = 4
         with self.assertRaises(ValueError):
             VALIDATE.validate_abba(manifest)
+
+    def test_final_only_requires_leaf_facade_abba_and_unique_routes(self) -> None:
+        manifest = final_only_manifest()
+        manifest["routes"][0]["blocks"][0]["legs"] = [
+            {"side": "facade", "value": manifest["routes"][0]["blocks"][0]["legs"][0]["value"]}
+        ] * 4
+        with self.assertRaises(ValueError):
+            VALIDATE.validate_abba(manifest)
+        manifest = final_only_manifest()
+        manifest["routes"][1]["route"] = manifest["routes"][0]["route"]
+        with self.assertRaises(ValueError):
+            VALIDATE.validate_abba(manifest)
+
+    def test_pair_rejects_same_source_and_binary_identity(self) -> None:
+        def endpoint(commit: str, binary_path: str, binary_hash: str, tree: str) -> dict:
+            shared = {"sha256": "a" * 64}
+            return {
+                "source_commit": commit,
+                "binary": {"path": binary_path, "sha256": binary_hash},
+                "source_archive": {"sha256": "b" * 64},
+                "source_identity": {"tree_sha256": tree},
+                "lock": shared,
+                "probe": shared,
+                "fixtures": shared,
+                "dependency_projection": shared,
+                "capabilities": {route: "available" for route in VALIDATE.ROUTES},
+            }
+        before = endpoint(VALIDATE.BASELINE_SOURCE_COMMIT, "/tmp/before", "c" * 64, "d" * 64)
+        after = endpoint(VALIDATE.CANDIDATE_SOURCE_COMMIT, "/tmp/after", "c" * 64, "e" * 64)
+        with self.assertRaises(ValueError):
+            VALIDATE.validate_pair(before, after)
+
+    def test_runner_reserves_wildcard_for_route_listing(self) -> None:
+        with self.assertRaises(ValueError):
+            QUALIFICATION.child(
+                Path(tempfile.mkdtemp()),
+                "invalid",
+                Path("/does/not/exist"),
+                {"fixture_root": "/tmp"},
+                "*",
+                "measure",
+                0,
+            )
+
+    def test_runner_has_process_caps_and_final_pairing(self) -> None:
+        self.assertGreater(QUALIFICATION.CHILD_TIMEOUT_S, 0)
+        self.assertGreater(QUALIFICATION.CHILD_OUTPUT_LIMIT, 0)
+        self.assertGreater(QUALIFICATION.CHILD_RSS_LIMIT, 0)
+        self.assertEqual(
+            QUALIFICATION.paired_route("signed_leaf/noop_write"),
+            "signed_facade/noop_write",
+        )
+
+    def test_memory_summary_rejects_unpaired_call_counts(self) -> None:
+        with self.assertRaises(ValueError):
+            VALIDATE.validate_memory_summary(
+                {
+                    "schema": "litchi_signed_native_memory.v1",
+                    "call_counts": [1, 8],
+                },
+                {},
+                set(),
+                (),
+            )
 
 
 if __name__ == "__main__":

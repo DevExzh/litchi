@@ -11,8 +11,10 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 from pathlib import Path
 import re
+import signal
 import statistics
 import subprocess
 import sys
@@ -37,6 +39,9 @@ W8 = importlib.util.module_from_spec(W8_SPEC)
 W8_SPEC.loader.exec_module(W8)
 
 SAFE_ROUTE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+CHILD_TIMEOUT_S = 300.0
+CHILD_OUTPUT_LIMIT = 4 * 1024 * 1024
+CHILD_RSS_LIMIT = 20 * 1024 * 1024 * 1024
 
 
 def save(path: Path, value: object) -> None:
@@ -57,8 +62,10 @@ def child(
     cpu: int,
     calls: int | None = None,
 ) -> dict[str, Any]:
-    if not SAFE_ROUTE.fullmatch(route):
+    if route != "*" and not SAFE_ROUTE.fullmatch(route):
         raise ValueError(f"invalid route name: {route!r}")
+    if route == "*" and mode != "list":
+        raise ValueError("wildcard route is reserved for list mode")
     stdout_path = output / f"{label}.stdout.json"
     stderr_path = output / f"{label}.stderr"
     command = [
@@ -75,7 +82,7 @@ def child(
     ]
     if calls is not None:
         command.extend(("--calls", str(calls)))
-    environment = dict(__import__("os").environ)
+    environment = dict(os.environ)
     environment["LITCHI_SIGNED_FIXTURE_ROOT"] = endpoint["fixture_root"]
     environment["LITCHI_SIGNED_ENDPOINT"] = (
         "before" if label.startswith("before") else "after"
@@ -85,20 +92,105 @@ def child(
 
     before_host = W8.guard(output, f"{label}.before")
     started_ns = time.time_ns()
-    with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
-        process = subprocess.Popen(
-            command,
-            stdout=stdout,
-            stderr=stderr,
-            env=environment,
-            start_new_session=True,
-        )
-        while process.poll() is None:
-            time.sleep(0.1)
-            W8.guard(output, f"{label}.during-{time.time_ns()}", {process.pid})
-        exit_code = process.returncode
-    finished_ns = time.time_ns()
-    after_host = W8.guard(output, f"{label}.after")
+    during_hosts: list[str] = []
+    guard_error: str | None = None
+    failed_after: dict[str, Any] | None = None
+    timed_out = False
+    rss_max = 0
+    process: subprocess.Popen[bytes] | None = None
+    exit_code: int | None = None
+    pending_error: BaseException | None = None
+
+    def rss_bytes(pid: int) -> int:
+        try:
+            for line in Path(f"/proc/{pid}/status").read_text().splitlines():
+                if line.startswith("VmRSS:"):
+                    return int(line.split()[1]) * 1024
+        except (FileNotFoundError, PermissionError, ValueError, IndexError):
+            return 0
+        return 0
+
+    def stop_group() -> None:
+        if process is None or process.poll() is not None:
+            return
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=5)
+
+    try:
+        with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
+            process = subprocess.Popen(
+                command,
+                stdout=stdout,
+                stderr=stderr,
+                env=environment,
+                start_new_session=True,
+            )
+            deadline = time.monotonic() + CHILD_TIMEOUT_S
+            checks = 0
+            while process.poll() is None:
+                if time.monotonic() >= deadline:
+                    timed_out = True
+                    guard_error = f"child exceeded {CHILD_TIMEOUT_S:.1f}s timeout"
+                rss_max = max(rss_max, rss_bytes(process.pid))
+                if rss_max > CHILD_RSS_LIMIT and guard_error is None:
+                    guard_error = f"child exceeded {CHILD_RSS_LIMIT} byte RSS cap"
+                if (
+                    (stdout_path.exists() and stdout_path.stat().st_size > CHILD_OUTPUT_LIMIT)
+                    or (stderr_path.exists() and stderr_path.stat().st_size > CHILD_OUTPUT_LIMIT)
+                ) and guard_error is None:
+                    guard_error = f"child exceeded {CHILD_OUTPUT_LIMIT} byte output cap"
+                checks += 1
+                during_label = f"{label}.during-{checks:05}"
+                try:
+                    during_hosts.append(W8.guard(output, during_label, {process.pid}))
+                except RuntimeError as error:
+                    if guard_error is None:
+                        guard_error = str(error)
+                    during_path = output / f"{during_label}.host.json"
+                    if during_path.is_file():
+                        during_hosts.append(str(during_path.resolve()))
+                if guard_error is not None:
+                    stop_group()
+                    break
+                time.sleep(0.1)
+            if process is not None:
+                exit_code = process.wait(timeout=5)
+    except BaseException as error:
+        if guard_error is None:
+            guard_error = str(error)
+        pending_error = error
+        stop_group()
+        if process is not None:
+            exit_code = process.wait(timeout=5)
+    finally:
+        if process is not None and process.poll() is None:
+            stop_group()
+        finished_ns = time.time_ns()
+        failed_after = {
+            "time_ns": finished_ns,
+            "exit_code": process.returncode if process is not None else None,
+            "guard_error": guard_error,
+            "timed_out": timed_out,
+            "rss_max_bytes": rss_max,
+            "stdout_bytes": stdout_path.stat().st_size if stdout_path.exists() else 0,
+            "stderr_bytes": stderr_path.stat().st_size if stderr_path.exists() else 0,
+        }
+    after_host: str | None = None
+    after_error: str | None = None
+    try:
+        after_host = W8.guard(output, f"{label}.after")
+    except RuntimeError as error:
+        after_error = str(error)
+        if guard_error is None:
+            guard_error = after_error
+    exit_code = process.returncode if process is not None else exit_code
     receipt = {
         "schema": "litchi_signed_native_child.v1",
         "label": label,
@@ -110,11 +202,24 @@ def child(
         "started_ns": started_ns,
         "finished_ns": finished_ns,
         "exit_code": exit_code,
-        "host_snapshots": [before_host, after_host],
+        "host_snapshots": [before_host, *during_hosts, after_host] if after_host else [before_host, *during_hosts],
+        "during_snapshots": len(during_hosts),
+        "rss_max_bytes": rss_max,
+        "timeout_seconds": CHILD_TIMEOUT_S,
+        "output_limit_bytes": CHILD_OUTPUT_LIMIT,
+        "rss_limit_bytes": CHILD_RSS_LIMIT,
+        "timed_out": timed_out,
+        "guard_error": guard_error,
+        "failed_after": failed_after,
+        "after_guard_error": after_error,
         "stdout": VALIDATE.artifact(stdout_path),
         "stderr": VALIDATE.artifact(stderr_path),
     }
     save(output / f"{label}.receipt.json", receipt)
+    if pending_error is not None:
+        raise pending_error
+    if guard_error or after_error:
+        raise RuntimeError(guard_error or after_error or f"{label}: child guard failed")
     if exit_code != 0:
         raise RuntimeError(f"{label} exited {exit_code}; see {stderr_path}")
     try:
@@ -154,7 +259,11 @@ def preflight(
             cpu,
         )
         capability = value.get("capability")
-        if capability == "capability_missing":
+        if capability == "not_applicable":
+            if endpoint_label != "before" or route not in VALIDATE.BASELINE_NOT_APPLICABLE:
+                raise ValueError(f"{endpoint_label}/{route}: invalid not_applicable disposition")
+            VALIDATE.validate_correctness_receipt(value, route, endpoint="before")
+        elif capability == "capability_missing":
             if endpoint_label == "after" or route not in VALIDATE.FINAL_ONLY:
                 raise ValueError(f"{endpoint_label}/{route}: required capability missing")
             VALIDATE.validate_correctness_receipt(value, route, endpoint="before")
@@ -190,6 +299,7 @@ def measure_block(
     cpu: int,
     label: str,
     sides: tuple[str, ...],
+    expected_route: str | None = None,
 ) -> dict[str, Any]:
     legs = []
     for index, side in enumerate(sides):
@@ -203,7 +313,7 @@ def measure_block(
             cpu,
             calls,
         )
-        VALIDATE.validate_measure(value, route, calls)
+        VALIDATE.validate_measure(value, route, calls, expected_route=expected_route)
         legs.append({"side": side, "value": value})
     return {"legs": legs}
 
@@ -220,6 +330,76 @@ def median_per_call(blocks: list[dict[str, Any]], side: str) -> float:
     return float(statistics.median(values))
 
 
+def paired_route(route: str) -> str:
+    if route.startswith("signed_leaf/"):
+        return "signed_facade/" + route.split("/", 1)[1]
+    if route.startswith("signed_facade/"):
+        return "signed_leaf/" + route.split("/", 1)[1]
+    raise ValueError(f"invalid signed route {route}")
+
+
+def final_only_row(
+    output: Path,
+    after: dict[str, Any],
+    after_binary: Path,
+    route: str,
+    rounds: int,
+    cpu: int,
+) -> dict[str, Any]:
+    leaf_route = route if route.startswith("signed_leaf/") else paired_route(route)
+    facade_route = route if route.startswith("signed_facade/") else paired_route(route)
+    leaf_calls, leaf_calibration = calibrate(
+        output,
+        after_binary,
+        after,
+        leaf_route,
+        cpu,
+        f"{route.replace('/', '_')}-leaf-calibration",
+    )
+    facade_calls, facade_calibration = calibrate(
+        output,
+        after_binary,
+        after,
+        facade_route,
+        cpu,
+        f"{route.replace('/', '_')}-facade-calibration",
+    )
+    calls = max(leaf_calls, facade_calls)
+    blocks: list[dict[str, Any]] = []
+    for block_index in range(rounds):
+        legs = []
+        for leg_index, side in enumerate(("leaf", "facade", "facade", "leaf")):
+            side_route = leaf_route if side == "leaf" else facade_route
+            legs.append(
+                measure_block(
+                    output,
+                    after_binary,
+                    after,
+                    side_route,
+                    calls,
+                    cpu,
+                    f"{route.replace('/', '_')}-leaf-facade-{block_index:02}-{leg_index}-{side}",
+                    (side,),
+                    expected_route=side_route,
+                )["legs"][0]
+            )
+        blocks.append({"legs": legs})
+    leaf_ns = median_per_call(blocks, "leaf")
+    facade_ns = median_per_call(blocks, "facade")
+    return {
+        "route": route,
+        "paired_route": paired_route(route),
+        "baseline": "leaf_facade",
+        "comparison": "final_leaf_vs_facade",
+        "calls": calls,
+        "calibration": {"leaf": leaf_calibration, "facade": facade_calibration},
+        "blocks": blocks,
+        "leaf_ns_per_call": leaf_ns,
+        "facade_ns_per_call": facade_ns,
+        "facade_leaf_ratio": facade_ns / leaf_ns,
+    }
+
+
 def run(
     before_binary: Path,
     after_binary: Path,
@@ -231,7 +411,7 @@ def run(
 ) -> dict[str, Any]:
     if rounds < VALIDATE.MIN_ABBA_ROUNDS:
         raise ValueError("at least five ABBA rounds are required")
-    if cpu not in __import__("os").sched_getaffinity(0):
+    if cpu not in os.sched_getaffinity(0):
         raise ValueError(f"CPU {cpu} is unavailable")
     if output.exists() and any(output.iterdir()):
         raise ValueError(f"refusing to overwrite nonempty output {output}")
@@ -264,37 +444,8 @@ def run(
     }
     save(output / "manifest.json", manifest)
     for index, route in enumerate(VALIDATE.TIMED):
-        baseline_missing = before_rows[route].get("capability") == "capability_missing"
-        if baseline_missing:
-            calls, calibration = calibrate(
-                output,
-                after_binary,
-                after,
-                route,
-                cpu,
-                f"{route.replace('/', '_')}-after-calibration",
-            )
-            blocks = [
-                measure_block(
-                    output,
-                    after_binary,
-                    after,
-                    route,
-                    calls,
-                    cpu,
-                    f"{route.replace('/', '_')}-final-{block_index:02}",
-                    ("after", "after", "after", "after"),
-                )
-                for block_index in range(rounds)
-            ]
-            row = {
-                "route": route,
-                "baseline": "capability_missing",
-                "calls": calls,
-                "calibration": {"after": calibration},
-                "blocks": blocks,
-                "final_after_ns_per_call": median_per_call(blocks, "after"),
-            }
+        if route in VALIDATE.FINAL_ONLY:
+            row = final_only_row(output, after, after_binary, route, rounds, cpu)
         else:
             before_calls, before_calibration = calibrate(
                 output,

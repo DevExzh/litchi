@@ -71,14 +71,14 @@ invent a second wrapper or claim that `Signed::file()` can consume itself.
 
 | route | operation | required correctness proof | baseline f2 status | timing status |
 |---|---|---|---|---|
-| `signed_leaf/noop_commit` | native same-value setter through `Signed::file().edit(...)` | `diagnostics.changed = false`; patch is native no-op; output remains signed and byte-identical | `unsupported/refused` if the old source cannot admit signed no-op; never time an error as a pass | final-only until a semantically identical before route exists |
-| `signed_facade/noop_commit` | same setter through `File::Signed.edit(...)` | same as leaf, plus result remains `File::Signed` | `unsupported/refused` unless old route passes the same proof | final-only |
-| `signed_leaf/noop_replay` | apply leaf no-op patch to independently reopened signed leaf | same format and exact recorded base; replay remains signed and bytes equal | `unsupported/refused` if no signed patch admission | final-only |
-| `signed_facade/noop_replay` | apply facade no-op patch to independently reopened signed facade | same as leaf, including wrapper/origin and bytes | `unsupported/refused` | final-only |
+| `signed_leaf/noop_commit` | native same-value setter through `Signed::file().edit(...)` | `diagnostics.changed = false`; patch is native no-op; output remains signed and byte-identical | `unsupported/refused` if the old source cannot admit signed no-op; never time an error as a pass | final leaf/facade comparison; no historical ratio |
+| `signed_facade/noop_commit` | same setter through `File::Signed.edit(...)` | same as leaf, plus result remains `File::Signed` | `unsupported/refused` unless old route passes the same proof | final leaf/facade comparison; no historical ratio |
+| `signed_leaf/noop_replay` | apply leaf no-op patch to independently reopened signed leaf | same format and exact recorded base; replay remains signed and bytes equal | `unsupported/refused` if no signed patch admission | final leaf/facade comparison; no historical ratio |
+| `signed_facade/noop_replay` | apply facade no-op patch to independently reopened signed facade | same as leaf, including wrapper/origin and bytes | `unsupported/refused` | final leaf/facade comparison; no historical ratio |
 | `signed_leaf/refusal` | real native change on signed leaf | `RefusalKind::ProtectedDocument`, fixed reason/code; source bytes unchanged; no output publication | correctness only; an expected refusal is not a timed success | correctness only |
 | `signed_facade/refusal` | real native change on signed facade | same refusal and no publication | correctness only | correctness only |
-| `signed_leaf/unsign_write` | consume `Signed::unsign`, changed native setter, stream `write_to` | unsigned result; signature graph/streams absent; changed semantic marker present; reopen is unsigned; source clone still refuses | existing explicit `Signed::unsign` route is paired only when this proof passes; a failed old route is a preflight failure, not a timed refusal | matched when the old route passes the same proof; otherwise visible as an unsupported final-only route |
-| `signed_facade/unsign_write` | same through facade-owned signed handle, then write | same byte/signature/source proof; facade source clone remains protected | existing explicit `Signed::unsign` route; same proof and pairing rule as the leaf | matched when the old route passes the same proof; otherwise visible as an unsupported final-only route |
+| `signed_leaf/unsign_write` | consume `Signed::unsign`, changed native setter, stream `write_to` | unsigned result; signature graph/streams absent; changed semantic marker present; reopen is unsigned; source clone still refuses | existing explicit `Signed::unsign` route is paired only when this proof passes; a failed old route is a preflight failure, not a timed refusal | final leaf/facade comparison; no historical ratio |
+| `signed_facade/unsign_write` | same through facade-owned signed handle, then write | same byte/signature/source proof; facade source clone remains protected | existing explicit `Signed::unsign` route; same proof and pairing rule as the leaf | final leaf/facade comparison; no historical ratio |
 | `signed_leaf/unsigned_negative` | apply an authorized unsigned no-op patch to signed recipient | `PatchConflict`, classified `invalid_input`; no signature re-marking | not applicable | correctness only |
 | `signed_facade/unsigned_negative` | facade counterpart | same | not applicable | correctness only |
 | `signed_leaf/source_freshness` | path-backed signed no-op/replay after external source mutation | `SourceChanged`, classified `io_error`; no publication | not applicable | correctness only |
@@ -86,11 +86,13 @@ invent a second wrapper or claim that `Signed::file()` can consume itself.
 | `signed_leaf/budget` | same-value native setter under finite `EditOptions`/`SemanticLimits` | authored operation/snapshot charge is retained; budget refusal is typed; no bypass by no-op collapse | not applicable | correctness only |
 | `signed_facade/budget` | facade counterpart | same | not applicable | correctness only |
 
-“Final-only” is a capability classification, not a performance ratio. A
-before/after ratio is emitted only when the before endpoint returns the same
-semantic result and the same publication class. If that pairing is absent,
-the runner emits `baseline = capability_missing` and refuses to produce a
-ratio.
+“Final-only” is a capability classification, not a historical before/after
+ratio. Every final-only route is still qualified with an actual final binary
+leaf/facade ABBA pair: `[leaf, facade, facade, leaf]`, five or more blocks,
+independent 500 ms calibrations and the reported `facade_leaf_ratio`. The
+manifest carries no `after_before_ratio` for these routes. A route cannot be
+left permanently unqualified merely because the historical f2 endpoint could
+not admit a signed no-op.
 
 ## 4. Direct format-native preflight
 
@@ -115,10 +117,21 @@ requires the matrix's expected disposition.
 
 ## 5. Timing and memory protocol
 
-1. Build two clean, release, pinned endpoint binaries from full source commits.
-   The endpoint manifests bind source archive, `Cargo.lock`, dependency
-   projection, probe source, tracked fixture tree and binary SHA-256. No
-   target directory is shared between endpoints.
+1. Build two clean, release, pinned endpoint binaries from full source commits
+   with the reviewed external consumer preparation driver. The f2 endpoint is
+   exactly `f2bbbc8d07ab5da26c180f1ff74813d39f632d54`; the final endpoint is
+   exactly `472b6705475b073e7fe08f6e11ee17fb1e29f838` from the immutable
+   `final-api-capture-472b670547/source` checkout. The driver verifies a clean
+   tree, writes a separate external package, runs `cargo generate-lockfile
+   --offline`, `cargo metadata --locked --format-version=1 --no-deps`, and
+   `cargo build --offline --locked --release`, then executes `--mode list` and
+   every `--mode validate` route to derive the endpoint capability map. The
+   endpoint manifests bind the source root/ref/tree hash, source archive,
+   adapter/probe, lock, normalized dependency projection, build receipt,
+   tracked fixture tree and binary SHA-256. No target directory is shared
+   between endpoints; the adapter selects the f2 public-field/limits and
+   XLSB `Option<Edit>` APIs through its consumer feature rather than changing
+   a production crate.
 2. Run correctness/preflight and direct native checks before timing. A route
    that fails any byte, signature-state, refusal, source-freshness or budget
    proof is rejected before calibration.
@@ -130,14 +143,22 @@ requires the matrix's expected disposition.
    buffer and reports bytes, writes and maximum write size.
 4. The guarded Python runner pins one CPU, requires a quiet process window,
    rejects Cargo/rustc/rustdoc/profilers/other probes and records full `/proc`
-   snapshots before, during and after each child. Each route calibrates to at
-   least 500 ms, rejects samples below 150 ms, and runs at least five outer
-   ABBA blocks. The inner workload is leaf, facade, facade, leaf; the outer
-   workload is before, after, after, before.
-5. Allocation evidence is separate. This probe introduces no allocator or
-   `unsafe` code. If allocation evidence is required, it is collected by a
-   separately reviewed external mechanism and cannot be merged into native
-   latency evidence. A native binary must remain uninstrumented.
+   snapshots before, during and after each child. Children have explicit
+   timeout, RSS and stdout/stderr caps; every timeout or guard failure kills
+   the process group, waits for it, records the failed-after receipt and then
+   checks the host again. Each route calibrates to at least 500 ms, rejects
+   samples below 150 ms, and runs at least five outer blocks. Final-only
+   blocks are exactly leaf, facade, facade, leaf.
+5. Allocation evidence is separate and per fixture. The probe introduces no
+   allocator or `unsafe` code. The external memory runner profiles the same
+   uninstrumented final binary with identical setup for each fixture, route
+   and call count `1`, `8` and `128`; its scope is explicitly the whole
+   process, including fixture open and setup, and profiler overhead is
+   reported. It runs `/usr/bin/heaptrack --record-only` followed by the
+   reviewed `tools/perf_resource_profile.py` parser (or an owner-approved
+   valgrind Massif equivalent), keeps raw captures outside Git, and commits
+   only hash-bound reduced summaries. These profiles are bounded-retention
+   evidence, not native latency samples.
 
 ## 6. Acceptance rules
 
@@ -154,6 +175,5 @@ requires the matrix's expected disposition.
 - Source freshness, patch conflict and limits must retain their typed
   dispositions and fixed codes. Any error hidden by a generic protected
   refusal fails the route.
-- A ratio is reported only for matched before/after capability. Final-only
-  signed routes remain visible and unqualified until a truthful baseline is
-  available.
+- Final-only signed routes report only the truthful final leaf/facade ratio;
+  no historical before/after ratio is fabricated or required.

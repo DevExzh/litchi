@@ -13,10 +13,62 @@ use std::time::Instant;
 
 use litchi_core::OwnedSource;
 use litchi_ops::error::Source;
-use litchi_ops::transaction::{EditOptions, Error as TransactionError, LimitKind, SemanticLimits};
+use litchi_ops::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use litchi_ops::{Code, File, Props, open, open_bytes};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+
+#[cfg(feature = "legacy_api")]
+mod commit_api {
+    use litchi_ops::transaction::{Commit, Diagnostics, Edit, Patch, SemanticLimits};
+    use litchi_ops::{File, Result};
+
+    pub fn file<T>(commit: &Commit<T>) -> &File {
+        &commit.file
+    }
+
+    pub fn patch<T>(commit: &Commit<T>) -> &Patch {
+        &commit.patch
+    }
+
+    pub fn diagnostics<T>(commit: &Commit<T>) -> &Diagnostics {
+        &commit.diagnostics
+    }
+
+    pub fn edit<T>(
+        file: &File,
+        limits: SemanticLimits,
+        f: impl FnOnce(&mut Edit) -> Result<T>,
+    ) -> Result<Commit<T>> {
+        file.edit_with_limits(&limits, f)
+    }
+}
+
+#[cfg(not(feature = "legacy_api"))]
+mod commit_api {
+    use litchi_ops::transaction::{Commit, Diagnostics, Edit, EditOptions, Patch, SemanticLimits};
+    use litchi_ops::{File, Result};
+
+    pub fn file<T>(commit: &Commit<T>) -> &File {
+        commit.file()
+    }
+
+    pub fn patch<T>(commit: &Commit<T>) -> &Patch {
+        commit.patch()
+    }
+
+    pub fn diagnostics<T>(commit: &Commit<T>) -> &Diagnostics {
+        commit.diagnostics()
+    }
+
+    pub fn edit<T>(
+        file: &File,
+        limits: SemanticLimits,
+        f: impl FnOnce(&mut Edit) -> Result<T>,
+    ) -> Result<Commit<T>> {
+        file.edit_with_options(EditOptions::new().semantic_limits(limits), f)
+    }
+}
 
 const SCHEMA: &str = "litchi_signed_native_probe.v1";
 const TARGET_NS: u128 = 500_000_000;
@@ -249,6 +301,15 @@ fn load_fixtures(root: &Path) -> Vec<Fixture> {
         .map(|row| {
             let object = row.as_object().expect("fixture object");
             let relative = string_field(object, "relative_path");
+            let relative_path = Path::new(relative);
+            assert!(
+                !relative_path.is_absolute()
+                    && !relative_path
+                        .components()
+                        .any(|component| matches!(component, std::path::Component::ParentDir))
+                    && !relative.contains('\\'),
+                "fixture path must be a portable relative path: {relative}"
+            );
             let plain_path = root.join(relative);
             let plain = fs::read(&plain_path)
                 .unwrap_or_else(|error| panic!("{}: {error}", plain_path.display()));
@@ -387,6 +448,29 @@ fn signed_row(fixture: &Fixture, file: &File) -> Value {
     })
 }
 
+fn xlsb_native_noop(bytes: &[u8]) -> Vec<u8> {
+    let package = litchi_xlsb::Package::from_bytes(bytes).expect("XLSB native package");
+    #[cfg(feature = "legacy_api")]
+    let edit = package
+        .edit_cell_values(0)
+        .expect("XLSB native selector")
+        .expect("XLSB native worksheet");
+    #[cfg(not(feature = "legacy_api"))]
+    let edit = package
+        .edit_cell_values(0)
+        .expect("XLSB native selector")
+        .resolve()
+        .expect("XLSB native resolve")
+        .expect("XLSB native worksheet");
+    let commit = edit.commit().expect("XLSB native no-op");
+    let mut output = Cursor::new(Vec::new());
+    commit
+        .into_package()
+        .write_to(&mut output)
+        .expect("XLSB native bytes");
+    output.into_inner()
+}
+
 fn direct_native_noop(fixture: &Fixture) -> Value {
     let status = match fixture.format.as_str() {
         "DOCX" => {
@@ -476,22 +560,7 @@ fn direct_native_noop(fixture: &Fixture) -> Value {
             "exact_noop"
         },
         "XLSB" => {
-            let package =
-                litchi_xlsb::Package::from_bytes(&fixture.signed).expect("XLSB native package");
-            let commit = package
-                .edit_cell_values(0)
-                .expect("XLSB native selector")
-                .resolve()
-                .expect("XLSB native resolve")
-                .expect("XLSB native worksheet")
-                .commit()
-                .expect("XLSB native no-op");
-            let mut output = Cursor::new(Vec::new());
-            commit
-                .into_package()
-                .write_to(&mut output)
-                .expect("XLSB native bytes");
-            assert_eq!(output.into_inner(), fixture.signed);
+            assert_eq!(xlsb_native_noop(&fixture.signed), fixture.signed);
             "exact_noop"
         },
         "XLS" => {
@@ -537,12 +606,12 @@ fn no_op_commit(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Value> {
     let endpoint = endpoint_file(&file, facade);
     let value = property_value(&endpoint, fixture);
     let commit = endpoint.edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))?;
-    let output = commit.file().to_bytes()?;
+    let output = commit_api::file(&commit).to_bytes()?;
     let mut row = signed_row(fixture, &file);
     row["status"] = json!("ok");
-    row["diagnostics_changed"] = json!(commit.diagnostics().changed());
-    row["patch_noop"] = json!(commit.patch().is_noop());
-    row["signed_after"] = json!(commit.file().is_signed());
+    row["diagnostics_changed"] = json!(commit_api::diagnostics(&commit).changed());
+    row["patch_noop"] = json!(commit_api::patch(&commit).is_noop());
+    row["signed_after"] = json!(commit_api::file(&commit).is_signed());
     row["output_sha256"] = json!(digest(&output));
     row["output_equals_source"] = json!(output == fixture.signed);
     row["source_after_sha256"] = json!(digest(&endpoint.to_bytes()?));
@@ -560,12 +629,12 @@ fn no_op_write(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Value> {
     let endpoint = endpoint_file(&file, facade);
     let value = property_value(&endpoint, fixture);
     let commit = endpoint.edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))?;
-    let (output_sha256, bytes, writes, max_write_bytes) = bounded_write(commit.file())?;
+    let (output_sha256, bytes, writes, max_write_bytes) = bounded_write(commit_api::file(&commit))?;
     let mut row = signed_row(fixture, &file);
     row["status"] = json!("ok");
-    row["patch_noop"] = json!(commit.patch().is_noop());
-    row["diagnostics_changed"] = json!(commit.diagnostics().changed());
-    row["signed_after"] = json!(commit.file().is_signed());
+    row["patch_noop"] = json!(commit_api::patch(&commit).is_noop());
+    row["diagnostics_changed"] = json!(commit_api::diagnostics(&commit).changed());
+    row["signed_after"] = json!(commit_api::file(&commit).is_signed());
     row["output_sha256"] = json!(output_sha256);
     row["output_equals_source"] =
         json!(bytes == fixture.signed.len() && output_sha256 == fixture.source_sha256);
@@ -583,11 +652,11 @@ fn no_op_replay(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Value> {
     let commit = endpoint.edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))?;
     let reopened = open_signed(fixture);
     let recipient = endpoint_file(&reopened, facade);
-    let replayed = commit.patch().apply(&recipient)?;
+    let replayed = commit_api::patch(&commit).apply(&recipient)?;
     let output = replayed.to_bytes()?;
     let mut row = signed_row(fixture, &file);
     row["status"] = json!("ok");
-    row["patch_noop"] = json!(commit.patch().is_noop());
+    row["patch_noop"] = json!(commit_api::patch(&commit).is_noop());
     row["replay_base_match"] = json!(output == fixture.signed);
     row["signed_after"] = json!(replayed.is_signed());
     row["output_sha256"] = json!(digest(&output));
@@ -609,6 +678,7 @@ fn changed_refusal(fixture: &Fixture, facade: bool) -> Value {
     row["refusal_kind"] = json!("ProtectedDocument");
     row["code"] = json!(error.code().as_str());
     row["source_after_sha256"] = json!(digest(&endpoint.to_bytes().expect("source remains")));
+    row["output_published"] = json!(false);
     assert_eq!(error.code(), Code::DocumentProtected);
     assert_eq!(before, endpoint.to_bytes().expect("source remains bytes"));
     row
@@ -625,8 +695,7 @@ fn unsigned_negative(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Valu
     let commit = unsigned
         .edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))
         .expect("authorized unsigned no-op");
-    let error = commit
-        .patch()
+    let error = commit_api::patch(&commit)
         .apply(&endpoint_file(&file, facade))
         .expect_err("unsigned no-op patch must conflict with signed publication");
     let recipient = endpoint_file(&file, facade);
@@ -666,10 +735,9 @@ fn source_freshness(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Value
     let opened = open(&path)?;
     let endpoint = endpoint_file(&opened, facade);
     let value = property_value(&endpoint, fixture);
-    let patch = endpoint
-        .edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))?
-        .patch()
-        .clone();
+    let patch_commit =
+        endpoint.edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))?;
+    let patch = commit_api::patch(&patch_commit).clone();
     let mut changed = fixture.signed.clone();
     changed[0] ^= 1;
     fs::write(&path, &changed).expect("mutate source fixture");
@@ -703,14 +771,12 @@ fn budget(fixture: &Fixture, facade: bool) -> Value {
         .expect("one-operation limit")
         .build()
         .expect("semantic limits");
-    let options = EditOptions::new().semantic_limits(limits);
     let value = property_value(&endpoint, fixture);
-    let error = endpoint
-        .edit_with_options(options, |edit| {
-            edit.set(fixture.target.as_str(), props(fixture, &value))?;
-            edit.set(fixture.target.as_str(), props(fixture, &value))
-        })
-        .expect_err("one-operation limit");
+    let error = commit_api::edit(&endpoint, limits, |edit| {
+        edit.set(fixture.target.as_str(), props(fixture, &value))?;
+        edit.set(fixture.target.as_str(), props(fixture, &value))
+    })
+    .expect_err("one-operation limit");
     let limit_kind = match error.leaf() {
         Source::Transaction(TransactionError::Limit { kind, .. }) => limit_kind_name(*kind),
         other => panic!("budget refusal was not a transaction limit: {other:?}"),
@@ -721,6 +787,7 @@ fn budget(fixture: &Fixture, facade: bool) -> Value {
     row["code"] = json!(error.code().as_str());
     row["limit_kind"] = json!(limit_kind);
     row["source_after_sha256"] = json!(digest(&endpoint.to_bytes().expect("budget source")));
+    row["output_published"] = json!(false);
     assert_eq!(error.code(), Code::LimitExceeded);
     assert_eq!(limit_kind, "operations");
     row
@@ -775,6 +842,33 @@ fn baseline_gap_route(route: &str) -> bool {
     )
 }
 
+fn baseline_not_applicable_route(route: &str) -> bool {
+    matches!(
+        route,
+        "signed_leaf/unsigned_negative"
+            | "signed_facade/unsigned_negative"
+            | "signed_leaf/source_freshness"
+            | "signed_facade/source_freshness"
+            | "signed_leaf/budget"
+            | "signed_facade/budget"
+    )
+}
+
+fn not_applicable(fixture: &Fixture) -> Value {
+    json!({
+        "name": fixture.name,
+        "format": fixture.format,
+        "origin": fixture.origin,
+        "signature_presence": "detected",
+        "cryptographic_verification": "not_performed",
+        "source_sha256": fixture.source_sha256,
+        "status": "not_applicable",
+        "disposition": "requires_signed_noop_admission",
+        "reason": "the historical endpoint cannot construct a signed no-op base",
+        "signed_before": true,
+    })
+}
+
 fn unsign_write(fixture: &Fixture, facade: bool) -> Value {
     let file = open_signed(fixture);
     let signed_clone = file.clone();
@@ -789,9 +883,11 @@ fn unsign_write(fixture: &Fixture, facade: bool) -> Value {
     let commit = endpoint
         .edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &changed)))
         .expect("authorized changed edit");
-    let output = commit.file().to_bytes().expect("authorized output");
+    let output = commit_api::file(&commit)
+        .to_bytes()
+        .expect("authorized output");
     let (stream_sha256, bytes, writes, max_write_bytes) =
-        bounded_write(commit.file()).expect("authorized bounded publication");
+        bounded_write(commit_api::file(&commit)).expect("authorized bounded publication");
     let reopened = open_bytes(output.clone()).expect("authorized output reopens");
     let signature_parts_absent = signature_parts_absent(fixture, &output);
     let target_after = property_value(&reopened, fixture);
@@ -871,7 +967,7 @@ fn timed_many(
                             edit.set(fixture.target.as_str(), props(fixture, &target.value))
                         })
                         .expect("timed signed no-op");
-                    std::hint::black_box(commit.diagnostics().changed());
+                    std::hint::black_box(commit_api::diagnostics(&commit).changed());
                 },
                 "signed_leaf/noop_write" | "signed_facade/noop_write" => {
                     let commit = target
@@ -881,7 +977,9 @@ fn timed_many(
                         })
                         .expect("timed signed publication");
                     let mut stream = StreamDigest::new();
-                    commit.file().write_to(&mut stream).expect("timed write");
+                    commit_api::file(&commit)
+                        .write_to(&mut stream)
+                        .expect("timed write");
                     std::hint::black_box(stream.finish());
                 },
                 "signed_leaf/noop_replay" | "signed_facade/noop_replay" => {
@@ -891,8 +989,7 @@ fn timed_many(
                             edit.set(fixture.target.as_str(), props(fixture, &target.value))
                         })
                         .expect("timed signed replay patch");
-                    let replayed = commit
-                        .patch()
+                    let replayed = commit_api::patch(&commit)
                         .apply(&target.recipient)
                         .expect("timed replay");
                     std::hint::black_box(replayed.is_signed());
@@ -905,8 +1002,7 @@ fn timed_many(
                         })
                         .expect("timed authorized edit");
                     let mut stream = StreamDigest::new();
-                    commit
-                        .file()
+                    commit_api::file(&commit)
                         .write_to(&mut stream)
                         .expect("timed authorized write");
                     std::hint::black_box(stream.finish());
@@ -928,6 +1024,16 @@ fn mode_value(mode: &str, route: &str, fixtures: &[Fixture], calls: usize) -> Va
     if mode == "validate" {
         let mut rows = Vec::with_capacity(fixtures.len());
         let mut capability = "available";
+        if endpoint() == "before" && baseline_not_applicable_route(route) {
+            rows.extend(fixtures.iter().map(not_applicable));
+            return json!({
+                "schema": SCHEMA,
+                "route": route,
+                "capability": "not_applicable",
+                "native_preflight": Vec::<Value>::new(),
+                "fixtures": rows,
+            });
+        }
         for fixture in fixtures {
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 route_operation(route, fixture)
@@ -964,6 +1070,28 @@ fn mode_value(mode: &str, route: &str, fixtures: &[Fixture], calls: usize) -> Va
             "capability": capability,
             "native_preflight": native,
             "fixtures": rows,
+        });
+    }
+    if mode == "memory" {
+        let requested = calls.max(1);
+        let mut proofs = Vec::with_capacity(fixtures.len());
+        for iteration in 0..requested {
+            for fixture in fixtures {
+                let row = route_operation(route, fixture)
+                    .unwrap_or_else(|error| panic!("memory route {route}: {}", error.code()));
+                if iteration == 0 {
+                    proofs.push(row);
+                }
+            }
+        }
+        return json!({
+            "schema": SCHEMA,
+            "route": route,
+            "mode": "memory",
+            "calls": requested,
+            "operations": requested.saturating_mul(fixtures.len()),
+            "scope": "whole_process_including_fixture_open_and_setup",
+            "fixtures": proofs,
         });
     }
     let requested = calls.max(1);
@@ -1023,7 +1151,20 @@ fn main() {
     }
     assert!(ROUTES.contains(&route), "unknown route {route}");
     let root = fixture_root();
-    let fixtures = load_fixtures(&root);
+    let all_fixtures = load_fixtures(&root);
+    let fixtures = if mode == "memory" {
+        let selected = std::env::var("LITCHI_SIGNED_FIXTURE")
+            .expect("LITCHI_SIGNED_FIXTURE is required for memory mode");
+        all_fixtures
+            .into_iter()
+            .filter(|fixture| fixture.name == selected)
+            .collect::<Vec<_>>()
+    } else {
+        all_fixtures
+    };
+    if mode == "memory" && fixtures.len() != 1 {
+        panic!("memory fixture selection did not resolve exactly one fixture");
+    }
     let value = mode_value(mode, route, &fixtures, calls);
     println!("{value}");
 }
