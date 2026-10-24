@@ -11,26 +11,30 @@ The reviewed driver is:
 
 ```text
 docs/unified-ops/results/0362umf/opc_read_ahead_timing.py
-bytes: 57434
-sha256: 0234ba04fdb7cebaaefc98b9681b2e8ce42d1ee928f856bc2bea02d2ce695318
+bytes: 68267
+sha256: 2a34730f1265aa0ac2c1c8c9be2f33865cc806a06e024e99dbd6e2691a309ac0
 ```
 
 The guard now:
 
 - enables a Linux child subreaper and requires every child to verify its
   parent, create its own session/process group, and install `PDEATHSIG`; it
-  retains start-time identities across reparenting and fails closed if group
-  cleanup cannot prove that all owned processes are gone;
+  retains start-time identities across reparenting, explicitly reaps adopted
+  zombies, and fails closed if group cleanup cannot prove that all owned
+  processes are gone.  The direct child is always waited/reaped even when a
+  monitor operation raises;
 - checks the deadline immediately after each polling wait, before accepting a
   normal child exit, and reports capture-thread join or capture-I/O failures;
 - treats normal `/proc` PID disappearance as expected, but fails closed on
   unexpected stat, identity, or RSS errors.  Kernel-thread/zombie missing RSS
   is the only explicit zero-RSS exception.  Restricted `exe`/`cwd` metadata is
-  retained only after readable `comm` and `cmdline` prove the process is not in
-  the guarded heavy set;
+  retained only after readable `comm` and `cmdline` prove the process is both
+  outside the guarded heavy set and not another Litchi process;
 - rejects symlinked target entries and any target growth, checks the target
-  cap throughout the child, and bounds each host snapshot/JSONL stream, event,
-  and final receipt;
+  cap throughout the child, and compares a content/structure/metadata identity
+  before and after the child so growth, shrink/deletion, and same-size content
+  mutation are all rejected.  Each host snapshot/JSONL stream, event, and
+  final receipt is bounded;
 - binds each binary by byte count and SHA-256 before the ABBA sequence and
   before and after every leg, while retaining the source HEAD/tree/status
   fence before and after each leg;
@@ -50,6 +54,13 @@ Static checks for this return were:
 python3 -m py_compile docs/unified-ops/results/0362umf/opc_read_ahead_timing.py
 python3 docs/unified-ops/results/0362umf/opc_read_ahead_timing.py --help
 git diff --check
+```
+
+The executable fake-child lifecycle suite is:
+
+```text
+./tools/test_opc_read_ahead_timing_guard.py -v
+4 tests passed
 ```
 
 No timing command was started because the host was concurrently running

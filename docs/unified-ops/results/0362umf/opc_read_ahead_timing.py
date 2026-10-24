@@ -95,6 +95,19 @@ class TimingError(RuntimeError):
     """A source, host, child, output, or report contract failed."""
 
 
+def guarded_process_name(value: str) -> bool:
+    """Identify build-heavy or litchi-owned process names from readable text."""
+    lowered = value.lower()
+    return Path(value).name.lower() in HEAVY_NAMES or "litchi" in lowered
+
+
+def restricted_metadata_is_unrelated(comm: str, cmdline: list[str], kernel_thread: bool) -> bool:
+    """Whether readable process text proves restricted exe/cwd is irrelevant."""
+    if kernel_thread:
+        return True
+    return bool(cmdline) and not any(guarded_process_name(value) for value in (comm, *cmdline))
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
@@ -196,6 +209,128 @@ def directory_size(path: Path) -> int:
     return total
 
 
+def target_identity(path: Path, maximum: int) -> dict[str, Any]:
+    """Hash target structure, metadata, and file contents for immutability."""
+    if path.is_symlink():
+        raise TimingError(f"target is a symlink: {path}")
+    if not path.exists():
+        missing = hashlib.sha256(b"missing\n").hexdigest()
+        return {"exists": False, "bytes": 0, "entries": 0, "sha256": missing}
+    digest = hashlib.sha256()
+    total = 0
+    entries = 0
+
+    def record(kind: str, relative: str, metadata: os.stat_result, content: str | None = None) -> None:
+        digest.update(
+            (
+                json.dumps(
+                    {
+                        "kind": kind,
+                        "path": relative,
+                        "dev": metadata.st_dev,
+                        "ino": metadata.st_ino,
+                        "mode": metadata.st_mode,
+                        "size": metadata.st_size,
+                        "mtime_ns": metadata.st_mtime_ns,
+                        "ctime_ns": metadata.st_ctime_ns,
+                        "content": content,
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n"
+            ).encode()
+        )
+
+    def visit(current: Path, relative: Path) -> None:
+        nonlocal total, entries
+        try:
+            current_stat = current.stat(follow_symlinks=False)
+            if not current.is_dir():
+                raise TimingError(f"target entry is not a directory: {current}")
+            record("directory", relative.as_posix(), current_stat)
+            entries += 1
+            children = sorted(os.scandir(current), key=lambda entry: entry.name)
+        except OSError as error:
+            raise TimingError(f"cannot inspect target directory {current}: {error}") from error
+        for child in children:
+            child_path = Path(child.path)
+            child_relative = relative / child.name
+            try:
+                if child.is_symlink():
+                    raise TimingError(f"target contains a symlink: {child_path}")
+                if child.is_dir(follow_symlinks=False):
+                    visit(child_path, child_relative)
+                    continue
+                if not child.is_file(follow_symlinks=False):
+                    raise TimingError(f"target contains a non-regular entry: {child_path}")
+                before_stat = child.stat(follow_symlinks=False)
+                if before_stat.st_size > maximum:
+                    raise TimingError(f"target exceeds cap: {path} ({before_stat.st_size} > {maximum})")
+                child_digest, child_bytes = sha256_file(child_path)
+                after_stat = child.stat(follow_symlinks=False)
+                before_identity = (
+                    before_stat.st_dev,
+                    before_stat.st_ino,
+                    before_stat.st_mode,
+                    before_stat.st_size,
+                    before_stat.st_mtime_ns,
+                    before_stat.st_ctime_ns,
+                )
+                after_identity = (
+                    after_stat.st_dev,
+                    after_stat.st_ino,
+                    after_stat.st_mode,
+                    after_stat.st_size,
+                    after_stat.st_mtime_ns,
+                    after_stat.st_ctime_ns,
+                )
+                if before_identity != after_identity:
+                    raise TimingError(f"target file changed while fingerprinting: {child_path}")
+                if child_bytes != before_stat.st_size:
+                    raise TimingError(f"target file size changed while fingerprinting: {child_path}")
+                record("file", child_relative.as_posix(), after_stat, child_digest)
+                total += child_bytes
+                entries += 1
+                if total > maximum:
+                    raise TimingError(f"target exceeds cap: {path} ({total} > {maximum})")
+            except FileNotFoundError as error:
+                raise TimingError(f"target entry disappeared during fingerprinting: {child_path}") from error
+            except OSError as error:
+                raise TimingError(f"cannot fingerprint target entry {child_path}: {error}") from error
+
+    if path.is_dir():
+        visit(path, Path("."))
+    else:
+        before_stat = path.stat(follow_symlinks=False)
+        if before_stat.st_size > maximum:
+            raise TimingError(f"target exceeds cap: {path} ({before_stat.st_size} > {maximum})")
+        file_digest, file_bytes = sha256_file(path)
+        after_stat = path.stat(follow_symlinks=False)
+        before_identity = (
+            before_stat.st_dev,
+            before_stat.st_ino,
+            before_stat.st_mode,
+            before_stat.st_size,
+            before_stat.st_mtime_ns,
+            before_stat.st_ctime_ns,
+        )
+        after_identity = (
+            after_stat.st_dev,
+            after_stat.st_ino,
+            after_stat.st_mode,
+            after_stat.st_size,
+            after_stat.st_mtime_ns,
+            after_stat.st_ctime_ns,
+        )
+        if before_identity != after_identity:
+            raise TimingError(f"target file changed while fingerprinting: {path}")
+        record("file", path.name, after_stat, file_digest)
+        total = file_bytes
+        entries = 1
+    return {"exists": True, "bytes": total, "entries": entries, "sha256": digest.hexdigest()}
+
+
 def _proc_stat_fields(raw: str) -> list[str]:
     right = raw.rsplit(") ", 1)
     if len(right) != 2:
@@ -214,31 +349,31 @@ def read_proc(pid: int) -> dict[str, Any] | None:
         return None
     except (PermissionError, OSError, ValueError) as error:
         raise TimingError(f"cannot inspect /proc/{pid}: {error}") from error
-    command_names = {Path(comm).name}
-    if cmdline:
-        command_names.add(Path(cmdline[0]).name)
-    command_is_heavy = bool(command_names & HEAVY_NAMES)
+    kernel_thread = not cmdline and len(fields) > 3 and fields[2] == "0" and fields[3] == "0"
     metadata_restricted = False
 
     # exe/cwd are restricted for some otherwise unrelated host processes
     # (notably PID 1 in a user namespace).  comm plus readable cmdline proves
-    # those processes are outside the guarded heavy set; retain explicit
-    # restricted markers instead of weakening RSS/stat identity checks.
+    # those processes are both outside the guarded heavy set and not another
+    # litchi process; retain explicit restricted markers instead of weakening
+    # RSS/stat identity checks.  A user process without readable cmdline is
+    # not provably unrelated and remains fail-closed.
     try:
         exe = os.readlink(proc / "exe")
     except FileNotFoundError:
         return None
     except PermissionError as error:
-        if not command_is_heavy:
+        if restricted_metadata_is_unrelated(comm, cmdline, kernel_thread):
             metadata_restricted = True
             exe = "<restricted>"
         else:
-            metadata_restricted = True
-            exe = "<restricted-heavy>"
+            raise TimingError(f"cannot prove restricted /proc/{pid}/exe is unrelated") from error
     except OSError as error:
         if error.errno == errno.EACCES:
+            if not restricted_metadata_is_unrelated(comm, cmdline, kernel_thread):
+                raise TimingError(f"cannot prove restricted /proc/{pid}/exe is unrelated") from error
             metadata_restricted = True
-            exe = "<restricted-heavy>" if command_is_heavy else "<restricted>"
+            exe = "<restricted>"
         else:
             raise TimingError(f"cannot inspect /proc/{pid}/exe: {error}") from error
     try:
@@ -246,10 +381,14 @@ def read_proc(pid: int) -> dict[str, Any] | None:
     except FileNotFoundError:
         return None
     except PermissionError as error:
+        if not restricted_metadata_is_unrelated(comm, cmdline, kernel_thread):
+            raise TimingError(f"cannot prove restricted /proc/{pid}/cwd is unrelated") from error
         metadata_restricted = True
         cwd = "<restricted>"
     except OSError as error:
         if error.errno == errno.EACCES:
+            if not restricted_metadata_is_unrelated(comm, cmdline, kernel_thread):
+                raise TimingError(f"cannot prove restricted /proc/{pid}/cwd is unrelated") from error
             metadata_restricted = True
             cwd = "<restricted>"
         else:
@@ -262,7 +401,7 @@ def read_proc(pid: int) -> dict[str, Any] | None:
         stat_state = fields[0] if fields else ""
         stat_pgrp = fields[2] if len(fields) > 2 else "-1"
         stat_session = fields[3] if len(fields) > 3 else "-1"
-        if stat_state == "Z" or (not cmdline and stat_pgrp == "0" and stat_session == "0"):
+        if stat_state == "Z" or kernel_thread:
             rss = 0
         else:
             raise TimingError(f"cannot read RSS for /proc/{pid}: VmRSS is absent")
@@ -392,11 +531,11 @@ def refresh_owned(
 
 
 def is_heavy(entry: Mapping[str, Any]) -> bool:
-    names = {Path(str(entry.get("exe", ""))).name, str(entry.get("comm", ""))}
-    if names & HEAVY_NAMES:
+    names = [str(entry.get("exe", "")), str(entry.get("comm", ""))]
+    if any(guarded_process_name(value) for value in names):
         return True
     command = entry.get("cmdline", [])
-    return bool(command) and Path(str(command[0])).name in HEAVY_NAMES
+    return bool(command) and any(guarded_process_name(str(value)) for value in command)
 
 
 def snapshot_json(snapshot: Mapping[int, Mapping[str, Any]], load: list[float]) -> dict[str, Any]:
@@ -442,7 +581,13 @@ def quiet_violations(
         old = previous.get(pid)
         new = current.get(pid)
         old_ticks = 0 if old is None else int(old.get("utime", 0)) + int(old.get("stime", 0))
-        new_ticks = 0 if new is None else int(new.get("utime", 0)) + int(new.get("stime", 0))
+        # If an owned child exited between samples, its final CPU interval is
+        # bounded by the last observed value.  Do not charge that disappearance
+        # as unowned host work; newly appearing unowned PIDs remain in the full
+        # current snapshot and are still accounted against /proc/stat.
+        new_ticks = old_ticks if new is None and old is not None else (
+            0 if new is None else int(new.get("utime", 0)) + int(new.get("stime", 0))
+        )
         if new_ticks >= old_ticks:
             owned_ticks += new_ticks - old_ticks
     outside_busy = selected_busy_delta - owned_ticks
@@ -501,7 +646,7 @@ def set_child_subreaper(enabled: bool) -> int:
         raise TimingError(f"cannot configure child subreaper: {error}") from error
 
 
-def live_owned(owned: Mapping[int, int]) -> dict[int, int]:
+def live_owned(owned: Mapping[int, int], *, root_pid: int | None = None) -> dict[int, int]:
     snapshot = proc_snapshot()
     result: dict[int, int] = {}
     for pid, expected_start in owned.items():
@@ -511,6 +656,23 @@ def live_owned(owned: Mapping[int, int]) -> dict[int, int]:
         actual_start = int(entry["starttime"])
         if actual_start != expected_start:
             raise TimingError(f"refusing to treat reused owned PID {pid} as a child")
+        if entry.get("state") == "Z" and pid != root_pid:
+            # A detached descendant can be adopted by this runner's
+            # subreaper as a zombie.  Reap it explicitly; treating a zombie
+            # as a running descendant would make cleanup fail forever.
+            try:
+                waited, _ = os.waitpid(pid, os.WNOHANG)
+            except ChildProcessError:
+                # It is still present but not waitable by this process: fail
+                # closed rather than claiming ownership was cleaned up.
+                result[pid] = expected_start
+                continue
+            except ProcessLookupError:
+                continue
+            except OSError as error:
+                raise TimingError(f"cannot reap owned zombie PID {pid}: {error}") from error
+            if waited == pid:
+                continue
         result[pid] = expected_start
     return result
 
@@ -547,7 +709,7 @@ def terminate_group(
     signal_owned(signal.SIGTERM)
     deadline = time.monotonic() + grace_seconds
     while time.monotonic() < deadline:
-        if process.poll() is not None and not process_group_exists(pgid) and not live_owned(owned):
+        if process.poll() is not None and not process_group_exists(pgid) and not live_owned(owned, root_pid=process.pid):
             return forced
         time.sleep(0.05)
     forced = True
@@ -564,12 +726,77 @@ def terminate_group(
         raise TimingError(f"child did not terminate after process-group cleanup: {process.pid}") from error
     deadline = time.monotonic() + grace_seconds
     while time.monotonic() < deadline:
-        if not process_group_exists(pgid) and not live_owned(owned):
+        if not process_group_exists(pgid) and not live_owned(owned, root_pid=process.pid):
             return forced
         time.sleep(0.05)
-    if process_group_exists(pgid) or live_owned(owned):
+    if process_group_exists(pgid) or live_owned(owned, root_pid=process.pid):
         raise TimingError(f"descendant process group survived cleanup: {process.pid}")
     return forced
+
+
+def ensure_child_reaped(
+    process: subprocess.Popen[bytes],
+    owned: Mapping[int, int],
+    pgid: int | None,
+    forced_cleanup: bool,
+) -> bool:
+    """Always reap the direct child, even when monitoring raised an error."""
+    cleanup_error: BaseException | None = None
+    try:
+        group_alive = pgid is not None and process_group_exists(pgid)
+        owned_alive = bool(live_owned(owned, root_pid=process.pid)) if pgid is not None else False
+        if process.poll() is None or group_alive or owned_alive:
+            if pgid is not None:
+                forced_cleanup = terminate_group(process, owned, pgid) or forced_cleanup
+            else:
+                process.terminate()
+    except BaseException as error:
+        cleanup_error = error
+        # Cleanup itself must not prevent the direct wait/reap.  Try the
+        # process group and direct child independently, then surface the
+        # original cleanup failure after wait below.
+        if pgid is not None:
+            try:
+                os.killpg(pgid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            except OSError:
+                pass
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        except OSError:
+            pass
+        forced_cleanup = True
+    finally:
+        try:
+            process.wait(timeout=5.0)
+        except subprocess.TimeoutExpired as error:
+            if pgid is not None:
+                try:
+                    os.killpg(pgid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                except OSError:
+                    pass
+            try:
+                process.kill()
+            except ProcessLookupError:
+                pass
+            except OSError:
+                pass
+            try:
+                process.wait(timeout=5.0)
+            except BaseException as reap_error:
+                if cleanup_error is None:
+                    cleanup_error = reap_error
+        except BaseException as reap_error:
+            if cleanup_error is None:
+                cleanup_error = reap_error
+    if cleanup_error is not None:
+        raise cleanup_error
+    return forced_cleanup
 
 
 class BoundedCapture(threading.Thread):
@@ -840,7 +1067,8 @@ def run_child(
     )
     if pre_violations:
         raise TimingError(f"quiet-host preflight rejected {endpoint}/{policy}/{label}: {pre_violations}")
-    target_before = safe_target_check(target, max_target)
+    target_before_identity = target_identity(target, max_target)
+    target_before = int(target_before_identity["bytes"])
     env = os.environ.copy()
     env.pop("LITCHI_CAPPED", None)
     env.pop("LITCHI_BLESS", None)
@@ -894,6 +1122,7 @@ def run_child(
     process: subprocess.Popen[bytes] | None = None
     pgid: int | None = None
     owned: dict[int, int] = {}
+    owned_seen: dict[int, int] = {}
     stdout_capture: BoundedCapture | None = None
     stderr_capture: BoundedCapture | None = None
     violations: list[str] = []
@@ -902,6 +1131,7 @@ def run_child(
     peak_rss = 0
     started_utc: str | None = None
     target_after = target_before
+    target_after_identity = target_before_identity
     during_bytes = 0
     previous = quiet_probe
     previous_cpu = probe_cpu
@@ -931,6 +1161,7 @@ def run_child(
             require_equal(root_entry.get("pgrp"), process.pid, "child process group")
             require_equal(root_entry.get("session"), process.pid, "child session")
             owned = {process.pid: int(root_entry["starttime"])}
+            owned_seen.update(owned)
             stdout_capture = BoundedCapture(process.stdout, stdout_path, max_output)
             stderr_capture = BoundedCapture(process.stderr, stderr_path, max_output)
             stdout_capture.start()
@@ -954,6 +1185,7 @@ def run_child(
                 for pid, entry in current.items():
                     if pid not in preexisting_pids and int(entry.get("ppid", -1)) == parent_pid:
                         owned[pid] = int(entry["starttime"])
+                owned_seen.update(owned)
                 accounting_current = dict(current)
                 for pid in owned:
                     if pid not in accounting_current and pid in previous:
@@ -1001,8 +1233,8 @@ def run_child(
             else:
                 process.wait(timeout=5)
         finally:
-            if process is not None and process.poll() is None and pgid is not None:
-                forced_cleanup = terminate_group(process, owned, pgid) or forced_cleanup
+            if process is not None:
+                forced_cleanup = ensure_child_reaped(process, owned, pgid, forced_cleanup)
     if stdout_capture is not None:
         stdout_capture.join(timeout=5)
         if stdout_capture.is_alive():
@@ -1025,7 +1257,8 @@ def run_child(
     for pid, entry in after.items():
         if pid not in preexisting_pids and int(entry.get("ppid", -1)) == parent_pid:
             owned[pid] = int(entry["starttime"])
-    live = live_owned(owned)
+    owned_seen.update(owned)
+    live = live_owned(owned, root_pid=process.pid)
     if live or process_group_exists(pgid):
         forced_cleanup = terminate_group(process, owned, pgid) or forced_cleanup
         violations.append(f"child ownership survived normal exit: {sorted(live)}")
@@ -1033,7 +1266,8 @@ def run_child(
         after_load = load_average()
         after_cpu = cpu_counters(cpu)
         owned = refresh_owned(after, owned, process.pid, pgid, process.pid)
-        live = live_owned(owned)
+        owned_seen.update(owned)
+        live = live_owned(owned, root_pid=process.pid)
         if live or process_group_exists(pgid):
             raise TimingError(f"child ownership survived cleanup: {sorted(live)}")
     source_after: dict[str, str] | None = None
@@ -1043,8 +1277,8 @@ def run_child(
         violations.append(f"source changed during child: {error}")
     post_violations = quiet_violations(
         quiet_probe,
-        {pid: after.get(pid, entry) for pid, entry in previous.items()},
-        owned=owned,
+        after,
+        owned=owned_seen,
         load_before=before_load[0],
         max_load_delta=max_load_delta,
         previous_cpu=previous_cpu,
@@ -1058,9 +1292,14 @@ def run_child(
         violations.append(f"descendants survived child exit: {descendants_left}")
     if forced_cleanup:
         violations.append("forced process-group cleanup was required")
-    target_after = safe_target_check(target, max_target)
-    if target_after > target_before:
-        violations.append(f"target grew during child: {target_before} -> {target_after}")
+    target_after_identity = target_identity(target, max_target)
+    target_after = int(target_after_identity["bytes"])
+    if target_after != target_before or target_after_identity["sha256"] != target_before_identity["sha256"]:
+        violations.append(
+            "target changed during child: "
+            f"bytes {target_before} -> {target_after}, "
+            f"sha256 {target_before_identity['sha256']} -> {target_after_identity['sha256']}"
+        )
     try:
         binary_after = verify_binary(binary, binary_identity, f"{endpoint} binary after {policy}/{label}")
     except TimingError as error:
@@ -1097,7 +1336,14 @@ def run_child(
         "cpu": cpu,
         "rss_peak_bytes": peak_rss,
         "rss_cap_bytes": max_rss,
-        "target": {"path": str(target), "bytes_before": target_before, "bytes_after": target_after, "cap_bytes": max_target},
+        "target": {
+            "path": str(target),
+            "bytes_before": target_before,
+            "bytes_after": target_after,
+            "cap_bytes": max_target,
+            "identity_before": target_before_identity,
+            "identity_after": target_after_identity,
+        },
         "stdout": {**stdout_identity, "overflow": stdout_capture.overflow if stdout_capture else True},
         "stderr": {**stderr_identity, "overflow": stderr_capture.overflow if stderr_capture else True},
         "report": report_identity,
