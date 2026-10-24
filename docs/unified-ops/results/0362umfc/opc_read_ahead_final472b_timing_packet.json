@@ -131,14 +131,14 @@
     "warmup": 3,
     "zero_delay": true,
     "output_names": [
-      "forward/a1.json",
-      "forward/b1.json",
-      "forward/b2.json",
-      "forward/a2.json",
-      "exact/a1.json",
-      "exact/b1.json",
-      "exact/b2.json",
-      "exact/a2.json"
+      "reports/forward/a1.json",
+      "reports/forward/b1.json",
+      "reports/forward/b2.json",
+      "reports/forward/a2.json",
+      "reports/exact/a1.json",
+      "reports/exact/b1.json",
+      "reports/exact/b2.json",
+      "reports/exact/a2.json"
     ],
     "comparison": "median(candidate b1,b2) versus median(baseline a1,a2), separately per policy; coordinator budget applies unchanged",
     "allocator": "not_applicable"
