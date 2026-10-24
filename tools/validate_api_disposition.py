@@ -12,11 +12,16 @@ Accepted decisions are:
 * ``FIXED`` — a source repair is evidenced;
 * ``BUILDER_DRAFT`` — a proven authoring builder is intentionally mutable;
 * ``SUBSTRATE_TRANSPORT`` — only a transport-only CFB/ZIP substrate row;
+* ``AST_VALUE`` — only the two reviewed Formula AST value methods;
+* ``WIRE_REQUEST`` — only the six reviewed IWA codec request values;
+* ``WIRE_SCHEMA`` — only the reviewed generated IWA protobuf schema values;
 * ``DEFERRED_REDACTION_22`` — only an explicitly identified item-22
   redaction row.
 
-The last category is the sole permitted deferral. Placeholder decisions from
-the scaffold and broad ``deferred``/``out-of-scope``/``wontfix`` values are
+The semantic categories classify inventory rows; they are not waivers and do
+not imply that a source capture or final disposition has been approved. The
+last category is the sole permitted deferral. Placeholder decisions from the
+scaffold and broad ``deferred``/``out-of-scope``/``wontfix`` values are
 rejected.
 """
 from __future__ import annotations
@@ -29,18 +34,65 @@ from pathlib import Path
 INVENTORY_FIELDS = ("crate", "category", "path", "detail", "target")
 DISPOSITION_FIELDS = INVENTORY_FIELDS + ("decision", "evidence", "owner")
 ROW_KEY = INVENTORY_FIELDS
-ACCEPTED_DECISIONS = frozenset({
-    "FIXED",
-    "BUILDER_DRAFT",
-    "SUBSTRATE_TRANSPORT",
-    "DEFERRED_REDACTION_22",
-})
 SUBSTRATE_CRATES = frozenset({"litchi-cfb", "soapberry-zip"})
 SCAFFOLD_DECISIONS = frozenset({
     "DRAFT_CANDIDATE_REVIEW",
     "SUBSTRATE_SCOPE_REVIEW",
     "UNASSIGNED_REQUIRED_REVIEW",
 })
+
+# These are semantic classifications for inventory rows that are not format
+# package edits.  Keep the allowlist at full inventory-row granularity: a
+# module prefix, crate-wide exception, or old alias must never acquire a
+# classification by accident.  The generated protobuf messages occur in the
+# inventory as both the edit_type and transaction_type rows, so both categories
+# are listed for each exact public path.
+SEMANTIC_ROWS = {
+    "AST_VALUE": frozenset({
+        ("litchi-formula", "mut_owner", "litchi_formula::Formula::set_root"),
+        ("litchi-formula", "mut_owner", "litchi_formula::Formula::set_display_style"),
+    }),
+    "WIRE_REQUEST": frozenset({
+        ("litchi-iwa-protos", "edit_type",
+         "litchi_iwa_protos::keynote_media_lifecycle_codec::SlideLifecycleEdit"),
+        ("litchi-iwa-protos", "edit_type",
+         "litchi_iwa_protos::keynote_media_lifecycle_codec::BuildLifecycleEdit"),
+        ("litchi-iwa-protos", "edit_type",
+         "litchi_iwa_protos::keynote_media_lifecycle_codec::BuildChunkLifecycleEdit"),
+        ("litchi-iwa-protos", "edit_type",
+         "litchi_iwa_protos::keynote_media_lifecycle_codec::node_cache::SlideNodeBuildCacheEdit"),
+        ("litchi-iwa-protos", "edit_type",
+         "litchi_iwa_protos::numbers_table_cell_storage_codec::TableDataListEntryRefCountEdit"),
+        ("litchi-iwa-protos", "edit_type",
+         "litchi_iwa_protos::numbers_table_cell_storage_codec::HeaderSizeEdit"),
+    }),
+    "WIRE_SCHEMA": frozenset({
+        ("litchi-iwa-protos", category, path)
+        for category in ("edit_type", "transaction_type")
+        for path in (
+            "litchi_iwa_protos::tswp::UndoTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::GenericTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::TextTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::CharIndexTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::ReplaceCharIndexTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::AttributeIndexTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::InsertAttributeTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::InsertNilTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::CharDeltaTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::ParagraphDataTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::ObjectDolcTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::CtDateTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::UnionTransaction",
+        )
+    }),
+}
+SEMANTIC_DECISIONS = frozenset(SEMANTIC_ROWS)
+ACCEPTED_DECISIONS = frozenset({
+    "FIXED",
+    "BUILDER_DRAFT",
+    "SUBSTRATE_TRANSPORT",
+    "DEFERRED_REDACTION_22",
+}) | SEMANTIC_DECISIONS
 
 
 def _read_rows(path: Path, fields: tuple[str, ...], label: str) -> tuple[list[dict[str, str]], list[str]]:
@@ -123,6 +175,15 @@ def _decision_errors(row: dict[str, str], line: int) -> list[str]:
         if row.get("category") != "redaction" or "redaction" not in lowered or "22" not in lowered:
             errors.append(
                 f"{label}: DEFERRED_REDACTION_22 requires a redaction row whose evidence names item 22"
+            )
+    elif decision in SEMANTIC_DECISIONS:
+        row_identity = (
+            row.get("crate", ""), row.get("category", ""), row.get("path", "")
+        )
+        if row_identity not in SEMANTIC_ROWS[decision]:
+            errors.append(
+                f"{label}: {decision} requires an exact reviewed crate/category/path; "
+                f"got {row_identity!r}"
             )
     return errors
 

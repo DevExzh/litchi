@@ -91,6 +91,110 @@ class DispositionValidationTests(unittest.TestCase):
         errors = validator.validate(self.inventory, self.disposition)
         self.assertTrue(any("requires a redaction row" in error for error in errors))
 
+    def test_accepts_only_the_reviewed_semantic_rows(self) -> None:
+        ast_rows = [
+            ("litchi-formula", "mut_owner", "litchi_formula::Formula::set_root"),
+            ("litchi-formula", "mut_owner", "litchi_formula::Formula::set_display_style"),
+        ]
+        request_rows = [
+            ("litchi-iwa-protos", "edit_type", path)
+            for path in (
+                "litchi_iwa_protos::keynote_media_lifecycle_codec::SlideLifecycleEdit",
+                "litchi_iwa_protos::keynote_media_lifecycle_codec::BuildLifecycleEdit",
+                "litchi_iwa_protos::keynote_media_lifecycle_codec::BuildChunkLifecycleEdit",
+                "litchi_iwa_protos::keynote_media_lifecycle_codec::node_cache::SlideNodeBuildCacheEdit",
+                "litchi_iwa_protos::numbers_table_cell_storage_codec::TableDataListEntryRefCountEdit",
+                "litchi_iwa_protos::numbers_table_cell_storage_codec::HeaderSizeEdit",
+            )
+        ]
+        schema_paths = (
+            "litchi_iwa_protos::tswp::UndoTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::GenericTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::TextTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::CharIndexTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::ReplaceCharIndexTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::AttributeIndexTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::InsertAttributeTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::InsertNilTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::CharDeltaTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::ParagraphDataTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::ObjectDolcTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::CtDateTransaction",
+            "litchi_iwa_protos::tswp::undo_transaction::UnionTransaction",
+        )
+        schema_rows = [
+            ("litchi-iwa-protos", category, path)
+            for category in ("edit_type", "transaction_type")
+            for path in schema_paths
+        ]
+        semantic_rows = [
+            (row, "AST_VALUE") for row in ast_rows
+        ] + [
+            (row, "WIRE_REQUEST") for row in request_rows
+        ] + [
+            (row, "WIRE_SCHEMA") for row in schema_rows
+        ]
+        inventory_rows = [
+            {"crate": crate, "category": category, "path": path,
+             "detail": "reviewed semantic row", "target": ""}
+            for (crate, category, path), _ in semantic_rows
+        ]
+        disposition_rows = [
+            {**row, "decision": decision,
+             "evidence": "record 0362ul2 exact source classification",
+             "owner": "coordinator"}
+            for row, (_, decision) in zip(inventory_rows, semantic_rows)
+        ]
+        self.write_rows(inventory_rows, disposition_rows)
+        self.assertEqual(validator.validate(self.inventory, self.disposition), [])
+
+    def test_semantic_categories_reject_unknown_or_mismatched_rows(self) -> None:
+        cases = [
+            (
+                "AST_VALUE", "litchi-formula", "mut_owner",
+                "litchi_formula::Formula::set_root::nested",
+            ),
+            (
+                "AST_VALUE", "other-crate", "mut_owner",
+                "litchi_formula::Formula::set_root",
+            ),
+            (
+                "WIRE_REQUEST", "litchi-iwa-protos", "transaction_type",
+                "litchi_iwa_protos::keynote_media_lifecycle_codec::SlideLifecycleEdit",
+            ),
+            (
+                "WIRE_REQUEST", "litchi-iwa-protos", "edit_type",
+                "litchi_iwa_protos::keynote_media_lifecycle_codec::LifecycleEdit",
+            ),
+            (
+                "WIRE_SCHEMA", "litchi-iwa-protos", "mut_owner",
+                "litchi_iwa_protos::tswp::UndoTransaction",
+            ),
+            (
+                "WIRE_SCHEMA", "litchi-iwa-protos", "edit_type",
+                "litchi_iwa_protos::tswp::UndoTransactionWrapperArchive",
+            ),
+            (
+                "WIRE_SCHEMA", "litchi-iwa-protos", "edit_type",
+                "litchi_iwa_protos::keynote_table_physical_sort_codec::HeaderRowEdit",
+            ),
+        ]
+        for decision, crate, category, path in cases:
+            with self.subTest(decision=decision, category=category, path=path):
+                row = {"crate": crate, "category": category, "path": path,
+                       "detail": "reviewed semantic row", "target": ""}
+                self.write_rows(
+                    [row],
+                    [{**row, "decision": decision,
+                      "evidence": "record 0362ul2 exact source classification",
+                      "owner": "coordinator"}],
+                )
+                errors = validator.validate(self.inventory, self.disposition)
+                self.assertTrue(
+                    any(f"{decision} requires an exact reviewed" in error for error in errors),
+                    errors,
+                )
+
     def test_rejects_short_and_extra_rows_without_traceback(self) -> None:
         self.inventory.write_text(
             "crate\tcategory\tpath\tdetail\ttarget\n"
