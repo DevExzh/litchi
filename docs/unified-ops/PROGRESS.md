@@ -3118,3 +3118,21 @@ See [0063](0063-source-pptx-modern-comments.md).
   dispositions, corpus replay, glossary closure and native qualification remain
   required. Comprehensive redaction audit 22 is the only deferral. Nothing is
   pushed.
+
+- Coordinator addendum (2026-10-24, ODP admission closure):
+  Reviewed ODP source `363a2497f9` and receipt `88c77dfe11` merge at
+  `d316d04291`; main integration reaches `1b68709e0b`. Source construction
+  stays cold, security admission precedes root/PI checks, and an empty splice
+  still performs first-use admission. All 448 tests across 38 suites, strict
+  all-target/all-feature Clippy and the all-target/all-feature facade check
+  pass. The coordinator verified the five raw logs and pinned configuration.
+  The receipt preserves the unrelated XLSX formatting overlay explicitly;
+  only committed ODP changes were merged. Native acceptance remains open.
+
+  Final DOCX SVG correction, Pages selector-allocation correction, Keynote
+  selector retention/minimal lock correction and XLSX pivot changes clear
+  scoped source review; their final runtime validation remains queued. Numbers
+  was returned for preserving its budget ledger across failed first-use
+  selection, and XLSX catalog work for early aggregate admission, effective
+  edit limits and cold initial-batch staging. Source integration remains
+  staging until the complete gates and required qualification pass. No push.

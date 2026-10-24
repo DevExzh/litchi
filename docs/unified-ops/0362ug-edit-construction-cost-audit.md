@@ -9,7 +9,8 @@ not accepted performance exceptions.
 
 This audit starts from assembled source `7559f44aa975254bd96f6e28eee17366b0ebeb6a`.
 ODG and ODB/ODM were assembled at `8779d059ad`. Reviewed DOC and the ODS
-resource-admission successor are assembled at `3676e21cfa`. Other rows below
+resource-admission successor are assembled at `3676e21cfa`; reviewed ODP
+entry/admission follows at `d316d04291`. Other rows below
 remain open; this is source integration, not final performance acceptance.
 
 ## Confirmed scopes
@@ -18,7 +19,7 @@ remain open; this is source integration, not final performance acceptance.
 | --- | --- | --- |
 | ODG | Primary edit copied content and styles XML, including unused copies for pure joined package replacement. | 0362utf, reviewed and merged at `c3f56b7a9d`; lazy part state retains the source package and materializes on mutation. |
 | ODB, ODM | ODB copied content XML; ODM title edits read raw meta.xml and copied projected title strings. | 0362ugb and 0362ugb-a, reviewed and merged at `8779d059ad`; borrowed XML/title state and deferred changed-title publication. |
-| ODP | Package edit builds a complete mutable presentation and copies validated slides/source fragments; flat edit clones the slide vector. | 0362uga, correction in progress. The already-lazy tail-append entry is not this finding. |
+| ODP | Package edit builds a complete mutable presentation and copies validated slides/source fragments; flat edit clones the slide vector. | 0362uga, reviewed and validated correction merged at `d316d04291`. The already-lazy tail-append entry is not this finding. |
 | ODS | Source cells construct protection state; DDE and sheet-metadata constructors load source projections; package resource-count validation enumerates archive members; flat edits allocate per-sheet staging. | 0362ugc merged at `f144cd6029`; reviewed and validated 0362ugca merged at `3676e21cfa`, removing the added open/edit census while retaining admission at staging, commit and replay. |
 | DOC | Primary/profiled and scoped families serialize/copy the source at entry; paragraph source-backed entry scans the source prefix. | 0362ugd and 0362ugd-a, reviewed and validated source/consumer correction merged at `cf7def80df`. |
 | XLS | Primary and source-backed cells copy/index source state; scoped capture serializes the archive for comments, visibility, objects, names, charts and pivots. | 0362uge, correction in progress. |
@@ -121,10 +122,15 @@ resource census stays cold through open/edit/drop/handoff, and first staging,
 commit and replay retain admission before candidate retention/publication.
 The pinned rerun passes 1,768 tests and strict all-target/all-feature Clippy on
 `1fdfcdcdba`; the only source delta after review removes redundant
-`#[must_use]`. Receipt `daf6a85bd4` is merged at `3676e21cfa`. ODP `00bc2e3454` likewise
-clears source review after moving security admission before root/PI checks
-and covering the empty-splice boundary; its prior 447-test receipt covers
-`337e4e6715`, not these later source changes.
+`#[must_use]`. Receipt `daf6a85bd4` is merged at `3676e21cfa`. ODP `363a2497f9` likewise clears source review after moving security admission
+before root/PI checks and covering the empty-splice boundary. The final run
+passes 448 tests across 38 suites, strict all-target/all-feature Clippy and
+the all-target/all-feature facade check. The coordinator verified all five
+raw-log identities and root configuration. Receipt `88c77dfe11` distinguishes
+the 20G memory cap from the 20,000,000,000-byte target cap and records the
+unrelated formatting-only XLSX working-tree overlay during consumer checks.
+Only committed ODP source was merged; that unattributed overlay stays in its
+leaf. The previous 447-test receipt remains historical.
 
 DOC source `251f33f1ce` now clears independent review and is merged at
 `cf7def80df`. Failed profiled opens retain their observers; strict and fallback
