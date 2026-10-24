@@ -25,15 +25,15 @@ fn assert_rejected(source: &[u8]) {
         "projection accepted {source:?}"
     );
     assert!(
-        part::add_family(source, &family).is_err(),
+        part::add_family(source, &family, part::Limits::DEFAULT).is_err(),
         "add accepted {source:?}"
     );
     assert!(
-        part::replace_family(source, &family).is_err(),
+        part::replace_family(source, &family, part::Limits::DEFAULT).is_err(),
         "replace accepted {source:?}"
     );
     assert!(
-        part::remove_family(source).is_err(),
+        part::remove_family(source, part::Limits::DEFAULT).is_err(),
         "remove accepted {source:?}"
     );
 }
@@ -119,7 +119,9 @@ fn valid_opaque_text_and_xml_whitespace_remain_lexically_intact() {
         let snapshot = part::read(source.as_bytes()).expect("valid opaque XML");
         assert_eq!(snapshot.xml_bytes(), source.as_bytes());
         assert_eq!(
-            snapshot.remove_family().expect("absent no-op"),
+            snapshot
+                .remove_family(part::Limits::DEFAULT)
+                .expect("absent no-op"),
             source.as_bytes()
         );
     }
@@ -217,11 +219,19 @@ fn insertion_wrappers_obey_exact_complete_part_output_limit() {
         ),
     ] {
         let source = theme(&body);
-        let output = part::add_family(source.as_bytes(), &family).expect("unbounded insertion");
-        let exact = part::add_family_with_limit(source.as_bytes(), &family, output.len())
+        let output = part::add_family(source.as_bytes(), &family, part::Limits::DEFAULT)
+            .expect("default-profile insertion");
+        let exact = part::add_family(source.as_bytes(), &family, part::Limits::new(output.len()))
             .expect("exact output limit");
         assert_eq!(output, exact);
-        assert!(part::add_family_with_limit(source.as_bytes(), &family, output.len() - 1).is_err());
+        assert!(
+            part::add_family(
+                source.as_bytes(),
+                &family,
+                part::Limits::new(output.len() - 1),
+            )
+            .is_err()
+        );
     }
 }
 
@@ -242,7 +252,7 @@ fn native_family_name_edit_preserves_exact_future_cdata_payload() {
         .set_name("Updated CDATA Theme")
         .expect("valid name");
     let changed = snapshot
-        .replace_family(&replacement)
+        .replace_family(&replacement, part::Limits::DEFAULT)
         .expect("CDATA is not a PI");
     let expected = format!(
         "{}{}",
@@ -265,16 +275,25 @@ fn caller_limit_preflight_handles_source_fragments_and_escaped_replacement_names
     replacement
         .set_name("Expanded & <quoted> \"name\"\r\n\t")
         .expect("escaped name");
-    let changed = part::replace_family(native.as_bytes(), &replacement).expect("replace");
+    let changed = part::replace_family(native.as_bytes(), &replacement, part::Limits::DEFAULT)
+        .expect("replace");
     assert!(changed.len() > native.len());
     assert_eq!(
-        part::replace_family_with_limit(native.as_bytes(), &replacement, changed.len())
-            .expect("exact limit"),
+        part::replace_family(
+            native.as_bytes(),
+            &replacement,
+            part::Limits::new(changed.len()),
+        )
+        .expect("exact limit"),
         changed
     );
     assert!(
-        part::replace_family_with_limit(native.as_bytes(), &replacement, changed.len() - 1)
-            .is_err()
+        part::replace_family(
+            native.as_bytes(),
+            &replacement,
+            part::Limits::new(changed.len() - 1),
+        )
+        .is_err()
     );
 
     let fragment = format!(
@@ -284,10 +303,11 @@ fn caller_limit_preflight_handles_source_fragments_and_escaped_replacement_names
     );
     let incoming = family::read(fragment.as_bytes()).expect("source-backed incoming family");
     let source = theme("");
-    assert!(part::add_family_with_limit(source.as_bytes(), &incoming, 1024).is_err());
-    let added = part::add_family(source.as_bytes(), &incoming).expect("large add");
+    assert!(part::add_family(source.as_bytes(), &incoming, part::Limits::new(1024)).is_err());
+    let added =
+        part::add_family(source.as_bytes(), &incoming, part::Limits::DEFAULT).expect("large add");
     assert_eq!(
-        part::add_family_with_limit(source.as_bytes(), &incoming, added.len())
+        part::add_family(source.as_bytes(), &incoming, part::Limits::new(added.len()),)
             .expect("exact add limit"),
         added
     );
@@ -330,8 +350,8 @@ fn standalone_document_markup_cannot_be_embedded_as_a_family_child() {
     ] {
         let standalone = format!("{prefix}{fragment}");
         let parsed = family::read(standalone.as_bytes()).expect("valid standalone declaration");
-        assert!(part::add_family(source.as_bytes(), &parsed).is_err());
-        assert!(part::replace_family(source.as_bytes(), &parsed).is_err());
+        assert!(part::add_family(source.as_bytes(), &parsed, part::Limits::DEFAULT).is_err());
+        assert!(part::replace_family(source.as_bytes(), &parsed, part::Limits::DEFAULT).is_err());
     }
     for standalone in [
         format!("<?future data?>{fragment}"),
@@ -344,7 +364,8 @@ fn standalone_document_markup_cannot_be_embedded_as_a_family_child() {
     }
     let commented = family::read(format!("<!-- <?x is comment text -->{fragment}").as_bytes())
         .expect("legal comment");
-    let added = part::add_family(source.as_bytes(), &commented).expect("comment can be embedded");
+    let added = part::add_family(source.as_bytes(), &commented, part::Limits::DEFAULT)
+        .expect("comment can be embedded");
     assert!(
         std::str::from_utf8(&added)
             .expect("UTF-8")

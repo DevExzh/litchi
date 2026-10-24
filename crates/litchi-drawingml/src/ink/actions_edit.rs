@@ -1258,7 +1258,10 @@ fn checked_action_type(value: ActionType) -> Result<ActionType> {
 }
 
 fn validate_scalar(value: &str, field: &'static str) -> Result<()> {
-    if value.len() > MAX_SCALAR_BYTES || value.bytes().any(|byte| byte == 0) {
+    if value.bytes().any(|byte| byte == 0) {
+        return Err(invalid(format!("{field} contains a NUL byte")));
+    }
+    if value.len() > MAX_SCALAR_BYTES {
         return Err(limit(LimitKind::ScalarBytes, value.len(), MAX_SCALAR_BYTES));
     }
     super::validate_xml_characters(value, field)?;

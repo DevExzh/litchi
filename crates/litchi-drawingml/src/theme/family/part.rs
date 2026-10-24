@@ -76,6 +76,43 @@ const MAX_ACTIVE_NAMESPACE_BINDINGS: usize = MAX_ACTIVE_NAMESPACE_DECLARATIONS +
 /// Maximum complete theme-part bytes inspected by this owner.
 pub const MAX_XML_BYTES: usize = theme_codec::MAX_XML_BYTES;
 
+/// Caller-selected bounds for complete Theme-part family operations.
+///
+/// The part codec has one public mutation/read policy rather than a
+/// limit-less entry and a second `_with_limit` spelling.  The XML byte bound
+/// is the caller's output admission policy; the other grammar ceilings remain
+/// the fixed DrawingML schema bounds declared by this module.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Limits {
+    /// Maximum complete Theme-part bytes accepted or produced.
+    pub max_xml_bytes: usize,
+}
+
+impl Limits {
+    /// The historical bounded Theme-part policy.
+    pub const DEFAULT: Self = Self {
+        max_xml_bytes: MAX_XML_BYTES,
+    };
+
+    /// Construct a caller-selected complete-part byte policy.
+    #[must_use]
+    pub const fn new(max_xml_bytes: usize) -> Self {
+        Self { max_xml_bytes }
+    }
+
+    fn validate(self) -> Result<Self> {
+        validate_output_limit(self.max_xml_bytes)?;
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 /// The extension URI profile that owns a parsed family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[must_use]
@@ -162,70 +199,52 @@ impl Snapshot {
         self.family.is_some()
     }
 
-    /// Replace the existing family, or add it when the owner is absent.
+    /// Replace the existing family, or add it when the owner is absent,
+    /// under the caller's complete-part output bound.
     ///
     /// When an owner exists, only the three typed scalar values from `family`
     /// are applied to the source-backed current family. This deliberately
     /// ignores any opaque source carried by an incoming value, so a detached
     /// value is safe and a value from another document cannot replace unknown
     /// attributes or extension children by accident.
-    pub fn replace_family(&self, family: &Family) -> Result<Vec<u8>> {
-        replace_family_source(self.source.as_ref(), family)
+    pub fn replace_family(&self, family: &Family, limits: Limits) -> Result<Vec<u8>> {
+        replace_family_source_with_limit(self.source.as_ref(), family, limits.max_xml_bytes)
     }
 
-    /// Replace the family while enforcing a caller-specific complete-part
-    /// output bound before allocating the patched source.
-    pub fn replace_family_with_limit(
-        &self,
-        family: &Family,
-        max_xml_bytes: usize,
-    ) -> Result<Vec<u8>> {
-        replace_family_source_with_limit(self.source.as_ref(), family, max_xml_bytes)
-    }
-
-    /// Add a family using the normative extension URI.
+    /// Add a family using the normative extension URI under the caller's
+    /// complete-part output bound.
     ///
     /// A leading standalone UTF-8 BOM on the incoming fragment is stripped
     /// before embedding; an XML declaration remains invalid as child markup.
-    pub fn add_family(&self, family: &Family) -> Result<Vec<u8>> {
-        add_family_source(self.source.as_ref(), family, EXTENSION_URI)
+    pub fn add_family(&self, family: &Family, limits: Limits) -> Result<Vec<u8>> {
+        add_family_source_with_limit(
+            self.source.as_ref(),
+            family,
+            EXTENSION_URI,
+            limits.max_xml_bytes,
+        )
     }
 
-    /// Add a normative family with a caller-specific complete-part bound.
-    pub fn add_family_with_limit(&self, family: &Family, max_xml_bytes: usize) -> Result<Vec<u8>> {
-        add_family_source_with_limit(self.source.as_ref(), family, EXTENSION_URI, max_xml_bytes)
-    }
-
-    /// Add a family using an explicitly admitted extension URI profile.
+    /// Add a family using an explicitly admitted extension URI profile under
+    /// the caller's complete-part output bound.
     ///
     /// A leading standalone UTF-8 BOM is stripped before embedding; an XML
     /// declaration remains invalid as child markup.
-    pub fn add_family_with_uri(&self, family: &Family, uri: &str) -> Result<Vec<u8>> {
-        add_family_source(self.source.as_ref(), family, uri)
-    }
-
-    /// Add a family with an admitted URI and caller-specific complete-part
-    /// output bound.
-    pub fn add_family_with_uri_limit(
+    pub fn add_family_with_uri(
         &self,
         family: &Family,
         uri: &str,
-        max_xml_bytes: usize,
+        limits: Limits,
     ) -> Result<Vec<u8>> {
-        add_family_source_with_limit(self.source.as_ref(), family, uri, max_xml_bytes)
+        add_family_source_with_limit(self.source.as_ref(), family, uri, limits.max_xml_bytes)
     }
 
     /// Remove the recognized direct family owner and its semantically empty
-    /// extension/list containers. XML whitespace alone does not retain a
-    /// container; comments, unrelated content, and foreign attributes do.
-    pub fn remove_family(&self) -> Result<Vec<u8>> {
-        remove_family_source(self.source.as_ref())
-    }
-
-    /// Remove the family while enforcing a caller-specific complete-part
-    /// output bound before allocating the patched source.
-    pub fn remove_family_with_limit(&self, max_xml_bytes: usize) -> Result<Vec<u8>> {
-        remove_family_source_with_limit(self.source.as_ref(), max_xml_bytes)
+    /// extension/list containers under the caller's complete-part output
+    /// bound. XML whitespace alone does not retain a container; comments,
+    /// unrelated content, and foreign attributes do.
+    pub fn remove_family(&self, limits: Limits) -> Result<Vec<u8>> {
+        remove_family_source_with_limit(self.source.as_ref(), limits.max_xml_bytes)
     }
 
     /// Borrow the complete source-backed owner range, when present.
@@ -301,65 +320,36 @@ pub fn family_profile(xml: &[u8]) -> Result<Option<ExtensionProfile>> {
         .and_then(|candidate| ExtensionProfile::from_uri(&candidate.uri)))
 }
 
-/// Replace an existing family or add a new normative family in a complete
-/// Theme part.
-pub fn replace_family(xml: &[u8], family: &Family) -> Result<Vec<u8>> {
-    replace_family_source(xml, family)
+/// Replace an existing family or add a new normative family under the
+/// caller's complete-part output bound.
+pub fn replace_family(xml: &[u8], family: &Family, limits: Limits) -> Result<Vec<u8>> {
+    replace_family_source_with_limit(xml, family, limits.validate()?.max_xml_bytes)
 }
 
-/// Replace an existing family or add one while enforcing a caller-specific
-/// complete-part output bound before allocating the patched source.
-pub fn replace_family_with_limit(
-    xml: &[u8],
-    family: &Family,
-    max_xml_bytes: usize,
-) -> Result<Vec<u8>> {
-    replace_family_source_with_limit(xml, family, max_xml_bytes)
+/// Add a normative family under the caller's complete-part output bound. A
+/// leading standalone UTF-8 BOM on the incoming fragment is stripped before
+/// embedding; an XML declaration remains invalid as child markup.
+pub fn add_family(xml: &[u8], family: &Family, limits: Limits) -> Result<Vec<u8>> {
+    add_family_source_with_limit(xml, family, EXTENSION_URI, limits.validate()?.max_xml_bytes)
 }
 
-/// Add a normative family to a complete Theme part. A leading standalone
-/// UTF-8 BOM on the incoming fragment is stripped before embedding; an XML
-/// declaration remains invalid as child markup.
-pub fn add_family(xml: &[u8], family: &Family) -> Result<Vec<u8>> {
-    add_family_source(xml, family, EXTENSION_URI)
-}
-
-/// Add a normative family with a caller-specific complete-part bound.
-pub fn add_family_with_limit(xml: &[u8], family: &Family, max_xml_bytes: usize) -> Result<Vec<u8>> {
-    add_family_source_with_limit(xml, family, EXTENSION_URI, max_xml_bytes)
-}
-
-/// Add a family with an explicitly admitted extension URI. A leading
-/// standalone UTF-8 BOM is stripped before embedding; an XML declaration
-/// remains invalid as child markup.
-pub fn add_family_with_uri(xml: &[u8], family: &Family, uri: &str) -> Result<Vec<u8>> {
-    add_family_source(xml, family, uri)
-}
-
-/// Add a family with an admitted URI and caller-specific complete-part bound.
-pub fn add_family_with_uri_limit(
+/// Add a family with an explicitly admitted extension URI under the caller's
+/// complete-part output bound. A leading standalone UTF-8 BOM is stripped
+/// before embedding; an XML declaration remains invalid as child markup.
+pub fn add_family_with_uri(
     xml: &[u8],
     family: &Family,
     uri: &str,
-    max_xml_bytes: usize,
+    limits: Limits,
 ) -> Result<Vec<u8>> {
-    add_family_source_with_limit(xml, family, uri, max_xml_bytes)
+    add_family_source_with_limit(xml, family, uri, limits.validate()?.max_xml_bytes)
 }
 
 /// Remove a direct recognized family and empty enclosing extension/list
-/// containers. Preserve comments, unrelated content, and foreign attributes.
-pub fn remove_family(xml: &[u8]) -> Result<Vec<u8>> {
-    remove_family_source(xml)
-}
-
-/// Remove a direct recognized family with a caller-specific complete-part
-/// output bound.
-pub fn remove_family_with_limit(xml: &[u8], max_xml_bytes: usize) -> Result<Vec<u8>> {
-    remove_family_source_with_limit(xml, max_xml_bytes)
-}
-
-fn replace_family_source(xml: &[u8], incoming: &Family) -> Result<Vec<u8>> {
-    replace_family_source_with_limit(xml, incoming, MAX_XML_BYTES)
+/// containers under the caller's complete-part output bound. Preserve
+/// comments, unrelated content, and foreign attributes.
+pub fn remove_family(xml: &[u8], limits: Limits) -> Result<Vec<u8>> {
+    remove_family_source_with_limit(xml, limits.validate()?.max_xml_bytes)
 }
 
 fn replace_family_source_with_limit(
@@ -412,10 +402,6 @@ fn replace_family_source_with_limit(
         ));
     }
     Ok(output)
-}
-
-fn add_family_source(xml: &[u8], family: &Family, uri: &str) -> Result<Vec<u8>> {
-    add_family_source_with_limit(xml, family, uri, MAX_XML_BYTES)
 }
 
 fn add_family_source_with_limit(
@@ -486,10 +472,6 @@ fn add_family_from_scan(
         ));
     }
     Ok(output)
-}
-
-fn remove_family_source(xml: &[u8]) -> Result<Vec<u8>> {
-    remove_family_source_with_limit(xml, MAX_XML_BYTES)
 }
 
 fn remove_family_source_with_limit(xml: &[u8], max_xml_bytes: usize) -> Result<Vec<u8>> {

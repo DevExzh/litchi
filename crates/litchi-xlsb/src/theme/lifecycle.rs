@@ -825,11 +825,11 @@ fn encode_new_theme(
         source.splice(range, codec::STRICT_NAMESPACE.bytes());
     }
     if let Some(family) = family {
-        source = super::family::part::add_family_with_uri_limit(
+        source = super::family::part::add_family_with_uri(
             &source,
             family,
             super::family::part::NATIVE_EXTENSION_URI,
-            limits.max_xml_bytes,
+            super::family::part::Limits::new(limits.max_xml_bytes),
         )?;
     }
     if source.len() > limits.max_xml_bytes {

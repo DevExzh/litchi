@@ -827,15 +827,19 @@ fn rewrite_family_source(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     let output = match (before, after) {
-        (Some(_), Some(family)) => {
-            family::part::replace_family_with_limit(source, family, limits.max_xml_bytes)
+        (Some(_), Some(family)) => family::part::replace_family(
+            source,
+            family,
+            family::part::Limits::new(limits.max_xml_bytes),
+        ),
+        (Some(_), None) => {
+            family::part::remove_family(source, family::part::Limits::new(limits.max_xml_bytes))
         },
-        (Some(_), None) => family::part::remove_family_with_limit(source, limits.max_xml_bytes),
-        (None, Some(family)) => family::part::add_family_with_uri_limit(
+        (None, Some(family)) => family::part::add_family_with_uri(
             source,
             family,
             family::part::NATIVE_EXTENSION_URI,
-            limits.max_xml_bytes,
+            family::part::Limits::new(limits.max_xml_bytes),
         ),
         (None, None) => Ok(source.to_vec()),
     }?;

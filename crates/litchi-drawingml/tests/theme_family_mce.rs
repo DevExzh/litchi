@@ -235,28 +235,36 @@ fn mce_owners_are_opaque_and_all_shared_mutations_refuse_without_source_change()
 
         assert!(
             snapshot
-                .add_family_with_uri(&incoming, part::NATIVE_EXTENSION_URI)
+                .add_family_with_uri(&incoming, part::NATIVE_EXTENSION_URI, part::Limits::DEFAULT,)
                 .is_err(),
             "{label}: snapshot add must refuse"
         );
         assert!(
-            snapshot.replace_family(&incoming).is_err(),
+            snapshot
+                .replace_family(&incoming, part::Limits::DEFAULT)
+                .is_err(),
             "{label}: snapshot replace must refuse"
         );
         assert!(
-            snapshot.remove_family().is_err(),
+            snapshot.remove_family(part::Limits::DEFAULT).is_err(),
             "{label}: snapshot remove must refuse"
         );
         assert!(
-            part::add_family_with_uri(&source, &incoming, part::NATIVE_EXTENSION_URI).is_err(),
+            part::add_family_with_uri(
+                &source,
+                &incoming,
+                part::NATIVE_EXTENSION_URI,
+                part::Limits::DEFAULT,
+            )
+            .is_err(),
             "{label}: borrowed add must refuse"
         );
         assert!(
-            part::replace_family(&source, &incoming).is_err(),
+            part::replace_family(&source, &incoming, part::Limits::DEFAULT).is_err(),
             "{label}: borrowed replace must refuse"
         );
         assert!(
-            part::remove_family(&source).is_err(),
+            part::remove_family(&source, part::Limits::DEFAULT).is_err(),
             "{label}: borrowed remove must refuse"
         );
         assert_eq!(
@@ -287,19 +295,43 @@ fn escaped_mce_owners_refuse_every_shared_mutation() {
             );
             assert!(
                 snapshot
-                    .add_family_with_uri(&incoming, part::NATIVE_EXTENSION_URI)
+                    .add_family_with_uri(
+                        &incoming,
+                        part::NATIVE_EXTENSION_URI,
+                        part::Limits::DEFAULT,
+                    )
                     .is_err(),
                 "{label}: snapshot add must refuse"
             );
-            assert!(snapshot.replace_family(&incoming).is_err(), "{label}");
-            assert!(snapshot.remove_family().is_err(), "{label}");
+            assert!(
+                snapshot
+                    .replace_family(&incoming, part::Limits::DEFAULT)
+                    .is_err(),
+                "{label}"
+            );
+            assert!(
+                snapshot.remove_family(part::Limits::DEFAULT).is_err(),
+                "{label}"
+            );
         }
         assert!(
-            part::add_family_with_uri(&source, &incoming, part::NATIVE_EXTENSION_URI).is_err(),
+            part::add_family_with_uri(
+                &source,
+                &incoming,
+                part::NATIVE_EXTENSION_URI,
+                part::Limits::DEFAULT,
+            )
+            .is_err(),
             "{label}: borrowed add must refuse"
         );
-        assert!(part::replace_family(&source, &incoming).is_err(), "{label}");
-        assert!(part::remove_family(&source).is_err(), "{label}");
+        assert!(
+            part::replace_family(&source, &incoming, part::Limits::DEFAULT).is_err(),
+            "{label}"
+        );
+        assert!(
+            part::remove_family(&source, part::Limits::DEFAULT).is_err(),
+            "{label}"
+        );
     }
 }
 
@@ -325,7 +357,7 @@ fn foreign_wrapper_mce_family_stays_opaque_while_direct_owner_can_be_added() {
     let incoming = family::Family::new("Fresh Direct Family", OFFICE_ID, OFFICE_VID)
         .expect("valid incoming family");
     let added = snapshot
-        .add_family_with_uri(&incoming, part::NATIVE_EXTENSION_URI)
+        .add_family_with_uri(&incoming, part::NATIVE_EXTENSION_URI, part::Limits::DEFAULT)
         .expect("foreign wrapper must not block direct owner");
     let added_snapshot = part::read(&added).expect("read direct owner after insertion");
     assert_eq!(
@@ -339,7 +371,7 @@ fn foreign_wrapper_mce_family_stays_opaque_while_direct_owner_can_be_added() {
         "opaque foreign wrapper bytes must remain exact"
     );
 
-    let removed = part::remove_family(&added).expect("remove direct owner");
+    let removed = part::remove_family(&added, part::Limits::DEFAULT).expect("remove direct owner");
     assert_eq!(
         removed, source,
         "removing direct owner must restore opaque source"
@@ -377,8 +409,13 @@ fn foreign_uri_mce_family_and_lookalike_remain_opaque_around_direct_owner() {
 
     let incoming = family::Family::new("Fresh Direct Family", OFFICE_ID, OFFICE_VID)
         .expect("valid incoming family");
-    let added = part::add_family_with_uri(&source, &incoming, part::NATIVE_EXTENSION_URI)
-        .expect("foreign URI must not block direct owner");
+    let added = part::add_family_with_uri(
+        &source,
+        &incoming,
+        part::NATIVE_EXTENSION_URI,
+        part::Limits::DEFAULT,
+    )
+    .expect("foreign URI must not block direct owner");
     let added_snapshot = part::read(&added).expect("read direct owner");
     assert_eq!(
         added_snapshot.family().expect("direct owner").name(),
@@ -391,7 +428,7 @@ fn foreign_uri_mce_family_and_lookalike_remain_opaque_around_direct_owner() {
         "foreign URI payload must remain exact"
     );
 
-    let removed = part::remove_family(&added).expect("remove direct owner");
+    let removed = part::remove_family(&added, part::Limits::DEFAULT).expect("remove direct owner");
     assert_eq!(
         removed, source,
         "foreign URI payload must survive inverse edit"

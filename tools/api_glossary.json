@@ -7852,6 +7852,30 @@
           "recursive": true
         },
         {
+          "name": "replace_family_with_limit",
+          "scope": "litchi_drawingml::theme::family::part",
+          "replacement": "use part::replace_family(..., part::Limits)",
+          "recursive": true
+        },
+        {
+          "name": "add_family_with_limit",
+          "scope": "litchi_drawingml::theme::family::part",
+          "replacement": "use part::add_family(..., part::Limits)",
+          "recursive": true
+        },
+        {
+          "name": "add_family_with_uri_limit",
+          "scope": "litchi_drawingml::theme::family::part",
+          "replacement": "use part::add_family_with_uri(..., part::Limits)",
+          "recursive": true
+        },
+        {
+          "name": "remove_family_with_limit",
+          "scope": "litchi_drawingml::theme::family::part",
+          "replacement": "use part::remove_family(..., part::Limits)",
+          "recursive": true
+        },
+        {
           "name": "AuthoringLimits",
           "scope": "litchi_drawingml::ink",
           "replacement": "use ink::builder::AuthoringLimits",

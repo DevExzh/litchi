@@ -2210,6 +2210,7 @@ transform, theme-family, and ink-action consumer uses the focused
 | `litchi_drawingml::ink::Prepared::from_bytes(bytes, AuthoringLimits)` | adopted (0362dv; required raw limit) |
 | `litchi_drawingml::chart::Package::apply`, `transform::Package::apply`, `theme::family::Package::apply` | adopted (0362dv; source-checked replay returns `Commit`) |
 | `litchi_drawingml::ink::actions::Prepared::{edit, edit_with_options, apply}` | adopted (0362dva; O(1) shared owner routes and commit triads) |
+| `litchi_drawingml::theme::family::part::{Limits, replace_family, add_family, add_family_with_uri, remove_family}` | adopted (0362dvb; every raw Theme-family mutation requires the module `Limits` policy; removed `_with_limit` twins are banned) |
 
 ## Per-series chart keys and warn-mode failures (record 0271)
 

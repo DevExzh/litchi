@@ -725,6 +725,11 @@ fn detached_limits_reserve_output_payload_nodes_depth_actions_groups_and_scalars
         LimitKind::ScalarBytes,
         4,
     );
+
+    expect_invalid(
+        ActionDraft::new(ActionType::Custom("ok\0".into()), "0"),
+        "NUL byte",
+    );
 }
 
 #[test]

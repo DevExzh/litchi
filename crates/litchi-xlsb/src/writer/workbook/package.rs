@@ -267,12 +267,17 @@ impl Builder {
             let has_family =
                 litchi_drawingml::theme::family::part::read_family(&theme_xml)?.is_some();
             theme_xml = if has_family {
-                litchi_drawingml::theme::family::part::replace_family(&theme_xml, family)?
+                litchi_drawingml::theme::family::part::replace_family(
+                    &theme_xml,
+                    family,
+                    litchi_drawingml::theme::family::part::Limits::DEFAULT,
+                )?
             } else {
                 litchi_drawingml::theme::family::part::add_family_with_uri(
                     &theme_xml,
                     family,
                     litchi_drawingml::theme::family::part::NATIVE_EXTENSION_URI,
+                    litchi_drawingml::theme::family::part::Limits::DEFAULT,
                 )?
             };
         }

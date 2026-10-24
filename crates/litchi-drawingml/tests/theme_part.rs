@@ -59,7 +59,8 @@ fn replace_native_family(replacement: &[u8]) -> Vec<u8> {
 }
 
 fn native_family_free_theme() -> Vec<u8> {
-    part::remove_family(NATIVE_THEME).expect("remove native family for fixture mutation")
+    part::remove_family(NATIVE_THEME, part::Limits::DEFAULT)
+        .expect("remove native family for fixture mutation")
 }
 
 fn native_empty_extension() -> Vec<u8> {
@@ -234,7 +235,7 @@ fn shared_theme_part_owner_reads_profiles_and_replays_exact_source() {
     let detached =
         family::Family::new("Edited Office", OFFICE_ID, OFFICE_VID).expect("detached family");
     let replaced = snapshot
-        .replace_family(&detached)
+        .replace_family(&detached, part::Limits::DEFAULT)
         .expect("replace source-backed family");
     let changed = part::read(&replaced).expect("read replaced Theme owner");
     assert_eq!(
@@ -249,15 +250,16 @@ fn shared_theme_part_owner_reads_profiles_and_replays_exact_source() {
     let original = family::Family::new("Office Theme", OFFICE_ID, OFFICE_VID)
         .expect("original detached family");
     let restored = changed
-        .replace_family(&original)
+        .replace_family(&original, part::Limits::DEFAULT)
         .expect("restore source-backed family");
     assert_eq!(restored, NATIVE_THEME);
 }
 
 #[test]
 fn shared_theme_part_owner_add_remove_is_exact_and_absent_remove_is_noop() {
-    let removed = part::remove_family(NATIVE_THEME).expect("remove native family");
-    let no_op = part::remove_family(&removed).expect("remove absent family");
+    let removed =
+        part::remove_family(NATIVE_THEME, part::Limits::DEFAULT).expect("remove native family");
+    let no_op = part::remove_family(&removed, part::Limits::DEFAULT).expect("remove absent family");
     assert_eq!(no_op, removed);
     assert!(
         part::read(&removed)
@@ -272,8 +274,13 @@ fn shared_theme_part_owner_add_remove_is_exact_and_absent_remove_is_noop() {
 
     let detached =
         family::Family::new("Office Theme", OFFICE_ID, OFFICE_VID).expect("detached family");
-    let restored = part::add_family_with_uri(&removed, &detached, part::NATIVE_EXTENSION_URI)
-        .expect("add native family");
+    let restored = part::add_family_with_uri(
+        &removed,
+        &detached,
+        part::NATIVE_EXTENSION_URI,
+        part::Limits::DEFAULT,
+    )
+    .expect("add native family");
     let restored_snapshot = part::read(&restored).expect("read restored native family");
     assert_eq!(
         restored_snapshot.family_profile(),
@@ -285,7 +292,8 @@ fn shared_theme_part_owner_add_remove_is_exact_and_absent_remove_is_noop() {
         .expect("family-free Theme is UTF-8")
         .replace(part::NATIVE_EXTENSION_URI, part::EXTENSION_URI)
         .into_bytes();
-    let added = part::add_family(&normative, &detached).expect("add normative family");
+    let added = part::add_family(&normative, &detached, part::Limits::DEFAULT)
+        .expect("add normative family");
     let parsed = part::read(&added).expect("read normative family");
     assert_eq!(
         parsed.family_profile(),
@@ -304,8 +312,13 @@ fn bom_prefixed_family_add_strips_only_the_leading_bom_before_insertion() {
     bom_family.extend_from_slice(native_family_fragment());
     let parsed = family::read(&bom_family).expect("read BOM-prefixed standalone family");
     let family_free = native_family_free_theme();
-    let added = part::add_family_with_uri(&family_free, &parsed, part::NATIVE_EXTENSION_URI)
-        .expect("standalone BOM is stripped before embedding");
+    let added = part::add_family_with_uri(
+        &family_free,
+        &parsed,
+        part::NATIVE_EXTENSION_URI,
+        part::Limits::DEFAULT,
+    )
+    .expect("standalone BOM is stripped before embedding");
     assert!(
         !added.windows(3).any(|window| window == b"\xEF\xBB\xBF"),
         "a standalone BOM must not be embedded inside a complete Theme ext"
@@ -409,9 +422,15 @@ fn inherited_family_projection_is_reusable_and_insertable() {
     let reread = family::read(&written).expect("reopen written inherited family");
     assert_eq!(reread, projected);
 
-    let family_free = part::remove_family(NATIVE_THEME).expect("remove native family");
-    let inserted = part::add_family_with_uri(&family_free, &projected, part::NATIVE_EXTENSION_URI)
-        .expect("insert inherited family projection");
+    let family_free =
+        part::remove_family(NATIVE_THEME, part::Limits::DEFAULT).expect("remove native family");
+    let inserted = part::add_family_with_uri(
+        &family_free,
+        &projected,
+        part::NATIVE_EXTENSION_URI,
+        part::Limits::DEFAULT,
+    )
+    .expect("insert inherited family projection");
     assert_eq!(
         part::read(&inserted)
             .expect("read inserted family")
@@ -431,14 +450,26 @@ fn hidden_mce_family_is_ignored_and_all_mutations_refuse_without_editing_subtree
         family::Family::new("Fresh Office", OFFICE_ID, OFFICE_VID).expect("detached family");
     assert!(
         snapshot
-            .add_family_with_uri(&detached, part::NATIVE_EXTENSION_URI)
+            .add_family_with_uri(&detached, part::NATIVE_EXTENSION_URI, part::Limits::DEFAULT,)
             .is_err()
     );
-    assert!(snapshot.replace_family(&detached).is_err());
-    assert!(snapshot.remove_family().is_err());
-    assert!(part::add_family_with_uri(&source, &detached, part::NATIVE_EXTENSION_URI).is_err());
-    assert!(part::replace_family(&source, &detached).is_err());
-    assert!(part::remove_family(&source).is_err());
+    assert!(
+        snapshot
+            .replace_family(&detached, part::Limits::DEFAULT)
+            .is_err()
+    );
+    assert!(snapshot.remove_family(part::Limits::DEFAULT).is_err());
+    assert!(
+        part::add_family_with_uri(
+            &source,
+            &detached,
+            part::NATIVE_EXTENSION_URI,
+            part::Limits::DEFAULT,
+        )
+        .is_err()
+    );
+    assert!(part::replace_family(&source, &detached, part::Limits::DEFAULT).is_err());
+    assert!(part::remove_family(&source, part::Limits::DEFAULT).is_err());
     assert_eq!(snapshot.xml_bytes(), source.as_slice());
 }
 
@@ -456,7 +487,7 @@ fn selected_mce_family_owner_refuses_a_second_direct_owner() {
         family::Family::new("Second Direct Family", OFFICE_ID, OFFICE_VID).expect("family");
     assert!(
         snapshot
-            .add_family_with_uri(&detached, part::NATIVE_EXTENSION_URI)
+            .add_family_with_uri(&detached, part::NATIVE_EXTENSION_URI, part::Limits::DEFAULT,)
             .is_err(),
         "adding a direct owner must refuse a selected MCE owner"
     );
@@ -528,7 +559,8 @@ fn add_reuses_an_extension_list_prefix_when_the_container_is_prefixed() {
         std::str::from_utf8(native_family_fragment()).expect("family UTF-8")
     );
     let source = replace_native_family(retained.as_bytes());
-    let removed = part::remove_family(&source).expect("remove native family");
+    let removed =
+        part::remove_family(&source, part::Limits::DEFAULT).expect("remove native family");
     let empty = String::from_utf8(removed)
         .expect("family-free Theme is UTF-8")
         .replace(
@@ -546,8 +578,13 @@ fn add_reuses_an_extension_list_prefix_when_the_container_is_prefixed() {
         .into_bytes();
     let detached =
         family::Family::new("Prefixed Family", OFFICE_ID, OFFICE_VID).expect("detached family");
-    let added = part::add_family_with_uri(&empty, &detached, part::NATIVE_EXTENSION_URI)
-        .expect("add family to prefixed extLst");
+    let added = part::add_family_with_uri(
+        &empty,
+        &detached,
+        part::NATIVE_EXTENSION_URI,
+        part::Limits::DEFAULT,
+    )
+    .expect("add family to prefixed extLst");
     let marker = format!("<p:ext uri=\"{}\">", part::NATIVE_EXTENSION_URI).into_bytes();
     assert!(
         added
@@ -658,7 +695,7 @@ fn scalar_family_update_preserves_processing_tokens_in_opaque_markup() {
     let detached = family::Family::new("Edited Complete Office", OFFICE_ID, OFFICE_VID)
         .expect("detached complete replacement family");
     let changed = snapshot
-        .replace_family(&detached)
+        .replace_family(&detached, part::Limits::DEFAULT)
         .expect("complete Theme scalar update preserves processing token");
     assert!(
         changed
@@ -736,7 +773,7 @@ fn legal_default_namespace_reset_and_namespace_heavy_foreign_children_round_trip
     let detached = family::Family::new("Edited Office", OFFICE_ID, OFFICE_VID)
         .expect("detached replacement family");
     let changed = snapshot
-        .replace_family(&detached)
+        .replace_family(&detached, part::Limits::DEFAULT)
         .expect("scalar update namespace-heavy family");
     let reopened = part::read(&changed).expect("reopen namespace-heavy family");
     assert_eq!(
@@ -903,7 +940,7 @@ fn removing_a_malformed_recognized_family_refuses_to_sanitize_it() {
     );
     let source = replace_native_family(malformed.as_bytes());
     assert!(part::read(&source).is_err());
-    assert!(part::remove_family(&source).is_err());
+    assert!(part::remove_family(&source, part::Limits::DEFAULT).is_err());
 }
 
 #[test]
@@ -912,5 +949,5 @@ fn oversized_family_is_rejected_inside_an_under_limit_theme_part() {
     assert!(source.len() > family::MAX_XML_BYTES);
     assert!(source.len() < codec::MAX_XML_BYTES);
     assert!(part::read(&source).is_err());
-    assert!(part::remove_family(&source).is_err());
+    assert!(part::remove_family(&source, part::Limits::DEFAULT).is_err());
 }

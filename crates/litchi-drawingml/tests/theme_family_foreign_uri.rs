@@ -36,12 +36,14 @@ fn foreign_namespace_lookalikes_are_opaque_under_unknown_extension_uris() {
                 .is_none()
         );
         assert_eq!(
-            snapshot.remove_family().expect("absent no-op"),
+            snapshot
+                .remove_family(part::Limits::DEFAULT)
+                .expect("absent no-op"),
             source.as_bytes()
         );
 
         let added = snapshot
-            .add_family(&detached)
+            .add_family(&detached, part::Limits::DEFAULT)
             .expect("add direct normative owner");
         assert!(
             std::str::from_utf8(&added)
@@ -55,7 +57,9 @@ fn foreign_namespace_lookalikes_are_opaque_under_unknown_extension_uris() {
             Some(part::ExtensionProfile::Normative)
         );
         assert_eq!(
-            reopened.remove_family().expect("remove only typed owner"),
+            reopened
+                .remove_family(part::Limits::DEFAULT)
+                .expect("remove only typed owner"),
             source.as_bytes()
         );
     }
