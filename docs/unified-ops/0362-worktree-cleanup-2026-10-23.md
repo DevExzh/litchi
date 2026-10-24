@@ -737,3 +737,21 @@ ODB/ODM was rechecked as clean and merged, but a live search still held its
 evidence files. That worktree was left intact pending the search owner's
 confirmation and a fresh handle audit. No measurement artifacts, targets,
 branch refs or incomplete source worktrees were deleted.
+
+## Sixteenth cleanup, 2026-10-24
+
+After the owners stopped their stale searches, a fresh handle audit found no
+users of the clean, merged ODB/ODM leaf. It was removed without force; branch
+`uo2/odb-odm-lazy-entry` remains at
+`dba6b055603ae7ff0b7b488ea41510a8f1a164ab`. The apparent checkout size was
+6,263,385,091 bytes. Three ignored files totaling 205,680 bytes are preserved
+in external quarantine with their hashes and restore instructions. The
+coordinator independently verified the files, receipt, ancestry, retained ref
+and removed-path absence. The external target/log root remains unchanged.
+
+Receipt:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/sixteenth-wave/receipt.md`
+(SHA-256 `540b65f860ad6764acfb4fd70b6b50bf0f5632a8f775d2f1c4484baf040f1c9e`).
+The adjacent manifest has SHA-256
+`4c2d6760f6722120286db58fd290a250d3a2d74ec02de3f5ddf067c3985ae0f5`.
+`restore.py` restores the three ignored files after worktree recreation.
