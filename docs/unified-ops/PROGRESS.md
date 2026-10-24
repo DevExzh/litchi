@@ -4230,7 +4230,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   engineering returns, not additional deferrals.
 
   Both XLSX release endpoints and the XLS F3 baseline build successfully.
-  The F3 candidate fails on eight outdated consumer-overlay calls and a
+  The F3 candidate fails on seven outdated consumer-overlay calls and a
   tracked fixture missing from its sparse checkout. Its preparation is
   returned for repair, with the failed log and target preserved. No sheet
   timing or allocation result is accepted from these builds.
@@ -4241,3 +4241,34 @@ See [0063](0063-source-pptx-modern-comments.md).
   A helper-path ambiguity is resolved against both exact engine hashes without
   altering the raw receipts. The protected trunk probe remains intact; only
   audit 22 is deferred and nothing is pushed.
+
+- Coordinator guarded-execution update (2026-10-24):
+  The gate retention and descendant-lifetime repair passes independent review
+  and merges at `a658fee291`. Its first actual retry exposes a target-sampling
+  race: Cargo removes a temporary file while `du` scans it, terminating the
+  guard thread. That run is stopped, its processes are verified gone, and its
+  source, target and failed evidence remain preserved without acceptance.
+
+  The follow-up retries transient sampling races and makes unexpected guard
+  failures stop and reap owned processes. Independent review verifies all
+  seventeen tooling tests, escaped-writer and hung-child failures, retained
+  artifacts, unchanged 53-step coverage and the exact 122-command ops plan.
+  It merges at `5e1881da1a`. A fresh outer-runner invocation is executing only
+  checks 25 through 33; both live guards are healthy at the checkpoint.
+  Isolated documentation and the rest of the gate remain required.
+
+  Signed-native protocol 0362ul24 merges at `75e5dd4b0f` after independent
+  review and 26 tests. It binds real route receipts, source and fixture
+  identities, bounded process lifetime and retained memory evidence. Its
+  ownership contract explicitly requires one serial controller and protects
+  pre-existing foreign children. The build adapter, actual qualification and
+  final collection remain pending; no signed performance result is claimed.
+
+  Further F3 review rejects an overlay that restores obsolete limits calls
+  in other active benchmark consumers. The next candidate restores those
+  files to exact 472b source; full paired preparation still requires baseline
+  rebinding and review before a build grant. The original failure is seven
+  arity errors plus one missing-fixture error, rather than eight arity errors.
+  Generic build-leasing cleanup and the W8 ABBA execution wrapper remain under
+  review. These returns preserve the every-consumer and performance requirements;
+  only audit 22 is deferred, and nothing is pushed.
