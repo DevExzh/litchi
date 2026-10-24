@@ -650,7 +650,10 @@ fn empty_assignments_keep_security_policy_and_signed_noops_are_retained() {
         .set("/body/p[1]", Props::new())
         .expect("an empty assignment is a signed exact no-op");
     assert!(signed_noop.is_signed());
-    assert_eq!(signed_noop.to_bytes().expect("signed no-op bytes"), signed_bytes);
+    assert_eq!(
+        signed_noop.to_bytes().expect("signed no-op bytes"),
+        signed_bytes
+    );
     let invalid_target = litchi_ops::open(signed_path).expect("signed fixture for target check");
     let target_error = invalid_target
         .set("/body/p[999]", Props::new())
