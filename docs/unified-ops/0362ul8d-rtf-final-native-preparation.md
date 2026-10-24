@@ -86,10 +86,19 @@ separation.
 
 ## Source-only commands
 
-The fresh receipt was produced with:
+The historical receipt was produced with the following relative-path command:
+it is retained as executed evidence, but is superseded by the manifest
+identity repair in [0362ul8e](0362ul8e-legacy-manifest-identity.md), whose
+preparer rejects relative manifest paths:
 
 ```text
 python3 source-candidate/tools/native_qualification/prepare_legacy_native_inputs.py --lane legacy-rtf --manifest driver/legacy-rtf-final.json --before source-baseline --after source-candidate --output driver/source-preparation.json
+```
+
+For a current re-preparation, pass absolute paths to the repaired preparer:
+
+```text
+python3 /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/source-candidate/tools/native_qualification/prepare_legacy_native_inputs.py --lane legacy-rtf --manifest /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/driver/legacy-rtf-final.json --before /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/source-baseline --after /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/source-candidate --output /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/driver/source-preparation.json
 ```
 
 The explicit manifest binds candidate revision
