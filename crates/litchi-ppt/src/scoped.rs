@@ -1157,6 +1157,7 @@ mod tests {
     struct VersionedSource {
         bytes: Vec<u8>,
         revision: AtomicU64,
+        flip_after_versions: AtomicU64,
     }
 
     impl VersionedSource {
@@ -1164,11 +1165,16 @@ mod tests {
             Self {
                 bytes,
                 revision: AtomicU64::new(0),
+                flip_after_versions: AtomicU64::new(0),
             }
         }
 
         fn change(&self) {
             self.revision.fetch_add(1, Ordering::AcqRel);
+        }
+
+        fn change_after_version_calls(&self, calls: u64) {
+            self.flip_after_versions.store(calls, Ordering::Release);
         }
     }
 
@@ -1178,10 +1184,20 @@ mod tests {
         }
 
         fn version(&self) -> std::io::Result<SourceVersion> {
-            Ok(SourceVersion::new(
-                0x5050,
-                self.revision.load(Ordering::Acquire),
-            ))
+            let revision = self.revision.load(Ordering::Acquire);
+            let remaining = self.flip_after_versions.load(Ordering::Acquire);
+            if remaining == 1 {
+                if self
+                    .flip_after_versions
+                    .compare_exchange(1, 0, Ordering::AcqRel, Ordering::Acquire)
+                    .is_ok()
+                {
+                    self.revision.fetch_add(1, Ordering::AcqRel);
+                }
+            } else if remaining > 1 {
+                self.flip_after_versions.fetch_sub(1, Ordering::AcqRel);
+            }
+            Ok(SourceVersion::new(0x5050, revision))
         }
 
         fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
@@ -1261,6 +1277,28 @@ mod tests {
         base.bytes().unwrap();
         source.change();
 
+        assert!(matches!(
+            base.native(),
+            Err(super::Failure::Package(Error::Ole(
+                OleError::SourceChanged { .. }
+            )))
+        ));
+    }
+
+    #[test]
+    fn native_projection_fences_a_source_change_during_construction() {
+        let source_package = Package::new().unwrap();
+        let source = Arc::new(VersionedSource::new(
+            source_package.to_encrypted_bytes().unwrap(),
+        ));
+        let package = Package::from_read_at(source.clone()).unwrap();
+        let base = super::Base::capture(&package).unwrap();
+        base.bytes().unwrap();
+
+        // The cached-byte fence uses two version calls. The third call is the
+        // presentation handoff inside native snapshot construction; advance
+        // the positional source immediately after it returns.
+        source.change_after_version_calls(3);
         assert!(matches!(
             base.native(),
             Err(super::Failure::Package(Error::Ole(
