@@ -610,6 +610,7 @@ def _validate_rows(
             "source_output_semantic_sha256",
             "changed_semantic_sha256",
             "changed_output_semantic_sha256",
+            "source_raw_sha256",
         ):
             _expect(_is_hash(receipt.get(key)), f"{path}: raw fidelity {key} is missing")
         _expect(
@@ -630,8 +631,24 @@ def _validate_rows(
             receipt["fidelity_mode"] == expected_mode
             and receipt.get("source_preserving_expected") == (expected_mode == "source_exact")
             and isinstance(receipt.get("source_output_exact"), bool)
-            and isinstance(receipt.get("changed_output_exact"), bool),
+            and isinstance(receipt.get("changed_output_exact"), bool)
+            and isinstance(receipt.get("source_raw_exact"), bool)
+            and isinstance(receipt.get("changed_output_exact_expected"), bool)
+            and isinstance(receipt.get("standalone_route_checked"), bool)
+            and isinstance(receipt.get("splice_oracle_checked"), bool)
+            and isinstance(receipt.get("splice_oracle_passed"), bool),
             f"{path}: raw fidelity source-preservation receipt is missing",
+        )
+        expected_route = (
+            "contextual_read_write" if part_id == "svg-blip" else "standalone_read_write"
+        )
+        _expect(
+            receipt.get("read_write_route") == expected_route,
+            f"{path}: raw fidelity route is not the production route",
+        )
+        _expect(
+            receipt.get("standalone_route_checked") is (part_id == "svg-blip"),
+            f"{path}: standalone SVG route coverage is inconsistent",
         )
         _expect(
             receipt["source_semantic_sha256"] == receipt["source_output_semantic_sha256"]
@@ -642,15 +659,32 @@ def _validate_rows(
             f"{path}: raw fidelity semantic model changed during write",
         )
         if receipt["source_preserving_expected"]:
+            _expect(receipt.get("source_raw_exact") is True, f"{path}: source raw bytes were not retained")
             _expect(
-                receipt["source_output_exact"] is True
-                and receipt["source_output_sha256"] == receipt["source_sha256"],
-                f"{path}: promised source-preserving route changed bytes",
+                receipt["source_raw_sha256"] == receipt["source_sha256"],
+                f"{path}: promised source-preserving route changed retained source bytes",
             )
+            if part_id == "svg-blip":
+                # Contextual export completes inherited declarations on an
+                # otherwise unchanged fragment.  The exact-source proof is
+                # the raw inherited fragment; changed contextual output is a
+                # dirty serialization and is not promised byte-identical.
+                _expect(
+                    receipt.get("changed_output_exact_expected") is False,
+                    f"{path}: contextual SVG changed-output policy is inconsistent",
+                )
+            else:
+                _expect(
+                    receipt.get("changed_output_exact_expected") is True
+                    and receipt["changed_output_exact"] is True
+                    and receipt["changed_output_sha256"] == receipt["changed_sha256"],
+                    f"{path}: promised changed source-preserving route changed bytes",
+                )
+        if part_id in {"formatcode2", "theme-family", "theme-family-part"}:
             _expect(
-                receipt["changed_output_exact"] is True
-                and receipt["changed_output_sha256"] == receipt["changed_sha256"],
-                f"{path}: promised changed source-preserving route changed bytes",
+                receipt.get("splice_oracle_checked") is True
+                and receipt.get("splice_oracle_passed") is True,
+                f"{path}: independent changed-source splice oracle is missing",
             )
         _expect(
             receipt.get("fixture_identity_sha256")
@@ -702,6 +736,44 @@ def _validate_rows(
                 f"{path}: theme-family mutation output size is missing",
             )
             _expect(item.get("output_differs") is True, f"{path}: theme-family mutation was a no-op")
+            if operation in {"replace_family", "add_family"}:
+                for field in ("requested_name", "requested_id", "requested_variant_id"):
+                    _expect(
+                        isinstance(item.get(field), str) and bool(item[field]),
+                        f"{path}: theme-family {operation} requested {field} is missing",
+                    )
+                for field in ("observed_name", "observed_id", "observed_variant_id"):
+                    _expect(
+                        isinstance(item.get(field), str) and bool(item[field]),
+                        f"{path}: theme-family {operation} observed {field} is missing",
+                    )
+                _expect(
+                    item["observed_name"] == item["requested_name"]
+                    and item["observed_id"] == item["requested_id"]
+                    and item["observed_variant_id"] == item["requested_variant_id"]
+                    and item.get("requested_identity_matches") is True,
+                    f"{path}: theme-family {operation} identity was not verified after parse",
+                )
+            else:
+                _expect(
+                    item.get("requested_name") is None
+                    and item.get("requested_id") is None
+                    and item.get("requested_variant_id") is None
+                    and item.get("observed_name") is None
+                    and item.get("observed_id") is None
+                    and item.get("observed_variant_id") is None
+                    and item.get("requested_identity_matches") is True,
+                    f"{path}: theme-family remove carries an invalid identity receipt",
+                )
+            for field in ("source_name", "source_id", "source_variant_id"):
+                _expect(
+                    isinstance(item.get(field), str) and bool(item[field]),
+                    f"{path}: theme-family {operation} source {field} is missing",
+                )
+            _expect(
+                item.get("source_identity_matches") is True,
+                f"{path}: Theme-part source identity was not bound before mutation",
+            )
         replace = mutation_by_operation["replace_family"]
         remove = mutation_by_operation["remove_family"]
         add = mutation_by_operation["add_family"]
@@ -852,6 +924,13 @@ def _validate_rows(
                     == expected_parts,
                     f"{path}: bounded sink does not identify production routes",
                 )
+                _expect(
+                    details.get("route", {}).get("contextual_svg_scope")
+                    == "contextual_read_write"
+                    and details.get("route", {}).get("contextual_svg_parts")
+                    == (["svg-blip"] if "svg-blip" in raw_routes else []),
+                    f"{path}: bounded sink contextual SVG route is not declared",
+                )
         elif operation in sink_operations - {"write_to_bounded_sink"}:
             sink = row.get("sink")
             _expect(isinstance(sink, dict), f"{path}: {operation} sink receipt is missing")
@@ -872,6 +951,14 @@ def _validate_rows(
                 and details.get("sink_writes") == sink["writes"],
                 f"{path}: {operation} sink detail receipt differs from row receipt",
             )
+            if operation == "vec_write":
+                route = details.get("route")
+                _expect(isinstance(route, dict), f"{path}: vec-write route details are missing")
+                _expect(
+                    route.get("contextual_svg_scope") == "contextual_read_write"
+                    and route.get("contextual_svg_parts") == (["svg-blip"] if "svg-blip" in raw_routes else []),
+                    f"{path}: vec-write contextual SVG route is not declared",
+                )
         elif operation == "stale_replay":
             _expect(
                 row.get("typed_refusal_checked") is True,
