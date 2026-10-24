@@ -36,7 +36,7 @@ wrapper SHA-256: 495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256
 inner memory-capped shim: /home/zhuhe/code/litchi-worktrees/.coord/bin/cargo
 inner shim SHA-256: 1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8
 target/process supervisor: docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py
-supervisor SHA-256: 89e674e9313eb3c3b7d25a95d31e9b6cbf304f3cc994b5e64ac08d80f46581c0
+supervisor SHA-256: b8603b469af213b097fcf1111ce57dbe2c8e6e3de19a9bbe01514f53eb6e663a
 reference compile command: /home/zhuhe/code/litchi-worktrees/.coord/rtf-fuzz-39a417-20261024/compile-command.txt
 reference compile command SHA-256: 81ab917ba0447718932a08dcb5e0ef1062fc0bda41d2aa4df48a5127019807b1
 reference compile receipt: /home/zhuhe/code/litchi-worktrees/.coord/rtf-fuzz-39a417-20261024/receipt.json
@@ -53,6 +53,8 @@ host-process adapter: docs/unified-ops/results/0362g/ppt_host_process_guard.py
 adapter SHA-256: 08c73174304061beeaf778df763be3507befd8200db72a8617a5d8ddc42e12b8
 correctness receipt validator: docs/unified-ops/results/0362g/validate_ppt_correctness_receipt.py
 validator SHA-256: cb635bc911998915da71c0dc69c97e6d31a2a7a8e68f0c52c94ec4596cf3aed7
+candidate lock guard: docs/unified-ops/results/0362g/validate_ppt_candidate_lock.py
+candidate lock guard SHA-256: 5ed31f6bf3377b1936b58e214fe2ea04c796b9b9f9508079a7b02a06820ab714
 final-source supervisor/wrapper hashes: must be freshly rebound after
 0362ul39/source freeze
 ~~~
@@ -184,8 +186,11 @@ This leaf registers four source-bound PPT steps in the existing
 `run_safe_gate.py` plan: `ppt-scoped-build`,
 `ppt-scoped-correctness-suite`, `ppt-scoped-correctness`, and
 `ppt-scoped-correctness-validate`. The final assembled source must retain and
-rebind them. The future command shape (with final-source hashes filled by the
-rebind receipt) is:
+rebind them. They are auxiliary steps: an ordinary run without an explicit
+`--only` or `--start-at` selection retains the existing full-gate plan and
+count (53 steps with the complete operations feature manifest; 57 only when
+all four auxiliaries are explicitly composed). The future command shape (with
+final-source hashes filled by the rebind receipt) is:
 
 ~~~sh
 set -eu
@@ -208,6 +213,12 @@ The coordinator-selected step/state must bind the final source HEAD/tree,
 the exact release probe artifact. Its correctness command list must retain
 these unchanged argv selectors with `RUST_TEST_THREADS=1` and
 `--test-threads=1`:
+
+Both Cargo-bearing auxiliary steps first run the candidate lock guard against
+the source `Cargo.lock` and the approved candidate SHA
+`4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`. A wrong
+lock exits before the host guard or Cargo is launched; the guard is therefore
+part of the preflight, not a post-build observation.
 
 ~~~text
 export RUST_TEST_THREADS=1
