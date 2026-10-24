@@ -4128,3 +4128,32 @@ See [0063](0063-source-pptx-modern-comments.md).
   exercises and independent hash/mode/ancestry checks pass (0362ul22). The
   protected trunk probe remains intact. Nothing is pushed; only audit 22 is
   deferred.
+
+- Coordinator correctness and cleanup update (2026-10-24):
+  The final 472b iWork constructor and owner preflights complete. All four
+  constructor variants pass fifteen routes, and all four owner variants pass
+  four routes, with byte-identical reports. Independent review verifies 95
+  artifact identities and 28 command receipts. Record 0361fde preserves the
+  actual owner baseline input and its canonical Git resolution; the corrected
+  record merges at `16d8e593b4`. Collection has no timing or allocation packet,
+  so native performance acceptance remains required.
+
+  Glossary reconciliation 0362ul23 merges at `74c032cc09` after independent
+  review. It corrects W1's source-backed commit shape, binds fresh API evidence,
+  closes stale ZIP/OPC source-debt wording and accurately records the earlier
+  PPT first-commit improvement. Final native qualification and the workspace
+  gate remain open. The signed-native audit identifies missing timed signed
+  routes in the otherwise unsigned W8 matrix; a dedicated qualification
+  protocol is in progress without changing the frozen production source.
+
+  The fresh 9781 gate has passed its first sixteen checks at this checkpoint.
+  Final PPT and W8 builds continue. Both DOC body-toggle release builds finish,
+  followed by targeted fidelity tests; their actual test selection is being
+  checked before acceptance. Isolated documentation, remaining builds and
+  quiet-host performance measurements stay required.
+
+  Cleanup wave 50 removes three merged qualification/report leaves without
+  force. Branches and five ignored files remain preserved, restoration checks
+  pass, and independent verification confirms retained source/evidence paths
+  and the protected trunk probe (0362ul25). No performance exception is added
+  and nothing is pushed.
