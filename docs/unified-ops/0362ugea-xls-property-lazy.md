@@ -209,3 +209,23 @@ Strict `cargo clippy -p litchi-xls --all-targets --all-features --locked
 --offline -- -D warnings` also passed on the same clean source; its 376-byte
 `xls-clippy-4dce.log` has SHA-256
 `5e2cc8fa002efc7d30797ae25f313d99b2145c4f70d1ae4e3d1d256894a0f61c`.
+
+Commit `3ae7b831406b01a801d5e75b171db0974243a13c` adds the causal controls
+requested for that fence: the stable over-limit object-stream admission still
+returns the concrete `StreamBytes` limit, while the source hook mutates after
+the pre-admission observation and the same admission error is promoted to
+typed `SourceChanged`. On clean `3ae7b83140`, the focused control command was:
+
+```text
+source /home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/env.sh
+cargo test -p litchi-xls --lib --locked --offline sheet_features::edit::tests::render_error_ -- --nocapture
+```
+
+Both controls passed (2/2; 0 ignored); the external 564-byte
+`sheet-render-error-controls-3ae.log` has SHA-256
+`e2b543362ec69ce280b4612cb67bccfac9d495e898fed92806479a9c977f71e8`.
+The sheet suite was rerun on the same clean source (12 passed, 1 ignored;
+1,025-byte `sheet-features-3ae.log`, SHA-256
+`03fdd36671e24bfb64fd06e383cab69ce51747d9ce8aca2f032f78f80e74248a`), as
+was strict all-target/all-feature Clippy (168-byte `xls-clippy-3ae.log`,
+SHA-256 `a9833e5e165bfbd444f5b4b1f2aa43eaa60c69c51e41fdf5b5ecc8182d4286aa`).
