@@ -191,6 +191,10 @@ validator, identity, route-shape and cap logic:
 python3 -m unittest tools.test_legacy_native_qualification tools.test_native_qualification_runner
 Ran 28 tests
 OK
+
+python3 -m unittest tools.test_no_3rdparty_references
+Ran 3 tests
+OK
 ```
 
 The Python modules compiled successfully with `python3 -m py_compile`; all
