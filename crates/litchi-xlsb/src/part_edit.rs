@@ -2052,6 +2052,8 @@ mod tests {
         drop(cold.edit_theme().unwrap());
         drop(cold.edit_custom_data().unwrap());
         drop(cold.edit_threaded_comments().unwrap());
+        drop(cold.edit_task_panes().unwrap());
+        drop(cold.edit_cell_values("missing").unwrap());
 
         assert!(!cold.projection_cached());
     }

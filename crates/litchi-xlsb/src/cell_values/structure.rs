@@ -363,20 +363,32 @@ impl Edit {
     /// operation that needs them. Entry and discard therefore retain only the
     /// immutable package owner and finite edit policy.
     fn ensure_prepared(&mut self) -> Result<()> {
-        if self.sheet_catalog.is_none() {
+        let sheet_catalog: Option<Arc<[SheetTarget]>> = if self.sheet_catalog.is_none() {
             let workbook = self.base.workbook()?;
-            let sheet_catalog = workbook
-                .sheets()
-                .map(|tab| SheetTarget {
-                    name: tab.name().to_owned(),
-                    kind: tab.kind(),
-                    state: tab.state(),
-                })
-                .collect::<Vec<_>>();
-            self.sheet_catalog = Some(sheet_catalog.into());
+            Some(
+                workbook
+                    .sheets()
+                    .map(|tab| SheetTarget {
+                        name: tab.name().to_owned(),
+                        kind: tab.kind(),
+                        state: tab.state(),
+                    })
+                    .collect::<Vec<_>>()
+                    .into(),
+            )
+        } else {
+            None
+        };
+        let before = if self.before.is_none() {
+            Some(Arc::new(self.base.to_bytes()?))
+        } else {
+            None
+        };
+        if let Some(sheet_catalog) = sheet_catalog {
+            self.sheet_catalog = Some(sheet_catalog);
         }
-        if self.before.is_none() {
-            self.before = Some(Arc::new(self.base.to_bytes()?));
+        if let Some(before) = before {
+            self.before = Some(before);
         }
         Ok(())
     }
@@ -2324,7 +2336,7 @@ fn admit_archive_before_copy<'data>(
 mod replay_admission_tests {
     use super::admit_archive_before_copy;
     use crate::Package;
-    use litchi_opc::SourceLimits;
+    use litchi_opc::{BlobPart, PackURI, SourceLimits};
 
     #[test]
     fn archive_preflight_checks_member_budget_before_owned_handoff() {
@@ -2352,6 +2364,25 @@ mod replay_admission_tests {
         let edit = super::Edit::new(&cold, super::TransferLimits::DEFAULT).unwrap();
         drop(edit);
         assert!(!cold.projection_cached());
+    }
+
+    #[test]
+    fn structural_preparation_is_failure_atomic_and_retryable() {
+        let mut opc = Package::new().unwrap().into_opc();
+        opc.add_part(Box::new(BlobPart::new(
+            PackURI::new("/invalid.bin").unwrap(),
+            "not a content type".to_owned(),
+            Vec::new(),
+        )));
+        let package = Package::from(opc);
+        let mut edit = super::Edit::new(&package, super::TransferLimits::DEFAULT).unwrap();
+
+        assert!(edit.ensure_prepared().is_err());
+        assert!(edit.sheet_catalog.is_none());
+        assert!(edit.before.is_none());
+        assert!(edit.ensure_prepared().is_err());
+        assert!(edit.sheet_catalog.is_none());
+        assert!(edit.before.is_none());
     }
 }
 
