@@ -195,7 +195,7 @@ impl From<Refusal> for Error {
 }
 
 #[cfg(test)]
-mod tests {
+mod selector_tests {
     use super::{OwnedChartSelector, OwnedSlideSelector, SelectorError};
     use crate::{ChartSelector, SlideSelector};
     use litchi_core::Position;
@@ -760,7 +760,7 @@ fn fingerprint(bytes: &[u8]) -> u64 {
 }
 
 #[cfg(test)]
-mod tests {
+mod patch_tests {
     use super::*;
 
     #[test]
