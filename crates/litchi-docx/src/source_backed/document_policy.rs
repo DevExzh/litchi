@@ -47,7 +47,7 @@ pub(super) fn validate_changed_document(package: &Package) -> Result<()> {
     // semantic publication does.  Check the retained source inventory before
     // constructing a topology so a detached patch cannot bypass the signed
     // source policy merely because it carries no source XML provenance.
-    if package.physical_package()?.has_signature_infrastructure() {
+    if package.physical_source()?.has_signature_infrastructure() {
         return Err(litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy.into());
     }
     if let Some(topology) = &package.effective {
