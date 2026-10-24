@@ -43,19 +43,21 @@ impl EditOptions {
 #[derive(Debug, Clone)]
 pub struct Edit {
     staged: Staged,
-    conformance: Conformance,
+    package: Package,
+    conformance: Option<Conformance>,
 }
 
 impl Package {
-    /// Start a task-pane edit after validating any existing graph. Existing
-    /// XML conformance is retained; new graphs use Transitional
-    /// `SpreadsheetML` relationships unless
+    /// Start a task-pane edit without loading any existing graph. Existing
+    /// XML conformance is retained when a non-empty graph is written; new
+    /// graphs use Transitional `SpreadsheetML` relationships unless
     /// [`Self::edit_task_panes_with_options`] selects another.
     ///
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, and the validation errors of the task-pane graph.
+    /// refused. Existing graph errors are reported by the first operation or
+    /// by [`Edit::commit`].
     pub fn edit_task_panes(&self) -> Result<Edit> {
         self.edit_task_panes_with_options(EditOptions::default())
     }
@@ -67,14 +69,10 @@ impl Package {
     /// See [`Self::edit_task_panes`].
     pub fn edit_task_panes_with_options(&self, options: EditOptions) -> Result<Edit> {
         let staged = Staged::new(self, "edit_task_panes")?;
-        let conformance = match options.conformance {
-            Some(conformance) => conformance,
-            None => super::existing_conformance(staged.opc())?,
-        };
-        common_web::load(staged.opc(), &common_web::Limits::standard()).map_err(Error::from)?;
         Ok(Edit {
             staged,
-            conformance,
+            package: self.clone(),
+            conformance: options.conformance,
         })
     }
 
@@ -112,13 +110,18 @@ impl Edit {
 
     /// Replace the complete graph. An empty collection removes the graph.
     pub fn replace(&mut self, panes: Panes) -> Result<()> {
-        let conformance = self.conformance;
+        let conformance = if panes.is_empty() {
+            None
+        } else {
+            let conformance = match self.conformance {
+                Some(conformance) => conformance,
+                None => super::existing_conformance(self.package.opc())?,
+            };
+            self.conformance = Some(conformance);
+            Some(conformance)
+        };
         self.apply(move |candidate| {
-            if panes.is_empty() {
-                common_web::remove(candidate, &common_web::Limits::standard())
-                    .map(|_| ())
-                    .map_err(Error::from)
-            } else {
+            if let Some(conformance) = conformance {
                 common_web::put(
                     candidate,
                     panes,
@@ -126,6 +129,10 @@ impl Edit {
                     &common_web::Limits::standard(),
                 )
                 .map_err(Error::from)
+            } else {
+                common_web::remove(candidate, &common_web::Limits::standard())
+                    .map(|_| ())
+                    .map_err(Error::from)
             }
         })
     }

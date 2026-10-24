@@ -1,8 +1,9 @@
 //! Immutable worksheet slicer edits of a [`crate::Package`] (record 0360).
 //!
-//! [`crate::Package::edit_slicers`] starts an [`Edit`] over the validated
-//! slicer graph; every operation works on a private candidate graph, so an
-//! error cannot stage a partial graph. [`Edit::commit`] validates the
+//! [`crate::Package::edit_slicers`] starts an [`Edit`] that retains the
+//! package and limits without loading the slicer graph; every operation
+//! works on a private candidate graph, so an error cannot stage a partial
+//! graph. [`Edit::commit`] validates the
 //! complete owner graph and returns a [`Commit`] holding the new package,
 //! the exact part-level [`Patch`] and the [`Diagnostics`];
 //! [`crate::Package::apply_slicers`] replays a patch onto an equal package.
@@ -55,19 +56,19 @@ impl EditOptions {
 pub struct Edit {
     staged: Staged,
     limits: SourceLimits,
-    /// The current staged graph has passed `graph_with_limits`. It is cleared
-    /// before a candidate replacement and restored only after validation;
-    /// `reset` returns to the already validated source graph.
+    /// Whether the current staged graph has passed `graph_with_limits`.
+    /// Validation is deferred until a graph operation or commit requires it.
     graph_validated: bool,
 }
 
 impl Package {
-    /// Start a slicer edit after validating the existing slicer graph.
+    /// Start a slicer edit without loading the existing slicer graph.
     ///
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, and the validation errors of the slicer graph.
+    /// refused. Existing graph errors are reported by the first operation or
+    /// by [`Edit::commit`].
     pub fn edit_slicers(&self) -> Result<Edit> {
         self.edit_slicers_with_options(EditOptions::default())
     }
@@ -79,11 +80,10 @@ impl Package {
             .opc()
             .read_limits()
             .min(options.limits.unwrap_or_else(|| staged.opc().read_limits()));
-        super::validation::graph_with_limits(staged.opc(), &limits)?;
         Ok(Edit {
             staged,
             limits,
-            graph_validated: true,
+            graph_validated: false,
         })
     }
 
@@ -152,19 +152,12 @@ impl Edit {
             crate::slicer_cache::SLICER_CACHE_RELATIONSHIP_TYPE.to_owned(),
             uri.relative_ref(workbook.base_uri()),
         )];
-        let budget = crate::raw::prepare_package_budget(
-            self.staged.opc(),
-            &workbook,
-            &additions,
-            &limits,
-        )?;
+        let budget =
+            crate::raw::prepare_package_budget(self.staged.opc(), &workbook, &additions, &limits)?;
         let prepared = raw::prepare_cache(value, workbook.base_uri(), &limits)?;
         self.apply_raw(&limits, move |candidate| {
             crate::slicer_cache::package::store_slicer_cache_prepared_in_place_with_budget(
-                candidate,
-                &prepared,
-                &limits,
-                &budget,
+                candidate, &prepared, &limits, &budget,
             )
         })
     }
@@ -271,7 +264,7 @@ impl Edit {
     /// Discard every staged change.
     pub fn reset(&mut self) {
         self.staged.reset();
-        self.graph_validated = true;
+        self.graph_validated = false;
     }
 
     /// Validate the staged slicer graph and publish it to a new package. An

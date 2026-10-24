@@ -161,7 +161,8 @@ fn malformed_task_pane_graph_is_rejected_without_mutation() {
     );
     let package = Package::from_opc(raw).unwrap();
     let before = package.to_bytes().unwrap();
-    assert!(package.edit_task_panes().is_err());
+    let edit = package.edit_task_panes().unwrap();
+    assert!(edit.commit().is_err());
     assert_eq!(package.to_bytes().unwrap(), before);
 }
 

@@ -40,6 +40,45 @@ fn package() -> (OpcPackage, PackURI) {
     (package, worksheet)
 }
 
+#[test]
+fn slicer_and_timeline_edit_entries_defer_cache_parsing() {
+    let (mut package, _) = package();
+    let workbook = PackURI::new("/xl/workbook.xml").unwrap();
+    let slicer_cache = PackURI::new("/xl/slicerCaches/malformed.xml").unwrap();
+    let timeline_cache = PackURI::new("/xl/timelineCaches/malformed.xml").unwrap();
+    package.add_part(Box::new(BlobPart::new(
+        slicer_cache.clone(),
+        slicer::CACHE_CONTENT_TYPE.into(),
+        b"<malformed".to_vec(),
+    )));
+    package.add_part(Box::new(BlobPart::new(
+        timeline_cache.clone(),
+        timeline::CACHE_CONTENT_TYPE.into(),
+        b"<malformed".to_vec(),
+    )));
+    let workbook_part = package.get_part_mut(&workbook).unwrap();
+    workbook_part.rels_mut().add_relationship(
+        slicer::CACHE_RELATIONSHIP_TYPE.into(),
+        slicer_cache.relative_ref(workbook.base_uri()),
+        "rIdMalformedSlicerCache".into(),
+        false,
+    );
+    workbook_part.rels_mut().add_relationship(
+        timeline::CACHE_RELATIONSHIP_TYPE.into(),
+        timeline_cache.relative_ref(workbook.base_uri()),
+        "rIdMalformedTimelineCache".into(),
+        false,
+    );
+
+    let source = litchi_xlsx::Package::from_opc(package).unwrap();
+    let before = source.to_bytes().unwrap();
+    let slicers = source.edit_slicers().unwrap();
+    assert!(slicers.commit().is_err());
+    let timelines = source.edit_timelines().unwrap();
+    assert!(timelines.commit().is_err());
+    assert_eq!(source.to_bytes().unwrap(), before);
+}
+
 fn misdeclare_member(mut bytes: Vec<u8>, wanted: &str) -> Vec<u8> {
     let eocd = bytes
         .windows(4)

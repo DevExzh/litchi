@@ -1,9 +1,10 @@
 //! Immutable worksheet timeline edits of a [`crate::Package`] (record
 //! 0360).
 //!
-//! [`crate::Package::edit_timelines`] starts an [`Edit`] over the validated
-//! timeline graph; every operation works on a private candidate graph, so an
-//! error cannot stage a partial graph. Timeline cache references are
+//! [`crate::Package::edit_timelines`] starts an [`Edit`] that retains the
+//! package metadata and limits without loading the timeline graph; every
+//! operation works on a private candidate graph, so an error cannot stage a
+//! partial graph. Timeline cache references are
 //! workbook-owned, so the workbook part identity is captured once when the
 //! edit starts. [`Edit::commit`] returns a [`Commit`] holding the new
 //! package, the exact part-level [`Patch`] and the [`Diagnostics`];
@@ -58,19 +59,19 @@ pub struct Edit {
     staged: Staged,
     workbook: PackURI,
     limits: SourceLimits,
-    /// The current staged graph has passed `graph_with_limits`. Every public
-    /// replacement goes through `apply`/`apply_raw`, and `reset` returns to
-    /// the already validated source graph.
+    /// Whether the current staged graph has passed `graph_with_limits`.
+    /// Validation is deferred until a graph operation or commit requires it.
     graph_validated: bool,
 }
 
 impl Package {
-    /// Start a timeline edit after validating the existing timeline graph.
+    /// Start a timeline edit without loading the existing timeline graph.
     ///
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, and the validation errors of the timeline graph.
+    /// refused. Existing graph errors are reported by the first operation or
+    /// by [`Edit::commit`].
     pub fn edit_timelines(&self) -> Result<Edit> {
         self.edit_timelines_with_options(EditOptions::default())
     }
@@ -83,12 +84,11 @@ impl Package {
             .opc()
             .read_limits()
             .min(options.limits.unwrap_or_else(|| staged.opc().read_limits()));
-        super::validation::graph_with_limits(staged.opc(), &workbook, &limits)?;
         Ok(Edit {
             staged,
             workbook,
             limits,
-            graph_validated: true,
+            graph_validated: false,
         })
     }
 
@@ -279,7 +279,7 @@ impl Edit {
     /// Discard every staged change.
     pub fn reset(&mut self) {
         self.staged.reset();
-        self.graph_validated = true;
+        self.graph_validated = false;
     }
 
     /// Validate the staged timeline graph and publish it to a new package.
