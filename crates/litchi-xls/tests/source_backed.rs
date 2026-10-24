@@ -2574,7 +2574,7 @@ fn deferred_package_handoff_promotes_original_source_changes_for_primary_edit_an
     let (source, deferred, sheet_index, reference, _sheet_name) = deferred_numeric_fixture();
     let handoff = Package::from_source(deferred).unwrap();
 
-    let mut edit = handoff.edit().unwrap();
+    let edit = handoff.edit().unwrap();
     source.bump();
     assert!(matches!(
         edit.source_cell(sheet_index, reference),
