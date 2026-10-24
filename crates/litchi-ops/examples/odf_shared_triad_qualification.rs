@@ -1014,10 +1014,12 @@ mod probe {
             .title
             .map(|value| value.text);
         family_result(
-            "odc",
-            "odc_chart_title",
-            "deterministic_builder",
-            "litchi_odc::Package::new",
+            FamilyIdentity {
+                family: "odc",
+                route: "odc_chart_title",
+                source_kind: "deterministic_builder",
+                source: "litchi_odc::Package::new",
+            },
             &source,
             &file_source,
             &changed_output,
@@ -1045,7 +1047,7 @@ mod probe {
             geometry[2].clone(),
             geometry[3].clone(),
         )
-            .expect("ODI set_geometry");
+        .expect("ODI set_geometry");
         edit.commit().expect("ODI changed commit")
     }
 
@@ -1209,10 +1211,12 @@ mod probe {
         let leaf_geometry = geometry_of(&changed_output);
         let facade_geometry = geometry_of(&file_changed_output);
         family_result(
-            "odi",
-            "odi_frame_geometry",
-            "deterministic_builder",
-            "litchi_odi::Package::new",
+            FamilyIdentity {
+                family: "odi",
+                route: "odi_frame_geometry",
+                source_kind: "deterministic_builder",
+                source: "litchi_odi::Package::new",
+            },
             &source,
             &file_source,
             &changed_output,
@@ -1401,10 +1405,12 @@ mod probe {
             .to_owned();
         assert_source_pair("OTH", &source, &file_source);
         family_result(
-            "oth",
-            "oth_paragraph_text",
-            "deterministic_builder",
-            "litchi_oth::Builder::paragraph(before)",
+            FamilyIdentity {
+                family: "oth",
+                route: "oth_paragraph_text",
+                source_kind: "deterministic_builder",
+                source: "litchi_oth::Builder::paragraph(before)",
+            },
             &source,
             &file_source,
             &changed_output,
@@ -1602,10 +1608,12 @@ mod probe {
         assert_source_pair("ODM", &source, &file_source);
         let archive_audit = archive_pair(&changed_output, &file_changed_output);
         family_result(
-            "odm",
-            "odm_title",
-            "deterministic_builder",
-            "litchi_odm::Builder::new + timestamp-free Structure::default_meta_xml",
+            FamilyIdentity {
+                family: "odm",
+                route: "odm_title",
+                source_kind: "deterministic_builder",
+                source: "litchi_odm::Builder::new + timestamp-free Structure::default_meta_xml",
+            },
             &source,
             &file_source,
             &changed_output,
@@ -1621,11 +1629,15 @@ mod probe {
         )
     }
 
+    struct FamilyIdentity<'a> {
+        family: &'a str,
+        route: &'a str,
+        source_kind: &'a str,
+        source: &'a str,
+    }
+
     fn family_result(
-        family: &str,
-        route: &str,
-        source_kind: &str,
-        source: &str,
+        identity: FamilyIdentity<'_>,
         source_bytes: &[u8],
         facade_source_bytes: &[u8],
         leaf_output: &[u8],
@@ -1637,6 +1649,12 @@ mod probe {
         facade: Value,
         timing: Value,
     ) -> Value {
+        let FamilyIdentity {
+            family,
+            route,
+            source_kind,
+            source,
+        } = identity;
         assert_eq!(
             source_bytes, facade_source_bytes,
             "{family} native/facade source bytes differ"
