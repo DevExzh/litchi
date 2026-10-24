@@ -51094,6 +51094,36 @@ fn rewrite_movie_title_operation(
                 )
                 self.assertTrue(any("must resolve its typed selector" in item for item in violations), violations)
 
+    def test_lazy_table_merge_transactions_guard_every_staging_entry(self) -> None:
+        """A deferred selector must still guard each operation that can stage."""
+
+        for spec in boundaries.IWA_TABLE_MERGE_TRANSACTION_SPECS:
+            deferred = spec.get("deferred_admission")
+            if deferred is None:
+                continue
+            with self.subTest(format=spec["format_name"]), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self._copy_table_merge_transaction_fixture(root, spec)
+                transaction = root / spec["transaction_path"]
+                original = transaction.read_text(encoding="utf-8")
+                guard = f"self.{deferred['helper']}()?;"
+                self.assertGreaterEqual(original.count(guard), len(deferred["stage_methods"]))
+                for index, method in enumerate(deferred["stage_methods"]):
+                    pieces = original.split(guard)
+                    transaction_source = (
+                        guard.join(pieces[: index + 1])
+                        + f"self.removed_{deferred['helper']}()?;"
+                        + guard.join(pieces[index + 1 :])
+                    )
+                    transaction.write_text(transaction_source, encoding="utf-8")
+                    violations = boundaries._audit_table_merge_transaction_source_topology(
+                        root, spec
+                    )
+                    self.assertTrue(
+                        any("must resolve its typed selector" in item for item in violations),
+                        (method, violations),
+                    )
+
     def test_numbers_wire_table_merge_writer_boundary_rejects_unbounded_or_peer_codec(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

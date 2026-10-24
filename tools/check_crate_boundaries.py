@@ -70479,6 +70479,14 @@ IWA_TABLE_MERGE_TRANSACTION_SPECS = (
         "apply_method": "apply_table_merges",
         "selector_types": frozenset({"SheetSelector", "TableSelector"}),
         "admission_markers": ("select_semantic_positions", "select_table"),
+        # Numbers keeps edit entry O(1): the owned selectors are admitted by
+        # the constructor, while the rooted target is resolved on the first
+        # staged/read operation.  Every operation that can stage or publish
+        # must therefore retain the private loader guard.
+        "deferred_admission": {
+            "helper": "ensure_loaded",
+            "stage_methods": ("regions", "merge", "unmerge", "commit"),
+        },
     },
     {
         "format_name": "Pages",
@@ -70505,7 +70513,17 @@ IWA_TABLE_MERGE_TRANSACTION_SPECS = (
             "resolve_body_table_with_budget",
             "select_body_table",
             "resolve_body_table",
+            # The lazy Edit resolver delegates through the owned typed
+            # selector; this is the target-resolution marker in that helper.
+            "resolve_with_budget",
         ),
+        # Pages also defers rooted selection until the first operation.  The
+        # private resolver performs the typed target lookup and readback; all
+        # staging/publication methods must call it before touching state.
+        "deferred_admission": {
+            "helper": "resolve",
+            "stage_methods": ("regions", "merge", "unmerge", "commit"),
+        },
     },
     {
         "format_name": "Keynote",
@@ -72263,6 +72281,86 @@ def _rust_public_method_bodies(
     return evidence
 
 
+def _rust_method_bodies(
+    source: str, method_name: str
+) -> list[tuple[str, str, int]]:
+    """Return declarations and bodies for public or private inherent methods.
+
+    The table-merge boundary has a deliberate lazy-entry path: its private
+    resolver is called by each staging/publication method rather than by the
+    package constructor.  This narrow sibling of
+    :func:`_rust_public_method_bodies` lets the audit inspect that resolver
+    without treating a marker in an unrelated helper as admission evidence.
+    """
+
+    masked_source = _mask_rust_cfg_test_items(source)
+    code = _mask_rust_non_code(masked_source)
+    method_pattern = re.compile(
+        r"(?m)^[ \t]*(?:(?:pub(?:\([^()\r\n]*\))?)[ \t]+)?"
+        r"(?:(?:unsafe|async|const)[ \t]+)*fn[ \t\r\n]+"
+        rf"(?:r#)?{re.escape(method_name)}\b"
+    )
+    evidence: list[tuple[str, str, int]] = []
+    for match in method_pattern.finditer(code):
+        cursor = match.end()
+        parentheses = 0
+        brackets = 0
+        while cursor < len(code):
+            character = code[cursor]
+            if character == "(":
+                parentheses += 1
+            elif character == ")" and parentheses:
+                parentheses -= 1
+            elif character == "[":
+                brackets += 1
+            elif character == "]" and brackets:
+                brackets -= 1
+            elif not parentheses and not brackets and character in "{;":
+                break
+            cursor += 1
+        if cursor >= len(code) or code[cursor] != "{":
+            continue
+        end = _rust_balanced_delimited_end(code, cursor)
+        if end is None:
+            continue
+        evidence.append(
+            (code[match.start() : cursor], code[match.start() : end],
+             code.count("\n", 0, match.start()) + 1)
+        )
+    return evidence
+
+
+def _table_merge_deferred_admission_is_checked(
+    transaction_source: str, spec: dict
+) -> bool:
+    """Check a lazy edit's private resolver and every guarded entry point."""
+
+    deferred = spec.get("deferred_admission")
+    if deferred is None:
+        return False
+    helper = deferred["helper"]
+    helper_methods = _rust_method_bodies(transaction_source, helper)
+    if not helper_methods:
+        return False
+    helper_has_selector = any(
+        _table_merge_transaction_has_marker(
+            _mask_rust_non_code(body), spec["admission_markers"]
+        )
+        for _declaration, body, _line in helper_methods
+    )
+    if not helper_has_selector:
+        return False
+    call = re.compile(rf"\bself\s*\.\s*{re.escape(helper)}\s*\(")
+    for method_name in deferred["stage_methods"]:
+        methods = _rust_method_bodies(transaction_source, method_name)
+        if not methods or not any(
+            call.search(_mask_rust_non_code(body)) is not None
+            for _declaration, body, _line in methods
+        ):
+            return False
+    return True
+
+
 def _audit_focused_table_merge_source_topology(
     root: Path,
     *,
@@ -73716,6 +73814,9 @@ def _audit_table_merge_transaction_source_topology(
             source, spec["apply_method"], type_name="Package"
         ):
             apply_evidence.append((evidence_declaration, body, line_number, path))
+    deferred_admission_checked = _table_merge_deferred_admission_is_checked(
+        transaction_source, spec
+    )
 
     if spec["edit_method"] not in package_methods:
         violations.append(
@@ -73743,8 +73844,11 @@ def _audit_table_merge_transaction_source_topology(
         else:
             for _declaration, body, line_number, body_path in edit_evidence:
                 body_code = _mask_rust_non_code(body)
-                if not _table_merge_transaction_has_marker(
-                    body_code, spec["admission_markers"]
+                if not (
+                    _table_merge_transaction_has_marker(
+                        body_code, spec["admission_markers"]
+                    )
+                    or deferred_admission_checked
                 ):
                     violations.append(
                         f"focused {format_name} {spec['edit_method']} must resolve "
