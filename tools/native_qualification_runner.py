@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fail-closed runner for the W4b XLSB and W5 legacy native ABBA lanes.
+"""Fail-closed runner for the W4b, W5, and legacy native ABBA lanes.
 
 The runner deliberately takes all source, target, binary, fixture, and output
 paths from a JSON manifest.  It does not know a wave commit and therefore
@@ -284,12 +284,22 @@ def load_manifest(path: Path) -> dict[str, Any]:
     data = _expand_environment(data)
     if data.get("schema") != SCHEMA:
         raise RunnerError(f"manifest schema must be {SCHEMA!r}")
-    if data.get("lane") not in {"w4b-xlsb", "w5-legacy"}:
-        raise RunnerError("lane must be w4b-xlsb or w5-legacy")
+    allowed_lanes = {
+        "w4b-xlsb",
+        "w5-legacy",
+        "legacy-rtf",
+        "legacy-ole-properties",
+        "legacy-xls-properties",
+    }
+    if data.get("lane") not in allowed_lanes:
+        raise RunnerError(f"lane must be one of {sorted(allowed_lanes)!r}")
     if data.get("abba_order") != list(ABBA_ORDER):
         raise RunnerError(f"abba_order must be {list(ABBA_ORDER)!r}")
     if data.get("rounds") != ROUNDS:
         raise RunnerError(f"rounds is fixed at {ROUNDS}")
+    blocks = data.get("abba_blocks", 1)
+    if not isinstance(blocks, int) or not 1 <= blocks <= 5:
+        raise RunnerError("abba_blocks must be an integer from 1 through 5")
     if "target_limit_bytes" in data or "memory_limit_bytes" in data:
         raise RunnerError("target and memory limits are fixed by the runner, not manifest-configurable")
     if set(data.get("legs", {})) != {"before", "after"}:
@@ -400,6 +410,9 @@ def _validate_validator(command: Any, location: str) -> None:
 
 
 def _validate_lane_workload(data: Mapping[str, Any]) -> None:
+    if str(data["lane"]).startswith("legacy-"):
+        _validate_legacy_native_workload(data)
+        return
     expected: dict[str, list[tuple[str, list[str]]]] = {
         "w4b-xlsb": [
             ("probe", ["{rounds}"]),
@@ -455,6 +468,149 @@ def _validate_lane_workload(data: Mapping[str, Any]) -> None:
         raise RunnerError("each lane needs exactly one historical-analyze validator")
     if validators[0].get("outputs") != ["{output_dir}/summary.json"]:
         raise RunnerError("historical analyzer must write summary.json in the output directory")
+
+
+def _validate_legacy_native_workload(data: Mapping[str, Any]) -> None:
+    """Keep the reusable legacy probes on an explicit, reviewed workload.
+
+    The ordinary W4b/W5 lanes intentionally keep their historical hard-coded
+    argv.  These three lanes share the same process/identity/cap guard but
+    have different standalone manifests and route contracts.  A manifest is
+    accepted only when it matches one of those contracts exactly; the
+    lane-specific validator then checks the probe output and receipt.
+    """
+
+    lane = str(data["lane"])
+    contracts: dict[str, dict[str, Any]] = {
+        "legacy-rtf": {
+            "probe": ["crates/litchi-rtf/examples/refusal_contract_bench.rs"],
+            "lock": "Cargo.lock",
+            "build_id": "rtf_refusal_contract",
+            "build_argv": [
+                "cargo",
+                "build",
+                "--release",
+                "--manifest-path",
+                "Cargo.toml",
+                "-p",
+                "litchi-rtf",
+                "--example",
+                "refusal_contract_bench",
+            ],
+            "artifacts": ["{target_dir}/release/examples/refusal_contract_bench"],
+            "programs": [("routes", [])],
+            "stdout": "{output_dir}/rtf-routes-block-{block}-{leg}-{index}.jsonl",
+            "stderr": "{output_dir}/rtf-routes-block-{block}-{leg}-{index}.stderr",
+            "blocks": 5,
+        },
+        "legacy-ole-properties": {
+            "probe": ["tools/perf-baseline/examples/ole_w5_probe.rs"],
+            "lock": "tools/perf-baseline/Cargo.lock",
+            "build_id": "ole_properties_probe",
+            "build_argv": [
+                "cargo",
+                "build",
+                "--release",
+                "--manifest-path",
+                "tools/perf-baseline/Cargo.toml",
+                "--no-default-features",
+                "--features",
+                "{property_features}",
+                "--example",
+                "ole_w5_probe",
+            ],
+            "artifacts": ["{target_dir}/release/examples/ole_w5_probe"],
+            "programs": [
+                (
+                    "read",
+                    ["--route", "read", "--warmup", "20", "--samples", "500", "--batch", "1"],
+                ),
+                (
+                    "edit",
+                    ["--route", "edit", "--warmup", "20", "--samples", "500", "--batch", "1"],
+                ),
+            ],
+            "stdout": "{output_dir}/ole-{program}-block-{block}-{leg}-{index}.csv",
+            "stderr": "{output_dir}/ole-{program}-block-{block}-{leg}-{index}.stderr",
+            "features": {"before": "legacy-owner-api,legacy-property-api", "after": "current-api"},
+            "blocks": 1,
+        },
+        "legacy-xls-properties": {
+            "probe": ["crates/litchi-ops/examples/ole_metadata_bench.rs"],
+            "lock": "Cargo.lock",
+            "fixtures": [
+                "test-data/ole/doc/FancyFoot.doc",
+                "test-data/ole/xls/Simple.xls",
+                "test-data/ole/ppt/SampleShow.ppt",
+            ],
+            "build_id": "xls_metadata_bench",
+            "build_argv": [
+                "cargo",
+                "build",
+                "--release",
+                "--manifest-path",
+                "Cargo.toml",
+                "-p",
+                "litchi-ops",
+                "--no-default-features",
+                "--features",
+                "doc,xls,ppt",
+                "--example",
+                "ole_metadata_bench",
+            ],
+            "artifacts": ["{target_dir}/release/examples/ole_metadata_bench"],
+            "programs": [
+                ("metadata", []),
+            ],
+            "stdout": "{output_dir}/xls-properties-block-{block}-{leg}-{index}.jsonl",
+            "stderr": "{output_dir}/xls-properties-block-{block}-{leg}-{index}.stderr",
+            "blocks": 1,
+        },
+    }
+    contract = contracts[lane]
+    if data.get("abba_blocks", 1) != contract["blocks"]:
+        raise RunnerError(f"{lane} must use exactly {contract['blocks']} ABBA block(s)")
+    shared = data.get("shared", {})
+    if shared.get("probe_paths") != contract["probe"] or shared.get("fixture_paths", []) != contract.get("fixtures", []):
+        raise RunnerError(f"{lane} does not bind the reviewed reusable probe")
+    for leg, spec in data["legs"].items():
+        if spec.get("lock_paths") != [contract["lock"]]:
+            raise RunnerError(f"{leg} does not bind the reviewed {lane} lock path")
+        commands = spec["build"]
+        if len(commands) != 1 or commands[0].get("id") != contract["build_id"]:
+            raise RunnerError(f"{leg} does not preserve the reviewed {lane} build command")
+        command = commands[0]
+        expected_build = list(contract["build_argv"])
+        if lane == "legacy-ole-properties":
+            expected_build[7] = contract["features"][leg]
+        if command.get("argv") != expected_build or command.get("artifacts") != contract["artifacts"]:
+            raise RunnerError(f"{leg} does not preserve the reviewed {lane} build route")
+        programs = spec.get("programs", [])
+        if [program.get("id") for program in programs] != [item[0] for item in contract["programs"]]:
+            raise RunnerError(f"{leg} does not preserve the reviewed {lane} program order")
+        for program, (program_id, expected_argv) in zip(programs, contract["programs"]):
+            if program.get("binary") != contract["artifacts"][0]:
+                raise RunnerError(f"{leg}/{program_id} does not use the built {lane} binary")
+            if program.get("argv") != expected_argv:
+                raise RunnerError(f"{leg}/{program_id} does not preserve the reviewed route arguments")
+            if program.get("outputs") != []:
+                raise RunnerError(f"{leg}/{program_id} must use the stdout report, not an unbound output")
+            expected_stdout = contract["stdout"].replace("{program}", program_id)
+            expected_stderr = contract["stderr"].replace("{program}", program_id)
+            if program.get("stdout") != expected_stdout or program.get("stderr") != expected_stderr:
+                raise RunnerError(f"{leg}/{program_id} does not use its dedicated report paths")
+            if program.get("require_stdout") is not True:
+                raise RunnerError(f"{leg}/{program_id} must emit a nonempty report stream")
+    validators = data.get("validators", [])
+    if len(validators) != 1 or validators[0].get("id") != "legacy-native-contract":
+        raise RunnerError(f"{lane} needs exactly one legacy-native-contract validator")
+    if validators[0].get("outputs") != ["{output_dir}/summary.json"]:
+        raise RunnerError(f"{lane} validator must write summary.json in the output directory")
+    environment = data.get("environment", {})
+    if environment.get("CARGO_PROFILE_RELEASE_DEBUG") != "0":
+        raise RunnerError(f"{lane} must disable release debug information")
+    if not isinstance(environment.get("TMPDIR"), str) or not environment["TMPDIR"]:
+        raise RunnerError(f"{lane} must bind an external TMPDIR")
 
 
 def _render(value: str, context: Mapping[str, Any]) -> str:
@@ -681,7 +837,14 @@ class SafeRunner:
         self.shared = manifest.get("shared", {})
         self.recorded_events: list[dict[str, Any]] = []
 
-    def _context(self, leg: str, index: int, *, output: Path | None = None) -> dict[str, Any]:
+    def _context(
+        self,
+        leg: str,
+        index: int,
+        *,
+        output: Path | None = None,
+        block: int = 1,
+    ) -> dict[str, Any]:
         spec = self.manifest["legs"][leg]
         source = _resolve_path(str(spec["source_root"]))
         target = _resolve_path(str(spec["target_dir"]))
@@ -696,6 +859,7 @@ class SafeRunner:
             "leg": leg,
             "index": index,
             "rounds": int(self.manifest.get("rounds", 31)),
+            "block": block,
             "fixture": fixture,
         }
         if output is not None:
@@ -709,6 +873,11 @@ class SafeRunner:
         # starting a build.
         env.pop("CARGO_HOME", None)
         env.pop("CARGO_CONFIG", None)
+        # These session switches are never part of a qualification input.
+        # A caller that needs one must record it in the reviewed manifest
+        # rather than inheriting a process-wide blessing/cap override.
+        env.pop("LITCHI_CAPPED", None)
+        env.pop("LITCHI_BLESS", None)
         path_prepend = [_render(str(value), context) for value in self.manifest.get("path_prepend", [])]
         if path_prepend:
             for path in path_prepend:
@@ -743,6 +912,7 @@ class SafeRunner:
             "CARGO_TARGET_DIR",
             "CARGO_BUILD_JOBS",
             "CARGO_INCREMENTAL",
+            "CARGO_PROFILE_RELEASE_DEBUG",
             "LITCHI_MEM_MAX",
             "LITCHI_PROBE_BATCH_ROUNDS",
             "TMPDIR",
@@ -1058,6 +1228,7 @@ class SafeRunner:
             },
             "cpu": self.cpu,
             "abba_order": list(ABBA_ORDER),
+            "abba_blocks": int(self.manifest.get("abba_blocks", 1)),
             "identities": identities,
             "event_count": len(self.recorded_events),
             "event_journal": {
@@ -1188,6 +1359,8 @@ class SafeRunner:
             raise RunnerError("build receipt limits are not the runner's fixed limits")
         if receipt.get("abba_order") != list(ABBA_ORDER):
             raise RunnerError("build receipt ABBA order differs from the fixed order")
+        if receipt.get("abba_blocks", 1) != int(self.manifest.get("abba_blocks", 1)):
+            raise RunnerError("build receipt ABBA block count differs from the manifest")
         journal = receipt.get("event_journal")
         if not isinstance(journal, dict) or journal.get("path") != str(self.output / "events-build.jsonl"):
             raise RunnerError("build receipt event journal path does not match")
@@ -1384,58 +1557,66 @@ class SafeRunner:
                     if str(program_path) not in recorded_paths:
                         raise RunnerError(f"program binary was not recorded by the build phase: {program_path}")
                 identities[leg] = identity
-            for index, leg in enumerate(ABBA_ORDER, start=1):
-                spec = self.manifest["legs"][leg]
-                context = self._context(leg, index)
-                env = self._environment(spec, context)
-                for program in spec["programs"]:
-                    program_id = program["id"]
-                    binary = _resolve_path(_render(str(program["binary"]), context))
-                    if not binary.is_file() or not os.access(binary, os.X_OK):
-                        raise RunnerError(f"measurement binary is missing or not executable: {binary}")
-                    output_values = [
-                        _resolve_path(_render(str(value), context))
-                        for value in program.get("outputs", [])
-                    ]
-                    for output in output_values:
-                        if not _under(output, self.output):
-                            raise RunnerError(f"declared child output escapes output_dir: {output}")
-                        if output.is_symlink() or output.exists():
-                            raise RunnerError(f"refusing to overwrite or follow child output: {output}")
-                        output.parent.mkdir(parents=True, exist_ok=True)
-                        if output.parent.is_symlink():
-                            raise RunnerError(f"child output parent may not be a symlink: {output.parent}")
-                    program_context = dict(context)
-                    if len(output_values) == 1:
-                        program_context["output"] = output_values[0]
-                    args = _render_argv([str(value) for value in program["argv"]], program_context)
-                    argv = [str(binary), *args]
-                    stdout_path = (
-                        _resolve_path(_render(str(program["stdout"]), program_context))
-                        if "stdout" in program
-                        else None
-                    )
-                    stderr_path = (
-                        _resolve_path(_render(str(program["stderr"]), program_context))
-                        if "stderr" in program
-                        else None
-                    )
-                    run_cwd = _resolve_path(str(spec.get("run_cwd", ".")), base=Path(identity["source_root"]))
-                    if not _under(run_cwd, Path(identity["source_root"])):
-                        raise RunnerError(f"run_cwd escapes source root: {run_cwd}")
-                    self._run_command(
-                        event_id=f"abba-{index:02d}-{leg}-{program_id}",
-                        leg=leg,
-                        argv=argv,
-                        cwd=run_cwd,
-                        env=env,
-                        identity=identities[leg],
-                        expected_outputs=output_values,
-                        require_stdout=bool(program.get("require_stdout", True)),
-                        stdout_path=stdout_path,
-                        stderr_path=stderr_path,
-                    )
-            validator_context = self._context("after", len(ABBA_ORDER) + 1)
+            blocks = int(self.manifest.get("abba_blocks", 1))
+            for block in range(1, blocks + 1):
+                for index, leg in enumerate(ABBA_ORDER, start=1):
+                    spec = self.manifest["legs"][leg]
+                    context = self._context(leg, index, block=block)
+                    env = self._environment(spec, context)
+                    for program in spec["programs"]:
+                        program_id = program["id"]
+                        binary = _resolve_path(_render(str(program["binary"]), context))
+                        if not binary.is_file() or not os.access(binary, os.X_OK):
+                            raise RunnerError(f"measurement binary is missing or not executable: {binary}")
+                        output_values = [
+                            _resolve_path(_render(str(value), context))
+                            for value in program.get("outputs", [])
+                        ]
+                        for output in output_values:
+                            if not _under(output, self.output):
+                                raise RunnerError(f"declared child output escapes output_dir: {output}")
+                            if output.is_symlink() or output.exists():
+                                raise RunnerError(f"refusing to overwrite or follow child output: {output}")
+                            output.parent.mkdir(parents=True, exist_ok=True)
+                            if output.parent.is_symlink():
+                                raise RunnerError(f"child output parent may not be a symlink: {output.parent}")
+                        program_context = dict(context)
+                        if len(output_values) == 1:
+                            program_context["output"] = output_values[0]
+                        program_context["program"] = program_id
+                        args = _render_argv([str(value) for value in program["argv"]], program_context)
+                        argv = [str(binary), *args]
+                        stdout_path = (
+                            _resolve_path(_render(str(program["stdout"]), program_context))
+                            if "stdout" in program
+                            else None
+                        )
+                        stderr_path = (
+                            _resolve_path(_render(str(program["stderr"]), program_context))
+                            if "stderr" in program
+                            else None
+                        )
+                        run_cwd = _resolve_path(str(spec.get("run_cwd", ".")), base=Path(identity["source_root"]))
+                        if not _under(run_cwd, Path(identity["source_root"])):
+                            raise RunnerError(f"run_cwd escapes source root: {run_cwd}")
+                        event_id = (
+                            f"abba-{index:02d}-{leg}-{program_id}"
+                            if blocks == 1
+                            else f"abba-block-{block:02d}-{index:02d}-{leg}-{program_id}"
+                        )
+                        self._run_command(
+                            event_id=event_id,
+                            leg=leg,
+                            argv=argv,
+                            cwd=run_cwd,
+                            env=env,
+                            identity=identities[leg],
+                            expected_outputs=output_values,
+                            require_stdout=bool(program.get("require_stdout", True)),
+                            stdout_path=stdout_path,
+                            stderr_path=stderr_path,
+                        )
+            validator_context = self._context("after", blocks * len(ABBA_ORDER) + 1, block=blocks)
             validator_spec = self.manifest["legs"]["after"]
             validator_env = self._environment(validator_spec, validator_context)
             for validator in self.manifest["validators"]:
