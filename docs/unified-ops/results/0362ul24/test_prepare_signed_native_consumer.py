@@ -40,7 +40,17 @@ class SignedConsumerPreparationTests(unittest.TestCase):
         self.assertIn("commit.patch()", adapter)
         self.assertIn("commit.diagnostics()", adapter)
         self.assertIn("edit_with_options", adapter)
+        self.assertIn(".resolve()", adapter)
         self.assertNotIn("commit.file;", adapter)
+
+    def test_harness_features_are_bound_to_reviewed_endpoint_projection(self) -> None:
+        before = PREPARE._reviewed_harness_features("f2")
+        after = PREPARE._reviewed_harness_features("472b")
+        self.assertIn("default", before)
+        self.assertNotIn("sign", before)
+        self.assertIn("sign", after)
+        self.assertNotEqual(before, after)
+        self.assertIn('features = ["default"', PREPARE.project_toml(Path("/tmp/source"), "f2"))
 
     def test_unsafe_external_outputs_are_rejected(self) -> None:
         with self.assertRaises(PREPARE.PreparationError):
@@ -88,6 +98,9 @@ class SignedConsumerPreparationTests(unittest.TestCase):
                     capabilities,
                     source_commit=PREPARE.FINAL_COMMIT,
                     binary=PREPARE.artifact(binary),
+                    fixture_manifest={"path": "/tmp/fixtures.json", "bytes": 1, "sha256": "0" * 64},
+                    fixture_root="/tmp/fixtures",
+                    endpoint_role="after",
                 )
 
 
