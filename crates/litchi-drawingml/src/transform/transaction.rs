@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::Error;
 use crate::Result;
 
-use super::{Angle, Point, Size, Transform, codec, validation};
+use super::{Angle, Limits, Point, Size, Transform, codec, validation};
 
 pub use crate::LimitKind;
 pub use litchi_core::edit::Diagnostics;
@@ -19,6 +19,7 @@ pub use litchi_core::edit::Diagnostics;
 pub struct Package {
     xml: Arc<[u8]>,
     value: Transform,
+    limits: Limits,
 }
 
 impl Package {
@@ -27,12 +28,14 @@ impl Package {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn from_xml(xml: impl Into<Vec<u8>>) -> Result<Self> {
+    pub fn from_xml(xml: impl Into<Vec<u8>>, limits: &Limits) -> Result<Self> {
         let xml = xml.into();
-        let value = codec::read(&xml)?;
+        let limits = limits.validate()?;
+        let value = codec::read(&xml, &limits)?;
         Ok(Self {
             xml: Arc::from(xml.into_boxed_slice()),
             value,
+            limits,
         })
     }
 
@@ -41,10 +44,11 @@ impl Package {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn new(value: Transform) -> Result<Self> {
-        let xml = codec::write(&value)?;
+    pub fn new(value: Transform, limits: &Limits) -> Result<Self> {
+        let limits = limits.validate()?;
+        let xml = codec::write(&value, &limits)?;
         drop(value);
-        Self::from_xml(xml)
+        Self::from_xml(xml, &limits)
     }
 
     /// Borrow the exact source bytes retained by this snapshot.
@@ -158,10 +162,10 @@ impl Edit {
         let xml = if self.base.value == self.working {
             self.base.xml.as_ref().to_vec()
         } else {
-            codec::write(&self.working)?
+            codec::write(&self.working, &self.base.limits)?
         };
         let changed = self.base.value != self.working;
-        let package = Package::from_xml(xml)?;
+        let package = Package::from_xml(xml, &self.base.limits)?;
         let patch = Patch {
             before: self.base.value,
             after: self.working,
@@ -223,9 +227,9 @@ impl Patch {
         let xml = if self.before == self.after {
             source.xml.as_ref().to_vec()
         } else {
-            codec::write(&self.after)?
+            codec::write(&self.after, &source.limits)?
         };
-        Package::from_xml(xml)
+        Package::from_xml(xml, &source.limits)
     }
 }
 

@@ -1033,7 +1033,7 @@ impl Unknown {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn from_xml(xml: &[u8]) -> crate::Result<Self> {
         Ok(Self {
-            xml: validation::validated_fragment(xml)?
+            xml: validation::validated_fragment(xml, validation::Limits::DEFAULT)?
                 .to_vec()
                 .into_boxed_slice(),
         })

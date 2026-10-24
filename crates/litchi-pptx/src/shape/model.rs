@@ -597,7 +597,10 @@ impl<'a> Common<'a> {
             .xml
             .get(range)
             .ok_or_else(|| Error::Invalid("shape transform span became invalid".into()))?;
-        Ok(Some(litchi_drawingml::transform::codec::read(xml)?))
+        Ok(Some(litchi_drawingml::transform::codec::read(
+            xml,
+            &litchi_drawingml::transform::Limits::DEFAULT,
+        )?))
     }
 
     /// Span of the shape's direct `p:txBody` element in processed owner XML.

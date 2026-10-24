@@ -44,6 +44,87 @@ pub const MAX_DEPTH: usize = 8;
 /// Maximum namespace prefix or URI bytes inspected on one declaration.
 pub const MAX_NAMESPACE_BYTES: usize = 4 * 1024;
 
+/// Caller-selected bounds for raw `formatcode2` XML operations.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[must_use]
+pub struct Limits {
+    pub max_xml_bytes: usize,
+    pub max_value_bytes: usize,
+    pub max_attributes: usize,
+    pub max_nodes: usize,
+    pub max_depth: usize,
+    pub max_namespace_bytes: usize,
+    pub max_output_bytes: usize,
+}
+
+impl Limits {
+    pub const DEFAULT: Self = Self {
+        max_xml_bytes: MAX_XML_BYTES,
+        max_value_bytes: MAX_VALUE_BYTES,
+        max_attributes: MAX_ATTRIBUTES,
+        max_nodes: MAX_NODES,
+        max_depth: MAX_DEPTH,
+        max_namespace_bytes: MAX_NAMESPACE_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+    };
+
+    #[must_use]
+    pub const fn new(
+        max_xml_bytes: usize,
+        max_value_bytes: usize,
+        max_attributes: usize,
+        max_nodes: usize,
+        max_depth: usize,
+        max_namespace_bytes: usize,
+        max_output_bytes: usize,
+    ) -> Self {
+        Self {
+            max_xml_bytes,
+            max_value_bytes,
+            max_attributes,
+            max_nodes,
+            max_depth,
+            max_namespace_bytes,
+            max_output_bytes,
+        }
+    }
+
+    fn validate(self) -> Result<Self> {
+        for (kind, value, maximum) in [
+            (LimitKind::XmlBytes, self.max_xml_bytes, MAX_XML_BYTES),
+            (LimitKind::TextBytes, self.max_value_bytes, MAX_VALUE_BYTES),
+            (
+                LimitKind::XmlAttributes,
+                self.max_attributes,
+                MAX_ATTRIBUTES,
+            ),
+            (LimitKind::XmlNodes, self.max_nodes, MAX_NODES),
+            (LimitKind::XmlDepth, self.max_depth, MAX_DEPTH),
+            (
+                LimitKind::NamespaceBytes,
+                self.max_namespace_bytes,
+                MAX_NAMESPACE_BYTES,
+            ),
+            (LimitKind::OutputBytes, self.max_output_bytes, MAX_XML_BYTES),
+        ] {
+            if value == 0 || value > maximum {
+                return Err(Error::InvalidLimit {
+                    kind,
+                    value,
+                    maximum,
+                });
+            }
+        }
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
 const XMLNS_NAMESPACE: &[u8] = b"http://www.w3.org/2000/xmlns/";
 
@@ -228,11 +309,19 @@ struct Parsed {
 /// XML declarations and comments around the root are accepted for standalone
 /// fragment use. A host embedding a source fragment must apply its own
 /// element-only placement rule; [`write()`] preserves the accepted source.
-pub fn read(xml: &[u8]) -> Result<Element> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+pub fn read(xml: &[u8], limits: &Limits) -> Result<Element> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
-    let parsed = scan(xml)?;
+    let parsed = scan(xml, limits)?;
+    if parsed.value.as_str().len() > limits.max_value_bytes {
+        return Err(limit(
+            LimitKind::TextBytes,
+            parsed.value.as_str().len(),
+            limits.max_value_bytes,
+        ));
+    }
     let source = Arc::from(xml);
     Ok(Element {
         value: parsed.value.clone(),
@@ -251,11 +340,19 @@ pub fn read(xml: &[u8]) -> Result<Element> {
 
 /// Read a complete fragment while retaining an existing immutable source
 /// allocation.
-pub fn read_shared(xml: Arc<[u8]>) -> Result<Element> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+pub fn read_shared(xml: Arc<[u8]>, limits: &Limits) -> Result<Element> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
-    let parsed = scan(xml.as_ref())?;
+    let parsed = scan(xml.as_ref(), limits)?;
+    if parsed.value.as_str().len() > limits.max_value_bytes {
+        return Err(limit(
+            LimitKind::TextBytes,
+            parsed.value.as_str().len(),
+            limits.max_value_bytes,
+        ));
+    }
     Ok(Element {
         value: parsed.value.clone(),
         source: Some(Arc::new(Source {
@@ -274,11 +371,19 @@ pub fn read_shared(xml: Arc<[u8]>) -> Result<Element> {
 /// Read one complete XML start tag containing the qualified `formatcode2`
 /// attribute. The tag may be self-closing or an opening tag whose matching
 /// end tag is supplied by the host outside this fragment.
-pub fn read_attribute(xml: &[u8]) -> Result<Attribute> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+pub fn read_attribute(xml: &[u8], limits: &Limits) -> Result<Attribute> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
-    let parsed = scan_attribute(xml)?;
+    let parsed = scan_attribute(xml, limits)?;
+    if parsed.value.as_str().len() > limits.max_value_bytes {
+        return Err(limit(
+            LimitKind::TextBytes,
+            parsed.value.as_str().len(),
+            limits.max_value_bytes,
+        ));
+    }
     let source = Arc::from(xml);
     Ok(Attribute {
         value: parsed.value.clone(),
@@ -300,11 +405,23 @@ pub fn read_attribute(xml: &[u8]) -> Result<Attribute> {
 /// caller-provided tag, without synthetic declarations. The temporary
 /// namespace-complete view must also fit [`MAX_XML_BYTES`] and
 /// [`MAX_ATTRIBUTES`]; inherited declarations consume that temporary headroom.
-pub fn read_attribute_with_bindings(xml: &[u8], bindings: &[(&str, &str)]) -> Result<Attribute> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+pub fn read_attribute_with_bindings(
+    xml: &[u8],
+    bindings: &[(&str, &str)],
+    limits: &Limits,
+) -> Result<Attribute> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
-    let parsed = scan_attribute_with_bindings(xml, bindings)?;
+    let parsed = scan_attribute_with_bindings(xml, bindings, limits)?;
+    if parsed.value.as_str().len() > limits.max_value_bytes {
+        return Err(limit(
+            LimitKind::TextBytes,
+            parsed.value.as_str().len(),
+            limits.max_value_bytes,
+        ));
+    }
     Ok(Attribute {
         value: parsed.value.clone(),
         source: Some(Arc::new(AttributeSource {
@@ -317,11 +434,19 @@ pub fn read_attribute_with_bindings(xml: &[u8], bindings: &[(&str, &str)]) -> Re
 
 /// Read an attribute start tag while retaining an existing immutable source
 /// allocation.
-pub fn read_attribute_shared(xml: Arc<[u8]>) -> Result<Attribute> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+pub fn read_attribute_shared(xml: Arc<[u8]>, limits: &Limits) -> Result<Attribute> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
-    let parsed = scan_attribute(xml.as_ref())?;
+    let parsed = scan_attribute(xml.as_ref(), limits)?;
+    if parsed.value.as_str().len() > limits.max_value_bytes {
+        return Err(limit(
+            LimitKind::TextBytes,
+            parsed.value.as_str().len(),
+            limits.max_value_bytes,
+        ));
+    }
     Ok(Attribute {
         value: parsed.value.clone(),
         source: Some(Arc::new(AttributeSource {
@@ -336,11 +461,20 @@ pub fn read_attribute_shared(xml: Arc<[u8]>) -> Result<Attribute> {
 pub fn read_attribute_shared_with_bindings(
     xml: Arc<[u8]>,
     bindings: &[(&str, &str)],
+    limits: &Limits,
 ) -> Result<Attribute> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, xml.len(), limits.max_xml_bytes));
     }
-    let parsed = scan_attribute_with_bindings(xml.as_ref(), bindings)?;
+    let parsed = scan_attribute_with_bindings(xml.as_ref(), bindings, limits)?;
+    if parsed.value.as_str().len() > limits.max_value_bytes {
+        return Err(limit(
+            LimitKind::TextBytes,
+            parsed.value.as_str().len(),
+            limits.max_value_bytes,
+        ));
+    }
     Ok(Attribute {
         value: parsed.value.clone(),
         source: Some(Arc::new(AttributeSource {
@@ -352,9 +486,17 @@ pub fn read_attribute_shared_with_bindings(
 }
 
 /// Serialize only the XML attribute value lexical form for a host start tag.
-pub fn write_attribute_value(value: &Value) -> Result<Vec<u8>> {
+pub fn write_attribute_value(value: &Value, limits: &Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
+    if value.as_str().len() > limits.max_value_bytes {
+        return Err(limit(
+            LimitKind::TextBytes,
+            value.as_str().len(),
+            limits.max_value_bytes,
+        ));
+    }
     let encoded_len = escaped_xstring_xml_len(value.as_str(), XStringContext::Attribute)?;
-    ensure_output_limit(encoded_len)?;
+    ensure_output_limit_with(encoded_len, limits.max_output_bytes)?;
     let encoded = encode_xstring_xml(value.as_str(), XStringContext::Attribute)?;
     let mut output = Vec::new();
     output
@@ -365,13 +507,16 @@ pub fn write_attribute_value(value: &Value) -> Result<Vec<u8>> {
 }
 
 /// Serialize a source-backed `formatcode2` attribute start tag.
-pub fn write_attribute(value: &Attribute) -> Result<Vec<u8>> {
-    validate_attribute_value(value)?;
+pub fn write_attribute(value: &Attribute, limits: &Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
+    validate_attribute_value_with(value, limits.max_value_bytes)?;
     if let Some(source) = value.source_state() {
         if source.value == value.value {
-            return clone_bounded(source.xml.as_ref());
+            return clone_bounded_with(source.xml.as_ref(), limits.max_output_bytes);
         }
-        return rewrite_attribute(source, value.value.as_str());
+        let output = rewrite_attribute(source, value.value.as_str())?;
+        ensure_output_limit_with(output.len(), limits.max_output_bytes)?;
+        return Ok(output);
     }
     Err(invalid(
         "formatcode2 attribute has no source backing; use write_attribute_value",
@@ -380,15 +525,21 @@ pub fn write_attribute(value: &Attribute) -> Result<Vec<u8>> {
 
 /// Serialize a source-backed `formatcode2` attribute to a caller-provided
 /// sink.
-pub fn write_attribute_to<W: std::io::Write>(writer: &mut W, value: &Attribute) -> Result<()> {
-    validate_attribute_value(value)?;
+pub fn write_attribute_to<W: std::io::Write>(
+    writer: &mut W,
+    value: &Attribute,
+    limits: &Limits,
+) -> Result<()> {
+    let limits = limits.validate()?;
+    validate_attribute_value_with(value, limits.max_value_bytes)?;
     if let Some(source) = value.source_state()
         && source.value == value.value
     {
+        ensure_output_limit_with(source.xml.len(), limits.max_output_bytes)?;
         writer.write_all(source.xml.as_ref())?;
         return Ok(());
     }
-    writer.write_all(&write_attribute(value)?)?;
+    writer.write_all(&write_attribute(value, &limits)?)?;
     Ok(())
 }
 
@@ -402,55 +553,47 @@ struct ParsedAttribute {
 /// its resolver. The resolver's per-element declaration cap protects its own
 /// buffer; this pass also bounds prefixes and raw URI values before that
 /// buffer can be populated.
-fn preflight_namespace_limits(xml: &[u8]) -> Result<()> {
+fn preflight_namespace_limits(xml: &[u8], limits: Limits) -> Result<()> {
     let mut reader = Reader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
     let mut buffer = Vec::new();
+    let mut nodes = 0usize;
+    let mut depth = 0usize;
     loop {
         let event = reader
             .read_event_into(&mut buffer)
             .map_err(xml_event_error)?;
         match event {
-            Event::Start(element) | Event::Empty(element) => {
-                validate_qname_prefix(element.name().into_inner())?;
-                let mut declarations = 0usize;
-                for raw_attribute in element.checked_attributes() {
-                    let attribute = raw_attribute.map_err(xml_error)?;
-                    validate_qname_prefix(attribute.key.into_inner())?;
-                    if !is_namespace_attribute(attribute.key) {
-                        continue;
-                    }
-                    declarations = declarations.checked_add(1).ok_or_else(|| {
-                        invalid("formatcode2 namespace declaration count overflow")
-                    })?;
-                    if declarations > MAX_ATTRIBUTES {
-                        return Err(limit(
-                            LimitKind::XmlAttributes,
-                            declarations,
-                            MAX_ATTRIBUTES,
-                        ));
-                    }
-                    let prefix = namespace_attribute_prefix(attribute.key)?;
-                    if prefix.len() > MAX_NAMESPACE_BYTES {
-                        return Err(limit(
-                            LimitKind::NamespacePrefixBytes,
-                            prefix.len(),
-                            MAX_NAMESPACE_BYTES,
-                        ));
-                    }
-                    if attribute.value.as_ref().len() > MAX_NAMESPACE_BYTES {
-                        return Err(limit(
-                            LimitKind::NamespaceBytes,
-                            attribute.value.as_ref().len(),
-                            MAX_NAMESPACE_BYTES,
-                        ));
-                    }
-                    let _ = normalize_namespace_uri(attribute.value.as_ref())?;
+            Event::Start(element) => {
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("formatcode2 node count overflow"))?;
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
+                if depth >= limits.max_depth {
+                    return Err(limit(LimitKind::XmlDepth, depth + 1, limits.max_depth));
+                }
+                depth += 1;
+                validate_namespace_declarations(&element, limits)?;
             },
-            Event::End(end) => validate_qname_prefix(end.name().into_inner())?,
+            Event::Empty(element) => {
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("formatcode2 node count overflow"))?;
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
+                }
+                validate_namespace_declarations(&element, limits)?;
+            },
+            Event::End(end) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("formatcode2 fragment has an unmatched close"))?;
+                validate_qname_prefix(end.name().into_inner(), limits.max_namespace_bytes)?;
+            },
             Event::Eof => break,
             _ => {},
         }
@@ -459,8 +602,47 @@ fn preflight_namespace_limits(xml: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn scan_attribute(xml: &[u8]) -> Result<ParsedAttribute> {
-    preflight_namespace_limits(xml)?;
+fn validate_namespace_declarations(element: &BytesStart<'_>, limits: Limits) -> Result<()> {
+    validate_qname_prefix(element.name().into_inner(), limits.max_namespace_bytes)?;
+    let mut declarations = 0usize;
+    for raw_attribute in element.checked_attributes() {
+        let attribute = raw_attribute.map_err(xml_error)?;
+        validate_qname_prefix(attribute.key.into_inner(), limits.max_namespace_bytes)?;
+        if !is_namespace_attribute(attribute.key) {
+            continue;
+        }
+        declarations = declarations
+            .checked_add(1)
+            .ok_or_else(|| invalid("formatcode2 namespace declaration count overflow"))?;
+        if declarations > limits.max_attributes {
+            return Err(limit(
+                LimitKind::XmlAttributes,
+                declarations,
+                limits.max_attributes,
+            ));
+        }
+        let prefix = namespace_attribute_prefix(attribute.key)?;
+        if prefix.len() > limits.max_namespace_bytes {
+            return Err(limit(
+                LimitKind::NamespacePrefixBytes,
+                prefix.len(),
+                limits.max_namespace_bytes,
+            ));
+        }
+        if attribute.value.as_ref().len() > limits.max_namespace_bytes {
+            return Err(limit(
+                LimitKind::NamespaceBytes,
+                attribute.value.as_ref().len(),
+                limits.max_namespace_bytes,
+            ));
+        }
+        let _ = normalize_namespace_uri(attribute.value.as_ref(), limits)?;
+    }
+    Ok(())
+}
+
+fn scan_attribute(xml: &[u8], limits: Limits) -> Result<ParsedAttribute> {
+    preflight_namespace_limits(xml, limits)?;
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
@@ -468,7 +650,7 @@ fn scan_attribute(xml: &[u8]) -> Result<ParsedAttribute> {
     reader.config_mut().check_comments = true;
     reader
         .resolver_mut()
-        .set_max_declarations_per_element(MAX_ATTRIBUTES);
+        .set_max_declarations_per_element(limits.max_attributes);
     let mut buffer = Vec::new();
     let mut parsed = None;
     loop {
@@ -476,7 +658,7 @@ fn scan_attribute(xml: &[u8]) -> Result<ParsedAttribute> {
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_event_error)?;
-        let namespace_result = resolved_namespace(&resolved);
+        let namespace_result = resolved_namespace(&resolved, limits);
         let event = event.into_owned();
         let event_end = position(&reader, origin)?;
         match event {
@@ -487,8 +669,8 @@ fn scan_attribute(xml: &[u8]) -> Result<ParsedAttribute> {
                         "formatcode2 attribute fragment must contain one start tag",
                     ));
                 }
-                validate_element_name(&element)?;
-                validate_attributes(&element, &reader)?;
+                validate_element_name(&element, limits.max_namespace_bytes)?;
+                validate_attributes(&element, &reader, limits)?;
                 namespace_result?;
                 parsed = Some(attribute_projection(
                     &element,
@@ -496,6 +678,7 @@ fn scan_attribute(xml: &[u8]) -> Result<ParsedAttribute> {
                     event_start,
                     event_end,
                     &reader,
+                    limits,
                 )?);
             },
             Event::Eof => break,
@@ -509,28 +692,32 @@ fn scan_attribute(xml: &[u8]) -> Result<ParsedAttribute> {
     parsed.ok_or_else(|| invalid("formatcode2 attribute fragment has no start tag"))
 }
 
-fn scan_attribute_with_bindings(xml: &[u8], bindings: &[(&str, &str)]) -> Result<ParsedAttribute> {
+fn scan_attribute_with_bindings(
+    xml: &[u8],
+    bindings: &[(&str, &str)],
+    limits: Limits,
+) -> Result<ParsedAttribute> {
     if bindings.is_empty() {
-        return scan_attribute(xml);
+        return scan_attribute(xml, limits);
     }
-    preflight_namespace_limits(xml)?;
-    let local_prefixes = local_namespace_prefixes(xml)?;
-    let additions = checked_inherited_bindings(bindings, &local_prefixes)?;
+    preflight_namespace_limits(xml, limits)?;
+    let local_prefixes = local_namespace_prefixes(xml, limits)?;
+    let additions = checked_inherited_bindings(bindings, &local_prefixes, limits)?;
     if additions.is_empty() {
-        return scan_attribute(xml);
+        return scan_attribute(xml, limits);
     }
-    let decorated = decorate_attribute_start_tag(xml, &additions)?;
-    scan_attribute(&decorated)
+    let decorated = decorate_attribute_start_tag(xml, &additions, limits)?;
+    scan_attribute(&decorated, limits)
 }
 
-fn local_namespace_prefixes(xml: &[u8]) -> Result<Vec<Vec<u8>>> {
+fn local_namespace_prefixes(xml: &[u8], limits: Limits) -> Result<Vec<Vec<u8>>> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     reader.config_mut().check_end_names = true;
     reader.config_mut().check_comments = true;
     reader
         .resolver_mut()
-        .set_max_declarations_per_element(MAX_ATTRIBUTES);
+        .set_max_declarations_per_element(limits.max_attributes);
     let mut buffer = Vec::new();
     let mut prefixes = Vec::new();
     let event = reader
@@ -544,18 +731,18 @@ fn local_namespace_prefixes(xml: &[u8]) -> Result<Vec<Vec<u8>>> {
                     continue;
                 }
                 let prefix = namespace_attribute_prefix(attribute.key)?;
-                if prefix.len() > MAX_NAMESPACE_BYTES {
+                if prefix.len() > limits.max_namespace_bytes {
                     return Err(limit(
                         LimitKind::NamespacePrefixBytes,
                         prefix.len(),
-                        MAX_NAMESPACE_BYTES,
+                        limits.max_namespace_bytes,
                     ));
                 }
-                if prefixes.len() >= MAX_ATTRIBUTES {
+                if prefixes.len() >= limits.max_attributes {
                     return Err(limit(
                         LimitKind::NamespaceDeclarations,
                         prefixes.len() + 1,
-                        MAX_ATTRIBUTES,
+                        limits.max_attributes,
                     ));
                 }
                 prefixes.push(prefix.to_vec());
@@ -572,30 +759,31 @@ fn local_namespace_prefixes(xml: &[u8]) -> Result<Vec<Vec<u8>>> {
 fn checked_inherited_bindings<'a>(
     bindings: &'a [(&'a str, &'a str)],
     local_prefixes: &[Vec<u8>],
+    limits: Limits,
 ) -> Result<Vec<(&'a [u8], &'a [u8])>> {
-    if bindings.len() > MAX_ATTRIBUTES {
+    if bindings.len() > limits.max_attributes {
         return Err(limit(
             LimitKind::NamespaceDeclarations,
             bindings.len(),
-            MAX_ATTRIBUTES,
+            limits.max_attributes,
         ));
     }
     let mut additions = Vec::new();
     for (prefix, namespace) in bindings {
         let prefix = prefix.as_bytes();
         let namespace = namespace.as_bytes();
-        if prefix.len() > MAX_NAMESPACE_BYTES {
+        if prefix.len() > limits.max_namespace_bytes {
             return Err(limit(
                 LimitKind::NamespacePrefixBytes,
                 prefix.len(),
-                MAX_NAMESPACE_BYTES,
+                limits.max_namespace_bytes,
             ));
         }
-        if namespace.len() > MAX_NAMESPACE_BYTES {
+        if namespace.len() > limits.max_namespace_bytes {
             return Err(limit(
                 LimitKind::NamespaceBytes,
                 namespace.len(),
-                MAX_NAMESPACE_BYTES,
+                limits.max_namespace_bytes,
             ));
         }
         validate_xml_text(
@@ -625,7 +813,11 @@ fn checked_inherited_bindings<'a>(
     Ok(additions)
 }
 
-fn decorate_attribute_start_tag(xml: &[u8], additions: &[(&[u8], &[u8])]) -> Result<Vec<u8>> {
+fn decorate_attribute_start_tag(
+    xml: &[u8],
+    additions: &[(&[u8], &[u8])],
+    limits: Limits,
+) -> Result<Vec<u8>> {
     let close = start_tag_close(xml)?;
     let insertion = if close > 0 && xml[close - 1] == b'/' {
         close - 1
@@ -651,8 +843,8 @@ fn decorate_attribute_start_tag(xml: &[u8], additions: &[(&[u8], &[u8])]) -> Res
         .len()
         .checked_add(addition_len)
         .ok_or_else(|| invalid("formatcode2 attribute XML length overflows"))?;
-    if output_len > MAX_XML_BYTES {
-        return Err(limit(LimitKind::XmlBytes, output_len, MAX_XML_BYTES));
+    if output_len > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, output_len, limits.max_xml_bytes));
     }
     let mut output = Vec::new();
     output
@@ -706,6 +898,7 @@ fn attribute_projection(
     event_start: usize,
     event_end: usize,
     reader: &NsReader<&[u8]>,
+    limits: Limits,
 ) -> Result<ParsedAttribute> {
     let mut selected = None;
     for raw_attribute in element.checked_attributes() {
@@ -713,7 +906,7 @@ fn attribute_projection(
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace_matches = match namespace {
             ResolveResult::Bound(namespace) => {
-                normalize_namespace_uri(namespace.into_inner())? == NAMESPACE.as_bytes()
+                normalize_namespace_uri(namespace.into_inner(), limits)? == NAMESPACE.as_bytes()
             },
             ResolveResult::Unbound => false,
             ResolveResult::Unknown(_) => {
@@ -729,11 +922,12 @@ fn attribute_projection(
         let lexical = attribute
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
             .map_err(xml_error)?;
-        if lexical.len() > MAX_LEXICAL_VALUE_BYTES {
+        let max_lexical_value_bytes = limits.max_value_bytes.saturating_mul(7);
+        if lexical.len() > max_lexical_value_bytes {
             return Err(limit(
                 LimitKind::LexicalValueBytes,
                 lexical.len(),
-                MAX_LEXICAL_VALUE_BYTES,
+                max_lexical_value_bytes,
             ));
         }
         validate_xml_text(lexical.as_ref(), "formatcode2 attribute value")?;
@@ -772,12 +966,12 @@ fn rewrite_attribute(source: &AttributeSource, value: &str) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn validate_attribute_value(value: &Attribute) -> Result<()> {
-    if value.value.as_str().len() > MAX_VALUE_BYTES {
+fn validate_attribute_value_with(value: &Attribute, maximum: usize) -> Result<()> {
+    if value.value.as_str().len() > maximum {
         return Err(limit(
             LimitKind::TextBytes,
-            value.value.value.len(),
-            MAX_VALUE_BYTES,
+            value.value.as_str().len(),
+            maximum,
         ));
     }
     Ok(())
@@ -861,27 +1055,34 @@ fn is_xml_whitespace_byte(byte: u8) -> bool {
 /// An unchanged parsed value returns the exact source. A changed parsed value
 /// patches only text-bearing event ranges and retains comments, processing
 /// instructions, namespace spelling, and surrounding lexical bytes.
-pub fn write(value: &Element) -> Result<Vec<u8>> {
-    validate_value(value)?;
+pub fn write(value: &Element, limits: &Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
+    validate_value_with(value, limits.max_value_bytes)?;
     if let Some(source) = value.source_state() {
         if source.value == value.value {
-            return clone_bounded(source.xml.as_ref());
+            return clone_bounded_with(source.xml.as_ref(), limits.max_output_bytes);
         }
-        return rewrite_source(source, value.value.as_str());
+        let output = rewrite_source(source, value.value.as_str())?;
+        ensure_output_limit_with(output.len(), limits.max_output_bytes)?;
+        return Ok(output);
     }
-    write_detached(value.value.as_str())
+    let output = write_detached(value.value.as_str())?;
+    ensure_output_limit_with(output.len(), limits.max_output_bytes)?;
+    Ok(output)
 }
 
 /// Serialize a `formatcode2` element to a caller-provided sink.
-pub fn write_to<W: std::io::Write>(writer: &mut W, value: &Element) -> Result<()> {
-    validate_value(value)?;
+pub fn write_to<W: std::io::Write>(writer: &mut W, value: &Element, limits: &Limits) -> Result<()> {
+    let limits = limits.validate()?;
+    validate_value_with(value, limits.max_value_bytes)?;
     if let Some(source) = value.source_state()
         && source.value == value.value
     {
+        ensure_output_limit_with(source.xml.len(), limits.max_output_bytes)?;
         writer.write_all(source.xml.as_ref())?;
         return Ok(());
     }
-    writer.write_all(&write(value)?)?;
+    writer.write_all(&write(value, &limits)?)?;
     Ok(())
 }
 
@@ -892,12 +1093,12 @@ fn checked_value(value: &str) -> Result<Arc<str>> {
     Ok(Arc::from(value))
 }
 
-fn validate_value(value: &Element) -> Result<()> {
-    if value.value.as_str().len() > MAX_VALUE_BYTES {
+fn validate_value_with(value: &Element, maximum: usize) -> Result<()> {
+    if value.value.as_str().len() > maximum {
         return Err(limit(
             LimitKind::TextBytes,
             value.value.as_str().len(),
-            MAX_VALUE_BYTES,
+            maximum,
         ));
     }
     Ok(())
@@ -934,6 +1135,13 @@ fn clone_bounded(xml: &[u8]) -> Result<Vec<u8>> {
         .map_err(|_| invalid("formatcode2 output allocation failed"))?;
     output.extend_from_slice(xml);
     Ok(output)
+}
+
+fn clone_bounded_with(xml: &[u8], maximum: usize) -> Result<Vec<u8>> {
+    if xml.len() > maximum {
+        return Err(limit(LimitKind::OutputBytes, xml.len(), maximum));
+    }
+    clone_bounded(xml)
 }
 
 fn rewrite_source(source: &Source, value: &str) -> Result<Vec<u8>> {
@@ -1073,8 +1281,8 @@ fn apply_replacements(
     Ok(output)
 }
 
-fn scan(xml: &[u8]) -> Result<Parsed> {
-    preflight_namespace_limits(xml)?;
+fn scan(xml: &[u8], limits: Limits) -> Result<Parsed> {
+    preflight_namespace_limits(xml, limits)?;
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     reader.config_mut().trim_text(false);
@@ -1082,7 +1290,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
     reader.config_mut().check_comments = true;
     reader
         .resolver_mut()
-        .set_max_declarations_per_element(MAX_ATTRIBUTES);
+        .set_max_declarations_per_element(limits.max_attributes);
     let mut buffer = Vec::new();
     let mut stack = Vec::<Vec<u8>>::new();
     let mut root_seen = false;
@@ -1104,7 +1312,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
         let (resolved, event) = reader
             .read_resolved_event_into(&mut buffer)
             .map_err(xml_event_error)?;
-        let namespace = resolved_namespace(&resolved)?;
+        let namespace = resolved_namespace(&resolved, limits)?;
         let event = event.into_owned();
         let event_end = position(&reader, origin)?;
         if !root_seen && !matches!(&event, Event::Decl(_) | Event::Eof) {
@@ -1122,14 +1330,18 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                 nodes = nodes
                     .checked_add(1)
                     .ok_or_else(|| invalid("formatcode2 node count overflow"))?;
-                if nodes > MAX_NODES {
-                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
-                if stack.len() >= MAX_DEPTH {
-                    return Err(limit(LimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
+                if stack.len() >= limits.max_depth {
+                    return Err(limit(
+                        LimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_depth,
+                    ));
                 }
-                validate_element_name(&element)?;
-                validate_attributes(&element, &reader)?;
+                validate_element_name(&element, limits.max_namespace_bytes)?;
+                validate_attributes(&element, &reader, limits)?;
                 if root_closed {
                     return Err(invalid(
                         "formatcode2 fragment has more than one root element",
@@ -1157,11 +1369,11 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                 nodes = nodes
                     .checked_add(1)
                     .ok_or_else(|| invalid("formatcode2 node count overflow"))?;
-                if nodes > MAX_NODES {
-                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
                 }
-                validate_element_name(&element)?;
-                validate_attributes(&element, &reader)?;
+                validate_element_name(&element, limits.max_namespace_bytes)?;
+                validate_attributes(&element, &reader, limits)?;
                 if root_closed {
                     return Err(invalid(
                         "formatcode2 fragment has more than one root element",
@@ -1187,7 +1399,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                 }
             },
             Event::End(end) => {
-                validate_end_name(&end)?;
+                validate_end_name(&end, limits.max_namespace_bytes)?;
                 if stack.pop().is_none() {
                     return Err(invalid(
                         "formatcode2 fragment has an unmatched closing element",
@@ -1234,7 +1446,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                 if !root_seen || stack.is_empty() {
                     return Err(invalid("formatcode2 contains a reference outside its root"));
                 }
-                let character = validate_general_ref(&reference)?;
+                let character = validate_general_ref(&reference, limits.max_value_bytes)?;
                 if let Some(character) = character {
                     append_lexical_char(&mut lexical_value, character)?;
                 }
@@ -1279,40 +1491,44 @@ fn only_namespace_attributes(element: &BytesStart<'_>) -> Result<bool> {
     Ok(true)
 }
 
-fn validate_element_name(element: &BytesStart<'_>) -> Result<()> {
+fn validate_element_name(element: &BytesStart<'_>, max_namespace_bytes: usize) -> Result<()> {
     let qualified_name = element.name();
     let name = std::str::from_utf8(qualified_name.as_ref()).map_err(xml_error)?;
     if !is_qualified_name(name) {
         return Err(invalid("formatcode2 element name is invalid"));
     }
-    validate_qname_prefix(qualified_name.as_ref())?;
+    validate_qname_prefix(qualified_name.as_ref(), max_namespace_bytes)?;
     Ok(())
 }
 
-fn validate_end_name(element: &BytesEnd<'_>) -> Result<()> {
+fn validate_end_name(element: &BytesEnd<'_>, max_namespace_bytes: usize) -> Result<()> {
     let qualified_name = element.name();
     let name = std::str::from_utf8(qualified_name.as_ref()).map_err(xml_error)?;
     if !is_qualified_name(name) {
         return Err(invalid("formatcode2 closing element name is invalid"));
     }
-    validate_qname_prefix(qualified_name.as_ref())?;
+    validate_qname_prefix(qualified_name.as_ref(), max_namespace_bytes)?;
     Ok(())
 }
 
-fn validate_qname_prefix(name: &[u8]) -> Result<()> {
+fn validate_qname_prefix(name: &[u8], max_namespace_bytes: usize) -> Result<()> {
     if let Some(colon) = name.iter().position(|byte| *byte == b':')
-        && colon > MAX_NAMESPACE_BYTES
+        && colon > max_namespace_bytes
     {
         return Err(limit(
             LimitKind::NamespacePrefixBytes,
-            name.iter().position(|byte| *byte == b':').unwrap_or(0),
-            MAX_NAMESPACE_BYTES,
+            colon,
+            max_namespace_bytes,
         ));
     }
     Ok(())
 }
 
-fn validate_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Result<()> {
+fn validate_attributes(
+    element: &BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+    limits: Limits,
+) -> Result<()> {
     let mut count = 0usize;
     let mut seen = HashSet::<&[u8]>::new();
     let mut expanded = HashSet::<(Vec<u8>, Vec<u8>)>::new();
@@ -1320,8 +1536,12 @@ fn validate_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Re
         count = count
             .checked_add(1)
             .ok_or_else(|| invalid("formatcode2 attribute count overflow"))?;
-        if count > MAX_ATTRIBUTES {
-            return Err(limit(LimitKind::XmlAttributes, count, MAX_ATTRIBUTES));
+        if count > limits.max_attributes {
+            return Err(limit(
+                LimitKind::XmlAttributes,
+                count,
+                limits.max_attributes,
+            ));
         }
         let attribute = attribute.map_err(xml_error)?;
         let key_bytes = attribute.key.into_inner();
@@ -1332,7 +1552,7 @@ fn validate_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Re
         // Validate the prefix before retaining the key in any duplicate set.
         // This keeps a hostile, oversized QName from becoming an unbounded
         // owned allocation merely to report a namespace error.
-        validate_qname_prefix(key_bytes)?;
+        validate_qname_prefix(key_bytes, limits.max_namespace_bytes)?;
         if !seen.insert(key_bytes) {
             return Err(invalid("formatcode2 element has duplicate attributes"));
         }
@@ -1341,43 +1561,45 @@ fn validate_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Re
         validate_xml_text(value.as_str(), "formatcode2 attribute value")?;
         if is_namespace_attribute(attribute.key) {
             let prefix = namespace_attribute_prefix(attribute.key)?;
-            if prefix.len() > MAX_NAMESPACE_BYTES {
+            if prefix.len() > limits.max_namespace_bytes {
                 return Err(limit(
                     LimitKind::NamespacePrefixBytes,
                     prefix.len(),
-                    MAX_NAMESPACE_BYTES,
+                    limits.max_namespace_bytes,
                 ));
             }
-            if value.len() > MAX_NAMESPACE_BYTES {
+            if value.len() > limits.max_namespace_bytes {
                 return Err(limit(
                     LimitKind::NamespaceBytes,
                     value.len(),
-                    MAX_NAMESPACE_BYTES,
+                    limits.max_namespace_bytes,
                 ));
             }
             validate_namespace_binding(prefix, value.as_bytes())?;
         } else {
             let (resolved, local) = reader.resolver().resolve_attribute(attribute.key);
             let namespace = match resolved {
-                ResolveResult::Bound(namespace) => normalize_namespace_uri(namespace.into_inner())?,
+                ResolveResult::Bound(namespace) => {
+                    normalize_namespace_uri(namespace.into_inner(), limits)?
+                },
                 ResolveResult::Unbound => Vec::new(),
                 ResolveResult::Unknown(prefix) => {
                     let prefix_bytes: &[u8] = prefix.as_ref();
-                    if prefix_bytes.len() > MAX_NAMESPACE_BYTES {
+                    if prefix_bytes.len() > limits.max_namespace_bytes {
                         return Err(limit(
                             LimitKind::NamespacePrefixBytes,
                             prefix_bytes.len(),
-                            MAX_NAMESPACE_BYTES,
+                            limits.max_namespace_bytes,
                         ));
                     }
                     return Err(invalid("formatcode2 attribute has an undeclared prefix"));
                 },
             };
-            if namespace.len() > MAX_NAMESPACE_BYTES {
+            if namespace.len() > limits.max_namespace_bytes {
                 return Err(limit(
                     LimitKind::NamespaceBytes,
                     namespace.len(),
-                    MAX_NAMESPACE_BYTES,
+                    limits.max_namespace_bytes,
                 ));
             }
             if !expanded.insert((namespace, local.into_inner().to_vec())) {
@@ -1460,12 +1682,12 @@ fn validate_raw_text(value: &[u8]) -> Result<()> {
     Ok(())
 }
 
-fn validate_general_ref(reference: &BytesRef<'_>) -> Result<Option<char>> {
-    if reference.len() > MAX_VALUE_BYTES {
+fn validate_general_ref(reference: &BytesRef<'_>, max_value_bytes: usize) -> Result<Option<char>> {
+    if reference.len() > max_value_bytes {
         return Err(limit(
             LimitKind::ScalarBytes,
             reference.len(),
-            MAX_VALUE_BYTES,
+            max_value_bytes,
         ));
     }
     if reference.is_char_ref() {
@@ -1552,17 +1774,17 @@ fn validate_declaration(declaration: &BytesDecl<'_>) -> Result<()> {
     Ok(())
 }
 
-fn resolved_namespace(resolved: &ResolveResult<'_>) -> Result<Vec<u8>> {
+fn resolved_namespace(resolved: &ResolveResult<'_>, limits: Limits) -> Result<Vec<u8>> {
     match resolved {
-        ResolveResult::Bound(namespace) => normalize_namespace_uri(namespace.into_inner()),
+        ResolveResult::Bound(namespace) => normalize_namespace_uri(namespace.into_inner(), limits),
         ResolveResult::Unbound => Ok(Vec::new()),
         ResolveResult::Unknown(prefix) => {
             let prefix_bytes: &[u8] = prefix.as_ref();
-            if prefix_bytes.len() > MAX_NAMESPACE_BYTES {
+            if prefix_bytes.len() > limits.max_namespace_bytes {
                 return Err(limit(
                     LimitKind::NamespacePrefixBytes,
                     prefix_bytes.len(),
-                    MAX_NAMESPACE_BYTES,
+                    limits.max_namespace_bytes,
                 ));
             }
             Err(invalid(format!(
@@ -1573,12 +1795,12 @@ fn resolved_namespace(resolved: &ResolveResult<'_>) -> Result<Vec<u8>> {
     }
 }
 
-fn normalize_namespace_uri(raw: &[u8]) -> Result<Vec<u8>> {
-    if raw.len() > MAX_NAMESPACE_BYTES {
+fn normalize_namespace_uri(raw: &[u8], limits: Limits) -> Result<Vec<u8>> {
+    if raw.len() > limits.max_namespace_bytes {
         return Err(limit(
             LimitKind::NamespaceBytes,
             raw.len(),
-            MAX_NAMESPACE_BYTES,
+            limits.max_namespace_bytes,
         ));
     }
     let raw = std::str::from_utf8(raw).map_err(xml_error)?;
@@ -1586,11 +1808,11 @@ fn normalize_namespace_uri(raw: &[u8]) -> Result<Vec<u8>> {
         .map_err(xml_error)?
         .into_owned();
     validate_xml_text(&decoded, "formatcode2 namespace URI")?;
-    if decoded.len() > MAX_NAMESPACE_BYTES {
+    if decoded.len() > limits.max_namespace_bytes {
         return Err(limit(
             LimitKind::NamespaceBytes,
             decoded.len(),
-            MAX_NAMESPACE_BYTES,
+            limits.max_namespace_bytes,
         ));
     }
     Ok(decoded.into_bytes())
@@ -1872,6 +2094,13 @@ fn hex(byte: u8) -> Option<u16> {
 fn ensure_output_limit(output_len: usize) -> Result<()> {
     if output_len > MAX_XML_BYTES {
         return Err(limit(LimitKind::XmlBytes, output_len, MAX_XML_BYTES));
+    }
+    Ok(())
+}
+
+fn ensure_output_limit_with(output_len: usize, maximum: usize) -> Result<()> {
+    if output_len > maximum {
+        return Err(limit(LimitKind::OutputBytes, output_len, maximum));
     }
     Ok(())
 }

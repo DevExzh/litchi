@@ -14,6 +14,68 @@ pub const MAX_NODES: usize = 256;
 /// Maximum number of typed color transforms in one color choice.
 pub const MAX_TRANSFORMS: usize = 64;
 
+/// Caller-selected bounds for one raw color fragment.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[must_use]
+pub struct Limits {
+    pub max_xml_bytes: usize,
+    pub max_depth: usize,
+    pub max_nodes: usize,
+    pub max_transforms: usize,
+}
+
+impl Limits {
+    pub const DEFAULT: Self = Self {
+        max_xml_bytes: MAX_XML_BYTES,
+        max_depth: MAX_DEPTH,
+        max_nodes: MAX_NODES,
+        max_transforms: MAX_TRANSFORMS,
+    };
+
+    #[must_use]
+    pub const fn new(
+        max_xml_bytes: usize,
+        max_depth: usize,
+        max_nodes: usize,
+        max_transforms: usize,
+    ) -> Self {
+        Self {
+            max_xml_bytes,
+            max_depth,
+            max_nodes,
+            max_transforms,
+        }
+    }
+
+    pub(crate) fn validate(self) -> Result<Self> {
+        for (kind, value, maximum) in [
+            (
+                crate::LimitKind::XmlBytes,
+                self.max_xml_bytes,
+                MAX_XML_BYTES,
+            ),
+            (crate::LimitKind::XmlDepth, self.max_depth, MAX_DEPTH),
+            (crate::LimitKind::XmlNodes, self.max_nodes, MAX_NODES),
+            (
+                crate::LimitKind::ColorTransforms,
+                self.max_transforms,
+                MAX_TRANSFORMS,
+            ),
+        ] {
+            if value == 0 || value > maximum {
+                return Err(Error::invalid_limit(kind, value, maximum));
+            }
+        }
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 const MIN_PERCENTAGE: i32 = -100_000;
 const MAX_PERCENTAGE: i32 = 100_000;
 const MAX_POSITIVE_ANGLE: u32 = 21_600_000;
@@ -160,12 +222,13 @@ pub(crate) fn parse_scaled(value: &str, kind: &'static str) -> Result<i32> {
 }
 
 /// Validate and return the original fragment without allocating a copy.
-pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
-    if xml.len() > MAX_XML_BYTES {
+pub(crate) fn validated_fragment(xml: &[u8], limits: Limits) -> Result<&[u8]> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
         return Err(Error::limit(
             crate::LimitKind::XmlBytes,
             xml.len(),
-            MAX_XML_BYTES,
+            limits.max_xml_bytes,
         ));
     }
 
@@ -184,8 +247,12 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
                 nodes = nodes
                     .checked_add(1)
                     .ok_or_else(|| Error::Invalid("DrawingML color node count overflow".into()))?;
-                if nodes > MAX_NODES {
-                    return Err(Error::limit(crate::LimitKind::XmlNodes, nodes, MAX_NODES));
+                if nodes > limits.max_nodes {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes,
+                    ));
                 }
                 if stack.is_empty() {
                     if root_seen {
@@ -195,11 +262,11 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
                     }
                     root_seen = true;
                 }
-                if stack.len() >= MAX_DEPTH {
+                if stack.len() >= limits.max_depth {
                     return Err(Error::limit(
                         crate::LimitKind::XmlDepth,
                         stack.len().saturating_add(1),
-                        MAX_DEPTH,
+                        limits.max_depth,
                     ));
                 }
                 stack.push(element.name().as_ref().to_vec());
@@ -208,8 +275,12 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
                 nodes = nodes
                     .checked_add(1)
                     .ok_or_else(|| Error::Invalid("DrawingML color node count overflow".into()))?;
-                if nodes > MAX_NODES {
-                    return Err(Error::limit(crate::LimitKind::XmlNodes, nodes, MAX_NODES));
+                if nodes > limits.max_nodes {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes,
+                    ));
                 }
                 if stack.is_empty() {
                     if root_seen {

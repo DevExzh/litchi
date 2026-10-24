@@ -22,7 +22,7 @@ fn emitter_writes_a_fresh_shape() {
         edit_as: EditAs::TwoCell,
     };
     let mut xml = String::new();
-    Emitter::new(1)
+    Emitter::new(1, litchi_drawingml::geometry::Limits::DEFAULT)
         .write_anchored_shape(
             &mut xml,
             &ShapeSpec::text_box("Title", anchor, Preset::Rect, "Hello"),
@@ -126,7 +126,7 @@ fn authoring_refuses_text_the_writer_cannot_write() {
     assert!(fonted.validate(0).is_err());
     let mut xml = "prefix".to_owned();
     assert!(
-        Emitter::new(1)
+        Emitter::new(1, litchi_drawingml::geometry::Limits::DEFAULT)
             .write_anchored_shape(&mut xml, &fonted)
             .is_err()
     );
@@ -155,7 +155,7 @@ fn authoring_refuses_lossy_break_without_touching_existing_output() {
     shape.paragraphs[0].runs[0].text = "wrong".to_owned();
     let mut xml = "prefix".to_owned();
 
-    let error = Emitter::new(1)
+    let error = Emitter::new(1, litchi_drawingml::geometry::Limits::DEFAULT)
         .write_anchored_shape(&mut xml, &shape)
         .unwrap_err();
 
@@ -184,7 +184,7 @@ fn authoring_refuses_incomplete_text_projection_without_touching_existing_output
     shape.properties.has_unmodeled_content = true;
     let mut xml = "prefix".to_owned();
 
-    let error = Emitter::new(1)
+    let error = Emitter::new(1, litchi_drawingml::geometry::Limits::DEFAULT)
         .write_anchored_shape(&mut xml, &shape)
         .unwrap_err();
 
@@ -214,7 +214,7 @@ fn authoring_preserves_break_markup() {
     shape.paragraphs[0].runs[0].text = "\n".to_owned();
     let mut xml = String::new();
 
-    Emitter::new(1)
+    Emitter::new(1, litchi_drawingml::geometry::Limits::DEFAULT)
         .write_anchored_shape(&mut xml, &shape)
         .unwrap();
 

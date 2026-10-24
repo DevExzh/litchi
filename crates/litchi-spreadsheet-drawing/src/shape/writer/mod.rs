@@ -43,7 +43,9 @@ use super::{
 };
 use crate::Error;
 use litchi_drawingml::geometry::writer::write_custom_geometry;
-use litchi_drawingml::geometry::{CustomGeometry, validate_custom_geometry};
+use litchi_drawingml::geometry::{
+    CustomGeometry, Limits as GeometryLimits, validate_custom_geometry,
+};
 
 macro_rules! write_xml {
     ($xml:expr, $($arguments:tt)*) => {
@@ -573,6 +575,7 @@ struct State {
     names: HashMap<String, u32>,
     preallocated: bool,
     emitted_names: HashSet<String>,
+    geometry_limits: GeometryLimits,
 }
 
 /// Errors raised while emitting a drawing object.
@@ -619,12 +622,16 @@ impl State {
         shapes: &[ShapeSpec],
         groups: &[GroupSpec],
         connections: &[ConnectionShapeSpec],
+        geometry_limits: GeometryLimits,
     ) -> Result<Self, String> {
         let mut emitter = Self {
             next_id: first_id,
             names: HashMap::new(),
             preallocated: true,
             emitted_names: HashSet::new(),
+            geometry_limits: geometry_limits
+                .validate()
+                .map_err(|error| error.to_string())?,
         };
         for shape in shapes {
             emitter.reserve(&shape.name)?;
@@ -673,7 +680,7 @@ impl State {
     ) -> WriteResult<()> {
         self.write_anchored(xml, &shape.anchor, |emitter, xml| {
             let id = emitter.allocate(&shape.name)?;
-            write_shape_xml(xml, shape, id)?;
+            write_shape_xml(xml, shape, id, &emitter.geometry_limits)?;
             Ok(())
         })
     }
@@ -724,7 +731,7 @@ impl State {
         match object {
             ObjectSpec::Shape(shape) => {
                 let id = self.allocate(&shape.name)?;
-                write_shape_xml(xml, shape, id)?;
+                write_shape_xml(xml, shape, id, &self.geometry_limits)?;
                 Ok(())
             },
             ObjectSpec::Group(group) => self.write_group_xml(xml, group),
@@ -816,7 +823,9 @@ impl State {
                     escape_xml(preset.token())
                 );
             },
-            Geometry::Custom(geometry) => write_custom_geometry(xml, geometry),
+            Geometry::Custom(geometry) => {
+                write_custom_geometry(xml, geometry, &self.geometry_limits)?;
+            },
         }
         xml.push_str("</xdr:spPr></xdr:cxnSp>");
         Ok(())
@@ -929,7 +938,12 @@ fn write_position(xml: &mut String, position: &EmuOffset) {
     );
 }
 
-fn write_shape_xml(xml: &mut String, spec: &ShapeSpec, id: u32) -> WriteResult<()> {
+fn write_shape_xml(
+    xml: &mut String,
+    spec: &ShapeSpec,
+    id: u32,
+    geometry_limits: &GeometryLimits,
+) -> WriteResult<()> {
     xml.push_str(r#"<xdr:sp macro="" textlink=""><xdr:nvSpPr>"#);
     write_c_nv_pr(xml, id, &spec.name, &spec.description, spec.hidden);
     if spec.is_text_box {
@@ -940,7 +954,9 @@ fn write_shape_xml(xml: &mut String, spec: &ShapeSpec, id: u32) -> WriteResult<(
     xml.push_str("</xdr:nvSpPr><xdr:spPr>");
     xml.push_str(r#"<a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></a:xfrm>"#);
     match &spec.geometry {
-        Geometry::Custom(geometry) => write_custom_geometry(xml, geometry),
+        Geometry::Custom(geometry) => {
+            write_custom_geometry(xml, geometry, geometry_limits)?;
+        },
         Geometry::Preset(preset) => {
             write_xml!(
                 xml,
@@ -967,13 +983,14 @@ pub struct Emitter {
 impl Emitter {
     /// Create an emitter whose first allocated object ID is `first_id`.
     #[must_use]
-    pub fn new(first_id: u32) -> Self {
+    pub fn new(first_id: u32, geometry_limits: GeometryLimits) -> Self {
         Self {
             inner: State {
                 next_id: first_id,
                 names: HashMap::new(),
                 preallocated: false,
                 emitted_names: HashSet::new(),
+                geometry_limits,
             },
         }
     }
@@ -984,8 +1001,9 @@ impl Emitter {
         shapes: &[ShapeSpec],
         groups: &[GroupSpec],
         connections: &[ConnectionShapeSpec],
+        geometry_limits: GeometryLimits,
     ) -> crate::Result<Self> {
-        State::for_objects(first_id, shapes, groups, connections)
+        State::for_objects(first_id, shapes, groups, connections, geometry_limits)
             .map(|inner| Self { inner })
             .map_err(Error::Invalid)
     }

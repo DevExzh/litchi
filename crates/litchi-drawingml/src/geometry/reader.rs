@@ -17,9 +17,8 @@ use crate::{Error, LimitKind, Result};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 
 use super::{
-    AdjustHandle, AdjustValue, ConnectionSite, CustomGeometry, Guide, MAX_ADJUST_HANDLES,
-    MAX_CONNECTION_SITES, MAX_GEOMETRY_GUIDES, MAX_GEOMETRY_PATHS, MAX_PATH_COMMANDS, Path,
-    PathCommand, Point, PolarAdjustHandle, Rectangle, XyAdjustHandle, normalize_xsd_token,
+    AdjustHandle, AdjustValue, ConnectionSite, CustomGeometry, Guide, Limits, Path, PathCommand,
+    Point, PolarAdjustHandle, Rectangle, XyAdjustHandle, normalize_xsd_token,
     validate_parsed_custom_geometry,
 };
 
@@ -116,9 +115,10 @@ enum PendingSite {
 }
 
 /// Streaming assembler for one `a:custGeom` subtree.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct CustomGeometryBuilder {
     geometry: CustomGeometry,
+    limits: Limits,
     saw_path_list: bool,
     pending_site: Option<(PendingSite, bool)>,
     pending_path: Option<Path>,
@@ -127,8 +127,15 @@ pub struct CustomGeometryBuilder {
 
 impl CustomGeometryBuilder {
     #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(limits: Limits) -> Result<Self> {
+        Ok(Self {
+            geometry: CustomGeometry::default(),
+            limits: limits.validate()?,
+            saw_path_list: false,
+            pending_site: None,
+            pending_path: None,
+            pending_command: None,
+        })
     }
 
     /// Handle a start or empty event whose parent is `parent`; returns the
@@ -276,11 +283,11 @@ impl CustomGeometryBuilder {
         } else {
             &mut self.geometry.guides
         };
-        if target.len() >= MAX_GEOMETRY_GUIDES {
+        if target.len() >= self.limits.max_guides {
             return Err(limit(
                 LimitKind::GeometryGuides,
                 target.len() + 1,
-                MAX_GEOMETRY_GUIDES,
+                self.limits.max_guides,
             ));
         }
         target.push(Guide { name, formula });
@@ -324,20 +331,21 @@ impl CustomGeometryBuilder {
     fn open_site(&mut self, site: PendingSite) -> Result<()> {
         let at_limit = match &site {
             PendingSite::Xy(_) | PendingSite::Polar(_) => {
-                self.geometry.adjust_handles.len() >= MAX_ADJUST_HANDLES
+                self.geometry.adjust_handles.len() >= self.limits.max_adjust_handles
             },
             PendingSite::Connection(_) => {
-                self.geometry.connection_sites.len() >= MAX_CONNECTION_SITES
+                self.geometry.connection_sites.len() >= self.limits.max_connection_sites
             },
         };
         if at_limit {
             let (observed, maximum) = match &site {
-                PendingSite::Xy(_) | PendingSite::Polar(_) => {
-                    (self.geometry.adjust_handles.len() + 1, MAX_ADJUST_HANDLES)
-                },
+                PendingSite::Xy(_) | PendingSite::Polar(_) => (
+                    self.geometry.adjust_handles.len() + 1,
+                    self.limits.max_adjust_handles,
+                ),
                 PendingSite::Connection(_) => (
                     self.geometry.connection_sites.len() + 1,
-                    MAX_CONNECTION_SITES,
+                    self.limits.max_connection_sites,
                 ),
             };
             return Err(limit(LimitKind::GeometrySites, observed, maximum));
@@ -393,11 +401,11 @@ impl CustomGeometryBuilder {
     }
 
     fn open_path(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
-        if self.geometry.paths.len() >= MAX_GEOMETRY_PATHS {
+        if self.geometry.paths.len() >= self.limits.max_paths {
             return Err(limit(
                 LimitKind::GeometryPaths,
                 self.geometry.paths.len() + 1,
-                MAX_GEOMETRY_PATHS,
+                self.limits.max_paths,
             ));
         }
         let defaults = Path::default();
@@ -518,11 +526,11 @@ impl CustomGeometryBuilder {
             .pending_path
             .as_mut()
             .ok_or_else(|| invalid("geometry path command outside a path"))?;
-        if path.commands.len() >= MAX_PATH_COMMANDS {
+        if path.commands.len() >= self.limits.max_path_commands {
             return Err(limit(
                 LimitKind::GeometryPathCommands,
                 path.commands.len() + 1,
-                MAX_PATH_COMMANDS,
+                self.limits.max_path_commands,
             ));
         }
         path.commands.push(command);

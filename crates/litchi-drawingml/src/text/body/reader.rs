@@ -1184,7 +1184,7 @@ impl<'x> Builder<'x> {
                 // 100%, which producers write, is refused), so a fragment
                 // it refuses is kept as written rather than failing the
                 // body.
-                let value = match color::read(fragment) {
+                let value = match color::read(fragment, &color::Limits::DEFAULT) {
                     Ok(value) => Some(value),
                     Err(_) => self.checked(color::Value::unknown(fragment))?,
                 };

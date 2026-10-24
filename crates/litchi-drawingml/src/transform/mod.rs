@@ -20,6 +20,7 @@ mod validation;
 mod tests;
 
 pub use crate::Error;
+pub use codec::Limits;
 pub use model::{Angle, Point, Size, Transform};
 pub use transaction::{Commit, Diagnostics, Edit, LimitKind, Package, Patch};
 pub use validation::validate;

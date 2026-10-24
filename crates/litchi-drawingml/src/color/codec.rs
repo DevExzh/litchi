@@ -12,7 +12,7 @@ use super::model::{
 use super::validation;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
-pub use super::validation::{MAX_DEPTH, MAX_NODES, MAX_TRANSFORMS, MAX_XML_BYTES};
+pub use super::validation::{Limits, MAX_DEPTH, MAX_NODES, MAX_TRANSFORMS, MAX_XML_BYTES};
 
 const VAL: &[u8] = b"val";
 const LAST_CLR: &[u8] = b"lastClr";
@@ -61,8 +61,9 @@ impl<'a> From<&'a Base> for BaseRef<'a> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn read(xml: &[u8]) -> Result<Value> {
-    let validated = validation::validated_fragment(xml)?;
+pub fn read(xml: &[u8], limits: &Limits) -> Result<Value> {
+    let limits = limits.validate()?;
+    let validated = validation::validated_fragment(xml, limits)?;
     let mut reader = Reader::from_reader(validated);
 
     loop {
@@ -77,12 +78,14 @@ pub fn read(xml: &[u8]) -> Result<Value> {
                     .trim()
                     .is_empty() => {},
             Event::Start(element) => {
-                return Ok(read_choice(&mut reader, &element)?
+                return Ok(read_choice(&mut reader, &element, limits.max_transforms)?
                     .unwrap_or_else(|| Value::Unknown(Unknown::from_validated(validated))));
             },
             Event::Empty(element) => {
-                return Ok(parse_empty_choice(&mut reader, &element)?
-                    .unwrap_or_else(|| Value::Unknown(Unknown::from_validated(validated))));
+                return Ok(
+                    parse_empty_choice(&mut reader, &element, limits.max_transforms)?
+                        .unwrap_or_else(|| Value::Unknown(Unknown::from_validated(validated))),
+                );
             },
             Event::End(_)
             | Event::Text(_)
@@ -104,7 +107,8 @@ pub fn read(xml: &[u8]) -> Result<Value> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn write(value: &Value) -> Result<Vec<u8>> {
+pub fn write(value: &Value, limits: &Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
     let mut output = String::new();
     match value {
         Value::Rgb(rgb) => write_base(&mut output, BaseRef::Rgb(*rgb), false),
@@ -122,20 +126,33 @@ pub fn write(value: &Value) -> Result<Vec<u8>> {
             output.push_str(base_name(value.base()));
             output.push('>');
         },
-        Value::Unknown(value) => return Ok(value.as_xml().to_vec()),
+        Value::Unknown(value) => {
+            if value.as_xml().len() > limits.max_xml_bytes {
+                return Err(Error::limit(
+                    crate::LimitKind::XmlBytes,
+                    value.as_xml().len(),
+                    limits.max_xml_bytes,
+                ));
+            }
+            return Ok(value.as_xml().to_vec());
+        },
     }
 
-    if output.len() > MAX_XML_BYTES {
+    if output.len() > limits.max_xml_bytes {
         return Err(Error::limit(
             crate::LimitKind::XmlBytes,
             output.len(),
-            MAX_XML_BYTES,
+            limits.max_xml_bytes,
         ));
     }
     Ok(output.into_bytes())
 }
 
-fn read_choice(reader: &mut Reader<&[u8]>, element: &BytesStart<'_>) -> Result<Option<Value>> {
+fn read_choice(
+    reader: &mut Reader<&[u8]>,
+    element: &BytesStart<'_>,
+    max_transforms: usize,
+) -> Result<Option<Value>> {
     let Some(base) = parse_base(element, reader.decoder())? else {
         return Ok(None);
     };
@@ -157,13 +174,13 @@ fn read_choice(reader: &mut Reader<&[u8]>, element: &BytesStart<'_>) -> Result<O
                 let Some(transform) = parse_transform(&element, reader.decoder())? else {
                     return Ok(None);
                 };
-                push_transform(&mut transforms, transform)?;
+                push_transform(&mut transforms, transform, max_transforms)?;
             },
             Event::Start(element) => {
                 let Some(transform) = parse_started_transform(reader, &element)? else {
                     return Ok(None);
                 };
-                push_transform(&mut transforms, transform)?;
+                push_transform(&mut transforms, transform, max_transforms)?;
             },
             Event::End(element) if element.name().as_ref() == root_name.as_slice() => break,
             Event::Eof => {
@@ -196,6 +213,7 @@ fn read_choice(reader: &mut Reader<&[u8]>, element: &BytesStart<'_>) -> Result<O
 fn parse_empty_choice(
     reader: &mut Reader<&[u8]>,
     element: &BytesStart<'_>,
+    _max_transforms: usize,
 ) -> Result<Option<Value>> {
     let decoder = reader.decoder();
     let Some(base) = parse_base(element, decoder)? else {
@@ -378,12 +396,16 @@ fn parse_transform(
     }))
 }
 
-fn push_transform(transforms: &mut Vec<Transform>, transform: Transform) -> Result<()> {
-    if transforms.len() >= MAX_TRANSFORMS {
+fn push_transform(
+    transforms: &mut Vec<Transform>,
+    transform: Transform,
+    max_transforms: usize,
+) -> Result<()> {
+    if transforms.len() >= max_transforms {
         return Err(Error::limit(
             crate::LimitKind::ColorTransforms,
             transforms.len() + 1,
-            MAX_TRANSFORMS,
+            max_transforms,
         ));
     }
     transforms.push(transform);

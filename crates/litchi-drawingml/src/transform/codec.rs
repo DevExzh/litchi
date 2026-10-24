@@ -19,6 +19,51 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 pub(crate) const MAX_XML_BYTES: usize = 1 << 20;
 const MAX_NODES: usize = 128;
 
+/// Caller-selected bounds for one raw transform fragment.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[must_use]
+pub struct Limits {
+    pub max_xml_bytes: usize,
+    pub max_nodes: usize,
+}
+
+impl Limits {
+    pub const DEFAULT: Self = Self {
+        max_xml_bytes: MAX_XML_BYTES,
+        max_nodes: MAX_NODES,
+    };
+
+    #[must_use]
+    pub const fn new(max_xml_bytes: usize, max_nodes: usize) -> Self {
+        Self {
+            max_xml_bytes,
+            max_nodes,
+        }
+    }
+
+    pub(crate) fn validate(self) -> Result<Self> {
+        for (kind, value, maximum) in [
+            (
+                crate::LimitKind::XmlBytes,
+                self.max_xml_bytes,
+                MAX_XML_BYTES,
+            ),
+            (crate::LimitKind::XmlNodes, self.max_nodes, MAX_NODES),
+        ] {
+            if value == 0 || value > maximum {
+                return Err(Error::invalid_limit(kind, value, maximum));
+            }
+        }
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 /// Read one complete `a:xfrm` element.
 ///
 /// The reader is intentionally fragment-oriented: a host may provide a
@@ -30,9 +75,14 @@ const MAX_NODES: usize = 128;
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn read(xml: &[u8]) -> Result<Transform> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit(crate::LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
+pub fn read(xml: &[u8], limits: &Limits) -> Result<Transform> {
+    let limits = limits.validate()?;
+    if xml.len() > limits.max_xml_bytes {
+        return Err(limit(
+            crate::LimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
     }
 
     let mut reader = Reader::from_reader(xml);
@@ -53,9 +103,9 @@ pub fn read(xml: &[u8]) -> Result<Transform> {
             .into_owned();
         nodes = nodes
             .checked_add(1)
-            .ok_or_else(|| limit(crate::LimitKind::XmlNodes, nodes, MAX_NODES))?;
-        if nodes > MAX_NODES {
-            return Err(limit(crate::LimitKind::XmlNodes, nodes, MAX_NODES));
+            .ok_or_else(|| limit(crate::LimitKind::XmlNodes, nodes, limits.max_nodes))?;
+        if nodes > limits.max_nodes {
+            return Err(limit(crate::LimitKind::XmlNodes, nodes, limits.max_nodes));
         }
 
         match event {
@@ -87,6 +137,7 @@ pub fn read(xml: &[u8]) -> Result<Transform> {
                     &mut reader,
                     &mut buffer,
                     &mut nodes,
+                    limits.max_nodes,
                 )?;
             },
             Event::Empty(element) if root_open => {
@@ -157,7 +208,8 @@ pub fn read(xml: &[u8]) -> Result<Transform> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn write(transform: &Transform) -> Result<Vec<u8>> {
+pub fn write(transform: &Transform, limits: &Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
     validation::validate(transform)?;
 
     let mut xml = String::with_capacity(192);
@@ -178,7 +230,7 @@ pub fn write(transform: &Transform) -> Result<Vec<u8>> {
         || transform.child_extent().is_some();
     if !has_children {
         xml.push_str("/>");
-        return checked_output(xml.into_bytes());
+        return checked_output(xml.into_bytes(), limits);
     }
 
     xml.push('>');
@@ -195,7 +247,7 @@ pub fn write(transform: &Transform) -> Result<Vec<u8>> {
         write_size(&mut xml, "chExt", value).map_err(format_error)?;
     }
     xml.push_str("</a:xfrm>");
-    checked_output(xml.into_bytes())
+    checked_output(xml.into_bytes(), limits)
 }
 
 /// Serialize a transform to a caller-owned sink.
@@ -203,8 +255,8 @@ pub fn write(transform: &Transform) -> Result<Vec<u8>> {
 ///
 /// Returns an error when input violates DrawingML constraints, exceeds a configured
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-pub fn write_to<W: Write>(writer: &mut W, transform: &Transform) -> Result<()> {
-    writer.write_all(&write(transform)?)?;
+pub fn write_to<W: Write>(writer: &mut W, transform: &Transform, limits: &Limits) -> Result<()> {
+    writer.write_all(&write(transform, limits)?)?;
     Ok(())
 }
 
@@ -233,10 +285,11 @@ fn parse_child_start(
     reader: &mut Reader<&[u8]>,
     buffer: &mut Vec<u8>,
     nodes: &mut usize,
+    max_nodes: usize,
 ) -> Result<()> {
     let local = element.local_name();
     let value = parse_child_value(local.as_ref(), element, decoder)?;
-    consume_leaf(reader, buffer, local.as_ref(), nodes)?;
+    consume_leaf(reader, buffer, local.as_ref(), nodes, max_nodes)?;
     set_child(transform, local.as_ref(), value)
 }
 
@@ -305,6 +358,7 @@ fn consume_leaf(
     buffer: &mut Vec<u8>,
     expected: &[u8],
     nodes: &mut usize,
+    max_nodes: usize,
 ) -> Result<()> {
     loop {
         let event = reader
@@ -313,9 +367,9 @@ fn consume_leaf(
             .into_owned();
         *nodes = nodes
             .checked_add(1)
-            .ok_or_else(|| limit(crate::LimitKind::XmlNodes, *nodes, MAX_NODES))?;
-        if *nodes > MAX_NODES {
-            return Err(limit(crate::LimitKind::XmlNodes, *nodes, MAX_NODES));
+            .ok_or_else(|| limit(crate::LimitKind::XmlNodes, *nodes, max_nodes))?;
+        if *nodes > max_nodes {
+            return Err(limit(crate::LimitKind::XmlNodes, *nodes, max_nodes));
         }
         match event {
             Event::End(element) if element.local_name().as_ref() == expected => return Ok(()),
@@ -448,12 +502,12 @@ fn write_size(xml: &mut String, name: &str, size: Size) -> std::fmt::Result {
     )
 }
 
-fn checked_output(output: Vec<u8>) -> Result<Vec<u8>> {
-    if output.len() > MAX_XML_BYTES {
+fn checked_output(output: Vec<u8>, limits: Limits) -> Result<Vec<u8>> {
+    if output.len() > limits.max_xml_bytes {
         return Err(limit(
             crate::LimitKind::XmlBytes,
             output.len(),
-            MAX_XML_BYTES,
+            limits.max_xml_bytes,
         ));
     }
     Ok(output)
