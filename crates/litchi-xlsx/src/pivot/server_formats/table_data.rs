@@ -3335,13 +3335,13 @@ pub(crate) fn edit_workbook_with_limits<'a>(
 /// edit retryable.  Dropping it discards it.
 pub struct Edit {
     source: Workbook,
-    selector: OwnedPivotTableSelector,
+    selector: OwnedTableDataSelector,
     limits: Limits,
-    materialized: Option<MaterializedEdit>,
+    materialized: Option<TableDataEditState>,
 }
 
 #[derive(Debug)]
-struct MaterializedEdit {
+struct TableDataEditState {
     before: Snapshot,
     staged: Vec<CellState>,
     positions: HashMap<PivotCellAddress, CellPosition>,
@@ -3350,12 +3350,12 @@ struct MaterializedEdit {
 }
 
 #[derive(Debug)]
-enum OwnedPivotTableSelector {
+enum OwnedTableDataSelector {
     Name(String),
     Position(usize),
 }
 
-impl OwnedPivotTableSelector {
+impl OwnedTableDataSelector {
     fn new<'a>(selector: PivotTableSelector<'a>, limits: SourceLimits) -> Result<Self> {
         match selector {
             PivotTableSelector::Position(position) => Ok(Self::Position(position)),
@@ -3392,7 +3392,7 @@ impl Edit {
         limits: &Limits,
     ) -> Result<Self> {
         let selector =
-            OwnedPivotTableSelector::new(selector.into(), source.pivot_package().read_limits())?;
+            OwnedTableDataSelector::new(selector.into(), source.pivot_package().read_limits())?;
         Ok(Self {
             source: source.clone(),
             selector,
@@ -3436,7 +3436,7 @@ impl Edit {
                 source,
             })?;
         staged_text_ledger.extend(std::iter::repeat_n(0, before.cells.len()));
-        self.materialized = Some(MaterializedEdit {
+        self.materialized = Some(TableDataEditState {
             before,
             staged,
             positions,
@@ -3446,13 +3446,13 @@ impl Edit {
         Ok(())
     }
 
-    fn state(&self) -> Result<&MaterializedEdit> {
+    fn state(&self) -> Result<&TableDataEditState> {
         self.materialized
             .as_ref()
             .ok_or_else(|| invalid("pivotTableData edit is not materialized"))
     }
 
-    fn state_mut(&mut self) -> Result<&mut MaterializedEdit> {
+    fn state_mut(&mut self) -> Result<&mut TableDataEditState> {
         self.materialized
             .as_mut()
             .ok_or_else(|| invalid("pivotTableData edit is not materialized"))

@@ -877,11 +877,11 @@ pub struct Edit {
     source: Workbook,
     cache_selector: PivotCacheSelector,
     field_selector: OwnedFieldSelector,
-    materialized: Option<MaterializedEdit>,
+    materialized: Option<CachedEditState>,
 }
 
 #[derive(Debug)]
-struct MaterializedEdit {
+struct CachedEditState {
     before: Snapshot,
     staged: Vec<String>,
 }
@@ -965,17 +965,17 @@ impl Edit {
             copy.push_str(&name.name);
             staged.push(copy);
         }
-        self.materialized = Some(MaterializedEdit { before, staged });
+        self.materialized = Some(CachedEditState { before, staged });
         Ok(())
     }
 
-    fn state(&self) -> Result<&MaterializedEdit> {
+    fn state(&self) -> Result<&CachedEditState> {
         self.materialized
             .as_ref()
             .ok_or_else(|| invalid("cached unique-name edit is not materialized"))
     }
 
-    fn state_mut(&mut self) -> Result<&mut MaterializedEdit> {
+    fn state_mut(&mut self) -> Result<&mut CachedEditState> {
         self.materialized
             .as_mut()
             .ok_or_else(|| invalid("cached unique-name edit is not materialized"))
