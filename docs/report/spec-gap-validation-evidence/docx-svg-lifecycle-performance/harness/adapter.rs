@@ -23,10 +23,13 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, SourceVersion,
 };
 use litchi_docx::drawing::DrawingPlacement;
-use litchi_docx::source_backed::{self, StorySelector};
-use litchi_docx::{Error as DocxError, Package as NormalPackage, ReadLimits};
+use litchi_docx::source_backed::{self, story_text::Selector as StorySelector};
+use litchi_docx::source_backed::svg::{Picture, PictureSelector, PictureView, Snapshot};
+use litchi_docx::{Error as DocxError, Package as NormalPackage};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part, TargetMode};
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part, SourceLimits, TargetMode,
+};
 use sha2::{Digest as _, Sha256};
 
 
@@ -649,8 +652,8 @@ fn elapsed(start: Instant) -> u64 {
 }
 
 fn batch_snapshot_metadata_matches(
-    expected: &source_backed::SourceBackedSvgAttachmentBatchSnapshot,
-    actual: &source_backed::SourceBackedSvgAttachmentBatchSnapshot,
+    expected: &Snapshot,
+    actual: &Snapshot,
 ) -> bool {
     expected.len() == actual.len()
         && expected.story_xml() == actual.story_xml()
@@ -663,8 +666,8 @@ fn batch_snapshot_metadata_matches(
 }
 
 fn snapshot_metadata_matches(
-    expected: &source_backed::SourceBackedSvgAttachmentSnapshot,
-    actual: &source_backed::SourceBackedSvgAttachmentSnapshot,
+    expected: &Picture,
+    actual: &Picture,
 ) -> bool {
     let raster_matches = expected.selector() == actual.selector()
         && expected.placement() == actual.placement()
@@ -688,8 +691,8 @@ fn snapshot_metadata_matches(
 }
 
 fn views_match_snapshot(
-    views: &[source_backed::SourceSvgPictureView],
-    expected: &source_backed::SourceBackedSvgAttachmentBatchSnapshot,
+    views: &[PictureView],
+    expected: &Snapshot,
 ) -> bool {
     views.len() == expected.len()
         && selectors(expected.len()).iter().all(|selector| {
@@ -726,9 +729,9 @@ fn views_match_snapshot(
 fn run_expected_topology_refusal(fixture: &Fixture, owners: usize) -> Result<RunResult> {
     let capture = Instant::now();
     let package = package_from_fixture(fixture)?;
-    let mut edit = package.edit_svg_attachments(selectors(owners))?;
+    let mut edit = package.edit_svg(selectors(owners))?;
     let capture_ns = elapsed(capture);
-    let source_snapshot = edit.source().clone();
+    let source_snapshot = edit.source()?;
     let stage = Instant::now();
     let mut stage_error: Option<DocxError> = None;
     for selector in selectors(owners) {
@@ -764,11 +767,12 @@ fn run_expected_topology_refusal(fixture: &Fixture, owners: usize) -> Result<Run
         }
     };
     let readback = Instant::now();
-    let post_failure = package.edit_svg_attachments(selectors(owners))?;
-    let metadata_unchanged = batch_snapshot_metadata_matches(&source_snapshot, post_failure.source());
+    let post_failure = package.edit_svg(selectors(owners))?;
+    let post_failure_source = post_failure.source()?;
+    let metadata_unchanged = batch_snapshot_metadata_matches(&source_snapshot, &post_failure_source);
     let no_op_commit = post_failure.commit()?;
     let mut readback_bytes = Vec::new();
-    package.publish_svg_attachment_batch_commit_to_stream(&mut readback_bytes, &no_op_commit)?;
+    no_op_commit.package().write_to(&mut readback_bytes)?;
     let physical_unchanged = readback_bytes.as_slice() == fixture.package.as_ref();
     let reopened = source_backed::Package::from_reader(Cursor::new(readback_bytes.as_slice()))?;
     let readback_views = reopened.svg_pictures(StorySelector::Main)?;
@@ -891,26 +895,27 @@ fn package_from_fixture(fixture: &Fixture) -> Result<source_backed::Package> {
     }))?)
 }
 
-fn selectors(count: usize) -> Vec<source_backed::PictureSelector> {
+fn selectors(count: usize) -> Vec<PictureSelector> {
     (0..count)
-        .map(|index| source_backed::PictureSelector::new(0, index))
+        .map(|index| PictureSelector::new(0, index))
         .collect()
 }
 
 fn run_single_attach(fixture: &Fixture, owners: usize) -> Result<RunResult> {
     let package = package_from_fixture(fixture)?;
     let capture = Instant::now();
-    let mut edit = package.edit_svg_attachment(source_backed::PictureSelector::new(0, owners - 1))?;
+    let selector = PictureSelector::new(0, owners - 1);
+    let mut edit = package.edit_svg([selector])?;
     let capture_ns = elapsed(capture);
     let stage = Instant::now();
-    let changed = edit.attach_svg(fixture.svg_payload.as_ref())?;
+    let changed = edit.attach_svg(selector, fixture.svg_payload.as_ref())?;
     let stage_ns = elapsed(stage);
     let commit_start = Instant::now();
     let commit = edit.commit()?;
     let commit_ns = elapsed(commit_start);
     let mut output = Vec::new();
     let publish = Instant::now();
-    package.publish_svg_attachment_commit_to_stream(&mut output, &commit)?;
+    commit.package().write_to(&mut output)?;
     let publish_ns = elapsed(publish);
     let reopen = Instant::now();
     let reopened = source_backed::Package::from_reader(Cursor::new(output.as_slice()))?;
@@ -947,17 +952,18 @@ fn run_single_attach(fixture: &Fixture, owners: usize) -> Result<RunResult> {
 fn run_single_detach(fixture: &Fixture, owners: usize) -> Result<RunResult> {
     let package = package_from_fixture(fixture)?;
     let capture = Instant::now();
-    let mut edit = package.edit_svg_attachment(source_backed::PictureSelector::new(0, owners - 1))?;
+    let selector = PictureSelector::new(0, owners - 1);
+    let mut edit = package.edit_svg([selector])?;
     let capture_ns = elapsed(capture);
     let stage = Instant::now();
-    let changed = edit.detach_svg()?;
+    let changed = edit.detach_svg(selector)?;
     let stage_ns = elapsed(stage);
     let commit_start = Instant::now();
     let commit = edit.commit()?;
     let commit_ns = elapsed(commit_start);
     let mut output = Vec::new();
     let publish = Instant::now();
-    package.publish_svg_attachment_commit_to_stream(&mut output, &commit)?;
+    commit.package().write_to(&mut output)?;
     let publish_ns = elapsed(publish);
     let reopen = Instant::now();
     let reopened = source_backed::Package::from_reader(Cursor::new(output.as_slice()))?;
@@ -994,7 +1000,7 @@ fn run_single_detach(fixture: &Fixture, owners: usize) -> Result<RunResult> {
 fn run_batch_attach(fixture: &Fixture, owners: usize) -> Result<RunResult> {
     let package = package_from_fixture(fixture)?;
     let capture = Instant::now();
-    let mut edit = package.edit_svg_attachments(selectors(owners))?;
+    let mut edit = package.edit_svg(selectors(owners))?;
     let capture_ns = elapsed(capture);
     let stage = Instant::now();
     for selector in selectors(owners) {
@@ -1006,7 +1012,7 @@ fn run_batch_attach(fixture: &Fixture, owners: usize) -> Result<RunResult> {
     let commit_ns = elapsed(commit_start);
     let mut output = Vec::new();
     let publish = Instant::now();
-    package.publish_svg_attachment_batch_commit_to_stream(&mut output, &commit)?;
+    commit.package().write_to(&mut output)?;
     let publish_ns = elapsed(publish);
     let reopen = Instant::now();
     let reopened = source_backed::Package::from_reader(Cursor::new(output.as_slice()))?;
@@ -1041,7 +1047,7 @@ fn run_batch_attach(fixture: &Fixture, owners: usize) -> Result<RunResult> {
 fn run_batch_detach(fixture: &Fixture, owners: usize) -> Result<RunResult> {
     let package = package_from_fixture(fixture)?;
     let capture = Instant::now();
-    let mut edit = package.edit_svg_attachments(selectors(owners))?;
+    let mut edit = package.edit_svg(selectors(owners))?;
     let capture_ns = elapsed(capture);
     let stage = Instant::now();
     for selector in selectors(owners) {
@@ -1053,7 +1059,7 @@ fn run_batch_detach(fixture: &Fixture, owners: usize) -> Result<RunResult> {
     let commit_ns = elapsed(commit_start);
     let mut output = Vec::new();
     let publish = Instant::now();
-    package.publish_svg_attachment_batch_commit_to_stream(&mut output, &commit)?;
+    commit.package().write_to(&mut output)?;
     let publish_ns = elapsed(publish);
     let reopen = Instant::now();
     let reopened = source_backed::Package::from_reader(Cursor::new(output.as_slice()))?;
@@ -1087,7 +1093,7 @@ fn run_batch_detach(fixture: &Fixture, owners: usize) -> Result<RunResult> {
 fn run_shared_cleanup(fixture: &Fixture) -> Result<RunResult> {
     let package = package_from_fixture(fixture)?;
     let capture = Instant::now();
-    let mut edit = package.edit_svg_attachments(selectors(fixture.owners))?;
+    let mut edit = package.edit_svg(selectors(fixture.owners))?;
     let capture_ns = elapsed(capture);
     let stage = Instant::now();
     for selector in selectors(fixture.owners) {
@@ -1099,7 +1105,7 @@ fn run_shared_cleanup(fixture: &Fixture) -> Result<RunResult> {
     let commit_ns = elapsed(commit_start);
     let mut output = Vec::new();
     let publish = Instant::now();
-    package.publish_svg_attachment_batch_commit_to_stream(&mut output, &commit)?;
+    commit.package().write_to(&mut output)?;
     let publish_ns = elapsed(publish);
     let reopen = Instant::now();
     let reopened = source_backed::Package::from_reader(Cursor::new(output.as_slice()))?;
@@ -1134,7 +1140,7 @@ fn run_shared_cleanup(fixture: &Fixture) -> Result<RunResult> {
 fn run_exact_inverse(fixture: &Fixture) -> Result<RunResult> {
     let package = package_from_fixture(fixture)?;
     let capture = Instant::now();
-    let mut edit = package.edit_svg_attachments(selectors(fixture.owners))?;
+    let mut edit = package.edit_svg(selectors(fixture.owners))?;
     let capture_ns = elapsed(capture);
     let stage = Instant::now();
     for selector in selectors(fixture.owners) {
@@ -1146,8 +1152,7 @@ fn run_exact_inverse(fixture: &Fixture) -> Result<RunResult> {
     let commit_ns = elapsed(commit_start);
     let mut output = Vec::new();
     let publish = Instant::now();
-    let publication = package
-        .publish_svg_attachment_batch_commit_with_publication_to_stream(&mut output, &commit)?;
+    commit.package().write_to(&mut output)?;
     let publish_ns = elapsed(publish);
     let reopen = Instant::now();
     let reopened = source_backed::Package::from_reader(Cursor::new(output.as_slice()))?;
@@ -1159,8 +1164,14 @@ fn run_exact_inverse(fixture: &Fixture) -> Result<RunResult> {
     let validation_pre_ns = elapsed(validation_pre);
     let mut restored = Vec::new();
     let inverse = Instant::now();
-    let inverse_snapshot = reopened
-        .publish_svg_attachment_batch_inverse_to_stream(&mut restored, &publication)?;
+    let inverse_commit = commit
+        .package()
+        .apply_svg(&commit.patch().inverse())?;
+    let inverse_snapshot = inverse_commit
+        .package()
+        .edit_svg(selectors(fixture.owners))?
+        .source()?;
+    inverse_commit.package().write_to(&mut restored)?;
     let inverse_ns = elapsed(inverse);
     let validation_mid = Instant::now();
     let inverse_semantic_ok = selectors(fixture.owners).iter().all(|selector| {
@@ -1221,10 +1232,11 @@ fn run_managed_large(fixture: &Fixture) -> Result<RunResult> {
         std::num::NonZeroU64::new(2 * 1024 * 1024).ok_or("invalid managed memory cap")?,
         0,
     )?;
-    let package = source_backed::Package::from_read_at_with_execution_context(
+    let package = source_backed::Package::from_read_at_with_options(
         Arc::new(source.clone()),
-        ReadLimits::default(),
-        ExecutionContext::new(budget, cancellation, execution_limits),
+        litchi_docx::OpenOptions::default()
+            .source_limits(SourceLimits::default())
+            .execution_context(ExecutionContext::new(budget, cancellation, execution_limits)),
     )?;
     source.reset();
     let capture = Instant::now();
@@ -1256,17 +1268,18 @@ fn run_managed_large(fixture: &Fixture) -> Result<RunResult> {
 fn run_noop_detach(fixture: &Fixture) -> Result<RunResult> {
     let package = package_from_fixture(fixture)?;
     let capture = Instant::now();
-    let mut edit = package.edit_svg_attachment(source_backed::PictureSelector::new(0, fixture.owners - 1))?;
+    let selector = PictureSelector::new(0, fixture.owners - 1);
+    let mut edit = package.edit_svg([selector])?;
     let capture_ns = elapsed(capture);
     let stage = Instant::now();
-    let changed = edit.detach_svg()?;
+    let changed = edit.detach_svg(selector)?;
     let stage_ns = elapsed(stage);
     let commit_start = Instant::now();
     let commit = edit.commit()?;
     let commit_ns = elapsed(commit_start);
     let mut output = Vec::new();
     let publish = Instant::now();
-    package.publish_svg_attachment_commit_to_stream(&mut output, &commit)?;
+    commit.package().write_to(&mut output)?;
     let publish_ns = elapsed(publish);
     let reopen = Instant::now();
     let reopened = source_backed::Package::from_reader(Cursor::new(output.as_slice()))?;

@@ -61,25 +61,37 @@ inputs or receipts and are not current consumers:
 | XLSX SVG lifecycle profile and phase profile | `docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/Cargo.toml` | `harness/main.rs`, `harness/phase_main.rs`, `harness/adapter.rs`, `harness/support.rs` |
 | XLSX contextual SVG source profile | `docs/report/spec-gap-validation-evidence/xlsx-svg-source/contextual-performance/harness/Cargo.toml` | `harness/main.rs`, `harness/support.rs` |
 
-The only standalone source migration in this packet is the contextual XLSX
-entrypoint.  Its tracked blob changed from
-`ea01ea53027df4227bd4e3e83a56a7ec9d8c71fd` at the packet parent to
-`ded954197222990dfe22d6af41262f25bb5fa56e` at the packet source.  The change
-passes `Limits::DEFAULT` to SVG reads and writes and passes the contextual
-output ceiling through `svg_blip::Limits`; the other five live harnesses do not
-call the changed shared raw APIs directly.  No historical evidence snapshot
+The live consumers were migrated to current public owners and bounded APIs in
+this packet.  The tracked source blobs changed from the packet base
+`2f7db7ee7fa01893e9099217fc4243687d196f63` to the following final blobs:
+
+| live source | before | after |
+| --- | --- | --- |
+| DOCX `harness/adapter.rs` | `32e9dec343b7d3c6c4a9c80b858ed8c07745658d` | `0a9a610d2359376009456cf247c16f183d2df20b` |
+| PPTX profile `harness/main.rs` | `8b148ee11e7269a588ed7ea69e8e8f4925ab503e` | `5767ac31214619be4d05f60987808780d1e6dd8c` |
+| PPTX evidence `harness/main.rs` | `e91cae72b5e71726612e0b8e7cc5e503f2696020` | `ef3d09e3a655ee75226116b9630cfd9e87aae7e5` |
+| PPTX strict namespace `harness/main.rs` | `57b4832962d173dd2f470487d5fdd7863e2d84e2` | `62333b14331c070ba2e56cf891b63995026e8a2a` |
+| XLSX profile `harness/adapter.rs` | `9c0d8025aefdadf3dd4128d4443f7fccca81e996` | `3a41d1871bdf7bf4d95bebb4250582c1ef4ce7e5` |
+| XLSX contextual `harness/main.rs` | `ea01ea53027df4227bd4e3e83a56a7ec9d8c71fd` | `2d185547da8ccb1500af8a45c8f727b93bad2307` |
+
+The DOCX/PPTX lifecycle consumers now use the public source package and
+`source::svg` edit/commit API.  The XLSX profile now uses the public `Package`
+owner, `Commit` accessors, required `SourceDrawing::scan` ordinal and
+`ScanLimits`, and `SourceLimits` for OPC admission.  Contextual XLSX retains
+its explicit `ScanLimits::default()` policy.  No historical evidence snapshot
 was relabeled or modified.
 
-The lock provenance for the deferred checks is:
+The lock provenance for the six standalone checks is (the before hashes are
+the packet-base files; the after hashes are the committed live files):
 
-| lockfile | SHA-256 |
-| --- | --- |
-| `docs/report/spec-gap-validation-evidence/docx-svg-lifecycle-performance/harness/Cargo.lock` | `bfa9b0faba56b190fac75e2266af959d983d17b0be40fa084833650d90e4cd6e` |
-| `docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle-performance/harness/Cargo.lock` | `b34d66bff058fbcebab8bd0c83dcadef341b016a400b5b5e952c33ed73a84df9` |
-| `docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/harness/Cargo.lock` | `0114fbff7f809e9842bb7037dd4899f0f7330408a476ee3ef6d7021e501edc99` |
-| `docs/report/spec-gap-validation-evidence/svg-strict-namespace/harness/Cargo.lock` | `654cd55bba9b3b7bfedda7334be9a460116150656bd31bdc1f9f5b4d45fa5b4d` |
-| `docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/Cargo.lock` | `12d4c700806b2b29e08ff3162e1aa9c44f49c14ae312467c0bdbc6c338caafe2` |
-| `docs/report/spec-gap-validation-evidence/xlsx-svg-source/contextual-performance/harness/Cargo.lock` | `986babc16c47d8df547a914cf3b23a77807dd583425ef1463b0cc8a4983247ae` |
+| lockfile | before SHA-256 | after SHA-256 |
+| --- | --- | --- |
+| `docs/report/spec-gap-validation-evidence/docx-svg-lifecycle-performance/harness/Cargo.lock` | `bfa9b0faba56b190fac75e2266af959d983d17b0be40fa084833650d90e4cd6e` | `8f9ab51778fa4a33da1e07e17ee95fcfbdefaf5e2bf8bb1513585750c8ded203` |
+| `docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle-performance/harness/Cargo.lock` | `b34d66bff058fbcebab8bd0c83dcadef341b016a400b5b5e952c33ed73a84df9` | `9cac33cbf5d670a90bc8a7dafe040442bb949f75bd7d540d23b696c43ddbfa20` |
+| `docs/report/spec-gap-validation-evidence/pptx-svg-lifecycle/harness/Cargo.lock` | `0114fbff7f809e9842bb7037dd4899f0f7330408a476ee3ef6d7021e501edc99` | `b19237d3a5a4a8b23ab013ef063ba75a1e6e84744551730e6ed73bf6a09342e6` |
+| `docs/report/spec-gap-validation-evidence/svg-strict-namespace/harness/Cargo.lock` | `654cd55bba9b3b7bfedda7334be9a460116150656bd31bdc1f9f5b4d45fa5b4d` | `2ce6148f4398af27ace1ea9b3f96e26ca456695fdc593b48a86593b1c74a1ea2` |
+| `docs/report/spec-gap-validation-evidence/xlsx-svg-lifecycle-performance/harness/Cargo.lock` | `12d4c700806b2b29e08ff3162e1aa9c44f49c14ae312467c0bdbc6c338caafe2` | `9823c4819c2294331a002ff9cb8bb8aa55bcd9c45ab4e07a64926f8b8f7943cf` |
+| `docs/report/spec-gap-validation-evidence/xlsx-svg-source/contextual-performance/harness/Cargo.lock` | `986babc16c47d8df547a914cf3b23a77807dd583425ef1463b0cc8a4983247ae` | `2bf23f28af0559c82b1a61aecb16f8ac15af02c7a7e18db1a292cfca75331a1b` |
 
 For the host configuration, the repository `Cargo.lock` is
 `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`,
@@ -88,17 +100,28 @@ For the host configuration, the repository `Cargo.lock` is
 `.cargo/config.toml` is
 `50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d`.
 
-No standalone Cargo compile has been performed on the packet source.  Once a
-validation slot is granted, run the six manifests sequentially with the
-capped shim, `LITCHI_MEM_MAX=20G`, `CARGO_BUILD_JOBS=1`,
-`CARGO_NET_OFFLINE=true`, `--locked --offline --all-targets`, and a fresh
-external target directory per manifest.  This is a compile-closure check only;
-it must not overwrite historical results or run a profile measurement.  Until
-that slot is granted, the standalone closure remains pending and the four host
-checks above are the only executed Cargo checks in this record.
+The first `--locked --offline --all-targets` attempt for each harness was
+retained externally.  Contextual XLSX, DOCX, PPTX profile, PPTX evidence, SVG
+strict namespace, and XLSX profile respectively required the reviewed local
+package dependency-list edges shown by their lock diffs; no registry package
+`source` or `checksum` changed.  After each lock repair, the same command was
+rerun with `--locked` and passed.  The final six terminal results were:
 
-The external generated target was cleaned after validation; no generated
-target files are part of the commit.
+- DOCX SVG lifecycle: passed (`docx-lifecycle-locked-final3.log`).
+- PPTX SVG lifecycle profile: passed (`pptx-lifecycle-profile-locked-final3.log`).
+- PPTX SVG lifecycle evidence: passed (`pptx-lifecycle-locked-final3.log`).
+- PPTX strict SVG namespace: passed (`svg-strict-locked-final3.log`).
+- XLSX SVG lifecycle profile/phase profile: passed (`xlsx-lifecycle-locked-final3.log`).
+- XLSX contextual SVG source: passed (`xlsx-contextual-locked-final3.log`).
+
+All six used one owned external Cargo target at
+`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-text-media-raw/standalone-target`,
+the capped shim, `LITCHI_MEM_MAX=20G`, `CARGO_BUILD_JOBS=1`,
+`CARGO_NET_OFFLINE=true`, `CARGO_TARGET_DIR` set to that path,
+`--locked --offline --all-targets`, and no profile execution.  Its final size
+was 395074325 bytes (377M `du`), below 20 GiB; no target
+files, generated artifacts, binaries, or historical evidence are part of the
+commit.
 
 The final review then found a valid collision case where a retained foreign
 `m3d:` or `r:` declaration prevented the canonical spelling from being

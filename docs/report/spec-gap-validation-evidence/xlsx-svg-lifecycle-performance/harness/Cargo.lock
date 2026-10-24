@@ -278,6 +278,7 @@ version = "1.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e634e2e0ebac1ee034020da1ca582e17ffe4e0f5e985823721e168928136dcb"
 dependencies = [
+ "crc32fast",
  "zlib-rs",
 ]
 
@@ -509,6 +510,7 @@ dependencies = [
  "base64",
  "chrono",
  "fast-float2",
+ "libc",
  "once_cell",
  "rand",
  "serde",
@@ -615,6 +617,7 @@ dependencies = [
  "quick-xml",
  "ryu",
  "serde_json",
+ "sha2 0.11.0",
  "smallvec",
  "thiserror",
  "unicode-normalization",

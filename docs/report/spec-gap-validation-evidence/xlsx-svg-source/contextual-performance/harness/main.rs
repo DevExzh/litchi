@@ -21,7 +21,7 @@ use std::hint::black_box;
 use std::time::Instant;
 
 use litchi_drawingml::svg_blip::{self, Limits, MAX_XML_BYTES, NamespaceContext, Reference};
-use litchi_xlsx::drawing::{SourceDrawing, SvgOwnerState};
+use litchi_xlsx::drawing::{ScanLimits, SourceDrawing, SvgOwnerState};
 
 use support::{AllocDelta, AllocSnapshot};
 
@@ -354,7 +354,7 @@ fn original_source() -> Vec<u8> {
 }
 
 fn execute(spec: LaneSpec, fixture: &Fixture) -> Result<Execution> {
-    let drawing = SourceDrawing::scan(&fixture.source)?;
+    let drawing = SourceDrawing::scan(&fixture.source, 0, ScanLimits::default())?;
     let observation = observe(&drawing, fixture)?;
     let common = Execution {
         actual_success: spec.expected_success(),
