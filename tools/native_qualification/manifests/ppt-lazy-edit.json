@@ -54,9 +54,19 @@
     "registration": {
       "path": "tools/perf-baseline/src/lib.rs",
       "line": "pub mod ppt_lazy_native;"
+    },
+    "fixture": {
+      "path": "test-data/unified-ops/ppt-lazy-native-fixture.ppt",
+      "bytes": 14848,
+      "sha256": "02fa44ca76903943e80a3a2da1f9dbd326c7a4a047540c3aa9cf211e34ef617c"
     }
   },
   "build": {
+    "preparation": {
+      "path": "PARAMETERIZED_EXTERNAL_PREPARATION_RECEIPT",
+      "bytes": null,
+      "sha256": null
+    },
     "receipt": {
       "path": "PARAMETERIZED_EXTERNAL_BUILD_RECEIPT",
       "bytes": null,

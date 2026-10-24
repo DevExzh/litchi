@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""Source-only tests for the PPT lazy-native baseline preparation."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+import subprocess
+import tempfile
+import unittest
+
+from tools.native_qualification import prepare_ppt_lazy_native_inputs as prep
+
+
+def git(root: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(root), *args],
+        check=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def repository(root: Path, *, baseline: bool, fixture: bytes | None = None) -> str:
+    root.mkdir(parents=True)
+    git(root, "init", "-q", "--initial-branch=main")
+    git(root, "config", "user.email", "ppt-prep@example.invalid")
+    git(root, "config", "user.name", "PPT preparation test")
+    (root / "tools" / "perf-baseline" / "src" / "bin").mkdir(parents=True)
+    (root / "tools" / "perf-baseline" / "Cargo.lock").write_bytes(
+        b"baseline lock\n" if baseline else b"candidate lock\n"
+    )
+    lib = "pub mod pptx_retention;\n"
+    if not baseline:
+        lib += f"{prep.REGISTRATION_LINE}\n"
+    (root / "tools" / "perf-baseline" / "src" / "lib.rs").write_text(lib, encoding="utf-8")
+    if not baseline:
+        for relative in prep.PROBE_PATHS:
+            (root / relative).write_text(f"{relative}\n", encoding="utf-8")
+    if fixture is not None:
+        destination = root / prep.FIXTURE_PATH
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(fixture)
+    git(root, "add", ".")
+    git(root, "commit", "-qm", "fixture")
+    return git(root, "rev-parse", "HEAD")
+
+
+class PptPreparationTests(unittest.TestCase):
+    def test_materializes_and_binds_the_reviewed_fixture(self) -> None:
+        fixture = b"reviewed fixture\n"
+        with tempfile.TemporaryDirectory(prefix="ppt-prep-") as directory:
+            root = Path(directory)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            baseline_ref = repository(baseline, baseline=True)
+            candidate_ref = repository(candidate, baseline=False, fixture=fixture)
+            baseline_tree = git(baseline, "rev-parse", "HEAD^{tree}")
+            old_values = (
+                prep.BASELINE_REF,
+                prep.BASELINE_TREE,
+                prep.BASELINE_LOCK_BYTES,
+                prep.BASELINE_LOCK_SHA256,
+                prep.FIXTURE_BYTES,
+                prep.FIXTURE_SHA256,
+            )
+            prep.BASELINE_REF = baseline_ref
+            prep.BASELINE_TREE = baseline_tree
+            prep.BASELINE_LOCK_BYTES = len(b"baseline lock\n")
+            prep.BASELINE_LOCK_SHA256 = hashlib.sha256(b"baseline lock\n").hexdigest()
+            prep.FIXTURE_BYTES = len(fixture)
+            prep.FIXTURE_SHA256 = hashlib.sha256(fixture).hexdigest()
+            output = root / "preparation.json"
+            try:
+                receipt = prep.prepare(
+                    baseline_root=baseline,
+                    candidate_root=candidate,
+                    candidate_ref=candidate_ref,
+                    candidate_lock_sha256=hashlib.sha256(b"candidate lock\n").hexdigest(),
+                    output=output,
+                )
+            finally:
+                (
+                    prep.BASELINE_REF,
+                    prep.BASELINE_TREE,
+                    prep.BASELINE_LOCK_BYTES,
+                    prep.BASELINE_LOCK_SHA256,
+                    prep.FIXTURE_BYTES,
+                    prep.FIXTURE_SHA256,
+                ) = old_values
+            materialized = baseline / prep.FIXTURE_PATH
+            self.assertEqual(materialized.read_bytes(), fixture)
+            self.assertEqual(receipt["baseline"]["fixture"]["destination"]["bytes"], len(fixture))
+            self.assertEqual(
+                receipt["baseline"]["fixture"]["destination"]["sha256"],
+                hashlib.sha256(fixture).hexdigest(),
+            )
+            self.assertEqual(receipt["baseline"]["tree"], baseline_tree)
+            self.assertEqual(
+                json.loads(output.read_text(encoding="utf-8"))["claim_scope"],
+                "source preparation identity only; no build, correctness, timing, or acceptance claim",
+            )
+            self.assertEqual(
+                sorted(prep._status_paths(receipt["baseline"]["after_overlay"]["status"])),
+                sorted([str(path) for path in prep.PROBE_PATHS] + [str(prep.REGISTRATION_PATH), str(prep.FIXTURE_PATH)]),
+            )
+
+    def test_rejects_a_changed_reviewed_fixture(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="ppt-prep-fixture-guard-") as directory:
+            root = Path(directory)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            baseline_ref = repository(baseline, baseline=True)
+            candidate_ref = repository(candidate, baseline=False, fixture=b"fixture\n")
+            baseline_tree = git(baseline, "rev-parse", "HEAD^{tree}")
+            old_values = (
+                prep.BASELINE_REF,
+                prep.BASELINE_TREE,
+                prep.BASELINE_LOCK_BYTES,
+                prep.BASELINE_LOCK_SHA256,
+                prep.FIXTURE_BYTES,
+                prep.FIXTURE_SHA256,
+            )
+            prep.BASELINE_REF = baseline_ref
+            prep.BASELINE_TREE = baseline_tree
+            prep.BASELINE_LOCK_BYTES = len(b"baseline lock\n")
+            prep.BASELINE_LOCK_SHA256 = hashlib.sha256(b"baseline lock\n").hexdigest()
+            prep.FIXTURE_BYTES = 8
+            prep.FIXTURE_SHA256 = hashlib.sha256(b"wrong\n").hexdigest()
+            try:
+                with self.assertRaisesRegex(prep.PreparationError, "reviewed fixture"):
+                    prep.prepare(
+                        baseline_root=baseline,
+                        candidate_root=candidate,
+                        candidate_ref=candidate_ref,
+                        candidate_lock_sha256=hashlib.sha256(b"candidate lock\n").hexdigest(),
+                        output=root / "missing.json",
+                    )
+            finally:
+                (
+                    prep.BASELINE_REF,
+                    prep.BASELINE_TREE,
+                    prep.BASELINE_LOCK_BYTES,
+                    prep.BASELINE_LOCK_SHA256,
+                    prep.FIXTURE_BYTES,
+                    prep.FIXTURE_SHA256,
+                ) = old_values
+
+
+if __name__ == "__main__":
+    unittest.main()
