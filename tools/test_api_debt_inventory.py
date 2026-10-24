@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import unittest
 
 from tools import api_debt_inventory as inventory
@@ -138,7 +139,113 @@ def duplicate_edit_fixture() -> dict:
     return {"root": 0, "includes_private": False, "index": index, "paths": paths}
 
 
+def commit_shape_fixture(crate: str, modules: tuple[str, ...], methods: tuple[str, ...]) -> dict:
+    """Build one small commit family without borrowing a format graph."""
+    index = {}
+    paths = {}
+
+    def add(item_id, name, path, kind, inner, *, visibility="public", span=False):
+        key = str(item_id)
+        index[key] = {
+            "name": name, "crate_id": 0, "visibility": visibility,
+            "inner": {kind: inner},
+        }
+        if span:
+            index[key]["span"] = {}
+        paths[key] = {"path": list(path), "kind": kind, "crate_id": 0}
+
+    add(0, crate, (crate,), "module", {"items": [], "is_crate": True})
+    parent_id = 0
+    parent_path = (crate,)
+    next_id = 1
+    for module in modules:
+        module_id = next_id
+        next_id += 1
+        module_path = parent_path + (module,)
+        add(module_id, module, module_path, "module", {"items": [], "is_crate": False})
+        index[str(parent_id)]["inner"]["module"]["items"].append(module_id)
+        parent_id = module_id
+        parent_path = module_path
+
+    commit_id = next_id
+    impl_id = commit_id + 1
+    function_ids = list(range(impl_id + 1, impl_id + 1 + len(methods)))
+    commit_path = parent_path + ("Commit",)
+    add(commit_id, "Commit", commit_path, "struct", {"fields": [], "impls": [impl_id]})
+    index[str(parent_id)]["inner"]["module"]["items"].append(commit_id)
+    add(impl_id, "Commit", commit_path, "impl", {"items": function_ids}, span=True)
+    for function_id, method in zip(function_ids, methods):
+        add(function_id, method, commit_path + (method,), "function", {
+            "sig": {"inputs": [], "output": {"primitive": "unit"}},
+            "generics": {"params": []},
+        })
+    return {"root": 0, "includes_private": False, "index": index, "paths": paths}
+
+
 class InventoryOwnerCoverageTests(unittest.TestCase):
+    def test_nominal_coverage_requires_the_local_definition_identity(self):
+        methods = ("package", "into_package", "patch", "diagnostics", "into_parts")
+        path = ("fixture", "foreign", "Commit")
+        valid = commit_shape_fixture("fixture", ("foreign",), methods)
+        self.assertIn(path, inventory.auditable_commit_nominals(valid, "fixture"))
+
+        foreign_index_only = copy.deepcopy(valid)
+        foreign_index_only["index"]["2"]["crate_id"] = 99
+        self.assertNotIn(
+            path, inventory.auditable_commit_nominals(foreign_index_only, "fixture")
+        )
+
+        foreign_index_item = copy.deepcopy(valid)
+        foreign_index_item["index"]["2"]["crate_id"] = 99
+        foreign_index_item["paths"]["2"]["crate_id"] = 99
+        self.assertNotIn(
+            path, inventory.auditable_commit_nominals(foreign_index_item, "fixture")
+        )
+
+        reexport = copy.deepcopy(valid)
+        reexport["index"]["2"] = {
+            "name": "Commit", "crate_id": 0, "visibility": "public",
+            "inner": {"type_alias": {"type": {
+                "resolved_path": {"id": "foreign-target", "args": None},
+            }, "generics": {"params": [], "where_predicates": []}}},
+        }
+        reexport["paths"]["2"]["kind"] = "type_alias"
+        reexport["paths"]["foreign-target"] = {
+            "crate_id": 99, "path": ["fixture", "foreign", "Commit"],
+            "kind": "struct",
+        }
+        self.assertNotIn(
+            path, inventory.auditable_commit_nominals(reexport, "fixture")
+        )
+
+    def test_file_accessors_are_scoped_to_the_unified_facade(self):
+        methods = ("file", "into_file", "patch", "diagnostics", "into_parts")
+        format_document = commit_shape_fixture("fixture", ("format",), methods)
+        findings = list(inventory.rows(
+            format_document, "fixture", result_rules=[], immutable_owners=set(),
+            delegated_globs=set(),
+        ))
+        commit_rows = [row for row in findings if row[0] == "commit_type"]
+        self.assertEqual(len(commit_rows), 1, findings)
+        self.assertIn("add into_package,package", commit_rows[0][3])
+        self.assertFalse(
+            inventory.gate.ReturnTypes(inventory.Inventory(format_document, "fixture")).is_commit(
+                ("fixture", "format", "Commit")
+            )
+        )
+
+        facade_document = commit_shape_fixture("litchi_ops", ("transaction",), methods)
+        facade_findings = list(inventory.rows(
+            facade_document, "litchi_ops", result_rules=[], immutable_owners=set(),
+            delegated_globs=set(),
+        ))
+        self.assertNotIn("commit_type", {row[0] for row in facade_findings}, facade_findings)
+        self.assertTrue(
+            inventory.gate.ReturnTypes(inventory.Inventory(facade_document, "litchi_ops")).is_commit(
+                ("litchi_ops", "transaction", "Commit")
+            )
+        )
+
     def test_policy_owner_name_outside_heuristic_covers_alias_once(self):
         document = owner_fixture()
         surface = inventory.Inventory(document, "fixture")

@@ -42,6 +42,8 @@ OWNERS = {"Package", "Workbook", "Document", "Presentation", "Drawing", "Chart",
           "FlatPresentation", "FlatDocument", "FlatSpreadsheet", "MutableDocument", "File"}
 CORE_COMMIT = ("litchi_core", "edit", "Commit")
 CORE_COMMIT_METHODS = frozenset({"package", "into_package", "patch", "diagnostics", "into_parts"})
+FACADE_COMMIT_PATHS = gate.FACADE_COMMIT_PATHS
+FACADE_COMMIT_METHODS = frozenset({"file", "into_file", "patch", "diagnostics", "into_parts"})
 DRAFT_NAMES = {"Reader", "Workbook", "Spreadsheet", "Presentation", "Document"}
 OUTPUT_PREFIXES = ("save", "to_", "write_to")
 SIGNATURE = {"sign", "sign_with", "resign", "resign_with", "unsign"}
@@ -178,6 +180,34 @@ class Inventory(gate.Surface):
         return super().walk(item_id, path, ancestors, exported=exported)
 
 
+def auditable_commit_nominals(document, crate: str, delegated_globs=frozenset()):
+    """Return canonical Commit paths whose defining graph audits the triad."""
+    surface = Inventory(document, crate, delegated_globs)
+    methods: dict[tuple[str, ...], set[str]] = {}
+    for path in surface.items.values():
+        if len(path) > 1:
+            methods.setdefault(path[:-1], set()).add(path[-1])
+    covered = set()
+    for path, kind in surface.exports.items():
+        item_id = surface.item_ids.get(path)
+        item = surface.index.get(str(item_id)) if item_id is not None else None
+        definition = surface.paths.get(str(item_id))
+        identity = (surface._nominal_identity(item_id)
+                    if item_id is not None else None)
+        if (kind not in gate.TYPE_KINDS or not path or path[0] != crate
+                or not isinstance(item, dict)
+                or item.get("crate_id") != surface.crate_id
+                or not isinstance(definition, dict)
+                or definition.get("crate_id") != surface.crate_id
+                or identity is None or identity[0] != surface.crate_id):
+            continue
+        required = (FACADE_COMMIT_METHODS if path in FACADE_COMMIT_PATHS
+                    else CORE_COMMIT_METHODS)
+        if path[-1] in {"Commit", "BatchCommit"} and required <= methods.get(path, set()):
+            covered.add(path)
+    return frozenset(covered)
+
+
 def target_family(method: str) -> str:
     """The Edit family a package mutator moves to (a naming heuristic)."""
     if method.startswith(OUTPUT_PREFIXES):
@@ -204,7 +234,15 @@ def target_family(method: str) -> str:
 
 
 def _rows(document, crate: str, result_rules=None, immutable_owners=None,
-          delegated_globs=None):
+          delegated_globs=None, available_crates=None, covered_nominals=None):
+    # A single-graph caller still represents an inventory with only its own
+    # defining crate. Foreign Commit aliases therefore fail closed unless the
+    # caller supplies an exact canonical coverage manifest. The core Commit is
+    # handled as the explicit shared-contract exemption below.
+    if available_crates is None:
+        available_crates = frozenset({crate})
+    if covered_nominals is None:
+        covered_nominals = frozenset()
     profiles = None
     if result_rules is None or immutable_owners is None or delegated_globs is None:
         profiles = gate.checked_policy(gate.read_json(gate.POLICY))
@@ -297,13 +335,33 @@ def _rows(document, crate: str, result_rules=None, immutable_owners=None,
                 # its accessors in litchi-core, whose unit tests check them.
                 members = members | CORE_COMMIT_METHODS
             if name.endswith("Commit"):
-                missing = [m for m in ("package", "into_package", "patch", "diagnostics", "into_parts")
-                           if m not in members]
+                # A foreign nominal type is audited in its defining crate. In
+                # particular, ODF metadata::Commit is a local generic alias of
+                # litchi_odf_common::metadata::Commit; inspecting the alias as
+                # if it owned methods produces nine false debt rows.
+                foreign = surface.foreign.get(path)
+                if foreign is not None and foreign != CORE_COMMIT:
+                    defining_crate = foreign[0]
+                    covered = (covered_nominals is not None
+                               and foreign in covered_nominals)
+                    if (available_crates is not None
+                            and (defining_crate not in available_crates or not covered)):
+                        yield (
+                            "commit_type", text,
+                            f"foreign Commit from {'::'.join(foreign)}; defining crate "
+                            "rustdoc target is not auditable in this inventory",
+                            f"include {defining_crate} rustdoc with the exact Commit triad",
+                        )
+                    continue
+                required = (FACADE_COMMIT_METHODS if path in FACADE_COMMIT_PATHS
+                            else CORE_COMMIT_METHODS)
+                missing = [m for m in sorted(required) if m not in members]
                 extra = [m for m in ("snapshot", "into_snapshot", "workbook", "into_workbook")
                          if m in members]
                 if missing or extra:
-                    detail = ",".join(sorted(members & {"package", "into_package", "patch",
-                                                        "diagnostics", "into_parts", *extra}))
+                    detail = ",".join(sorted(members & {"package", "into_package", "file",
+                                                        "into_file", "patch", "diagnostics",
+                                                        "into_parts", *extra}))
                     target = "; ".join(filter(None, (
                         "add " + ",".join(missing) if missing else "",
                         "delete " + ",".join(extra) if extra else "")))
@@ -323,7 +381,7 @@ def _rows(document, crate: str, result_rules=None, immutable_owners=None,
 
 
 def rows(document, crate: str, result_rules=None, immutable_owners=None,
-         delegated_globs=None):
+         delegated_globs=None, available_crates=None, covered_nominals=None):
     """Yield unique debt rows while preserving distinct public paths.
 
     Rustdoc can expose the same nominal item through both a public spelling
@@ -333,7 +391,7 @@ def rows(document, crate: str, result_rules=None, immutable_owners=None,
     """
     seen = set()
     for row in _rows(document, crate, result_rules, immutable_owners,
-                     delegated_globs):
+                     delegated_globs, available_crates, covered_nominals):
         if row not in seen:
             seen.add(row)
             yield row
@@ -352,10 +410,21 @@ def main(argv=None) -> int:
         # each full graph; the second pass remains sequential so the
         # inventory does not retain all 1+ GiB of all-features JSON.
         crates = []
+        seen_crates = set()
+        covered_nominals = set()
         for path in args.json:
             document = gate.read_json(path)
             root = str(document["root"])
-            crates.append(document["index"][root]["name"])
+            crate = document["index"][root]["name"]
+            if crate in seen_crates:
+                raise InventoryError(f"duplicate crate rustdoc input: {crate}")
+            seen_crates.add(crate)
+            crates.append(crate)
+            covered_nominals.update(
+                auditable_commit_nominals(
+                    document, crate, policy_delegated_globs(crate, profiles)
+                )
+            )
         del document
         missing = missing_delegated_inputs(crates, profiles)
         if missing:
@@ -372,7 +441,10 @@ def main(argv=None) -> int:
             # Captures may be renamed by profile or source revision. The crate
             # identity belongs to the rustdoc graph, not the artifact filename.
             crate = document["index"][str(document["root"])]["name"]
-            for row in rows(document, crate):
+            for row in rows(
+                    document, crate,
+                    available_crates=frozenset(crates),
+                    covered_nominals=frozenset(covered_nominals)):
                 print(crate.replace("_", "-"), *row, sep="\t")
     except InventoryError as error:
         print(f"inventory error: {error}", file=sys.stderr)

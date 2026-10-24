@@ -12,6 +12,21 @@ from typing import Any
 
 NOMINAL_KINDS = frozenset({"struct", "enum", "union", "type_alias"})
 
+# The unified facade has a deliberately different owner accessor from the
+# format packages.  Keep this set explicit: a format-owned Commit that happens
+# to grow ``file``/``into_file`` must not silently satisfy the facade contract.
+FACADE_COMMIT_PATHS = frozenset({
+    ("litchi_ops", "BatchCommit"),
+    ("litchi_ops", "batch", "BatchCommit"),
+    ("litchi_ops", "transaction", "Commit"),
+})
+
+# ODF metadata Commit is a generic type defined by the common crate and
+# re-exported through each format crate as a local alias.  Its defining crate
+# is audited separately, so the return resolver must prove this exact nominal
+# identity before extracting the alias's owner argument.
+ODF_METADATA_COMMIT = ("litchi_odf_common", "metadata", "Commit")
+
 
 class ReturnTypes:
     def __init__(self, surface):
@@ -144,10 +159,9 @@ class ReturnTypes:
             return foreign[-1] in {"Commit", "BatchCommit"}
         members = {p[-1] for p, kind in self.surface.exports.items()
                    if kind == "function" and p[:-1] == path}
-        owner_getters = {"package", "into_package"} if path[-1] != "BatchCommit" else {"file", "into_file"}
-        # The File facade uses file/into_file (0351 section 2.5, rule 7).
-        if {"file", "into_file"} <= members:
-            owner_getters = {"file", "into_file"}
+        owner_getters = ({"file", "into_file"}
+                         if path in FACADE_COMMIT_PATHS
+                         else {"package", "into_package"})
         return owner_getters | {"patch", "diagnostics", "into_parts"} <= members
 
     def commit_package(self, path: tuple[str, ...], args=()):
@@ -157,12 +171,23 @@ class ReturnTypes:
             return None
         if self.surface.paths.get(target[1], {}).get("path") == ["litchi_core", "edit", "Commit"]:
             return target[2][0] if len(target[2]) in (2, 3) else None
+        target_path = tuple(self.surface.paths.get(target[1], {}).get("path", ()))
+        if target_path == ODF_METADATA_COMMIT:
+            # The path spelling is only the first filter.  Canonical identity
+            # rejects an unrelated crate using the same name and rejects an
+            # ambiguous rustdoc graph with duplicate external identities.
+            expected = self.nominal_identity(ODF_METADATA_COMMIT, canonical=True)
+            actual = self._resolve_nominal_identity(target[1])
+            if (expected is not None and actual == expected
+                    and len(target[2]) == 1):
+                return target[2][0]
         item = self.surface.index.get(target[1], {})
         definition = next(iter(item.get("inner", {}).values()), {})
         params = [p for p in definition.get("generics", {}).get("params", [])
                   if "type" in p["kind"]]
         bindings = {p["name"]: value for p, value in zip(params, target[2])}
-        for getter in ("into_package", "into_file"):
+        getters = ("into_file",) if path in FACADE_COMMIT_PATHS else ("into_package",)
+        for getter in getters:
             item_id = self.surface.item_ids.get(path + (getter,))
             function = self.surface.index.get(item_id, {}).get("inner", {}).get("function")
             if function is not None:

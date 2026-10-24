@@ -35,9 +35,9 @@ from pathlib import Path
 from typing import Any
 
 try:
-    from .rustdoc_return_types import ReturnTypes
+    from .rustdoc_return_types import FACADE_COMMIT_PATHS, ReturnTypes
 except ImportError:  # Direct command-line execution.
-    from rustdoc_return_types import ReturnTypes
+    from rustdoc_return_types import FACADE_COMMIT_PATHS, ReturnTypes
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY = ROOT / "tools/api_glossary.json"
@@ -311,6 +311,13 @@ class Surface:
         self.receivers: dict[tuple[str, ...], str] = {}
         self.foreign: dict[tuple[str, ...], tuple[str, ...]] = {}
         self.references: set[str] = set()
+        # Rust permits a type and a macro to share one spelling. Keep the type
+        # namespace authoritative for glossary/family checks; a derive macro
+        # must not replace an enum merely because rustdoc visits it later.
+        # Two unrelated type exports remain ambiguous and fail closed instead
+        # of being silently accepted.
+        self._type_exports: dict[tuple[str, ...], tuple[str, str]] = {}
+        self._export_conflicts: set[tuple[str, ...]] = set()
         self.walk(root, (crate,), frozenset(), exported=True)
         # Follow nominal types in signatures even if their defining module is
         # private. Do not traverse unrelated items in that private module.
@@ -343,10 +350,13 @@ class Surface:
             if entry["crate_id"] == self.crate_id:
                 raise ValueError(f"missing local rustdoc item {item_id}")
             if exported:
-                self.exports[path] = entry["kind"]
-                self.item_ids.setdefault(path, item_id)
+                self._record_export(path, entry["kind"], item_id)
             self.names.add((path, path[-1]))
-            self.foreign[path] = tuple(entry["path"])
+            if entry["kind"] in TYPE_KINDS:
+                # ``foreign`` describes the defining crate of a nominal type;
+                # a proc-derive macro sharing its spelling is not a foreign
+                # type alias and must not redirect family/commit checks.
+                self.foreign[path] = tuple(entry["path"])
             return
         inner = item.get("inner", {})
         if len(inner) != 1:
@@ -392,8 +402,7 @@ class Surface:
             )
             return
         if exported:
-            self.exports[path] = kind
-            self.item_ids.setdefault(path, item_id)
+            self._record_export(path, kind, item_id)
         self.names.add((path, path[-1]))
         if kind == "function":
             receiver = self_receiver(data)
@@ -437,6 +446,86 @@ class Surface:
             )
             for impl_id in data.get("impls", []):
                 self.walk(str(impl_id), path, ancestors, exported=exported)
+
+    def _type_alias_target(self, item_id: str) -> str | None:
+        item = self.index.get(str(item_id))
+        inner = item.get("inner", {}) if isinstance(item, dict) else {}
+        alias = inner.get("type_alias") if isinstance(inner, dict) else None
+        resolved = alias.get("type", {}).get("resolved_path", {}) if isinstance(alias, dict) else {}
+        target = resolved.get("id") if isinstance(resolved, dict) else None
+        return str(target) if target is not None else None
+
+    def _nominal_identity(self, item_id: str):
+        """Resolve an alias chain to one guarded rustdoc nominal identity."""
+        visited = set()
+        current = str(item_id)
+        while current not in visited:
+            visited.add(current)
+            item = self.index.get(current)
+            entry = self.paths.get(current)
+            if item is None:
+                if not isinstance(entry, dict) or entry.get("kind") not in TYPE_KINDS:
+                    return None
+                crate_id = entry.get("crate_id")
+                return (crate_id, current) if type(crate_id) is int else None
+            inner = item.get("inner", {})
+            if not isinstance(inner, dict) or len(inner) != 1:
+                return None
+            kind, data = next(iter(inner.items()))
+            if kind == "type_alias":
+                target = self._type_alias_target(current)
+                if target is None:
+                    return None
+                current = target
+                continue
+            if kind not in TYPE_KINDS or not isinstance(entry, dict):
+                return None
+            crate_id = entry.get("crate_id")
+            return (crate_id, current) if type(crate_id) is int else None
+        # A cycle is not a nominal identity and must not make two aliases look
+        # equivalent merely because their spelling or first hop matches.
+        return None
+
+    def _related_type_exports(self, first: str, second: str) -> bool:
+        """Whether two type IDs resolve to the same nominal target."""
+        first, second = str(first), str(second)
+        if first == second:
+            return True
+        first_identity = self._nominal_identity(first)
+        second_identity = self._nominal_identity(second)
+        return (first_identity is not None
+                and first_identity == second_identity)
+
+    def _record_export(self, path: tuple[str, ...], kind: str, item_id: str) -> None:
+        """Record an export while preserving Rust's separate namespaces."""
+        if kind in TYPE_KINDS:
+            previous = self._type_exports.get(path)
+            if previous is not None:
+                _previous_kind, previous_id = previous
+                if not self._related_type_exports(previous_id, item_id):
+                    # Keep names for vocabulary diagnostics, but remove the
+                    # usable export so family and nominal checks fail closed.
+                    self._export_conflicts.add(path)
+                    self.exports.pop(path, None)
+                    self.item_ids.pop(path, None)
+                    return
+                # A local type alias is walked before its nominal target. The
+                # target's concrete kind is useful to callers, while the
+                # alias ID remains the caller-visible identity.
+                if path not in self._export_conflicts:
+                    self.exports[path] = kind
+                return
+            self._type_exports[path] = (kind, str(item_id))
+            if path not in self._export_conflicts:
+                self.exports[path] = kind
+                self.item_ids[path] = str(item_id)
+            return
+        # A value/proc-macro namespace entry can coexist with a type. It is
+        # never allowed to overwrite the type export or its rustdoc identity.
+        if path in self._type_exports or path in self._export_conflicts:
+            return
+        self.exports[path] = kind
+        self.item_ids.setdefault(path, str(item_id))
 
     def children(self, ids, parent, ancestors, *, exported, defaults=False):
         for child_id in ids:

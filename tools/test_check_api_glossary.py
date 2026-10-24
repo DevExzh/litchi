@@ -360,6 +360,152 @@ class RustdocTests(unittest.TestCase):
         return gate.violations(self.document, profile(
             banned_names=[ban(n, scope) for n in names], families=list(families)))
 
+    def _namespace_collision_document(self, *, macro_first=False, conflict=False):
+        document = copy.deepcopy(self.document)
+        root = str(document["root"])
+        module_id = "namespace-collision-module"
+        enum_id = "namespace-collision-enum"
+        macro_id = "namespace-collision-derive"
+        conflict_id = "namespace-collision-conflicting-enum"
+        type_use_id = "namespace-collision-type-use"
+        macro_use_id = "namespace-collision-macro-use"
+        conflict_use_id = "namespace-collision-conflict-use"
+        document["index"][root]["inner"]["module"]["items"].append(module_id)
+        document["index"][module_id] = {
+            "name": "namespace_collision", "crate_id": 0,
+            "visibility": "public",
+            "inner": {"module": {"items": [], "is_crate": False}},
+        }
+        document["index"][enum_id] = {
+            "name": "Error", "crate_id": 0, "visibility": "public",
+            "attrs": ["non_exhaustive"],
+            "inner": {"enum": {"generics": {"params": [], "where_predicates": []},
+                                 "has_stripped_variants": False, "variants": [], "impls": []}},
+        }
+        document["index"][conflict_id] = copy.deepcopy(document["index"][enum_id])
+        document["index"][conflict_id]["id"] = conflict_id
+        document["index"][macro_id] = {
+            "name": "Error", "crate_id": 99, "visibility": "public",
+            "inner": {"proc_macro": {}},
+        }
+        document["index"][type_use_id] = {
+            "name": "Error", "crate_id": 0, "visibility": "public",
+            "inner": {"use": {"name": "Error", "id": enum_id, "is_glob": False}},
+        }
+        document["index"][macro_use_id] = {
+            "name": "Error", "crate_id": 0, "visibility": "public",
+            "inner": {"use": {"name": "Error", "id": macro_id, "is_glob": False}},
+        }
+        document["index"][conflict_use_id] = {
+            "name": "Error", "crate_id": 0, "visibility": "public",
+            "inner": {"use": {"name": "Error", "id": conflict_id, "is_glob": False}},
+        }
+        items = [macro_use_id, type_use_id] if macro_first else [type_use_id, macro_use_id]
+        if conflict:
+            items.append(conflict_use_id)
+        document["index"][module_id]["inner"]["module"]["items"] = items
+        document["paths"].update({
+            module_id: {"crate_id": 0, "path": ["fixture", "namespace_collision"],
+                        "kind": "module"},
+            enum_id: {"crate_id": 0,
+                      "path": ["fixture", "namespace_collision", "Error"], "kind": "enum"},
+            conflict_id: {"crate_id": 0,
+                          "path": ["fixture", "namespace_collision", "Error"], "kind": "enum"},
+            macro_id: {"crate_id": 99,
+                       "path": ["thiserror_impl", "Error"], "kind": "proc_derive"},
+        })
+        return document
+
+    def _alias_chain_document(self, *, reverse=False, unrelated=False):
+        document = copy.deepcopy(self.document)
+        root = str(document["root"])
+        module_id = "alias-chain-module"
+        alias_a = "alias-chain-a"
+        alias_b = "alias-chain-b"
+        alias_c = "alias-chain-c"
+        external_one = "alias-chain-external-one"
+        external_two = "alias-chain-external-two"
+        use_a = "alias-chain-use-a"
+        use_b = "alias-chain-use-b"
+        use_c = "alias-chain-use-c"
+        document["index"][root]["inner"]["module"]["items"].append(module_id)
+        document["index"][module_id] = {
+            "name": "alias_chain", "crate_id": 0, "visibility": "public",
+            "inner": {"module": {"items": [], "is_crate": False}},
+        }
+
+        def local_alias(item_id, name, target_id):
+            document["index"][item_id] = {
+                "name": name, "crate_id": 0, "visibility": "public",
+                "inner": {"type_alias": {"type": {
+                    "resolved_path": {"id": target_id, "args": None},
+                }, "generics": {"params": [], "where_predicates": []}}},
+            }
+
+        local_alias(alias_a, "AliasA", external_one)
+        local_alias(alias_b, "AliasB", alias_a)
+        local_alias(alias_c, "AliasC", external_two)
+        for item_id, name, target_id in (
+            (use_a, "Error", alias_a),
+            (use_b, "Error", alias_b),
+            (use_c, "Error", alias_c),
+        ):
+            document["index"][item_id] = {
+                "name": name, "crate_id": 0, "visibility": "public",
+                "inner": {"use": {"name": name, "id": target_id, "is_glob": False}},
+            }
+        items = [use_b, use_a] if reverse else [use_a, use_b]
+        if unrelated:
+            items.append(use_c)
+        document["index"][module_id]["inner"]["module"]["items"] = items
+        document["paths"].update({
+            module_id: {"crate_id": 0, "path": ["fixture", "alias_chain"],
+                        "kind": "module"},
+            alias_a: {"crate_id": 0, "path": ["fixture", "alias_chain", "AliasA"],
+                      "kind": "type_alias"},
+            alias_b: {"crate_id": 0, "path": ["fixture", "alias_chain", "AliasB"],
+                      "kind": "type_alias"},
+            alias_c: {"crate_id": 0, "path": ["fixture", "alias_chain", "AliasC"],
+                      "kind": "type_alias"},
+            external_one: {"crate_id": 77,
+                           "path": ["external_common", "Error"], "kind": "struct"},
+            external_two: {"crate_id": 78,
+                           "path": ["other_common", "Error"], "kind": "struct"},
+        })
+        return document
+
+    def test_type_namespace_survives_derive_macro_in_both_visit_orders(self):
+        path = ("fixture", "namespace_collision", "Error")
+        for macro_first in (False, True):
+            with self.subTest(macro_first=macro_first):
+                surface = gate.Surface(
+                    self._namespace_collision_document(macro_first=macro_first), "fixture"
+                )
+                self.assertEqual(surface.exports.get(path), "enum")
+                self.assertEqual(surface.item_ids.get(path), "namespace-collision-enum")
+
+        conflict = gate.Surface(
+            self._namespace_collision_document(macro_first=True, conflict=True), "fixture"
+        )
+        self.assertNotIn(path, conflict.item_ids)
+        self.assertNotIn(conflict.exports.get(path), gate.TYPE_KINDS)
+
+    def test_transitive_aliases_share_identity_but_unrelated_targets_conflict(self):
+        path = ("fixture", "alias_chain", "Error")
+        for reverse in (False, True):
+            with self.subTest(reverse=reverse):
+                surface = gate.Surface(
+                    self._alias_chain_document(reverse=reverse), "fixture"
+                )
+                self.assertEqual(surface.exports.get(path), "struct")
+                self.assertIn(surface.item_ids.get(path), {"alias-chain-a", "alias-chain-b"})
+
+        unrelated = gate.Surface(
+            self._alias_chain_document(reverse=True, unrelated=True), "fixture"
+        )
+        self.assertNotIn(path, unrelated.item_ids)
+        self.assertNotIn(unrelated.exports.get(path), gate.TYPE_KINDS)
+
     def test_inventory_catches_exact_and_suffixed_limit_twins(self):
         limits = {path for kind, path, _, _ in inventory.rows(self.document, "fixture")
                   if kind == "with_limits"}
@@ -746,6 +892,101 @@ class RustdocTests(unittest.TestCase):
         ambiguous["paths"]["ambiguous-core-commit"] = copy.deepcopy(canonical)
         self.assertEqual(len(gate.violations(ambiguous, profile(result_methods=[rule]))), 1)
 
+    def test_external_generic_metadata_commit_requires_exact_nominal_identity(self):
+        # ODF format crates expose a local generic alias of the common
+        # metadata Commit.  The common crate's rustdoc item is external and
+        # has no method body in this graph, so owner extraction must use the
+        # proven generic argument rather than a name-based fallback.
+        document = copy.deepcopy(self.document)
+        root = str(document["root"])
+        module_id = "external-metadata-module"
+        odf_id = "external-odf-metadata-commit"
+        unrelated_id = "external-unrelated-metadata-commit"
+        alias_id = "local-odf-metadata-commit"
+        unrelated_alias_id = "local-unrelated-metadata-commit"
+        package_id = gate.Surface(self.document, "fixture").item_ids[("fixture", "strict", "Package")]
+        document["index"][root]["inner"]["module"]["items"].append(module_id)
+        document["index"][module_id] = {
+            "name": "external_metadata", "crate_id": 0,
+            "visibility": "public",
+            "inner": {"module": {"items": [alias_id, unrelated_alias_id], "is_crate": False}},
+        }
+        def alias(item_id, name, target_id, target_path):
+            document["index"][item_id] = {
+                "name": name, "crate_id": 0, "visibility": "public",
+                "inner": {"type_alias": {"type": {"resolved_path": {
+                    "path": "::".join(target_path), "id": target_id,
+                    "args": {"angle_bracketed": {"args": [{"type": {
+                        "resolved_path": {"id": package_id, "args": None},
+                    }}], "constraints": []}},
+                }}, "generics": {"params": [], "where_predicates": []}}},
+            }
+
+        alias(alias_id, "Commit", odf_id,
+              ("litchi_odf_common", "metadata", "Commit"))
+        alias(unrelated_alias_id, "UnrelatedCommit", unrelated_id,
+              ("other_odf_common", "metadata", "Commit"))
+        document["paths"].update({
+            module_id: {"crate_id": 0, "path": ["fixture", "external_metadata"],
+                        "kind": "module"},
+            alias_id: {"crate_id": 0,
+                       "path": ["fixture", "external_metadata", "Commit"],
+                       "kind": "type_alias"},
+            unrelated_alias_id: {"crate_id": 0,
+                                 "path": ["fixture", "external_metadata", "UnrelatedCommit"],
+                                 "kind": "type_alias"},
+            odf_id: {"crate_id": 900, "path": ["litchi_odf_common", "metadata", "Commit"],
+                     "kind": "struct"},
+            unrelated_id: {"crate_id": 901, "path": ["other_odf_common", "metadata", "Commit"],
+                           "kind": "struct"},
+        })
+        surface = gate.Surface(document, "fixture")
+        return_types = gate.ReturnTypes(surface)
+        package = return_types.type_at(("fixture", "strict", "Package"))
+        self.assertEqual(
+            return_types.commit_package(("fixture", "external_metadata", "Commit")),
+            package,
+        )
+        self.assertIsNone(
+            return_types.commit_package(("fixture", "external_metadata", "UnrelatedCommit"))
+        )
+
+        missing_defining_graph = list(inventory.rows(
+            document, "fixture", result_rules=[], immutable_owners=set(),
+            delegated_globs=set(),
+            available_crates={"fixture", "litchi_odf_common", "other_odf_common"},
+            covered_nominals=set(),
+        ))
+        self.assertTrue(
+            any(row[0] == "commit_type"
+                and row[1] == "fixture::external_metadata::Commit"
+                and "litchi_odf_common" in row[2]
+                for row in missing_defining_graph),
+            missing_defining_graph,
+        )
+        supplied_defining_graph = list(inventory.rows(
+            document, "fixture", result_rules=[], immutable_owners=set(),
+            delegated_globs=set(),
+            available_crates={"fixture", "litchi_odf_common", "other_odf_common"},
+            covered_nominals={
+                ("litchi_odf_common", "metadata", "Commit"),
+                ("other_odf_common", "metadata", "Commit"),
+            },
+        ))
+        self.assertNotIn(
+            "fixture::external_metadata::Commit",
+            {row[1] for row in supplied_defining_graph if row[0] == "commit_type"},
+        )
+        capture = self.directory / "foreign-alias-without-defining-graph.json"
+        capture.write_text(json.dumps(document), encoding="utf-8")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(inventory.main([str(capture)]), 0)
+        self.assertIn(
+            "fixture\tcommit_type\tfixture::external_metadata::Commit",
+            output.getvalue(),
+        )
+
     def test_shared_type_rows_use_nominal_ids_for_aliases_and_reexports(self):
         rows = [
             {"path": "fixture::shared_core::Commit", "target": "litchi_core::edit::Commit"},
@@ -859,6 +1100,15 @@ class RustdocTests(unittest.TestCase):
         with contextlib.redirect_stdout(output):
             self.assertEqual(inventory.main([str(capture)]), 0)
         self.assertIn("fixture\treplay_return\tfixture::returns::Package::apply_bad", output.getvalue())
+
+    def test_inventory_cli_rejects_duplicate_crate_roots(self):
+        output = io.StringIO()
+        error = io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(error):
+            self.assertEqual(
+                inventory.main([str(self.json_path), str(self.json_path)]), 2
+            )
+        self.assertIn("duplicate crate rustdoc input: fixture", error.getvalue())
 
     def test_cli_exit_codes_and_unknown_profile(self):
         policy_path = self.directory / "policy.json"
