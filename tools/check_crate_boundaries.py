@@ -15671,6 +15671,13 @@ PAGES_TRANSACTION_FAMILIES: tuple[
 PAGES_TRANSACTION_FAMILY_BY_OWNER = {
     family[0]: family for family in PAGES_TRANSACTION_FAMILIES
 }
+# A family may use a shared litchi-core vocabulary item when it carries no
+# format-specific state.  This is an explicit source contract, not a missing
+# family exemption: the owner must re-export the exact shared item, and the
+# shared definition is checked below for the required API.
+PAGES_TRANSACTION_SHARED_TYPES = {
+    "metadata_edit": frozenset({"Diagnostics"}),
+}
 # Root aliases and ingress types deleted by W1 that have no prefix+short
 # spelling.  ``MetadataEdit*`` and ``SectionParagraphs*`` were never published
 # but are banned with the other prefixed spellings so the families stay
@@ -70479,6 +70486,14 @@ IWA_TABLE_MERGE_TRANSACTION_SPECS = (
         "apply_method": "apply_table_merges",
         "selector_types": frozenset({"SheetSelector", "TableSelector"}),
         "admission_markers": ("select_semantic_positions", "select_table"),
+        # Numbers keeps edit entry O(1): the owned selectors are admitted by
+        # the constructor, while the rooted target is resolved on the first
+        # staged/read operation.  Every operation that can stage or publish
+        # must therefore retain the private loader guard.
+        "deferred_admission": {
+            "helper": "ensure_loaded",
+            "stage_methods": ("regions", "merge", "unmerge", "commit"),
+        },
     },
     {
         "format_name": "Pages",
@@ -70505,7 +70520,17 @@ IWA_TABLE_MERGE_TRANSACTION_SPECS = (
             "resolve_body_table_with_budget",
             "select_body_table",
             "resolve_body_table",
+            # The lazy Edit resolver delegates through the owned typed
+            # selector; this is the target-resolution marker in that helper.
+            "resolve_with_budget",
         ),
+        # Pages also defers rooted selection until the first operation.  The
+        # private resolver performs the typed target lookup and readback; all
+        # staging/publication methods must call it before touching state.
+        "deferred_admission": {
+            "helper": "resolve",
+            "stage_methods": ("regions", "merge", "unmerge", "commit"),
+        },
     },
     {
         "format_name": "Keynote",
@@ -72263,6 +72288,152 @@ def _rust_public_method_bodies(
     return evidence
 
 
+def _rust_method_bodies(
+    source: str, method_name: str, *, type_name: str | None = None
+) -> list[tuple[str, str, int]]:
+    """Return declarations and bodies for public or private inherent methods.
+
+    The table-merge boundary has a deliberate lazy-entry path: its private
+    resolver is called by each staging/publication method rather than by the
+    package constructor.  This narrow sibling of
+    :func:`_rust_public_method_bodies` lets the audit inspect that resolver
+    without treating a marker in an unrelated helper as admission evidence.
+    """
+
+    masked_source = _mask_rust_cfg_test_items(source)
+    code = _mask_rust_non_code(masked_source)
+    impl_ranges: list[tuple[int, int]] = []
+    if type_name is not None:
+        for implementation in RUST_IMPL_DECLARATION.finditer(code):
+            if code.count("{", 0, implementation.start()) != code.count(
+                "}", 0, implementation.start()
+            ):
+                continue
+            parentheses = 0
+            brackets = 0
+            opening = -1
+            cursor = implementation.end()
+            while cursor < len(code):
+                character = code[cursor]
+                if character == "(":
+                    parentheses += 1
+                elif character == ")" and parentheses:
+                    parentheses -= 1
+                elif character == "[":
+                    brackets += 1
+                elif character == "]" and brackets:
+                    brackets -= 1
+                elif character == "{" and not parentheses and not brackets:
+                    opening = cursor
+                    break
+                cursor += 1
+            if opening < 0:
+                continue
+            header = re.sub(r"\s+", " ", code[implementation.start() : opening]).strip()
+            if re.match(
+                rf"^impl(?:\s*<[^>{{}}]*>)?\s+{re.escape(type_name)}"
+                rf"(?:\s*<[^>{{}}]*>)?(?:\s+where .*)?$",
+                header,
+            ) is None:
+                continue
+            end = _rust_balanced_delimited_end(code, opening)
+            if end is not None:
+                impl_ranges.append((opening + 1, end - 1))
+
+    method_pattern = re.compile(
+        r"(?m)^[ \t]*(?:(?:pub(?:\([^()\r\n]*\))?)[ \t]+)?"
+        r"(?:(?:unsafe|async|const)[ \t]+)*fn[ \t\r\n]+"
+        rf"(?:r#)?{re.escape(method_name)}\b"
+    )
+    evidence: list[tuple[str, str, int]] = []
+    for match in method_pattern.finditer(code):
+        if type_name is not None and not any(
+            start <= match.start() < end for start, end in impl_ranges
+        ):
+            continue
+        cursor = match.end()
+        parentheses = 0
+        brackets = 0
+        while cursor < len(code):
+            character = code[cursor]
+            if character == "(":
+                parentheses += 1
+            elif character == ")" and parentheses:
+                parentheses -= 1
+            elif character == "[":
+                brackets += 1
+            elif character == "]" and brackets:
+                brackets -= 1
+            elif not parentheses and not brackets and character in "{;":
+                break
+            cursor += 1
+        if cursor >= len(code) or code[cursor] != "{":
+            continue
+        end = _rust_balanced_delimited_end(code, cursor)
+        if end is None:
+            continue
+        evidence.append(
+            (code[match.start() : cursor], code[match.start() : end],
+             code.count("\n", 0, match.start()) + 1)
+        )
+    return evidence
+
+
+def _table_merge_deferred_admission_is_checked(
+    transaction_source: str, spec: dict
+) -> bool:
+    """Check a lazy edit's private resolver and every guarded entry point."""
+
+    deferred = spec.get("deferred_admission")
+    if deferred is None:
+        return False
+    helper = deferred["helper"]
+    edit_type = spec.get("type_names", {}).get(
+        "Edit", f"{spec.get('prefix', '')}Edit"
+    )
+    helper_methods = _rust_method_bodies(
+        transaction_source, helper, type_name=edit_type
+    )
+    if not helper_methods:
+        return False
+    helper_has_selector = any(
+        _table_merge_transaction_has_marker(
+            _mask_rust_non_code(body), spec["admission_markers"]
+        )
+        for _declaration, body, _line in helper_methods
+    )
+    if not helper_has_selector:
+        return False
+    call = re.compile(
+        rf"\bself\s*\.\s*{re.escape(helper)}\s*\(\s*\)\s*\?\s*;"
+    )
+    for method_name in deferred["stage_methods"]:
+        methods = _rust_method_bodies(
+            transaction_source, method_name, type_name=edit_type
+        )
+        checked = False
+        for _declaration, body, _line in methods:
+            body_code = _mask_rust_non_code(body)
+            opening = body_code.find("{")
+            if opening < 0:
+                continue
+            body_code = body_code[opening + 1 :]
+            match = call.search(body_code)
+            if match is None:
+                continue
+            # The resolver must propagate its typed error, and it must be the
+            # first self operation in the entry point.  This prevents a
+            # discarded-error decoy or staging before target admission.
+            first_self = re.search(r"\bself\s*\.", body_code)
+            if first_self is None or match.start() != first_self.start():
+                continue
+            checked = True
+            break
+        if not checked:
+            return False
+    return True
+
+
 def _audit_focused_table_merge_source_topology(
     root: Path,
     *,
@@ -73716,6 +73887,9 @@ def _audit_table_merge_transaction_source_topology(
             source, spec["apply_method"], type_name="Package"
         ):
             apply_evidence.append((evidence_declaration, body, line_number, path))
+    deferred_admission_checked = _table_merge_deferred_admission_is_checked(
+        transaction_source, spec
+    )
 
     if spec["edit_method"] not in package_methods:
         violations.append(
@@ -73743,8 +73917,11 @@ def _audit_table_merge_transaction_source_topology(
         else:
             for _declaration, body, line_number, body_path in edit_evidence:
                 body_code = _mask_rust_non_code(body)
-                if not _table_merge_transaction_has_marker(
-                    body_code, spec["admission_markers"]
+                if not (
+                    _table_merge_transaction_has_marker(
+                        body_code, spec["admission_markers"]
+                    )
+                    or deferred_admission_checked
                 ):
                     violations.append(
                         f"focused {format_name} {spec['edit_method']} must resolve "
@@ -77187,6 +77364,23 @@ PAGES_TRANSACTION_REEXPORT = re.compile(
     r"[ \t\r\n]*::[ \t\r\n]*(?P<items>\{[^{}]*\}|\*|(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
     r"(?:[ \t\r\n]+as[ \t\r\n]+(?:r#)?[A-Za-z_][A-Za-z0-9_]*)?)[ \t\r\n]*;"
 )
+PAGES_TRANSACTION_SHARED_TYPE_REEXPORTS = {
+    "Diagnostics": re.compile(
+        r"(?m)^[ \t]*pub[ \t]+use[ \t]+litchi_core[ \t]*::[ \t]*"
+        r"edit[ \t]*::[ \t]*Diagnostics[ \t]*;"
+    ),
+}
+PAGES_TRANSACTION_SHARED_TYPE_ALIASES = {
+    "Diagnostics": re.compile(
+        r"(?ms)\bpub\s+use\s+litchi_core\s*::\s*edit\s*::\s*"
+        r"(?:Diagnostics\s+as\s+(?P<direct>[A-Za-z_][A-Za-z0-9_]*)"
+        r"|\{\s*[^;{}]*?\bDiagnostics\s+as\s+"
+        r"(?P<group>[A-Za-z_][A-Za-z0-9_]*)[^;{}]*\})\s*;"
+    ),
+}
+PAGES_TRANSACTION_SHARED_TYPE_SOURCES = {
+    "Diagnostics": Path("crates/litchi-core/src/edit.rs"),
+}
 PAGES_PUBLIC_USE_STATEMENT = re.compile(
     r"(?<![A-Za-z0-9_])pub[ \t\r\n]+use\b[^;]*;"
 )
@@ -77194,6 +77388,36 @@ PAGES_NOMINAL_DEFINITION = re.compile(
     r"(?<![A-Za-z0-9_#])(?:struct|enum|union|trait|type)[ \t\r\n]+"
     r"(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
 )
+
+
+def _pages_shared_type_violations(
+    root: Path, name: str, title: str
+) -> list[str]:
+    """Validate one shared canonical type used by a Pages family."""
+
+    source_path = root / PAGES_TRANSACTION_SHARED_TYPE_SOURCES[name]
+    if not source_path.is_file():
+        return [
+            f"{title} shared canonical type {name} source is missing: "
+            f"{PAGES_TRANSACTION_SHARED_TYPE_SOURCES[name]}"
+        ]
+    source = _mask_rust_cfg_test_items(source_path.read_text(encoding="utf-8"))
+    code = _mask_rust_non_code(source)
+    if re.search(
+        rf"(?m)^\s*pub\s+struct\s+{re.escape(name)}\b", code
+    ) is None:
+        return [
+            f"{title} shared canonical type {name} is not a public struct: "
+            f"{PAGES_TRANSACTION_SHARED_TYPE_SOURCES[name]}"
+        ]
+    if name == "Diagnostics" and re.search(
+        r"\bpub\s+const\s+fn\s+changed\s*\(\s*&\s*self\s*\)", code
+    ) is None:
+        return [
+            f"{title} shared Diagnostics is missing its public changed accessor: "
+            f"{PAGES_TRANSACTION_SHARED_TYPE_SOURCES[name]}"
+        ]
+    return []
 
 
 _PAGES_MASKED_SOURCE_CACHE: dict[tuple[str, int, int], str] = {}
@@ -77383,6 +77607,7 @@ def _pages_transaction_family_violations(
     else:
         owner_source = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
         reachable = _rust_canonical_exports(owner_source, expected)
+        shared_types = PAGES_TRANSACTION_SHARED_TYPES.get(owner, frozenset())
         defined: set[str] = set()
         family_sources = [owner_source]
         helper_root = root / PAGES_SOURCE_ROOT / "package" / owner
@@ -77397,6 +77622,31 @@ def _pages_transaction_family_violations(
                 if match.group("name") in expected:
                     defined.add(match.group("name"))
         for name in shorts:
+            if name in shared_types:
+                if name in defined:
+                    violations.append(
+                        f"{title} must not define shared canonical type {name}; "
+                        f"re-export litchi_core::edit::{name}: {owner_relative}"
+                    )
+                reexport = PAGES_TRANSACTION_SHARED_TYPE_REEXPORTS.get(name)
+                if reexport is None or reexport.search(owner_source) is None:
+                    violations.append(
+                        f"{title} must re-export shared litchi_core::edit::{name}: "
+                        f"{owner_relative}"
+                    )
+                else:
+                    alias_pattern = PAGES_TRANSACTION_SHARED_TYPE_ALIASES.get(name)
+                    if alias_pattern is not None:
+                        owner_code = _mask_rust_non_code(owner_source)
+                        for alias_match in alias_pattern.finditer(owner_code):
+                            alias = alias_match.group("direct") or alias_match.group("group")
+                            violations.append(
+                                f"{title} has alternate public alias {alias} for "
+                                f"shared litchi_core::edit::{name}: {owner_relative}"
+                            )
+                    violations.extend(_pages_shared_type_violations(root, name, title))
+                    defined.add(name)
+                continue
             if name not in defined:
                 violations.append(
                     f"{title} owner is missing canonical type {name}: {owner_relative}"

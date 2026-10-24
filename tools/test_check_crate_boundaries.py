@@ -6787,14 +6787,27 @@ def add_pages_transaction_family_scaffold(root: Path, owner: str) -> None:
     owner_path = root / boundaries.PAGES_SOURCE_ROOT / "package" / f"{owner}.rs"
     owner_path.parent.mkdir(parents=True, exist_ok=True)
     text = owner_path.read_text(encoding="utf-8") if owner_path.is_file() else ""
+    shared_types = boundaries.PAGES_TRANSACTION_SHARED_TYPES.get(owner, frozenset())
     missing = [
         name
         for name in shorts
-        if re.search(rf"\b(?:struct|enum|type|union|trait)[ \t]+{name}\b", text) is None
+        if name not in shared_types
+        and re.search(rf"\b(?:struct|enum|type|union|trait)[ \t]+{name}\b", text) is None
     ]
+    if "Diagnostics" in shared_types and "litchi_core::edit::Diagnostics" not in text:
+        text = "pub use litchi_core::edit::Diagnostics;\n" + text
     owner_path.write_text(
         "".join(f"pub struct {name};\n" for name in missing) + text, encoding="utf-8"
     )
+
+    if shared_types:
+        core_edit = root / boundaries.PAGES_TRANSACTION_SHARED_TYPE_SOURCES["Diagnostics"]
+        core_edit.parent.mkdir(parents=True, exist_ok=True)
+        core_edit.write_text(
+            "pub struct Diagnostics { changed: bool }\n"
+            "impl Diagnostics { pub const fn changed(&self) -> bool { self.changed } }\n",
+            encoding="utf-8",
+        )
 
     file_segments = (
         segments if owner in PAGES_TRANSACTION_FILE_SCOPED_OWNERS else segments[:-1]
@@ -10242,6 +10255,15 @@ class BoundaryPolicyTests(unittest.TestCase):
                 + "pub fn leak(object_id: u64, source: &[u8]) {}\n",
                 encoding="utf-8",
             )
+            metadata = root / boundaries.PAGES_SOURCE_ROOT / "package" / "metadata_edit.rs"
+            metadata.write_text(
+                metadata.read_text(encoding="utf-8")
+                + "pub use litchi_core::edit::Diagnostics as MetadataDiagnostics;\n"
+                + "pub use litchi_core::edit::{\n"
+                + "    Diagnostics as GroupedMetadataDiagnostics,\n"
+                + "};\n",
+                encoding="utf-8",
+            )
 
             violations = boundaries.audit_pages_transaction_family_source_topology(root)
 
@@ -10255,6 +10277,10 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "defines retired name DocumentSourceLimits",
                 "body_chart_data transaction public API exposes raw identifier object_id",
                 "body_chart_data transaction public API exposes raw byte slice",
+                "Pages metadata_edit transaction family has alternate public alias "
+                "MetadataDiagnostics for shared litchi_core::edit::Diagnostics",
+                "Pages metadata_edit transaction family has alternate public alias "
+                "GroupedMetadataDiagnostics for shared litchi_core::edit::Diagnostics",
             ):
                 self.assertTrue(
                     any(fragment in item for item in violations),
@@ -51092,6 +51118,82 @@ fn rewrite_movie_title_operation(
                 violations = boundaries._audit_table_merge_transaction_source_topology(
                     root, spec
                 )
+                self.assertTrue(any("must resolve its typed selector" in item for item in violations), violations)
+
+    def test_lazy_table_merge_transactions_guard_every_staging_entry(self) -> None:
+        """A deferred selector must still guard each operation that can stage."""
+
+        for spec in boundaries.IWA_TABLE_MERGE_TRANSACTION_SPECS:
+            deferred = spec.get("deferred_admission")
+            if deferred is None:
+                continue
+            with self.subTest(format=spec["format_name"]), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self._copy_table_merge_transaction_fixture(root, spec)
+                transaction = root / spec["transaction_path"]
+                original = transaction.read_text(encoding="utf-8")
+                guard = f"self.{deferred['helper']}()?;"
+                self.assertGreaterEqual(original.count(guard), len(deferred["stage_methods"]))
+                def replace_in_method(source: str, method: str, value: str) -> str:
+                    match = re.search(
+                        rf"(?ms)(^[ \t]*(?:(?:pub(?:\([^()\r\n]*\))?)[ \t]+)?"
+                        rf"fn[ \t]+{re.escape(method)}\b.*?)(?=^[ \t]*"
+                        r"(?:(?:pub(?:\([^()\r\n]*\))?)[ \t]+)?fn[ \t]+|\Z)",
+                        source,
+                    )
+                    self.assertIsNotNone(match, method)
+                    segment = match.group(1)
+                    self.assertIn(guard, segment, method)
+                    segment = segment.replace(guard, value, 1)
+                    return source[: match.start(1)] + segment + source[match.end(1) :]
+
+                for method in deferred["stage_methods"]:
+                    transaction_source = replace_in_method(
+                        original,
+                        method,
+                        f"self.removed_{deferred['helper']}()?;",
+                    )
+                    transaction.write_text(transaction_source, encoding="utf-8")
+                    violations = boundaries._audit_table_merge_transaction_source_topology(
+                        root, spec
+                    )
+                    self.assertTrue(
+                        any("must resolve its typed selector" in item for item in violations),
+                        (method, violations),
+                    )
+
+                # A discarded resolver error is not admission proof.
+                transaction.write_text(
+                    replace_in_method(
+                        original,
+                        "regions",
+                        f"let _ = self.{deferred['helper']}();",
+                    ),
+                    encoding="utf-8",
+                )
+                violations = boundaries._audit_table_merge_transaction_source_topology(root, spec)
+                self.assertTrue(any("must resolve its typed selector" in item for item in violations), violations)
+
+                # Target resolution must precede the first staging/readback
+                # operation in each entry point.
+                transaction.write_text(
+                    replace_in_method(
+                        original,
+                        "regions",
+                        f"let _ = self.regions.as_ref();\n        {guard}",
+                    ),
+                    encoding="utf-8",
+                )
+                violations = boundaries._audit_table_merge_transaction_source_topology(root, spec)
+                self.assertTrue(any("must resolve its typed selector" in item for item in violations), violations)
+
+                # A same-named root helper cannot satisfy the Edit boundary.
+                transaction.write_text(
+                    replace_in_method(original, "regions", "self.removed_resolver()?;")
+                    + f"\nfn {deferred['helper']}() {{ {', '.join(deferred['stage_methods'])}; }}\n",
+                    encoding="utf-8",
+                )
+                violations = boundaries._audit_table_merge_transaction_source_topology(root, spec)
                 self.assertTrue(any("must resolve its typed selector" in item for item in violations), violations)
 
     def test_numbers_wire_table_merge_writer_boundary_rejects_unbounded_or_peer_codec(self) -> None:

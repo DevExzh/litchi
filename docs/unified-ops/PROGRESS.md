@@ -3449,7 +3449,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   1,360-test tooling run returns stale boundary rules, ODG guard-literal
   scanner matches and unclassified diagnostic evidence. Reviewed scanner
   and evidence corrections merge at `ec0d6bb0db` and `2b88f4ad75`;
-  the boundary correction remains in review. Reviewed XLS source
+  boundary correction `5a8cfa93c1` now passes independent review. Its
+  guarded deferred selectors preserve O(1) entry and require typed error
+  propagation before staging; the shared Pages Diagnostics rule rejects
+  duplicates and aliases. All 1,144 boundary tests pass, and the CLI checks
+  68 packages and 290 declarations. Its 11 legacy-host edges remain explicit;
+  this packet alone does not establish final inventory closure. Reviewed XLS source
   `dfe8281fb3` and receipt `3ddd72e97e` are now merged: a canonical shared
   catalog preserves O(1) adapter entry, direct native source checks and
   trailing-fence precedence without cloning eager sheet names. All 1,907
