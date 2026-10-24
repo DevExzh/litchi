@@ -215,7 +215,14 @@ def proc_identity(pid: int) -> dict[str, object] | None:
         close = stat.rfind(")")
         fields = stat[close + 2 :].split()
         cmdline = Path(f"/proc/{pid}/cmdline").read_bytes().replace(b"\0", b" ").decode(errors="replace").strip()
-        return {"pid": pid, "starttime": fields[19], "cmdline": cmdline}
+        return {
+            "pid": pid,
+            "starttime": fields[19],
+            "ppid": int(fields[1]),
+            "pgrp": int(fields[2]),
+            "session": int(fields[3]),
+            "cmdline": cmdline,
+        }
     except (OSError, IndexError, ValueError):
         return None
 
@@ -223,6 +230,33 @@ def proc_identity(pid: int) -> dict[str, object] | None:
 def alive(identity: dict[str, object]) -> bool:
     current = proc_identity(int(identity["pid"]))
     return current is not None and current["starttime"] == identity["starttime"]
+
+
+def capture_descendants(root_pid: int, seen: dict[str, dict[str, object]]) -> None:
+    """Record only processes whose live parent chain starts at root_pid."""
+    root = proc_identity(root_pid)
+    if root is None:
+        return
+    rows: dict[int, dict[str, object]] = {}
+    try:
+        candidates = list(Path("/proc").iterdir())
+    except OSError:
+        return
+    for candidate in candidates:
+        if not candidate.name.isdigit():
+            continue
+        identity = proc_identity(int(candidate.name))
+        if identity is not None:
+            rows[int(identity["pid"])] = identity
+    owned = {root_pid}
+    changed = True
+    while changed:
+        changed = False
+        for pid, identity in rows.items():
+            if pid not in owned and identity.get("ppid") in owned:
+                seen[f"{identity['pid']}:{identity['starttime']}"] = identity
+                owned.add(pid)
+                changed = True
 
 
 def parse_properties(text: str) -> dict[str, str]:
@@ -268,6 +302,17 @@ def show_unit(systemctl: Path, unit: str) -> dict[str, object]:
             "command": command,
         }
     if not properties.get("ControlGroup"):
+        inactive_empty = (
+            properties.get("ActiveState") == "inactive"
+            and properties.get("SubState") in {"dead", "exited"}
+            and properties.get("MainPID") in {"", "0"}
+        )
+        if inactive_empty:
+            properties["available"] = False
+            properties["monitor_error_kind"] = "unit-gone"
+            properties["monitor_error"] = "transient scope is inactive with an empty ControlGroup"
+            properties["command"] = command
+            return properties
         return {
             "available": False,
             "monitor_error_kind": "schema",
@@ -286,6 +331,8 @@ def cgroup_pids(properties: dict[str, object]) -> tuple[str | None, list[int], s
     path = Path("/sys/fs/cgroup") / raw.lstrip("/") / "cgroup.procs"
     try:
         pids = [int(line) for line in path.read_text().splitlines() if line.strip()]
+    except FileNotFoundError as error:
+        return raw, [], f"cgroup.procs is gone: {error}"
     except (OSError, ValueError) as error:
         return raw, [], f"cannot read cgroup.procs: {error}"
     return raw, pids, None
@@ -370,7 +417,11 @@ def cleanup_owned(
 ) -> dict[str, object]:
     """Stop and reap the scope, analyzer, and observed escaped identities."""
     errors: list[str] = []
-    seen = state.get("seen_scope_processes", {})
+    seen: dict[str, dict[str, object]] = {}
+    for key in ("seen_scope_processes", "seen_analyzer_processes"):
+        values = state.get(key, {})
+        if isinstance(values, dict):
+            seen.update(values)
     cgroup_path = state.get("last_cgroup_path")
     unit_gc_expected = bool(state.get("unit_gc_expected"))
     reported_cgroup_errors: set[str] = set()
@@ -382,7 +433,8 @@ def cleanup_owned(
         if not isinstance(cgroup_path, str):
             return []
         _, pids, error = cgroup_pids({"ControlGroup": cgroup_path})
-        if error is not None and not unit_gc_expected and error not in reported_cgroup_errors:
+        gone_after_gc = unit_gc_expected and error is not None and error.startswith("cgroup.procs is gone:")
+        if error is not None and not gone_after_gc and error not in reported_cgroup_errors:
             reported_cgroup_errors.add(error)
             errors.append(error)
         return pids
@@ -788,7 +840,10 @@ def invoke_analyzer(config: dict[str, Any], state: dict[str, Any], owned: dict[s
     with stdout.open("wb") as out, stderr.open("wb") as err:
         process = subprocess.Popen(command, stdout=out, stderr=err, start_new_session=True)
         owned["analyzer"] = process
+        analyzer_seen = state.setdefault("seen_analyzer_processes", {})
+        capture_descendants(process.pid, analyzer_seen)
         while process.poll() is None:
+            capture_descendants(process.pid, analyzer_seen)
             if directory_bytes((paths["output"], paths["tmp"])) > int(config["aggregate_output_limit_bytes"]):
                 state["analyzer_output_limit_exceeded"] = True
                 cleanup_error = terminate_process_group(process)
@@ -807,13 +862,15 @@ def invoke_analyzer(config: dict[str, Any], state: dict[str, Any], owned: dict[s
                     raise GuardFailure(f"analyzer exceeded its ten-minute deadline; cleanup failed: {cleanup_error}")
                 raise GuardFailure("analyzer exceeded its ten-minute deadline")
             time.sleep(POLL_SECONDS)
-        completed = process.wait()
-        owned["analyzer"] = None
+        completed_returncode = process.wait()
+        # Keep the Popen handle until the outer finally block.  A successful
+        # analyzer may have left a child in its owned process group; the final
+        # cleanup must still inspect and reap that group before qualification.
     state["analyzer_command"] = command
-    state["analyzer_exit_code"] = completed.returncode
+    state["analyzer_exit_code"] = completed_returncode
     state["analyzer_stdout"] = str(stdout)
     state["analyzer_stderr"] = str(stderr)
-    if completed.returncode != 0 or not (output / "analysis.json").is_file():
+    if completed_returncode != 0 or not (output / "analysis.json").is_file():
         raise GuardFailure("final analyzer failed; see analyzer stdout/stderr")
 
 
@@ -1001,6 +1058,13 @@ def run_config(config_path: Path) -> int:
     finally:
         for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
             signal.signal(signum, signal.SIG_IGN)
+        for key in ("seen_scope_processes", "seen_analyzer_processes"):
+            values = state.get(key)
+            if isinstance(values, dict):
+                receipt[key] = list(values.values())
+        for key in ("analyzer_command", "analyzer_exit_code", "analyzer_stdout", "analyzer_stderr"):
+            if key in state:
+                receipt[key] = state[key]
         cleanup = cleanup_owned(systemctl, str(config["unit"]), owned.get("systemd"), owned.get("analyzer"), state)
         receipt["cleanup"] = cleanup
         if cleanup.get("errors") and outcome_error is None:

@@ -12,8 +12,10 @@ are `tools/test_w8_quiet_abba.py` and cover a normal guard state, failed and
 timeout exits, an escaped descendant, oversized output, fake systemctl
 success/failure, missing-control-group and cgroup-read errors, CPU/argv
 launcher mutation, exact launcher file limits, a fake no-argument launcher,
-escaped-child cleanup, unreadable-cgroup cleanup, analyzer-group cleanup, and
-the cgroup/deadline command.  They ran as sixteen
+escaped-child cleanup, unreadable-cgroup cleanup, analyzer-group cleanup,
+separate-session cgroup-child cleanup, transient-scope GC, analyzer exit
+and observed outside-scope-child paths, and the cgroup/deadline command.
+They ran as twenty-two
 tests with:
 
 ```text
@@ -22,11 +24,11 @@ python3 -m unittest -v tools.test_w8_quiet_abba
 
 The existing registered W8 policy module imports the same test case, so the
 current gate invocation `python3 -m unittest tools.test_w8_projection_policy`
-executes all sixteen wrapper tests (33 tests total in that module); no frozen gate
+executes all twenty-two wrapper tests (39 tests total in that module); no frozen gate
 source or native runner is changed.
 
-The wrapper itself is 49,150 bytes with SHA-256
-`d18b2ef531d2e1ca3f8d2eb93a9a6f549f2745555480b68829ced90e326afc3e`; the
+The wrapper itself is 51,908 bytes with SHA-256
+`4bf3b018d568864b138d92afef04bfcd42e8f1ea97fd1f1e32224c983978b0d3`; the
 generated no-argument launcher is separately hashed into the run
 configuration before execution.
 
@@ -90,7 +92,14 @@ an explicitly recorded unit disappearance after a valid final sample.
 Every refusal writes
 `tmp/w8-quiet-abba-receipt.json`; successful and failed runs therefore have a
 raw receipt.  The final analyzer is invoked only after these checks and the
-runner's 109-route/2,400-receipt manifest checks pass.
+runner's 109-route/2,400-receipt manifest checks pass.  The native runner and
+launcher are owned by the transient systemd cgroup; cleanup kills only the
+recorded ControlGroup and its observed members.  The analyzer starts after
+that scope exits, in its own process group outside the native cgroup; its
+group handle remains owned through final cleanup, and descendants observed
+through its parent chain are retained by start-time identity for cleanup.
+No unrelated host process or unobserved foreign cgroup is searched or
+signalled.
 
 The configuration records the selected CPU and complete runner argv.  The
 generated launcher embeds both as literals, and `run` parses and compares the

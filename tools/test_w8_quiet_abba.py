@@ -41,6 +41,30 @@ class QuietAbbaWrapperTests(unittest.TestCase):
             "file_limit_bytes": wrapper.OUTPUT_FILE_LIMIT_BYTES,
         }
 
+    def _analyzer_config(self, root: Path) -> tuple[dict, Path]:
+        config = self._config(root)
+        output = config["paths"]["output"]
+        analyzer = root / "fake-analyzer.py"
+        analyzer.write_text(
+            "from pathlib import Path\n"
+            "import sys\n"
+            "Path(sys.argv[1], 'analysis.json').write_text('{\"status\":\"ok\"}')\n",
+            encoding="utf-8",
+        )
+        manifest = {
+            "schema": "litchi_file_qualification.v3",
+            "status": "complete; analyze.py review pending",
+            "routes": [f"route-{index}" for index in range(wrapper.TARGET_ROUTE_COUNT)],
+            "calibration": [{} for _ in range(wrapper.TARGET_ROUTE_COUNT)],
+            "abba": [{} for _ in range(wrapper.TARGET_ROUTE_COUNT)],
+        }
+        (output / "manifest.json").write_bytes(wrapper.canonical(manifest))
+        for index in range(2 + 2 * wrapper.TARGET_ROUTE_COUNT + 4 * wrapper.ROUNDS * wrapper.TARGET_ROUTE_COUNT):
+            (output / f"sample-{index}.receipt.json").write_text("{}", encoding="utf-8")
+        config["paths"]["analyzer"] = analyzer
+        config["artifacts"] = {"python": {"path": sys.executable}}
+        return config, analyzer
+
     def test_launcher_sets_exact_byte_rlimit_and_no_argument_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -128,6 +152,67 @@ class QuietAbbaWrapperTests(unittest.TestCase):
             rejected = subprocess.run([str(launcher), "extra"], check=False, capture_output=True, text=True, env=environment)
             self.assertNotEqual(rejected.returncode, 0)
 
+    def test_invoke_analyzer_happy_path_checks_real_manifest_and_exit_code(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config, _analyzer = self._analyzer_config(Path(directory))
+            state: dict = {}
+            owned: dict = {"analyzer": None}
+            with mock.patch.object(wrapper, "POLL_SECONDS", 0.01):
+                wrapper.invoke_analyzer(config, state, owned)
+            self.assertEqual(state["analyzer_exit_code"], 0)
+            self.assertIsNotNone(owned["analyzer"])
+            self.assertTrue((config["paths"]["output"] / "analysis.json").is_file())
+            cleanup = wrapper.cleanup_owned(None, None, None, owned["analyzer"], {"seen_scope_processes": {}, "last_cgroup_path": None})
+            self.assertEqual(cleanup["errors"], [])
+
+    def test_invoke_analyzer_records_nonzero_exit_and_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config, analyzer = self._analyzer_config(Path(directory))
+            analyzer.write_text("raise SystemExit(7)\n", encoding="utf-8")
+            state: dict = {}
+            owned: dict = {"analyzer": None}
+            with mock.patch.object(wrapper, "POLL_SECONDS", 0.01), self.assertRaises(wrapper.GuardFailure):
+                wrapper.invoke_analyzer(config, state, owned)
+            self.assertEqual(state["analyzer_exit_code"], 7)
+            self.assertIsNotNone(owned["analyzer"])
+            cleanup = wrapper.cleanup_owned(None, None, None, owned["analyzer"], {"seen_scope_processes": {}, "last_cgroup_path": None})
+            self.assertEqual(cleanup["errors"], [])
+
+    def test_invoke_analyzer_owns_observed_outside_scope_child(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            config, analyzer = self._analyzer_config(Path(directory))
+            analyzer.write_text(
+                "from pathlib import Path\n"
+                "import subprocess\n"
+                "import sys\n"
+                "import time\n"
+                "output = Path(sys.argv[1])\n"
+                "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'], start_new_session=True)\n"
+                "(output / 'analyzer-child.pid').write_text(str(child.pid))\n"
+                "(output / 'analysis.json').write_text('{\"status\":\"ok\"}')\n"
+                "time.sleep(0.2)\n",
+                encoding="utf-8",
+            )
+            state: dict = {}
+            owned: dict = {"analyzer": None}
+            try:
+                with mock.patch.object(wrapper, "POLL_SECONDS", 0.01):
+                    wrapper.invoke_analyzer(config, state, owned)
+                child_pid = int((config["paths"]["output"] / "analyzer-child.pid").read_text())
+                self.assertTrue(state.get("seen_analyzer_processes"))
+                cleanup = wrapper.cleanup_owned(
+                    None,
+                    None,
+                    None,
+                    owned["analyzer"],
+                    {"seen_analyzer_processes": state["seen_analyzer_processes"], "last_cgroup_path": None},
+                )
+                self.assertEqual(cleanup["errors"], [])
+                self.assertIsNone(wrapper.proc_identity(child_pid))
+            finally:
+                if owned.get("analyzer") is not None and owned["analyzer"].poll() is None:
+                    wrapper.cleanup_owned(None, None, None, owned["analyzer"], state)
+
     def test_systemd_command_has_exact_cgroup_timeout_and_runner_launcher_only(self) -> None:
         config = {
             "unit": "w8-file-abba-test.scope",
@@ -208,6 +293,89 @@ class QuietAbbaWrapperTests(unittest.TestCase):
             self.assertEqual(value["monitor_error_kind"], "schema")
             _path, _pids, error = wrapper.cgroup_pids({"ControlGroup": "/missing-w8-cgroup"})
             self.assertIsNotNone(error)
+
+    def test_transient_scope_gc_empty_cgroup_retains_metadata_and_skips_kill(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            calls = root / "systemctl-calls"
+            kill_log = root / "systemctl-kill"
+            systemctl = root / "fake-systemctl-lifecycle.py"
+            systemctl.write_text(
+                "#!/usr/bin/env python3\n"
+                "import sys\n"
+                "from pathlib import Path\n"
+                f"calls = Path({str(calls)!r})\n"
+                f"kill_log = Path({str(kill_log)!r})\n"
+                "if 'kill' in sys.argv:\n"
+                "    kill_log.write_text('called')\n"
+                "    raise SystemExit(1)\n"
+                "count = int(calls.read_text() or '0') if calls.exists() else 0\n"
+                "calls.write_text(str(count + 1))\n"
+                "if count == 0:\n"
+                "    print('ActiveState=active')\n"
+                "    print('SubState=running')\n"
+                "    print('Result=success')\n"
+                "    print('ExecMainStatus=0')\n"
+                "    print('MainPID=123')\n"
+                "    print('ControlGroup=/w8-test.scope')\n"
+                "    print('MemoryCurrent=1000')\n"
+                "    print('MemoryPeak=1234')\n"
+                "else:\n"
+                "    print('ActiveState=inactive')\n"
+                "    print('SubState=dead')\n"
+                "    print('Result=success')\n"
+                "    print('ExecMainStatus=0')\n"
+                "    print('MainPID=0')\n"
+                "    print('ControlGroup=')\n"
+                "    print('MemoryCurrent=0')\n"
+                "    print('MemoryPeak=1234')\n",
+                encoding="utf-8",
+            )
+            systemctl.chmod(systemctl.stat().st_mode | stat.S_IXUSR)
+            errors: list[str] = []
+            with mock.patch.object(wrapper, "cgroup_pids", return_value=("/w8-test.scope", [], None)):
+                active = wrapper.scope_state(systemctl, "w8-test.scope", {}, [])
+                gone = wrapper.scope_state(systemctl, "w8-test.scope", {}, errors)
+            self.assertTrue(active["available"])
+            self.assertFalse(gone["available"])
+            self.assertEqual(gone["monitor_error_kind"], "unit-gone")
+            self.assertEqual(gone["ActiveState"], "inactive")
+            self.assertEqual(gone["ControlGroup"], "")
+            self.assertEqual(len(errors), 1)
+
+            config = self._config(root / "checks")
+            state = {
+                "runner_exit_code": 0,
+                "timeout_exit_code": 0,
+                "unit_metadata_missing": False,
+                "memory_peak_bytes": 1234,
+                "memory_current_max_bytes": 0,
+                "leftover_processes": [],
+                "leftover_cgroup_pids": [],
+                "deadline_exceeded": False,
+                "output_limit_exceeded": False,
+                "monitor_errors": [],
+                "post_monitor_errors": errors,
+                "post_monitor_available_samples": 0,
+                "unit_gc_expected": True,
+                "last_cgroup_path": "/w8-test.scope",
+            }
+            with mock.patch.object(wrapper, "forbidden_rows", return_value=([], [])):
+                self.assertEqual(wrapper.post_process_checks(config, state), [])
+            with mock.patch.object(
+                wrapper,
+                "cgroup_pids",
+                return_value=("/w8-test.scope", [], "cgroup.procs is gone: scope was garbage-collected"),
+            ):
+                cleanup = wrapper.cleanup_owned(
+                    systemctl,
+                    "w8-test.scope",
+                    None,
+                    None,
+                    {"seen_scope_processes": {}, "last_cgroup_path": "/w8-test.scope", "unit_gc_expected": True},
+                )
+            self.assertEqual(cleanup["errors"], [])
+            self.assertFalse(kill_log.exists())
 
     def test_normal_state_passes_output_and_descendant_guards(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -410,6 +578,74 @@ class QuietAbbaWrapperTests(unittest.TestCase):
             self.assertEqual(cleanup["errors"], [])
             self.assertIsNotNone(process.poll())
 
+    def test_cleanup_reaps_analyzer_child_in_owned_process_group(self) -> None:
+        code = (
+            "import subprocess,time\n"
+            "child=subprocess.Popen(['sleep','30'])\n"
+            "print(child.pid, flush=True)\n"
+            "time.sleep(30)\n"
+        )
+        analyzer = subprocess.Popen(
+            [sys.executable, "-c", code], stdout=subprocess.PIPE, text=True, start_new_session=True
+        )
+        self.assertIsNotNone(analyzer.stdout)
+        child_pid = int(analyzer.stdout.readline().strip())
+        cleanup = wrapper.cleanup_owned(None, None, None, analyzer, {"seen_scope_processes": {}, "last_cgroup_path": None})
+        analyzer.stdout.close()
+        self.assertEqual(cleanup["errors"], [])
+        self.assertIsNotNone(analyzer.poll())
+        self.assertIsNone(wrapper.proc_identity(child_pid))
+
+    def test_cleanup_kills_separate_session_child_through_owned_cgroup(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            kill_log = root / "systemctl-kill"
+            pid_file = root / "owned-pids.json"
+            systemctl = root / "fake-systemctl-kill-owned.py"
+            systemctl.write_text(
+                "#!/usr/bin/env python3\n"
+                "import json\n"
+                "import os\n"
+                "import signal\n"
+                "import sys\n"
+                "from pathlib import Path\n"
+                f"kill_log = Path({str(kill_log)!r})\n"
+                f"pid_file = Path({str(pid_file)!r})\n"
+                "if 'kill' in sys.argv:\n"
+                "    for pid in json.loads(pid_file.read_text()):\n"
+                "        try:\n"
+                "            os.kill(pid, signal.SIGKILL)\n"
+                "        except ProcessLookupError:\n"
+                "            pass\n"
+                "    kill_log.write_text('called')\n"
+                "    raise SystemExit(0)\n"
+                "raise SystemExit(0)\n",
+                encoding="utf-8",
+            )
+            systemctl.chmod(systemctl.stat().st_mode | stat.S_IXUSR)
+            leader = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True)
+            child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True)
+            self.assertNotEqual(os.getsid(leader.pid), os.getsid(child.pid))
+            pid_file.write_text(json.dumps([leader.pid, child.pid]), encoding="utf-8")
+
+            def owned_cgroup(_properties: dict) -> tuple[str, list[int], None]:
+                pids = [process.pid for process in (leader, child) if process.poll() is None]
+                return "/owned-w8.scope", pids, None
+
+            with mock.patch.object(wrapper, "cgroup_pids", side_effect=owned_cgroup):
+                cleanup = wrapper.cleanup_owned(
+                    systemctl,
+                    "w8-file-abba-test.scope",
+                    leader,
+                    None,
+                    {"seen_scope_processes": {}, "last_cgroup_path": "/owned-w8.scope"},
+                )
+            self.assertEqual(cleanup["errors"], [])
+            self.assertTrue(kill_log.exists())
+            self.assertIsNotNone(leader.poll())
+            self.assertIsNotNone(child.poll())
+            self.assertEqual(cleanup["remaining_cgroup_pids"], [])
+
     def test_cleanup_fails_closed_on_unreadable_owned_cgroup(self) -> None:
         with mock.patch.object(
             wrapper,
@@ -424,6 +660,24 @@ class QuietAbbaWrapperTests(unittest.TestCase):
                 {"seen_scope_processes": {}, "last_cgroup_path": "/w8-test.scope"},
             )
         self.assertTrue(any("cannot read cgroup.procs" in error for error in cleanup["errors"]))
+
+        with mock.patch.object(
+            wrapper,
+            "cgroup_pids",
+            return_value=("/w8-test.scope", [], "cannot read cgroup.procs: permission denied"),
+        ):
+            cleanup = wrapper.cleanup_owned(
+                None,
+                None,
+                None,
+                None,
+                {
+                    "seen_scope_processes": {},
+                    "last_cgroup_path": "/w8-test.scope",
+                    "unit_gc_expected": True,
+                },
+            )
+        self.assertTrue(any("permission denied" in error for error in cleanup["errors"]))
 
     def test_cleanup_reaps_escaped_child_after_leader_exit(self) -> None:
         code = (
