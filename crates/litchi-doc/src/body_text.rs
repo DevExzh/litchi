@@ -5983,6 +5983,7 @@ mod tests {
     };
     use crate::parts::dofr::{DofrFrameKind, DofrPayload};
     use crate::parts::fib::FileInformationBlock;
+    use crate::parts::protection::ProtectionPolicy;
     use crate::tracked_revision::{Limits, RevisionEditor};
     use crate::writer::{
         BookmarkEntry, Builder, CharacterFormatting, FloatingPosition, ParagraphFormatting,
