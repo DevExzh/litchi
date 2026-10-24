@@ -139,11 +139,7 @@ def _source_state(root: Path) -> dict[str, Any]:
     top = _resolve(Path(_git(root, "rev-parse", "--show-toplevel")))
     if top != root:
         raise PreparationError(f"source is not a worktree top-level: {root}")
-    # Some reviewed fixtures live below repository ignore rules because the
-    # historical baseline never tracked that test corpus.  Include ignored
-    # paths in the receipt/status guard so materializing one cannot be
-    # silently omitted from the exact external adapter closure.
-    status = _git(root, "status", "--porcelain=v1", "--untracked-files=all", "--ignored")
+    status = _git(root, "status", "--porcelain=v1", "--untracked-files=all")
     return {
         "root": str(root),
         "ref": _git(root, "rev-parse", "HEAD"),
@@ -302,7 +298,36 @@ def prepare(
         + [str(REGISTRATION_PATH)]
         + [str(path) for path, _, _ in _reviewed_fixture_specs()]
     )
-    observed_status = sorted(_status_paths(baseline_after["status"]))
+    normal_status = baseline_after["status"]
+    observed_status = _status_paths(normal_status)
+    normal_paths = set(observed_status)
+    extra_status_lines: list[str] = []
+    # Some reviewed fixtures live below repository ignore rules because the
+    # historical baseline never tracked that test corpus.  Query only those
+    # exact paths with ``--ignored``; a repository-wide ignored scan would
+    # traverse the large historical fixture corpus and make preparation
+    # needlessly unbounded.
+    for relative, _, _ in COMPILE_FIXTURES:
+        ignored_status = _git(
+            baseline_root,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--ignored",
+            "--",
+            str(relative),
+        )
+        for line in ignored_status.splitlines():
+            paths = _status_paths(line)
+            if paths and paths[0] not in normal_paths:
+                extra_status_lines.append(line)
+                observed_status.extend(paths)
+    if extra_status_lines:
+        baseline_after["status"] = "\n".join([normal_status, *extra_status_lines])
+        baseline_after["status_sha256"] = hashlib.sha256(
+            baseline_after["status"].encode()
+        ).hexdigest()
+    observed_status = sorted(set(observed_status))
     if observed_status != expected_status:
         raise PreparationError(f"baseline overlay changed unexpected paths: {observed_status!r}")
     if baseline_after["tree"] != baseline_before["tree"]:
