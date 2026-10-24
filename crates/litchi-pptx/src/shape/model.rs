@@ -1178,7 +1178,8 @@ impl BodyTextIndex {
 
 #[cfg(test)]
 mod tests {
-    use super::{reader, text_body_limits_for, transform_limits_for};
+    use super::{text_body_limits_for, transform_limits_for};
+    use crate::shape::reader;
 
     #[test]
     fn subordinate_readers_use_the_scene_input_budget() {
