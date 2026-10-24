@@ -68,7 +68,7 @@ it is 159 bytes with SHA-256
 `4e521a0f1bb41ae2a3457145b85068968ded05e68bb070a4f12a20c26aa363e5`.
 
 Source commit `55c562e9cf4bc900c62787697eea974eef790201` contains the owner
-coverage implementation and the initial validator/tests. The follow-up
-hardening is intentionally kept in this leaf until its next checked commit;
-no rustdoc capture, Cargo build, API-debt closure, or final acceptance claim
-is made here.
+coverage implementation and the initial validator/tests. Follow-up commit
+`d2494012fc` adds the malformed-row hardening and this audit record. No
+rustdoc capture, Cargo build, API-debt closure, or final acceptance claim is
+made here.
