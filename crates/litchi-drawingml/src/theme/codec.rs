@@ -1667,10 +1667,17 @@ fn validate_replacement_attributes(
         }
         let is_namespace = attribute.key.as_ref() == b"xmlns"
             || attribute.key.as_ref().strip_prefix(b"xmlns:").is_some();
-        crate::preflight_attribute_value_bytes(
-            attribute.value.as_ref(),
-            limits.max_attribute_value_bytes,
-        )?;
+        // Namespace bindings have their own structural budget.  Do not charge
+        // the selected scalar/attribute-value budget for a binding URI: a
+        // narrow value policy applies to modeled attribute values, while the
+        // namespace URI remains bounded by the crate-wide XML hard cap and
+        // the namespace-count checks performed by the surrounding visitor.
+        let raw_value_limit = if is_namespace {
+            MAX_ATTRIBUTE_VALUE_BYTES
+        } else {
+            limits.max_attribute_value_bytes
+        };
+        crate::preflight_attribute_value_bytes(attribute.value.as_ref(), raw_value_limit)?;
         let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
