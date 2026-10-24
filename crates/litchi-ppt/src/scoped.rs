@@ -1295,16 +1295,37 @@ mod tests {
         let base = super::Base::capture(&package).unwrap();
         base.bytes().unwrap();
 
-        // The cached-byte fence uses two version calls. The third call is the
-        // presentation handoff inside native snapshot construction; advance
-        // the positional source immediately after it returns.
-        source.change_after_version_calls(3);
+        // The cached-byte fence uses two version calls. Advance the
+        // positional source immediately after the second one returns, so
+        // presentation construction observes the new revision and succeeds;
+        // the final Base fence must still reject the stale edit.
+        source.change_after_version_calls(2);
         assert!(matches!(
             base.native(),
             Err(super::Failure::Package(Error::Ole(
                 OleError::SourceChanged { .. }
             )))
         ));
+
+        // The same transition does not make native construction fail by
+        // itself: without Base::native's final fence, the package's own
+        // presentation fence observes the new revision and succeeds.
+        let control_source = Arc::new(VersionedSource::new(
+            source_package.to_encrypted_bytes().unwrap(),
+        ));
+        let control_package = Package::from_read_at(control_source.clone()).unwrap();
+        let control = super::Base::capture(&control_package).unwrap();
+        control.bytes().unwrap();
+        control_source.change_after_version_calls(2);
+        let bytes = control.shared_bytes().unwrap();
+        assert!(
+            crate::slide_order::Snapshot::from_package_with_options(
+                control.package(),
+                bytes,
+                control.open_options(),
+            )
+            .is_ok()
+        );
     }
 
     #[test]
