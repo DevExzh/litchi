@@ -151,8 +151,18 @@ fn poi_animation_fixtures_are_strictly_gated() {
         };
         match package.edit_animations() {
             Ok(edit) => {
-                let _timelines = edit.timelines().unwrap();
-                let commit = edit.commit().unwrap();
+                let _timelines = match edit.timelines() {
+                    Ok(timelines) => timelines,
+                    Err(animation::Error::Refused(refusal)) => {
+                        assert_eq!(refusal.kind(), RefusalKind::UnsupportedContent);
+                        assert_eq!(std::fs::read(&path).unwrap(), original);
+                        continue;
+                    },
+                    Err(error) => panic!("{path:?}: animation projection failed: {error:?}"),
+                };
+                let commit = edit
+                    .commit()
+                    .unwrap_or_else(|error| panic!("{path:?}: animation commit failed: {error:?}"));
                 assert!(!commit.diagnostics().changed());
                 assert_eq!(
                     commit.package().to_bytes().unwrap(),

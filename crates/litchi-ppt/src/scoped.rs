@@ -1175,7 +1175,7 @@ mod tests {
             self.revision.fetch_add(1, Ordering::AcqRel);
         }
 
-        fn change_after_version_calls(&self, calls: u64) {
+        fn change_before_version_call(&self, calls: u64) {
             self.flip_after_versions.store(calls, Ordering::Release);
         }
     }
@@ -1186,7 +1186,6 @@ mod tests {
         }
 
         fn version(&self) -> std::io::Result<SourceVersion> {
-            let revision = self.revision.load(Ordering::Acquire);
             let remaining = self.flip_after_versions.load(Ordering::Acquire);
             if remaining == 1 {
                 if self
@@ -1199,6 +1198,7 @@ mod tests {
             } else if remaining > 1 {
                 self.flip_after_versions.fetch_sub(1, Ordering::AcqRel);
             }
+            let revision = self.revision.load(Ordering::Acquire);
             Ok(SourceVersion::new(0x5050, revision))
         }
 
@@ -1297,11 +1297,10 @@ mod tests {
         let base = Base::capture(&package).unwrap();
         base.bytes().unwrap();
 
-        // The cached-byte fence uses two version calls. Advance the
-        // positional source immediately after the second one returns, so
-        // presentation construction observes the new revision and succeeds;
-        // the final Base fence must still reject the stale edit.
-        source.change_after_version_calls(2);
+        // Arm the source immediately before the final Base fence. The
+        // package's own presentation fence has already accepted the same
+        // source revision, so this isolates the owner-level check.
+        source.change_before_version_call(9);
         assert!(matches!(
             base.native(),
             Err(super::Failure::Package(Error::Ole(
@@ -1318,16 +1317,14 @@ mod tests {
         let control_package = Package::from_read_at(control_source.clone()).unwrap();
         let control = Base::capture(&control_package).unwrap();
         control.bytes().unwrap();
-        control_source.change_after_version_calls(2);
+        control_source.change_before_version_call(9);
         let bytes = control.shared_bytes().unwrap();
-        assert!(
-            crate::slide_order::Snapshot::from_package_with_options(
-                control.package(),
-                bytes,
-                control.open_options(),
-            )
-            .is_ok()
+        let control_snapshot = crate::slide_order::Snapshot::from_package_with_options(
+            control.package(),
+            bytes,
+            control.open_options(),
         );
+        assert!(control_snapshot.is_ok());
     }
 
     #[test]
