@@ -30,7 +30,7 @@ crate::scoped::family!("envelope");
 #[derive(Clone)]
 pub struct Edit {
     base: crate::scoped::Base,
-    inner: Editor,
+    inner: Option<Editor>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -44,38 +44,57 @@ impl std::fmt::Debug for Edit {
 
 impl Edit {
     fn open(base: crate::scoped::Base) -> Result<Self> {
-        let bytes = base.to_vec();
-        let options = base.options();
-        let inner = Editor::open_with_options(bytes, options)?;
-        Ok(Self { base, inner })
+        Ok(Self { base, inner: None })
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut Editor> {
+        if self.inner.is_none() {
+            let bytes = self.base.to_vec()?;
+            let options = self.base.options();
+            self.inner = Some(Editor::open_with_options(bytes, options)?);
+        }
+        self.inner.as_mut().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "envelope edit was not initialized".into(),
+            ))
+        })
+    }
+
+    fn take_inner(&mut self) -> Result<Editor> {
+        self.inner_mut()?;
+        self.inner.take().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "envelope edit was not initialized".into(),
+            ))
+        })
     }
 
     /// The current immutable semantic envelope snapshot.
-    #[must_use]
-    pub fn envelope(&self) -> &TransactionSnapshot {
-        self.inner.envelope()
+    pub fn envelope(&mut self) -> Result<&TransactionSnapshot> {
+        Ok(self.inner_mut()?.envelope())
     }
 
     /// The current decoded envelope, when present.
-    #[must_use]
-    pub fn value(&self) -> Option<&Envelope> {
-        self.inner.value()
+    pub fn value(&mut self) -> Result<Option<&Envelope>> {
+        Ok(self.inner_mut()?.value())
     }
 
     /// The current supported Office message body, when present.
-    #[must_use]
-    pub fn message(&self) -> Option<&Message> {
-        self.inner.message()
+    pub fn message(&mut self) -> Result<Option<&Message>> {
+        Ok(self.inner_mut()?.message())
     }
 
     /// Set or replace the complete envelope FIB range.
     pub fn set(&mut self, envelope: Envelope) -> Result<()> {
-        self.inner.set(envelope).map(|_| ()).map_err(Error::from)
+        self.inner_mut()?
+            .set(envelope)
+            .map(|_| ())
+            .map_err(Error::from)
     }
 
     /// Set or replace the supported Office message body.
     pub fn set_message(&mut self, message: Message) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_message(message)
             .map(|_| ())
             .map_err(Error::from)
@@ -83,7 +102,7 @@ impl Edit {
 
     /// Replace an existing envelope, rejecting a missing FIB range.
     pub fn replace(&mut self, envelope: Envelope) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .replace(envelope)
             .map(|_| ())
             .map_err(Error::from)
@@ -91,7 +110,7 @@ impl Edit {
 
     /// Apply and publish a clone-first semantic transaction atomically.
     pub fn apply(&mut self, transaction: RecordEdit) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .apply(transaction)
             .map(|_| ())
             .map_err(Error::from)
@@ -102,7 +121,7 @@ impl Edit {
     where
         F: FnOnce(&mut Message),
     {
-        self.inner
+        self.inner_mut()?
             .update_message(edit)
             .map(|_| ())
             .map_err(Error::from)
@@ -110,7 +129,7 @@ impl Edit {
 
     /// Clear the complete envelope FIB range.
     pub fn clear(&mut self) -> Result<()> {
-        self.inner.clear().map(|_| ()).map_err(Error::from)
+        self.inner_mut()?.clear().map(|_| ()).map_err(Error::from)
     }
 
     /// Validate the staged edits and publish them as a new package.
@@ -120,8 +139,8 @@ impl Edit {
     /// Returns an error when the edited part fails validation, the package
     /// cannot be republished, or [`Error::Signed`] for a changed signed
     /// package.
-    pub fn commit(self) -> Result<Commit> {
-        let after = self.inner.finish()?;
+    pub fn commit(mut self) -> Result<Commit> {
+        let after = self.take_inner()?.finish()?;
         Ok(published(self.base.publish(after)?))
     }
 }

@@ -280,7 +280,7 @@ impl Presentation {
     pub fn edit(&self) -> Edit {
         Edit {
             source: self.clone(),
-            draft: self.slides().to_vec(),
+            draft: None,
             replacements: BTreeMap::new(),
         }
     }
@@ -330,7 +330,7 @@ impl<'a> From<&'a str> for Selector<'a> {
 /// An isolated, source-bound replacement edit of a flat presentation.
 pub struct Edit {
     source: Presentation,
-    draft: Vec<Slide>,
+    draft: Option<Vec<Slide>>,
     replacements: BTreeMap<usize, String>,
 }
 
@@ -343,14 +343,16 @@ impl Edit {
 
     /// Discards every staged replacement in place.
     pub fn reset(&mut self) {
-        self.draft = self.source.slides().to_vec();
+        self.draft = None;
         self.replacements.clear();
     }
 
     /// Borrow the staged slide projection.
     #[must_use]
     pub fn slides(&self) -> &[Slide] {
-        &self.draft
+        self.draft
+            .as_deref()
+            .unwrap_or_else(|| self.source.slides())
     }
 
     /// Replace one slide's modeled title and drawing payload.
@@ -365,17 +367,18 @@ impl Edit {
         S: Into<Selector<'a>>,
     {
         check_text(title, text, self.source.bounds)?;
-        let Some(index) = select(&self.draft, selector.into())? else {
+        let Some(index) = select(self.slides(), selector.into())? else {
             return Ok(None);
         };
-        if self.draft[index].title.as_deref() == Some(title) && self.draft[index].text == text {
+        if self.slides()[index].title.as_deref() == Some(title) && self.slides()[index].text == text
+        {
             return Ok(Some(()));
         }
         let range = &self.source.page_ranges[index];
         let source_page = &self.source.xml[range.clone()];
         let replacement = replace_page(source_page, title, text)?;
         self.replacements.insert(index, replacement);
-        let slide = &mut self.draft[index];
+        let slide = &mut self.draft_mut()[index];
         slide.title = (!title.is_empty()).then(|| title.to_owned());
         text.clone_into(&mut slide.text);
         slide.shapes.clear();
@@ -433,7 +436,12 @@ impl Edit {
         push_bounded(&mut output, &xml[cursor..], bounds)?;
         validate_compact_xml(&output, bounds)?;
         let presentation = Presentation::parse(output.as_bytes(), bounds)?;
-        if presentation.slides() != self.draft {
+        if presentation.slides()
+            != self
+                .draft
+                .as_deref()
+                .unwrap_or_else(|| self.source.slides())
+        {
             return invalid("flat ODP commit readback differs from the staged slide model");
         }
         let changed = presentation.as_bytes() != self.source.as_bytes();
@@ -442,6 +450,11 @@ impl Edit {
             after: presentation.clone(),
         };
         Ok(Commit::new(presentation, patch, Diagnostics::new(changed)))
+    }
+
+    fn draft_mut(&mut self) -> &mut Vec<Slide> {
+        self.draft
+            .get_or_insert_with(|| self.source.slides().to_vec())
     }
 }
 

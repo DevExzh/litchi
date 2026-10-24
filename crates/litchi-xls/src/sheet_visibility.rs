@@ -175,10 +175,12 @@ impl Snapshot {
         self.edit_based(None)
     }
 
+    #[cfg(test)]
     fn edit_based(&self, base: crate::scoped::Base) -> Edit {
         Edit {
             base,
-            source: self.clone(),
+            package: None,
+            source: Some(self.clone()),
             changes: Vec::new(),
         }
     }
@@ -297,11 +299,25 @@ struct Change {
 #[derive(Clone)]
 pub struct Edit {
     base: crate::scoped::Base,
-    source: Snapshot,
+    package: Option<crate::Package>,
+    source: Option<Snapshot>,
     changes: Vec<Change>,
 }
 
 impl Edit {
+    fn source_ref(&mut self) -> Result<&Snapshot> {
+        if self.source.is_none() {
+            let package = self.package.clone().ok_or_else(|| {
+                Error::InvalidData("worksheet visibility edit lost its source package".into())
+            })?;
+            let (_, bytes) = crate::scoped::capture(&package)?;
+            self.source = Some(Snapshot::from_bytes(bytes)?);
+        }
+        self.source.as_ref().ok_or_else(|| {
+            Error::InvalidData("worksheet visibility edit source was not retained".into())
+        })
+    }
+
     /// Stages one exact visible, hidden, or very-hidden outcome.
     ///
     /// # Errors
@@ -313,8 +329,8 @@ impl Edit {
         selector: Selector<'_>,
         visibility: SheetVisibility,
     ) -> Result<&mut Self> {
-        let sheet = self
-            .source
+        let source = self.source_ref()?.clone();
+        let sheet = source
             .resolve(selector)?
             .ok_or_else(|| Error::WorksheetNotFound("visibility edit worksheet selector".into()))?;
         if let Some(change) = self.changes.iter_mut().find(|change| change.sheet == sheet) {
@@ -325,7 +341,7 @@ impl Edit {
             }
             return Ok(self);
         }
-        let before = self.source.inner.sheets[sheet].visibility;
+        let before = source.inner.sheets[sheet].visibility;
         if before == visibility {
             return Ok(self);
         }
@@ -398,23 +414,23 @@ impl Edit {
         Ok(Commit::new(package, record.patch, record.diagnostics))
     }
 
-    pub(crate) fn commit_record(self) -> Result<RecordCommit> {
+    pub(crate) fn commit_record(mut self) -> Result<RecordCommit> {
+        let source = self.source_ref()?.clone();
         if self.changes.is_empty() {
             let patch = Patch::new(
-                Arc::clone(&self.source.inner.bytes),
-                Arc::clone(&self.source.inner.bytes),
+                Arc::clone(&source.inner.bytes),
+                Arc::clone(&source.inner.bytes),
             );
             return Ok(RecordCommit {
-                snapshot: self.source,
+                snapshot: source,
                 patch,
                 diagnostics: Diagnostics::default(),
             });
         }
-        require_final_visible_worksheet(&self.source, &self.changes)?;
-        let mut workbook = self.source.inner.workbook_stream.to_vec();
+        require_final_visible_worksheet(&source, &self.changes)?;
+        let mut workbook = source.inner.workbook_stream.to_vec();
         for change in &self.changes {
-            let entry = self
-                .source
+            let entry = source
                 .inner
                 .sheets
                 .get(change.sheet)
@@ -434,13 +450,13 @@ impl Edit {
             *field = encode_visibility(change.after);
         }
         let package = ObjectPackage::open_with_options(
-            self.source.inner.bytes.to_vec(),
+            source.inner.bytes.to_vec(),
             OpenOptions::new()
                 .targets(Targets::default())
                 .limits(Limits::default()),
         )?;
         let mut editor = package.edit()?;
-        editor.put_stream_shared(&self.source.inner.workbook_path, Arc::from(workbook))?;
+        editor.put_stream_shared(&source.inner.workbook_path, Arc::from(workbook))?;
         let snapshot = Snapshot::open_package(editor.commit()?.into_package())?;
         for change in &self.changes {
             if snapshot
@@ -455,9 +471,9 @@ impl Edit {
                 ));
             }
         }
-        certify_workbook_transition(&self.source, &snapshot)?;
+        certify_workbook_transition(&source, &snapshot)?;
         let patch = Patch::new(
-            Arc::clone(&self.source.inner.bytes),
+            Arc::clone(&source.inner.bytes),
             Arc::clone(&snapshot.inner.bytes),
         );
         Ok(RecordCommit {
@@ -486,7 +502,8 @@ impl Edit {
     /// `BoundSheet8` state, an invalid final-visible-sheet outcome, a changed
     /// stream length, failed complete semantic readback, or a bounded CFB
     /// overlay failure.
-    pub(crate) fn commit_source_backed(self) -> Result<SourceBackedCommit> {
+    pub(crate) fn commit_source_backed(mut self) -> Result<SourceBackedCommit> {
+        let source_snapshot = self.source_ref()?.clone();
         let effective: Vec<_> = self
             .changes
             .iter()
@@ -494,7 +511,7 @@ impl Edit {
             .collect();
 
         if !effective.is_empty() {
-            require_final_visible_worksheet(&self.source, &self.changes)?;
+            require_final_visible_worksheet(&source_snapshot, &self.changes)?;
         }
 
         let mut splices = Vec::new();
@@ -502,17 +519,16 @@ impl Edit {
             .try_reserve_exact(effective.len())
             .map_err(|_error| Error::Allocation("staging source-backed visibility splices"))?;
         for change in &effective {
-            let entry = self
-                .source
-                .inner
-                .sheets
-                .get(change.sheet)
-                .ok_or(Error::PatchConflict {
-                    operation: "edit sheet visibility",
-                    reason: "source-backed worksheet visibility owner is stale",
-                })?;
-            let field = self
-                .source
+            let entry =
+                source_snapshot
+                    .inner
+                    .sheets
+                    .get(change.sheet)
+                    .ok_or(Error::PatchConflict {
+                        operation: "edit sheet visibility",
+                        reason: "source-backed worksheet visibility owner is stale",
+                    })?;
+            let field = source_snapshot
                 .inner
                 .workbook_stream
                 .get(entry.visibility_offset)
@@ -530,7 +546,7 @@ impl Edit {
                 Error::InvalidData("BoundSheet8 visibility offset exceeds u64".into())
             })?;
             splices.push(SameLengthStreamSplice::new(
-                self.source.inner.workbook_path.clone(),
+                source_snapshot.inner.workbook_path.clone(),
                 offset,
                 Arc::from(vec![before]),
                 Arc::from(vec![encode_visibility(change.after)]),
@@ -542,7 +558,7 @@ impl Edit {
         // length)` identity the previous private adapter reported, so the
         // composed target's version is unchanged; the sealed provenance lets
         // the plan compute its digests once instead of re-proving them.
-        let source = Arc::clone(&self.source.inner.bytes);
+        let source = Arc::clone(&source_snapshot.inner.bytes);
         let source_version =
             SourceVersion::new(source.as_ptr() as usize as u64, source.len() as u64);
         let publisher = SourceBackedOverlayPublisher::open_owned(
@@ -553,17 +569,17 @@ impl Edit {
         .map_err(overlay_to_error)?;
         let (plan, owner_validated) = publisher
             .plan_splices_with_owner(splices, StreamSpliceLimits::default(), |candidate| {
-                verify_source_backed_candidate(candidate.clone(), &self.source, &effective)
+                verify_source_backed_candidate(candidate.clone(), &source_snapshot, &effective)
                     .map_err(VisibilityOwnerError::Owner)
             })
             .map_err(VisibilityOwnerError::into_error)?;
         if owner_validated.is_none() {
-            verify_source_backed_readback(&plan, &self.source, &effective)?;
+            verify_source_backed_readback(&plan, &source_snapshot, &effective)?;
         }
 
-        let source_workbook_bytes = u64::try_from(self.source.inner.workbook_stream.len())
+        let source_workbook_bytes = u64::try_from(source_snapshot.inner.workbook_stream.len())
             .map_err(|_error| Error::InvalidData("Workbook stream length exceeds u64".into()))?;
-        let source_bytes = u64::try_from(self.source.inner.bytes.len())
+        let source_bytes = u64::try_from(source_snapshot.inner.bytes.len())
             .map_err(|_error| Error::InvalidData("source CFB length exceeds u64".into()))?;
         let diagnostics = SourceBackedDiagnostics {
             changed_worksheets: effective.len(),
@@ -580,7 +596,7 @@ impl Edit {
             target_fingerprint: plan.target_fingerprint(),
         };
         Ok(SourceBackedCommit {
-            source: self.source,
+            source: source_snapshot,
             plan,
             diagnostics,
         })
@@ -677,8 +693,19 @@ impl crate::Package {
     ///
     /// Returns an error for an encrypted, protected or unsupported workbook.
     pub fn edit_sheet_visibility(&self) -> Result<Edit> {
-        let (base, bytes) = crate::scoped::capture(self)?;
-        Ok(Snapshot::from_bytes(bytes)?.edit_based(base))
+        if self.is_encrypted() {
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit sheet visibility",
+                "an encrypted workbook cannot be republished by a scoped edit",
+            ));
+        }
+        Ok(Edit {
+            base: Some(self.clone()),
+            package: Some(self.clone()),
+            source: None,
+            changes: Vec::new(),
+        })
     }
 
     /// Replay a worksheet-visibility patch onto the exact package it was

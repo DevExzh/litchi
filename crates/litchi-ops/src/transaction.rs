@@ -1842,7 +1842,7 @@ impl Edit {
                 .as_mut()
                 .ok_or_else(|| crate::Error::new(Code::InternalError, "DOC body run missing"))?;
             let changed = run.stage(plan, _index, _spelling)?;
-            let bytes = self.snapshot_bytes.saturating_add(run.snapshot_bytes());
+            let bytes = self.snapshot_bytes.saturating_add(run.snapshot_bytes()?);
             if bytes > self.limits.max_snapshot_bytes() {
                 return Err(Error::Limit {
                     kind: LimitKind::SnapshotBytes,

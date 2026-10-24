@@ -29,7 +29,8 @@ fn deck() -> Result<Package> {
 }
 
 fn slide_xml(package: &Package) -> Result<Vec<u8>> {
-    let part = package.edit()?.slides()[0].part_name().clone();
+    let mut edit = package.edit()?;
+    let part = edit.slides()?[0].part_name().clone();
     Ok(package.opc()?.get_part(&part)?.blob().to_vec())
 }
 
@@ -923,11 +924,14 @@ fn text_indexes_of_the_corpus_equal_the_readers() -> Result<()> {
             let Ok(package) = Package::from_bytes(&std::fs::read(&path)?) else {
                 continue;
             };
-            let Ok(edit) = package.edit() else {
+            let Ok(mut edit) = package.edit() else {
                 continue;
             };
             let opc = package.opc()?;
-            for slide in edit.slides() {
+            let Ok(slides) = edit.slides() else {
+                continue;
+            };
+            for slide in slides {
                 let xml = opc.get_part(slide.part_name())?.blob().to_vec();
                 let Ok(scene) = crate::shape::owned::Scene::read(xml) else {
                     continue;

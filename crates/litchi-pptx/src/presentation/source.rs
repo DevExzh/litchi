@@ -415,8 +415,9 @@ fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
 /// before parsing or authoring. The scene is indexed once before authoring and
 /// the candidate is indexed again during semantic readback, so both bounded
 /// scene policies plus the escaped fragment and lexical output stay inside
-/// the caller's admission. The reservation is deliberately conservative and
-/// capped by the caller-selected source output ceiling.
+/// the caller's execution-budget admission. The source output ceiling still
+/// bounds the candidate bytes, while derived scene memory is governed by the
+/// execution context rather than that semantic output limit.
 fn reserve_source_text_box(
     context: Option<&ExecutionContext>,
     input_bytes: usize,
@@ -459,7 +460,6 @@ fn reserve_source_text_box(
     let amount = input_scene
         .checked_add(output_scene)
         .and_then(|size| size.checked_add(transient))
-        .filter(|amount| *amount <= maximum)
         .ok_or(Error::Limit {
             resource: "source-backed text-box admission bytes",
             limit: maximum,

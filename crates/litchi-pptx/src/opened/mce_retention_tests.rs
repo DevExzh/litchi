@@ -271,9 +271,9 @@ fn transaction_and_commit_release_hooks_are_value_preserving() -> Result<()> {
     let slides = source.slides().to_vec();
 
     let mut transaction = source.edit();
-    assert!(transaction.retained_mce_bytes() > 0);
+    assert!(transaction.retained_mce_bytes()? > 0);
     transaction.release_retained_mce();
-    assert_eq!(transaction.retained_mce_bytes(), 0);
+    assert_eq!(transaction.retained_mce_bytes()?, 0);
     let mut commit = transaction.commit()?;
     assert!(!commit.diagnostics().changed());
     assert_eq!(commit.snapshot().revision(), revision);

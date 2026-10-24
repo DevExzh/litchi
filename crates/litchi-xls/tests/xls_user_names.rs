@@ -571,6 +571,31 @@ fn package_owner_is_exact_for_noop_and_reversible_for_changed_stream() {
 }
 
 #[test]
+fn package_edit_entry_and_drop_are_deferred_until_a_user_names_operation() {
+    let guid = [0x42; 16];
+    let source_bytes =
+        workbook_container(user_names_stream(guid, "Alice"), revision_log_stream(guid));
+    let source =
+        UserNamesPackageSnapshot::from_bytes(source_bytes.clone(), UserNamesLimits::default())
+            .unwrap();
+    let package = xls_package(&source);
+
+    let edit = package.edit_user_names().unwrap();
+    assert!(format!("{edit:?}").contains("materialized: false"));
+    drop(edit);
+
+    let noop = package.edit_user_names().unwrap().commit().unwrap();
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.patch().before(), source_bytes.as_slice());
+    assert_eq!(noop.patch().after(), source_bytes.as_slice());
+
+    let mut changed = package.edit_user_names().unwrap();
+    assert!(format!("{changed:?}").contains("materialized: false"));
+    changed.set_user_name(0, "Bob").unwrap();
+    assert!(format!("{changed:?}").contains("materialized: true"));
+}
+
+#[test]
 fn package_owner_accepts_official_rrdhead_code_pages_and_keeps_unicode_user_name() {
     for (index, code_page) in [437u16, 850, 20_127, 1_201, 12_000].into_iter().enumerate() {
         let guid = [0x80 + u8::try_from(index).unwrap(); 16];

@@ -28,7 +28,7 @@ impl From<TransactionError> for Error {
 #[derive(Clone)]
 pub struct Edit {
     base: crate::scoped::Base,
-    inner: Transaction,
+    inner: Option<Transaction>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -42,13 +42,32 @@ impl std::fmt::Debug for Edit {
 
 impl Edit {
     fn open(base: crate::scoped::Base) -> Result<Self> {
-        let snapshot = Snapshot::open_with_policy(
-            base.to_vec(),
-            base.options().revision_limits_value(),
-            base.options().protection_policy_value(),
-        )?;
-        let inner = snapshot.edit();
-        Ok(Self { base, inner })
+        Ok(Self { base, inner: None })
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut Transaction> {
+        if self.inner.is_none() {
+            let snapshot = Snapshot::open_with_policy(
+                self.base.to_vec()?,
+                self.base.options().revision_limits_value(),
+                self.base.options().protection_policy_value(),
+            )?;
+            self.inner = Some(snapshot.edit());
+        }
+        self.inner.as_mut().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "embedded-object edit was not initialized".into(),
+            ))
+        })
+    }
+
+    fn take_inner(&mut self) -> Result<Transaction> {
+        self.inner_mut()?;
+        self.inner.take().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "embedded-object edit was not initialized".into(),
+            ))
+        })
     }
 
     /// Returns the current candidate inventory without publishing it.
@@ -57,8 +76,8 @@ impl Edit {
     ///
     /// Returns an error when the candidate contains an unresolved field
     /// reference or malformed recognized metadata.
-    pub fn inventory(&self) -> Result<Inventory> {
-        Ok(self.inner.inventory()?)
+    pub fn inventory(&mut self) -> Result<Inventory> {
+        Ok(self.inner_mut()?.inventory()?)
     }
 
     /// Returns current managed field references in document order.
@@ -67,8 +86,8 @@ impl Edit {
     ///
     /// Returns an error when a field reference has no owning `ObjectPool`
     /// storage.
-    pub fn objects(&self) -> Result<Vec<Reference>> {
-        Ok(self.inner.objects()?)
+    pub fn objects(&mut self) -> Result<Vec<Reference>> {
+        Ok(self.inner_mut()?.objects()?)
     }
 
     /// Adds one field and its inert `ObjectPool` storage.
@@ -78,7 +97,7 @@ impl Edit {
     /// Returns an error when the options, field tables, payload bounds, or
     /// candidate CFB cannot be validated atomically.
     pub fn add(&mut self, options: WriteOptions) -> Result<Reference> {
-        Ok(self.inner.add(options)?)
+        Ok(self.inner_mut()?.add(options)?)
     }
 
     /// Removes one managed field and its owning `ObjectPool` storage.
@@ -88,7 +107,7 @@ impl Edit {
     /// Returns an error when the storage ID is not referenced or the candidate
     /// field/package rewrite fails validation.
     pub fn remove(&mut self, storage_id: u32) -> Result<Reference> {
-        Ok(self.inner.remove(storage_id)?)
+        Ok(self.inner_mut()?.remove(storage_id)?)
     }
 
     /// Reorders the managed embedded-object suffix by semantic storage ID.
@@ -98,7 +117,7 @@ impl Edit {
     /// Returns an error when the IDs are not a complete valid permutation or
     /// the candidate field/package rewrite fails validation.
     pub fn reorder(&mut self, storage_ids: &[u32]) -> Result<()> {
-        Ok(self.inner.reorder(storage_ids)?)
+        Ok(self.inner_mut()?.reorder(storage_ids)?)
     }
 
     /// Replaces one complete standalone object CFB without activating it.
@@ -112,7 +131,9 @@ impl Edit {
     /// Returns an error when the storage ID is not referenced, the replacement
     /// is malformed/oversized, or the candidate package cannot be validated.
     pub fn replace_storage(&mut self, storage_id: u32, compound_file: Vec<u8>) -> Result<()> {
-        Ok(self.inner.replace_storage(storage_id, compound_file)?)
+        Ok(self
+            .inner_mut()?
+            .replace_storage(storage_id, compound_file)?)
     }
 
     /// Replaces or creates the passive `\x03ObjInfo` ODT metadata stream.
@@ -122,7 +143,7 @@ impl Edit {
     /// Returns an error when the storage ID is not referenced, the typed ODT
     /// is invalid, or the candidate package cannot be validated.
     pub fn set_info(&mut self, storage_id: u32, info: Info) -> Result<()> {
-        Ok(self.inner.set_info(storage_id, info)?)
+        Ok(self.inner_mut()?.set_info(storage_id, info)?)
     }
 
     /// Clone-edits one existing, valid passive `\x03ObjInfo` ODT value.
@@ -135,7 +156,7 @@ impl Edit {
     where
         F: FnOnce(&mut Info),
     {
-        Ok(self.inner.update_info(storage_id, edit)?)
+        Ok(self.inner_mut()?.update_info(storage_id, edit)?)
     }
 
     /// Clone-edits inert OLEDS `\x01Ole` metadata without resolving its link.
@@ -155,7 +176,7 @@ impl Edit {
             &mut litchi_ole_common::object::link::Link,
         ) -> std::result::Result<(), litchi_ole_common::Error>,
     {
-        Ok(self.inner.update_link(storage_id, limits, edit)?)
+        Ok(self.inner_mut()?.update_link(storage_id, limits, edit)?)
     }
 
     /// Clone-edits one presentation under explicit OLEDS limits.
@@ -170,7 +191,7 @@ impl Edit {
         F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         Ok(self
-            .inner
+            .inner_mut()?
             .update_presentation(storage_id, index, limits, edit)?)
     }
 
@@ -186,7 +207,7 @@ impl Edit {
         F: FnOnce(&mut presentation::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         Ok(self
-            .inner
+            .inner_mut()?
             .update_presentation_for(reference, index, limits, edit)?)
     }
 
@@ -198,7 +219,7 @@ impl Edit {
         patch: &presentation::Patch,
     ) -> Result<()> {
         Ok(self
-            .inner
+            .inner_mut()?
             .apply_presentation_patch(storage_id, index, patch)?)
     }
 
@@ -210,7 +231,7 @@ impl Edit {
         patch: &presentation::Patch,
     ) -> Result<()> {
         Ok(self
-            .inner
+            .inner_mut()?
             .apply_presentation_patch_for(reference, index, patch)?)
     }
 
@@ -224,7 +245,7 @@ impl Edit {
     where
         F: FnOnce(&mut native::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
-        Ok(self.inner.update_native(storage_id, limits, edit)?)
+        Ok(self.inner_mut()?.update_native(storage_id, limits, edit)?)
     }
 
     /// Clone-edits reference-selected native data under explicit limits.
@@ -237,12 +258,14 @@ impl Edit {
     where
         F: FnOnce(&mut native::Edit) -> std::result::Result<(), litchi_ole_common::Error>,
     {
-        Ok(self.inner.update_native_for(reference, limits, edit)?)
+        Ok(self
+            .inner_mut()?
+            .update_native_for(reference, limits, edit)?)
     }
 
     /// Applies a source-checked native-data patch to one managed object.
     pub fn apply_native_patch(&mut self, storage_id: u32, patch: &native::Patch) -> Result<()> {
-        Ok(self.inner.apply_native_patch(storage_id, patch)?)
+        Ok(self.inner_mut()?.apply_native_patch(storage_id, patch)?)
     }
 
     /// Applies a native-data patch selected by a DOC object reference.
@@ -251,7 +274,7 @@ impl Edit {
         reference: &Reference,
         patch: &native::Patch,
     ) -> Result<()> {
-        Ok(self.inner.apply_native_patch_for(reference, patch)?)
+        Ok(self.inner_mut()?.apply_native_patch_for(reference, patch)?)
     }
 
     /// Appends a native Equation.3 EMBED field with a real PICF bitmap
@@ -262,7 +285,7 @@ impl Edit {
     /// Returns an error when the equation, preview or candidate package
     /// cannot be validated; the staged state is unchanged.
     pub fn add_mtef_equation(&mut self, options: MtefEquationWriteOptions) -> Result<Reference> {
-        Ok(self.inner.add_mtef_equation(options)?)
+        Ok(self.inner_mut()?.add_mtef_equation(options)?)
     }
 
     /// Validate the staged edits and publish them as a new package.
@@ -272,8 +295,8 @@ impl Edit {
     /// Returns an error when the protection policy refuses a changed write,
     /// the package cannot be republished, or [`Error::Signed`] for a changed
     /// signed package.
-    pub fn commit(self) -> Result<Commit> {
-        let after = self.inner.commit()?.into_patch().after().to_vec();
+    pub fn commit(mut self) -> Result<Commit> {
+        let after = self.take_inner()?.commit()?.into_patch().after().to_vec();
         Ok(published(self.base.publish(after)?))
     }
 }

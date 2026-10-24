@@ -104,9 +104,9 @@ fn direct_publication_keeps_the_candidate_independent_of_source_drift() -> Resul
 fn no_op_package_and_commit_debug_do_not_disclose_document_content() -> Result<()> {
     let source = opened()?;
     let original = source.to_bytes()?;
-    let edit = source.edit()?;
+    let mut edit = source.edit()?;
     let edit_debug = format!("{edit:?}");
-    let source_debug = format!("{:?}", edit.source());
+    let source_debug = format!("{:?}", edit.source()?);
     let commit = edit.commit()?;
     let debug = format!("{commit:?} {:?} {:?}", commit.package(), commit.patch());
     for value in [&edit_debug, &source_debug, &debug] {

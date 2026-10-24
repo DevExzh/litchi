@@ -57,9 +57,8 @@ fn expected() -> Vec<(Option<String>, u32, Option<String>)> {
 }
 
 fn slide_xml(package: &Package, position: usize) -> Vec<u8> {
-    let part = package.edit().unwrap().slides()[position]
-        .part_name()
-        .clone();
+    let mut edit = package.edit().unwrap();
+    let part = edit.slides().unwrap()[position].part_name().clone();
     package
         .opc()
         .unwrap()

@@ -38,7 +38,7 @@ fn unsupported_real_producer_pages_are_refused_before_staging() {
     let source_bytes = fixture("tdf169979.odp");
     let source = Package::from_bytes(&source_bytes).unwrap();
     let mut transaction = source.edit().unwrap();
-    let before = transaction.slides().to_vec();
+    let before = transaction.slides().unwrap().to_vec();
     let error = transaction
         .move_slide(0, edit::SlidePosition::Last)
         .unwrap_err();
@@ -47,7 +47,7 @@ fn unsupported_real_producer_pages_are_refused_before_staging() {
             .to_string()
             .contains("declarations or settings cannot yet be reordered losslessly")
     );
-    assert_eq!(transaction.slides(), before);
+    assert_eq!(transaction.slides().unwrap(), before);
     let commit = transaction.commit().unwrap();
     assert!(!commit.diagnostics().changed());
     assert_eq!(commit.package().as_bytes(), source_bytes);
@@ -92,13 +92,13 @@ fn retained_declarations_and_settings_are_conservatively_refused() {
     writer.add_file("content.xml", CONTENT).unwrap();
     let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
     let mut transaction = source.edit().unwrap();
-    let before = transaction.slides().to_vec();
+    let before = transaction.slides().unwrap().to_vec();
 
     let error = transaction
         .move_slide(0, edit::SlidePosition::Last)
         .unwrap_err();
     assert!(error.to_string().contains("declarations or settings"));
-    assert_eq!(transaction.slides(), before);
+    assert_eq!(transaction.slides().unwrap(), before);
     let commit = transaction.commit().unwrap();
     assert!(!commit.diagnostics().changed());
     assert_eq!(commit.package().as_bytes(), source.as_bytes());
@@ -225,6 +225,7 @@ fn staged_coordinates_cover_middle_first_last_noop_and_atomic_failures() {
     assert_eq!(
         transaction
             .slides()
+            .unwrap()
             .iter()
             .map(|slide| slide.title.as_deref().unwrap())
             .collect::<Vec<_>>(),
@@ -237,25 +238,26 @@ fn staged_coordinates_cover_middle_first_last_noop_and_atomic_failures() {
     assert_eq!(
         transaction
             .slides()
+            .unwrap()
             .iter()
             .map(|slide| slide.title.as_deref().unwrap())
             .collect::<Vec<_>>(),
         ["D", "A", "C", "B"]
     );
-    let before_failure = transaction.slides().to_vec();
+    let before_failure = transaction.slides().unwrap().to_vec();
     assert!(
         transaction
             .move_slide(1, edit::SlidePosition::Index(4))
             .is_err()
     );
-    assert_eq!(transaction.slides(), before_failure);
+    assert_eq!(transaction.slides().unwrap(), before_failure);
     assert!(
         transaction
             .move_slide("missing", edit::SlidePosition::First)
             .unwrap()
             .is_none()
     );
-    assert_eq!(transaction.slides(), before_failure);
+    assert_eq!(transaction.slides().unwrap(), before_failure);
     transaction
         .move_slide(0, edit::SlidePosition::Index(2))
         .unwrap()
@@ -263,14 +265,15 @@ fn staged_coordinates_cover_middle_first_last_noop_and_atomic_failures() {
     assert_eq!(
         transaction
             .slides()
+            .unwrap()
             .iter()
             .map(|slide| slide.title.as_deref().unwrap())
             .collect::<Vec<_>>(),
         ["A", "C", "D", "B"]
     );
-    let before_mixed_edit = transaction.slides().to_vec();
+    let before_mixed_edit = transaction.slides().unwrap().to_vec();
     assert!(transaction.remove(0).is_err());
-    assert_eq!(transaction.slides(), before_mixed_edit);
+    assert_eq!(transaction.slides().unwrap(), before_mixed_edit);
     let commit = transaction.commit().unwrap();
     Package::from_bytes(commit.package().as_bytes())
         .unwrap()
@@ -294,13 +297,13 @@ fn page_indexed_operation_conflict_is_refused_without_moving_slides() {
     transaction
         .add_annotation(&litchi_odp::annotation::Anchor::page(1), &annotation)
         .unwrap();
-    let before = transaction.slides().to_vec();
+    let before = transaction.slides().unwrap().to_vec();
 
     let error = transaction
         .move_slide(0, edit::SlidePosition::Last)
         .unwrap_err();
     assert!(error.to_string().contains("page-indexed operations"));
-    assert_eq!(transaction.slides(), before);
+    assert_eq!(transaction.slides().unwrap(), before);
 
     let commit = transaction.commit().unwrap();
     let reopened = commit.package().presentation().unwrap();

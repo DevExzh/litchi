@@ -411,8 +411,8 @@ pub struct Snapshot {
     pub(crate) owner_state: Arc<crate::package::OpenedOwnerState>,
     pub(crate) package: Arc<OpcPackage>,
     pub(crate) presentation_name: PackURI,
-    pub(crate) slides: Vec<Slide>,
-    pub(crate) slide_name_index: SlideNameIndex,
+    pub(crate) slides: Arc<Vec<Slide>>,
+    pub(crate) slide_name_index: Arc<SlideNameIndex>,
     pub(crate) revision: [u8; 32],
     pub(crate) limits: Limits,
     pub(crate) physical_source_provenance: bool,
@@ -644,7 +644,7 @@ impl Snapshot {
     /// Slides in current presentation order.
     #[must_use]
     pub fn slides(&self) -> &[Slide] {
-        &self.slides
+        self.slides.as_ref()
     }
 
     /// Fingerprint of the complete captured OPC graph.
@@ -978,8 +978,8 @@ fn capture_internal(
         owner_state: Arc::default(),
         package: owned,
         presentation_name,
-        slides,
-        slide_name_index,
+        slides: Arc::new(slides),
+        slide_name_index: Arc::new(slide_name_index),
         revision,
         limits,
         physical_source_provenance,

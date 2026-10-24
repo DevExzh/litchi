@@ -35,7 +35,7 @@ fn reopen(package: &Package) -> litchi_doc::Document {
 
 /// Commit `edit`, check that the patch inverts to the exact source bytes,
 /// and return the published package.
-fn commit(source: &Package, edit: litchi_doc::Edit) -> Package {
+fn commit(source: &Package, edit: litchi_doc::Edit<'static>) -> Package {
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     let (package, patch) = commit.into_parts();

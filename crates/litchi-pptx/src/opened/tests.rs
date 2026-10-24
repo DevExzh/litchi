@@ -673,6 +673,29 @@ fn opened_plain_slide_package() -> Result<Package> {
     Package::from_reader(std::io::Cursor::new(bytes))
 }
 
+#[test]
+fn package_edit_defers_capture_until_first_use() -> Result<()> {
+    let package = opened_plain_slide_package()?;
+    let _setup = super::model::fingerprint_log::take();
+    {
+        let edit = package.edit()?;
+        drop(edit);
+    }
+    assert!(
+        super::model::fingerprint_log::take().is_empty(),
+        "constructing and dropping an edit must not capture the package"
+    );
+
+    let mut edit = package.edit()?;
+    assert!(super::model::fingerprint_log::take().is_empty());
+    assert_eq!(edit.slides()?.len(), 1);
+    assert!(
+        !super::model::fingerprint_log::take().is_empty(),
+        "the first semantic use must materialize the existing capture path"
+    );
+    Ok(())
+}
+
 fn borrowed_plain_slide_package() -> Result<Package> {
     let package = opened_plain_slide_package()?;
     Package::from_bytes(&package.to_bytes()?)
@@ -735,7 +758,7 @@ fn opened_slide_name_index_preserves_ambiguity() -> Result<()> {
         Err(Error::AmbiguousSlideName { matches: 2, .. })
     ));
     assert!(edit.swap_slides(litchi_core::Position::new(0), litchi_core::Position::new(1))?);
-    assert_eq!(edit.slides()[0].id(), snapshot.slides()[1].id());
+    assert_eq!(edit.slides()?[0].id(), snapshot.slides()[1].id());
     Ok(())
 }
 

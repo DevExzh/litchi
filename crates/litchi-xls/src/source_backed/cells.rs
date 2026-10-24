@@ -15,16 +15,38 @@ pub use crate::cell_values::source_diagnostics::Diagnostics;
 #[derive(Clone)]
 pub struct Edit {
     source: SourceBackedWorkbook,
-    inner: crate::cell_values::Edit,
+    inner: Option<crate::cell_values::Edit>,
 }
 
 impl std::fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_struct("Edit").finish_non_exhaustive()
+        formatter
+            .debug_struct("Edit")
+            .field("materialized", &self.inner.is_some())
+            .finish_non_exhaustive()
     }
 }
 
 impl Edit {
+    fn inner_mut(&mut self) -> Result<&mut crate::cell_values::Edit> {
+        if self.inner.is_none() {
+            let package = self
+                .source
+                .staging_package()
+                .map_err(|error| crate::source_backed::protected_edit_error(error, "edit cells"))?;
+            let snapshot = package.cell_values().map_err(|error| {
+                crate::source_backed::protected_edit_error(
+                    crate::scoped::package_error(error),
+                    "edit cells",
+                )
+            })?;
+            self.inner = Some(snapshot.edit());
+        }
+        self.inner.as_mut().ok_or(Error::Internal(
+            "source-backed cell edit engine was not retained",
+        ))
+    }
+
     /// Stage a number into an existing numeric cell.
     ///
     /// # Errors
@@ -36,7 +58,8 @@ impl Edit {
         reference: Reference,
         value: f64,
     ) -> Result<()> {
-        self.inner.set_number(selector.into(), reference, value)?;
+        self.inner_mut()?
+            .set_number(selector.into(), reference, value)?;
         Ok(())
     }
 
@@ -51,7 +74,8 @@ impl Edit {
         reference: Reference,
         value: f64,
     ) -> Result<()> {
-        self.inner.set_numeric(selector.into(), reference, value)?;
+        self.inner_mut()?
+            .set_numeric(selector.into(), reference, value)?;
         Ok(())
     }
 
@@ -67,7 +91,8 @@ impl Edit {
         reference: Reference,
         value: Value,
     ) -> Result<()> {
-        self.inner.set_value(selector.into(), reference, value)?;
+        self.inner_mut()?
+            .set_value(selector.into(), reference, value)?;
         Ok(())
     }
 
@@ -85,7 +110,22 @@ impl Edit {
         // publish an overlay validated against stale source bytes.
         let source = self.source.clone();
         source.ensure_original_source_current()?;
-        let planned = self.inner.commit_source_backed_plan()?;
+        let inner = match self.inner {
+            Some(inner) => inner,
+            None => {
+                let package = source.staging_package().map_err(|error| {
+                    crate::source_backed::protected_edit_error(error, "edit cells")
+                })?;
+                let snapshot = package.cell_values().map_err(|error| {
+                    crate::source_backed::protected_edit_error(
+                        crate::scoped::package_error(error),
+                        "edit cells",
+                    )
+                })?;
+                snapshot.edit()
+            },
+        };
+        let planned = inner.commit_source_backed_plan()?;
         source.ensure_original_source_current()?;
         let (plan, diagnostics) = planned.into_plan();
         let commit = published_deferred(&source, plan, diagnostics)?;
@@ -117,18 +157,10 @@ impl SourceBackedWorkbook {
     ///
     /// Returns an error when the workbook cannot be read as cell values.
     pub fn edit_cells(&self) -> Result<Edit> {
-        let package = self
-            .staging_package()
-            .map_err(|error| crate::source_backed::protected_edit_error(error, "edit cells"))?;
-        let snapshot = package.cell_values().map_err(|error| {
-            crate::source_backed::protected_edit_error(
-                crate::scoped::package_error(error),
-                "edit cells",
-            )
-        })?;
+        self.ensure_original_source_current()?;
         Ok(Edit {
             source: self.clone(),
-            inner: snapshot.edit(),
+            inner: None,
         })
     }
 

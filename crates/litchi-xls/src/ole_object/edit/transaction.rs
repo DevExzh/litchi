@@ -16,45 +16,96 @@ use super::{Commit, Diagnostics, Patch, Snapshot};
 #[derive(Clone)]
 pub struct Edit {
     base: crate::scoped::Base,
-    source: Snapshot,
-    editor: Editor,
+    package: Option<crate::Package>,
+    source: Option<Snapshot>,
+    editor: Option<Editor>,
+    limits: litchi_ole_common::object::Limits,
 }
 
 impl Edit {
+    #[cfg(test)]
     pub(super) fn new(base: crate::scoped::Base, source: Snapshot) -> Self {
+        let limits = source.limits();
         Self {
             base,
-            editor: source.editor().clone(),
-            source,
+            package: None,
+            editor: Some(source.editor().clone()),
+            source: Some(source),
+            limits,
         }
+    }
+
+    pub(super) fn lazy(
+        base: crate::scoped::Base,
+        package: crate::Package,
+        limits: litchi_ole_common::object::Limits,
+    ) -> Self {
+        Self {
+            base,
+            package: Some(package),
+            source: None,
+            editor: None,
+            limits,
+        }
+    }
+
+    fn ensure_open(&mut self) -> Result<()> {
+        if self.source.is_some() {
+            return Ok(());
+        }
+        let package = self.package.clone().ok_or_else(|| {
+            crate::Error::InvalidData("OLE-object edit lost its source package".into())
+        })?;
+        let (_, bytes) = crate::scoped::capture(&package)?;
+        let source = Snapshot::open(bytes, self.limits)?;
+        let editor = source.editor().clone();
+        self.source = Some(source);
+        self.editor = Some(editor);
+        Ok(())
     }
 
     /// Returns the immutable source snapshot used for publication checks.
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.source
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_open()?;
+        self.source.as_ref().ok_or_else(|| {
+            crate::Error::InvalidData("OLE-object edit source was not retained".into())
+        })
     }
 
     /// Returns the current worksheet count without materializing the CFB.
     #[must_use]
-    pub fn worksheet_count(&self) -> usize {
-        self.editor.worksheet_count()
+    pub fn worksheet_count(&mut self) -> Result<usize> {
+        self.ensure_open()?;
+        Ok(self
+            .editor
+            .as_ref()
+            .ok_or_else(|| crate::Error::InvalidData("OLE-object editor was not retained".into()))?
+            .worksheet_count())
     }
 
     /// Returns the current typed embedded-OLE records for one worksheet.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn objects(&self, worksheet: usize) -> Result<&[OleObjectRecord]> {
-        self.editor.objects(worksheet)
+    pub fn objects(&mut self, worksheet: usize) -> Result<&[OleObjectRecord]> {
+        self.ensure_open()?;
+        self.editor
+            .as_ref()
+            .ok_or_else(|| crate::Error::InvalidData("OLE-object editor was not retained".into()))?
+            .objects(worksheet)
     }
 
     /// Returns the current typed form-control records for one worksheet.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn form_controls(&self, worksheet: usize) -> Result<&[FormControl]> {
-        self.editor.form_controls(worksheet)
+    pub fn form_controls(&mut self, worksheet: usize) -> Result<&[FormControl]> {
+        self.ensure_open()?;
+        self.editor
+            .as_ref()
+            .ok_or_else(|| crate::Error::InvalidData("OLE-object editor was not retained".into()))?
+            .form_controls(worksheet)
     }
 
     /// Adds a typed form-control `Obj` record.
@@ -103,9 +154,14 @@ impl Edit {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_object(&mut self, worksheet: usize, object_id: u16) -> Result<OleObjectRecord> {
-        let mut candidate = self.editor.clone();
+        self.ensure_open()?;
+        let mut candidate = self
+            .editor
+            .as_ref()
+            .ok_or_else(|| crate::Error::InvalidData("OLE-object editor was not retained".into()))?
+            .clone();
         let removed = candidate.remove(worksheet, object_id)?;
-        self.editor = candidate;
+        self.editor = Some(candidate);
         Ok(removed)
     }
 
@@ -119,9 +175,14 @@ impl Edit {
     /// Returns an error if the selected object is absent or is not a valid
     /// storage-backed embedded object.
     pub fn remove_embedded_payload(&mut self, worksheet: usize, object_id: u16) -> Result<()> {
-        let mut candidate = self.editor.clone();
+        self.ensure_open()?;
+        let mut candidate = self
+            .editor
+            .as_ref()
+            .ok_or_else(|| crate::Error::InvalidData("OLE-object editor was not retained".into()))?
+            .clone();
         candidate.remove_embedded_payload(worksheet, object_id)?;
-        self.editor = candidate;
+        self.editor = Some(candidate);
         Ok(())
     }
 
@@ -185,7 +246,8 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_open()?;
         let base = self.base.clone();
         let record = self.commit_record()?;
         let package = crate::scoped::publish(base, record.patch.before(), record.patch.after())?;
@@ -194,9 +256,15 @@ impl Edit {
 
     /// The record-level result: the reopened candidate snapshot, its patch
     /// and diagnostics, before the package is republished.
-    pub(crate) fn commit_record(self) -> Result<RecordCommit> {
-        let before = self.source;
-        let after = self.editor.finish()?;
+    pub(crate) fn commit_record(mut self) -> Result<RecordCommit> {
+        self.ensure_open()?;
+        let before = self.source.take().ok_or_else(|| {
+            crate::Error::InvalidData("OLE-object edit source was not retained".into())
+        })?;
+        let editor = self.editor.take().ok_or_else(|| {
+            crate::Error::InvalidData("OLE-object editor was not retained".into())
+        })?;
+        let after = editor.finish()?;
         let patch = Patch::new(before.bytes().to_vec(), after);
         // Reopen the candidate through the object owner: the commit proves
         // the rendered artifact still validates under its bounds.
@@ -217,9 +285,14 @@ impl Edit {
     where
         F: FnOnce(&mut Editor) -> Result<()>,
     {
-        let mut candidate = self.editor.clone();
+        self.ensure_open()?;
+        let mut candidate = self
+            .editor
+            .as_ref()
+            .ok_or_else(|| crate::Error::InvalidData("OLE-object editor was not retained".into()))?
+            .clone();
         edit(&mut candidate)?;
-        self.editor = candidate;
+        self.editor = Some(candidate);
         Ok(())
     }
 }

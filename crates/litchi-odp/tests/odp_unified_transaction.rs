@@ -453,8 +453,9 @@ fn signed_packages_are_refused_before_a_transaction_can_stage_changes() {
         edit::CryptoCapability::Refused(edit::CryptoRefusal::SignatureRemovalUnavailable)
     );
 
-    let Err(error) = source.edit() else {
-        panic!("signed package unexpectedly admitted an editing transaction");
+    let error = match source.edit().unwrap().commit() {
+        Ok(_) => panic!("signed package unexpectedly committed"),
+        Err(error) => error,
     };
     assert!(error.to_string().contains("signed packages"));
 }
@@ -489,8 +490,9 @@ fn encrypted_package_entries_are_refused_before_staging() {
         edit::CryptoCapability::Refused(edit::CryptoRefusal::EncryptionAuthoringUnavailable)
     );
 
-    let Err(error) = source.edit() else {
-        panic!("encrypted package unexpectedly admitted an editing transaction");
+    let error = match source.edit().unwrap().commit() {
+        Ok(_) => panic!("encrypted package unexpectedly committed"),
+        Err(error) => error,
     };
     assert!(error.to_string().contains("encrypted package entries"));
 }
