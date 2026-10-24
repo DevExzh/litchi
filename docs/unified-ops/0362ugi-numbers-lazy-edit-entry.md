@@ -62,8 +62,12 @@ The raw logs remain outside the repository at
   Command: `source /home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/env.sh && set -o pipefail && cargo test --offline --locked -p litchi --all-features --test numbers_facade --no-fail-fast --message-format=short 2>&1 | tee /home/zhuhe/code/litchi-worktrees/.coord/numbers-lazy-entry/numbers-facade-test.log`; it reported all 5 facade tests passed and 0 failed.
 
 `cargo fmt --all -- --check` and `git diff --check` passed for the validated
-commit above.  The selector deferral follow-up is statically formatted and
-diff-clean in source commit
-`86c762d2a7284e3d45e2168f86865f13ea9fe3af`; rerun the Numbers, iWork, facade,
-and strict-Clippy commands above on this successor before coordinator
-integration.
+commit above.  The selector-deferral successor `86c762d2a7284e3d45e2168f86865f13ea9fe3af`
+was reviewed and extended in source commit
+`4c2fd76b49` to admit owned selector names against each family's retained or
+transaction ledger before copying, charge chart/image first-use sheet scans,
+and migrate the four standalone fuzz `path()` consumers to the fallible
+accessor.  Rustfmt and `git diff --check` pass for that successor.  Cargo
+validation was not rerun in this turn because the coordinator's build slot
+was transferred to another workstream; rerun the Numbers, iWork, facade, and
+strict-Clippy commands above on `4c2fd76b49` before coordinator integration.
