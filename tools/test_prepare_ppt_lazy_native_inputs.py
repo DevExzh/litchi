@@ -265,6 +265,131 @@ class PptPreparationTests(unittest.TestCase):
                 prep._status_paths(receipt["baseline"]["after_overlay"]["status"]),
             )
 
+    def test_rejects_wrong_baseline_before_sparse_materialization(self) -> None:
+        fixture = b"reviewed fixture\n"
+        compile_path = Path("test-data/compile-fixture-tracked.bin")
+        compile_value = b"tracked compile fixture\n"
+        compile_fixtures = (
+            (compile_path, len(compile_value), hashlib.sha256(compile_value).hexdigest()),
+        )
+        with tempfile.TemporaryDirectory(prefix="ppt-prep-sparse-identity-") as directory:
+            root = Path(directory)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            old_values = (
+                prep.BASELINE_REF,
+                prep.BASELINE_TREE,
+                prep.BASELINE_LOCK_BYTES,
+                prep.BASELINE_LOCK_SHA256,
+                prep.FIXTURE_BYTES,
+                prep.FIXTURE_SHA256,
+                prep.COMPILE_FIXTURES,
+            )
+            prep.COMPILE_FIXTURES = compile_fixtures
+            try:
+                baseline_ref = repository(
+                    baseline,
+                    baseline=True,
+                    compile_fixtures={compile_path: compile_value},
+                )
+                candidate_ref = repository(
+                    candidate,
+                    baseline=False,
+                    fixture=fixture,
+                    compile_fixtures={compile_path: compile_value},
+                )
+                baseline_tree = git(baseline, "rev-parse", "HEAD^{tree}")
+                subprocess.run(
+                    ["git", "-C", str(baseline), "update-index", "--skip-worktree", "--", str(compile_path)],
+                    check=True,
+                )
+                (baseline / compile_path).unlink()
+                prep.BASELINE_REF = "0" * 40
+                prep.BASELINE_TREE = baseline_tree
+                prep.BASELINE_LOCK_BYTES = len(b"baseline lock\n")
+                prep.BASELINE_LOCK_SHA256 = hashlib.sha256(b"baseline lock\n").hexdigest()
+                prep.FIXTURE_BYTES = len(fixture)
+                prep.FIXTURE_SHA256 = hashlib.sha256(fixture).hexdigest()
+                with self.assertRaisesRegex(prep.PreparationError, "pinned pre-lazy parent"):
+                    prep.prepare(
+                        baseline_root=baseline,
+                        candidate_root=candidate,
+                        candidate_ref=candidate_ref,
+                        candidate_lock_sha256=hashlib.sha256(b"candidate lock\n").hexdigest(),
+                        output=root / "preparation.json",
+                    )
+                self.assertFalse((baseline / compile_path).exists())
+                self.assertEqual(git(baseline, "status", "--porcelain=v1"), "")
+            finally:
+                (
+                    prep.BASELINE_REF,
+                    prep.BASELINE_TREE,
+                    prep.BASELINE_LOCK_BYTES,
+                    prep.BASELINE_LOCK_SHA256,
+                    prep.FIXTURE_BYTES,
+                    prep.FIXTURE_SHA256,
+                    prep.COMPILE_FIXTURES,
+                ) = old_values
+
+    def test_rejects_preexisting_untracked_compile_fixture(self) -> None:
+        fixture = b"reviewed fixture\n"
+        compile_path = Path("test-data/compile-fixture-untracked.bin")
+        compile_value = b"untracked compile fixture\n"
+        compile_fixtures = (
+            (compile_path, len(compile_value), hashlib.sha256(compile_value).hexdigest()),
+        )
+        with tempfile.TemporaryDirectory(prefix="ppt-prep-untracked-") as directory:
+            root = Path(directory)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            old_values = (
+                prep.BASELINE_REF,
+                prep.BASELINE_TREE,
+                prep.BASELINE_LOCK_BYTES,
+                prep.BASELINE_LOCK_SHA256,
+                prep.FIXTURE_BYTES,
+                prep.FIXTURE_SHA256,
+                prep.COMPILE_FIXTURES,
+            )
+            prep.COMPILE_FIXTURES = compile_fixtures
+            try:
+                baseline_ref = repository(baseline, baseline=True)
+                candidate_ref = repository(
+                    candidate,
+                    baseline=False,
+                    fixture=fixture,
+                    compile_fixtures={compile_path: compile_value},
+                )
+                baseline_tree = git(baseline, "rev-parse", "HEAD^{tree}")
+                destination = baseline / compile_path
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(compile_value)
+                prep.BASELINE_REF = baseline_ref
+                prep.BASELINE_TREE = baseline_tree
+                prep.BASELINE_LOCK_BYTES = len(b"baseline lock\n")
+                prep.BASELINE_LOCK_SHA256 = hashlib.sha256(b"baseline lock\n").hexdigest()
+                prep.FIXTURE_BYTES = len(fixture)
+                prep.FIXTURE_SHA256 = hashlib.sha256(fixture).hexdigest()
+                with self.assertRaisesRegex(prep.PreparationError, "outside the pinned tracked tree"):
+                    prep.prepare(
+                        baseline_root=baseline,
+                        candidate_root=candidate,
+                        candidate_ref=candidate_ref,
+                        candidate_lock_sha256=hashlib.sha256(b"candidate lock\n").hexdigest(),
+                        output=root / "preparation.json",
+                    )
+                self.assertEqual(destination.read_bytes(), compile_value)
+            finally:
+                (
+                    prep.BASELINE_REF,
+                    prep.BASELINE_TREE,
+                    prep.BASELINE_LOCK_BYTES,
+                    prep.BASELINE_LOCK_SHA256,
+                    prep.FIXTURE_BYTES,
+                    prep.FIXTURE_SHA256,
+                    prep.COMPILE_FIXTURES,
+                ) = old_values
+
 
 if __name__ == "__main__":
     unittest.main()

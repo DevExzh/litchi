@@ -202,6 +202,29 @@ def _materialize_tracked_baseline_fixture(
     return True
 
 
+def _tracked_baseline_path(root: Path, relative: Path) -> bool:
+    records = _git(root, "ls-files", "-v", "-z", "--", str(relative))
+    return records in (f"H {relative}\0", f"S {relative}\0")
+
+
+def _validate_initial_baseline_state(
+    state: dict[str, Any],
+    *,
+    allowed_sparse_paths: set[str],
+) -> None:
+    """Accept only the tracked fixture omissions caused by sparse checkout."""
+
+    for line in state["status"].splitlines():
+        if len(line) < 3:
+            raise PreparationError(f"malformed baseline status line: {line!r}")
+        paths = _status_paths(line)
+        if len(paths) != 1 or paths[0] not in allowed_sparse_paths or line[:2] not in {" D", "D "}:
+            raise PreparationError(
+                "baseline has unexpected changes before fixture materialization: "
+                f"{line!r}"
+            )
+
+
 def _source_state(root: Path) -> dict[str, Any]:
     root = _resolve(root, must_exist=True)
     top = _resolve(Path(_git(root, "rev-parse", "--show-toplevel")))
@@ -233,7 +256,13 @@ def _status_paths(status: str) -> list[str]:
         # worktree-only modification, that removes its leading status-column
         # space; recognise both the normal three-column form and the compact
         # ``M path`` form rather than silently dropping the first path byte.
-        path = line[2:] if len(line) >= 3 and line[1] == " " else line[3:]
+        if len(line) >= 3 and line[1] == " ":
+            # Normal two-column status such as ``D  path`` has a second
+            # separator before the path; _git's outer strip turns `` M
+            # path`` into the compact ``M path`` form.
+            path = line[3:] if line[2] == " " else line[2:]
+        else:
+            path = line[3:]
         if " -> " in path:
             path = path.split(" -> ", 1)[1]
         paths.append(path)
@@ -323,24 +352,43 @@ def prepare(
     if output.exists() or _under(output, baseline_root) or _under(output, candidate_root):
         raise PreparationError("preparation receipt must be a new file outside both worktrees")
 
+    # Validate the endpoint identity before touching a sparse worktree.  A
+    # wrong endpoint must fail closed rather than being made to look correct
+    # by restoring a reviewed file into it.
+    baseline_initial = _source_state(baseline_root)
+    if baseline_initial["ref"] != BASELINE_REF or baseline_initial["tree"] != BASELINE_TREE:
+        raise PreparationError("baseline is not the pinned pre-lazy parent")
+    sparse_paths: set[str] = set()
+    for relative, _, _ in COMPILE_FIXTURES:
+        tracked = _tracked_baseline_path(baseline_root, relative)
+        destination = _resolve(baseline_root / relative)
+        if tracked:
+            sparse_paths.add(str(relative))
+        elif destination.exists() or destination.is_symlink():
+            raise PreparationError(
+                f"baseline compile fixture exists outside the pinned tracked tree: {relative}"
+            )
+    _validate_initial_baseline_state(
+        baseline_initial,
+        allowed_sparse_paths=sparse_paths,
+    )
+    candidate = _source_state(candidate_root)
+    if candidate["ref"] != candidate_ref or not candidate["clean"]:
+        raise PreparationError("candidate must be clean and at candidate_ref")
+
     # A detached baseline checkout may have a sparse/omitted worktree file for
     # a blob that is nevertheless part of its pinned Git tree.  Materialize
-    # only the reviewed compile fixtures before taking the clean baseline
-    # snapshot; checkout-index restores the exact pinned blob and therefore
-    # leaves the production tree unchanged.
+    # only the reviewed compile fixtures after identity validation;
+    # checkout-index restores the exact pinned blob and therefore leaves the
+    # production tree unchanged.
     for relative, expected_bytes, expected_sha256 in COMPILE_FIXTURES:
         _materialize_tracked_baseline_fixture(
             baseline_root, relative, expected_bytes, expected_sha256
         )
 
     baseline_before = _source_state(baseline_root)
-    candidate = _source_state(candidate_root)
-    if baseline_before["ref"] != BASELINE_REF or baseline_before["tree"] != BASELINE_TREE:
-        raise PreparationError("baseline is not the pinned pre-lazy parent")
     if not baseline_before["clean"]:
         raise PreparationError("baseline must be clean before the external overlay")
-    if candidate["ref"] != candidate_ref or not candidate["clean"]:
-        raise PreparationError("candidate must be clean and at candidate_ref")
 
     baseline_lock = _tracked_regular(baseline_root, BASELINE_LOCK_PATH, "baseline Cargo.lock")
     baseline_lock_identity = _identity(baseline_lock)
@@ -437,6 +485,7 @@ def prepare(
         "status": "prepared",
         "lane": "ppt-lazy-native",
         "baseline": {
+            "sparse_before": baseline_initial,
             "before": baseline_before,
             "after_overlay": baseline_after,
             "ref": baseline_before["ref"],
