@@ -1055,8 +1055,11 @@ fn unrelated_eager_edit_retains_physical_limit_for_connections_read() {
         else {
             continue;
         };
+        let Ok(mut connections_edit) = package.edit_connections() else {
+            continue;
+        };
         if matches!(
-            package.edit_connections(),
+            connections_edit.before(),
             Err(Error::Limit {
                 kind: litchi_xlsx::LimitKind::Connections(
                     litchi_xlsx::connections::LimitKind::Depth,
@@ -1080,8 +1083,12 @@ fn unrelated_eager_edit_retains_physical_limit_for_connections_read() {
         .expect("unrelated cell edit succeeds");
     let committed = edit.commit().expect("unrelated edit commits");
 
+    let mut connections_edit = committed
+        .package()
+        .edit_connections()
+        .expect("connections edit construction is deferred");
     assert!(matches!(
-        committed.package().edit_connections(),
+        connections_edit.before(),
         Err(Error::Limit {
             kind: litchi_xlsx::LimitKind::Connections(litchi_xlsx::connections::LimitKind::Depth),
             ..
@@ -1095,8 +1102,11 @@ fn unrelated_eager_edit_retains_physical_limit_for_connections_read() {
         OpenOptions::new().source_limits(limits),
     )
     .expect("the owning package still admits the deferred member");
+    let mut connections_edit = reopened
+        .edit_connections()
+        .expect("reopened connections edit construction is deferred");
     assert!(matches!(
-        reopened.edit_connections(),
+        connections_edit.before(),
         Err(Error::Limit {
             kind: litchi_xlsx::LimitKind::Connections(litchi_xlsx::connections::LimitKind::Depth),
             ..
@@ -1414,13 +1424,12 @@ fn relationship_xml_cap_includes_inserted_edges_and_removal_inverse_restores_sou
 
     let before_under_removal = package_bytes(&two.package);
     let under_removal_package = two.package.clone();
-    assert!(
-        under_removal_package
-            .edit_custom_data_with_options(options(
-                &CustomDataLimits::new().with_max_relationship_xml_bytes(removal_limit - 1)
-            ))
-            .is_err()
-    );
+    let mut under_removal = under_removal_package
+        .edit_custom_data_with_options(options(
+            &CustomDataLimits::new().with_max_relationship_xml_bytes(removal_limit - 1),
+        ))
+        .expect("one-under removal edit construction is deferred");
+    assert!(under_removal.entries().is_err());
     assert_eq!(package_bytes(&under_removal_package), before_under_removal);
     Package::from_bytes(&before_under_removal)
         .expect("one-under removal rejection leaves a reopenable source");
