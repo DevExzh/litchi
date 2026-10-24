@@ -9,6 +9,7 @@
 use crate::diagram::Limits;
 use crate::{Error, LimitKind, Result};
 use litchi_core::xml::escape_xml;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -767,7 +768,7 @@ fn is_dml_namespace(resolved: &ResolveResult<'_>) -> bool {
 }
 
 fn attribute_value(element: &BytesStart<'_>, name: &[u8]) -> Result<Option<String>> {
-    for attribute in element.attributes().with_checks(true) {
+    for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.local_name().as_ref() == name {
             let value = std::str::from_utf8(attribute.value.as_ref())
@@ -1703,6 +1704,27 @@ fn generate_smartart_quickstyle_xml_unchecked() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn attribute_lookup_checks_large_tags_and_stops_at_duplicate_names() {
+        let attributes = (0..80)
+            .map(|index| format!(" a{index}=\"{index}\""))
+            .collect::<String>();
+        let content = format!("pt{attributes} wanted=\"A &amp; B\"");
+        let element = BytesStart::from_content(content, 2);
+        assert_eq!(
+            attribute_value(&element, b"wanted").unwrap().as_deref(),
+            Some("A & B")
+        );
+        assert_eq!(attribute_value(&element, b"missing").unwrap(), None);
+
+        let duplicate = format!("pt{attributes} a79=\"duplicate wanted='wrong'\" wanted=\"late\"");
+        let element = BytesStart::from_content(duplicate, 2);
+        assert!(matches!(
+            attribute_value(&element, b"wanted"),
+            Err(Error::Xml(_))
+        ));
+    }
 
     #[test]
     fn test_diagram_type_from_uri() {

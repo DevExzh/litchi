@@ -651,7 +651,7 @@ impl Spec {
             )
             .ok_or_else(|| Error::Invalid("SmartArt text length overflows".to_owned()))?;
         let relationship_bytes = drawing_relationship
-            .map(|relationship| escaped_xml_len(relationship))
+            .map(escaped_xml_len)
             .transpose()?
             .unwrap_or(0);
         let capacity = estimated_output(

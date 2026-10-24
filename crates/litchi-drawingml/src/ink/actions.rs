@@ -2169,19 +2169,28 @@ fn validation_profile_attach(
     let Some(frame) = frame else {
         return Err(invalid("ink actions profile value has no parent"));
     };
-    let valid = match (&frame.kind, value) {
+    let valid = matches!(
+        (&frame.kind, value),
         (ValidationFrameKind::Root, ValidationValue::Definitions)
-        | (ValidationFrameKind::Root, ValidationValue::ActionGroup)
-        | (ValidationFrameKind::Root, ValidationValue::Action)
-        | (ValidationFrameKind::ActionGroup { .. }, ValidationValue::Action)
-        | (ValidationFrameKind::Action { .. }, ValidationValue::Property)
-        | (ValidationFrameKind::Action { .. }, ValidationValue::Data)
-        | (ValidationFrameKind::Action { .. }, ValidationValue::DataGroup)
-        | (ValidationFrameKind::DataGroup { .. }, ValidationValue::Data)
-        | (ValidationFrameKind::Data { .. }, ValidationValue::DataChild)
-        | (_, ValidationValue::None) => true,
-        _ => false,
-    };
+            | (ValidationFrameKind::Root, ValidationValue::ActionGroup)
+            | (ValidationFrameKind::Root, ValidationValue::Action)
+            | (
+                ValidationFrameKind::ActionGroup { .. },
+                ValidationValue::Action
+            )
+            | (
+                ValidationFrameKind::Action { .. },
+                ValidationValue::Property
+            )
+            | (ValidationFrameKind::Action { .. }, ValidationValue::Data)
+            | (
+                ValidationFrameKind::Action { .. },
+                ValidationValue::DataGroup
+            )
+            | (ValidationFrameKind::DataGroup { .. }, ValidationValue::Data)
+            | (ValidationFrameKind::Data { .. }, ValidationValue::DataChild)
+            | (_, ValidationValue::None)
+    );
     if valid {
         Ok(())
     } else {

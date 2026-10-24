@@ -1454,11 +1454,11 @@ where
         let Some(replacement) = replacement(character) else {
             continue;
         };
-        writer.write_all(value[cursor..index].as_bytes())?;
+        writer.write_all(&value.as_bytes()[cursor..index])?;
         writer.write_all(replacement.as_bytes())?;
         cursor = index + character.len_utf8();
     }
-    writer.write_all(value[cursor..].as_bytes())?;
+    writer.write_all(&value.as_bytes()[cursor..])?;
     Ok(())
 }
 

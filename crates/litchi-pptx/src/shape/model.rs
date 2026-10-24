@@ -724,14 +724,13 @@ impl<'a> Common<'a> {
 
 fn transform_limits_for(limits: super::reader::Limits) -> litchi_drawingml::transform::Limits {
     litchi_drawingml::transform::Limits::new(
-        limits
-            .input_bytes()
-            .min(litchi_drawingml::transform::Limits::DEFAULT.max_xml_bytes)
-            .max(1),
+        limits.input_bytes().clamp(
+            1,
+            litchi_drawingml::transform::Limits::DEFAULT.max_xml_bytes,
+        ),
         limits
             .nodes()
-            .min(litchi_drawingml::transform::Limits::DEFAULT.max_nodes)
-            .max(1),
+            .clamp(1, litchi_drawingml::transform::Limits::DEFAULT.max_nodes),
     )
 }
 

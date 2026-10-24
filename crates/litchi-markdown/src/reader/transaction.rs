@@ -456,13 +456,11 @@ impl TransferPlan {
     }
 
     /// Inspect the validated destination commit without publishing it.
-    #[must_use]
     pub const fn planned_commit(&self) -> &Commit {
         &self.commit
     }
 
     /// Consume this preflight into its already validated commit.
-    #[must_use]
     pub fn into_commit(self) -> Commit {
         self.commit
     }

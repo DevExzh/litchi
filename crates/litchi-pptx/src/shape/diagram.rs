@@ -17,7 +17,6 @@ pub use litchi_drawingml::diagram::{
 /// Relationship IDs are escaped before insertion. The data relationship is
 /// expected to use the usual `rIdN` spelling; the non-numeric prefix is used
 /// for the companion layout, quick-style, and color relationships.
-#[must_use]
 pub fn graphic_frame(
     shape_id: u32,
     x: i64,

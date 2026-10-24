@@ -1213,10 +1213,10 @@ impl<'x> Builder<'x> {
                 // it refuses is kept as written rather than failing the
                 // body.
                 let color_limits = color::Limits::new(
-                    self.limits.input_bytes().min(color::MAX_XML_BYTES).max(1),
-                    self.limits.depth().min(color::MAX_DEPTH).max(1),
-                    self.limits.nodes().min(color::MAX_NODES).max(1),
-                    self.limits.nodes().min(color::MAX_TRANSFORMS).max(1),
+                    self.limits.input_bytes().clamp(1, color::MAX_XML_BYTES),
+                    self.limits.depth().clamp(1, color::MAX_DEPTH),
+                    self.limits.nodes().clamp(1, color::MAX_NODES),
+                    self.limits.nodes().clamp(1, color::MAX_TRANSFORMS),
                 );
                 let value = match color::read(fragment, &color_limits) {
                     Ok(value) => Some(value),

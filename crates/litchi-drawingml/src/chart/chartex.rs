@@ -881,7 +881,7 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
         let mut attributes = Vec::new();
         for attribute in element.checked_attributes() {
             let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-            let name = attribute_name(&reader, &attribute);
+            let name = attribute_name(reader, &attribute);
             let value = attribute
                 .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
                 .map_err(|error| Error::Xml(error.to_string()))?
