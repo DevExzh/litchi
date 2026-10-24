@@ -32,9 +32,9 @@ remain open; this is source integration, not final performance acceptance.
 | Pages | Body-table constructors rebuild rooted inventories; chart data, drawable order, headers/footers and footnotes decode or copy selected/source graph state. | 0362ugg/0362ugr, reviewed and validated correction merged at `9ea602e0e1`. |
 | Keynote | Text/name selection can decode a whole show; chart data and table/chart constructors decode selected payloads or scan the graph. | 0362ugh/0362ugr, reviewed and validated correction merged at `9ea602e0e1`. |
 | Numbers | Title/image selection scans rooted graph state; chart and merge constructors retain decoded data/regions. | 0362ugi/0362ugr, reviewed and validated correction merged at `9ea602e0e1`. |
-| PPT | Primary and metadata edits serialize and parse the whole CFB. `scoped::Base::capture` copies `to_encrypted_bytes()` into a new shared buffer. | 0362ugj, source review clear at `ca125d2ba1`; package tests, doctests, strict Clippy and selected facade tests pass. Standalone validation and final receipt remain pending. |
+| PPT | Primary and metadata edits serialize and parse the whole CFB. `scoped::Base::capture` copies `to_encrypted_bytes()` into a new shared buffer. | 0362ugj, reviewed and validated correction merged at `127c26d59f`; standalone consumers and the ODG adapter compile, with corrected probe bindings. |
 | PPTX | In-memory `Package::edit` captures all slides, notes and name indexes and fingerprints parts; opened edit construction also clones the slide vector and name index. | 0362ugk, reviewed and validated correction merged at `a3eb017da2`; remaining benchmark getter fixed under 0362ugka. |
-| DOCX | Ordinary and source-backed document entry parses/indexes main XML; Ink scans package parts and bindings; OPC edit clones graph metadata; several source-backed document families capture source projections at entry. | 0362ugl, composed validation in progress; review returned a facade signed empty-property no-op regression for correction. |
+| DOCX | Ordinary and source-backed document entry parses/indexes main XML; Ink scans package parts and bindings; OPC edit clones graph metadata; several source-backed document families capture source projections at entry. | 0362ugl/0362ugla/0362uglb, reviewed and validated correction merged at `5ce9829784`, including signed empty-property no-op preservation and all fuzz consumers. |
 | XLSB | Primary and cell-value constructors serialize source before-images; several owner families read/clone selected graphs, and a cold `From<OpcPackage>` projection can materialize through generic staged entry. | 0362ugm, reviewed and validated correction merged at `0d35a83a31`. |
 
 PPT's accepted 0362j work repairs replay and first-commit digest cost. It
@@ -372,3 +372,35 @@ The only merge conflict was formatting of the XLS/PPT metadata benchmark.
 Resolution preserves their currently infallible property getters and the
 already-fallible DOC getter. Pending PPT and XLS-property source changes must
 migrate their own getters when they merge. No native qualification is claimed.
+
+
+## DOCX and PPT merges, 2026-10-24
+
+DOCX final source `0cf1a17174` and receipt `3a6c56958c` merge at `5ce9829784`.
+Independent review covers source/limit precedence, inverse/fidelity assertions,
+lazy projection access, signed valid-target exact no-ops, invalid-target errors
+and complete fuzz publication migration. The coordinator verified ten captured
+logs: 2,355 package tests, 170 doctests (31 ignored), 739 operations tests,
+23 facade tests, focused signed regression, strict checks and standalone
+consumers. Record 0362uglb distinguishes the exact clean pins and the two-file
+fuzz overlay. Merge resolution only normalizes cfg feature order and receipt
+wording/whitespace, adds verified missing identities and preserves every source
+change. No native qualification is claimed.
+
+PPT implementation/operations source `ca125d2ba1` and final consumer/binding
+receipt `70a9b57622` merge at `127c26d59f`. The coordinator verified 1,568 package
+tests (three ignored), 22 doctests (eight ignored), 71 selected operations
+tests, strict Clippy, all-target consumer checks and standalone compilation.
+The shared OLE benchmark explicitly handles the now-fallible PPT property
+getter; XLS remains infallible until its separate follow-up merges. The ODG
+candidate adapter compiles through the separately hashed external overlay.
+All three changed probe identities are refreshed, and 26 build-free ODG tests
+pass. These results qualify compilation and correctness checks, not native
+performance.
+
+The composed strict consumer check passes at `ecf598b637` after a private
+ODF probe identity grouping closes its fourteen-argument lint failure (0362ugsa).
+This pin precedes the DOCX/PPT merges and is not the final gate. The remaining
+known source returns are XLS changed-publication freshness under 0362ugea and
+the PPTX refusal-kind classifier. Final full gates, all-68 inventory, corpus,
+glossary and native qualification remain required.

@@ -859,3 +859,30 @@ The adjacent 1,180-byte manifest has SHA-256
 the 1,636-byte restore helper has SHA-256
 `6bfa5ece6b163cd6ebc8ac41b33d3a80af226b90e6280bbb5ac22fa0ccfb3525`.
 Recreate each worktree from its retained branch, then run that `restore.py`.
+
+
+## Twenty-first cleanup, 2026-10-24
+
+After the XLSX composition at `3d129677ce`, fresh ancestry, cleanliness and
+process checks permitted removal of the Pivot, Graphs and Objects leaves
+without force. Their retained tips are `83a1b6a0901c066d46b334a4f8aeb01803c8a1ce`,
+`672b7498e8881262ded29010fc95864b7cda63a9` and
+`2ea78edd48e99795e85db85e8632264acc4379eb`. Apparent checkout sizes were
+411,680,768, 411,684,864 and 411,668,480 bytes, totaling 1,235,034,112 bytes.
+No ignored or untracked files required quarantine; no external target root
+existed for these three leaves. The coordinator independently verified all
+receipt hashes, retained refs, ancestry and removed paths.
+
+The core XLSX leaf remained intact because live review jobs held its source
+files. Its ignored local target and lockfile, and the separate external target
+and logs, were not moved or deleted during this cleanup.
+
+Receipt:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/twenty-first-wave/receipt.md`
+(2,478 bytes, SHA-256
+`281713d334ff9fe58667af7a246ded708117ad4b264f35964a68f963e67b8a8d`).
+The adjacent 1,885-byte manifest has SHA-256
+`80c14d48d5b031b1cfd4dcc3d4ec379bd0f3a63874659419681426bbf1570893`;
+the 1,639-byte restore helper has SHA-256
+`520f6e6dd99dcae416323df4d8eec0ebb7bf2f9b0d884c13193428035549381d`.
+Recreate each removed worktree from its retained branch.

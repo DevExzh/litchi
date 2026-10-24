@@ -17,3 +17,12 @@ The diagnostic log remains external:
 The check exited 101; the runner verified clean source, no remaining owned
 builders and a stable 4,706,624,729-byte target. A new source-bound rerun is
 required after this correction. No native qualification is claimed.
+
+The source-bound rerun passes at `ecf598b6377c691196bb99fcf0e3be8166903c92`.
+Strict all-target/all-feature Clippy for CLI, operations, facade and Python
+exits zero in 21.137 seconds. Three post-exit observations show no owned
+builders and a stable 4,706,626,475-byte target. Independent source review
+confirms that all four identities, receipt keys, assertions and measured
+boundaries are unchanged. [The reduced receipt](results/0362ugsa/consumer-check.json)
+binds the command, source, locks, runner policy and complete external logs.
+This remains one selected check, not the full 53-step gate.
