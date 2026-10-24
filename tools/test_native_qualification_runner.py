@@ -774,6 +774,200 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             self.assertTrue(all("process_observation" not in event for event in events))
             self.assertFalse(observer.path.exists())
 
+    def _overlap_fixture(self, root: Path, *, max_jobs: int = 4, expires: str | None = None):
+        permit = root / "permit.json"
+        manifest_path = root / "manifest.json"
+        lease_dir = root / "leases"
+        manifest = {
+            "schema": runner.SCHEMA,
+            "lane": "w5-legacy",
+            "output_dir": str(root / "output"),
+            "build_execution": {"class": "compile_only", "permit_path": str(permit)},
+            "legs": {
+                "before": {
+                    "source_root": str(ROOT),
+                    "target_dir": str(root / "target-before"),
+                    "build": [{"id": "build", "argv": ["cargo", "build"], "artifacts": ["{target_dir}/probe"]}],
+                },
+                "after": {
+                    "source_root": str(ROOT),
+                    "target_dir": str(root / "target-after"),
+                    "build": [{"id": "build", "argv": ["cargo", "build"], "artifacts": ["{target_dir}/probe"]}],
+                },
+            },
+        }
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        expires = expires or (
+            runner._dt.datetime.now(runner._dt.timezone.utc) + runner._dt.timedelta(minutes=5)
+        ).isoformat()
+        permit.write_text(
+            json.dumps(
+                {
+                    "schema": runner.BUILD_PERMIT_SCHEMA,
+                    "grant_id": "test-grant",
+                    "job_group": "test-group",
+                    "expires_utc": expires,
+                    "max_jobs": max_jobs,
+                    "allowed_lanes": ["w5-legacy"],
+                    "allowed_manifest_sha256": [manifest_hash],
+                    "allowed_command_classes": ["cargo-build", "cargo-check", "cargo-clippy", "cargo-test"],
+                    "lease_dir": str(lease_dir),
+                }
+            ),
+            encoding="utf-8",
+        )
+        return manifest, manifest_path, permit, lease_dir
+
+    @staticmethod
+    def _peer_entry(pid: int, starttime: str, argv: list[str]) -> dict[str, object]:
+        return {
+            "pid": pid,
+            "ppid": 1,
+            "pgrp": pid,
+            "starttime": starttime,
+            "comm": "cargo",
+            "exe": "/usr/bin/cargo",
+            "cwd": str(ROOT),
+            "cmdline": argv,
+        }
+
+    def _write_peer_lease(
+        self,
+        lease: runner.BuildOverlapLease,
+        path: Path,
+        *,
+        pid: int = 999991,
+        starttime: str = "peer-start",
+        argv: list[str] | None = None,
+    ) -> None:
+        value = {
+            "schema": runner.BUILD_PERMIT_SCHEMA,
+            "status": "active",
+            "lease_id": "peer-lease",
+            "grant_id": lease.grant_id,
+            "job_group": lease.job_group,
+            "permit_sha256": lease.permit_hash,
+            "root_pid": pid,
+            "root_starttime": starttime,
+            "lane": "w5-legacy",
+            "manifest_path": str(lease.manifest_path),
+            "manifest_sha256": hashlib.sha256(lease.manifest_path.read_bytes()).hexdigest(),
+            "command_class": "cargo-build",
+            "allowed_command_classes": ["cargo-build"],
+            "phase": "build",
+            "source_roots": [str(ROOT)],
+            "target_dirs": [str(Path(path).parent / "peer-target")],
+            "created_utc": runner._now(),
+            "expires_utc": lease.permit["expires_utc"],
+        }
+        path.write_text(json.dumps(value), encoding="utf-8")
+
+    def test_compile_overlap_default_guard_rejects_unregistered_builder(self) -> None:
+        entry = self._peer_entry(999991, "peer-start", ["cargo", "build"])
+        with mock.patch.object(runner, "_proc_snapshot", return_value={999991: entry}):
+            with self.assertRaisesRegex(runner.RunnerError, "unrelated Litchi"):
+                runner.ProcessGuard().require_quiet()
+
+    def test_compile_overlap_lease_rejects_stale_hash_pid_reuse_expiry_and_excess(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-negative-") as directory:
+            root = Path(directory)
+            manifest, manifest_path, _permit, lease_dir = self._overlap_fixture(root, max_jobs=1)
+            lease = runner.BuildOverlapLease(manifest, manifest_path)
+            lease.acquire()
+            own = runner._read_proc(os.getpid())
+            assert own is not None
+            peer_path = lease_dir / "peer.json"
+            self._write_peer_lease(lease, peer_path)
+            peer = self._peer_entry(999991, "peer-start", ["cargo", "build"])
+            with mock.patch.object(runner, "_proc_snapshot", return_value={os.getpid(): own, 999991: peer}):
+                with self.assertRaisesRegex(runner.RunnerError, "exceeds max_jobs"):
+                    lease.ensure_valid()
+            peer_path.unlink()
+            self._write_peer_lease(lease, peer_path)
+            with mock.patch.object(runner, "_proc_snapshot", return_value={os.getpid(): own}):
+                with self.assertRaisesRegex(runner.RunnerError, "process is gone"):
+                    lease.peer_snapshots({os.getpid(): own})
+            peer_path.unlink()
+            with mock.patch.object(runner, "_proc_snapshot", return_value={os.getpid(): own}):
+                permit_path = Path(lease.permit_path)
+                permit_path.write_text(permit_path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+                with self.assertRaisesRegex(runner.RunnerError, "permit changed"):
+                    lease.ensure_valid()
+            lease.release()
+
+    def test_compile_overlap_lease_allows_only_declared_live_peer(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-peer-") as directory:
+            root = Path(directory)
+            manifest, manifest_path, _permit, lease_dir = self._overlap_fixture(root)
+            lease = runner.BuildOverlapLease(manifest, manifest_path)
+            lease.acquire()
+            own = runner._read_proc(os.getpid())
+            assert own is not None
+            peer_path = lease_dir / "peer.json"
+            self._write_peer_lease(lease, peer_path)
+            peer = self._peer_entry(999991, "peer-start", ["cargo", "build"])
+            snapshot = {os.getpid(): own, 999991: peer}
+            with mock.patch.object(runner, "_proc_snapshot", return_value=snapshot):
+                self.assertEqual(lease.peer_snapshots(snapshot)[0]["root_pid"], 999991)
+                self.assertEqual(lease.allowed_peer_processes(snapshot), {999991})
+                self.assertEqual(runner.ProcessGuard().offenders(overlap=lease), [])
+            lease.release()
+
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-expired-") as directory:
+            root = Path(directory)
+            expired = (runner._dt.datetime.now(runner._dt.timezone.utc) - runner._dt.timedelta(seconds=1)).isoformat()
+            manifest, manifest_path, _permit, _lease_dir = self._overlap_fixture(root, expires=expired)
+            with self.assertRaisesRegex(runner.RunnerError, "expired"):
+                runner.BuildOverlapLease(manifest, manifest_path)
+
+    def test_compile_overlap_lease_rejects_pid_reuse_and_disallowed_phase(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-phase-") as directory:
+            root = Path(directory)
+            manifest, manifest_path, _permit, lease_dir = self._overlap_fixture(root)
+            lease = runner.BuildOverlapLease(manifest, manifest_path)
+            lease.acquire()
+            own = runner._read_proc(os.getpid())
+            assert own is not None
+            peer_path = lease_dir / "peer.json"
+            self._write_peer_lease(lease, peer_path)
+            for starttime, argv, reason in (
+                ("other-start", ["cargo", "build"], "PID was reused"),
+                ("peer-start", ["cargo", "doc"], "phase changed"),
+                ("peer-start", ["cargo", "check"], "phase changed"),
+            ):
+                peer = self._peer_entry(999991, starttime, argv)
+                with mock.patch.object(runner, "_proc_snapshot", return_value={os.getpid(): own, 999991: peer}):
+                    with self.assertRaisesRegex(runner.RunnerError, reason):
+                        lease.peer_snapshots({os.getpid(): own, 999991: peer})
+            lease.release()
+
+    def test_control_false_does_not_select_compile_overlap_guard(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-control-") as directory:
+            root = Path(directory)
+            safe = runner.SafeRunner(
+                {
+                    "lane": "w5-legacy",
+                    "output_dir": str(root / "output"),
+                    "build_execution": {"class": "compile_only", "permit_path": str(root / "permit.json")},
+                    "legs": {
+                        "before": {
+                            "source_root": str(ROOT),
+                            "target_dir": str(root / "target"),
+                            "build": [{"id": "build", "argv": ["cargo", "build"], "artifacts": ["{target_dir}/probe"]}],
+                        }
+                    },
+                },
+                ROOT / "tools/native_qualification_runner.py",
+                "abba",
+                None,
+            )
+            sentinel = object()
+            safe.overlap_lease = sentinel  # type: ignore[assignment]
+            self.assertEqual(safe._event_execution_class("control"), "exclusive")
+            self.assertEqual(safe._event_execution_class("measurement"), "exclusive")
+            self.assertEqual(safe._event_execution_class("build"), "compile_only")
+
 
 if __name__ == "__main__":
     unittest.main()
