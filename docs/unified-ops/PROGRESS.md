@@ -4283,3 +4283,34 @@ See [0063](0063-source-pptx-modern-comments.md).
   running. The W8 ABBA execution wrapper remains under review. These returns
   preserve the every-consumer and performance requirements; only audit 22 is
   deferred, and nothing is pushed.
+
+- Coordinator paired-build and execution-preparation update (2026-10-24):
+  The F3 driver now binds the original baseline harness and clean 472b
+  candidate separately (`f5961b28db`). Independent review verifies unchanged
+  workload semantics, all active consumers and the reusable baseline binary.
+  The fresh candidate release build passes; its actual binary and later
+  qualification command bind the new target path. Record integration
+  `e064a22fc4` preserves the earlier failed build and accurately records a
+  target-monitor observation gap. No F3 ABBA or memory qualification is
+  inferred from the successful build.
+
+  OPC's two release builds and four correctness reports pass independent
+  review. Record 0362umfa is accepted at `e9aa4cada9`, separately from the
+  returned timing guard. The original missing-fixture failure and corrected
+  sparse-checkout materialization remain documented. Timing-guard repairs
+  still require review before any measured run.
+
+  ODG/ODF source preparations and the corrected ODP build/memory handoff
+  merge at `53a99025ac` after independent review. The final ODP packet checks
+  source, locks, binaries and fixtures and rejects incomplete memory metrics.
+  Its five negative cases pass; actual builds, measurements and the historical
+  memory residual remain open.
+
+  W8's guarded execution wrapper merges at `4dbf31e4b1`. Independent review
+  verifies 91 focused tests and actual harmless systemd-scope lifecycle
+  checks, including the host's post-exit metadata representation. The frozen
+  probe and policy remain unchanged. Its real ABBA run still needs a quiet
+  window. The five-lane compile-only cohort is being corrected to bind fresh
+  temporary directories consistently; it has not run. The 9781 gate continues
+  its ops integration chunks with bounded target retention and healthy guards.
+  All remaining gate, corpus and performance requirements stay active.
