@@ -49,11 +49,12 @@ The exact external diff contains one added row and no changed or removed row:
 unified-ops/ppt-lazy-native-fixture.ppt	ppt	exact		none		-
 ```
 
-The rendered summary consequently changes only `ppt` from 32 to 33 exact and
-structure rows, and `all` from 998 to 999 exact and structure rows. No
-`RefusalKind`, error code, refusal disposition, byte-fidelity, or capability
-changed. This is an intended corpus inventory refresh, not a normalization or
-broadened exception.
+The rendered summary consequently changes only the `ppt` `exact` cell from 32
+to 33 and its `revert none` cell from 32 to 33. The corresponding `all`
+`exact` cell changes from 998 to 999 and `revert none` from 77 to 78; all
+`structure` cells remain unchanged. No `RefusalKind`, error code, refusal
+disposition, byte-fidelity, or capability changed. This is an intended corpus
+inventory refresh, not a normalization or broadened exception.
 
 For the independent comparison, the same freshly compiled binary was run with
 `LITCHI_BLESS` unset against the regenerated reports. It passed 1/1 in 78.10s;
