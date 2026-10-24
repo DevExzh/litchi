@@ -97,6 +97,36 @@ class InventoryOwnerCoverageTests(unittest.TestCase):
             frozenset({("fixture", "OddOwner")}),
         )
 
+    def test_missing_policy_owner_fails_closed(self):
+        surface = inventory.Inventory(owner_fixture(), "fixture")
+        with self.assertRaisesRegex(inventory.InventoryError, "MissingOwner missing"):
+            inventory.policy_owner_paths(surface, "fixture", {"fixture::MissingOwner"})
+        with self.assertRaisesRegex(inventory.InventoryError, "MissingOwner missing"):
+            list(inventory.rows(
+                owner_fixture(), "fixture", result_rules=[],
+                immutable_owners={"fixture::MissingOwner"},
+            ))
+
+    def test_ambiguous_policy_owner_fails_closed(self):
+        document = owner_fixture()
+        document["index"]["0"]["inner"]["module"]["items"].append(10)
+        document["index"]["10"] = {
+            "name": "CyclicAlias",
+            "crate_id": 0,
+            "visibility": "public",
+            "inner": {"type_alias": {
+                "type": {"resolved_path": {"id": 10, "args": None}},
+            }},
+        }
+        document["paths"]["10"] = {
+            "path": ["fixture", "CyclicAlias"],
+            "kind": "type_alias",
+            "crate_id": 0,
+        }
+        surface = inventory.Inventory(document, "fixture")
+        with self.assertRaisesRegex(inventory.InventoryError, "CyclicAlias.*ambiguous"):
+            inventory.policy_owner_paths(surface, "fixture", {"fixture::CyclicAlias"})
+
 
 if __name__ == "__main__":
     unittest.main()

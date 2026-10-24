@@ -41,10 +41,11 @@ litchi-odraw: image::Blip, image::Entry, image::Store, image::Delay,
 The repeated XLSX declarations are intentionally counted as policy
 declarations and deduplicated when resolving public paths. The implementation
 does not infer that any of these owners is present in rustdoc; a missing or
-ambiguous nominal path remains an inventory input error rather than an
-accepted exception. The focused fixture proves a non-heuristic owner,
-re-export and type alias produce one owner row and that a builder owner is
-excluded from mutable-owner findings.
+ambiguous nominal path now raises a fail-closed `InventoryError` (and the CLI
+returns status 2) rather than silently dropping debt. The focused fixture
+proves a non-heuristic owner, re-export and type alias produce one owner row,
+that a builder owner is excluded from mutable-owner findings, and that both a
+missing owner and a cyclic/ambiguous alias are rejected.
 
 ## Validator hardening
 
@@ -55,20 +56,21 @@ structural errors, so malformed input cannot raise a `None.strip()` traceback
 or hide extra columns. CRLF files remain valid, and empty `detail` and
 `target` fields remain allowed.
 
-The exact post-change test command was:
+The exact post-fix test command was:
 
 ```text
 python3 -B -m unittest tools.test_validate_api_disposition tools.test_api_debt_inventory tools.test_check_api_glossary
 ```
 
-It ran 60 tests and passed. The complete stdout/stderr log is retained
+It ran 63 tests and passed. The complete stdout/stderr log is retained
 outside Git at
-`/home/zhuhe/code/litchi-worktrees/.coord/inventory-owner-coverage-55c562e9cf-followup.log`;
-it is 159 bytes with SHA-256
-`4e521a0f1bb41ae2a3457145b85068968ded05e68bb070a4f12a20c26aa363e5`.
+`/home/zhuhe/code/litchi-worktrees/.coord/inventory-owner-coverage-d2494012fc-followup.log`;
+it is 162 bytes with SHA-256
+`1d9aadf20eeebeef36434673aeb388d02f3f5aece86a41e54a4515b98f46d22e`.
+The prior 60-test log remains retained at its original path and identity.
 
 Source commit `55c562e9cf4bc900c62787697eea974eef790201` contains the owner
 coverage implementation and the initial validator/tests. Follow-up commit
-`d2494012fc` adds the malformed-row hardening and this audit record. No
-rustdoc capture, Cargo build, API-debt closure, or final acceptance claim is
-made here.
+`d2494012fc` adds malformed-row hardening; the current fail-closed owner and
+UTF-8 fixes are recorded in the next checked commit. No rustdoc capture, Cargo
+build, API-debt closure, or final acceptance claim is made here.

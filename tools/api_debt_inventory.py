@@ -63,6 +63,10 @@ ALIASES = {
 }
 
 
+class InventoryError(ValueError):
+    """The rustdoc surface cannot prove a policy requirement."""
+
+
 def policy_immutable_owners(crate: str, profiles=None) -> frozenset[tuple[str, ...]]:
     """Return policy-declared immutable owners for one rustdoc crate.
 
@@ -97,16 +101,24 @@ def policy_owner_paths(surface: Inventory, crate: str,
         for path in immutable_owners
     }
     return_types = gate.ReturnTypes(surface)
-    identities = {
-        identity
-        for path in owner_paths
-        if (surface.exports.get(path) in gate.TYPE_KINDS
-            and (identity := return_types.nominal_identity(path)) is not None)
-    }
-    if not identities:
-        return frozenset(owner_paths)
+    identities = set()
+    for path in sorted(owner_paths):
+        kind = surface.exports.get(path)
+        if kind not in gate.TYPE_KINDS:
+            state = "missing" if kind is None else f"has non-nominal kind {kind!r}"
+            raise InventoryError(
+                f"{crate}: policy immutable owner {'::'.join(path)} {state}"
+            )
+        identity = return_types.nominal_identity(path)
+        if identity is None:
+            raise InventoryError(
+                f"{crate}: policy immutable owner {'::'.join(path)} has an "
+                "missing or ambiguous nominal identity"
+            )
+        identities.add(identity)
     for path, kind in surface.exports.items():
-        if kind in gate.TYPE_KINDS and return_types.nominal_identity(path) in identities:
+        if (kind in gate.TYPE_KINDS
+                and return_types.nominal_identity(path) in identities):
             owner_paths.add(path)
     return frozenset(owner_paths)
 
@@ -268,13 +280,17 @@ def main(argv=None) -> int:
     parser.add_argument("json", nargs="+", type=Path, help="rustdoc JSON, one per crate")
     args = parser.parse_args(argv)
     print("crate\tcategory\tpath\tdetail\ttarget")
-    for path in args.json:
-        document = gate.read_json(path)
-        # Captures may be renamed by profile or source revision. The crate
-        # identity belongs to the rustdoc graph, not the artifact filename.
-        crate = document["index"][str(document["root"])]["name"]
-        for row in rows(document, crate):
-            print(crate.replace("_", "-"), *row, sep="\t")
+    try:
+        for path in args.json:
+            document = gate.read_json(path)
+            # Captures may be renamed by profile or source revision. The crate
+            # identity belongs to the rustdoc graph, not the artifact filename.
+            crate = document["index"][str(document["root"])]["name"]
+            for row in rows(document, crate):
+                print(crate.replace("_", "-"), *row, sep="\t")
+    except InventoryError as error:
+        print(f"inventory error: {error}", file=sys.stderr)
+        return 2
     return 0
 
 

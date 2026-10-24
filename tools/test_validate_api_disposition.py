@@ -148,6 +148,17 @@ class DispositionValidationTests(unittest.TestCase):
         )
         self.assertEqual(validator.validate(self.inventory, self.disposition), [])
 
+    def test_reports_invalid_utf8_as_a_read_error(self) -> None:
+        self.inventory.write_bytes(
+            b"crate\tcategory\tpath\tdetail\ttarget\n\xff\n"
+        )
+        self.disposition.write_text(
+            "crate\tcategory\tpath\tdetail\ttarget\tdecision\tevidence\towner\n",
+            encoding="utf-8",
+        )
+        errors = validator.validate(self.inventory, self.disposition)
+        self.assertTrue(any(error.startswith("inventory: cannot read:") for error in errors))
+
 
 if __name__ == "__main__":
     unittest.main()

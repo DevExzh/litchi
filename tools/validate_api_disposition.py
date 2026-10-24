@@ -74,7 +74,7 @@ def _read_rows(path: Path, fields: tuple[str, ...], label: str) -> tuple[list[di
                         errors.append(
                             f"{label} line {line}: {field} must be nonblank"
                         )
-    except (OSError, csv.Error) as error:
+    except (OSError, UnicodeError, csv.Error) as error:
         return [], [f"{label}: cannot read: {error}"]
     return rows, errors
 
