@@ -69,8 +69,17 @@ REVIEWED_INPUTS: dict[str, dict[str, Any]] = {
                 "before": "litchi_rtf::Package::apply -> litchi_rtf::Package",
                 "after": "litchi_rtf::Package::apply -> litchi_rtf::edit::Commit",
             },
+            "live_current_probe": {
+                "relative_path": "crates/litchi-rtf/examples/refusal_contract_bench.rs",
+                "sha256": "51d98d9dffe628acf9236929fc6952e05982911280149dcd18399d45d4972485",
+                "lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+                "lock_source": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/locks/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock",
+                "api": "current litchi-rtf workspace example; not part of the baseline adapter source",
+            },
             "historical_failed_compile": {
                 "source_sha256": "70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585",
+                "source_relative_path": "crates/litchi-rtf/examples/refusal_contract_bench.rs",
+                "api_context": "current litchi-rtf consumer at candidate fence 35e37dbede6657dd023b114a1536862c18541946",
                 "receipt": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-probe-compile/check-before.json",
                 "receipt_sha256": "f3af926353fc3db4f74221f62ed4f4743cc6b31c359ab42415c8f1500e33bda4",
                 "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-probe-compile/check-before.log",
@@ -413,6 +422,14 @@ def _validate_reviewed_inputs(lane: str, identity: dict[str, Any], leg: str) -> 
             manifest_hash == adapter["manifest_sha256"][leg],
             f"{leg} adapter manifest is not the reviewed consumer overlay",
         )
+        live = adapter.get("live_current_probe")
+        if leg == "after" and live is not None:
+            live_path = root / str(live["relative_path"])
+            live_hash, _ = _sha256(live_path)
+            _expect(live_hash == live["sha256"], f"{leg} live workspace probe is not reviewed")
+            lock_source = Path(str(live["lock_source"]))
+            lock_hash, _ = _sha256(lock_source)
+            _expect(lock_hash == live["lock_sha256"], f"{leg} live workspace lock is not reviewed")
     fixture_records: dict[str, dict[str, Any]] = {}
     for relative in spec["fixture_relatives"]:
         path = (root / relative).resolve()

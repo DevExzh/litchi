@@ -90,6 +90,8 @@ RTF_BASELINE_LOCK_SHA256 = "57c2a19ffeff395fdea95c33f295c85b08400b00e2fd9cec94d6
 RTF_CANDIDATE_LOCK_SHA256 = "6dbfc0bcc64cdf8e625a6562f2d5d11c1e98ad7cb6edda299b9adf2a36a70e39"
 RTF_BASELINE_MANIFEST_SHA256 = "af876fbf715edb643d2c7abb8643efb252413c640824890e90b1849207889676"
 RTF_CANDIDATE_MANIFEST_SHA256 = "60cde3ec148b08d81806d0b15740808c37ecbc9eed8ecf3f4d32e20ce8631a49"
+RTF_LIVE_PROBE_RELATIVE = "crates/litchi-rtf/examples/refusal_contract_bench.rs"
+RTF_LIVE_PROBE_SHA256 = "51d98d9dffe628acf9236929fc6952e05982911280149dcd18399d45d4972485"
 
 RTF_ADAPTER_RECORD: dict[str, Any] = {
     "relative_path": "tools/perf-baseline/examples/refusal_contract_bench.rs",
@@ -111,8 +113,17 @@ RTF_ADAPTER_RECORD: dict[str, Any] = {
         "before": "litchi_rtf::Package::apply -> litchi_rtf::Package",
         "after": "litchi_rtf::Package::apply -> litchi_rtf::edit::Commit",
     },
+    "live_current_probe": {
+        "relative_path": RTF_LIVE_PROBE_RELATIVE,
+        "sha256": RTF_LIVE_PROBE_SHA256,
+        "lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        "lock_source": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/locks/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock",
+        "api": "current litchi-rtf workspace example; not part of the baseline adapter source",
+    },
     "historical_failed_compile": {
         "source_sha256": "70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585",
+        "source_relative_path": RTF_LIVE_PROBE_RELATIVE,
+        "api_context": "current litchi-rtf consumer at candidate fence 35e37dbede6657dd023b114a1536862c18541946",
         "receipt": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-probe-compile/check-before.json",
         "receipt_sha256": "f3af926353fc3db4f74221f62ed4f4743cc6b31c359ab42415c8f1500e33bda4",
         "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-probe-compile/check-before.log",
@@ -359,6 +370,14 @@ def _source_identity(root: Path, lane: str, leg: str, spec: dict[str, Any]) -> d
             manifest_sha256 == adapter["manifest_sha256"][leg],
             f"{lane}/{leg} adapter manifest is not the reviewed consumer overlay",
         )
+        live = adapter.get("live_current_probe")
+        if leg == "after" and live is not None:
+            live_path = root / str(live["relative_path"])
+            live_sha256, _ = _sha256(live_path)
+            _expect(live_sha256 == live["sha256"], f"{lane}/{leg} live workspace probe is not reviewed")
+            lock_source = Path(str(live["lock_source"]))
+            lock_sha256, _ = _sha256(lock_source)
+            _expect(lock_sha256 == live["lock_sha256"], f"{lane}/{leg} live workspace lock is not reviewed")
     probe_record = next(record for record in files if record["relative"] == spec["probe"])
     _expect(probe_record["sha256"] == spec["probe_sha256"][leg], f"{lane}/{leg} probe is not the reviewed generator")
     if lane == "legacy-ole-properties":

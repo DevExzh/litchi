@@ -26,6 +26,15 @@ baseline lock was taken from its pinned 86d tree; the requested external
 `rtf-refusals/historicalaudit` directory is absent in this checkout, so no
 current lock was copied into the baseline.
 
+The live current workspace example is separately kept at
+`crates/litchi-rtf/examples/refusal_contract_bench.rs`, SHA-256
+`51d98d9dffe628acf9236929fc6952e05982911280149dcd18399d45d4972485`.  It is
+not substituted into the paired baseline adapter because the 86d baseline has
+no such workspace example; the standalone probe remains the only paired source
+for the native-era comparison.  Its locked current-crate check used the
+external pinned 4100 lock, SHA-256
+`4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`.
+
 The adapter matches the actual native variant before normalizing the fixed
 contract fields.  The baseline `UnsupportedSource(&'static str)` and
 `ProtectedDocument { protection_type }` variants are not relabeled as a
@@ -38,9 +47,10 @@ staging.  All refusal reasons are fixed, content-free text.
 The pre-adapter probe (`crates/litchi-rtf/examples/refusal_contract_bench.rs`)
 remains historical at SHA-256
 `70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585`.  Its
-actual pinned check failed before the adapter because baseline `Package::parse`
-was given `&Vec<u8>` and baseline `Package::apply` returned `Package`, not a
-current `Commit` with `.to_bytes()`.  The retained receipt is
+actual pinned check was a current-candidate check at the 35e37 staging fence;
+it failed because current `Package::parse` expects `&str` rather than the
+provided `&Vec<u8>`, and current `Package::apply` returns `edit::Commit`, not a
+`Package` with `.to_bytes()`.  The retained receipt is
 `/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-probe-compile/check-before.json`
 (SHA-256 `f3af926353fc3db4f74221f62ed4f4743cc6b31c359ab42415c8f1500e33bda4`),
 with log SHA-256
@@ -52,20 +62,32 @@ status 101.  This failure is diagnostic evidence, not a passing build.
 The capped environment was `PATH` with `.coord/bin` first,
 `LITCHI_CAPPED`/`LITCHI_BLESS` unset, `LITCHI_MEM_MAX=20G`,
 `CARGO_BUILD_JOBS=1`, `CARGO_INCREMENTAL=0`, offline and locked, with each
-target kept below 20,000,000,000 bytes.  The corrected commands were:
+target kept below 20,000,000,000 bytes.  The two live current-crate commands
+ran in the source-only scratch checkout
+`/home/zhuhe/code/litchi-worktrees/.coord/rtf-live-current-kQPuva`, with the
+4100 lock recorded above; that lock was not added to this repair worktree.
+The corrected commands were:
 
 ```text
 cargo check --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --no-default-features --features rtf-current-api --example refusal_contract_bench
 cargo run --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --no-default-features --features rtf-current-api --example refusal_contract_bench -- --check-only
 cargo check --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --no-default-features --features rtf-legacy-api --example refusal_contract_bench
 cargo run --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --no-default-features --features rtf-legacy-api --example refusal_contract_bench -- --check-only
+cargo check --offline --locked -p litchi-rtf --example refusal_contract_bench
+cargo run --offline --locked -p litchi-rtf --example refusal_contract_bench -- --check-only
 ```
 
-All four commands exited 0.  The focused check-only outputs were:
+All six commands exited 0.  The paired focused check-only outputs were:
 
 ```text
 before: validation=passed, native_error_api=litchi_rtf::edit::Error::{UnsupportedSource,ProtectedDocument}, apply_result_api=Package, routes=8
 after:  validation=passed, native_error_api=litchi_rtf::edit::Error::Refused(Refusal), apply_result_api=edit::Commit, routes=8
+```
+
+The live current workspace check-only output was:
+
+```text
+validation=passed, native_error_api=litchi_rtf::edit::Error::Refused(Refusal), apply_result_api=litchi_rtf::Package::apply -> litchi_rtf::edit::Commit, routes=8
 ```
 
 The candidate locked-check log is retained outside the checkout at
@@ -77,7 +99,16 @@ baseline equivalents are `adapter-baseline-check-locked.log` (SHA-256
 `72131d35df8d9815e5b9545782526578dabbef6f8a363d4eb84282e02ed22937`) and
 `adapter-baseline-check-only.log` (SHA-256
 `37ffb1e7eac667dace125663a9171dc3b07d8398dd3de32d72777ab0065fac34`).  The
-direct route receipts are
+live current workspace locked-check log is
+`adapter-live-current-check-locked-4100.log` (SHA-256
+`75d3102d079b32969ec0e06aa084cc597cef5c3b1101940584f46cd058727d7c`), and
+the check-only log is `adapter-live-current-check-only.log` (SHA-256
+`37c15e50a03a2646be3ed12f3743fd06e913f5963bc46db43846d27a2058701d`).  Its
+direct route receipt is `adapter-live-current-routes.jsonl` (8 lines, SHA-256
+`7636523062a48b9754c7e70d84c3ee0cd3a2aaca958ed0f4f02efa977b68203f`), with
+empty stderr SHA-256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`.
+The paired direct route receipts are
 `adapter-current-routes.jsonl` (8 lines, SHA-256
 `997050b07053de66506a09356e6a6e00e27201debf76d454d67b2317f1dbacfa`) and
 `adapter-baseline-routes.jsonl` (8 lines, SHA-256
@@ -100,11 +131,12 @@ claim.
 
 `legacy-rtf.json`, `native_qualification_runner.py`, the preparer and validator
 now bind the standalone probe path, per-leg feature, per-leg lock hash and
-adapter manifest hash.  The qualification workload remains five ABBA blocks,
-31 rounds, and the same eight route/output/error/fidelity fields.  The
-validator still requires positive finite medians and exact fixed refusal
-fields, while the source adapter records the native API distinction rather
-than weakening that contract.
+adapter manifest hash; the validator also pins the live current workspace
+example separately.  The qualification workload remains five ABBA blocks, 31
+rounds, and the same eight route/output/error/fidelity fields.  The validator
+still requires positive finite medians and exact fixed refusal fields, while
+the source adapter records the native API distinction rather than weakening
+that contract.
 
 Build-free protocol tests passed:
 

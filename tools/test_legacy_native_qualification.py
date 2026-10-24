@@ -39,6 +39,18 @@ class LegacyNativeQualificationTests(unittest.TestCase):
         adapter = preparation.RTF_ADAPTER_RECORD
         reviewed = validator.REVIEWED_INPUTS["legacy-rtf"]
         self.assertEqual(adapter, reviewed["adapter"])
+        live = adapter["live_current_probe"]
+        live_path = ROOT / live["relative_path"]
+        self.assertEqual(hashlib.sha256(live_path.read_bytes()).hexdigest(), live["sha256"])
+        self.assertEqual(
+            live["lock_sha256"],
+            "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        )
+        self.assertEqual(
+            hashlib.sha256(Path(live["lock_source"]).read_bytes()).hexdigest(),
+            live["lock_sha256"],
+        )
+        self.assertEqual(live["api"], "current litchi-rtf workspace example; not part of the baseline adapter source")
         self.assertEqual(
             reviewed["probe_sha256"],
             {"before": adapter["probe_sha256"], "after": adapter["probe_sha256"]},
@@ -51,7 +63,12 @@ class LegacyNativeQualificationTests(unittest.TestCase):
             },
         )
         self.assertNotEqual(adapter["probe_sha256"], adapter["historical_failed_compile"]["source_sha256"])
+        self.assertNotEqual(live["sha256"], adapter["historical_failed_compile"]["source_sha256"])
         self.assertEqual(adapter["historical_failed_compile"]["exit"], 101)
+        self.assertEqual(
+            adapter["historical_failed_compile"]["api_context"],
+            "current litchi-rtf consumer at candidate fence 35e37dbede6657dd023b114a1536862c18541946",
+        )
         self.assertEqual(
             adapter["native_error_api"]["before"],
             "litchi_rtf::edit::Error::{UnsupportedSource,ProtectedDocument}",
