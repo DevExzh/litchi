@@ -56,10 +56,40 @@ or used by the current harness.
 
 ## Runtime validation receipt
 
-The successful runtime checks below were run from source `88869b24b9826cb8cdf45e8d7cd0e3ebebae9852` with Rust `1.95.0`,
-the assigned offline/locked `CARGO_BUILD_JOBS=1` environment, and the
-workspace's sparse patterns unchanged. Raw logs remain outside the repository
-under `/home/zhuhe/code/litchi-worktrees/.coord/keynote-lazy-entry/`:
+The successful runtime checks below were run with Rust `1.95.0`, the assigned
+offline/locked `CARGO_BUILD_JOBS=1` environment, and the workspace's sparse
+patterns unchanged. They were run on three precisely recorded working-tree
+overlays rather than one clean commit:
+
+* `K` started at clean commit
+  `88869b24b9826cb8cdf45e8d7cd0e3ebebae9852` and had five dirty, fallible
+  getter-attribute files. Those files were committed unchanged by
+  `8f747b7f0abe39ae9b5f098b0832b9b7967c2340` and remain unchanged in the
+  final tree:
+  `slide_chart_arrangement.rs` (`48987b4410b585c3468dba0d695befa3e8265763`),
+  `slide_chart_data.rs` (`60a94b8ade7e4209c83cb8202d387e7d15be8cbb`),
+  `slide_chart_title.rs` (`96d0d62cc1c0f9bac003a0ab7d44ddd784df0be4`),
+  `slide_table_lock_state.rs` (`1404b54820c17c471611ac6f1c01765b27b16b56`),
+  and `slide_text.rs` (`5a45920ca3c5254c1bbd5392cb293115bfb8623d`).
+  The Keynote test/Clippy and ops checks below ran on `K`, not on clean
+  `88869b24b9`.
+* `H` was `K` plus the offline-regenerated standalone harness lockfile,
+  later committed by `8f747b7f0a` with blob
+  `cc9461661455285e47a50d8ab08a573111a6f057`. The standalone harness checks
+  below ran on `H`.
+* `I` started at clean `8f747b7f0abe39ae9b5f098b0832b9b7967c2340` and had the
+  one-line IWA test-fixture edit in `crates/litchi-iwa/src/package.rs`. That
+  exact file is blob `f2834d280e9f5a3020848614c6e5f7a8c4fc5e6c` in final commit
+  `178ef2ff3c68b9a26ff6146a0f71eed3ef405194`; the repaired IWA checks below
+  ran on `I`, not on clean `8f747b7f0a`.
+
+Commit `178ef2ff3c` differs from `8f747b7f0a` only in that IWA test
+fixture and the receipt update then present. The Keynote, ops, harness source,
+and harness lock paths are byte-identical between those commits, so their
+`K`/`H` receipts apply to the final relevant source without an unnecessary
+rebuild. Raw logs
+remain outside the repository under
+`/home/zhuhe/code/litchi-worktrees/.coord/keynote-lazy-entry/`.
 
 ```text
 cargo test --offline --locked -p litchi-keynote --all-features -j 1
@@ -122,8 +152,10 @@ aggregate ceiling at 4. The five-byte replacement now exercises the intended
 total-size refusal without weakening the assertion or changing production
 code.
 
-After the repair, focused and full IWA validation passed from source
-`8f747b7f0abe39ae9b5f098b0832b9b7967c2340`:
+After the repair, focused and full IWA validation passed on overlay `I`:
+clean source `8f747b7f0abe39ae9b5f098b0832b9b7967c2340` plus the dirty
+one-line test-fixture edit described above. That exact overlay is committed in
+`178ef2ff3c68b9a26ff6146a0f71eed3ef405194`:
 
 ```text
 cargo test --offline --locked -p litchi-iwa --all-features package::tests::package_edit_rejects_limit_exceeding_stage_atomically -- --nocapture
@@ -141,3 +173,15 @@ cargo clippy --offline --locked -p litchi-iwa --all-targets --all-features -j 1 
 
 All raw logs remain outside the repository under
 `/home/zhuhe/code/litchi-worktrees/.coord/keynote-lazy-entry/`.
+
+The final assigned target tree was
+`/home/zhuhe/code/litchi-worktrees/.coord/keynote-lazy-entry/target`, exactly
+`6818426880` bytes by `du -sB1`. The environment fingerprints were:
+
+```text
+.cargo/config.toml                                      50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d
+rust-toolchain.toml                                     e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310
+Cargo.lock                                               6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da
+tools/perf-baseline/unified-batch-closure/Cargo.lock     9dc6098e4453a2df54d035e63b2ccd1e0ebf30da8a0cd06cb9e63655d5ce9d36
+.coord/keynote-lazy-entry/env.sh                         42d98d07d010d128109f1a2b1d4cf58e78788ce576579fe71d7a97be1d0c008c
+```
