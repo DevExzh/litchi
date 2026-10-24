@@ -17,8 +17,8 @@ and the cgroup/deadline command.  They ran as seven tests with:
 python3 -m unittest -v tools.test_w8_quiet_abba
 ```
 
-The wrapper itself is 33,312 bytes with SHA-256
-`bead6f22a111b4cac7af554ceb527bbf9a568b82628ee6731c48742c4c1b3661`; the
+The wrapper itself is 34,115 bytes with SHA-256
+`800a010868e1746fc6a24aabc06879b57dfc4c114c2105b143bb61972874bee9`; the
 generated no-argument launcher is separately hashed into the run
 configuration before execution.
 

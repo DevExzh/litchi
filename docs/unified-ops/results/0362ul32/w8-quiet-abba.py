@@ -433,6 +433,14 @@ def validate_config(config_path: Path) -> dict[str, Any]:
             verify_digest(path, row, name)
     if int(config.get("rounds", 0)) != ROUNDS:
         raise GuardFailure("round count is not the reviewed five")
+    if int(config.get("deadline_seconds", 0)) != DEFAULT_DEADLINE_SECONDS:
+        raise GuardFailure("deadline is not the reviewed twelve-hour bound")
+    if int(config.get("stop_grace_seconds", 0)) != STOP_GRACE_SECONDS:
+        raise GuardFailure("stop grace is not the reviewed sixty-second bound")
+    if int(config.get("memory_max_bytes", 0)) != MEMORY_MAX_BYTES or int(config.get("swap_max_bytes", -1)) != SWAP_MAX_BYTES:
+        raise GuardFailure("memory/swap limits are not the reviewed exact byte limits")
+    if int(config.get("file_limit_bytes", 0)) != OUTPUT_FILE_LIMIT_BYTES or int(config.get("aggregate_output_limit_bytes", 0)) != AGGREGATE_OUTPUT_LIMIT_BYTES:
+        raise GuardFailure("output limits are not the reviewed exact byte limits")
     cpu = int(config.get("cpu", -1))
     if cpu not in os.sched_getaffinity(0):
         raise GuardFailure(f"selected CPU {cpu} is no longer available")
@@ -441,7 +449,7 @@ def validate_config(config_path: Path) -> dict[str, Any]:
     launcher = paths.get("launcher")
     if output is None or tmp is None or launcher is None or output == tmp:
         raise GuardFailure("output/TMP/launcher paths are incomplete")
-    if not output.is_dir() or any(output.iterdir()):
+    if output.is_symlink() or tmp.is_symlink() or not output.is_dir() or any(output.iterdir()):
         raise GuardFailure("ABBA output must be an existing empty directory")
     if not tmp.is_dir():
         raise GuardFailure("TMP directory is missing")
