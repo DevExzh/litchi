@@ -3136,3 +3136,44 @@ See [0063](0063-source-pptx-modern-comments.md).
   selection, and XLSX catalog work for early aggregate admission, effective
   edit limits and cold initial-batch staging. Source integration remains
   staging until the complete gates and required qualification pass. No push.
+
+- Coordinator checkpoint (2026-10-24, XLS integration and composed validation):
+  Main integration reaches `ab366e3b10`. Reviewed XLS lazy-entry/source-fence
+  correction `b8ed2d46bb` and receipt `8c2b79f7c5` merge at `50d4f4b88d`.
+  Content-matching cross-owner replay retains the recipient's deferred fence;
+  admission and later guards preserve typed SourceChanged precedence for an
+  in-flight original mutation. Chart/pivot failures retain retry state.
+  The coordinator verified 1,870 passing tests across 100 suites, strict
+  Clippy, all-feature facade checks and four metadata tests. The existing
+  ignored test writes an evidence workbook. No native timing is claimed.
+
+  The coordinator composed Pages/Numbers/Keynote with current integration in
+  the existing Pages leaf at `3ae5fdf0ff`, then validation caught and corrected
+  a Footnote Arc type error, two test fixtures/names and a Keynote selector-kind
+  mapping. Source review confirms the Arc fix preserves sharing and error
+  behavior. Pages and Numbers checks pass at their recorded source boundaries;
+  Keynote's all-target suite also passes. The remaining iWork checks, explicit
+  doctests and standalone consumers continue under record 0362ugr. These
+  assemblies are not yet accepted into main integration.
+
+  XLSX source/catalog/batch work, pivot, graph and object corrections are
+  composed with current XLS integration at `7ed6fb0ca7`. Effective nested pivot
+  limits now retain their typed error; the regression distinguishes the exact
+  oversized nested part from earlier candidate serialization. The omitted
+  tracked Cargo alias configuration was materialized and all root configuration
+  verified before the combined build. Validation is repairing concrete compile
+  omissions in the composed families, then rerunning the complete relevant
+  suites, strict checks, consumers and doctests under record 0362ugs.
+
+  ODF shared-triad tooling `7f85a0dd5d` clears scoped semantic/provenance review;
+  18 ODF-specific Python tests pass independently. Its Rust probe is included
+  in composed facade compilation. Native measurements remain unrun and final
+  endpoints unresolved. ODG tooling is still being corrected and reviewed for
+  actual source-byte closure, effective build environment and final target
+  size enforcement; passing Python tests alone do not qualify native results.
+
+  Four build slots rotate across composed iWork, composed XLSX, XLSB and PPTX.
+  PPT and DOCX validation remains queued. An attempted XLS worktree cleanup
+  stopped because a foreign process holds a fixture; no files or targets were
+  removed. Final full gates, all-68 inventory, corpus, glossary and native
+  qualification remain required. Only redaction audit 22 is deferred. No push.
