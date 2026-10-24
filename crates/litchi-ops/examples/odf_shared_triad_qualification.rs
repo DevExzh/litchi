@@ -18,7 +18,7 @@ mod allocation {
     use std::alloc::{GlobalAlloc, Layout, System};
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-    pub const ENABLED: bool = true;
+    pub(crate) const ENABLED: bool = true;
 
     static ACTIVE: AtomicBool = AtomicBool::new(false);
     static ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
@@ -69,7 +69,7 @@ mod allocation {
     #[global_allocator]
     static GLOBAL: CountingAllocator = CountingAllocator;
 
-    pub fn begin() {
+    pub(crate) fn begin() {
         ACTIVE.store(false, Ordering::Relaxed);
         ALLOCATIONS.store(0, Ordering::Relaxed);
         DEALLOCATIONS.store(0, Ordering::Relaxed);
@@ -79,7 +79,7 @@ mod allocation {
         ACTIVE.store(true, Ordering::Relaxed);
     }
 
-    pub fn end() -> [usize; 5] {
+    pub(crate) fn end() -> [usize; 5] {
         // Stop observing before loading the counters.  The caller may now
         // construct receipt JSON without charging that bookkeeping to the
         // operation that was measured.
@@ -96,11 +96,11 @@ mod allocation {
 
 #[cfg(not(odf_shared_triad_allocator))]
 mod allocation {
-    pub const ENABLED: bool = false;
+    pub(crate) const ENABLED: bool = false;
 
-    pub fn begin() {}
+    pub(crate) fn begin() {}
 
-    pub fn end() -> [usize; 5] {
+    pub(crate) fn end() -> [usize; 5] {
         [0; 5]
     }
 }
@@ -112,6 +112,7 @@ mod probe {
     use std::io::{Cursor, Read};
     use std::time::Instant;
 
+    use super::allocation;
     use litchi_core::Position;
     use litchi_odf_common::core::{PackageWriter, StreamingArchiveLimits, Structure};
     use litchi_ops::{File, TargetArg, open_bytes};
@@ -279,7 +280,10 @@ mod probe {
                 let attribute = attribute.expect("ODF manifest attribute");
                 let key = String::from_utf8_lossy(attribute.key.as_ref()).into_owned();
                 let value = attribute
-                    .decode_and_unescape_value(reader.decoder())
+                    .decoded_and_normalized_value(
+                        quick_xml::XmlVersion::Implicit1_0,
+                        reader.decoder(),
+                    )
                     .expect("ODF manifest attribute value")
                     .into_owned();
                 (key, value)
@@ -345,6 +349,9 @@ mod probe {
                 },
                 Ok(Event::DocType(declaration)) => {
                     other_events.push(format!("doctype:{declaration:?}"));
+                },
+                Ok(Event::GeneralRef(reference)) => {
+                    other_events.push(format!("general-ref:{reference:?}"));
                 },
                 Ok(Event::Eof) => break,
                 Err(error) => panic!("ODF manifest XML: {error}"),
@@ -1031,7 +1038,13 @@ mod probe {
         geometry: [Option<String>; 4],
     ) -> litchi_odi::Commit {
         let mut edit = package.edit();
-        edit.set_geometry(0, geometry[0], geometry[1], geometry[2], geometry[3])
+        edit.set_geometry(
+            0,
+            geometry[0].clone(),
+            geometry[1].clone(),
+            geometry[2].clone(),
+            geometry[3].clone(),
+        )
             .expect("ODI set_geometry");
         edit.commit().expect("ODI changed commit")
     }

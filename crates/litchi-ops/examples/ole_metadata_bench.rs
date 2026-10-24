@@ -78,6 +78,7 @@ mod enabled {
             || {
                 let mut edit = package.edit_metadata().expect("edit");
                 edit.properties_mut()
+                    .expect("properties")
                     .set("title", "Retitled")
                     .expect("set");
                 edit.commit()
@@ -130,7 +131,6 @@ mod enabled {
             || {
                 let mut edit = package.edit_metadata().expect("edit");
                 edit.properties_mut()
-                    .expect("properties")
                     .set("title", "Retitled")
                     .expect("set");
                 edit.commit()
