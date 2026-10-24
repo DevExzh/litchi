@@ -15,9 +15,10 @@ The probe now:
   lengths before the first warmup, and compares that receipt across every
   paired baseline and candidate leg;
 - compares typed semantic models after a write, retaining exact-source checks
-  only for formatcode2, SVG blips, theme-family values/parts, and the strict
-  InkML action profile (for both source and changed fixtures); the image blip
-  lane is explicitly scanner-only;
+  only for formatcode2, SVG blips, and theme-family values/parts. InkML action
+  output is canonicalized by its writer, so its receipt is semantic/model
+  fidelity rather than a false source-identity claim; the image blip lane is
+  explicitly scanner-only;
 - uses the production SVG contextual writer for its output-limit preflight,
   with an unbounded observation sink. Every current typed output limit,
   including Vec/String routes, receives an actual refusal check; chart's
@@ -29,10 +30,18 @@ The probe now:
   candidate. These control events are retained
   in the runner journal with `measured=false` and are excluded from measured
   RSS/timing children. The SVG preflight intentionally uses a contextual
-  parsed value and contextual writer; ordinary sink, fidelity, and standalone
-  Vec/String routes intentionally use their standalone prepared values;
-  the existing post-run validator comparison across all qualified reports is
-  retained as a second handoff check;
+  parsed value and contextual writer; the normal Vec and bounded-sink rows and
+  the outside-clock fidelity check use that same contextual route. The
+  standalone route remains covered by the entry-reader row as an explicitly
+  additional route; the existing post-run validator comparison across all
+  qualified reports is retained as a second handoff check;
+- mutates parsed, source-backed formatcode2 and Theme Family values. Their
+  changed receipts verify the untouched lexical source splice and decoded
+  semantic change. Complete Theme-part add/replace receipts parse the result
+  and compare the requested name, id, and variant id after the operation;
+- builds all operation detail/refusal receipts before the first warmup. Timed
+  rows black-box only the production Result, with cap selection, output sizing,
+  error classification, digests, and receipt construction outside the clock;
 - keeps image-blip `find_first_embed`/`write_embed` helper work in a separate
   scanner-helper receipt; it is not reported as a typed writer;
 - passes the current typed limits through the `drawingml-raw-current`,

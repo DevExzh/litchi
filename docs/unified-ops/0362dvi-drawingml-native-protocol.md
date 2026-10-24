@@ -129,7 +129,8 @@ exists, a zero-write bounded-sink refusal.
 Canonical raw fixtures are checked by an outside-clock second decode/encode
 oracle. Routes promised source preservation must reproduce the exact source
 bytes; diagram and Ink action routes explicitly record that canonicalization
-is not source-preserving. Timed rows execute only their named production
+is not source-preserving (the Ink action writer does not retain source bytes).
+Timed rows execute only their named production
 operation: digesting, JSON receipt construction, and fidelity/refusal
 validation occur in the detail pass after timing. Each RSS receipt is bound
 to the child PID, command-line SHA-256, source revision, and kernel

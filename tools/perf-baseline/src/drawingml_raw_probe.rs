@@ -346,6 +346,7 @@ struct LaneCase {
     parts: Vec<Part>,
     prepared: Vec<PreparedPart>,
     shared: Vec<SharedPart>,
+    shared_prepared: Vec<PreparedValue>,
     stale: Vec<u8>,
     owners: Vec<OwnerFixture>,
     prepared_owners: Vec<OwnerWork>,
@@ -385,8 +386,12 @@ struct PreparedPart {
     /// separate from the standalone value used by the ordinary Vec writer so
     /// the production preflight and its detail receipt exercise the same
     /// contextual object.
+    contextual_source: Option<dml::svg_blip::SvgBlip>,
     contextual_changed: Option<dml::svg_blip::SvgBlip>,
+    contextual_source_output_bytes: Option<usize>,
     contextual_changed_output_bytes: Option<usize>,
+    output_payload_bytes: Option<usize>,
+    output_limit: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -465,6 +470,7 @@ struct RawFidelityReceipt {
     source_preserving_expected: bool,
     source_output_exact: bool,
     changed_output_exact: bool,
+    read_write_route: &'static str,
     fidelity_mode: &'static str,
     source_semantic_sha256: String,
     source_output_semantic_sha256: String,
@@ -500,6 +506,13 @@ struct ThemeFamilyMutationReceipt {
     output_sha256: String,
     output_bytes: usize,
     output_differs: bool,
+    requested_name: Option<String>,
+    requested_id: Option<String>,
+    requested_variant_id: Option<String>,
+    observed_name: Option<String>,
+    observed_id: Option<String>,
+    observed_variant_id: Option<String>,
+    requested_identity_matches: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1287,6 +1300,24 @@ fn write_svg_contextual_default(value: &dml::svg_blip::SvgBlip) -> Result<Vec<u8
 }
 
 #[cfg(feature = "drawingml-raw-current")]
+fn write_svg_contextual_to_default<W: Write>(
+    writer: &mut W,
+    value: &dml::svg_blip::SvgBlip,
+) -> Result<(), ProbeFailure> {
+    dml::svg_blip::write_contextual_to(writer, value, dml::svg_blip::Limits::DEFAULT)
+        .map_err(|error| classify(error, 0))
+}
+
+#[cfg(not(feature = "drawingml-raw-current"))]
+fn write_svg_contextual_to_default<W: Write>(
+    writer: &mut W,
+    value: &dml::svg_blip::SvgBlip,
+) -> Result<(), ProbeFailure> {
+    dml::svg_blip::write_contextual_to(writer, value, dml::svg_blip::MAX_XML_BYTES)
+        .map_err(|error| classify(error, 0))
+}
+
+#[cfg(feature = "drawingml-raw-current")]
 fn read_model3d_value(bytes: &[u8]) -> Result<dml::model3d::Metadata, ProbeFailure> {
     dml::model3d::codec::read(bytes, dml::model3d::codec::Limits::DEFAULT)
         .map_err(|error| classify(error, bytes.len()))
@@ -1465,7 +1496,7 @@ fn complete_theme_family_part(family: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
         )
     })?;
     Ok(format!(
-        "<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:thm15=\"{}\" name=\"Office\"><a:themeElements/><a:extLst><a:ext uri=\"{}\">{family}</a:ext></a:extLst></a:theme>",
+        "<!--theme-part-before--><a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:thm15=\"{}\" name=\"Office\"><a:themeElements/><!--theme-part-opaque--><a:extLst><a:ext uri=\"{}\"> {family} </a:ext></a:extLst><!--theme-part-after--></a:theme>",
         dml::theme::family::NAMESPACE,
         dml::theme::family::NAMESPACE,
     )
@@ -2093,17 +2124,12 @@ fn write_transform_value_limited<W: Write>(
     ))
 }
 
-fn output_limit_attempt(
+fn output_limit_result(
     part: &Part,
     prepared: &PreparedPart,
     maximum: usize,
-    timed: bool,
-) -> Result<OutputLimitAttempt, ProbeFailure> {
-    let mut sink = if timed {
-        CountingSink::timed(usize::MAX)
-    } else {
-        CountingSink::new(usize::MAX)
-    };
+    mut sink: &mut CountingSink,
+) -> Result<(), ProbeFailure> {
     let result = match (part.kind, &prepared.changed) {
         (PartKind::Chart, PreparedValue::Chart(value)) => {
             write_chart_value_limited(&mut sink, value, maximum)
@@ -2151,6 +2177,16 @@ fn output_limit_attempt(
         (PartKind::Blip, _) => return Err(fail("image blip has no typed output writer")),
         _ => return Err(fail("prepared raw value kind mismatch")),
     };
+    result
+}
+
+fn output_limit_attempt(
+    part: &Part,
+    prepared: &PreparedPart,
+    maximum: usize,
+) -> Result<OutputLimitAttempt, ProbeFailure> {
+    let mut sink = CountingSink::new(usize::MAX);
+    let result = output_limit_result(part, prepared, maximum, &mut sink);
     let error =
         result.expect_err("typed output-cap preflight unexpectedly accepted the selected cap");
     let refusal = error
@@ -2176,7 +2212,7 @@ fn output_limit_attempt(
             part.id
         )));
     }
-    let sink = if supports_production_sink(part.kind) && !timed {
+    let sink = if supports_production_sink(part.kind) {
         Some(write_receipt(sink))
     } else {
         None
@@ -2186,6 +2222,174 @@ fn output_limit_attempt(
         sink,
         partial_output_allowed,
     })
+}
+
+/// Timed output refusal calls deliberately keep the concrete production
+/// `Result` opaque.  This helper has no common probe error, refusal mapping,
+/// digest, or receipt path; those belong exclusively to `output_limit_attempt`
+/// in the pre-warmup detail pass.
+fn output_limit_timed(part: &Part, prepared: &PreparedPart, maximum: usize, sink: &mut CountingSink) {
+    match (part.kind, &prepared.changed) {
+        (PartKind::Chart, PreparedValue::Chart(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::chart::writer::write(
+                sink,
+                value,
+                &dml::chart::Limits::new(maximum),
+            ));
+        }
+        (PartKind::FormatCode, PreparedValue::FormatCode(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            {
+                let defaults = dml::chart::extension::formatcode2::Limits::DEFAULT;
+                let limits = dml::chart::extension::formatcode2::Limits::new(
+                    defaults.max_xml_bytes,
+                    defaults.max_value_bytes,
+                    defaults.max_attributes,
+                    defaults.max_nodes,
+                    defaults.max_depth,
+                    defaults.max_namespace_bytes,
+                    maximum,
+                );
+                black_box(dml::chart::extension::formatcode2::write_to(
+                    sink, value, &limits,
+                ));
+            }
+        }
+        (PartKind::Diagram, PreparedValue::Diagram { source, outline }) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            {
+                let entry = outline.entries.first();
+                if let Some(entry) = entry {
+                    let limits = diagram_limits_with_output(maximum);
+                    black_box(dml::diagram::edit::set_text(
+                        source,
+                        &entry.id,
+                        &entry.text,
+                        &limits,
+                    ));
+                }
+            }
+        }
+        (PartKind::TextBody, PreparedValue::TextBody(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            {
+                let mut output = String::new();
+                black_box(dml::text::body::writer::write(
+                    &mut output,
+                    value,
+                    dml::text::body::writer::Limits::new(maximum),
+                ));
+            }
+        }
+        (PartKind::SvgBlip, _) => {
+            if let Some(value) = prepared.contextual_changed.as_ref() {
+                #[cfg(feature = "drawingml-raw-current")]
+                {
+                    let defaults = dml::svg_blip::Limits::DEFAULT;
+                    let limits = dml::svg_blip::Limits::new(
+                        defaults.max_input_bytes,
+                        maximum,
+                    );
+                    black_box(dml::svg_blip::write_contextual_to(sink, value, limits));
+                }
+                #[cfg(not(feature = "drawingml-raw-current"))]
+                black_box(dml::svg_blip::write_contextual_to(sink, value, maximum));
+            }
+        }
+        (PartKind::Model3d, PreparedValue::Model3d(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            {
+                let defaults = dml::model3d::codec::Limits::DEFAULT;
+                let limits = dml::model3d::codec::Limits::new(
+                    defaults.max_xml_bytes,
+                    defaults.max_fragment_bytes,
+                    maximum,
+                );
+                black_box(dml::model3d::codec::write_to(sink, value, limits));
+            }
+        }
+        (PartKind::Theme, PreparedValue::Theme(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::theme::codec::encode_part(
+                &value.name,
+                &value.colors,
+                &value.fonts,
+                dml::theme::codec::Limits::new(maximum),
+            ));
+        }
+        (PartKind::ThemeFamily, PreparedValue::ThemeFamily(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::theme::family::write_to(
+                sink,
+                value,
+                dml::theme::family::Limits::new(maximum),
+            ));
+        }
+        (PartKind::ThemeFamilyPart, PreparedValue::ThemeFamilyPart(snapshot)) => {
+            #[cfg(feature = "drawingml-theme-family-current")]
+            if let Some(family) = snapshot.family() {
+                black_box(snapshot.replace_family(
+                    family,
+                    dml::theme::family::part::Limits::new(maximum),
+                ));
+            }
+        }
+        (PartKind::InkActions, PreparedValue::InkActions(value)) => {
+            #[cfg(any(
+                feature = "drawingml-raw-current",
+                feature = "drawingml-ink-limits-current"
+            ))]
+            {
+                let defaults = dml::ink::actions::Limits::DEFAULT;
+                black_box(dml::ink::actions::write_profile_to(
+                    sink,
+                    value,
+                    dml::ink::actions::Limits::new(defaults.max_source_bytes, maximum),
+                ));
+            }
+        }
+        (PartKind::Geometry, PreparedValue::Geometry(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            {
+                let mut output = String::new();
+                let mut limits = dml::geometry::Limits::DEFAULT;
+                limits.max_output_bytes = maximum;
+                black_box(dml::geometry::writer::write_custom_geometry(
+                    &mut output,
+                    value,
+                    &limits,
+                ));
+            }
+        }
+        (PartKind::Color, PreparedValue::Color(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            {
+                let defaults = dml::color::Limits::DEFAULT;
+                black_box(dml::color::write(
+                    value,
+                    &dml::color::Limits::new(
+                        maximum,
+                        defaults.max_depth,
+                        defaults.max_nodes,
+                        defaults.max_transforms,
+                    ),
+                ));
+            }
+        }
+        (PartKind::Transform, PreparedValue::Transform(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            {
+                let defaults = dml::transform::codec::Limits::DEFAULT;
+                black_box(dml::transform::codec::write_to(
+                    sink,
+                    value,
+                    &dml::transform::codec::Limits::new(maximum, defaults.max_nodes),
+                ));
+            }
+        }
+        _ => {}
+    }
 }
 
 struct CountingSink {
@@ -2338,6 +2542,7 @@ fn chart_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
     let mut changed_wire = Vec::new();
     write_chart_value(&mut changed_wire, &changed_chart)?;
     let changed = read_chart(&changed_wire)?;
+    let over = over_limit(PartKind::Chart, &source);
     Ok(vec![Part {
         id: "chart",
         kind: PartKind::Chart,
@@ -2347,19 +2552,33 @@ fn chart_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
         // chart::reader::read delegates its input admission to the shared
         // MCE default policy (256 MiB).  Keep the boundary fixture tied to
         // that real production limit rather than treating Chart as unbounded.
-        over: over_limit(PartKind::Chart),
+        over,
         limit_resource: "MCE input bytes",
     }])
 }
 
 fn format_code_part(fixture: &FixtureLane) -> Result<Part, ProbeFailure> {
-    let mut value = dml::chart::extension::formatcode2::Element::new("0.00")
+    // Keep a deliberately non-canonical source (comments, surrounding
+    // whitespace, and CDATA) so the changed fixture proves the production
+    // source splice rather than a detached canonical round trip.
+    let detached = dml::chart::extension::formatcode2::Element::new("0.00")
         .map_err(|error| classify(error, 0))?;
-    let source = {
+    let canonical = {
         let mut output = Vec::new();
-        write_format_code_value(&mut output, &value)?;
+        write_format_code_value(&mut output, &detached)?;
         output
     };
+    let canonical_text = std::str::from_utf8(&canonical)
+        .map_err(|error| invalid_input(error.to_string(), canonical.len()))?;
+    let open_end = canonical_text
+        .find('>')
+        .ok_or_else(|| fail("formatcode2 detached fixture has no root opening tag"))?;
+    let root_open = &canonical_text[..=open_end];
+    let source = format!(
+        "<!--formatcode2-before-->\n{root_open}<![CDATA[0.00]]><!--formatcode2-opaque--> </c16r2:formatcode2>\n<!--formatcode2-after-->"
+    )
+    .into_bytes();
+    let mut value = read_format_code_value(&source)?;
     value
         .set_value(format!("0.00;{}", fixture.mutation.len()))
         .map_err(|error| classify(error, 0))?;
@@ -2368,13 +2587,14 @@ fn format_code_part(fixture: &FixtureLane) -> Result<Part, ProbeFailure> {
         write_format_code_value(&mut output, &value)?;
         output
     };
+    let over = over_limit(PartKind::FormatCode, &source);
     Ok(Part {
         id: "formatcode2",
         kind: PartKind::FormatCode,
         source,
         changed,
         malformed: malformed_fragment("formatcode2", &fixture.malformed),
-        over: over_limit(PartKind::FormatCode),
+        over,
         limit_resource: "formatcode2 XML bytes",
     })
 }
@@ -2399,13 +2619,14 @@ fn diagram_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
     let text_changed =
         set_diagram_text(&source, &entry.id, &format!("{} changed", fixture.mutation))?;
     let changed = set_diagram_reference(&text_changed, Some("rIdDrawing"))?;
+    let over = over_limit(PartKind::Diagram, &source);
     Ok(vec![Part {
         id: "diagram-data-model",
         kind: PartKind::Diagram,
         source,
         changed,
         malformed: malformed_fragment("diagram-data-model", &fixture.malformed),
-        over: over_limit(PartKind::Diagram),
+        over,
         limit_resource: "diagram data-model bytes",
     }])
 }
@@ -2451,6 +2672,9 @@ fn text_media_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
     dml::blip::write_embed(&mut blip, "rIdImage", true).map_err(|error| fail(error.to_string()))?;
     let blip_source = blip.into_bytes();
     let blip_changed = br#"<a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rIdImageChanged"/>"#.to_vec();
+    let text_over = over_limit(PartKind::TextBody, &source);
+    let svg_over = over_limit(PartKind::SvgBlip, &svg_source);
+    let model_over = over_limit(PartKind::Model3d, &model_source);
     Ok(vec![
         Part {
             id: "text-body",
@@ -2458,7 +2682,7 @@ fn text_media_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
             source,
             changed,
             malformed: malformed_fragment("text-body", &fixture.malformed),
-            over: over_limit(PartKind::TextBody),
+            over: text_over,
             limit_resource: "text body input bytes",
         },
         Part {
@@ -2467,7 +2691,7 @@ fn text_media_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
             source: svg_source,
             changed: svg_changed,
             malformed: malformed_fragment("svg-blip", &fixture.malformed),
-            over: over_limit(PartKind::SvgBlip),
+            over: svg_over,
             limit_resource: "SVG blip XML bytes",
         },
         Part {
@@ -2476,7 +2700,7 @@ fn text_media_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
             source: model_source,
             changed: model_changed,
             malformed: malformed_fragment("model3d", &fixture.malformed),
-            over: over_limit(PartKind::Model3d),
+            over: model_over,
             limit_resource: "model3d XML bytes",
         },
         Part {
@@ -2525,13 +2749,33 @@ fn theme_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
         "{22222222-2222-2222-2222-222222222222}",
     )
     .map_err(|error| classify(error, 0))?;
-    let family_source = write_family_value(&family)?;
-    let family_changed = family
-        .with_name(format!("Family {}", fixture.mutation.len()))
+    let family_canonical = write_family_value(&family)?;
+    let family_canonical = std::str::from_utf8(&family_canonical)
+        .map_err(|error| invalid_input(error.to_string(), family_canonical.len()))?;
+    let family_source = format!(
+        "<!--theme-family-before-->\n  {family_canonical}\n<!--theme-family-after-->"
+    )
+    .into_bytes();
+    // Parse the non-canonical source, then mutate the retained projection.
+    // The changed bytes therefore exercise the production lexical splice.
+    let mut family_value = read_family_value(&family_source)?;
+    family_value
+        .set_name(format!("Family {}", fixture.mutation.len()))
         .map_err(|error| classify(error, family_source.len()))?;
-    let family_changed = write_family_value(&family_changed)?;
+    let family_changed = write_family_value(&family_value)?;
     let family_part_source = complete_theme_family_part(&family_source)?;
-    let family_part_changed = complete_theme_family_part(&family_changed)?;
+    // Mutate the complete source-backed part rather than embedding the
+    // detached family serialization into a newly generated wrapper.
+    let family_part_snapshot = read_theme_family_part_value(&family_part_source)?;
+    let source_family = family_part_snapshot
+        .family()
+        .cloned()
+        .ok_or_else(|| fail("complete Theme fixture has no direct family owner"))?;
+    let family_part_changed = theme_family_replace(&family_part_snapshot, &family_value)
+        .map_err(|error| classify(error, family_part_source.len()))?;
+    if source_family == family_value {
+        return Err(fail("Theme fixture mutation did not change family identity"));
+    }
     let ink_source = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s"><iact:action type="add" startTime="0.25"><iact:actionData name="stroke"/></iact:action><iact:actionGroup type="transform" startTime="1"><iact:action type="remove" startTime="2"/></iact:actionGroup></iact:actions>"#.to_vec();
     let ink_profile = read_ink_value(&ink_source)?;
     let ink_changed = ink_source
@@ -2543,8 +2787,13 @@ fn theme_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
             output
         })
         .unwrap_or_else(|| ink_source.clone());
-    let mut ink_output = Vec::new();
-    write_ink_value(&mut ink_output, &ink_profile)?;
+    // The writer is intentionally exercised by the raw fidelity route; do
+    // not use its canonical bytes as the source fixture for this lane.
+    let _ = ink_profile;
+    let theme_over = over_limit(PartKind::Theme, &source);
+    let family_over = over_limit(PartKind::ThemeFamily, &family_source);
+    let family_part_over = over_limit(PartKind::ThemeFamilyPart, &family_part_source);
+    let ink_over = over_limit(PartKind::InkActions, &ink_source);
     Ok(vec![
         Part {
             id: "theme",
@@ -2552,7 +2801,7 @@ fn theme_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
             source,
             changed,
             malformed: malformed_fragment("theme", &fixture.malformed),
-            over: over_limit(PartKind::Theme),
+            over: theme_over,
             limit_resource: "theme XML bytes",
         },
         Part {
@@ -2561,7 +2810,7 @@ fn theme_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
             source: family_source,
             changed: family_changed,
             malformed: malformed_fragment("theme-family", &fixture.malformed),
-            over: over_limit(PartKind::ThemeFamily),
+            over: family_over,
             limit_resource: "theme family XML bytes",
         },
         Part {
@@ -2570,7 +2819,7 @@ fn theme_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
             source: family_part_source,
             changed: family_part_changed,
             malformed: malformed_fragment("theme-family-part", &fixture.malformed),
-            over: over_limit(PartKind::ThemeFamilyPart),
+            over: family_part_over,
             limit_resource: "Theme Family XML bytes",
         },
         Part {
@@ -2579,7 +2828,7 @@ fn theme_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
             source: ink_source,
             changed: ink_changed,
             malformed: malformed_fragment("ink-actions", &fixture.malformed),
-            over: over_limit(PartKind::InkActions),
+            over: ink_over,
             limit_resource: "ink actions source bytes",
         },
     ])
@@ -2636,6 +2885,8 @@ fn geometry_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
         )?;
         output
     };
+    let color_over = over_limit(PartKind::Color, &color_source);
+    let transform_over = over_limit(PartKind::Transform, &transform_source);
     Ok(vec![
         Part {
             id: "geometry",
@@ -2652,7 +2903,7 @@ fn geometry_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
             source: color_source,
             changed: color_changed,
             malformed: malformed_fragment("color", &fixture.malformed),
-            over: over_limit(PartKind::Color),
+            over: color_over,
             limit_resource: "DrawingML color XML",
         },
         format_part,
@@ -2662,7 +2913,7 @@ fn geometry_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
             source: transform_source,
             changed: transform_changed,
             malformed: malformed_fragment("transform", &fixture.malformed),
-            over: over_limit(PartKind::Transform),
+            over: transform_over,
             limit_resource: "DrawingML transform XML bytes",
         },
     ])
@@ -2709,14 +2960,24 @@ fn make_case(lane: &str, fixture: &FixtureLane) -> Result<LaneCase, ProbeFailure
         .copied()
         .map(|route| owner_fixture(route, &parts))
         .collect::<Result<Vec<_>, _>>()?;
-    let prepared = parts
+    let mut prepared = parts
         .iter()
         .map(|part| {
+            let contextual_source = if part.kind == PartKind::SvgBlip {
+                Some(read_svg_contextual_value(&part.source)?)
+            } else {
+                None
+            };
             let contextual_changed = if part.kind == PartKind::SvgBlip {
                 Some(read_svg_contextual_value(&part.changed)?)
             } else {
                 None
             };
+            let contextual_source_output_bytes = contextual_source
+                .as_ref()
+                .map(write_svg_contextual_default)
+                .transpose()?
+                .map(|output| output.len());
             let contextual_changed_output_bytes = contextual_changed
                 .as_ref()
                 .map(write_svg_contextual_default)
@@ -2726,12 +2987,16 @@ fn make_case(lane: &str, fixture: &FixtureLane) -> Result<LaneCase, ProbeFailure
                 id: part.id,
                 source: prepare_value(part.kind, &part.source)?,
                 changed: prepare_value(part.kind, &part.changed)?,
+                contextual_source,
                 contextual_changed,
+                contextual_source_output_bytes,
                 contextual_changed_output_bytes,
+                output_payload_bytes: None,
+                output_limit: None,
             })
         })
         .collect::<Result<Vec<_>, ProbeFailure>>()?;
-    let shared = parts
+    let shared: Vec<SharedPart> = parts
         .iter()
         .filter(|part| supports_shared(part.kind))
         .map(|part| SharedPart {
@@ -2740,10 +3005,28 @@ fn make_case(lane: &str, fixture: &FixtureLane) -> Result<LaneCase, ProbeFailure
             source: std::sync::Arc::<[u8]>::from(part.source.clone()),
         })
         .collect();
+    for (part, prepared_part) in parts.iter().zip(&mut prepared) {
+        if output_limit_supported(part.kind) {
+            let payload = output_payload_bytes(part, prepared_part)?;
+            if payload <= 1 {
+                return Err(fail(format!(
+                    "{} output fixture is too small for a strict cap",
+                    part.id
+                )));
+            }
+            prepared_part.output_payload_bytes = Some(payload);
+            prepared_part.output_limit = Some(payload - 1);
+        }
+    }
+    let shared_prepared = shared
+        .iter()
+        .map(read_shared_value)
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(LaneCase {
         parts,
         prepared,
         shared,
+        shared_prepared,
         stale,
         owners,
         prepared_owners: Vec::new(),
@@ -2801,6 +3084,11 @@ fn select_raw_scope(case: &mut LaneCase, scope: &str) -> Result<(), ProbeFailure
         .collect::<std::collections::HashSet<_>>();
     case.prepared.retain(|part| selected.contains(part.id));
     case.shared.retain(|part| selected.contains(part.id));
+    case.shared_prepared = case
+        .shared
+        .iter()
+        .map(read_shared_value)
+        .collect::<Result<Vec<_>, _>>()?;
     case.owners.clear();
     case.prepared_owners.clear();
     Ok(())
@@ -3542,8 +3830,7 @@ fn semantic_mode(kind: PartKind) -> &'static str {
         PartKind::FormatCode
         | PartKind::SvgBlip
         | PartKind::ThemeFamily
-        | PartKind::ThemeFamilyPart
-        | PartKind::InkActions => "source_exact",
+        | PartKind::ThemeFamilyPart => "source_exact",
         PartKind::Blip => "scanner",
         _ => "model",
     }
@@ -3631,10 +3918,49 @@ fn raw_fidelity(case: &LaneCase) -> Result<Vec<RawFidelityReceipt>, ProbeFailure
     case.parts
         .iter()
         .map(|part| {
-            let source_output = roundtrip(part.kind, &part.source)?;
-            let changed_output = roundtrip(part.kind, &part.changed)?;
+            let (source_output, changed_output, read_write_route) = if part.kind == PartKind::SvgBlip
+            {
+                let prepared = case
+                    .prepared
+                    .iter()
+                    .find(|value| value.id == part.id)
+                    .ok_or_else(|| fail("SVG contextual fixture was not prepared"))?;
+                let source_value = prepared
+                    .contextual_source
+                    .as_ref()
+                    .ok_or_else(|| fail("SVG contextual source was not prepared"))?;
+                let changed_value = prepared
+                    .contextual_changed
+                    .as_ref()
+                    .ok_or_else(|| fail("SVG contextual changed value was not prepared"))?;
+                (
+                    write_svg_contextual_default(source_value)?,
+                    write_svg_contextual_default(changed_value)?,
+                    "contextual_read_write",
+                )
+            } else {
+                (
+                    roundtrip(part.kind, &part.source)?,
+                    roundtrip(part.kind, &part.changed)?,
+                    "standalone_read_write",
+                )
+            };
             if source_output.is_empty() || changed_output.is_empty() {
                 return Err(fail(format!("{} raw readback was empty", part.id)));
+            }
+            if part.kind == PartKind::SvgBlip {
+                let prepared = case
+                    .prepared
+                    .iter()
+                    .find(|value| value.id == part.id)
+                    .ok_or_else(|| fail("SVG contextual fixture was not prepared"))?;
+                if prepared.contextual_source_output_bytes != Some(source_output.len())
+                    || prepared.contextual_changed_output_bytes != Some(changed_output.len())
+                {
+                    return Err(fail(
+                        "SVG contextual output changed after the pre-warmup handoff",
+                    ));
+                }
             }
             let source_semantic = semantic_key(part.kind, &part.source)?;
             let source_output_semantic = semantic_key(part.kind, &source_output)?;
@@ -3690,6 +4016,7 @@ fn raw_fidelity(case: &LaneCase) -> Result<Vec<RawFidelityReceipt>, ProbeFailure
                 source_preserving_expected,
                 source_output_exact: source_output == part.source,
                 changed_output_exact,
+                read_write_route,
                 fidelity_mode: semantic_mode(part.kind),
                 source_semantic_sha256: sha256(source_semantic.as_bytes()),
                 source_output_semantic_sha256: sha256(source_output_semantic.as_bytes()),
@@ -3710,7 +4037,6 @@ fn source_preserving(kind: PartKind) -> bool {
             | PartKind::SvgBlip
             | PartKind::ThemeFamily
             | PartKind::ThemeFamilyPart
-            | PartKind::InkActions
     )
 }
 
@@ -3853,9 +4179,11 @@ fn input_limit(kind: PartKind) -> Option<(&'static str, usize)> {
         PartKind::SvgBlip => Some(("SVG blip XML bytes", 16 * 1024 * 1024)),
         PartKind::Model3d => Some(("model3d XML bytes", 16 * 1024 * 1024)),
         PartKind::Theme => Some(("theme XML bytes", 8 * 1024 * 1024)),
-        PartKind::ThemeFamily | PartKind::ThemeFamilyPart => {
-            Some(("theme family XML bytes", 1 << 20))
-        },
+        PartKind::ThemeFamily => Some(("theme family XML bytes", 1 << 20)),
+        PartKind::ThemeFamilyPart => Some((
+            "complete Theme-part XML bytes",
+            dml::theme::family::part::MAX_XML_BYTES,
+        )),
         PartKind::InkActions => Some(("ink actions source bytes", 16 * 1024 * 1024)),
         PartKind::Color => Some(("DrawingML color XML", 64 * 1024)),
         PartKind::Transform => Some(("DrawingML transform XML", 1 << 20)),
@@ -3863,9 +4191,12 @@ fn input_limit(kind: PartKind) -> Option<(&'static str, usize)> {
     }
 }
 
-fn over_limit(kind: PartKind) -> Vec<u8> {
+fn over_limit(kind: PartKind, source: &[u8]) -> Vec<u8> {
     let (_, limit) = input_limit(kind).expect("fixture boundary requires an input limit");
-    vec![b' '; limit.saturating_add(1)]
+    // Keep the boundary fixture valid so a typed input-limit refusal is not
+    // hidden behind an earlier malformed-XML refusal.  XML permits trailing
+    // whitespace after the complete document.
+    sized_with_whitespace(source, limit.saturating_add(1))
 }
 
 fn part_has_input_limit(kind: PartKind) -> bool {
@@ -4017,19 +4348,57 @@ fn read_shared_value(part: &SharedPart) -> Result<PreparedValue, ProbeFailure> {
     }
 }
 
-fn read_shared_lane(case: &LaneCase) -> Result<Vec<PreparedValue>, ProbeFailure> {
-    case.shared.iter().map(read_shared_value).collect()
+fn timed_shared_read(case: &LaneCase) {
+    for part in &case.shared {
+        match part.kind {
+            PartKind::FormatCode => {
+                #[cfg(feature = "drawingml-raw-current")]
+                black_box(dml::chart::extension::formatcode2::read_shared(
+                    std::sync::Arc::clone(&part.source),
+                    &dml::chart::extension::formatcode2::Limits::DEFAULT,
+                ));
+                #[cfg(not(feature = "drawingml-raw-current"))]
+                black_box(dml::chart::extension::formatcode2::read_shared(
+                    std::sync::Arc::clone(&part.source),
+                ));
+            }
+            PartKind::ThemeFamily => {
+                #[cfg(feature = "drawingml-raw-current")]
+                black_box(dml::theme::family::read_shared(
+                    std::sync::Arc::clone(&part.source),
+                    dml::theme::family::Limits::DEFAULT,
+                ));
+                #[cfg(not(feature = "drawingml-raw-current"))]
+                black_box(dml::theme::family::read_shared(std::sync::Arc::clone(
+                    &part.source,
+                )));
+            }
+            PartKind::ThemeFamilyPart => {
+                #[cfg(feature = "drawingml-raw-current")]
+                black_box(dml::theme::family::part::read_shared(
+                    std::sync::Arc::clone(&part.source),
+                    dml::theme::family::part::Limits::DEFAULT,
+                ));
+                #[cfg(not(feature = "drawingml-raw-current"))]
+                black_box(dml::theme::family::part::read_shared(std::sync::Arc::clone(
+                    &part.source,
+                )));
+            }
+            _ => {}
+        }
+    }
 }
 
 fn shared_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, ProbeFailure> {
     if timed {
-        for value in read_shared_lane(case)? {
-            black_box(value);
-        }
+        // Keep the production shared reader result opaque to the timer.  The
+        // parsed value and receipt validation belong to the pre-warmup detail
+        // pass; this row measures only the shared reader call itself.
+        timed_shared_read(case);
         return Ok(OperationValue::Timed);
     }
     let mut sink = CountingSink::new(usize::MAX);
-    for value in read_shared_lane(case)? {
+    for value in &case.shared_prepared {
         let output = match &value {
             PreparedValue::FormatCode(value) => {
                 let mut output = Vec::new();
@@ -4145,6 +4514,19 @@ fn theme_family_mutations(
             "theme-family replace did not change the complete Theme part",
         ));
     }
+    let replaced_snapshot = read_theme_family_part_value(&replaced)?;
+    let replaced_family = replaced_snapshot
+        .family()
+        .ok_or_else(|| fail("theme-family replace lost its direct owner"))?;
+    let requested_name = changed_family.name().to_owned();
+    let requested_id = changed_family.id().to_string();
+    let requested_variant_id = changed_family.variant_id().to_string();
+    let replaced_identity_matches = replaced_family == &changed_family;
+    if !replaced_identity_matches {
+        return Err(fail(
+            "theme-family replace parsed owner differs from requested identity",
+        ));
+    }
     let removed =
         theme_family_remove(&part.source).map_err(|error| classify(error, part.source.len()))?;
     let removed_snapshot = read_theme_family_part_value(&removed)?;
@@ -4154,8 +4536,14 @@ fn theme_family_mutations(
     let added = theme_family_add(&removed, &changed_family)
         .map_err(|error| classify(error, removed.len()))?;
     let added_snapshot = read_theme_family_part_value(&added)?;
-    if added_snapshot.family().is_none() {
-        return Err(fail("theme-family add did not restore a direct owner"));
+    let added_family = added_snapshot
+        .family()
+        .ok_or_else(|| fail("theme-family add did not restore a direct owner"))?;
+    let added_identity_matches = added_family == &changed_family;
+    if !added_identity_matches {
+        return Err(fail(
+            "theme-family add parsed owner differs from requested identity",
+        ));
     }
     Ok(vec![
         ThemeFamilyMutationReceipt {
@@ -4164,6 +4552,13 @@ fn theme_family_mutations(
             output_sha256: sha256(&replaced),
             output_bytes: replaced.len(),
             output_differs: true,
+            requested_name: Some(requested_name.clone()),
+            requested_id: Some(requested_id.clone()),
+            requested_variant_id: Some(requested_variant_id.clone()),
+            observed_name: Some(replaced_family.name().to_owned()),
+            observed_id: Some(replaced_family.id().to_string()),
+            observed_variant_id: Some(replaced_family.variant_id().to_string()),
+            requested_identity_matches: replaced_identity_matches,
         },
         ThemeFamilyMutationReceipt {
             operation: "remove_family",
@@ -4171,6 +4566,13 @@ fn theme_family_mutations(
             output_sha256: sha256(&removed),
             output_bytes: removed.len(),
             output_differs: removed != part.source,
+            requested_name: None,
+            requested_id: None,
+            requested_variant_id: None,
+            observed_name: None,
+            observed_id: None,
+            observed_variant_id: None,
+            requested_identity_matches: removed_snapshot.family().is_none(),
         },
         ThemeFamilyMutationReceipt {
             operation: "add_family",
@@ -4178,6 +4580,13 @@ fn theme_family_mutations(
             output_sha256: sha256(&added),
             output_bytes: added.len(),
             output_differs: added != removed,
+            requested_name: Some(requested_name),
+            requested_id: Some(requested_id),
+            requested_variant_id: Some(requested_variant_id),
+            observed_name: Some(added_family.name().to_owned()),
+            observed_id: Some(added_family.id().to_string()),
+            observed_variant_id: Some(added_family.variant_id().to_string()),
+            requested_identity_matches: added_identity_matches,
         },
     ])
 }
@@ -4231,15 +4640,13 @@ fn preflight_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
             }));
             continue;
         }
-        let preflight_bytes = output_payload_bytes(part, prepared)?;
-        if preflight_bytes <= 1 {
-            return Err(fail(format!(
-                "{} output fixture is too small for a strict cap",
-                part.id
-            )));
-        }
-        let output_limit = preflight_bytes - 1;
-        let attempt = output_limit_attempt(part, prepared, output_limit, false)?;
+        let preflight_bytes = prepared
+            .output_payload_bytes
+            .ok_or_else(|| fail(format!("{} output fixture has no prepared size", part.id)))?;
+        let output_limit = prepared
+            .output_limit
+            .ok_or_else(|| fail(format!("{} output fixture has no prepared cap", part.id)))?;
+        let attempt = output_limit_attempt(part, prepared, output_limit)?;
         let sink_writes = attempt.sink.as_ref().map_or(0, |sink| sink.writes);
         let partial_output_bytes = attempt.sink.as_ref().map_or(0, |sink| sink.bytes);
         total_sink_writes = total_sink_writes.saturating_add(sink_writes);
@@ -4278,40 +4685,22 @@ fn preflight_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
 }
 
 /// Execute only production boundary calls during a timed preflight row.
-/// Fixture parsing, contextual SVG preparation, and cap selection stay
-/// outside the clock; the timed call is the real typed refusal boundary.
+/// Fixture parsing, contextual SVG preparation, cap selection, and output
+/// sizing are all completed in `make_case`; the timed call is only the real
+/// production result.
 fn production_preflight(case: &LaneCase) -> Result<(), ProbeFailure> {
     for part in &case.parts {
         if boundary_kind(part.kind) == "none" {
             continue;
         }
-        let error = roundtrip(part.kind, &part.over)
-            .map(|_| ())
-            .expect_err("production boundary source must be refused");
-        black_box(error);
+        timed_entry_read(part.kind, &part.over);
     }
-    for part in &case.parts {
-        if !output_limit_supported(part.kind) {
+    for (part, prepared) in case.parts.iter().zip(&case.prepared) {
+        let Some(output_limit) = prepared.output_limit else {
             continue;
-        }
-        let prepared = case
-            .prepared
-            .iter()
-            .find(|value| value.id == part.id)
-            .ok_or_else(|| fail(format!("missing prepared value for {}", part.id)))?;
-        let preflight_bytes = output_payload_bytes(part, prepared)?;
-        if preflight_bytes <= 1 {
-            return Err(fail(format!(
-                "{} output fixture is too small for a strict cap",
-                part.id
-            )));
-        }
-        black_box(output_limit_attempt(
-            part,
-            prepared,
-            preflight_bytes - 1,
-            true,
-        )?);
+        };
+        let mut sink = CountingSink::timed(usize::MAX);
+        output_limit_timed(part, prepared, output_limit, &mut sink);
     }
     Ok(())
 }
@@ -4321,21 +4710,17 @@ fn production_preflight(case: &LaneCase) -> Result<(), ProbeFailure> {
 /// detail pass.
 fn malformed_production(case: &LaneCase) -> Result<(), ProbeFailure> {
     for part in &case.parts {
-        let error = roundtrip(part.kind, &part.malformed)
-            .map(|_| ())
-            .expect_err("malformed source must be refused");
-        black_box(error);
+        timed_entry_read(part.kind, &part.malformed);
     }
     Ok(())
 }
 
 fn normal_write(case: &LaneCase, timed: bool) -> Result<OperationValue, ProbeFailure> {
-    let production_parts = case
+    if !case
         .parts
         .iter()
-        .filter(|part| supports_production_sink(part.kind))
-        .collect::<Vec<_>>();
-    if production_parts.is_empty() {
+        .any(|part| supports_production_sink(part.kind))
+    {
         return Ok(if timed {
             OperationValue::Timed
         } else {
@@ -4346,22 +4731,48 @@ fn normal_write(case: &LaneCase, timed: bool) -> Result<OperationValue, ProbeFai
             }))
         });
     }
-    let mut sink = if timed {
-        CountingSink::timed(usize::MAX)
-    } else {
-        CountingSink::new(usize::MAX)
-    };
-    for part in production_parts {
-        let prepared = case
-            .prepared
-            .iter()
-            .find(|value| value.id == part.id)
-            .ok_or_else(|| fail(format!("missing prepared value for {}", part.id)))?;
-        write_prepared_to(part.kind, &prepared.changed, &mut sink)?;
-    }
     if timed {
+        let mut sink = CountingSink::timed(usize::MAX);
+        for (part, prepared) in case.parts.iter().zip(&case.prepared) {
+            if !supports_production_sink(part.kind) {
+                continue;
+            }
+            if part.kind == PartKind::SvgBlip {
+                if let Some(value) = prepared.contextual_changed.as_ref() {
+                    #[cfg(feature = "drawingml-raw-current")]
+                    black_box(dml::svg_blip::write_contextual_to(
+                        &mut sink,
+                        value,
+                        dml::svg_blip::Limits::DEFAULT,
+                    ));
+                    #[cfg(not(feature = "drawingml-raw-current"))]
+                    black_box(dml::svg_blip::write_contextual_to(
+                        &mut sink,
+                        value,
+                        dml::svg_blip::MAX_XML_BYTES,
+                    ));
+                }
+            } else {
+                timed_write_prepared_to(part.kind, &prepared.changed, &mut sink);
+            }
+        }
         Ok(OperationValue::Timed)
     } else {
+        let mut sink = CountingSink::new(usize::MAX);
+        for (part, prepared) in case.parts.iter().zip(&case.prepared) {
+            if !supports_production_sink(part.kind) {
+                continue;
+            }
+            if part.kind == PartKind::SvgBlip {
+                let value = prepared
+                    .contextual_changed
+                    .as_ref()
+                    .ok_or_else(|| fail("SVG contextual value was not prepared"))?;
+                write_svg_contextual_to_default(&mut sink, value)?;
+            } else {
+                write_prepared_to(part.kind, &prepared.changed, &mut sink)?;
+            }
+        }
         let sink = write_receipt(sink);
         Ok(OperationValue::SinkDetails {
             sink,
@@ -4372,77 +4783,409 @@ fn normal_write(case: &LaneCase, timed: bool) -> Result<OperationValue, ProbeFai
                     .filter(|part| supports_production_sink(part.kind))
                     .map(|part| part.id)
                     .collect::<Vec<_>>(),
+                "contextual_svg_parts": case
+                    .parts
+                    .iter()
+                    .filter(|part| part.kind == PartKind::SvgBlip)
+                    .map(|part| part.id)
+                    .collect::<Vec<_>>(),
+                "contextual_svg_scope": "contextual_read_write",
             }),
         })
     }
 }
 
-/// Read timing owns only the reader call.  The outside-clock receipt pass
-/// performs the corresponding write so it can retain a digest without adding
-/// serialization work to the read sample.
-fn read_entry_value(kind: PartKind, bytes: &[u8]) -> Result<(), ProbeFailure> {
+/// Call the raw readers directly for the timed entry row.  Each arm leaves
+/// its native production `Result` opaque to the optimizer; no common probe
+/// error or refusal receipt is built on the clock.
+fn timed_entry_read(kind: PartKind, bytes: &[u8]) {
     match kind {
         PartKind::Chart => {
-            black_box(read_chart_value(bytes)?);
-        },
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::chart::reader::read(bytes, &dml::chart::Limits::DEFAULT));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::chart::reader::read(bytes));
+        }
         PartKind::FormatCode => {
-            black_box(read_format_code_value(bytes)?);
-        },
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::chart::extension::formatcode2::read(
+                bytes,
+                &dml::chart::extension::formatcode2::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::chart::extension::formatcode2::read(bytes));
+        }
         PartKind::Diagram => {
-            black_box(read_diagram_value(bytes)?);
-        },
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::diagram::edit::Outline::read(
+                bytes,
+                &dml::diagram::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::diagram::edit::Outline::read(bytes));
+        }
         PartKind::TextBody => {
-            black_box(read_text_value(bytes)?);
-        },
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::text::body::reader::read(
+                bytes,
+                quick_xml::name::NamespaceResolver::default(),
+                dml::text::body::reader::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::text::body::reader::read_with_options(
+                bytes,
+                quick_xml::name::NamespaceResolver::default(),
+                dml::text::body::reader::Limits::DEFAULT,
+            ));
+        }
         PartKind::SvgBlip => {
-            black_box(read_svg_value(bytes)?);
-        },
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::svg_blip::read(bytes, dml::svg_blip::Limits::DEFAULT));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::svg_blip::read(bytes));
+        }
         PartKind::Model3d => {
-            black_box(read_model3d_value(bytes)?);
-        },
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::model3d::codec::read(
+                bytes,
+                dml::model3d::codec::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::model3d::codec::read(bytes));
+        }
         PartKind::Blip => {
-            black_box(read_blip_value(bytes)?);
-        },
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::blip::find_first_embed(bytes, dml::blip::Limits::DEFAULT));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::blip::find_first_embed(bytes));
+        }
         PartKind::Theme => {
-            black_box(read_theme_value(bytes)?);
-        },
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::theme::codec::read(bytes, dml::theme::codec::Limits::DEFAULT));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::theme::codec::read(bytes));
+        }
         PartKind::ThemeFamily => {
-            black_box(read_family_value(bytes)?);
-        },
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::theme::family::read(bytes, dml::theme::family::Limits::DEFAULT));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::theme::family::read(bytes));
+        }
         PartKind::ThemeFamilyPart => {
-            black_box(read_theme_family_part_value(bytes)?);
-        },
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::theme::family::part::read(
+                bytes,
+                dml::theme::family::part::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::theme::family::part::read(bytes));
+        }
         PartKind::InkActions => {
-            black_box(read_ink_value(bytes)?);
-        },
+            #[cfg(any(
+                feature = "drawingml-raw-current",
+                feature = "drawingml-ink-limits-current"
+            ))]
+            black_box(dml::ink::actions::read_profile(
+                bytes,
+                dml::ink::actions::Limits::DEFAULT,
+            ));
+            #[cfg(not(any(
+                feature = "drawingml-raw-current",
+                feature = "drawingml-ink-limits-current"
+            )))]
+            black_box(dml::ink::actions::read_profile(bytes));
+        }
         PartKind::Geometry => {
-            black_box(read_geometry_value(bytes)?);
-        },
+            // Geometry's public reader is the bounded builder walk used by
+            // `parse_geometry`; retain that production Result without
+            // converting it into a timed probe refusal.
+            black_box(parse_geometry(bytes));
+        }
         PartKind::Color => {
-            black_box(read_color_value(bytes)?);
-        },
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::color::read(bytes, &dml::color::Limits::DEFAULT));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::color::read(bytes));
+        }
         PartKind::Transform => {
-            black_box(read_transform_value(bytes)?);
-        },
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::transform::codec::read(
+                bytes,
+                &dml::transform::codec::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::transform::codec::read(bytes));
+        }
     }
-    Ok(())
 }
 
 fn entry_read_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, ProbeFailure> {
     if timed {
         for part in &case.parts {
-            read_entry_value(part.kind, &part.source)?;
+            timed_entry_read(part.kind, &part.source);
         }
         return Ok(OperationValue::Timed);
     }
     let mut sink = CountingSink::new(usize::MAX);
-    for part in &case.parts {
-        let value = prepare_value(part.kind, &part.source)?;
-        let output = write_prepared_vec(part.kind, &value)?;
+    for (part, prepared) in case.parts.iter().zip(&case.prepared) {
+        let output = write_prepared_vec(part.kind, &prepared.source)?;
         sink.write_all(&output)
             .map_err(|error| io_failure(error, output.len()))?;
     }
     Ok(OperationValue::Sink(write_receipt(sink)))
+}
+
+/// Timed Vec/String writes mirror `write_prepared_vec` without routing native
+/// results through `ProbeFailure`.  Source-edit routes still call their real
+/// production mutation and serializer; all receipt/fidelity work remains in
+/// the pre-warmup detail pass.
+fn timed_write_prepared_vec(kind: PartKind, value: &PreparedValue) {
+    match (kind, value) {
+        (PartKind::Chart, PreparedValue::Chart(value)) => {
+            let mut output = Vec::new();
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::chart::writer::write(
+                &mut output,
+                value,
+                &dml::chart::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::chart::writer::write(&mut output, value));
+        }
+        (PartKind::FormatCode, PreparedValue::FormatCode(value)) => {
+            let mut output = Vec::new();
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::chart::extension::formatcode2::write_to(
+                &mut output,
+                value,
+                &dml::chart::extension::formatcode2::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::chart::extension::formatcode2::write_to(&mut output, value));
+        }
+        (PartKind::Diagram, PreparedValue::Diagram { source, outline }) => {
+            if let Some(entry) = outline.entries.first() {
+                #[cfg(feature = "drawingml-raw-current")]
+                {
+                    let limits = dml::diagram::Limits::DEFAULT;
+                    let result = dml::diagram::edit::set_text(
+                        source,
+                        &entry.id,
+                        &entry.text,
+                        &limits,
+                    );
+                    let result = match result {
+                        Ok(output) => dml::diagram::edit::set_drawing_reference(
+                            &output,
+                            outline.drawing_relationship.as_deref(),
+                            &limits,
+                        ),
+                        Err(error) => Err(error),
+                    };
+                    black_box(result);
+                }
+                #[cfg(not(feature = "drawingml-raw-current"))]
+                {
+                    let result = dml::diagram::edit::set_text(source, &entry.id, &entry.text);
+                    let result = match result {
+                        Ok(output) => dml::diagram::edit::set_drawing_reference(
+                            &output,
+                            outline.drawing_relationship.as_deref(),
+                        ),
+                        Err(error) => Err(error),
+                    };
+                    black_box(result);
+                }
+            }
+        }
+        (PartKind::TextBody, PreparedValue::TextBody(value)) => {
+            let mut contents = String::new();
+            #[cfg(feature = "drawingml-raw-current")]
+            let result = dml::text::body::writer::write(
+                &mut contents,
+                value,
+                dml::text::body::writer::Limits::DEFAULT,
+            );
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            let result = dml::text::body::writer::write(&mut contents, value);
+            // Keep the production writer's result and bytes observable without
+            // adding the host wrapper serialization to the timed route.
+            black_box((result, contents));
+        }
+        (PartKind::Model3d, PreparedValue::Model3d(value)) => {
+            let mut output = Vec::new();
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::model3d::codec::write_to(
+                &mut output,
+                value,
+                dml::model3d::codec::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::model3d::codec::write_to(&mut output, value));
+        }
+        (PartKind::Blip, PreparedValue::Blip(value)) => {
+            let mut output = String::new();
+            black_box(dml::blip::write_embed(&mut output, value, true));
+        }
+        (PartKind::Theme, PreparedValue::Theme(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::theme::codec::encode_part(
+                &value.name,
+                &value.colors,
+                &value.fonts,
+                dml::theme::codec::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::theme::codec::encode_part(
+                &value.name,
+                &value.colors,
+                &value.fonts,
+            ));
+        }
+        (PartKind::ThemeFamily, PreparedValue::ThemeFamily(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::theme::family::write(
+                value,
+                dml::theme::family::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::theme::family::write(value));
+        }
+        (PartKind::ThemeFamilyPart, PreparedValue::ThemeFamilyPart(snapshot)) => {
+            if let Some(family) = snapshot.family() {
+                #[cfg(feature = "drawingml-theme-family-current")]
+                black_box(snapshot.replace_family(
+                    family,
+                    dml::theme::family::part::Limits::DEFAULT,
+                ));
+                #[cfg(not(feature = "drawingml-theme-family-current"))]
+                black_box(snapshot.replace_family_with_limit(
+                    family,
+                    dml::theme::family::part::MAX_XML_BYTES,
+                ));
+            }
+        }
+        (PartKind::InkActions, PreparedValue::InkActions(value)) => {
+            let mut output = Vec::new();
+            #[cfg(any(
+                feature = "drawingml-raw-current",
+                feature = "drawingml-ink-limits-current"
+            ))]
+            black_box(dml::ink::actions::write_profile_to(
+                &mut output,
+                value,
+                dml::ink::actions::Limits::DEFAULT,
+            ));
+            #[cfg(not(any(
+                feature = "drawingml-raw-current",
+                feature = "drawingml-ink-limits-current"
+            )))]
+            black_box(dml::ink::actions::write_profile_to(&mut output, value));
+        }
+        (PartKind::Geometry, PreparedValue::Geometry(value)) => {
+            let mut output = String::new();
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::geometry::writer::write_custom_geometry(
+                &mut output,
+                value,
+                &dml::geometry::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::geometry::writer::write_custom_geometry(&mut output, value));
+        }
+        (PartKind::Color, PreparedValue::Color(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::color::write(value, &dml::color::Limits::DEFAULT));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::color::write(value));
+        }
+        (PartKind::Transform, PreparedValue::Transform(value)) => {
+            let mut output = Vec::new();
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::transform::codec::write_to(
+                &mut output,
+                value,
+                &dml::transform::codec::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::transform::codec::write_to(&mut output, value));
+        }
+        _ => {}
+    }
+}
+
+/// Direct native sink calls for the bounded-sink row.  Only the capability
+/// matrix's real sink writers reach this helper.
+fn timed_write_prepared_to(kind: PartKind, value: &PreparedValue, sink: &mut CountingSink) {
+    match (kind, value) {
+        (PartKind::Chart, PreparedValue::Chart(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::chart::writer::write(
+                sink,
+                value,
+                &dml::chart::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::chart::writer::write(sink, value));
+        }
+        (PartKind::FormatCode, PreparedValue::FormatCode(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::chart::extension::formatcode2::write_to(
+                sink,
+                value,
+                &dml::chart::extension::formatcode2::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::chart::extension::formatcode2::write_to(sink, value));
+        }
+        (PartKind::Model3d, PreparedValue::Model3d(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::model3d::codec::write_to(
+                sink,
+                value,
+                dml::model3d::codec::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::model3d::codec::write_to(sink, value));
+        }
+        (PartKind::ThemeFamily, PreparedValue::ThemeFamily(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::theme::family::write_to(
+                sink,
+                value,
+                dml::theme::family::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::theme::family::write_to(sink, value));
+        }
+        (PartKind::InkActions, PreparedValue::InkActions(value)) => {
+            #[cfg(any(
+                feature = "drawingml-raw-current",
+                feature = "drawingml-ink-limits-current"
+            ))]
+            black_box(dml::ink::actions::write_profile_to(
+                sink,
+                value,
+                dml::ink::actions::Limits::DEFAULT,
+            ));
+            #[cfg(not(any(
+                feature = "drawingml-raw-current",
+                feature = "drawingml-ink-limits-current"
+            )))]
+            black_box(dml::ink::actions::write_profile_to(sink, value));
+        }
+        (PartKind::Transform, PreparedValue::Transform(value)) => {
+            #[cfg(feature = "drawingml-raw-current")]
+            black_box(dml::transform::codec::write_to(
+                sink,
+                value,
+                &dml::transform::codec::Limits::DEFAULT,
+            ));
+            #[cfg(not(feature = "drawingml-raw-current"))]
+            black_box(dml::transform::codec::write_to(sink, value));
+        }
+        _ => {}
+    }
 }
 
 /// Write timing consumes values parsed once in `make_case`; no reader or
@@ -4452,24 +5195,37 @@ fn entry_read_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, 
 /// detached pure writer.
 fn vec_write_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, ProbeFailure> {
     if timed {
-        for part in &case.parts {
-            let prepared = case
-                .prepared
-                .iter()
-                .find(|value| value.id == part.id)
-                .ok_or_else(|| fail(format!("missing prepared value for {}", part.id)))?;
-            black_box(write_prepared_vec(part.kind, &prepared.changed)?);
+        for (part, prepared) in case.parts.iter().zip(&case.prepared) {
+            if part.kind == PartKind::SvgBlip {
+                if let Some(value) = prepared.contextual_changed.as_ref() {
+                    #[cfg(feature = "drawingml-raw-current")]
+                    black_box(dml::svg_blip::write_contextual(
+                        value,
+                        dml::svg_blip::Limits::DEFAULT,
+                    ));
+                    #[cfg(not(feature = "drawingml-raw-current"))]
+                    black_box(dml::svg_blip::write_contextual(
+                        value,
+                        dml::svg_blip::MAX_XML_BYTES,
+                    ));
+                }
+            } else {
+                timed_write_prepared_vec(part.kind, &prepared.changed);
+            }
         }
         return Ok(OperationValue::Timed);
     }
     let mut sink = CountingSink::new(usize::MAX);
-    for part in &case.parts {
-        let prepared = case
-            .prepared
-            .iter()
-            .find(|value| value.id == part.id)
-            .ok_or_else(|| fail(format!("missing prepared value for {}", part.id)))?;
-        let output = write_prepared_vec(part.kind, &prepared.changed)?;
+    for (part, prepared) in case.parts.iter().zip(&case.prepared) {
+        let output = if part.kind == PartKind::SvgBlip {
+            let value = prepared
+                .contextual_changed
+                .as_ref()
+                .ok_or_else(|| fail("SVG contextual value was not prepared"))?;
+            write_svg_contextual_default(value)?
+        } else {
+            write_prepared_vec(part.kind, &prepared.changed)?
+        };
         sink.write_all(&output)
             .map_err(|error| io_failure(error, output.len()))?;
     }
@@ -4502,6 +5258,13 @@ fn vec_write_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, P
                 .map(|part| part.id)
                 .collect::<Vec<_>>(),
             "scanner_helper_scope": "scanner_helper",
+            "contextual_svg_parts": case
+                .parts
+                .iter()
+                .filter(|part| part.kind == PartKind::SvgBlip)
+                .map(|part| part.id)
+                .collect::<Vec<_>>(),
+            "contextual_svg_scope": "contextual_read_write",
             "typed_writer_parts": case
                 .parts
                 .iter()
@@ -4759,6 +5522,7 @@ fn measure(
     arguments: &Arguments,
     observer: Option<&dyn AllocationObserver>,
     outside_fidelity_checked: bool,
+    prepared_value: OperationValue,
 ) -> Result<(Row, Option<AllocationMetrics>, u64), ProbeFailure> {
     for _ in 0..arguments.warmups {
         for _ in 0..arguments.iterations {
@@ -4801,8 +5565,7 @@ fn measure(
         )));
     }
     let metrics = before.map(|before| observer.expect("observer disappeared").finish(before));
-    let value = operation(case, operation_name, false)?;
-    let (details, sink) = match value {
+    let (details, sink) = match prepared_value {
         OperationValue::Timed => (
             serde_json::json!({
                 "not_applicable": true,
@@ -5002,16 +5765,25 @@ pub fn run(observer: Option<&dyn AllocationObserver>) -> io::Result<()> {
     } else {
         OWNER_OPERATIONS.to_vec()
     };
+    // Build every outside-clock operation receipt before the first warmup.
+    // Timed rows receive these immutable details and never rerun a fidelity,
+    // refusal, digest, or output-size check after their samples.
+    let prepared_operations = operations
+        .iter()
+        .map(|operation_name| operation(&case, operation_name, false))
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|error| io::Error::other(error.message))?;
     let mut rows = Vec::with_capacity(operations.len());
     let mut all_metrics = Vec::new();
     let mut peak_rss = process_rss_bytes();
-    for operation_name in operations {
+    for (operation_name, prepared_value) in operations.into_iter().zip(prepared_operations) {
         let (row, metrics, row_peak) = measure(
             &case,
             &operation_name,
             &arguments,
             observer,
             !raw_fidelity.is_empty() || !owner_proofs.is_empty(),
+            prepared_value,
         )
         .map_err(|error| io::Error::other(error.message))?;
         rows.push(row);

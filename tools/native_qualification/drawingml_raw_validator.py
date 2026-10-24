@@ -64,7 +64,6 @@ SOURCE_EXACT_PARTS = {
     "svg-blip",
     "theme-family",
     "theme-family-part",
-    "ink-actions",
 }
 SCANNER_PARTS = {"image-blip"}
 EXTERNAL_RESOURCE_SCHEMA = "litchi.drawingml.external-process-resource.v1"
@@ -584,6 +583,13 @@ def _validate_rows(
             and isinstance(receipt.get("changed_output_exact"), bool),
             f"{path}: raw fidelity source-preservation receipt is missing",
         )
+        expected_route = (
+            "contextual_read_write" if part_id == "svg-blip" else "standalone_read_write"
+        )
+        _expect(
+            receipt.get("read_write_route") == expected_route,
+            f"{path}: raw fidelity route is not the production route",
+        )
         _expect(
             receipt["source_semantic_sha256"] == receipt["source_output_semantic_sha256"]
             and receipt["changed_semantic_sha256"]
@@ -653,6 +659,35 @@ def _validate_rows(
                 f"{path}: theme-family mutation output size is missing",
             )
             _expect(item.get("output_differs") is True, f"{path}: theme-family mutation was a no-op")
+            if operation in {"replace_family", "add_family"}:
+                for field in ("requested_name", "requested_id", "requested_variant_id"):
+                    _expect(
+                        isinstance(item.get(field), str) and bool(item[field]),
+                        f"{path}: theme-family {operation} requested {field} is missing",
+                    )
+                for field in ("observed_name", "observed_id", "observed_variant_id"):
+                    _expect(
+                        isinstance(item.get(field), str) and bool(item[field]),
+                        f"{path}: theme-family {operation} observed {field} is missing",
+                    )
+                _expect(
+                    item["observed_name"] == item["requested_name"]
+                    and item["observed_id"] == item["requested_id"]
+                    and item["observed_variant_id"] == item["requested_variant_id"]
+                    and item.get("requested_identity_matches") is True,
+                    f"{path}: theme-family {operation} identity was not verified after parse",
+                )
+            else:
+                _expect(
+                    item.get("requested_name") is None
+                    and item.get("requested_id") is None
+                    and item.get("requested_variant_id") is None
+                    and item.get("observed_name") is None
+                    and item.get("observed_id") is None
+                    and item.get("observed_variant_id") is None
+                    and item.get("requested_identity_matches") is True,
+                    f"{path}: theme-family remove carries an invalid identity receipt",
+                )
         replace = mutation_by_operation["replace_family"]
         remove = mutation_by_operation["remove_family"]
         add = mutation_by_operation["add_family"]
@@ -781,6 +816,13 @@ def _validate_rows(
                     == expected_parts,
                     f"{path}: bounded sink does not identify production routes",
                 )
+                _expect(
+                    details.get("route", {}).get("contextual_svg_scope")
+                    == "contextual_read_write"
+                    and details.get("route", {}).get("contextual_svg_parts")
+                    == (["svg-blip"] if "svg-blip" in raw_routes else []),
+                    f"{path}: bounded sink contextual SVG route is not declared",
+                )
         elif operation in sink_operations - {"write_to_bounded_sink"}:
             sink = row.get("sink")
             _expect(isinstance(sink, dict), f"{path}: {operation} sink receipt is missing")
@@ -801,6 +843,14 @@ def _validate_rows(
                 and details.get("sink_writes") == sink["writes"],
                 f"{path}: {operation} sink detail receipt differs from row receipt",
             )
+            if operation == "vec_write":
+                route = details.get("route")
+                _expect(isinstance(route, dict), f"{path}: vec-write route details are missing")
+                _expect(
+                    route.get("contextual_svg_scope") == "contextual_read_write"
+                    and route.get("contextual_svg_parts") == (["svg-blip"] if "svg-blip" in raw_routes else []),
+                    f"{path}: vec-write contextual SVG route is not declared",
+                )
         elif operation == "stale_replay":
             _expect(
                 row.get("typed_refusal_checked") is True,
