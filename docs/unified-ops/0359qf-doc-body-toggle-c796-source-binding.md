@@ -64,6 +64,8 @@ was SHA-256
 packet adds the same opt-in dump-only harness change to both legs; the final
 probe source SHA-256 in each copy is
 b808e4dcba33dcafd4dff7dd22dc250e4170f2613839044fa8097263f5020965.
+The c796-to-probe-only diff has SHA-256
+d28c3bac33f8b2a8f0b8f4cbcdfb731e5b47e7635c067b34b599efead56e67aa.
 With no LITCHI_PROBE_OUTPUT_DIR, this change does not alter the route or its
 timing path. With that variable set, it writes the selected output bytes so
 the fresh batch can be structurally audited.
@@ -75,6 +77,11 @@ The overlay can be independently rechecked without Cargo:
 ~~~sh
 REVIEWED=/home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/final-source-baseline
 BASE=/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/doc-body-c796-baseline
+PACKET=/home/zhuhe/code/litchi-worktrees/uo2-doc-body-toggle-final
+git -C "$PACKET" diff c796d0acc24c7c6e6fd08980b9e31af6bb86b18b --binary -- crates/litchi-ops/examples/legacy_w5_source_probe.rs |
+  git -C "$BASE" apply --check -
+git -C "$PACKET" diff c796d0acc24c7c6e6fd08980b9e31af6bb86b18b --binary -- crates/litchi-ops/examples/legacy_w5_source_probe.rs |
+  git -C "$BASE" apply -
 git -C "$REVIEWED" diff --cached --binary -- crates/litchi-doc/src/body_text.rs crates/litchi-doc/src/tracked_revision/package.rs | sha256sum
 git -C "$REVIEWED" diff --cached --binary -- crates/litchi-doc/src/body_text.rs crates/litchi-doc/src/tracked_revision/package.rs |
   git -C "$BASE" apply --check -
