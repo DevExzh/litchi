@@ -55,7 +55,16 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         self.assertEqual(manifest["paired"]["minimum_leg_ms"], 150)
         self.assertEqual(manifest["paired"]["samples_per_leg"], 20)
         self.assertTrue(manifest["paired"]["normal_and_allocator_are_separate"])
-        self.assertEqual(manifest["status"], "real_adapters_ready_source_fence_pending")
+        self.assertEqual(manifest["status"], "real_adapters_ready_external_receipts_pending")
+        self.assertEqual(
+            manifest["baseline_workspace_lock_sha256"],
+            preparation.HISTORICAL_WORKSPACE_LOCK_SHA256,
+        )
+        self.assertEqual(
+            manifest["baseline_workspace_lock_bytes"],
+            preparation.HISTORICAL_WORKSPACE_LOCK_BYTES,
+        )
+        self.assertEqual(manifest["candidate_workspace_lock_bytes"], 139606)
         for profile in manifest["profiles"]:
             self.assertTrue(profile["source_fence"])
             self.assertTrue(profile["record"])
@@ -63,29 +72,33 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         theme = manifest["profiles"][3]
         self.assertEqual(
             theme["approved_baseline_revisions"],
+            ["996651b6b19717a0192dfd4144bccd367fb2ea44"],
+        )
+        self.assertEqual(theme["raw_scope"], "bulk")
+        route_profiles = manifest["route_profiles"]
+        self.assertEqual(route_profiles[0]["raw_scope"], "family")
+        self.assertEqual(
+            route_profiles[0]["approved_baseline_revisions"],
             ["11728db894181ffbcdbcea3ae0008d51fdd2d8af"],
         )
-        self.assertEqual(theme["route_baselines"]["theme"], theme["approved_baseline_revisions"][0])
-        self.assertEqual(
-            theme["route_baselines"]["ink"],
-            [
-                "9034328f32657bec6b144f607bfe71e5caf7d1f3",
-                "8e0d6a3e93db18b447f1a56a71608eae171fbb83",
-                "3b0ee480b798f3a65c1296fb03e13eaf2f1c3a34",
-            ],
-        )
+        self.assertEqual(len(manifest["owner_profiles"]), 4)
+        self.assertTrue(all(profile["endpoint"] == "owner" for profile in manifest["owner_profiles"]))
 
     def test_materialized_profile_is_checked_by_generic_runner(self) -> None:
         master = {
             "candidate_root": ROOT,
             "candidate_revision": "a" * 40,
+            "baseline_workspace_lock_sha256": preparation.HISTORICAL_WORKSPACE_LOCK_SHA256,
+            "baseline_workspace_lock_bytes": preparation.HISTORICAL_WORKSPACE_LOCK_BYTES,
+            "candidate_workspace_lock_sha256": "b" * 64,
+            "candidate_workspace_lock_bytes": 139606,
             "output_dir": Path("/tmp/dml-protocol-output"),
             "target_root": Path("/tmp/dml-protocol-target"),
         }
         profile = {
             "id": LANES[0],
             "baseline_root": Path("/tmp/dml-protocol-baseline"),
-            "baseline_revision": "2d330c3305b79da79cd924bf371d2941b7f14cc4",
+            "baseline_revision": "2f7db7ee7fa01893e9099217fc4243687d196f63",
             "preparation_receipt": Path("/tmp/dml-protocol-preparation.json"),
             "source_fence": "test fence",
             "record": "test record",
@@ -104,10 +117,14 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
             "svg_blip::read",
             "model3d::codec::read",
             "theme::family::read_shared",
+            "theme::family::part::read",
             "ink::actions::read_profile",
             "CustomGeometryBuilder",
             "color::read",
             "transform::codec::read",
+            "theme_family_mutations",
+            "Package::apply",
+            "VmHWM",
         ):
             self.assertIn(endpoint, source)
         self.assertIn("size_class_receipts", source)

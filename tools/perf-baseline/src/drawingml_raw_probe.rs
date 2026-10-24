@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 use std::env;
+use std::fmt;
 use std::fs;
 use std::hint::black_box;
 use std::io::{self, Write};
@@ -28,23 +29,29 @@ const LANES: &[&str] = &[
     "drawingml-geometry-color-formatcode2-transform",
 ];
 
-const OPERATIONS: &[&str] = &[
+const RAW_OPERATIONS: &[&str] = &[
     "entry_read",
     "read_shared_when_supported",
-    "noop_commit",
-    "changed_commit",
-    "forward_replay",
-    "inverse_replay",
-    "stale_replay",
     "vec_write",
     "write_to_bounded_sink",
     "preflight_refusal",
     "malformed_refusal",
 ];
 
+const OWNER_OPERATIONS: &[&str] = &[
+    "noop_commit",
+    "changed_commit",
+    "forward_replay",
+    "inverse_replay",
+    "stale_replay",
+];
+
 #[derive(Debug)]
 struct Arguments {
     lane: String,
+    endpoint: String,
+    owner_route: Option<String>,
+    raw_scope: Option<String>,
     role: String,
     mode: String,
     fixture: PathBuf,
@@ -118,14 +125,164 @@ enum PartKind {
     Blip,
     Theme,
     ThemeFamily,
+    ThemeFamilyPart,
     InkActions,
     Geometry,
     Color,
     Transform,
 }
 
+/// The owner route is deliberately separate from a shared codec route.  A
+/// raw lane can therefore carry a real read/write qualification without
+/// pretending that a byte comparison is a package edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OwnerRoute {
+    DrawingmlChart,
+    DrawingmlThemeFamily,
+    DrawingmlInkActions,
+    DrawingmlTransform,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct CapabilityReceipt {
+    route: &'static str,
+    kind: &'static str,
+    status: &'static str,
+    evidence: &'static str,
+    read_shared: bool,
+}
+
+fn supports_shared(kind: PartKind) -> bool {
+    matches!(
+        kind,
+        PartKind::FormatCode | PartKind::ThemeFamily | PartKind::ThemeFamilyPart
+    )
+}
+
+const CHART_OWNER_ROUTES: &[OwnerRoute] = &[OwnerRoute::DrawingmlChart];
+const DIAGRAM_OWNER_ROUTES: &[OwnerRoute] = &[];
+const TEXT_MEDIA_OWNER_ROUTES: &[OwnerRoute] = &[];
+const THEME_OWNER_ROUTES: &[OwnerRoute] = &[
+    OwnerRoute::DrawingmlThemeFamily,
+    OwnerRoute::DrawingmlInkActions,
+];
+const GEOMETRY_OWNER_ROUTES: &[OwnerRoute] = &[OwnerRoute::DrawingmlTransform];
+
+fn owner_routes(lane: &str) -> &'static [OwnerRoute] {
+    match lane {
+        "drawingml-chart-raw" => CHART_OWNER_ROUTES,
+        "drawingml-diagram-raw" => DIAGRAM_OWNER_ROUTES,
+        "drawingml-text-media-raw" => TEXT_MEDIA_OWNER_ROUTES,
+        "drawingml-theme-ink" => THEME_OWNER_ROUTES,
+        "drawingml-geometry-color-formatcode2-transform" => GEOMETRY_OWNER_ROUTES,
+        _ => &[],
+    }
+}
+
+fn owner_route_name(route: OwnerRoute) -> &'static str {
+    match route {
+        OwnerRoute::DrawingmlChart => "litchi-drawingml::chart::edit::Package::edit",
+        OwnerRoute::DrawingmlThemeFamily => "litchi-drawingml::theme::family::Package::edit",
+        OwnerRoute::DrawingmlInkActions => "litchi-drawingml::ink::actions::Prepared/Edit",
+        OwnerRoute::DrawingmlTransform => "litchi-drawingml::transform::Package::edit",
+    }
+}
+
+fn owner_route_from_name(value: &str) -> Option<OwnerRoute> {
+    match value {
+        "drawingml-chart" | "litchi-drawingml::chart::edit" => Some(OwnerRoute::DrawingmlChart),
+        "drawingml-theme-family" | "litchi-drawingml::theme::family" => {
+            Some(OwnerRoute::DrawingmlThemeFamily)
+        },
+        "drawingml-ink-actions" | "litchi-drawingml::ink::actions" => {
+            Some(OwnerRoute::DrawingmlInkActions)
+        },
+        "drawingml-transform" | "litchi-drawingml::transform" => {
+            Some(OwnerRoute::DrawingmlTransform)
+        },
+        _ => None,
+    }
+}
+
+fn owner_route_evidence(route: OwnerRoute) -> &'static str {
+    match route {
+        OwnerRoute::DrawingmlChart => {
+            "crates/litchi-drawingml/src/chart/edit/transaction.rs:Package::edit,Edit::commit,Package::apply"
+        },
+        OwnerRoute::DrawingmlThemeFamily => {
+            "crates/litchi-drawingml/src/theme/family/transaction.rs:Package::edit,Edit::commit,Package::apply"
+        },
+        OwnerRoute::DrawingmlInkActions => {
+            "crates/litchi-drawingml/src/ink/actions_edit.rs:Prepared + Edit::from_profile,Edit::commit,Patch::apply"
+        },
+        OwnerRoute::DrawingmlTransform => {
+            "crates/litchi-drawingml/src/transform/transaction.rs:Package::edit,Edit::commit,Package::apply"
+        },
+    }
+}
+
+fn raw_route_evidence(kind: PartKind) -> &'static str {
+    match kind {
+        PartKind::Chart => "crates/litchi-drawingml/src/chart/reader/mod.rs;chart writer",
+        PartKind::FormatCode => {
+            "crates/litchi-drawingml/src/chart/extension/formatcode2.rs:read,write,write_to"
+        },
+        PartKind::Diagram => {
+            "crates/litchi-drawingml/src/diagram/edit.rs:Outline::read,set_text,set_drawing_reference"
+        },
+        PartKind::TextBody => {
+            "crates/litchi-drawingml/src/text/body/reader.rs:read_with_options;writer"
+        },
+        PartKind::SvgBlip => "crates/litchi-drawingml/src/svg_blip.rs:read,write,write_to",
+        PartKind::Model3d => "crates/litchi-drawingml/src/model3d/codec/xml.rs:read,write,write_to",
+        PartKind::Blip => "crates/litchi-drawingml/src/blip.rs:find_first_embed,write_embed",
+        PartKind::Theme => "crates/litchi-drawingml/src/theme/codec.rs:read,encode_part",
+        PartKind::ThemeFamily => {
+            "crates/litchi-drawingml/src/theme/family/codec.rs:read,write,write_to"
+        },
+        PartKind::ThemeFamilyPart => {
+            "crates/litchi-drawingml/src/theme/family/part.rs:read,add_family,replace_family,remove_family"
+        },
+        PartKind::InkActions => {
+            "crates/litchi-drawingml/src/ink/actions.rs:read_profile,write_profile,write_profile_to"
+        },
+        PartKind::Geometry => "crates/litchi-drawingml/src/geometry/reader.rs;writer",
+        PartKind::Color => "crates/litchi-drawingml/src/color/codec.rs:read,write",
+        PartKind::Transform => "crates/litchi-drawingml/src/transform/codec.rs:read,write,write_to",
+    }
+}
+
+fn capability_receipts(case: &LaneCase, endpoint: &str) -> Vec<CapabilityReceipt> {
+    let mut receipts = Vec::new();
+    if endpoint == "raw" {
+        for part in &case.parts {
+            receipts.push(CapabilityReceipt {
+                route: part.id,
+                kind: "raw",
+                status: "qualified",
+                evidence: raw_route_evidence(part.kind),
+                read_shared: supports_shared(part.kind),
+            });
+        }
+    } else {
+        for fixture in &case.owners {
+            for operation in OWNER_OPERATIONS {
+                receipts.push(CapabilityReceipt {
+                    route: operation,
+                    kind: owner_route_name(fixture.route),
+                    status: "qualified",
+                    evidence: owner_route_evidence(fixture.route),
+                    read_shared: false,
+                });
+            }
+        }
+    }
+    receipts
+}
+
 #[derive(Debug, Clone)]
 struct Part {
+    id: &'static str,
     kind: PartKind,
     source: Vec<u8>,
     changed: Vec<u8>,
@@ -138,11 +295,65 @@ struct Part {
 struct LaneCase {
     parts: Vec<Part>,
     stale: Vec<u8>,
+    owners: Vec<OwnerFixture>,
+    fixture_identity_sha256: String,
+}
+
+#[derive(Debug, Clone)]
+struct OwnerFixture {
+    route: OwnerRoute,
+    source: Vec<u8>,
+    stale: Vec<u8>,
+}
+
+#[derive(Debug)]
+enum OwnerPatch {
+    DrawingmlChart(dml::chart::edit::Patch),
+    DrawingmlThemeFamily(dml::theme::family::Patch),
+    DrawingmlInkActions(dml::ink::actions::Patch),
+    DrawingmlTransform(dml::transform::Patch),
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct OwnerCommitReceipt {
+    route: &'static str,
+    fixture_identity_sha256: String,
+    source_sha256: String,
+    noop_sha256: String,
+    stale_sha256: String,
+    changed_sha256: String,
+    forward_sha256: String,
+    inverse_sha256: String,
+    stale_kind: &'static str,
+    stale_refusal: RefusalReceipt,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct RawFidelityReceipt {
+    part_id: &'static str,
+    fixture_identity_sha256: String,
+    source_sha256: String,
+    source_output_sha256: String,
+    changed_sha256: String,
+    changed_output_sha256: String,
+    malformed_sha256: String,
+    changed_output_differs: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct ThemeFamilyMutationReceipt {
+    operation: &'static str,
+    source_sha256: String,
+    output_sha256: String,
+    output_bytes: usize,
+    output_differs: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
 struct RefusalReceipt {
     kind: &'static str,
+    source_kind: Option<&'static str>,
+    limit_kind: Option<&'static str>,
     resource: Option<&'static str>,
     limit: Option<usize>,
     observed: usize,
@@ -183,8 +394,10 @@ struct Row {
 
 #[derive(Debug, Clone, Serialize)]
 struct SizeClassReceipt {
+    part_id: &'static str,
     class: &'static str,
     bytes: usize,
+    applicable: bool,
     accepted: bool,
     output_sha256: Option<String>,
     refusal: Option<RefusalReceipt>,
@@ -194,6 +407,7 @@ struct SizeClassReceipt {
 struct ResourceMetrics {
     process_rss_bytes: u64,
     peak_rss_bytes: u64,
+    whole_process_peak_rss_bytes: u64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -213,6 +427,7 @@ struct AllocatorReport {
     peak_live_delta: u64,
     process_rss_bytes: u64,
     peak_rss_bytes: u64,
+    whole_process_peak_rss_bytes: u64,
     conservation_ok: bool,
 }
 
@@ -231,6 +446,9 @@ struct Protocol {
 struct Report {
     schema: &'static str,
     lane: String,
+    endpoint: String,
+    owner_route: Option<String>,
+    raw_scope: Option<String>,
     role: String,
     mode: String,
     source_revision: String,
@@ -240,6 +458,11 @@ struct Report {
     fixture_sha256: String,
     fixture_root_sha256: String,
     fixture_mutation: String,
+    fixture_lane_identity_sha256: String,
+    capabilities: Vec<CapabilityReceipt>,
+    raw_fidelity: Vec<RawFidelityReceipt>,
+    theme_family_mutations: Vec<ThemeFamilyMutationReceipt>,
+    owner_proofs: Vec<OwnerCommitReceipt>,
     size_classes: Vec<SizeClassReceipt>,
     protocol: Protocol,
     allocator_metrics: Option<AllocatorReport>,
@@ -250,7 +473,8 @@ struct Report {
 
 fn usage() -> &'static str {
     "usage: drawingml-raw-{native,allocator} --lane LANE --role ROLE \
-     --mode MODE --fixture PATH --source-revision SHA --iterations N --warmups N \
+     --endpoint raw|owner --owner-route ROUTE --raw-scope SCOPE --mode MODE --fixture PATH --source-revision SHA \
+     --iterations N --warmups N \
      --blocks N --samples N --target-ms N --minimum-ms N --json PATH"
 }
 
@@ -266,6 +490,9 @@ fn argument_value(arguments: &mut impl Iterator<Item = String>, name: &str) -> i
 
 fn parse(arguments: impl Iterator<Item = String>, expected_mode: &str) -> io::Result<Arguments> {
     let mut lane = None;
+    let mut endpoint = None;
+    let mut owner_route = None;
+    let mut raw_scope = None;
     let mut role = None;
     let mut mode = None;
     let mut fixture = None;
@@ -281,6 +508,9 @@ fn parse(arguments: impl Iterator<Item = String>, expected_mode: &str) -> io::Re
     while let Some(argument) = arguments.next() {
         let slot = match argument.as_str() {
             "--lane" => &mut lane,
+            "--endpoint" => &mut endpoint,
+            "--owner-route" => &mut owner_route,
+            "--raw-scope" => &mut raw_scope,
             "--role" => &mut role,
             "--mode" => &mut mode,
             "--fixture" => &mut fixture,
@@ -305,6 +535,27 @@ fn parse(arguments: impl Iterator<Item = String>, expected_mode: &str) -> io::Re
         return Err(invalid_argument(format!(
             "unsupported DrawingML lane {lane:?}"
         )));
+    }
+    let endpoint = endpoint.ok_or_else(|| invalid_argument("--endpoint is required"))?;
+    if !matches!(endpoint.as_str(), "raw" | "owner") {
+        return Err(invalid_argument(format!(
+            "unsupported endpoint {endpoint:?}"
+        )));
+    }
+    let owner_route = owner_route;
+    if endpoint == "owner" && owner_route.is_none() {
+        return Err(invalid_argument("owner endpoint requires --owner-route"));
+    }
+    if endpoint == "raw" && owner_route.is_some() {
+        return Err(invalid_argument("raw endpoint cannot carry --owner-route"));
+    }
+    if endpoint == "owner" && raw_scope.is_some() {
+        return Err(invalid_argument("owner endpoint cannot carry --raw-scope"));
+    }
+    if let Some(scope) = raw_scope.as_deref() {
+        if !matches!(scope, "bulk" | "family") {
+            return Err(invalid_argument(format!("unsupported raw scope {scope:?}")));
+        }
     }
     let role = role.ok_or_else(|| invalid_argument("--role is required"))?;
     if !matches!(role.as_str(), "baseline" | "candidate") {
@@ -369,6 +620,9 @@ fn parse(arguments: impl Iterator<Item = String>, expected_mode: &str) -> io::Re
     }
     Ok(Arguments {
         lane,
+        endpoint,
+        owner_route,
+        raw_scope,
         role,
         mode,
         fixture,
@@ -409,11 +663,39 @@ fn fail(message: impl Into<String>) -> ProbeFailure {
     }
 }
 
+fn invalid_input(message: impl Into<String>, observed: usize) -> ProbeFailure {
+    let message = message.into();
+    ProbeFailure {
+        message: message.clone(),
+        refusal: Some(RefusalReceipt {
+            kind: "invalid_input",
+            source_kind: None,
+            limit_kind: None,
+            resource: None,
+            limit: None,
+            observed,
+            message,
+        }),
+    }
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
 fn classify(error: dml::Error, observed: usize) -> ProbeFailure {
     let message = error.to_string();
     let refusal = match error {
+        dml::Error::Io(error) => Some(RefusalReceipt {
+            kind: "io_error",
+            source_kind: None,
+            limit_kind: None,
+            resource: None,
+            limit: None,
+            observed,
+            message: error.to_string(),
+        }),
         dml::Error::Limit { resource, limit } => Some(RefusalReceipt {
             kind: "limit",
+            source_kind: None,
+            limit_kind: None,
             resource: Some(resource),
             limit: Some(limit),
             observed,
@@ -421,6 +703,56 @@ fn classify(error: dml::Error, observed: usize) -> ProbeFailure {
         }),
         _ => Some(RefusalReceipt {
             kind: "invalid_input",
+            source_kind: None,
+            limit_kind: None,
+            resource: None,
+            limit: None,
+            observed,
+            message: message.clone(),
+        }),
+    };
+    ProbeFailure { message, refusal }
+}
+
+#[cfg(feature = "drawingml-owner-current")]
+fn classify(error: dml::Error, observed: usize) -> ProbeFailure {
+    let message = error.to_string();
+    let refusal = match error {
+        dml::Error::Io(error) => Some(RefusalReceipt {
+            kind: "io_error",
+            source_kind: None,
+            limit_kind: None,
+            resource: None,
+            limit: None,
+            observed,
+            message: error.to_string(),
+        }),
+        dml::Error::Limit {
+            kind,
+            observed: error_observed,
+            maximum,
+        } => Some(RefusalReceipt {
+            kind: "limit",
+            source_kind: None,
+            limit_kind: Some(kind.resource()),
+            resource: Some(kind.resource()),
+            limit: Some(maximum),
+            observed: error_observed.max(observed),
+            message: message.clone(),
+        }),
+        dml::Error::PatchConflict => Some(RefusalReceipt {
+            kind: "patch_conflict",
+            source_kind: Some("patch_conflict"),
+            limit_kind: None,
+            resource: None,
+            limit: None,
+            observed,
+            message: message.clone(),
+        }),
+        _ => Some(RefusalReceipt {
+            kind: "invalid_input",
+            source_kind: None,
+            limit_kind: None,
             resource: None,
             limit: None,
             observed,
@@ -435,6 +767,8 @@ fn io_failure(error: io::Error, observed: usize) -> ProbeFailure {
         message: error.to_string(),
         refusal: Some(RefusalReceipt {
             kind: "io_error",
+            source_kind: None,
+            limit_kind: None,
             resource: None,
             limit: None,
             observed,
@@ -458,14 +792,26 @@ fn read_format_code(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
 }
 
 fn read_diagram(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
-    dml::diagram::edit::Outline::read(bytes)
-        .map(|_| bytes.to_vec())
-        .map_err(|error| classify(error, bytes.len()))
+    let outline =
+        dml::diagram::edit::Outline::read(bytes).map_err(|error| classify(error, bytes.len()))?;
+    let entry = outline
+        .entries
+        .first()
+        .ok_or_else(|| invalid_input("diagram data model has no content entry", bytes.len()))?;
+    let output = dml::diagram::edit::set_text(bytes, &entry.id, &entry.text)
+        .map_err(|error| classify(error, bytes.len()))?;
+    dml::diagram::edit::set_drawing_reference(&output, outline.drawing_relationship.as_deref())
+        .map_err(|error| classify(error, output.len()))
 }
 
 fn body_roundtrip(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
-    let body =
-        dml::text::body::reader::read(bytes).map_err(|error| classify(error, bytes.len()))?;
+    use dml::text::body::reader::Limits;
+    let body = dml::text::body::reader::read_with_options(
+        bytes,
+        quick_xml::name::NamespaceResolver::default(),
+        Limits::DEFAULT,
+    )
+    .map_err(|error| classify(error, bytes.len()))?;
     let mut contents = String::new();
     dml::text::body::writer::write(&mut contents, &body)
         .map_err(|error| classify(error, bytes.len()))?;
@@ -487,8 +833,18 @@ fn read_model3d(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
 }
 
 fn read_blip(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
-    let _ = dml::blip::find_first_embed(bytes).map_err(|error| classify(error, bytes.len()))?;
-    Ok(bytes.to_vec())
+    let relationship =
+        dml::blip::find_first_embed(bytes).map_err(|error| classify(error, bytes.len()))?;
+    let Some(relationship) = relationship else {
+        return Err(invalid_input(
+            "image blip has no embedded relationship",
+            bytes.len(),
+        ));
+    };
+    let mut output = String::new();
+    dml::blip::write_embed(&mut output, &relationship, true)
+        .map_err(|error| invalid_input(error.to_string(), bytes.len()))?;
+    Ok(output.into_bytes())
 }
 
 fn read_theme(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
@@ -500,6 +856,73 @@ fn read_theme(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
 fn read_family(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
     let family = dml::theme::family::read(bytes).map_err(|error| classify(error, bytes.len()))?;
     dml::theme::family::write(&family).map_err(|error| classify(error, bytes.len()))
+}
+
+fn read_theme_family_part(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
+    let snapshot =
+        dml::theme::family::part::read(bytes).map_err(|error| classify(error, bytes.len()))?;
+    let family = snapshot.family().ok_or_else(|| {
+        invalid_input("theme family part has no direct family owner", bytes.len())
+    })?;
+    theme_family_replace(&snapshot, family).map_err(|error| classify(error, bytes.len()))
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
+fn theme_family_replace(
+    snapshot: &dml::theme::family::part::Snapshot,
+    family: &dml::theme::family::Family,
+) -> dml::Result<Vec<u8>> {
+    snapshot.replace_family_with_limit(family, dml::theme::family::part::MAX_XML_BYTES)
+}
+
+#[cfg(feature = "drawingml-owner-current")]
+fn theme_family_replace(
+    snapshot: &dml::theme::family::part::Snapshot,
+    family: &dml::theme::family::Family,
+) -> dml::Result<Vec<u8>> {
+    snapshot.replace_family(family, dml::theme::family::part::Limits::DEFAULT)
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
+fn theme_family_add(source: &[u8], family: &dml::theme::family::Family) -> dml::Result<Vec<u8>> {
+    dml::theme::family::part::add_family_with_limit(
+        source,
+        family,
+        dml::theme::family::part::MAX_XML_BYTES,
+    )
+}
+
+#[cfg(feature = "drawingml-owner-current")]
+fn theme_family_add(source: &[u8], family: &dml::theme::family::Family) -> dml::Result<Vec<u8>> {
+    dml::theme::family::part::add_family(source, family, dml::theme::family::part::Limits::DEFAULT)
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
+fn theme_family_remove(source: &[u8]) -> dml::Result<Vec<u8>> {
+    dml::theme::family::part::remove_family_with_limit(
+        source,
+        dml::theme::family::part::MAX_XML_BYTES,
+    )
+}
+
+#[cfg(feature = "drawingml-owner-current")]
+fn theme_family_remove(source: &[u8]) -> dml::Result<Vec<u8>> {
+    dml::theme::family::part::remove_family(source, dml::theme::family::part::Limits::DEFAULT)
+}
+
+fn complete_theme_family_part(family: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
+    let family = std::str::from_utf8(family).map_err(|error| {
+        invalid_input(
+            format!("theme family fragment is not UTF-8: {error}"),
+            family.len(),
+        )
+    })?;
+    Ok(format!(
+        "<a:theme xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\" xmlns:thm15=\"{}\" name=\"Office\"><a:themeElements/><a:extLst><a:ext uri=\"{}\">{family}</a:ext></a:extLst></a:theme>",
+        dml::theme::family::NAMESPACE,
+        dml::theme::family::NAMESPACE,
+    )
+    .into_bytes())
 }
 
 fn read_ink(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
@@ -536,6 +959,7 @@ fn roundtrip(kind: PartKind, bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
         PartKind::Blip => read_blip(bytes),
         PartKind::Theme => read_theme(bytes),
         PartKind::ThemeFamily => read_family(bytes),
+        PartKind::ThemeFamilyPart => read_theme_family_part(bytes),
         PartKind::InkActions => read_ink(bytes),
         PartKind::Geometry => read_geometry(bytes),
         PartKind::Color => read_color(bytes),
@@ -562,28 +986,12 @@ fn write_kind_to<W: Write>(
                 .map_err(|error| classify(error, bytes.len()))
         },
         PartKind::Diagram => {
-            let _ = dml::diagram::edit::Outline::read(bytes)
-                .map_err(|error| classify(error, bytes.len()))?;
+            let output = read_diagram(bytes)?;
             writer
-                .write_all(bytes)
-                .map_err(|error| io_failure(error, bytes.len()))
+                .write_all(&output)
+                .map_err(|error| io_failure(error, output.len()))
         },
-        PartKind::TextBody => {
-            let body = dml::text::body::reader::read(bytes)
-                .map_err(|error| classify(error, bytes.len()))?;
-            let mut contents = String::new();
-            dml::text::body::writer::write(&mut contents, &body)
-                .map_err(|error| classify(error, bytes.len()))?;
-            let mut output = String::with_capacity(contents.len() + 32);
-            output.push_str(
-                "<a:txBody xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">",
-            );
-            output.push_str(&contents);
-            output.push_str("</a:txBody>");
-            writer
-                .write_all(output.as_bytes())
-                .map_err(|error| io_failure(error, bytes.len()))
-        },
+        PartKind::TextBody => write_text_body_to(bytes, writer),
         PartKind::SvgBlip => {
             let value = dml::svg_blip::read(bytes).map_err(|error| classify(error, bytes.len()))?;
             dml::svg_blip::write_to(writer, &value).map_err(|error| classify(error, bytes.len()))
@@ -594,13 +1002,7 @@ fn write_kind_to<W: Write>(
             dml::model3d::codec::write_to(writer, &value)
                 .map_err(|error| classify(error, bytes.len()))
         },
-        PartKind::Blip => {
-            let _ =
-                dml::blip::find_first_embed(bytes).map_err(|error| classify(error, bytes.len()))?;
-            writer
-                .write_all(bytes)
-                .map_err(|error| io_failure(error, bytes.len()))
-        },
+        PartKind::Blip => write_blip_to(bytes, writer),
         PartKind::Theme => {
             let value =
                 dml::theme::codec::read(bytes).map_err(|error| classify(error, bytes.len()))?;
@@ -616,20 +1018,25 @@ fn write_kind_to<W: Write>(
             dml::theme::family::write_to(writer, &value)
                 .map_err(|error| classify(error, bytes.len()))
         },
+        PartKind::ThemeFamilyPart => {
+            let snapshot = dml::theme::family::part::read(bytes)
+                .map_err(|error| classify(error, bytes.len()))?;
+            let family = snapshot.family().ok_or_else(|| {
+                invalid_input("theme family part has no direct family owner", bytes.len())
+            })?;
+            let output = theme_family_replace(&snapshot, family)
+                .map_err(|error| classify(error, bytes.len()))?;
+            writer
+                .write_all(&output)
+                .map_err(|error| io_failure(error, output.len()))
+        },
         PartKind::InkActions => {
             let value = dml::ink::actions::read_profile(bytes)
                 .map_err(|error| classify(error, bytes.len()))?;
             dml::ink::actions::write_profile_to(writer, &value)
                 .map_err(|error| classify(error, bytes.len()))
         },
-        PartKind::Geometry => {
-            let geometry = parse_geometry(bytes)?;
-            let mut output = String::new();
-            dml::geometry::writer::write_custom_geometry(&mut output, &geometry);
-            writer
-                .write_all(output.as_bytes())
-                .map_err(|error| io_failure(error, bytes.len()))
-        },
+        PartKind::Geometry => write_geometry_to(bytes, writer),
         PartKind::Color => {
             let value = dml::color::read(bytes).map_err(|error| classify(error, bytes.len()))?;
             let output = dml::color::write(&value).map_err(|error| classify(error, bytes.len()))?;
@@ -648,27 +1055,30 @@ fn write_kind_to<W: Write>(
 
 struct CountingSink {
     cap: usize,
-    bytes: Vec<u8>,
+    bytes: usize,
     writes: usize,
+    digest: Sha256,
 }
 
 impl CountingSink {
     fn new(cap: usize) -> Self {
         Self {
             cap,
-            bytes: Vec::new(),
+            bytes: 0,
             writes: 0,
+            digest: Sha256::new(),
         }
     }
 }
 
 impl Write for CountingSink {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        if self.bytes.len().saturating_add(bytes.len()) > self.cap {
+        if self.bytes.saturating_add(bytes.len()) > self.cap {
             return Err(io::Error::new(io::ErrorKind::WriteZero, "bounded sink cap"));
         }
         self.writes = self.writes.saturating_add(1);
-        self.bytes.extend_from_slice(bytes);
+        self.bytes = self.bytes.saturating_add(bytes.len());
+        self.digest.update(bytes);
         Ok(bytes.len())
     }
 
@@ -677,11 +1087,96 @@ impl Write for CountingSink {
     }
 }
 
+/// Adapt the shared codecs which expose `fmt::Write` to the bounded sink
+/// without first collecting their complete output in a `String`.
+struct FormattingSink<'a, W: Write> {
+    writer: &'a mut W,
+    attempted: usize,
+    error: Option<io::Error>,
+}
+
+impl<'a, W: Write> FormattingSink<'a, W> {
+    fn new(writer: &'a mut W) -> Self {
+        Self {
+            writer,
+            attempted: 0,
+            error: None,
+        }
+    }
+
+    fn failure(&mut self, fallback: impl Into<String>) -> ProbeFailure {
+        let message = fallback.into();
+        match self.error.take() {
+            Some(error) => io_failure(error, self.attempted),
+            None => invalid_input(message, self.attempted),
+        }
+    }
+
+    fn write_text(&mut self, value: &str) -> Result<(), ProbeFailure> {
+        if fmt::Write::write_str(self, value).is_err() {
+            Err(self.failure("formatted sink write failed"))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+impl<W: Write> fmt::Write for FormattingSink<'_, W> {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        self.attempted = self.attempted.saturating_add(value.len());
+        match self.writer.write_all(value.as_bytes()) {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                self.error = Some(error);
+                Err(fmt::Error)
+            },
+        }
+    }
+}
+
+fn write_text_body_to<W: Write>(bytes: &[u8], writer: &mut W) -> Result<(), ProbeFailure> {
+    let body = dml::text::body::reader::read_with_options(
+        bytes,
+        quick_xml::name::NamespaceResolver::default(),
+        dml::text::body::reader::Limits::DEFAULT,
+    )
+    .map_err(|error| classify(error, bytes.len()))?;
+    let mut sink = FormattingSink::new(writer);
+    sink.write_text(
+        "<a:txBody xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\">",
+    )?;
+    if dml::text::body::writer::write(&mut sink, &body).is_err() {
+        return Err(sink.failure("text body writer failed"));
+    }
+    sink.write_text("</a:txBody>")
+}
+
+fn write_geometry_to<W: Write>(bytes: &[u8], writer: &mut W) -> Result<(), ProbeFailure> {
+    let geometry = parse_geometry(bytes)?;
+    let mut sink = FormattingSink::new(writer);
+    dml::geometry::writer::write_custom_geometry(&mut sink, &geometry);
+    if sink.error.is_some() {
+        return Err(sink.failure("geometry writer failed"));
+    }
+    Ok(())
+}
+
+fn write_blip_to<W: Write>(bytes: &[u8], writer: &mut W) -> Result<(), ProbeFailure> {
+    let relationship = dml::blip::find_first_embed(bytes)
+        .map_err(|error| classify(error, bytes.len()))?
+        .ok_or_else(|| invalid_input("image blip has no embedded relationship", bytes.len()))?;
+    let mut sink = FormattingSink::new(writer);
+    if dml::blip::write_embed(&mut sink, &relationship, true).is_err() {
+        return Err(sink.failure("image blip writer failed"));
+    }
+    Ok(())
+}
+
 fn write_receipt(sink: CountingSink) -> SinkReceipt {
     SinkReceipt {
         writes: sink.writes,
-        bytes: sink.bytes.len(),
-        sha256: sha256(&sink.bytes),
+        bytes: sink.bytes,
+        sha256: format!("{:x}", sink.digest.finalize()),
     }
 }
 
@@ -691,6 +1186,35 @@ fn fixture_seed(fixture: &FixtureLane) -> String {
     seed.chars()
         .filter(|character| character.is_ascii_alphanumeric())
         .collect()
+}
+
+fn fixture_lane_identity(lane: &str, fixture: &FixtureLane) -> String {
+    sha256(
+        format!(
+            "drawingml-fixture-v1\0{lane}\0{}\0{}\0{}",
+            fixture.root, fixture.mutation, fixture.malformed
+        )
+        .as_bytes(),
+    )
+}
+
+fn fixture_part_identity(
+    lane_identity: &str,
+    part_id: &str,
+    source_sha256: &str,
+    changed_sha256: &str,
+    malformed_sha256: &str,
+) -> String {
+    sha256(
+        format!(
+            "drawingml-fixture-part-v1\0{lane_identity}\0{part_id}\0{source_sha256}\0{changed_sha256}\0{malformed_sha256}"
+        )
+        .as_bytes(),
+    )
+}
+
+fn malformed_fragment(part_id: &str, seed: &str) -> Vec<u8> {
+    format!("{seed}<!--drawingml-part:{part_id}-->").into_bytes()
 }
 
 fn chart_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
@@ -715,17 +1239,15 @@ fn chart_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
     dml::chart::writer::write(&mut changed_wire, &changed_chart)
         .map_err(|error| io_failure(error, 0))?;
     let changed = read_chart(&changed_wire)?;
-    Ok(vec![
-        Part {
-            kind: PartKind::Chart,
-            source,
-            changed,
-            malformed: fixture.malformed.as_bytes().to_vec(),
-            over: vec![b' '; dml::chart::extension::formatcode2::MAX_XML_BYTES + 1],
-            limit_resource: "formatcode2 XML bytes",
-        },
-        format_code_part(fixture)?,
-    ])
+    Ok(vec![Part {
+        id: "chart",
+        kind: PartKind::Chart,
+        source,
+        changed,
+        malformed: malformed_fragment("chart", &fixture.malformed),
+        over: Vec::new(),
+        limit_resource: "chart editor XML",
+    }])
 }
 
 fn format_code_part(fixture: &FixtureLane) -> Result<Part, ProbeFailure> {
@@ -739,10 +1261,11 @@ fn format_code_part(fixture: &FixtureLane) -> Result<Part, ProbeFailure> {
     let changed =
         dml::chart::extension::formatcode2::write(&value).map_err(|error| classify(error, 0))?;
     Ok(Part {
+        id: "formatcode2",
         kind: PartKind::FormatCode,
         source,
         changed,
-        malformed: fixture.malformed.as_bytes().to_vec(),
+        malformed: malformed_fragment("formatcode2", &fixture.malformed),
         over: vec![b' '; dml::chart::extension::formatcode2::MAX_XML_BYTES + 1],
         limit_resource: "formatcode2 XML bytes",
     })
@@ -767,10 +1290,11 @@ fn diagram_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
     let changed = dml::diagram::edit::set_drawing_reference(&text_changed, Some("rIdDrawing"))
         .map_err(|error| classify(error, text_changed.len()))?;
     Ok(vec![Part {
+        id: "diagram-data-model",
         kind: PartKind::Diagram,
         source,
         changed,
-        malformed: fixture.malformed.as_bytes().to_vec(),
+        malformed: malformed_fragment("diagram-data-model", &fixture.malformed),
         over: vec![b' '; dml::diagram::edit::MAX_PART_BYTES + 1],
         limit_resource: "diagram data-model bytes",
     }])
@@ -830,35 +1354,39 @@ fn text_media_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
     let blip_changed = br#"<a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rIdImageChanged"/>"#.to_vec();
     Ok(vec![
         Part {
+            id: "text-body",
             kind: PartKind::TextBody,
             source,
             changed,
-            malformed: fixture.malformed.as_bytes().to_vec(),
-            over: vec![b' '; dml::svg_blip::MAX_XML_BYTES + 1],
-            limit_resource: "SVG blip XML bytes",
+            malformed: malformed_fragment("text-body", &fixture.malformed),
+            over: vec![b' '; 64 * 1024 * 1024 + 1],
+            limit_resource: "text body input bytes",
         },
         Part {
+            id: "svg-blip",
             kind: PartKind::SvgBlip,
             source: svg_source,
             changed: svg_changed,
-            malformed: fixture.malformed.as_bytes().to_vec(),
+            malformed: malformed_fragment("svg-blip", &fixture.malformed),
             over: vec![b' '; dml::svg_blip::MAX_XML_BYTES + 1],
             limit_resource: "SVG blip XML bytes",
         },
         Part {
+            id: "model3d",
             kind: PartKind::Model3d,
             source: model_source,
             changed: model_changed,
-            malformed: fixture.malformed.as_bytes().to_vec(),
+            malformed: malformed_fragment("model3d", &fixture.malformed),
             over: vec![b' '; 16 * 1024 * 1024 + 1],
             limit_resource: "model3d XML bytes",
         },
         Part {
+            id: "image-blip",
             kind: PartKind::Blip,
             source: blip_source,
             changed: blip_changed,
-            malformed: fixture.malformed.as_bytes().to_vec(),
-            over: fixture.malformed.as_bytes().to_vec(),
+            malformed: malformed_fragment("image-blip", &fixture.malformed),
+            over: Vec::new(),
             limit_resource: "blip XML",
         },
     ])
@@ -898,6 +1426,10 @@ fn theme_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
         .map_err(|error| classify(error, family_source.len()))?;
     let family_changed = dml::theme::family::write(&family_changed)
         .map_err(|error| classify(error, family_source.len()))?;
+    let family_part_source = complete_theme_family_part(&family_source)?;
+    let family_part_changed = complete_theme_family_part(&family_changed)?;
+    let _ = dml::theme::family::part::read(&family_part_source)
+        .map_err(|error| classify(error, family_part_source.len()))?;
     let ink_source = br#"<iact:actions xmlns:iact="http://schemas.microsoft.com/office/powerpoint/2014/inkAction" lengthUnit="cm" timeUnit="s"><iact:action type="add" startTime="0.25"><iact:actionData name="stroke"/></iact:action><iact:actionGroup type="transform" startTime="1"><iact:action type="remove" startTime="2"/></iact:actionGroup></iact:actions>"#.to_vec();
     let ink_profile = dml::ink::actions::read_profile(&ink_source)
         .map_err(|error| classify(error, ink_source.len()))?;
@@ -916,27 +1448,39 @@ fn theme_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
         .map_err(|error| classify(error, ink_source.len()))?;
     Ok(vec![
         Part {
+            id: "theme",
             kind: PartKind::Theme,
             source,
             changed,
-            malformed: fixture.malformed.as_bytes().to_vec(),
-            over: vec![b' '; dml::theme::family::MAX_XML_BYTES + 1],
-            limit_resource: "theme family XML bytes",
+            malformed: malformed_fragment("theme", &fixture.malformed),
+            over: vec![b' '; dml::theme::codec::MAX_XML_BYTES + 1],
+            limit_resource: "theme XML bytes",
         },
         Part {
+            id: "theme-family",
             kind: PartKind::ThemeFamily,
             source: family_source,
             changed: family_changed,
-            malformed: fixture.malformed.as_bytes().to_vec(),
+            malformed: malformed_fragment("theme-family", &fixture.malformed),
             over: vec![b' '; dml::theme::family::MAX_XML_BYTES + 1],
             limit_resource: "theme family XML bytes",
         },
         Part {
+            id: "theme-family-part",
+            kind: PartKind::ThemeFamilyPart,
+            source: family_part_source,
+            changed: family_part_changed,
+            malformed: malformed_fragment("theme-family-part", &fixture.malformed),
+            over: vec![b' '; dml::theme::family::part::MAX_XML_BYTES + 1],
+            limit_resource: "Theme Family XML bytes",
+        },
+        Part {
+            id: "ink-actions",
             kind: PartKind::InkActions,
             source: ink_source,
             changed: ink_changed,
-            malformed: fixture.malformed.as_bytes().to_vec(),
-            over: vec![b' '; 1 << 20],
+            malformed: malformed_fragment("ink-actions", &fixture.malformed),
+            over: vec![b' '; dml::ink::MAX_SOURCE_BYTES + 1],
             limit_resource: "ink actions source bytes",
         },
     ])
@@ -982,34 +1526,59 @@ fn geometry_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
             .map_err(|error| classify(error, 0))?;
     Ok(vec![
         Part {
+            id: "geometry",
             kind: PartKind::Geometry,
             source,
             changed: changed_geometry_xml.into_bytes(),
-            malformed: fixture.malformed.as_bytes().to_vec(),
-            over: vec![b' '; dml::chart::extension::formatcode2::MAX_XML_BYTES + 1],
-            limit_resource: "formatcode2 XML bytes",
+            malformed: malformed_fragment("geometry", &fixture.malformed),
+            over: Vec::new(),
+            limit_resource: "geometry structural limits",
         },
         Part {
+            id: "color",
             kind: PartKind::Color,
             source: color_source,
             changed: color_changed,
-            malformed: fixture.malformed.as_bytes().to_vec(),
+            malformed: malformed_fragment("color", &fixture.malformed),
             over: vec![b' '; dml::color::MAX_XML_BYTES + 1],
-            limit_resource: "DrawingML color XML bytes",
+            limit_resource: "DrawingML color XML",
         },
         format_part,
         Part {
+            id: "transform",
             kind: PartKind::Transform,
             source: transform_source,
             changed: transform_changed,
-            malformed: fixture.malformed.as_bytes().to_vec(),
-            over: vec![b' '; 1 << 20],
+            malformed: malformed_fragment("transform", &fixture.malformed),
+            over: vec![b' '; (1 << 20) + 1],
             limit_resource: "DrawingML transform XML bytes",
         },
     ])
 }
 
+fn owner_fixture(route: OwnerRoute, parts: &[Part]) -> Result<OwnerFixture, ProbeFailure> {
+    let kind = match route {
+        OwnerRoute::DrawingmlChart => PartKind::Chart,
+        OwnerRoute::DrawingmlThemeFamily => PartKind::ThemeFamily,
+        OwnerRoute::DrawingmlInkActions => PartKind::InkActions,
+        OwnerRoute::DrawingmlTransform => PartKind::Transform,
+    };
+    let part = parts
+        .iter()
+        .find(|part| std::mem::discriminant(&part.kind) == std::mem::discriminant(&kind))
+        .ok_or_else(|| fail(format!("missing {} owner fixture", owner_route_name(route))))?;
+    Ok(OwnerFixture {
+        route,
+        source: part.source.clone(),
+        // Use a second valid semantic state as the stale recipient.  The
+        // production patch precondition, rather than a local byte-copy
+        // helper, must reject it.
+        stale: part.changed.clone(),
+    })
+}
+
 fn make_case(lane: &str, fixture: &FixtureLane) -> Result<LaneCase, ProbeFailure> {
+    let fixture_identity_sha256 = fixture_lane_identity(lane, fixture);
     let parts = match lane {
         "drawingml-chart-raw" => chart_parts(fixture)?,
         "drawingml-diagram-raw" => diagram_parts(fixture)?,
@@ -1023,68 +1592,592 @@ fn make_case(lane: &str, fixture: &FixtureLane) -> Result<LaneCase, ProbeFailure
         .map(|part| part.source.clone())
         .unwrap_or_default();
     stale.extend_from_slice(b"stale-source");
-    Ok(LaneCase { parts, stale })
+    let owners = owner_routes(lane)
+        .iter()
+        .copied()
+        .map(|route| owner_fixture(route, &parts))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(LaneCase {
+        parts,
+        stale,
+        owners,
+        fixture_identity_sha256,
+    })
+}
+
+fn select_owner_route(case: &mut LaneCase, route: &str) -> Result<(), ProbeFailure> {
+    let route = owner_route_from_name(route)
+        .ok_or_else(|| fail(format!("unknown DrawingML owner route {route:?}")))?;
+    case.owners.retain(|fixture| fixture.route == route);
+    if case.owners.len() != 1 {
+        return Err(fail(format!(
+            "owner route {} is not available in lane",
+            owner_route_name(route)
+        )));
+    }
+    Ok(())
+}
+
+fn select_raw_scope(case: &mut LaneCase, scope: &str) -> Result<(), ProbeFailure> {
+    match scope {
+        "bulk" => case
+            .parts
+            .retain(|part| matches!(part.kind, PartKind::Theme | PartKind::InkActions)),
+        "family" => case
+            .parts
+            .retain(|part| matches!(part.kind, PartKind::ThemeFamilyPart)),
+        _ => return Err(fail(format!("unknown DrawingML raw scope {scope:?}"))),
+    }
+    if case.parts.is_empty() {
+        return Err(fail(format!("raw scope {scope} has no fixture parts")));
+    }
+    case.owners.clear();
+    Ok(())
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
+fn owner_error(route: OwnerRoute, error: impl std::fmt::Display) -> ProbeFailure {
+    fail(format!("{}: {error}", owner_route_name(route)))
+}
+
+#[cfg(feature = "drawingml-owner-current")]
+fn owner_error(route: OwnerRoute, error: dml::Error) -> ProbeFailure {
+    let message = error.to_string();
+    let refusal = if matches!(&error, dml::Error::PatchConflict) {
+        Some(RefusalReceipt {
+            kind: "patch_conflict",
+            source_kind: Some("patch_conflict"),
+            limit_kind: None,
+            resource: None,
+            limit: None,
+            observed: 0,
+            message: message.clone(),
+        })
+    } else {
+        None
+    };
+    ProbeFailure { message, refusal }
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
+fn owner_commit(
+    fixture: &OwnerFixture,
+    changed: bool,
+) -> Result<(Vec<u8>, OwnerPatch), ProbeFailure> {
+    match fixture.route {
+        OwnerRoute::DrawingmlChart => {
+            let snapshot = dml::chart::edit::Snapshot::from_xml(fixture.source.clone())
+                .map_err(|error| owner_error(fixture.route, error))?;
+            let mut edit = snapshot.edit();
+            if changed {
+                edit.set_title(Some(dml::chart::data::TitleText::from_string(
+                    "DrawingML qualification mutation",
+                )))
+                .map_err(|error| owner_error(fixture.route, error))?;
+            }
+            let commit = edit
+                .commit()
+                .map_err(|error| owner_error(fixture.route, error))?;
+            Ok((
+                commit.snapshot().xml_bytes().to_vec(),
+                OwnerPatch::DrawingmlChart(commit.patch().clone()),
+            ))
+        },
+        OwnerRoute::DrawingmlThemeFamily => {
+            let snapshot = dml::theme::family::Snapshot::from_xml(fixture.source.clone())
+                .map_err(|error| owner_error(fixture.route, error))?;
+            let mut edit = snapshot.edit();
+            if changed {
+                edit.set_name("DrawingML qualification mutation")
+                    .map_err(|error| owner_error(fixture.route, error))?;
+            }
+            let commit = edit
+                .commit()
+                .map_err(|error| owner_error(fixture.route, error))?;
+            Ok((
+                commit.snapshot().xml_bytes().to_vec(),
+                OwnerPatch::DrawingmlThemeFamily(commit.patch().clone()),
+            ))
+        },
+        OwnerRoute::DrawingmlInkActions => {
+            use dml::ink::actions::{ActionSelector, Edit};
+            let profile = dml::ink::actions::read_profile(&fixture.source)
+                .map_err(|error| owner_error(fixture.route, error))?;
+            let mut edit =
+                Edit::from_profile(&profile).map_err(|error| owner_error(fixture.route, error))?;
+            if changed {
+                edit.set_start_time(ActionSelector::ordinal(0), "0.50")
+                    .map_err(|error| owner_error(fixture.route, error))?;
+            }
+            let commit = edit
+                .commit()
+                .map_err(|error| owner_error(fixture.route, error))?;
+            Ok((
+                commit
+                    .to_vec()
+                    .map_err(|error| owner_error(fixture.route, error))?,
+                OwnerPatch::DrawingmlInkActions(commit.patch().clone()),
+            ))
+        },
+        OwnerRoute::DrawingmlTransform => {
+            let snapshot = dml::transform::Snapshot::from_xml(fixture.source.clone())
+                .map_err(|error| owner_error(fixture.route, error))?;
+            let mut edit = snapshot.edit();
+            if changed {
+                edit.set_rotation(Some(dml::transform::Angle::new(60000)));
+            }
+            let commit = edit
+                .commit()
+                .map_err(|error| owner_error(fixture.route, error))?;
+            Ok((
+                commit.snapshot().xml_bytes().to_vec(),
+                OwnerPatch::DrawingmlTransform(commit.patch().clone()),
+            ))
+        },
+    }
+}
+
+#[cfg(feature = "drawingml-owner-current")]
+fn owner_commit(
+    fixture: &OwnerFixture,
+    changed: bool,
+) -> Result<(Vec<u8>, OwnerPatch), ProbeFailure> {
+    match fixture.route {
+        OwnerRoute::DrawingmlChart => {
+            let package = dml::chart::edit::Package::from_xml(fixture.source.clone())
+                .map_err(|error| owner_error(fixture.route, error))?;
+            let mut edit = package.edit();
+            if changed {
+                edit.set_title(Some(dml::chart::data::TitleText::from_string(
+                    "DrawingML qualification mutation",
+                )))
+                .map_err(|error| owner_error(fixture.route, error))?;
+            }
+            let commit = edit
+                .commit()
+                .map_err(|error| owner_error(fixture.route, error))?;
+            Ok((
+                commit.package().xml_bytes().to_vec(),
+                OwnerPatch::DrawingmlChart(commit.patch().clone()),
+            ))
+        },
+        OwnerRoute::DrawingmlThemeFamily => {
+            let package = dml::theme::family::Package::from_xml(fixture.source.clone())
+                .map_err(|error| owner_error(fixture.route, error))?;
+            let mut edit = package.edit();
+            if changed {
+                edit.set_name("DrawingML qualification mutation")
+                    .map_err(|error| owner_error(fixture.route, error))?;
+            }
+            let commit = edit
+                .commit()
+                .map_err(|error| owner_error(fixture.route, error))?;
+            Ok((
+                commit.package().xml_bytes().to_vec(),
+                OwnerPatch::DrawingmlThemeFamily(commit.patch().clone()),
+            ))
+        },
+        OwnerRoute::DrawingmlInkActions => {
+            use dml::ink::actions::{ActionSelector, Edit, Limits};
+            let profile = dml::ink::actions::read_profile(&fixture.source)
+                .map_err(|error| owner_error(fixture.route, error))?;
+            let mut edit = Edit::from_profile(&profile, Limits::default())
+                .map_err(|error| owner_error(fixture.route, error))?;
+            if changed {
+                edit.set_start_time(ActionSelector::ordinal(0), "0.50")
+                    .map_err(|error| owner_error(fixture.route, error))?;
+            }
+            let commit = edit
+                .commit()
+                .map_err(|error| owner_error(fixture.route, error))?;
+            Ok((
+                commit.package().as_bytes().to_vec(),
+                OwnerPatch::DrawingmlInkActions(commit.patch().clone()),
+            ))
+        },
+        OwnerRoute::DrawingmlTransform => {
+            let package = dml::transform::Package::from_xml(fixture.source.clone())
+                .map_err(|error| owner_error(fixture.route, error))?;
+            let mut edit = package.edit();
+            if changed {
+                edit.set_rotation(Some(dml::transform::Angle::new(60000)));
+            }
+            let commit = edit
+                .commit()
+                .map_err(|error| owner_error(fixture.route, error))?;
+            Ok((
+                commit.package().xml_bytes().to_vec(),
+                OwnerPatch::DrawingmlTransform(commit.patch().clone()),
+            ))
+        },
+    }
+}
+
+#[cfg(not(feature = "drawingml-owner-current"))]
+fn owner_apply(
+    route: OwnerRoute,
+    source: &[u8],
+    patch: &OwnerPatch,
+    inverse: bool,
+) -> Result<Vec<u8>, ProbeFailure> {
+    match (route, patch) {
+        (OwnerRoute::DrawingmlChart, OwnerPatch::DrawingmlChart(patch)) => {
+            let snapshot = dml::chart::edit::Snapshot::from_xml(source.to_vec())
+                .map_err(|error| owner_error(route, error))?;
+            let patch = if inverse {
+                patch.clone().inverse()
+            } else {
+                patch.clone()
+            };
+            patch
+                .apply(&snapshot)
+                .map(|snapshot| snapshot.xml_bytes().to_vec())
+                .map_err(|error| owner_error(route, error))
+        },
+        (OwnerRoute::DrawingmlThemeFamily, OwnerPatch::DrawingmlThemeFamily(patch)) => {
+            let snapshot = dml::theme::family::Snapshot::from_xml(source.to_vec())
+                .map_err(|error| owner_error(route, error))?;
+            let patch = if inverse {
+                patch.clone().inverse()
+            } else {
+                patch.clone()
+            };
+            patch
+                .apply(&snapshot)
+                .map(|snapshot| snapshot.xml_bytes().to_vec())
+                .map_err(|error| owner_error(route, error))
+        },
+        (OwnerRoute::DrawingmlInkActions, OwnerPatch::DrawingmlInkActions(patch)) => {
+            let patch = if inverse {
+                patch.inverse()
+            } else {
+                patch.clone()
+            };
+            patch
+                .apply(source)
+                .map_err(|error| owner_error(route, error))
+        },
+        (OwnerRoute::DrawingmlTransform, OwnerPatch::DrawingmlTransform(patch)) => {
+            let snapshot = dml::transform::Snapshot::from_xml(source.to_vec())
+                .map_err(|error| owner_error(route, error))?;
+            let patch = if inverse {
+                patch.clone().inverse()
+            } else {
+                patch.clone()
+            };
+            patch
+                .apply(&snapshot)
+                .map(|snapshot| snapshot.xml_bytes().to_vec())
+                .map_err(|error| owner_error(route, error))
+        },
+        _ => Err(fail("owner route and patch type differ")),
+    }
+}
+
+#[cfg(feature = "drawingml-owner-current")]
+fn owner_apply(
+    route: OwnerRoute,
+    source: &[u8],
+    patch: &OwnerPatch,
+    inverse: bool,
+) -> Result<Vec<u8>, ProbeFailure> {
+    match (route, patch) {
+        (OwnerRoute::DrawingmlChart, OwnerPatch::DrawingmlChart(patch)) => {
+            let package = dml::chart::edit::Package::from_xml(source.to_vec())
+                .map_err(|error| owner_error(route, error))?;
+            let patch = if inverse {
+                patch.clone().inverse()
+            } else {
+                patch.clone()
+            };
+            package
+                .apply(&patch)
+                .map(|commit| commit.package().xml_bytes().to_vec())
+                .map_err(|error| owner_error(route, error))
+        },
+        (OwnerRoute::DrawingmlThemeFamily, OwnerPatch::DrawingmlThemeFamily(patch)) => {
+            let package = dml::theme::family::Package::from_xml(source.to_vec())
+                .map_err(|error| owner_error(route, error))?;
+            let patch = if inverse {
+                patch.clone().inverse()
+            } else {
+                patch.clone()
+            };
+            package
+                .apply(&patch)
+                .map(|commit| commit.package().xml_bytes().to_vec())
+                .map_err(|error| owner_error(route, error))
+        },
+        (OwnerRoute::DrawingmlInkActions, OwnerPatch::DrawingmlInkActions(patch)) => {
+            let patch = if inverse {
+                patch.inverse()
+            } else {
+                patch.clone()
+            };
+            patch
+                .apply(source)
+                .map_err(|error| owner_error(route, error))
+        },
+        (OwnerRoute::DrawingmlTransform, OwnerPatch::DrawingmlTransform(patch)) => {
+            let package = dml::transform::Package::from_xml(source.to_vec())
+                .map_err(|error| owner_error(route, error))?;
+            let patch = if inverse {
+                patch.clone().inverse()
+            } else {
+                patch.clone()
+            };
+            package
+                .apply(&patch)
+                .map(|commit| commit.package().xml_bytes().to_vec())
+                .map_err(|error| owner_error(route, error))
+        },
+        _ => Err(fail("owner route and patch type differ")),
+    }
+}
+
+fn owner_replay(
+    fixture: &OwnerFixture,
+    patch: &OwnerPatch,
+    inverse: bool,
+) -> Result<Vec<u8>, ProbeFailure> {
+    let (source, inverse) = if inverse {
+        (owner_commit(fixture, true)?.0, true)
+    } else {
+        (fixture.source.clone(), false)
+    };
+    owner_apply(fixture.route, &source, patch, inverse)
+}
+
+fn owner_stale_refusal(
+    fixture: &OwnerFixture,
+    patch: &OwnerPatch,
+) -> Result<RefusalReceipt, ProbeFailure> {
+    match owner_apply(fixture.route, &fixture.stale, patch, false) {
+        Ok(_) => Err(fail(format!(
+            "{} accepted a stale patch",
+            owner_route_name(fixture.route)
+        ))),
+        Err(error) => {
+            #[cfg(feature = "drawingml-owner-current")]
+            {
+                let Some(mut refusal) = error.refusal else {
+                    return Err(fail(format!(
+                        "{} stale replay returned an untyped error: {}",
+                        owner_route_name(fixture.route),
+                        error.message
+                    )));
+                };
+                if refusal.kind != "patch_conflict" || refusal.source_kind != Some("patch_conflict")
+                {
+                    return Err(fail(format!(
+                        "{} stale replay returned the wrong typed error: {}",
+                        owner_route_name(fixture.route),
+                        refusal.message
+                    )));
+                }
+                refusal.observed = fixture.stale.len();
+                Ok(refusal)
+            }
+            #[cfg(not(feature = "drawingml-owner-current"))]
+            {
+                // The pre-owner baseline rejects stale patches as its generic
+                // invalid-input error.  Keep that historical behavior in the
+                // receipt while naming the normalized contract kind used by
+                // the paired validator.
+                Ok(RefusalReceipt {
+                    kind: "patch_conflict",
+                    source_kind: Some("invalid_input"),
+                    limit_kind: None,
+                    resource: None,
+                    limit: None,
+                    observed: fixture.stale.len(),
+                    message: error.message,
+                })
+            }
+        },
+    }
+}
+
+fn owner_proof(
+    fixture_identity_sha256: &str,
+    fixture: &OwnerFixture,
+) -> Result<OwnerCommitReceipt, ProbeFailure> {
+    let (noop_bytes, _noop_patch) = owner_commit(fixture, false)?;
+    if noop_bytes != fixture.source {
+        return Err(fail(format!(
+            "{} no-op commit changed the exact source bytes",
+            owner_route_name(fixture.route)
+        )));
+    }
+    let (changed_bytes, patch) = owner_commit(fixture, true)?;
+    let forward_bytes = owner_replay(fixture, &patch, false)?;
+    let inverse_bytes = owner_replay(fixture, &patch, true)?;
+    if forward_bytes != changed_bytes {
+        return Err(fail(format!(
+            "{} forward replay differs from committed output",
+            owner_route_name(fixture.route)
+        )));
+    }
+    if inverse_bytes != fixture.source {
+        return Err(fail(format!(
+            "{} inverse replay did not restore the exact source",
+            owner_route_name(fixture.route)
+        )));
+    }
+    let stale_refusal = owner_stale_refusal(fixture, &patch)?;
+    Ok(OwnerCommitReceipt {
+        route: owner_route_name(fixture.route),
+        fixture_identity_sha256: sha256(
+            format!(
+                "drawingml-owner-fixture-v1\0{fixture_identity_sha256}\0{}\0{}",
+                owner_route_name(fixture.route),
+                sha256(&fixture.source),
+                sha256(&fixture.stale),
+            )
+            .as_bytes(),
+        ),
+        source_sha256: sha256(&fixture.source),
+        noop_sha256: sha256(&noop_bytes),
+        stale_sha256: sha256(&fixture.stale),
+        changed_sha256: sha256(&changed_bytes),
+        forward_sha256: sha256(&forward_bytes),
+        inverse_sha256: sha256(&inverse_bytes),
+        stale_kind: stale_refusal.kind,
+        stale_refusal,
+    })
+}
+
+fn raw_fidelity(case: &LaneCase) -> Result<Vec<RawFidelityReceipt>, ProbeFailure> {
+    case.parts
+        .iter()
+        .map(|part| {
+            let source_output = roundtrip(part.kind, &part.source)?;
+            let changed_output = roundtrip(part.kind, &part.changed)?;
+            if source_output.is_empty() || changed_output.is_empty() {
+                return Err(fail(format!("{} raw readback was empty", part.id)));
+            }
+            if source_output == changed_output {
+                return Err(fail(format!(
+                    "{} changed fixture did not change its raw readback",
+                    part.id
+                )));
+            }
+            let source_sha256 = sha256(&part.source);
+            let changed_sha256 = sha256(&part.changed);
+            let malformed_sha256 = sha256(&part.malformed);
+            Ok(RawFidelityReceipt {
+                part_id: part.id,
+                fixture_identity_sha256: fixture_part_identity(
+                    &case.fixture_identity_sha256,
+                    part.id,
+                    &source_sha256,
+                    &changed_sha256,
+                    &malformed_sha256,
+                ),
+                source_sha256,
+                source_output_sha256: sha256(&source_output),
+                changed_sha256,
+                changed_output_sha256: sha256(&changed_output),
+                malformed_sha256,
+                changed_output_differs: true,
+            })
+        })
+        .collect()
 }
 
 fn size_class_receipts(case: &LaneCase) -> Result<Vec<SizeClassReceipt>, ProbeFailure> {
-    let part = case
-        .parts
-        .iter()
-        .find(|part| {
-            matches!(
-                part.kind,
-                PartKind::FormatCode
-                    | PartKind::ThemeFamily
-                    | PartKind::SvgBlip
-                    | PartKind::Model3d
-                    | PartKind::Diagram
-            )
-        })
-        .ok_or_else(|| fail("lane has no bounded source endpoint"))?;
-    let maximum = part.over.len().saturating_sub(1);
-    let near = sized_with_whitespace(&part.source, maximum.saturating_sub(1));
-    let at = sized_with_whitespace(&part.source, maximum);
-    let mut receipts = Vec::with_capacity(5);
-    for (class, bytes, expected_kind) in [
-        ("small", part.source.clone(), None),
-        ("near_limit", near, None),
-        ("at_limit", at, None),
-        ("over_limit", part.over.clone(), Some("limit")),
-        ("malformed", part.malformed.clone(), Some("invalid_input")),
-    ] {
-        match roundtrip(part.kind, &bytes) {
-            Ok(output) => {
-                if expected_kind.is_some() {
-                    return Err(fail(format!(
-                        "{class} endpoint was accepted despite expected refusal"
-                    )));
-                }
+    let mut receipts = Vec::with_capacity(case.parts.len().saturating_mul(5));
+    for part in &case.parts {
+        let cases = if input_limit(part.kind).is_some() {
+            let maximum = part.over.len().saturating_sub(1);
+            vec![
+                ("small", part.source.clone(), None, true),
+                (
+                    "near_limit",
+                    sized_with_whitespace(&part.source, maximum.saturating_sub(1)),
+                    None,
+                    true,
+                ),
+                (
+                    "at_limit",
+                    sized_with_whitespace(&part.source, maximum),
+                    None,
+                    true,
+                ),
+                ("over_limit", part.over.clone(), Some("limit"), true),
+                (
+                    "malformed",
+                    part.malformed.clone(),
+                    Some("invalid_input"),
+                    true,
+                ),
+            ]
+        } else {
+            vec![
+                ("small", part.source.clone(), None, true),
+                ("near_limit", part.source.clone(), None, true),
+                ("at_limit", part.source.clone(), None, true),
+                ("over_limit", Vec::new(), None, false),
+                (
+                    "malformed",
+                    part.malformed.clone(),
+                    Some("invalid_input"),
+                    true,
+                ),
+            ]
+        };
+        for (class, bytes, expected_kind, applicable) in cases {
+            if !applicable {
                 receipts.push(SizeClassReceipt {
+                    part_id: part.id,
                     class,
-                    bytes: bytes.len(),
-                    accepted: true,
-                    output_sha256: Some(sha256(&output)),
-                    refusal: None,
-                });
-            },
-            Err(error) => {
-                let refusal = error
-                    .refusal
-                    .ok_or_else(|| fail(format!("{class} endpoint lacked typed refusal")))?;
-                if expected_kind != Some(refusal.kind) {
-                    return Err(fail(format!(
-                        "{class} endpoint returned {} instead of {:?}",
-                        refusal.kind, expected_kind
-                    )));
-                }
-                receipts.push(SizeClassReceipt {
-                    class,
-                    bytes: bytes.len(),
+                    bytes: 0,
+                    applicable: false,
                     accepted: false,
                     output_sha256: None,
-                    refusal: Some(refusal),
+                    refusal: None,
                 });
-            },
+                continue;
+            }
+            match roundtrip(part.kind, &bytes) {
+                Ok(output) => {
+                    if expected_kind.is_some() {
+                        return Err(fail(format!(
+                            "{} {class} endpoint was accepted despite expected refusal",
+                            part.id
+                        )));
+                    }
+                    receipts.push(SizeClassReceipt {
+                        part_id: part.id,
+                        class,
+                        bytes: bytes.len(),
+                        applicable: true,
+                        accepted: true,
+                        output_sha256: Some(sha256(&output)),
+                        refusal: None,
+                    });
+                },
+                Err(error) => {
+                    let refusal = error.refusal.ok_or_else(|| {
+                        fail(format!("{} {class} endpoint lacked typed refusal", part.id))
+                    })?;
+                    if expected_kind != Some(refusal.kind) {
+                        return Err(fail(format!(
+                            "{} {class} endpoint returned {} instead of {:?}",
+                            part.id, refusal.kind, expected_kind
+                        )));
+                    }
+                    receipts.push(SizeClassReceipt {
+                        part_id: part.id,
+                        class,
+                        bytes: bytes.len(),
+                        applicable: true,
+                        accepted: false,
+                        output_sha256: None,
+                        refusal: Some(refusal),
+                    });
+                },
+            }
         }
     }
     Ok(receipts)
@@ -1100,6 +2193,28 @@ fn sized_with_whitespace(source: &[u8], target: usize) -> Vec<u8> {
     output
 }
 
+fn input_limit(kind: PartKind) -> Option<(&'static str, usize)> {
+    match kind {
+        PartKind::FormatCode => Some(("formatcode2 XML bytes", 1 << 20)),
+        PartKind::Diagram => Some(("diagram data-model bytes", 16 * 1024 * 1024)),
+        PartKind::TextBody => Some(("text body input bytes", 64 * 1024 * 1024)),
+        PartKind::SvgBlip => Some(("SVG blip XML bytes", 16 * 1024 * 1024)),
+        PartKind::Model3d => Some(("model3d XML bytes", 16 * 1024 * 1024)),
+        PartKind::Theme => Some(("theme XML bytes", 8 * 1024 * 1024)),
+        PartKind::ThemeFamily | PartKind::ThemeFamilyPart => {
+            Some(("theme family XML bytes", 1 << 20))
+        },
+        PartKind::InkActions => Some(("ink actions source bytes", 16 * 1024 * 1024)),
+        PartKind::Color => Some(("DrawingML color XML", 64 * 1024)),
+        PartKind::Transform => Some(("DrawingML transform XML", 1 << 20)),
+        PartKind::Chart | PartKind::Blip | PartKind::Geometry => None,
+    }
+}
+
+fn part_has_input_limit(kind: PartKind) -> bool {
+    input_limit(kind).is_some()
+}
+
 fn parse_geometry(bytes: &[u8]) -> Result<dml::geometry::CustomGeometry, ProbeFailure> {
     use dml::geometry::reader::{CustomGeometryBuilder, GeometryElement};
     let mut reader = Reader::from_reader(bytes);
@@ -1110,28 +2225,31 @@ fn parse_geometry(bytes: &[u8]) -> Result<dml::geometry::CustomGeometry, ProbeFa
     loop {
         let event = reader
             .read_event_into(&mut buffer)
-            .map_err(|error| fail(error.to_string()))?
+            .map_err(|error| invalid_input(error.to_string(), bytes.len()))?
             .into_owned();
         match event {
             Event::Start(element) => {
                 let local = element.local_name().as_ref().to_vec();
                 if stack.is_empty() {
                     if local.as_slice() != b"custGeom" {
-                        return Err(fail("geometry root is not custGeom"));
+                        return Err(invalid_input("geometry root is not custGeom", bytes.len()));
                     }
                     stack.push(GeometryElement::CustomGeometry);
                 } else {
                     let parent = *stack
                         .last()
-                        .ok_or_else(|| fail("geometry stack is empty"))?;
+                        .ok_or_else(|| invalid_input("geometry stack is empty", bytes.len()))?;
                     let child = builder
                         .open(parent, &local, &element, reader.decoder())
                         .map_err(|error| classify(error, bytes.len()))?;
                     let child = child.ok_or_else(|| {
-                        fail(format!(
-                            "unsupported geometry child {:?}",
-                            String::from_utf8_lossy(&local)
-                        ))
+                        invalid_input(
+                            format!(
+                                "unsupported geometry child {:?}",
+                                String::from_utf8_lossy(&local)
+                            ),
+                            bytes.len(),
+                        )
                     })?;
                     stack.push(child);
                 }
@@ -1139,19 +2257,25 @@ fn parse_geometry(bytes: &[u8]) -> Result<dml::geometry::CustomGeometry, ProbeFa
             Event::Empty(element) => {
                 let local = element.local_name().as_ref().to_vec();
                 if stack.is_empty() {
-                    return Err(fail("empty geometry root is unsupported"));
+                    return Err(invalid_input(
+                        "empty geometry root is unsupported",
+                        bytes.len(),
+                    ));
                 }
                 let parent = *stack
                     .last()
-                    .ok_or_else(|| fail("geometry stack is empty"))?;
+                    .ok_or_else(|| invalid_input("geometry stack is empty", bytes.len()))?;
                 let child = builder
                     .open(parent, &local, &element, reader.decoder())
                     .map_err(|error| classify(error, bytes.len()))?;
                 let child = child.ok_or_else(|| {
-                    fail(format!(
-                        "unsupported geometry child {:?}",
-                        String::from_utf8_lossy(&local)
-                    ))
+                    invalid_input(
+                        format!(
+                            "unsupported geometry child {:?}",
+                            String::from_utf8_lossy(&local)
+                        ),
+                        bytes.len(),
+                    )
                 })?;
                 builder
                     .close(child)
@@ -1160,7 +2284,7 @@ fn parse_geometry(bytes: &[u8]) -> Result<dml::geometry::CustomGeometry, ProbeFa
             Event::End(_) => {
                 let element = stack
                     .pop()
-                    .ok_or_else(|| fail("geometry close underflow"))?;
+                    .ok_or_else(|| invalid_input("geometry close underflow", bytes.len()))?;
                 builder
                     .close(element)
                     .map_err(|error| classify(error, bytes.len()))?;
@@ -1168,14 +2292,17 @@ fn parse_geometry(bytes: &[u8]) -> Result<dml::geometry::CustomGeometry, ProbeFa
                     break;
                 }
             },
-            Event::Eof => return Err(fail("geometry root is unterminated")),
+            Event::Eof => return Err(invalid_input("geometry root is unterminated", bytes.len())),
             Event::Text(_)
             | Event::CData(_)
             | Event::Comment(_)
             | Event::Decl(_)
             | Event::PI(_) => {},
             Event::DocType(_) | Event::GeneralRef(_) => {
-                return Err(fail("geometry contains forbidden markup"));
+                return Err(invalid_input(
+                    "geometry contains forbidden markup",
+                    bytes.len(),
+                ));
             },
         }
         buffer.clear();
@@ -1185,19 +2312,10 @@ fn parse_geometry(bytes: &[u8]) -> Result<dml::geometry::CustomGeometry, ProbeFa
         .map_err(|error| classify(error, bytes.len()))
 }
 
-fn read_lane(case: &LaneCase, changed: bool) -> Result<Vec<Vec<u8>>, ProbeFailure> {
-    case.parts
-        .iter()
-        .map(|part| {
-            let bytes = if changed { &part.changed } else { &part.source };
-            roundtrip(part.kind, bytes)
-        })
-        .collect()
-}
-
 fn read_shared_lane(case: &LaneCase) -> Result<Vec<Vec<u8>>, ProbeFailure> {
     case.parts
         .iter()
+        .filter(|part| supports_shared(part.kind))
         .map(|part| match part.kind {
             PartKind::FormatCode => {
                 let value = dml::chart::extension::formatcode2::read_shared(
@@ -1215,204 +2333,175 @@ fn read_shared_lane(case: &LaneCase) -> Result<Vec<Vec<u8>>, ProbeFailure> {
                 dml::theme::family::write(&value)
                     .map_err(|error| classify(error, part.source.len()))
             },
-            _ => roundtrip(part.kind, &part.source),
+            PartKind::ThemeFamilyPart => {
+                let value = dml::theme::family::part::read_shared(std::sync::Arc::<[u8]>::from(
+                    part.source.clone(),
+                ))
+                .map_err(|error| classify(error, part.source.len()))?;
+                Ok(value.xml_bytes().to_vec())
+            },
+            _ => Err(fail(format!("{} has no shared-reader route", part.id))),
         })
         .collect()
 }
 
-fn source_fidelity(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
-    let outputs = read_lane(case, false)?;
-    let exact = outputs
-        .iter()
-        .zip(case.parts.iter())
-        .all(|(output, part)| *output == part.source);
-    if !exact {
-        return Err(fail("source-preserving no-op changed bytes"));
-    }
-    Ok(serde_json::json!({
-        "source_preserving_noop": true,
-        "parts": case.parts.len(),
-        "source_sha256": case.parts.iter().map(|part| sha256(&part.source)).collect::<Vec<_>>(),
-    }))
-}
-
-fn changed_fidelity(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
-    let outputs = read_lane(case, true)?;
-    let mut changed = false;
-    let mut hashes = Vec::new();
-    for ((output, part), source) in outputs.iter().zip(case.parts.iter()).zip(case.parts.iter()) {
-        if *output != source.source {
-            changed = true;
-        }
-        if output != &part.changed {
-            return Err(fail("changed output did not read back exactly"));
-        }
-        hashes.push(sha256(output));
-    }
-    if !changed {
-        return Err(fail("changed commit did not change any source bytes"));
-    }
-    Ok(serde_json::json!({
-        "semantic_changed_output_readback": true,
-        "changed_sha256": hashes,
-    }))
-}
-
-fn patch_forward(base: &[u8], target: &[u8], actual: &[u8]) -> Result<Vec<u8>, RefusalReceipt> {
-    if actual != base {
-        return Err(RefusalReceipt {
-            kind: "patch_conflict",
-            resource: None,
-            limit: None,
-            observed: actual.len(),
-            message: "patch base does not match package content".into(),
-        });
-    }
-    Ok(target.to_vec())
-}
-
-fn all_forward(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
-    let mut parts = Vec::with_capacity(case.parts.len());
-    for part in &case.parts {
-        let output =
-            patch_forward(&part.source, &part.changed, &part.source).map_err(|refusal| {
-                ProbeFailure {
-                    message: refusal.message.clone(),
-                    refusal: Some(refusal),
-                }
-            })?;
-        if output != part.changed {
-            return Err(fail("forward patch did not reproduce changed output"));
-        }
-        parts.push(serde_json::json!({
-            "base_sha256": sha256(&part.source),
-            "output_sha256": sha256(&output),
-            "actual_sha256": sha256(&part.source),
-        }));
-    }
-    Ok(serde_json::json!({ "forward_exact": true, "parts": parts }))
-}
-
-fn all_inverse(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
-    let mut parts = Vec::with_capacity(case.parts.len());
-    for part in &case.parts {
-        let output =
-            patch_forward(&part.changed, &part.source, &part.changed).map_err(|refusal| {
-                ProbeFailure {
-                    message: refusal.message.clone(),
-                    refusal: Some(refusal),
-                }
-            })?;
-        if output != part.source {
-            return Err(fail("inverse patch did not restore exact source"));
-        }
-        parts.push(serde_json::json!({
-            "changed_sha256": sha256(&part.changed),
-            "restored_sha256": sha256(&output),
-            "base_sha256": sha256(&part.source),
-        }));
-    }
-    Ok(serde_json::json!({ "inverse_exact": true, "parts": parts }))
-}
-
-fn stale_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
-    let part = case
-        .parts
-        .first()
-        .ok_or_else(|| fail("lane has no patch part"))?;
-    let refusal = patch_forward(&part.source, &part.changed, &case.stale)
-        .expect_err("stale source must conflict");
-    if refusal.kind != "patch_conflict" {
-        return Err(fail("stale replay did not produce PatchConflict"));
-    }
-    Ok(serde_json::json!({
-        "stale_refusal": true,
-        "base_sha256": sha256(&part.source),
-        "stale_sha256": sha256(&case.stale),
-        "output_sha256": sha256(&part.changed),
-        "refusal": refusal,
-    }))
-}
-
 fn malformed_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
-    let part = case
-        .parts
-        .first()
-        .ok_or_else(|| fail("lane has no malformed part"))?;
-    let error =
-        roundtrip(part.kind, &part.malformed).expect_err("malformed source must be refused");
-    let refusal = error
-        .refusal
-        .ok_or_else(|| fail("malformed input lacked typed refusal"))?;
-    if refusal.kind != "invalid_input" {
-        return Err(fail("malformed input was not invalid_input"));
+    let mut parts = Vec::with_capacity(case.parts.len());
+    for part in &case.parts {
+        let error = roundtrip(part.kind, &part.malformed)
+            .map(|_| ())
+            .expect_err("malformed source must be refused");
+        let refusal = error
+            .refusal
+            .ok_or_else(|| fail(format!("{} malformed input lacked typed refusal", part.id)))?;
+        if refusal.kind != "invalid_input" {
+            return Err(fail(format!(
+                "{} malformed input was not invalid_input",
+                part.id
+            )));
+        }
+        parts.push(serde_json::json!({
+            "part_id": part.id,
+            "refusal": refusal,
+        }));
     }
     let limit = limit_check(case)?;
-    Ok(serde_json::json!({ "malformed_refusal": true, "refusal": refusal, "limit": limit }))
+    Ok(serde_json::json!({
+        "malformed_refusal": true,
+        "refusal": parts.first().and_then(|part| part.get("refusal")).cloned(),
+        "parts": parts,
+        "limit": limit,
+    }))
 }
 
 fn limit_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
+    let mut parts = Vec::new();
+    for part in &case.parts {
+        if input_limit(part.kind).is_none() {
+            continue;
+        }
+        let error = roundtrip(part.kind, &part.over)
+            .map(|_| ())
+            .expect_err("over-limit source must be refused");
+        let refusal = error
+            .refusal
+            .ok_or_else(|| fail(format!("{} over-limit input lacked typed refusal", part.id)))?;
+        if refusal.kind != "limit"
+            || refusal.limit_kind.is_none()
+            || refusal.limit.is_none()
+            || refusal.observed <= refusal.limit.unwrap_or(0)
+        {
+            return Err(fail(format!(
+                "{} over-limit source was not a typed limit refusal: {}",
+                part.id, error.message
+            )));
+        }
+        parts.push(serde_json::json!({
+            "part_id": part.id,
+            "expected_legacy_resource": part.limit_resource,
+            "refusal": refusal,
+        }));
+    }
+    Ok(serde_json::json!({
+        "limit_refusal": !parts.is_empty(),
+        "parts": parts,
+    }))
+}
+
+fn theme_family_mutations(
+    case: &LaneCase,
+) -> Result<Vec<ThemeFamilyMutationReceipt>, ProbeFailure> {
     let part = case
         .parts
         .iter()
-        .find(|part| {
-            matches!(
-                part.kind,
-                PartKind::FormatCode
-                    | PartKind::ThemeFamily
-                    | PartKind::SvgBlip
-                    | PartKind::Model3d
-                    | PartKind::Diagram
-            )
-        })
-        .ok_or_else(|| fail("lane has no bounded source part"))?;
-    let error = roundtrip(part.kind, &part.over).expect_err("over-limit source must be refused");
-    let refusal = error
-        .refusal
-        .ok_or_else(|| fail("over-limit input lacked typed refusal"))?;
-    if refusal.kind != "limit"
-        || refusal.limit.is_none()
-        || refusal.observed <= refusal.limit.unwrap_or(0)
-        || refusal.resource != Some(part.limit_resource)
-    {
-        return Err(fail(format!(
-            "over-limit source was not a typed limit refusal: {}",
-            error.message
-        )));
+        .find(|part| matches!(part.kind, PartKind::ThemeFamilyPart))
+        .ok_or_else(|| fail("theme-family mutation route has no complete Theme part"))?;
+    let source_snapshot = dml::theme::family::part::read(&part.source)
+        .map_err(|error| classify(error, part.source.len()))?;
+    let changed_snapshot = dml::theme::family::part::read(&part.changed)
+        .map_err(|error| classify(error, part.changed.len()))?;
+    let changed_family = changed_snapshot
+        .family()
+        .cloned()
+        .ok_or_else(|| fail("changed Theme part has no direct family owner"))?;
+    let source_sha256 = sha256(&part.source);
+    let replaced = theme_family_replace(&source_snapshot, &changed_family)
+        .map_err(|error| classify(error, part.source.len()))?;
+    if replaced == part.source {
+        return Err(fail(
+            "theme-family replace did not change the complete Theme part",
+        ));
     }
-    Ok(serde_json::json!({ "limit_refusal": true, "refusal": refusal }))
+    let removed =
+        theme_family_remove(&part.source).map_err(|error| classify(error, part.source.len()))?;
+    let removed_snapshot =
+        dml::theme::family::part::read(&removed).map_err(|error| classify(error, removed.len()))?;
+    if removed_snapshot.family().is_some() {
+        return Err(fail("theme-family remove retained a direct owner"));
+    }
+    let added = theme_family_add(&removed, &changed_family)
+        .map_err(|error| classify(error, removed.len()))?;
+    let added_snapshot =
+        dml::theme::family::part::read(&added).map_err(|error| classify(error, added.len()))?;
+    if added_snapshot.family().is_none() {
+        return Err(fail("theme-family add did not restore a direct owner"));
+    }
+    Ok(vec![
+        ThemeFamilyMutationReceipt {
+            operation: "replace_family",
+            source_sha256: source_sha256.clone(),
+            output_sha256: sha256(&replaced),
+            output_bytes: replaced.len(),
+            output_differs: true,
+        },
+        ThemeFamilyMutationReceipt {
+            operation: "remove_family",
+            source_sha256: source_sha256.clone(),
+            output_sha256: sha256(&removed),
+            output_bytes: removed.len(),
+            output_differs: removed != part.source,
+        },
+        ThemeFamilyMutationReceipt {
+            operation: "add_family",
+            source_sha256: sha256(&removed),
+            output_sha256: sha256(&added),
+            output_bytes: added.len(),
+            output_differs: added != removed,
+        },
+    ])
 }
 
 fn preflight_check(case: &LaneCase) -> Result<serde_json::Value, ProbeFailure> {
-    let part = case
-        .parts
-        .iter()
-        .find(|part| {
-            matches!(
-                part.kind,
-                PartKind::FormatCode
-                    | PartKind::ThemeFamily
-                    | PartKind::SvgBlip
-                    | PartKind::Model3d
-                    | PartKind::Diagram
-            )
-        })
-        .ok_or_else(|| fail("lane has no output part"))?;
-    let mut preflight = Vec::new();
-    write_kind_to(part.kind, &part.changed, &mut preflight)?;
-    if preflight.is_empty() {
-        return Err(fail("preflight output was empty"));
-    }
-    let mut sink = CountingSink::new(preflight.len().saturating_sub(1));
-    let rejected = write_kind_to(part.kind, &part.changed, &mut sink).is_err();
-    if !rejected || sink.writes != 0 {
-        return Err(fail("bounded preflight wrote before refusal"));
+    let mut parts = Vec::with_capacity(case.parts.len());
+    for part in &case.parts {
+        let mut full_sink = CountingSink::new(usize::MAX);
+        write_kind_to(part.kind, &part.changed, &mut full_sink)?;
+        let full_receipt = write_receipt(full_sink);
+        if full_receipt.bytes == 0 {
+            return Err(fail(format!("{} preflight output was empty", part.id)));
+        }
+        let mut sink = CountingSink::new(full_receipt.bytes.saturating_sub(1));
+        let error = write_kind_to(part.kind, &part.changed, &mut sink)
+            .expect_err("bounded sink must refuse before its first write");
+        let refusal = error
+            .refusal
+            .ok_or_else(|| fail(format!("{} preflight lacked a typed sink refusal", part.id)))?;
+        if sink.writes != 0 {
+            return Err(fail(format!("{} preflight wrote before refusal", part.id)));
+        }
+        parts.push(serde_json::json!({
+            "part_id": part.id,
+            "preflight_bytes": full_receipt.bytes,
+            "sink_writes": sink.writes,
+            "sink_limit": full_receipt.bytes - 1,
+            "observed_output": full_receipt.bytes,
+            "refusal": refusal,
+        }));
     }
     Ok(serde_json::json!({
         "preflight_zero_writes": true,
-        "preflight_bytes": preflight.len(),
-        "sink_writes": sink.writes,
-        "refusal": { "kind": "limit", "resource": "output bytes", "limit": preflight.len() - 1, "observed": preflight.len(), "message": "bounded output rejected before sink write" }
+        "sink_writes": 0,
+        "parts": parts,
     }))
 }
 
@@ -1424,6 +2513,68 @@ fn normal_write(case: &LaneCase) -> Result<SinkReceipt, ProbeFailure> {
     Ok(write_receipt(sink))
 }
 
+fn vector_receipt(
+    outputs: impl IntoIterator<Item = Result<Vec<u8>, ProbeFailure>>,
+) -> Result<SinkReceipt, ProbeFailure> {
+    let mut sink = CountingSink::new(usize::MAX);
+    for output in outputs {
+        let output = output?;
+        sink.write_all(&output)
+            .map_err(|error| io_failure(error, output.len()))?;
+    }
+    Ok(write_receipt(sink))
+}
+
+fn owner_operation(case: &LaneCase, operation_name: &str) -> Result<OperationValue, ProbeFailure> {
+    let mut sink = CountingSink::new(usize::MAX);
+    let mut refusals = Vec::new();
+    for fixture in &case.owners {
+        match operation_name {
+            "noop_commit" => {
+                let output = owner_commit(fixture, false)?.0;
+                sink.write_all(&output)
+                    .map_err(|error| io_failure(error, output.len()))?;
+            },
+            "changed_commit" => {
+                let output = owner_commit(fixture, true)?.0;
+                sink.write_all(&output)
+                    .map_err(|error| io_failure(error, output.len()))?;
+            },
+            "forward_replay" => {
+                let (changed, patch) = owner_commit(fixture, true)?;
+                let _ = changed;
+                let output = owner_replay(fixture, &patch, false)?;
+                sink.write_all(&output)
+                    .map_err(|error| io_failure(error, output.len()))?;
+            },
+            "inverse_replay" => {
+                let (changed, patch) = owner_commit(fixture, true)?;
+                let _ = changed;
+                let output = owner_replay(fixture, &patch, true)?;
+                sink.write_all(&output)
+                    .map_err(|error| io_failure(error, output.len()))?;
+            },
+            "stale_replay" => {
+                let (_changed, patch) = owner_commit(fixture, true)?;
+                refusals.push(owner_stale_refusal(fixture, &patch)?);
+            },
+            _ => {
+                return Err(fail(format!(
+                    "unsupported owner operation {operation_name}"
+                )));
+            },
+        }
+    }
+    if operation_name == "stale_replay" {
+        Ok(OperationValue::Details(serde_json::json!({
+            "refusal": refusals.first().cloned(),
+            "refusals": refusals,
+        })))
+    } else {
+        Ok(OperationValue::Sink(write_receipt(sink)))
+    }
+}
+
 #[derive(Debug)]
 enum OperationValue {
     Bytes(Vec<u8>),
@@ -1432,26 +2583,38 @@ enum OperationValue {
 }
 
 fn operation(case: &LaneCase, name: &str) -> Result<OperationValue, ProbeFailure> {
+    if OWNER_OPERATIONS.contains(&name) {
+        if case.owners.is_empty() {
+            return Err(fail(format!(
+                "owner operation {name} was requested for a raw-only lane"
+            )));
+        }
+        return owner_operation(case, name);
+    }
     match name {
-        "entry_read" => {
-            let _ = read_lane(case, false)?;
-            Ok(OperationValue::Bytes(case.parts[0].source.clone()))
-        },
+        "entry_read" => Ok(OperationValue::Sink(vector_receipt(
+            case.parts
+                .iter()
+                .map(|part| roundtrip(part.kind, &part.source)),
+        )?)),
         "read_shared_when_supported" => {
-            let _ = read_shared_lane(case)?;
-            Ok(OperationValue::Bytes(case.parts[0].source.clone()))
+            let outputs = read_shared_lane(case)?;
+            if outputs.is_empty() {
+                Ok(OperationValue::Details(serde_json::json!({
+                    "not_applicable": true,
+                    "reason": "no shared-reader API exists for this lane",
+                })))
+            } else {
+                Ok(OperationValue::Sink(vector_receipt(
+                    outputs.into_iter().map(Ok),
+                )?))
+            }
         },
-        "noop_commit" => Ok(OperationValue::Details(source_fidelity(case)?)),
-        "changed_commit" => Ok(OperationValue::Details(changed_fidelity(case)?)),
-        "forward_replay" => Ok(OperationValue::Details(all_forward(case)?)),
-        "inverse_replay" => Ok(OperationValue::Details(all_inverse(case)?)),
-        "stale_replay" => Ok(OperationValue::Details(stale_check(case)?)),
-        "vec_write" => {
-            let outputs = read_lane(case, true)?;
-            Ok(OperationValue::Bytes(
-                outputs.into_iter().flatten().collect(),
-            ))
-        },
+        "vec_write" => Ok(OperationValue::Sink(vector_receipt(
+            case.parts
+                .iter()
+                .map(|part| roundtrip(part.kind, &part.changed)),
+        )?)),
         "write_to_bounded_sink" => Ok(OperationValue::Sink(normal_write(case)?)),
         "preflight_refusal" => Ok(OperationValue::Details(preflight_check(case)?)),
         "malformed_refusal" => Ok(OperationValue::Details(malformed_check(case)?)),
@@ -1502,6 +2665,24 @@ fn process_rss_bytes() -> u64 {
         .lines()
         .find_map(|line| {
             line.strip_prefix("VmRSS:")
+                .and_then(|value| value.split_whitespace().next())
+                .and_then(|value| value.parse::<u64>().ok())
+                .map(|value| value.saturating_mul(1024))
+        })
+        .unwrap_or(0)
+}
+
+/// Return the kernel-maintained whole-process RSS high-water mark.  Unlike
+/// the sample-side `VmRSS` observations, `VmHWM` is retained even when a
+/// short allocation peak falls between samples.
+fn whole_process_peak_rss_bytes() -> u64 {
+    let Ok(status) = fs::read_to_string("/proc/self/status") else {
+        return 0;
+    };
+    status
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("VmHWM:")
                 .and_then(|value| value.split_whitespace().next())
                 .and_then(|value| value.parse::<u64>().ok())
                 .map(|value| value.saturating_mul(1024))
@@ -1600,6 +2781,7 @@ fn allocator_report(
     metrics: AllocationMetrics,
     process_rss_bytes: u64,
     peak_rss_bytes: u64,
+    whole_process_peak_rss_bytes: u64,
 ) -> AllocatorReport {
     AllocatorReport {
         elapsed_claimable: metrics.elapsed_claimable,
@@ -1617,6 +2799,7 @@ fn allocator_report(
         peak_live_delta: metrics.peak_live_delta,
         process_rss_bytes,
         peak_rss_bytes,
+        whole_process_peak_rss_bytes,
         conservation_ok: metrics.conservation_ok,
     }
 }
@@ -1658,15 +2841,55 @@ pub fn run(observer: Option<&dyn AllocationObserver>) -> io::Result<()> {
     let arguments = parse(env::args().skip(1), expected_mode)
         .map_err(|error| io::Error::new(error.kind(), format!("{error}; {}", usage())))?;
     let (fixture_bytes, fixture) = load_fixture(&arguments.fixture, &arguments.lane)?;
-    let case =
+    let mut case =
         make_case(&arguments.lane, &fixture).map_err(|error| io::Error::other(error.message))?;
-    let size_classes =
-        size_class_receipts(&case).map_err(|error| io::Error::other(error.message))?;
-    let mut rows = Vec::with_capacity(OPERATIONS.len());
+    if arguments.endpoint == "owner" {
+        select_owner_route(
+            &mut case,
+            arguments
+                .owner_route
+                .as_deref()
+                .expect("owner route validated by argument parser"),
+        )
+        .map_err(|error| io::Error::other(error.message))?;
+    } else if let Some(scope) = arguments.raw_scope.as_deref() {
+        select_raw_scope(&mut case, scope).map_err(|error| io::Error::other(error.message))?;
+    }
+    let size_classes = if arguments.endpoint == "raw" {
+        size_class_receipts(&case).map_err(|error| io::Error::other(error.message))?
+    } else {
+        Vec::new()
+    };
+    let raw_fidelity = if arguments.endpoint == "raw" {
+        raw_fidelity(&case).map_err(|error| io::Error::other(error.message))?
+    } else {
+        Vec::new()
+    };
+    let theme_family_mutations =
+        if arguments.endpoint == "raw" && arguments.raw_scope.as_deref() == Some("family") {
+            theme_family_mutations(&case).map_err(|error| io::Error::other(error.message))?
+        } else {
+            Vec::new()
+        };
+    let owner_proofs = if arguments.endpoint == "owner" {
+        case.owners
+            .iter()
+            .map(|fixture| owner_proof(&case.fixture_identity_sha256, fixture))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| io::Error::other(error.message))?
+    } else {
+        Vec::new()
+    };
+    let operations = if arguments.endpoint == "raw" {
+        RAW_OPERATIONS.to_vec()
+    } else {
+        OWNER_OPERATIONS.to_vec()
+    };
+    let mut rows = Vec::with_capacity(operations.len());
     let mut all_metrics = Vec::new();
     let mut peak_rss = process_rss_bytes();
-    for operation_name in OPERATIONS {
-        let (row, metrics, row_peak) = measure(&case, operation_name, &arguments, observer)
+    for operation_name in operations {
+        let (row, metrics, row_peak) = measure(&case, &operation_name, &arguments, observer)
             .map_err(|error| io::Error::other(error.message))?;
         rows.push(row);
         if let Some(metrics) = metrics {
@@ -1675,9 +2898,13 @@ pub fn run(observer: Option<&dyn AllocationObserver>) -> io::Result<()> {
         peak_rss = peak_rss.max(row_peak);
     }
     let metrics = aggregate_metrics(&all_metrics);
+    let whole_process_peak_rss = whole_process_peak_rss_bytes();
     let report = Report {
         schema: "litchi.drawingml.raw.probe.v1",
         lane: arguments.lane,
+        endpoint: arguments.endpoint,
+        owner_route: arguments.owner_route,
+        raw_scope: arguments.raw_scope,
         role: arguments.role,
         mode: arguments.mode,
         source_revision: arguments.source_revision,
@@ -1687,6 +2914,11 @@ pub fn run(observer: Option<&dyn AllocationObserver>) -> io::Result<()> {
         fixture_sha256: sha256(&fixture_bytes),
         fixture_root_sha256: sha256(fixture.root.as_bytes()),
         fixture_mutation: fixture.mutation,
+        fixture_lane_identity_sha256: case.fixture_identity_sha256.clone(),
+        capabilities: capability_receipts(&case, &arguments.endpoint),
+        raw_fidelity,
+        theme_family_mutations,
+        owner_proofs,
         size_classes,
         protocol: Protocol {
             warmups: arguments.warmups,
@@ -1697,11 +2929,18 @@ pub fn run(observer: Option<&dyn AllocationObserver>) -> io::Result<()> {
             fresh_process: true,
             abba_order: ["baseline", "candidate", "candidate", "baseline"],
         },
-        allocator_metrics: observer
-            .map(|_| allocator_report(metrics, process_rss_bytes(), peak_rss)),
+        allocator_metrics: observer.map(|_| {
+            allocator_report(
+                metrics,
+                process_rss_bytes(),
+                peak_rss,
+                whole_process_peak_rss,
+            )
+        }),
         resource_metrics: ResourceMetrics {
             process_rss_bytes: process_rss_bytes(),
             peak_rss_bytes: peak_rss,
+            whole_process_peak_rss_bytes: whole_process_peak_rss,
         },
         rows,
         iterations: arguments.iterations,

@@ -21,8 +21,12 @@ from typing import Any, Mapping
 
 
 SCHEMA = "litchi.drawingml.raw-preparation.v1"
-WORKSPACE_LOCK_SHA256 = "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6"
-WORKSPACE_LOCK_BYTES = 139591
+HISTORICAL_WORKSPACE_LOCK_SHA256 = "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6"
+HISTORICAL_WORKSPACE_LOCK_BYTES = 139591
+# Kept as compatibility names for callers that only need the fixed historical
+# baseline identity. Candidate roots use their separately supplied lock hash.
+WORKSPACE_LOCK_SHA256 = HISTORICAL_WORKSPACE_LOCK_SHA256
+WORKSPACE_LOCK_BYTES = HISTORICAL_WORKSPACE_LOCK_BYTES
 ADAPTER_PATHS = (
     "Cargo.lock",
     "tools/perf-baseline/Cargo.lock",
@@ -40,21 +44,28 @@ ADAPTER_PATHS = (
 # preparer means a future protocol edit cannot silently become historical
 # baseline evidence merely because it is copied into a worktree.
 STATIC_REVIEWED_ADAPTER_SHA256 = {
-    "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
-    "tools/perf-baseline/Cargo.toml": "0d93c8aa779bf45dded1359517466c5c1566a5e97875a055723ff71e3c780f7f",
+    "Cargo.lock": HISTORICAL_WORKSPACE_LOCK_SHA256,
+    "tools/perf-baseline/Cargo.toml": "b203b4b5f58938c9fee1027127a80b620a263ee4a4652c527090f879aba62ce1",
     "tools/perf-baseline/src/lib.rs": "99b2595d031c9d0ece1a5b46e17d0ddc017629c7e69655909508a28e725aed04",
-    "tools/perf-baseline/src/drawingml_raw_probe.rs": "dbc52409556bdc5931a8767e9ae961604f660be1975d8b94cd60afe9f756aa64",
+    "tools/perf-baseline/src/drawingml_raw_probe.rs": "5d7eda0f85cc9849f564821422b117509a2dee5ffb8b4b127a648eb99697f437",
     "tools/perf-baseline/src/bin/drawingml_raw_native.rs": "c64e5cb9436622d383a55f6720c940344c7575cc56404ab6459133afbc63116e",
     "tools/perf-baseline/src/bin/drawingml_raw_allocator.rs": "6dd60e14b760bf7562017ddc99b9356699a13155eb88a46cdb62a81aa3b0d3b9",
     "tools/perf-baseline/src/bin/support/drawingml_counting_allocator.rs": "3db5f3a49cf1c3e5ef496f6f3a787f94e74fa3d995879af578a60cb910d13117",
-    "tools/native_qualification/drawingml_raw_validator.py": "75bd77ba6db9452a456a8e65e75eaa102277631ae2889e9ed50abdfd650d5673",
+    "tools/native_qualification/drawingml_raw_validator.py": "2fac4102715b631c8e5fe2683608da6924329bbe8af15296e0a6d2ab4d133d34",
     "tools/native_qualification/fixtures/drawingml_raw_fixtures.json": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
 }
 
 
-def _reviewed_adapter_hashes(perf_lock_sha256: str) -> dict[str, str]:
+LOCK_PATHS = frozenset(("Cargo.lock", "tools/perf-baseline/Cargo.lock"))
+
+
+def _reviewed_adapter_hashes(
+    perf_lock_sha256: str,
+    workspace_lock_sha256: str,
+) -> dict[str, str]:
     return {
         **STATIC_REVIEWED_ADAPTER_SHA256,
+        "Cargo.lock": workspace_lock_sha256,
         "tools/perf-baseline/Cargo.lock": perf_lock_sha256,
     }
 
@@ -138,17 +149,25 @@ def _identity(root: Path) -> dict[str, Any]:
     }
 
 
-def _validate_adapter(identity: Mapping[str, Any], label: str, *, reviewed: bool, perf_lock_sha256: str) -> None:
+def _validate_adapter(
+    identity: Mapping[str, Any],
+    label: str,
+    *,
+    reviewed: bool,
+    perf_lock_sha256: str,
+    workspace_lock_sha256: str,
+    workspace_lock_bytes: int,
+) -> None:
     statuses = identity.get("status_paths")
     _expect(isinstance(statuses, list), f"{label} status paths are missing")
     _expect(set(statuses).issubset(set(ADAPTER_PATHS)), f"{label} changed outside adapter allowlist: {statuses!r}")
     hashes = identity.get("adapter_hashes")
     _expect(isinstance(hashes, dict) and set(hashes) == set(ADAPTER_PATHS), f"{label} adapter hashes are incomplete")
-    _expect(identity.get("workspace_lock_sha256") == WORKSPACE_LOCK_SHA256, f"{label} does not use the historical 52ed workspace lock")
-    _expect(identity.get("workspace_lock_bytes") == WORKSPACE_LOCK_BYTES, f"{label} workspace lock byte count differs")
+    _expect(identity.get("workspace_lock_sha256") == workspace_lock_sha256, f"{label} workspace lock differs")
+    _expect(identity.get("workspace_lock_bytes") == workspace_lock_bytes, f"{label} workspace lock byte count differs")
     _expect(identity.get("perf_lock_sha256") == perf_lock_sha256, f"{label} does not use the selected perf-baseline lock")
     if reviewed:
-        for path, expected in _reviewed_adapter_hashes(perf_lock_sha256).items():
+        for path, expected in _reviewed_adapter_hashes(perf_lock_sha256, workspace_lock_sha256).items():
             observed = hashes[path].get("sha256")
             _expect(observed == expected, f"{label} reviewed adapter hash mismatch: {path}")
 
@@ -161,15 +180,41 @@ def _validate_receipt_data(
     baseline_revision: str,
     candidate_revision: str,
     perf_lock_sha256: str,
+    candidate_workspace_lock_sha256: str,
+    candidate_workspace_lock_bytes: int,
 ) -> dict[str, Any]:
     _expect(receipt.get("schema") == SCHEMA, "preparation receipt schema mismatch")
     _expect(receipt.get("baseline_revision") == baseline_revision, "receipt baseline revision differs")
     _expect(receipt.get("candidate_revision") == candidate_revision, "receipt candidate revision differs")
     _expect(receipt.get("adapter_paths") == list(ADAPTER_PATHS), "adapter path allowlist changed")
-    _expect(receipt.get("workspace_lock_sha256") == WORKSPACE_LOCK_SHA256, "receipt workspace lock is not the historic 52ed workspace lock")
-    _expect(receipt.get("workspace_lock_bytes") == WORKSPACE_LOCK_BYTES, "receipt workspace lock byte count differs")
+    _expect(
+        receipt.get("baseline_workspace_lock_sha256") == HISTORICAL_WORKSPACE_LOCK_SHA256,
+        "receipt baseline workspace lock is not the historic 52ed lock",
+    )
+    _expect(
+        receipt.get("candidate_workspace_lock_sha256") == candidate_workspace_lock_sha256,
+        "receipt candidate workspace lock differs",
+    )
+    _expect(
+        receipt.get("baseline_workspace_lock_bytes") == HISTORICAL_WORKSPACE_LOCK_BYTES,
+        "receipt baseline workspace lock byte count differs",
+    )
+    _expect(
+        receipt.get("candidate_workspace_lock_bytes") == candidate_workspace_lock_bytes,
+        "receipt candidate workspace lock byte count differs",
+    )
     _expect(receipt.get("perf_lock_sha256") == perf_lock_sha256, "receipt perf-baseline lock differs")
-    _expect(receipt.get("reviewed_adapter_sha256") == _reviewed_adapter_hashes(perf_lock_sha256), "reviewed adapter hashes changed")
+    _expect(
+        receipt.get("reviewed_adapter_sha256") == {
+            "baseline": _reviewed_adapter_hashes(
+                perf_lock_sha256, HISTORICAL_WORKSPACE_LOCK_SHA256
+            ),
+            "candidate": _reviewed_adapter_hashes(
+                perf_lock_sha256, candidate_workspace_lock_sha256
+            ),
+        },
+        "reviewed adapter hashes changed",
+    )
     baseline = receipt.get("baseline")
     candidate = receipt.get("candidate")
     _expect(isinstance(baseline, dict) and isinstance(candidate, dict), "source identities are missing")
@@ -178,10 +223,36 @@ def _validate_receipt_data(
     _expect(baseline.get("head") == baseline_revision, "baseline HEAD differs")
     _expect(candidate.get("head") == candidate_revision, "candidate HEAD differs")
     _expect(receipt.get("perf_lock_bytes") == candidate.get("perf_lock_bytes"), "receipt perf-baseline lock byte count differs")
-    _validate_adapter(baseline, "baseline", reviewed=True, perf_lock_sha256=perf_lock_sha256)
-    _validate_adapter(candidate, "candidate", reviewed=True, perf_lock_sha256=perf_lock_sha256)
+    _validate_adapter(
+        baseline,
+        "baseline",
+        reviewed=True,
+        perf_lock_sha256=perf_lock_sha256,
+        workspace_lock_sha256=HISTORICAL_WORKSPACE_LOCK_SHA256,
+        workspace_lock_bytes=HISTORICAL_WORKSPACE_LOCK_BYTES,
+    )
+    _validate_adapter(
+        candidate,
+        "candidate",
+        reviewed=True,
+        perf_lock_sha256=perf_lock_sha256,
+        workspace_lock_sha256=candidate_workspace_lock_sha256,
+        workspace_lock_bytes=candidate["workspace_lock_bytes"],
+    )
     _expect(candidate.get("status_paths") == [], "candidate source must be clean")
-    _expect(baseline.get("adapter_hashes") == candidate.get("adapter_hashes"), "adapter bytes differ")
+    _expect(
+        {
+            path: baseline["adapter_hashes"][path]
+            for path in ADAPTER_PATHS
+            if path not in LOCK_PATHS
+        }
+        == {
+            path: candidate["adapter_hashes"][path]
+            for path in ADAPTER_PATHS
+            if path not in LOCK_PATHS
+        },
+        "non-lock adapter bytes differ",
+    )
     _expect(receipt.get("baseline_status_paths") == baseline.get("status_paths"), "baseline status receipt differs")
     return dict(receipt)
 
@@ -194,6 +265,8 @@ def validate_preparation_receipt(
     baseline_revision: str,
     candidate_revision: str,
     perf_lock_sha256: str,
+    candidate_workspace_lock_sha256: str,
+    candidate_workspace_lock_bytes: int,
 ) -> dict[str, Any]:
     receipt_path = receipt_path.resolve(strict=False)
     _expect(not receipt_path.is_symlink() and receipt_path.is_file(), f"receipt is missing: {receipt_path}")
@@ -211,6 +284,8 @@ def validate_preparation_receipt(
         baseline_revision=baseline_revision,
         candidate_revision=candidate_revision,
         perf_lock_sha256=perf_lock_sha256,
+        candidate_workspace_lock_sha256=candidate_workspace_lock_sha256,
+        candidate_workspace_lock_bytes=candidate_workspace_lock_bytes,
     )
     for label, current in (("baseline", _identity(baseline_root)), ("candidate", _identity(candidate_root))):
         recorded = expected[label]
@@ -239,6 +314,8 @@ def prepare(
     candidate_revision: str,
     receipt_path: Path,
     perf_lock_sha256: str,
+    candidate_workspace_lock_sha256: str,
+    candidate_workspace_lock_bytes: int,
 ) -> None:
     baseline_root = _root(baseline_root)
     candidate_root = _root(candidate_root)
@@ -249,8 +326,21 @@ def prepare(
     before_status = _status_paths(_git(baseline_root, "status", "--porcelain=v1", "--untracked-files=all"))
     _expect(set(before_status).issubset(set(ADAPTER_PATHS)), "baseline already contains an unapproved change")
     candidate = _identity(candidate_root)
-    _validate_adapter(candidate, "candidate", reviewed=True, perf_lock_sha256=perf_lock_sha256)
+    _expect(
+        candidate["workspace_lock_bytes"] == candidate_workspace_lock_bytes,
+        "candidate workspace lock byte count differs",
+    )
+    _validate_adapter(
+        candidate,
+        "candidate",
+        reviewed=True,
+        perf_lock_sha256=perf_lock_sha256,
+        workspace_lock_sha256=candidate_workspace_lock_sha256,
+        workspace_lock_bytes=candidate["workspace_lock_bytes"],
+    )
     for relative in ADAPTER_PATHS:
+        if relative in LOCK_PATHS:
+            continue
         source = candidate_root / relative
         target = baseline_root / relative
         _expect(not source.is_symlink() and source.is_file(), f"candidate adapter path is missing: {source}")
@@ -258,21 +348,49 @@ def prepare(
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, target)
     baseline = _identity(baseline_root)
-    _validate_adapter(baseline, "baseline", reviewed=True, perf_lock_sha256=perf_lock_sha256)
+    _validate_adapter(
+        baseline,
+        "baseline",
+        reviewed=True,
+        perf_lock_sha256=perf_lock_sha256,
+        workspace_lock_sha256=HISTORICAL_WORKSPACE_LOCK_SHA256,
+        workspace_lock_bytes=HISTORICAL_WORKSPACE_LOCK_BYTES,
+    )
     _expect(baseline.get("head") == baseline_revision, "baseline HEAD changed during preparation")
     _expect(candidate.get("head") == candidate_revision, "candidate HEAD changed during preparation")
-    _expect(baseline.get("adapter_hashes") == candidate.get("adapter_hashes"), "adapter copy differs")
+    _expect(
+        {
+            path: baseline["adapter_hashes"][path]
+            for path in ADAPTER_PATHS
+            if path not in LOCK_PATHS
+        }
+        == {
+            path: candidate["adapter_hashes"][path]
+            for path in ADAPTER_PATHS
+            if path not in LOCK_PATHS
+        },
+        "non-lock adapter bytes differ",
+    )
     receipt = {
         "schema": SCHEMA,
         "baseline_revision": baseline_revision,
         "candidate_revision": candidate_revision,
         "adapter_paths": list(ADAPTER_PATHS),
         "baseline_status_paths": list(baseline.get("status_paths", [])),
-        "workspace_lock_sha256": WORKSPACE_LOCK_SHA256,
-        "workspace_lock_bytes": WORKSPACE_LOCK_BYTES,
+        "baseline_workspace_lock_sha256": HISTORICAL_WORKSPACE_LOCK_SHA256,
+        "baseline_workspace_lock_bytes": HISTORICAL_WORKSPACE_LOCK_BYTES,
+        "candidate_workspace_lock_sha256": candidate_workspace_lock_sha256,
+        "candidate_workspace_lock_bytes": candidate["workspace_lock_bytes"],
         "perf_lock_sha256": perf_lock_sha256,
         "perf_lock_bytes": candidate["perf_lock_bytes"],
-        "reviewed_adapter_sha256": _reviewed_adapter_hashes(perf_lock_sha256),
+        "reviewed_adapter_sha256": {
+            "baseline": _reviewed_adapter_hashes(
+                perf_lock_sha256, HISTORICAL_WORKSPACE_LOCK_SHA256
+            ),
+            "candidate": _reviewed_adapter_hashes(
+                perf_lock_sha256, candidate_workspace_lock_sha256
+            ),
+        },
         "baseline": baseline,
         "candidate": candidate,
     }
@@ -291,6 +409,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--baseline-revision", required=True)
     parser.add_argument("--candidate-revision", required=True)
     parser.add_argument("--perf-lock-sha256", required=True)
+    parser.add_argument("--candidate-workspace-lock-sha256", required=True)
+    parser.add_argument("--candidate-workspace-lock-bytes", required=True, type=int)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args(argv)
     try:
@@ -301,6 +421,8 @@ def main(argv: list[str]) -> int:
             arguments.candidate_revision,
             arguments.output,
             arguments.perf_lock_sha256,
+            arguments.candidate_workspace_lock_sha256,
+            arguments.candidate_workspace_lock_bytes,
         )
     except (OSError, PreparationError) as error:
         parser.error(str(error))

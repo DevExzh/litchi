@@ -611,8 +611,54 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
     expected_program_ids = ["raw-native", "raw-allocator"]
     expected_bins = ["drawingml-raw-native", "drawingml-raw-allocator"]
     profile_lane = data.get("drawingml_profile")
+    drawingml_lane = data.get("drawingml_lane", profile_lane)
+    endpoint = data.get("drawingml_endpoint", "raw")
+    owner_route = data.get("drawingml_owner_route")
+    raw_scope = data.get("drawingml_raw_scope")
+    owner_lanes = {
+        "drawingml-chart": "drawingml-chart-raw",
+        "drawingml-theme-family": "drawingml-theme-ink",
+        "drawingml-ink-actions": "drawingml-theme-ink",
+        "drawingml-transform": "drawingml-geometry-color-formatcode2-transform",
+    }
+    raw_lanes = {
+        "drawingml-chart-raw",
+        "drawingml-diagram-raw",
+        "drawingml-text-media-raw",
+        "drawingml-theme-ink",
+        "drawingml-geometry-color-formatcode2-transform",
+    }
     if not isinstance(profile_lane, str) or not profile_lane:
         raise RunnerError("drawingml raw profile name is required")
+    if not isinstance(drawingml_lane, str) or not drawingml_lane:
+        raise RunnerError("drawingml raw lane is required")
+    if drawingml_lane not in raw_lanes:
+        raise RunnerError("drawingml raw lane is not reviewed")
+    if endpoint not in {"raw", "owner"}:
+        raise RunnerError("drawingml endpoint must be raw or owner")
+    if endpoint == "owner":
+        if owner_route not in owner_lanes or owner_lanes[owner_route] != drawingml_lane:
+            raise RunnerError("drawingml owner route is not reviewed for this lane")
+        if raw_scope is not None:
+            raise RunnerError("drawingml owner endpoint carries a raw scope")
+    else:
+        if owner_route is not None:
+            raise RunnerError("drawingml raw endpoint carries an owner route")
+        if raw_scope not in {None, "bulk", "family"}:
+            raise RunnerError("drawingml raw scope is not reviewed")
+    for field in (
+        "baseline_workspace_lock_sha256",
+        "candidate_workspace_lock_sha256",
+    ):
+        value = data.get(field)
+        if not isinstance(value, str) or len(value) != 64 or value != value.lower() or any(
+            character not in "0123456789abcdef" for character in value
+        ):
+            raise RunnerError(f"{field} must carry a lowercase workspace-lock SHA-256")
+    for field in ("baseline_workspace_lock_bytes", "candidate_workspace_lock_bytes"):
+        value = data.get(field)
+        if not isinstance(value, int) or value <= 0:
+            raise RunnerError(f"{field} must carry a positive workspace-lock byte count")
     for leg, spec in data["legs"].items():
         commands = spec["build"]
         if [command["id"] for command in commands] != expected_build_ids:
@@ -625,8 +671,33 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
             manifest_index = argv.index("--manifest-path")
             if argv[manifest_index + 1] != manifest_path:
                 raise RunnerError(f"{leg}/{command['id']} uses a different manifest")
-            if argv[manifest_index + 2 :] != ["--bin", binary_name]:
+            if argv[manifest_index + 2 :].count("--bin") != 1:
                 raise RunnerError(f"{leg}/{command['id']} changes the reviewed DrawingML raw binary route")
+            bin_index = argv.index("--bin", manifest_index + 2)
+            if argv[bin_index + 1 :] != [binary_name]:
+                raise RunnerError(f"{leg}/{command['id']} changes the reviewed DrawingML raw binary route")
+            feature_args = argv[manifest_index + 2 : bin_index]
+            if any(value not in {"--no-default-features", "--features"} for value in feature_args):
+                raise RunnerError(f"{leg}/{command['id']} has an unreviewed Cargo feature argument")
+            if feature_args.count("--features") > 1 or feature_args.count("--no-default-features") > 1:
+                raise RunnerError(f"{leg}/{command['id']} repeats a Cargo feature argument")
+            if "--features" in feature_args:
+                feature_index = feature_args.index("--features")
+                if feature_index + 1 >= len(feature_args) or not feature_args[feature_index + 1]:
+                    raise RunnerError(f"{leg}/{command['id']} has an empty Cargo feature set")
+            expected_feature_names = data.get(
+                "drawingml_baseline_features" if leg == "before" else "drawingml_candidate_features",
+                [],
+            )
+            if not isinstance(expected_feature_names, list) or any(
+                not isinstance(value, str) or not value for value in expected_feature_names
+            ):
+                raise RunnerError(f"{leg}/{command['id']} has invalid reviewed feature metadata")
+            expected_feature_args = ["--no-default-features"] if leg == "before" else []
+            if expected_feature_names:
+                expected_feature_args.extend(["--features", ",".join(expected_feature_names)])
+            if feature_args != expected_feature_args:
+                raise RunnerError(f"{leg}/{command['id']} changed the reviewed Cargo feature set")
             if command["artifacts"] != [f"{{target_dir}}/release/{binary_name}"]:
                 raise RunnerError(f"{leg}/{command['id']} artifact path differs")
         programs = spec["programs"]
@@ -639,7 +710,15 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
         for program, mode, binary_name in zip(programs, ("normal", "allocator"), expected_bins):
             expected_argv = [
                 "--lane",
-                profile_lane,
+                drawingml_lane,
+                "--endpoint",
+                endpoint,
+            ]
+            if owner_route is not None:
+                expected_argv.extend(["--owner-route", str(owner_route)])
+            if raw_scope is not None:
+                expected_argv.extend(["--raw-scope", str(raw_scope)])
+            expected_argv.extend([
                 "--role",
                 expected_role,
                 "--mode",
@@ -662,7 +741,7 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
                 "150",
                 "--json",
                 "{output}",
-            ]
+            ])
             if program["argv"] != expected_argv:
                 raise RunnerError(f"{leg}/{program['id']} changes the DrawingML raw probe arguments")
             if program["binary"] != f"{{target_dir}}/release/{binary_name}":
@@ -689,7 +768,9 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
         "--output-dir",
         "{output_dir}",
         "--lane",
-        profile_lane,
+        drawingml_lane,
+        "--endpoint",
+        endpoint,
         "--fixture",
         "{fixture}",
         "--baseline-revision",

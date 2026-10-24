@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Run the source-fenced paired DrawingML raw qualification protocol.
+"""Run the source-fenced paired DrawingML endpoint qualification protocol.
 
-The five raw families do not share one historical parent.  This coordinator
-manifest therefore describes five profile pairs, each with its own immutable
-baseline worktree and preparation receipt, and one assembled candidate.  Each
-profile is materialized into the already-reviewed generic native runner, so
+The raw families and four owner transitions do not share one historical
+parent.  This coordinator manifest therefore describes immutable endpoint
+pairs, each with its own baseline worktree and preparation receipt, and one
+assembled candidate.  Each endpoint is materialized into the already-reviewed generic native runner, so
 Cargo path validation, 20 GB target/address-space limits, process quietness,
 fresh child processes, output handoff, and ABBA ordering remain shared with
 the established W4b/W5 lanes.
@@ -46,6 +46,13 @@ LANES = (
     "drawingml-geometry-color-formatcode2-transform",
 )
 ABBA = ("baseline", "candidate", "candidate", "baseline")
+OWNER_ROUTES = {
+    "drawingml-chart": "drawingml-chart-raw",
+    "drawingml-theme-family": "drawingml-theme-ink",
+    "drawingml-ink-actions": "drawingml-theme-ink",
+    "drawingml-transform": "drawingml-geometry-color-formatcode2-transform",
+}
+RAW_SCOPES = {"bulk", "family"}
 ADAPTER_PATHS = tuple(preparation.ADAPTER_PATHS)
 PROBE_PATHS = tuple(path for path in ADAPTER_PATHS if not path.endswith("Cargo.lock"))
 TOKEN = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
@@ -139,6 +146,22 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
         raise RunnerError("manifest profile order or count differs from the five reviewed raw lanes")
     candidate_root = _path(str(data.get("candidate_root", "")))
     candidate_revision = _full_sha(data.get("candidate_revision"), "candidate_revision")
+    baseline_workspace_lock_sha256 = _full_hash(
+        data.get("baseline_workspace_lock_sha256"),
+        "baseline_workspace_lock_sha256",
+    )
+    if baseline_workspace_lock_sha256 != preparation.HISTORICAL_WORKSPACE_LOCK_SHA256:
+        raise RunnerError("baseline workspace lock is not the reviewed historical 52ed identity")
+    baseline_workspace_lock_bytes = data.get("baseline_workspace_lock_bytes")
+    if baseline_workspace_lock_bytes != preparation.HISTORICAL_WORKSPACE_LOCK_BYTES:
+        raise RunnerError("baseline workspace lock byte count differs from the reviewed 52ed identity")
+    candidate_workspace_lock_sha256 = _full_hash(
+        data.get("candidate_workspace_lock_sha256"),
+        "candidate_workspace_lock_sha256",
+    )
+    candidate_workspace_lock_bytes = data.get("candidate_workspace_lock_bytes")
+    if not isinstance(candidate_workspace_lock_bytes, int) or candidate_workspace_lock_bytes <= 0:
+        raise RunnerError("candidate_workspace_lock_bytes must be a positive integer")
     output = _path(str(data.get("output_dir", "")))
     target_root = _path(str(data.get("target_root", "")))
     if output.exists() and output.is_symlink():
@@ -156,45 +179,82 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
     if data.get("fixture_sha256") != fixture_hash or data.get("fixture_bytes") != fixture_bytes:
         raise RunnerError("manifest fixture identity differs from the tracked descriptor")
     profiles: list[dict[str, Any]] = []
+    profile_specs = list(data["profiles"])
+    for key in ("route_profiles", "owner_profiles"):
+        extra = data.get(key, [])
+        if not isinstance(extra, list):
+            raise RunnerError(f"{key} must be a list")
+        profile_specs.extend(extra)
     source_paths = {"candidate": candidate_root, "output": output, "target": target_root}
-    for profile in data["profiles"]:
+    profile_ids: set[str] = set()
+    for profile in profile_specs:
         if not isinstance(profile, dict):
             raise RunnerError("profile must be an object")
-        lane = profile["id"]
+        profile_id = profile["id"]
+        if not isinstance(profile_id, str) or not profile_id or profile_id in profile_ids:
+            raise RunnerError(f"duplicate or invalid endpoint profile id: {profile_id!r}")
+        profile_ids.add(profile_id)
+        lane = profile.get("lane", profile_id)
+        endpoint = profile.get("endpoint", "raw")
+        owner_route = profile.get("owner_route")
+        raw_scope = profile.get("raw_scope")
+        if lane not in LANES:
+            raise RunnerError(f"{profile_id} lane is not one of the reviewed raw lanes")
+        if endpoint not in {"raw", "owner"}:
+            raise RunnerError(f"{profile_id} endpoint is not raw or owner")
+        if endpoint == "owner":
+            if owner_route not in OWNER_ROUTES:
+                raise RunnerError(f"{profile_id} owner route is not reviewed: {owner_route!r}")
+            if OWNER_ROUTES[owner_route] != lane:
+                raise RunnerError(f"{profile_id} owner route does not belong to its lane")
+        if endpoint == "raw" and owner_route is not None:
+            raise RunnerError(f"{profile_id} raw endpoint carries an owner route")
+        if endpoint == "owner" and raw_scope is not None:
+            raise RunnerError(f"{profile_id} owner endpoint carries a raw scope")
+        if raw_scope is not None and raw_scope not in RAW_SCOPES:
+            raise RunnerError(f"{profile_id} has an unknown raw scope")
+        baseline_features = profile.get("baseline_features", [])
+        candidate_features = profile.get("candidate_features", ["drawingml-owner-current"])
+        for label, features in (
+            ("baseline_features", baseline_features),
+            ("candidate_features", candidate_features),
+        ):
+            if not isinstance(features, list) or any(
+                not isinstance(feature, str) or not feature for feature in features
+            ):
+                raise RunnerError(f"{profile_id}.{label} must be a list of non-empty feature names")
         baseline_root = _path(str(profile.get("baseline_root", "")))
-        baseline_revision = _full_sha(profile.get("baseline_revision"), f"{lane}.baseline_revision")
-        perf_lock_sha256 = _full_hash(profile.get("perf_lock_sha256"), f"{lane}.perf_lock_sha256")
+        baseline_revision = _full_sha(profile.get("baseline_revision"), f"{profile_id}.baseline_revision")
+        perf_lock_sha256 = _full_hash(profile.get("perf_lock_sha256"), f"{profile_id}.perf_lock_sha256")
         receipt = _path(str(profile.get("preparation_receipt", "")))
         approved = profile.get("approved_baseline_revisions")
         if not isinstance(approved, list) or not approved:
-            raise RunnerError(f"{lane} baseline revision is not one of its reviewed source parents")
+            raise RunnerError(f"{profile_id} baseline revision is not one of its reviewed source parents")
         for index, revision in enumerate(approved):
-            _full_sha(revision, f"{lane}.approved_baseline_revisions[{index}]")
+            _full_sha(revision, f"{profile_id}.approved_baseline_revisions[{index}]")
         if baseline_revision not in approved:
-            raise RunnerError(f"{lane} baseline revision is not one of its reviewed source parents")
+            raise RunnerError(f"{profile_id} baseline revision is not one of its reviewed source parents")
         route_baselines = profile.get("route_baselines")
-        if lane == "drawingml-theme-ink" and route_baselines is None:
-            raise RunnerError("drawingml-theme-ink needs explicit theme and Ink route parents")
         if route_baselines is not None:
             if not isinstance(route_baselines, dict):
-                raise RunnerError(f"{lane}.route_baselines must be an object")
+                raise RunnerError(f"{profile_id}.route_baselines must be an object")
             if lane == "drawingml-theme-ink" and set(route_baselines) != {"theme", "ink"}:
                 raise RunnerError("drawingml-theme-ink route_baselines must name only theme and ink")
             for route, revisions in route_baselines.items():
                 values = [revisions] if isinstance(revisions, str) else revisions
                 if not isinstance(values, list) or not values:
-                    raise RunnerError(f"{lane}.{route} has no exact baseline parent")
+                    raise RunnerError(f"{profile_id}.{route} has no exact baseline parent")
                 for revision in values:
-                    _full_sha(revision, f"{lane}.{route}.baseline")
+                    _full_sha(revision, f"{profile_id}.{route}.baseline")
             theme_parent = route_baselines.get("theme")
             if lane == "drawingml-theme-ink" and not isinstance(theme_parent, str):
                 raise RunnerError("drawingml-theme-ink needs one exact theme parent; Ink routes are separate")
             if isinstance(theme_parent, str) and baseline_revision != theme_parent:
-                raise RunnerError(f"{lane} baseline must be the exact theme parent; Ink routes need a separate endpoint")
+                raise RunnerError(f"{profile_id} baseline must be the exact theme parent; Ink routes need a separate endpoint")
         if not baseline_root.is_dir():
-            raise RunnerError(f"{lane} baseline root is not a directory: {baseline_root}")
+            raise RunnerError(f"{profile_id} baseline root is not a directory: {baseline_root}")
         if not receipt.is_file() or receipt.is_symlink():
-            raise RunnerError(f"{lane} preparation receipt is missing: {receipt}")
+            raise RunnerError(f"{profile_id} preparation receipt is missing: {receipt}")
         # Several lanes intentionally share one immutable parent worktree
         # (chart/diagram/geometry currently use the same owner parent).  That
         # is safe because each child target/output is separate; reject only
@@ -207,17 +267,21 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
             if name.startswith("baseline-"):
                 continue
             if baseline_root == other or _under(baseline_root, other) or _under(other, baseline_root):
-                raise RunnerError(f"{lane} baseline overlaps {name}: {baseline_root}")
+                raise RunnerError(f"{profile_id} baseline overlaps {name}: {baseline_root}")
         for name, other in source_paths.items():
             if receipt == other or _under(receipt, other) or _under(other, receipt):
-                raise RunnerError(f"{lane} preparation receipt overlaps {name}: {receipt}")
-        source_paths[f"baseline-{lane}"] = baseline_root
-        source_paths[f"receipt-{lane}"] = receipt
+                raise RunnerError(f"{profile_id} preparation receipt overlaps {name}: {receipt}")
+        source_paths[f"baseline-{profile_id}"] = baseline_root
+        source_paths[f"receipt-{profile_id}"] = receipt
         for key in ("source_fence", "record"):
             if not isinstance(profile.get(key), str) or not profile[key]:
-                raise RunnerError(f"{lane}.{key} is required")
+                raise RunnerError(f"{profile_id}.{key} is required")
         profiles.append({
-            "id": lane,
+            "id": profile_id,
+            "lane": lane,
+            "endpoint": endpoint,
+            "owner_route": owner_route,
+            "raw_scope": raw_scope,
             "baseline_root": baseline_root,
             "baseline_revision": baseline_revision,
             "perf_lock_sha256": perf_lock_sha256,
@@ -226,6 +290,8 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
             "record": profile["record"],
             "approved_baseline_revisions": tuple(approved),
             "route_baselines": route_baselines,
+            "baseline_features": tuple(baseline_features),
+            "candidate_features": tuple(candidate_features),
         })
     # Baseline worktrees may be shared between profiles at the same parent;
     # all of them remain disjoint from the candidate, outputs, targets, and
@@ -235,6 +301,10 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
         "plan_sha256": PLAN_SHA256,
         "candidate_root": candidate_root,
         "candidate_revision": candidate_revision,
+        "baseline_workspace_lock_sha256": baseline_workspace_lock_sha256,
+        "baseline_workspace_lock_bytes": baseline_workspace_lock_bytes,
+        "candidate_workspace_lock_sha256": candidate_workspace_lock_sha256,
+        "candidate_workspace_lock_bytes": candidate_workspace_lock_bytes,
         "output_dir": output,
         "target_root": target_root,
         "fixture": fixture,
@@ -246,27 +316,51 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], output: Path) -> dict[str, Any]:
-    lane = str(profile["id"])
+    profile_id = str(profile["id"])
+    lane = str(profile.get("lane", profile_id))
+    endpoint = str(profile.get("endpoint", "raw"))
+    owner_route = profile.get("owner_route")
+    raw_scope = profile.get("raw_scope")
     before = Path(profile["baseline_root"])
     after = Path(master["candidate_root"])
     before_revision = str(profile["baseline_revision"])
     after_revision = str(master["candidate_revision"])
-    lane_output = output / "lanes" / lane
-    target_before = Path(master["target_root"]) / lane / "baseline"
-    target_after = Path(master["target_root"]) / lane / "candidate"
+    lane_output = output / "lanes" / profile_id
+    target_before = Path(master["target_root"]) / profile_id / "baseline"
+    target_after = Path(master["target_root"]) / profile_id / "candidate"
     adapter_paths = list(PROBE_PATHS)
-    build = [
-        {
-            "id": "drawingml_raw_native",
-            "argv": ["cargo", "build", "--release", "--locked", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--bin", "drawingml-raw-native"],
-            "artifacts": ["{target_dir}/release/drawingml-raw-native"],
-        },
-        {
-            "id": "drawingml_raw_allocator",
-            "argv": ["cargo", "build", "--release", "--locked", "--manifest-path", "tools/perf-baseline/Cargo.toml", "--bin", "drawingml-raw-allocator"],
-            "artifacts": ["{target_dir}/release/drawingml-raw-allocator"],
-        },
-    ]
+
+    def build(role: str) -> list[dict[str, Any]]:
+        features = list(
+            profile.get(
+                "baseline_features" if role == "baseline" else "candidate_features",
+                (),
+            )
+        )
+        feature_args = ["--features", ",".join(features)] if features else []
+        no_default = ["--no-default-features"] if role == "baseline" else []
+        cargo = [
+            "cargo",
+            "build",
+            "--release",
+            "--locked",
+            "--manifest-path",
+            "tools/perf-baseline/Cargo.toml",
+            *no_default,
+            *feature_args,
+        ]
+        return [
+            {
+                "id": "drawingml_raw_native",
+                "argv": [*cargo, "--bin", "drawingml-raw-native"],
+                "artifacts": ["{target_dir}/release/drawingml-raw-native"],
+            },
+            {
+                "id": "drawingml_raw_allocator",
+                "argv": [*cargo, "--bin", "drawingml-raw-allocator"],
+                "artifacts": ["{target_dir}/release/drawingml-raw-allocator"],
+            },
+        ]
 
     def programs(role: str, leg: str) -> list[dict[str, Any]]:
         revision = before_revision if role == "baseline" else after_revision
@@ -281,7 +375,10 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
                 "id": program_id,
                 "binary": f"{{target_dir}}/release/{binary}",
                 "argv": [
-                    "--lane", lane, "--role", role, "--mode", mode,
+                    "--lane", lane, "--endpoint", endpoint,
+                    *( ["--owner-route", str(owner_route)] if owner_route else [] ),
+                    *( ["--raw-scope", str(raw_scope)] if raw_scope else [] ),
+                    "--role", role, "--mode", mode,
                     "--fixture", "{fixture}", "--source-revision", revision,
                     "--iterations", "1", "--warmups", "3", "--blocks", "5",
                     "--samples", "20", "--target-ms", "500", "--minimum-ms", "150",
@@ -297,7 +394,17 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
     return {
         "schema": generic.SCHEMA,
         "lane": "drawingml-raw",
-        "drawingml_profile": lane,
+        "drawingml_profile": profile_id,
+        "drawingml_lane": lane,
+        "drawingml_endpoint": endpoint,
+        "drawingml_owner_route": owner_route,
+        "drawingml_raw_scope": raw_scope,
+        "baseline_workspace_lock_sha256": str(master["baseline_workspace_lock_sha256"]),
+        "baseline_workspace_lock_bytes": int(master["baseline_workspace_lock_bytes"]),
+        "candidate_workspace_lock_sha256": str(master["candidate_workspace_lock_sha256"]),
+        "candidate_workspace_lock_bytes": int(master["candidate_workspace_lock_bytes"]),
+        "drawingml_baseline_features": list(profile.get("baseline_features", ())),
+        "drawingml_candidate_features": list(profile.get("candidate_features", ())),
         "source_fence": str(profile["source_fence"]),
         "rounds": 31,
         "abba_order": list(generic.ABBA_ORDER),
@@ -313,7 +420,7 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
                 "source_revision": before_revision,
                 "target_dir": str(target_before),
                 "lock_paths": ["Cargo.lock", "tools/perf-baseline/Cargo.lock"],
-                "build": build,
+                "build": build("baseline"),
                 "programs": programs("baseline", "before"),
             },
             "after": {
@@ -321,7 +428,7 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
                 "source_revision": after_revision,
                 "target_dir": str(target_after),
                 "lock_paths": ["Cargo.lock", "tools/perf-baseline/Cargo.lock"],
-                "build": build,
+                "build": build("candidate"),
                 "programs": programs("candidate", "after"),
             },
         },
@@ -330,7 +437,7 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
             "argv": [
                 "python3",
                 "{source_root}/tools/native_qualification/drawingml_raw_validator.py",
-                "--output-dir", "{output_dir}", "--lane", lane, "--fixture", "{fixture}",
+                "--output-dir", "{output_dir}", "--lane", lane, "--endpoint", endpoint, "--fixture", "{fixture}",
                 "--baseline-revision", before_revision,
                 "--candidate-revision", after_revision,
                 "--source-fence", str(profile["source_fence"]),
@@ -352,6 +459,8 @@ def _prepare_profile(master: Mapping[str, Any], profile: Mapping[str, Any]) -> N
             baseline_revision=str(profile["baseline_revision"]),
             candidate_revision=str(master["candidate_revision"]),
             perf_lock_sha256=str(profile["perf_lock_sha256"]),
+            candidate_workspace_lock_sha256=str(master["candidate_workspace_lock_sha256"]),
+            candidate_workspace_lock_bytes=int(master["candidate_workspace_lock_bytes"]),
         )
     except (OSError, ValueError) as error:
         raise RunnerError(f"{profile['id']} preparation receipt validation failed: {error}") from error
@@ -436,7 +545,15 @@ def run(manifest_path: Path, phase: str, cpu: int | None) -> None:
                     raise RunnerError(f"{profile['id']} materialized profile is missing")
                 profile_hash, _ = _sha256_file(profile_path)
                 profile_files.append({
-                    "lane": profile["id"],
+                    "profile": profile["id"],
+                    "lane": profile["lane"],
+                    "endpoint": profile["endpoint"],
+                    "owner_route": profile["owner_route"],
+                    "raw_scope": profile["raw_scope"],
+                    "baseline_workspace_lock_sha256": master["baseline_workspace_lock_sha256"],
+                    "baseline_workspace_lock_bytes": master["baseline_workspace_lock_bytes"],
+                    "candidate_workspace_lock_sha256": master["candidate_workspace_lock_sha256"],
+                    "candidate_workspace_lock_bytes": master["candidate_workspace_lock_bytes"],
                     "path": str(profile_path),
                     "sha256": profile_hash,
                     "baseline_revision": profile["baseline_revision"],
@@ -460,10 +577,22 @@ def run(manifest_path: Path, phase: str, cpu: int | None) -> None:
             "plan_sha256": PLAN_SHA256,
             "candidate_root": str(master["candidate_root"]),
             "candidate_revision": master["candidate_revision"],
+            "baseline_workspace_lock_sha256": master["baseline_workspace_lock_sha256"],
+            "baseline_workspace_lock_bytes": master["baseline_workspace_lock_bytes"],
+            "candidate_workspace_lock_sha256": master["candidate_workspace_lock_sha256"],
+            "candidate_workspace_lock_bytes": master["candidate_workspace_lock_bytes"],
             "abba_order": list(ABBA),
             "profiles": profile_files or [
                 {
-                    "lane": profile["id"],
+                    "profile": profile["id"],
+                    "lane": profile["lane"],
+                    "endpoint": profile["endpoint"],
+                    "owner_route": profile["owner_route"],
+                    "raw_scope": profile["raw_scope"],
+                    "baseline_workspace_lock_sha256": master["baseline_workspace_lock_sha256"],
+                    "baseline_workspace_lock_bytes": master["baseline_workspace_lock_bytes"],
+                    "candidate_workspace_lock_sha256": master["candidate_workspace_lock_sha256"],
+                    "candidate_workspace_lock_bytes": master["candidate_workspace_lock_bytes"],
                     "path": str(output / "profiles" / f"{profile['id']}.json"),
                     "sha256": _sha256_file(output / "profiles" / f"{profile['id']}.json")[0],
                     "baseline_revision": profile["baseline_revision"],
@@ -473,7 +602,7 @@ def run(manifest_path: Path, phase: str, cpu: int | None) -> None:
                 for profile in master["profiles"]
             ],
             "children": profile_receipts,
-            "claim_scope": "paired raw DrawingML protocol only; no absolute-profile or whole-library claim",
+            "claim_scope": "paired DrawingML raw and detached-owner endpoints only; no absolute-profile or whole-library claim",
         }
         if phase == "build":
             _write_json(output / "build-receipt.json", receipt)
@@ -494,6 +623,10 @@ def run(manifest_path: Path, phase: str, cpu: int | None) -> None:
                 "generic_bytes": generic_runner_bytes,
             },
             "plan_sha256": PLAN_SHA256,
+            "baseline_workspace_lock_sha256": master["baseline_workspace_lock_sha256"],
+            "baseline_workspace_lock_bytes": master["baseline_workspace_lock_bytes"],
+            "candidate_workspace_lock_sha256": master["candidate_workspace_lock_sha256"],
+            "candidate_workspace_lock_bytes": master["candidate_workspace_lock_bytes"],
             "children": profile_receipts,
             "error": str(error),
         }

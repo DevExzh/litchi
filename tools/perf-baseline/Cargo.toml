@@ -13,6 +13,10 @@ current-api = ["current-owner-api", "current-property-api"]
 # `current-owner-api,legacy-property-api`.
 current-owner-api = []
 current-property-api = []
+# The DrawingML owner transition is measured against the common pre-owner
+# source (945eb1d6...).  The baseline uses the pre-contract names while the
+# candidate build enables the Package/Edit API branch in the probe.
+drawingml-owner-current = []
 allocator-metrics = []
 current-xlsx-raw-opc = []
 legacy-xlsx-raw-opc = []
