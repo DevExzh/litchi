@@ -360,6 +360,78 @@ class RustdocTests(unittest.TestCase):
         return gate.violations(self.document, profile(
             banned_names=[ban(n, scope) for n in names], families=list(families)))
 
+    def _namespace_collision_document(self, *, macro_first=False, conflict=False):
+        document = copy.deepcopy(self.document)
+        root = str(document["root"])
+        module_id = "namespace-collision-module"
+        enum_id = "namespace-collision-enum"
+        macro_id = "namespace-collision-derive"
+        conflict_id = "namespace-collision-conflicting-enum"
+        type_use_id = "namespace-collision-type-use"
+        macro_use_id = "namespace-collision-macro-use"
+        conflict_use_id = "namespace-collision-conflict-use"
+        document["index"][root]["inner"]["module"]["items"].append(module_id)
+        document["index"][module_id] = {
+            "name": "namespace_collision", "crate_id": 0,
+            "visibility": "public",
+            "inner": {"module": {"items": [], "is_crate": False}},
+        }
+        document["index"][enum_id] = {
+            "name": "Error", "crate_id": 0, "visibility": "public",
+            "attrs": ["non_exhaustive"],
+            "inner": {"enum": {"generics": {"params": [], "where_predicates": []},
+                                 "has_stripped_variants": False, "variants": [], "impls": []}},
+        }
+        document["index"][conflict_id] = copy.deepcopy(document["index"][enum_id])
+        document["index"][conflict_id]["id"] = conflict_id
+        document["index"][macro_id] = {
+            "name": "Error", "crate_id": 99, "visibility": "public",
+            "inner": {"proc_macro": {}},
+        }
+        document["index"][type_use_id] = {
+            "name": "Error", "crate_id": 0, "visibility": "public",
+            "inner": {"use": {"name": "Error", "id": enum_id, "is_glob": False}},
+        }
+        document["index"][macro_use_id] = {
+            "name": "Error", "crate_id": 0, "visibility": "public",
+            "inner": {"use": {"name": "Error", "id": macro_id, "is_glob": False}},
+        }
+        document["index"][conflict_use_id] = {
+            "name": "Error", "crate_id": 0, "visibility": "public",
+            "inner": {"use": {"name": "Error", "id": conflict_id, "is_glob": False}},
+        }
+        items = [macro_use_id, type_use_id] if macro_first else [type_use_id, macro_use_id]
+        if conflict:
+            items.append(conflict_use_id)
+        document["index"][module_id]["inner"]["module"]["items"] = items
+        document["paths"].update({
+            module_id: {"crate_id": 0, "path": ["fixture", "namespace_collision"],
+                        "kind": "module"},
+            enum_id: {"crate_id": 0,
+                      "path": ["fixture", "namespace_collision", "Error"], "kind": "enum"},
+            conflict_id: {"crate_id": 0,
+                          "path": ["fixture", "namespace_collision", "Error"], "kind": "enum"},
+            macro_id: {"crate_id": 99,
+                       "path": ["thiserror_impl", "Error"], "kind": "proc_derive"},
+        })
+        return document
+
+    def test_type_namespace_survives_derive_macro_in_both_visit_orders(self):
+        path = ("fixture", "namespace_collision", "Error")
+        for macro_first in (False, True):
+            with self.subTest(macro_first=macro_first):
+                surface = gate.Surface(
+                    self._namespace_collision_document(macro_first=macro_first), "fixture"
+                )
+                self.assertEqual(surface.exports.get(path), "enum")
+                self.assertEqual(surface.item_ids.get(path), "namespace-collision-enum")
+
+        conflict = gate.Surface(
+            self._namespace_collision_document(macro_first=True, conflict=True), "fixture"
+        )
+        self.assertNotIn(path, conflict.item_ids)
+        self.assertNotIn(conflict.exports.get(path), gate.TYPE_KINDS)
+
     def test_inventory_catches_exact_and_suffixed_limit_twins(self):
         limits = {path for kind, path, _, _ in inventory.rows(self.document, "fixture")
                   if kind == "with_limits"}
@@ -745,6 +817,65 @@ class RustdocTests(unittest.TestCase):
                          if value["path"] == ["litchi_core", "edit", "Commit"])
         ambiguous["paths"]["ambiguous-core-commit"] = copy.deepcopy(canonical)
         self.assertEqual(len(gate.violations(ambiguous, profile(result_methods=[rule]))), 1)
+
+    def test_external_generic_metadata_commit_requires_exact_nominal_identity(self):
+        # ODF format crates expose a local generic alias of the common
+        # metadata Commit.  The common crate's rustdoc item is external and
+        # has no method body in this graph, so owner extraction must use the
+        # proven generic argument rather than a name-based fallback.
+        document = copy.deepcopy(self.document)
+        root = str(document["root"])
+        module_id = "external-metadata-module"
+        odf_id = "external-odf-metadata-commit"
+        unrelated_id = "external-unrelated-metadata-commit"
+        alias_id = "local-odf-metadata-commit"
+        unrelated_alias_id = "local-unrelated-metadata-commit"
+        package_id = gate.Surface(self.document, "fixture").item_ids[("fixture", "strict", "Package")]
+        document["index"][root]["inner"]["module"]["items"].append(module_id)
+        document["index"][module_id] = {
+            "name": "external_metadata", "crate_id": 0,
+            "visibility": "public",
+            "inner": {"module": {"items": [alias_id, unrelated_alias_id], "is_crate": False}},
+        }
+        def alias(item_id, name, target_id, target_path):
+            document["index"][item_id] = {
+                "name": name, "crate_id": 0, "visibility": "public",
+                "inner": {"type_alias": {"type": {"resolved_path": {
+                    "path": "::".join(target_path), "id": target_id,
+                    "args": {"angle_bracketed": {"args": [{"type": {
+                        "resolved_path": {"id": package_id, "args": None},
+                    }}], "constraints": []}},
+                }}, "generics": {"params": [], "where_predicates": []}}},
+            }
+
+        alias(alias_id, "Commit", odf_id,
+              ("litchi_odf_common", "metadata", "Commit"))
+        alias(unrelated_alias_id, "UnrelatedCommit", unrelated_id,
+              ("other_odf_common", "metadata", "Commit"))
+        document["paths"].update({
+            module_id: {"crate_id": 0, "path": ["fixture", "external_metadata"],
+                        "kind": "module"},
+            alias_id: {"crate_id": 0,
+                       "path": ["fixture", "external_metadata", "Commit"],
+                       "kind": "type_alias"},
+            unrelated_alias_id: {"crate_id": 0,
+                                 "path": ["fixture", "external_metadata", "UnrelatedCommit"],
+                                 "kind": "type_alias"},
+            odf_id: {"crate_id": 900, "path": ["litchi_odf_common", "metadata", "Commit"],
+                     "kind": "struct"},
+            unrelated_id: {"crate_id": 901, "path": ["other_odf_common", "metadata", "Commit"],
+                           "kind": "struct"},
+        })
+        surface = gate.Surface(document, "fixture")
+        return_types = gate.ReturnTypes(surface)
+        package = return_types.type_at(("fixture", "strict", "Package"))
+        self.assertEqual(
+            return_types.commit_package(("fixture", "external_metadata", "Commit")),
+            package,
+        )
+        self.assertIsNone(
+            return_types.commit_package(("fixture", "external_metadata", "UnrelatedCommit"))
+        )
 
     def test_shared_type_rows_use_nominal_ids_for_aliases_and_reexports(self):
         rows = [

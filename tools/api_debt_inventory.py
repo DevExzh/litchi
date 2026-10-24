@@ -42,6 +42,8 @@ OWNERS = {"Package", "Workbook", "Document", "Presentation", "Drawing", "Chart",
           "FlatPresentation", "FlatDocument", "FlatSpreadsheet", "MutableDocument", "File"}
 CORE_COMMIT = ("litchi_core", "edit", "Commit")
 CORE_COMMIT_METHODS = frozenset({"package", "into_package", "patch", "diagnostics", "into_parts"})
+FACADE_COMMIT_PATHS = gate.FACADE_COMMIT_PATHS
+FACADE_COMMIT_METHODS = frozenset({"file", "into_file", "patch", "diagnostics", "into_parts"})
 DRAFT_NAMES = {"Reader", "Workbook", "Spreadsheet", "Presentation", "Document"}
 OUTPUT_PREFIXES = ("save", "to_", "write_to")
 SIGNATURE = {"sign", "sign_with", "resign", "resign_with", "unsign"}
@@ -297,13 +299,21 @@ def _rows(document, crate: str, result_rules=None, immutable_owners=None,
                 # its accessors in litchi-core, whose unit tests check them.
                 members = members | CORE_COMMIT_METHODS
             if name.endswith("Commit"):
-                missing = [m for m in ("package", "into_package", "patch", "diagnostics", "into_parts")
-                           if m not in members]
+                # A foreign nominal type is audited in its defining crate. In
+                # particular, ODF metadata::Commit is a local generic alias of
+                # litchi_odf_common::metadata::Commit; inspecting the alias as
+                # if it owned methods produces nine false debt rows.
+                if path in surface.foreign and surface.foreign[path] != CORE_COMMIT:
+                    continue
+                required = (FACADE_COMMIT_METHODS if path in FACADE_COMMIT_PATHS
+                            else CORE_COMMIT_METHODS)
+                missing = [m for m in sorted(required) if m not in members]
                 extra = [m for m in ("snapshot", "into_snapshot", "workbook", "into_workbook")
                          if m in members]
                 if missing or extra:
-                    detail = ",".join(sorted(members & {"package", "into_package", "patch",
-                                                        "diagnostics", "into_parts", *extra}))
+                    detail = ",".join(sorted(members & {"package", "into_package", "file",
+                                                        "into_file", "patch", "diagnostics",
+                                                        "into_parts", *extra}))
                     target = "; ".join(filter(None, (
                         "add " + ",".join(missing) if missing else "",
                         "delete " + ",".join(extra) if extra else "")))

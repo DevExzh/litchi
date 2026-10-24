@@ -5424,7 +5424,217 @@
         "litchi_xlsx::Workbook",
         "litchi_xlsx::Worksheet"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_xlsx::Package::apply",
+          "ok": "litchi_xlsx::workbook::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_active_x",
+          "ok": "litchi_xlsx::active_x::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_auto_filter",
+          "ok": "litchi_xlsx::auto_filter::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_calculation_chain",
+          "ok": "litchi_xlsx::chain::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_calculation_metadata",
+          "ok": "litchi_xlsx::calculation_properties::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_chart_sheets",
+          "ok": "litchi_xlsx::chart_sheet::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_charts",
+          "ok": "litchi_xlsx::chart::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_comments",
+          "ok": "litchi_xlsx::workbook::comments::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_conditional_formats",
+          "ok": "litchi_xlsx::conditional_formatting::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_connections",
+          "ok": "litchi_xlsx::connections::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_custom_data",
+          "ok": "litchi_xlsx::custom_data::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_data_model",
+          "ok": "litchi_xlsx::workbook::data_model::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_data_type_icons",
+          "ok": "litchi_xlsx::data_type_icons::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_data_validations",
+          "ok": "litchi_xlsx::data_validation::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_drawings",
+          "ok": "litchi_xlsx::drawing::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_external_links",
+          "ok": "litchi_xlsx::external_links::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_metadata",
+          "ok": "litchi_xlsx::metadata::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_named_sheet_views",
+          "ok": "litchi_xlsx::named_sheet_view::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_ole_objects",
+          "ok": "litchi_xlsx::ole_objects::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_opc",
+          "ok": "litchi_xlsx::opc::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_page_breaks",
+          "ok": "litchi_xlsx::page_breaks::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_pivot_cache",
+          "ok": "litchi_xlsx::pivot::cached_unique_names::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_pivot_table",
+          "ok": "litchi_xlsx::pivot::server_formats::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_pivot_table_data",
+          "ok": "litchi_xlsx::pivot::table_data::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_printer_settings",
+          "ok": "litchi_xlsx::package::printer_settings::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_query_tables",
+          "ok": "litchi_xlsx::query_table::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_revisions",
+          "ok": "litchi_xlsx::revisions::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_rich_value_refresh",
+          "ok": "litchi_xlsx::rich_values::refresh_intervals::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_slicers",
+          "ok": "litchi_xlsx::slicer::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_smart_tags",
+          "ok": "litchi_xlsx::smart_tags::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_surveys",
+          "ok": "litchi_xlsx::survey::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_task_panes",
+          "ok": "litchi_xlsx::task_panes::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_timelines",
+          "ok": "litchi_xlsx::timeline::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_volatile_dependencies",
+          "ok": "litchi_xlsx::volatile_dependencies::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_xml_maps",
+          "ok": "litchi_xlsx::xml_maps::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_auto_filter",
+          "ok": "litchi_xlsx::auto_filter::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_calculation_metadata",
+          "ok": "litchi_xlsx::calculation_properties::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_cell_values",
+          "ok": "litchi_xlsx::cell_values::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_conditional_formats",
+          "ok": "litchi_xlsx::conditional_formatting::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_data_validations",
+          "ok": "litchi_xlsx::data_validation::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_defined_names",
+          "ok": "litchi_xlsx::defined_names::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_form_controls",
+          "ok": "litchi_xlsx::form_control::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_hyperlinks",
+          "ok": "litchi_xlsx::hyperlinks::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_merges",
+          "ok": "litchi_xlsx::merge::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_page_breaks",
+          "ok": "litchi_xlsx::page_breaks::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_page_margins",
+          "ok": "litchi_xlsx::page_margins::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_page_setup",
+          "ok": "litchi_xlsx::page_setup::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_print_options",
+          "ok": "litchi_xlsx::print_options::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_row_visibility",
+          "ok": "litchi_xlsx::row_visibility::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_sheet_protection",
+          "ok": "litchi_xlsx::sheet_protection::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_sheet_values",
+          "ok": "litchi_xlsx::cell_values::sheet::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_tab_state",
+          "ok": "litchi_xlsx::tab_state::source::Commit"
+        }
+      ]
     },
     {
       "id": "xlsx-full",
@@ -6734,7 +6944,221 @@
         "litchi_xlsx::Workbook",
         "litchi_xlsx::Worksheet"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_xlsx::Package::apply",
+          "ok": "litchi_xlsx::workbook::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_active_x",
+          "ok": "litchi_xlsx::active_x::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_auto_filter",
+          "ok": "litchi_xlsx::auto_filter::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_calculation_chain",
+          "ok": "litchi_xlsx::chain::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_calculation_metadata",
+          "ok": "litchi_xlsx::calculation_properties::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_chart_sheets",
+          "ok": "litchi_xlsx::chart_sheet::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_charts",
+          "ok": "litchi_xlsx::chart::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_comments",
+          "ok": "litchi_xlsx::workbook::comments::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_conditional_formats",
+          "ok": "litchi_xlsx::conditional_formatting::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_connections",
+          "ok": "litchi_xlsx::connections::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_custom_data",
+          "ok": "litchi_xlsx::custom_data::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_data_model",
+          "ok": "litchi_xlsx::workbook::data_model::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_data_type_icons",
+          "ok": "litchi_xlsx::data_type_icons::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_data_validations",
+          "ok": "litchi_xlsx::data_validation::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_drawings",
+          "ok": "litchi_xlsx::drawing::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_external_links",
+          "ok": "litchi_xlsx::external_links::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_metadata",
+          "ok": "litchi_xlsx::metadata::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_named_sheet_views",
+          "ok": "litchi_xlsx::named_sheet_view::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_ole_objects",
+          "ok": "litchi_xlsx::ole_objects::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_opc",
+          "ok": "litchi_xlsx::opc::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_page_breaks",
+          "ok": "litchi_xlsx::page_breaks::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_pivot_cache",
+          "ok": "litchi_xlsx::pivot::cached_unique_names::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_pivot_table",
+          "ok": "litchi_xlsx::pivot::server_formats::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_pivot_table_data",
+          "ok": "litchi_xlsx::pivot::table_data::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_printer_settings",
+          "ok": "litchi_xlsx::package::printer_settings::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_query_tables",
+          "ok": "litchi_xlsx::query_table::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_revisions",
+          "ok": "litchi_xlsx::revisions::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_rich_value_refresh",
+          "ok": "litchi_xlsx::rich_values::refresh_intervals::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_slicers",
+          "ok": "litchi_xlsx::slicer::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_smart_tags",
+          "ok": "litchi_xlsx::smart_tags::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_surveys",
+          "ok": "litchi_xlsx::survey::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_task_panes",
+          "ok": "litchi_xlsx::task_panes::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_timelines",
+          "ok": "litchi_xlsx::timeline::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_vba",
+          "ok": "litchi_xlsx::active_x::vba::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_volatile_dependencies",
+          "ok": "litchi_xlsx::volatile_dependencies::Commit"
+        },
+        {
+          "method": "litchi_xlsx::Package::apply_xml_maps",
+          "ok": "litchi_xlsx::xml_maps::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_auto_filter",
+          "ok": "litchi_xlsx::auto_filter::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_calculation_metadata",
+          "ok": "litchi_xlsx::calculation_properties::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_cell_values",
+          "ok": "litchi_xlsx::cell_values::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_conditional_formats",
+          "ok": "litchi_xlsx::conditional_formatting::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_data_validations",
+          "ok": "litchi_xlsx::data_validation::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_defined_names",
+          "ok": "litchi_xlsx::defined_names::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_form_controls",
+          "ok": "litchi_xlsx::form_control::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_hyperlinks",
+          "ok": "litchi_xlsx::hyperlinks::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_merges",
+          "ok": "litchi_xlsx::merge::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_page_breaks",
+          "ok": "litchi_xlsx::page_breaks::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_page_margins",
+          "ok": "litchi_xlsx::page_margins::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_page_setup",
+          "ok": "litchi_xlsx::page_setup::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_print_options",
+          "ok": "litchi_xlsx::print_options::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_row_visibility",
+          "ok": "litchi_xlsx::row_visibility::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_sheet_protection",
+          "ok": "litchi_xlsx::sheet_protection::source::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_sheet_values",
+          "ok": "litchi_xlsx::cell_values::sheet::Commit"
+        },
+        {
+          "method": "litchi_xlsx::SourceBackedWorkbook::apply_tab_state",
+          "ok": "litchi_xlsx::tab_state::source::Commit"
+        }
+      ]
     },
     {
       "id": "xlsb-minimal",
@@ -7255,7 +7679,121 @@
         {"path": "litchi_xlsb::cell_values::structure::Commit", "target": "litchi_core::edit::Commit"},
         {"path": "litchi_xlsb::cell_values::structure::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_xlsb::Package::apply",
+          "ok": "litchi_xlsb::cell_values::structure::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_auto_filter",
+          "ok": "litchi_xlsb::auto_filter::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_calculation_chain",
+          "ok": "litchi_xlsb::calculation_chain::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_cell_values",
+          "ok": "litchi_xlsb::cell_values::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_cell_watches",
+          "ok": "litchi_xlsb::cell_watches::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_comments",
+          "ok": "litchi_xlsb::comments::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_conditional_formats",
+          "ok": "litchi_xlsb::conditional_formatting::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_connections",
+          "ok": "litchi_xlsb::package::connections::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_custom_data",
+          "ok": "litchi_xlsb::custom_data::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_data_model",
+          "ok": "litchi_xlsb::data_model::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_data_validations",
+          "ok": "litchi_xlsb::data_validation::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_drawings",
+          "ok": "litchi_xlsb::drawing::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_hyperlinks",
+          "ok": "litchi_xlsb::hyperlinks::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_merged_cells",
+          "ok": "litchi_xlsb::merged_cells::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_metadata",
+          "ok": "litchi_xlsb::metadata::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_opc",
+          "ok": "litchi_xlsb::opc::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_page_breaks",
+          "ok": "litchi_xlsb::page_breaks::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_ribbon",
+          "ok": "litchi_xlsb::ribbon::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_scenarios",
+          "ok": "litchi_xlsb::scenarios::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_shared_workbook",
+          "ok": "litchi_xlsb::shared_workbook::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_slicers",
+          "ok": "litchi_xlsb::slicer::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_sparklines",
+          "ok": "litchi_xlsb::sparkline::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_task_panes",
+          "ok": "litchi_xlsb::task_panes::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_theme",
+          "ok": "litchi_xlsb::theme::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_threaded_comments",
+          "ok": "litchi_xlsb::comments::threaded::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_timelines",
+          "ok": "litchi_xlsb::timeline::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_volatile_dependencies",
+          "ok": "litchi_xlsb::volatile_dependencies::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_xml_maps",
+          "ok": "litchi_xlsb::xml_maps::Commit"
+        }
+      ]
     },
     {
       "id": "xlsb-full",
@@ -7780,7 +8318,125 @@
         {"path": "litchi_xlsb::cell_values::structure::Commit", "target": "litchi_core::edit::Commit"},
         {"path": "litchi_xlsb::cell_values::structure::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_xlsb::Package::apply",
+          "ok": "litchi_xlsb::cell_values::structure::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_auto_filter",
+          "ok": "litchi_xlsb::auto_filter::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_calculation_chain",
+          "ok": "litchi_xlsb::calculation_chain::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_cell_values",
+          "ok": "litchi_xlsb::cell_values::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_cell_watches",
+          "ok": "litchi_xlsb::cell_watches::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_comments",
+          "ok": "litchi_xlsb::comments::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_conditional_formats",
+          "ok": "litchi_xlsb::conditional_formatting::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_connections",
+          "ok": "litchi_xlsb::package::connections::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_custom_data",
+          "ok": "litchi_xlsb::custom_data::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_data_model",
+          "ok": "litchi_xlsb::data_model::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_data_validations",
+          "ok": "litchi_xlsb::data_validation::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_drawings",
+          "ok": "litchi_xlsb::drawing::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_hyperlinks",
+          "ok": "litchi_xlsb::hyperlinks::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_merged_cells",
+          "ok": "litchi_xlsb::merged_cells::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_metadata",
+          "ok": "litchi_xlsb::metadata::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_opc",
+          "ok": "litchi_xlsb::opc::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_page_breaks",
+          "ok": "litchi_xlsb::page_breaks::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_ribbon",
+          "ok": "litchi_xlsb::ribbon::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_scenarios",
+          "ok": "litchi_xlsb::scenarios::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_shared_workbook",
+          "ok": "litchi_xlsb::shared_workbook::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_slicers",
+          "ok": "litchi_xlsb::slicer::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_sparklines",
+          "ok": "litchi_xlsb::sparkline::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_task_panes",
+          "ok": "litchi_xlsb::task_panes::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_theme",
+          "ok": "litchi_xlsb::theme::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_threaded_comments",
+          "ok": "litchi_xlsb::comments::threaded::edit::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_timelines",
+          "ok": "litchi_xlsb::timeline::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_vba",
+          "ok": "litchi_xlsb::vba::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_volatile_dependencies",
+          "ok": "litchi_xlsb::volatile_dependencies::Commit"
+        },
+        {
+          "method": "litchi_xlsb::Package::apply_xml_maps",
+          "ok": "litchi_xlsb::xml_maps::Commit"
+        }
+      ]
     },
     {
       "id": "drawingml",
@@ -8280,7 +8936,61 @@
         "litchi_doc::Document",
         "litchi_doc::source_backed::Package"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_doc::Package::apply",
+          "ok": "litchi_doc::package::edit::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_annotation_bookmarks",
+          "ok": "litchi_doc::annotation_bookmarks::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_captions",
+          "ok": "litchi_doc::captions::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_command_bars",
+          "ok": "litchi_doc::parts::command_bars::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_durable",
+          "ok": "litchi_doc::package::edit::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_embedded_objects",
+          "ok": "litchi_doc::embedded_object::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_envelope",
+          "ok": "litchi_doc::parts::envelope::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_metadata",
+          "ok": "litchi_doc::package::metadata::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_property_sets",
+          "ok": "litchi_doc::package::property_set::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_route_slip",
+          "ok": "litchi_doc::route_slip::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_subdocuments",
+          "ok": "litchi_doc::parts::subdocuments::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_tracked_revisions",
+          "ok": "litchi_doc::tracked_revision::Commit"
+        },
+        {
+          "method": "litchi_doc::source_backed::Package::apply_paragraph",
+          "ok": "litchi_doc::source_backed::paragraph::Commit"
+        }
+      ]
     },
     {
       "id": "doc-full",
@@ -8749,7 +9459,61 @@
         "litchi_doc::Document",
         "litchi_doc::source_backed::Package"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_doc::Package::apply",
+          "ok": "litchi_doc::package::edit::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_annotation_bookmarks",
+          "ok": "litchi_doc::annotation_bookmarks::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_captions",
+          "ok": "litchi_doc::captions::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_command_bars",
+          "ok": "litchi_doc::parts::command_bars::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_durable",
+          "ok": "litchi_doc::package::edit::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_embedded_objects",
+          "ok": "litchi_doc::embedded_object::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_envelope",
+          "ok": "litchi_doc::parts::envelope::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_metadata",
+          "ok": "litchi_doc::package::metadata::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_property_sets",
+          "ok": "litchi_doc::package::property_set::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_route_slip",
+          "ok": "litchi_doc::route_slip::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_subdocuments",
+          "ok": "litchi_doc::parts::subdocuments::Commit"
+        },
+        {
+          "method": "litchi_doc::Package::apply_tracked_revisions",
+          "ok": "litchi_doc::tracked_revision::Commit"
+        },
+        {
+          "method": "litchi_doc::source_backed::Package::apply_paragraph",
+          "ok": "litchi_doc::source_backed::paragraph::Commit"
+        }
+      ]
     },
     {
       "id": "xls-minimal",
@@ -9282,7 +10046,65 @@
         {"path": "litchi_xls::package::metadata::Commit", "target": "litchi_core::edit::Commit"},
         {"path": "litchi_xls::package::metadata::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_xls::Package::apply",
+          "ok": "litchi_xls::package::edit::Commit"
+        },
+        {
+          "method": "litchi_xls::Package::apply_charts",
+          "ok": "litchi_xls::chart::Commit"
+        },
+        {
+          "method": "litchi_xls::Package::apply_comments",
+          "ok": "litchi_xls::comments::Commit"
+        },
+        {
+          "method": "litchi_xls::Package::apply_metadata",
+          "ok": "litchi_xls::package::metadata::Commit"
+        },
+        {
+          "method": "litchi_xls::Package::apply_ole_objects",
+          "ok": "litchi_xls::ole_object::Commit"
+        },
+        {
+          "method": "litchi_xls::Package::apply_pivot_views",
+          "ok": "litchi_xls::pivot_view::Commit"
+        },
+        {
+          "method": "litchi_xls::Package::apply_property_sets",
+          "ok": "litchi_xls::workbook::package::property_set::Commit"
+        },
+        {
+          "method": "litchi_xls::Package::apply_semantic",
+          "ok": "litchi_xls::package::edit::Commit"
+        },
+        {
+          "method": "litchi_xls::Package::apply_sheet_features",
+          "ok": "litchi_xls::sheet_features::edit::Commit"
+        },
+        {
+          "method": "litchi_xls::Package::apply_sheet_visibility",
+          "ok": "litchi_xls::sheet_visibility::Commit"
+        },
+        {
+          "method": "litchi_xls::Package::apply_user_names",
+          "ok": "litchi_xls::user_names::publication::Commit"
+        },
+        {
+          "method": "litchi_xls::SourceBackedWorkbook::apply_cells",
+          "ok": "litchi_xls::source_backed::cells::Commit"
+        },
+        {
+          "method": "litchi_xls::SourceBackedWorkbook::apply_comments",
+          "ok": "litchi_xls::source_backed::comments::Commit"
+        },
+        {
+          "method": "litchi_xls::SourceBackedWorkbook::apply_sheet_visibility",
+          "ok": "litchi_xls::source_backed::sheet_visibility::Commit"
+        }
+      ]
     },
     {
       "id": "ppt-minimal",
@@ -10144,7 +10966,73 @@
         {"path": "litchi_ppt::package::metadata::Commit", "target": "litchi_core::edit::Commit"},
         {"path": "litchi_ppt::package::metadata::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_ppt::Package::apply",
+          "ok": "litchi_ppt::package::edit::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_animations",
+          "ok": "litchi_ppt::animation::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_broadcast",
+          "ok": "litchi_ppt::broadcast::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_client_data",
+          "ok": "litchi_ppt::client_data::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_diagrams",
+          "ok": "litchi_ppt::diagram::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_document_comparison",
+          "ok": "litchi_ppt::document_comparison::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_durable",
+          "ok": "litchi_ppt::package::edit::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_external_media",
+          "ok": "litchi_ppt::external_media::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_fonts",
+          "ok": "litchi_ppt::font::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_master_layout",
+          "ok": "litchi_ppt::master_layout::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_master_metadata",
+          "ok": "litchi_ppt::master::metadata::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_metadata",
+          "ok": "litchi_ppt::package::metadata::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_objects",
+          "ok": "litchi_ppt::embedded::object::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_picture_bullets",
+          "ok": "litchi_ppt::picture_bullets::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_slide_sync",
+          "ok": "litchi_ppt::slide_sync::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_text",
+          "ok": "litchi_ppt::text_edit::Commit"
+        }
+      ]
     },
     {
       "id": "ppt-full",
@@ -11013,7 +11901,73 @@
         {"path": "litchi_ppt::package::metadata::Commit", "target": "litchi_core::edit::Commit"},
         {"path": "litchi_ppt::package::metadata::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_ppt::Package::apply",
+          "ok": "litchi_ppt::package::edit::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_animations",
+          "ok": "litchi_ppt::animation::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_broadcast",
+          "ok": "litchi_ppt::broadcast::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_client_data",
+          "ok": "litchi_ppt::client_data::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_diagrams",
+          "ok": "litchi_ppt::diagram::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_document_comparison",
+          "ok": "litchi_ppt::document_comparison::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_durable",
+          "ok": "litchi_ppt::package::edit::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_external_media",
+          "ok": "litchi_ppt::external_media::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_fonts",
+          "ok": "litchi_ppt::font::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_master_layout",
+          "ok": "litchi_ppt::master_layout::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_master_metadata",
+          "ok": "litchi_ppt::master::metadata::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_metadata",
+          "ok": "litchi_ppt::package::metadata::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_objects",
+          "ok": "litchi_ppt::embedded::object::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_picture_bullets",
+          "ok": "litchi_ppt::picture_bullets::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_slide_sync",
+          "ok": "litchi_ppt::slide_sync::Commit"
+        },
+        {
+          "method": "litchi_ppt::Package::apply_text",
+          "ok": "litchi_ppt::text_edit::Commit"
+        }
+      ]
     },
     {
       "id": "rtf-minimal",
@@ -11726,7 +12680,17 @@
         "litchi_ole_common::object::Package",
         "litchi_ole_common::property_set::user_defined::Properties"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_ole_common::object::Package::apply",
+          "ok": "litchi_core::edit::Commit",
+          "type_args": [
+            "litchi_ole_common::object::Package",
+            "litchi_ole_common::object::Patch"
+          ]
+        }
+      ]
     },
     {
       "id": "crypto",
@@ -11902,6 +12866,12 @@
         "litchi_ograph::Workbook",
         "litchi_ograph::WorkbookRef",
         "litchi_ograph::Payload"
+      ],
+      "result_methods": [
+        {
+          "method": "litchi_ograph::Package::apply",
+          "ok": "litchi_ograph::Commit"
+        }
       ]
     },
     {
@@ -12423,7 +13393,33 @@
         "litchi_odt::generic::flat::Document",
         "litchi_odt::odc::Document"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_odt::Package::apply",
+          "ok": "litchi_odt::transaction::Commit"
+        },
+        {
+          "method": "litchi_odt::Package::apply_metadata",
+          "ok": "litchi_odt::metadata::Commit"
+        },
+        {
+          "method": "litchi_odt::flat::Document::apply",
+          "ok": "litchi_odt::flat::Commit"
+        },
+        {
+          "method": "litchi_odt::generic::Package::apply",
+          "ok": "litchi_odt::generic::Commit"
+        },
+        {
+          "method": "litchi_odt::generic::flat::Document::apply",
+          "ok": "litchi_odt::generic::flat::Commit"
+        },
+        {
+          "method": "litchi_odt::odc::Document::apply",
+          "ok": "litchi_odt::odc::Commit"
+        }
+      ]
     },
     {
       "id": "ods",
@@ -12892,7 +13888,45 @@
         "litchi_ods::flat::Workbook",
         "litchi_ods::SourceBackedSpreadsheet"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_ods::Package::apply",
+          "ok": "litchi_ods::document::Commit"
+        },
+        {
+          "method": "litchi_ods::Package::apply_metadata",
+          "ok": "litchi_ods::metadata::Commit"
+        },
+        {
+          "method": "litchi_ods::Package::apply_with_security",
+          "ok": "litchi_ods::document::Commit"
+        },
+        {
+          "method": "litchi_ods::flat::Workbook::apply",
+          "ok": "litchi_ods::flat::Commit"
+        },
+        {
+          "method": "litchi_ods::SourceBackedSpreadsheet::apply_cells",
+          "ok": "litchi_ods::source_backed::cells::Commit"
+        },
+        {
+          "method": "litchi_ods::SourceBackedSpreadsheet::apply_dde",
+          "ok": "litchi_ods::source_backed::dde::Commit"
+        },
+        {
+          "method": "litchi_ods::SourceBackedSpreadsheet::apply_dde_with",
+          "ok": "litchi_ods::source_backed::dde::Commit"
+        },
+        {
+          "method": "litchi_ods::SourceBackedSpreadsheet::apply_sheet_metadata",
+          "ok": "litchi_ods::source_backed::sheet_metadata::Commit"
+        },
+        {
+          "method": "litchi_ods::SourceBackedSpreadsheet::apply_sheet_metadata_with",
+          "ok": "litchi_ods::source_backed::sheet_metadata::Commit"
+        }
+      ]
     },
     {
       "id": "odp",
@@ -13345,7 +14379,25 @@
         "litchi_odp::flat::Presentation",
         "litchi_odp::SourceBackedPresentation"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_odp::Package::apply",
+          "ok": "litchi_odp::edit::Commit"
+        },
+        {
+          "method": "litchi_odp::Package::apply_metadata",
+          "ok": "litchi_odp::metadata::Commit"
+        },
+        {
+          "method": "litchi_odp::flat::Presentation::apply",
+          "ok": "litchi_odp::flat::Commit"
+        },
+        {
+          "method": "litchi_odp::SourceBackedPresentation::apply_tail_append",
+          "ok": "litchi_odp::tail_append::Commit"
+        }
+      ]
     },
     {
       "id": "oth",
@@ -13559,7 +14611,17 @@
         {"path": "litchi_oth::Commit", "target": "litchi_core::edit::Commit"},
         {"path": "litchi_oth::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_oth::Package::apply",
+          "ok": "litchi_oth::Commit"
+        },
+        {
+          "method": "litchi_oth::Package::apply_metadata",
+          "ok": "litchi_oth::metadata::Commit"
+        }
+      ]
     },
     {
       "id": "odm",
@@ -13816,7 +14878,25 @@
         {"path": "litchi_odm::transaction::Commit", "target": "litchi_core::edit::Commit"},
         {"path": "litchi_odm::transaction::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_odm::Package::apply",
+          "ok": "litchi_odm::transaction::Commit"
+        },
+        {
+          "method": "litchi_odm::Package::apply_link",
+          "ok": "litchi_odm::link::Commit"
+        },
+        {
+          "method": "litchi_odm::Package::apply_metadata",
+          "ok": "litchi_odm::metadata::Commit"
+        },
+        {
+          "method": "litchi_odm::Package::apply_title",
+          "ok": "litchi_odm::title::Commit"
+        }
+      ]
     },
     {
       "id": "odi",
@@ -14040,7 +15120,21 @@
         {"path": "litchi_odi::flat::Commit", "target": "litchi_core::edit::Commit"},
         {"path": "litchi_odi::flat::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_odi::Package::apply",
+          "ok": "litchi_odi::Commit"
+        },
+        {
+          "method": "litchi_odi::Package::apply_metadata",
+          "ok": "litchi_odi::metadata::Commit"
+        },
+        {
+          "method": "litchi_odi::flat::Image::apply",
+          "ok": "litchi_odi::flat::Commit"
+        }
+      ]
     },
     {
       "id": "odb",
@@ -14189,7 +15283,17 @@
         "litchi_odb::Package",
         "litchi_odb::Database"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_odb::Package::apply",
+          "ok": "litchi_odb::Commit"
+        },
+        {
+          "method": "litchi_odb::Package::apply_metadata",
+          "ok": "litchi_odb::metadata::Commit"
+        }
+      ]
     },
     {
       "id": "odg",
@@ -14633,7 +15737,21 @@
         "litchi_odg::Drawing",
         "litchi_odg::flat::Drawing"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_odg::Package::apply",
+          "ok": "litchi_odg::edit::Commit"
+        },
+        {
+          "method": "litchi_odg::Package::apply_metadata",
+          "ok": "litchi_odg::metadata::Commit"
+        },
+        {
+          "method": "litchi_odg::flat::Drawing::apply",
+          "ok": "litchi_odg::flat::Commit"
+        }
+      ]
     },
     {
       "id": "odc",
@@ -14889,7 +16007,21 @@
         {"path": "litchi_odc::Commit", "target": "litchi_core::edit::Commit"},
         {"path": "litchi_odc::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_odc::Package::apply",
+          "ok": "litchi_odc::Commit"
+        },
+        {
+          "method": "litchi_odc::Package::apply_metadata",
+          "ok": "litchi_odc::metadata::Commit"
+        },
+        {
+          "method": "litchi_odc::flat::Chart::apply",
+          "ok": "litchi_odc::flat::Commit"
+        }
+      ]
     },
     {
       "id": "odf-formula",
@@ -15104,7 +16236,17 @@
         "litchi_odf_formula::Package",
         "litchi_odf_formula::Formula"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_odf_formula::Package::apply",
+          "ok": "litchi_odf_formula::Commit"
+        },
+        {
+          "method": "litchi_odf_formula::Package::apply_metadata",
+          "ok": "litchi_odf_formula::metadata::Commit"
+        }
+      ]
     },
     {
       "id": "ops-odf",
@@ -16932,7 +18074,137 @@
         "litchi_numbers::Package",
         "litchi_numbers::Workbook"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_numbers::Package::apply_names",
+          "ok": "litchi_numbers::names::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_arrangement",
+          "ok": "litchi_numbers::sheet::chart::arrangement::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_data",
+          "ok": "litchi_numbers::sheet::chart::data::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_image_adjustments",
+          "ok": "litchi_numbers::shape::image::adjustments::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_lifecycle",
+          "ok": "litchi_numbers::sheet::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_order",
+          "ok": "litchi_numbers::sheet::order::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_appearance",
+          "ok": "litchi_numbers::table::appearance::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_comment",
+          "ok": "litchi_numbers::cell::comment::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_comment_reply",
+          "ok": "litchi_numbers::cell::comment::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_control_format",
+          "ok": "litchi_numbers::cell::data_format::control::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_currency_format",
+          "ok": "litchi_numbers::cell::data_format::currency::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_custom_format",
+          "ok": "litchi_numbers::cell::data_format::custom::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_date_time_format",
+          "ok": "litchi_numbers::cell::data_format::date_time::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_duration_format",
+          "ok": "litchi_numbers::cell::data_format::duration::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_fraction_format",
+          "ok": "litchi_numbers::cell::data_format::fraction::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_number_format",
+          "ok": "litchi_numbers::cell::data_format::number::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_percentage_format",
+          "ok": "litchi_numbers::cell::data_format::percentage::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_pop_up_menu_format",
+          "ok": "litchi_numbers::cell::data_format::pop_up_menu::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_scientific_format",
+          "ok": "litchi_numbers::cell::data_format::scientific::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_text_format",
+          "ok": "litchi_numbers::cell::data_format::text::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_text_style",
+          "ok": "litchi_numbers::cell::text_style::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cells",
+          "ok": "litchi_numbers::table::cells::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_dimension_size",
+          "ok": "litchi_numbers::table::dimension::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_headers",
+          "ok": "litchi_numbers::table::headers::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_lifecycle",
+          "ok": "litchi_numbers::table::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_lock",
+          "ok": "litchi_numbers::table::lock::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_merges",
+          "ok": "litchi_numbers::table::merge::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_order",
+          "ok": "litchi_numbers::table::order::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_relocation",
+          "ok": "litchi_numbers::table::relocation::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_sort_order",
+          "ok": "litchi_numbers::table::sort::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_title",
+          "ok": "litchi_numbers::table::title::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_topology",
+          "ok": "litchi_numbers::table::topology::Commit"
+        }
+      ]
     },
     {
       "id": "numbers-full",
@@ -17603,7 +18875,137 @@
         "litchi_numbers::Package",
         "litchi_numbers::Workbook"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_numbers::Package::apply_names",
+          "ok": "litchi_numbers::names::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_arrangement",
+          "ok": "litchi_numbers::sheet::chart::arrangement::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_chart_data",
+          "ok": "litchi_numbers::sheet::chart::data::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_image_adjustments",
+          "ok": "litchi_numbers::shape::image::adjustments::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_lifecycle",
+          "ok": "litchi_numbers::sheet::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_sheet_order",
+          "ok": "litchi_numbers::sheet::order::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_appearance",
+          "ok": "litchi_numbers::table::appearance::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_comment",
+          "ok": "litchi_numbers::cell::comment::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_comment_reply",
+          "ok": "litchi_numbers::cell::comment::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_control_format",
+          "ok": "litchi_numbers::cell::data_format::control::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_currency_format",
+          "ok": "litchi_numbers::cell::data_format::currency::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_custom_format",
+          "ok": "litchi_numbers::cell::data_format::custom::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_date_time_format",
+          "ok": "litchi_numbers::cell::data_format::date_time::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_duration_format",
+          "ok": "litchi_numbers::cell::data_format::duration::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_fraction_format",
+          "ok": "litchi_numbers::cell::data_format::fraction::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_number_format",
+          "ok": "litchi_numbers::cell::data_format::number::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_percentage_format",
+          "ok": "litchi_numbers::cell::data_format::percentage::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_pop_up_menu_format",
+          "ok": "litchi_numbers::cell::data_format::pop_up_menu::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_scientific_format",
+          "ok": "litchi_numbers::cell::data_format::scientific::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_text_format",
+          "ok": "litchi_numbers::cell::data_format::text::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cell_text_style",
+          "ok": "litchi_numbers::cell::text_style::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_cells",
+          "ok": "litchi_numbers::table::cells::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_dimension_size",
+          "ok": "litchi_numbers::table::dimension::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_headers",
+          "ok": "litchi_numbers::table::headers::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_lifecycle",
+          "ok": "litchi_numbers::table::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_lock",
+          "ok": "litchi_numbers::table::lock::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_merges",
+          "ok": "litchi_numbers::table::merge::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_order",
+          "ok": "litchi_numbers::table::order::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_relocation",
+          "ok": "litchi_numbers::table::relocation::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_sort_order",
+          "ok": "litchi_numbers::table::sort::transaction::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_title",
+          "ok": "litchi_numbers::table::title::Commit"
+        },
+        {
+          "method": "litchi_numbers::Package::apply_table_topology",
+          "ok": "litchi_numbers::table::topology::Commit"
+        }
+      ]
     },
     {
       "id": "ops-iwork",
@@ -17720,7 +19122,26 @@
           "recursive": false
         }
       ],
-      "families": []
+      "families": [],
+      "immutable_owners": [
+        "litchi_ops::File"
+      ],
+      "result_methods": [
+        {
+          "method": "litchi_ops::File::apply",
+          "ok": "litchi_ops::transaction::Commit",
+          "type_args": [
+            "litchi_ops::Applied"
+          ]
+        },
+        {
+          "method": "litchi_ops::File::apply_with",
+          "ok": "litchi_ops::transaction::Commit",
+          "type_args": [
+            "litchi_ops::Applied"
+          ]
+        }
+      ]
     },
     {
       "id": "facade-iwork",
@@ -19028,6 +20449,122 @@
         {
           "method": "litchi_pages::Package::apply_metadata",
           "ok": "litchi_pages::metadata::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_chart_arrangement",
+          "ok": "litchi_pages::chart::arrangement::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_chart_data",
+          "ok": "litchi_pages::chart::data::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_drawable_order",
+          "ok": "litchi_pages::drawable::order::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_footnote",
+          "ok": "litchi_pages::footnote::body::transaction::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_footnote_text",
+          "ok": "litchi_pages::footnote::text::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_image_adjustments",
+          "ok": "litchi_pages::image::adjustments::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_appearance",
+          "ok": "litchi_pages::table::appearance::transaction::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_creation",
+          "ok": "litchi_pages::table::creation::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_deletion",
+          "ok": "litchi_pages::table::deletion::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_dimension_size",
+          "ok": "litchi_pages::table::dimension::transaction::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_header_settings",
+          "ok": "litchi_pages::table::headers::transaction::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_hidden_axes",
+          "ok": "litchi_pages::table::hidden_axes::transaction::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_lock",
+          "ok": "litchi_pages::table::lock::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_merges",
+          "ok": "litchi_pages::table::merge::transaction::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_name",
+          "ok": "litchi_pages::table::name::transaction::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_sort_order",
+          "ok": "litchi_pages::table::sort::transaction::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_title",
+          "ok": "litchi_pages::table::title::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_body_table_values",
+          "ok": "litchi_pages::table::values::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_document_settings",
+          "ok": "litchi_pages::document_settings::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_header_footer_text",
+          "ok": "litchi_pages::header_footer::text::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_page_layout",
+          "ok": "litchi_pages::page_layout::transaction::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_section_background",
+          "ok": "litchi_pages::section::background::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_section_lifecycle",
+          "ok": "litchi_pages::section::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_section_name",
+          "ok": "litchi_pages::section::name::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_section_pagination",
+          "ok": "litchi_pages::section::pagination::transaction::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_section_paragraphs",
+          "ok": "litchi_pages::section::paragraphs::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_section_settings",
+          "ok": "litchi_pages::section::settings::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_section_text",
+          "ok": "litchi_pages::section::text::Commit"
+        },
+        {
+          "method": "litchi_pages::Package::apply_section_text_style",
+          "ok": "litchi_pages::section::text_style::Commit"
         }
       ],
       "family_methods": true,
@@ -20444,7 +21981,185 @@
         "litchi_keynote::Package",
         "litchi_keynote::Presentation"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_keynote::Package::apply",
+          "ok": "litchi_keynote::edit::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_show_settings",
+          "ok": "litchi_keynote::show::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_audio_creation",
+          "ok": "litchi_keynote::slide::audio::creation::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_audio_position",
+          "ok": "litchi_keynote::slide::audio::position::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_background",
+          "ok": "litchi_keynote::background::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_build_order",
+          "ok": "litchi_keynote::build::order::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_arrangement",
+          "ok": "litchi_keynote::chart::arrangement::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_axis_title",
+          "ok": "litchi_keynote::chart::axis_title::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_caption",
+          "ok": "litchi_keynote::chart::caption::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_data",
+          "ok": "litchi_keynote::chart::data::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_legend",
+          "ok": "litchi_keynote::chart::legend::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_title",
+          "ok": "litchi_keynote::chart::title::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_value_axis_settings",
+          "ok": "litchi_keynote::chart::value_axis::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_creation",
+          "ok": "litchi_keynote::slide::creation::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_deletion",
+          "ok": "litchi_keynote::slide::delete::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_drawable_comment",
+          "ok": "litchi_keynote::slide::comment::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_drawables",
+          "ok": "litchi_keynote::slide::drawable::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_image_adjustments",
+          "ok": "litchi_keynote::slide::image::adjustments::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_media_data",
+          "ok": "litchi_keynote::slide::media::data::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_media_lifecycle",
+          "ok": "litchi_keynote::slide::media::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_media_properties",
+          "ok": "litchi_keynote::slide::media::properties::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_movie_caption",
+          "ok": "litchi_keynote::slide::movie::caption::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_movie_creation",
+          "ok": "litchi_keynote::slide::movie::creation::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_movie_geometry",
+          "ok": "litchi_keynote::slide::movie::geometry::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_movie_playback_settings",
+          "ok": "litchi_keynote::slide::movie::playback::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_movie_title",
+          "ok": "litchi_keynote::slide::movie::title::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_notes",
+          "ok": "litchi_keynote::slide::notes::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_order",
+          "ok": "litchi_keynote::slide::order::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_placeholder_visibility",
+          "ok": "litchi_keynote::slide::placeholder::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_appearance",
+          "ok": "litchi_keynote::slide::table::appearance::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_cell_number_format",
+          "ok": "litchi_keynote::slide::table::number_format::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_dimension_size",
+          "ok": "litchi_keynote::slide::table::dimension::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_headers",
+          "ok": "litchi_keynote::slide::table::headers::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_lock_state",
+          "ok": "litchi_keynote::slide::table::lock::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_merges",
+          "ok": "litchi_keynote::slide::table::merge::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_name",
+          "ok": "litchi_keynote::slide::table::name::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_physical_sort",
+          "ok": "litchi_keynote::slide::table::physical_sort::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_sort_order",
+          "ok": "litchi_keynote::slide::table::sort::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_title",
+          "ok": "litchi_keynote::slide::table::title::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_text",
+          "ok": "litchi_keynote::slide::text::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_transition",
+          "ok": "litchi_keynote::transition::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_soundtrack_items",
+          "ok": "litchi_keynote::soundtrack::items::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_soundtrack_order",
+          "ok": "litchi_keynote::soundtrack::order::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_soundtrack_settings",
+          "ok": "litchi_keynote::soundtrack::Commit"
+        }
+      ]
     },
     {
       "id": "keynote-full",
@@ -21850,7 +23565,185 @@
         "litchi_keynote::Package",
         "litchi_keynote::Presentation"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_keynote::Package::apply",
+          "ok": "litchi_keynote::edit::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_show_settings",
+          "ok": "litchi_keynote::show::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_audio_creation",
+          "ok": "litchi_keynote::slide::audio::creation::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_audio_position",
+          "ok": "litchi_keynote::slide::audio::position::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_background",
+          "ok": "litchi_keynote::background::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_build_order",
+          "ok": "litchi_keynote::build::order::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_arrangement",
+          "ok": "litchi_keynote::chart::arrangement::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_axis_title",
+          "ok": "litchi_keynote::chart::axis_title::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_caption",
+          "ok": "litchi_keynote::chart::caption::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_data",
+          "ok": "litchi_keynote::chart::data::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_legend",
+          "ok": "litchi_keynote::chart::legend::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_title",
+          "ok": "litchi_keynote::chart::title::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_chart_value_axis_settings",
+          "ok": "litchi_keynote::chart::value_axis::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_creation",
+          "ok": "litchi_keynote::slide::creation::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_deletion",
+          "ok": "litchi_keynote::slide::delete::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_drawable_comment",
+          "ok": "litchi_keynote::slide::comment::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_drawables",
+          "ok": "litchi_keynote::slide::drawable::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_image_adjustments",
+          "ok": "litchi_keynote::slide::image::adjustments::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_media_data",
+          "ok": "litchi_keynote::slide::media::data::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_media_lifecycle",
+          "ok": "litchi_keynote::slide::media::lifecycle::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_media_properties",
+          "ok": "litchi_keynote::slide::media::properties::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_movie_caption",
+          "ok": "litchi_keynote::slide::movie::caption::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_movie_creation",
+          "ok": "litchi_keynote::slide::movie::creation::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_movie_geometry",
+          "ok": "litchi_keynote::slide::movie::geometry::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_movie_playback_settings",
+          "ok": "litchi_keynote::slide::movie::playback::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_movie_title",
+          "ok": "litchi_keynote::slide::movie::title::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_notes",
+          "ok": "litchi_keynote::slide::notes::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_order",
+          "ok": "litchi_keynote::slide::order::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_placeholder_visibility",
+          "ok": "litchi_keynote::slide::placeholder::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_appearance",
+          "ok": "litchi_keynote::slide::table::appearance::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_cell_number_format",
+          "ok": "litchi_keynote::slide::table::number_format::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_dimension_size",
+          "ok": "litchi_keynote::slide::table::dimension::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_headers",
+          "ok": "litchi_keynote::slide::table::headers::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_lock_state",
+          "ok": "litchi_keynote::slide::table::lock::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_merges",
+          "ok": "litchi_keynote::slide::table::merge::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_name",
+          "ok": "litchi_keynote::slide::table::name::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_physical_sort",
+          "ok": "litchi_keynote::slide::table::physical_sort::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_sort_order",
+          "ok": "litchi_keynote::slide::table::sort::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_table_title",
+          "ok": "litchi_keynote::slide::table::title::transaction::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_text",
+          "ok": "litchi_keynote::slide::text::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_slide_transition",
+          "ok": "litchi_keynote::transition::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_soundtrack_items",
+          "ok": "litchi_keynote::soundtrack::items::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_soundtrack_order",
+          "ok": "litchi_keynote::soundtrack::order::Commit"
+        },
+        {
+          "method": "litchi_keynote::Package::apply_soundtrack_settings",
+          "ok": "litchi_keynote::soundtrack::Commit"
+        }
+      ]
     },
     {
       "id": "biff",
@@ -22021,7 +23914,13 @@
         "litchi_odraw::prop::picture::View",
         "litchi_odraw::prop::Props"
       ],
-      "family_methods": true
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_odraw::prop::picture::Package::apply",
+          "ok": "litchi_odraw::prop::picture::Commit"
+        }
+      ]
     }
   ]
 }
