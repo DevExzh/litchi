@@ -372,13 +372,22 @@ fn create_save_and_flat_refusals() {
     .unwrap();
     // Record 0292: a flat presentation edits its packaged projection and
     // republishes the edit into its flat bytes (`flat_odf_unified.rs`).
-    // This producer file's empty master-page name passes the flat reader
-    // but not the packaged projection, so its edits are a typed refusal.
+    // The projection admission now handles this producer's empty
+    // master-page name; prove that the page rename is real and reversible,
+    // rather than accepting a false no-op.
     let capabilities = flat.capabilities();
     assert!(capabilities.verb(Verb::Set).is_supported());
     assert!(capabilities.verb(Verb::Get).is_supported());
-    let error = flat.set("/slide[1]", props! { "name" => "x" }).unwrap_err();
-    assert_eq!(error.code(), Code::UnsupportedCapability);
+    let before = flat.to_bytes().unwrap();
+    let original = prop(&flat, "/slide[1]", "name").unwrap();
+    let renamed = flat.set("/slide[1]", props! { "name" => "x" }).unwrap();
+    assert_eq!(prop(&renamed, "/slide[1]", "name").as_deref(), Some("x"));
+    assert_ne!(renamed.to_bytes().unwrap(), before);
+    let restored = renamed
+        .set("/slide[1]", props! { "name" => original.as_str() })
+        .unwrap();
+    assert_eq!(prop(&restored, "/slide[1]", "name"), Some(original));
+    assert_eq!(restored.to_bytes().unwrap(), before);
     let copy = directory.path().join("copy.fodp");
     flat.save_as(&copy).unwrap();
     assert_eq!(

@@ -909,15 +909,15 @@ xlsx	colbreak	edit	supported		ok tx.set
 xlsx	colbreak	batch	supported		ok set item
 xlsx	colbreak	create	supported		ok format
 xlsx	colbreak	save	supported		ok format
-xlsx	run	get	supported		ok 1 instances, first `create() + add sheet + add run` /sheet[1]/A1/run[1]
-xlsx	run	find	supported		ok 1 instances, first `create() + add sheet + add run` /sheet[1]/A1/run[1]
+xlsx	run	get	supported		ok 2 instances, first `create() + add sheet + add run` /sheet[1]/A1/run[1]
+xlsx	run	find	supported		ok 2 instances, first `create() + add sheet + add run` /sheet[1]/A1/run[1]
 xlsx	run	query	supported		ok matches in create() + add sheet + add run
-xlsx	run	view	supported		ok 1 instances, first `create() + add sheet + add run` /sheet[1]/A1/run[1]
+xlsx	run	view	supported		ok 2 instances, first `create() + add sheet + add run` /sheet[1]/A1/run[1]
 xlsx	run	set	supported		ok `create() + add sheet + add run` /sheet[1]/A1/run[1] {"text":"Litchi"}
 xlsx	run	add	supported		ok /sheet[1]/A1/run[1] on `create() + add sheet` under /sheet[1]/A1 {}
 xlsx	run	remove	supported		ok `create() + add sheet + add run` /sheet[1]/A1/run[1]
-xlsx	run	move	format-verb		unreached
-xlsx	run	swap	format-verb		unreached
+xlsx	run	move	format-verb		refused unsupported_type
+xlsx	run	swap	format-verb		refused unsupported_type
 xlsx	run	edit	supported		ok tx.set
 xlsx	run	batch	supported		ok set item
 xlsx	run	create	supported		ok format
