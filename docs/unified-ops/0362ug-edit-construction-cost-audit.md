@@ -322,12 +322,17 @@ pre-footer hash and the final closed log, and identifies the documentation-only
 slicer/timeline overlay that overlapped the standalone run; exact compiler-read
 timing was not captured. No native performance claim is made.
 
-The coordinator's diagnostic checkout is fast-forwarded to `0d35a83a31` and
-is running the repaired gate runner's `clippy-all-features` step against the
-combined CLI/ops/facade/Python consumers. This is a single selected check,
-not the final 53-step gate. Its build slot was released by XLSB. The other
-three slots now cover PPT, XLSX and DOCX validation. Final source freeze,
-all-68 inventory, full gate, corpus and native qualification remain required.
+The combined CLI/ops/facade/Python strict check first found a missing PPTX
+benchmark migration at `0d35a83a31`; the gate monitor also hit a vanished-PID
+race. Correction 0362ugka propagates `slides()` errors, and runner successor
+`f9cf4aa6d5` narrowly handles `ProcessLookupError`. The rerun passes at
+`0f007c4d74` in 27.094 seconds with all targets/features, a clean source,
+no remaining owned processes, and stable target size 4,706,526,684 bytes.
+Its reduced source/command/log/plan/state receipt is in 0362ugka. This is
+one selected check, not the final 53-step gate. The released coordinator slot
+is assigned to the XLS follow-up alongside PPT, XLSX and DOCX. Final source
+freeze, all-68 inventory, full gate, corpus and native qualification remain
+required.
 
 
 A subsequent check of the actual XLS metadata getter exposed an omitted
