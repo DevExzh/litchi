@@ -1657,7 +1657,7 @@ fn entire_registered_closure_extensions_under_mce_are_readable_diagnostic_and_re
             PivotTableDataDiagnostic::MceAmbiguous
         );
         assert!(!view.is_editable());
-        assert_edit_deferred_error(workbook);
+        assert_edit_deferred_error(&workbook);
     }
 }
 
@@ -1804,7 +1804,7 @@ fn missing_c444_is_none_and_c510_index_routes_are_diagnostic_read_only() {
         PivotTableDataDiagnostic::ServerFormatIndexUnresolved
     );
     assert!(!view.is_editable());
-    assert_edit_deferred_error(workbook);
+    assert_edit_deferred_error(&workbook);
 
     let count_mismatch = Fixture::build(FixtureOptions {
         server_count: "3",
