@@ -13,9 +13,8 @@ use litchi_core::{Reservation, Resource as CoreResource, SourceVersion};
 use litchi_drawingml::svg_blip;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{
-    ArtifactStreamPublication, ArtifactStreamTarget, AuthoredXmlFragment, EffectiveTopology,
-    PackURI, PartData, PartView, SourceArtifact, SourceArtifactFingerprint, SourceTopologyPlan,
-    TargetMode,
+    ArtifactStreamReport, ArtifactStreamTarget, AuthoredXmlFragment, EffectiveTopology, PackURI,
+    PartData, PartView, SourceArtifact, SourceArtifactFingerprint, SourceTopologyPlan, TargetMode,
 };
 use sha2::{Digest as _, Sha256};
 
@@ -1755,7 +1754,7 @@ impl super::Package {
         target_sink: &mut ArtifactStreamTarget<'_>,
         current: &Snapshot,
         target: &Snapshot,
-    ) -> Result<ArtifactStreamPublication> {
+    ) -> Result<ArtifactStreamReport> {
         let package = self.physical_package()?.clone();
         let plan = build_batch_topology_plan(&package, current, target)?;
         let prepared = package.prepare_topology(plan)?;

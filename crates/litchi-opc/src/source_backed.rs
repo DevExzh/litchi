@@ -54,7 +54,7 @@ mod view;
 pub use artifact_restore::SourceArtifactRestoreProof;
 pub use artifact_restore::{
     ArtifactStream, ArtifactStreamError, ArtifactStreamGuard, ArtifactStreamPolicy,
-    ArtifactStreamPublication, ArtifactStreamTarget,
+    ArtifactStreamReport, ArtifactStreamTarget,
 };
 pub use view::{PreparedMetadataData, PreparedPartData, PreparedPartView};
 mod read_ahead;

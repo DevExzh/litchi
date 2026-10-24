@@ -12,7 +12,7 @@ use litchi_opc::source_backed::{
     SourcePartSpliceLimits, SourcePartSpliceProof, SourcePartSpliceReplay,
     SourcePartSpliceReplayError, SourcePartSpliceReplayProof, VerifiedDecodedReaderError,
 };
-use litchi_opc::{ArtifactStreamPublication, ArtifactStreamTarget, SourceArtifactFingerprint};
+use litchi_opc::{ArtifactStreamReport, ArtifactStreamTarget, SourceArtifactFingerprint};
 use sha2::{Digest as _, Sha256};
 use std::fmt;
 use std::io::{self, BufRead, Read, Write};
@@ -1709,7 +1709,7 @@ impl PreparedStream {
     pub(super) fn stream_to_target(
         &self,
         target: &mut ArtifactStreamTarget<'_>,
-    ) -> std::result::Result<ArtifactStreamPublication, litchi_opc::OpcError> {
+    ) -> std::result::Result<ArtifactStreamReport, litchi_opc::OpcError> {
         let splice = self.splice.duplicate();
         let publication = match self.expected_candidate_archive {
             Some(expected) => target.publish_splice_with_expected_artifact(

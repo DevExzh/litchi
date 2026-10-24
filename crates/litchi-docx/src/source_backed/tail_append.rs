@@ -29,7 +29,7 @@ use litchi_ooxml_common::xml_name::is_qualified_name;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::source_backed::VerifiedDecodedReaderError;
 use litchi_opc::{
-    ArtifactStreamGuard, ArtifactStreamPublication, ArtifactStreamTarget, SourcePartSpliceFragment,
+    ArtifactStreamGuard, ArtifactStreamReport, ArtifactStreamTarget, SourcePartSpliceFragment,
     SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
 };
 use quick_xml::XmlVersion;
@@ -508,7 +508,7 @@ impl PreparedTail {
     fn stream_to_target(
         &self,
         target: &mut ArtifactStreamTarget<'_>,
-    ) -> crate::Result<ArtifactStreamPublication> {
+    ) -> crate::Result<ArtifactStreamReport> {
         let guard = TailPublicationGuard::from_options(&self.options);
         target
             .publish_splice_with_guard(&self.splice, &guard)
