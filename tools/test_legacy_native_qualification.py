@@ -62,6 +62,11 @@ class LegacyNativeQualificationTests(unittest.TestCase):
         self.assertIn('current-owner-api', baseline)
         self.assertIn('current-property-api', baseline)
         self.assertIn('legacy-property-api', baseline)
+        self.assertEqual(baseline.count('ObjectPackage::open_with_options('), 1)
+        self.assertEqual(baseline.count('Ok(source.edit()?)'), 1)
+        self.assertEqual(baseline.count('package.write_to(&mut output)?'), 1)
+        self.assertEqual(baseline.count('UserProperties::with_limits'), 1)
+        self.assertEqual(baseline.count('UserEdit::with_limits'), 1)
 
     def test_manifests_bind_reusable_drivers_and_contracts(self) -> None:
         expected = {
