@@ -1260,7 +1260,17 @@ fn source_fence_workbook(inner: &PackageInner) -> Option<&SourceBackedWorkbook> 
 
 fn ensure_source_fence(inner: &PackageInner) -> Result<()> {
     if let Some(workbook) = source_fence_workbook(inner) {
-        workbook.ensure_current().map_err(Error::Source)?;
+        return workbook.ensure_current().map_err(Error::Source);
+    }
+    if let PackageState::Source { cfb, .. } = &inner.state {
+        let expected = cfb.captured_source_version();
+        let observed = cfb.source_version().map_err(SourceBackedError::from)?;
+        if observed != expected {
+            return Err(Error::Source(SourceBackedError::SourceChanged {
+                expected,
+                observed,
+            }));
+        }
     }
     Ok(())
 }
