@@ -597,16 +597,7 @@ impl<'a> Common<'a> {
             .xml
             .get(range)
             .ok_or_else(|| Error::Invalid("shape transform span became invalid".into()))?;
-        let transform_limits = litchi_drawingml::transform::Limits::new(
-            self.limits
-                .output_bytes()
-                .min(litchi_drawingml::transform::Limits::DEFAULT.max_xml_bytes)
-                .max(1),
-            self.limits
-                .nodes()
-                .min(litchi_drawingml::transform::Limits::DEFAULT.max_nodes)
-                .max(1),
-        );
+        let transform_limits = transform_limits_for(self.limits);
         Ok(Some(litchi_drawingml::transform::codec::read(
             xml,
             &transform_limits,
@@ -651,13 +642,7 @@ impl<'a> Common<'a> {
             .xml
             .get(range)
             .ok_or_else(|| Error::Invalid("shape text body span became invalid".into()))?;
-        let limits = text_reader::Limits::new(
-            self.limits.output_bytes().min(self.xml.len()).max(1),
-            self.limits.depth(),
-            self.limits.nodes(),
-            self.limits.retained_text_bytes(),
-        )
-        .unwrap_or(text_reader::Limits::DEFAULT);
+        let limits = text_body_limits_for(self.limits, self.xml.len());
         Ok(Some(text_reader::read_with_options(xml, scope, limits)?))
     }
 
@@ -735,6 +720,29 @@ impl<'a> Common<'a> {
         }
         Ok(resolver)
     }
+}
+
+fn transform_limits_for(limits: super::reader::Limits) -> litchi_drawingml::transform::Limits {
+    litchi_drawingml::transform::Limits::new(
+        limits
+            .input_bytes()
+            .min(litchi_drawingml::transform::Limits::DEFAULT.max_xml_bytes)
+            .max(1),
+        limits
+            .nodes()
+            .min(litchi_drawingml::transform::Limits::DEFAULT.max_nodes)
+            .max(1),
+    )
+}
+
+fn text_body_limits_for(limits: super::reader::Limits, owner_bytes: usize) -> text_reader::Limits {
+    text_reader::Limits::new(
+        limits.input_bytes().min(owner_bytes).max(1),
+        limits.depth(),
+        limits.nodes(),
+        limits.retained_text_bytes(),
+    )
+    .unwrap_or(text_reader::Limits::DEFAULT)
 }
 
 /// The first start tag (or empty element) of `xml`.
@@ -1165,5 +1173,26 @@ impl BodyTextIndex {
     #[must_use]
     pub fn text_run(&self, paragraph: usize, ordinal: usize) -> Option<usize> {
         self.0.text_run(0, 0, paragraph, ordinal)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{reader, text_body_limits_for, transform_limits_for};
+
+    #[test]
+    fn subordinate_readers_use_the_scene_input_budget() {
+        let limits = reader::Limits::new(173, 4096, 64, 128, 1024, 4096)
+            .expect("finite asymmetric scene limits");
+        assert_eq!(transform_limits_for(limits).max_xml_bytes, 173);
+        assert_eq!(text_body_limits_for(limits, 2048).input_bytes(), 173);
+
+        let reverse = reader::Limits::new(4096, 173, 64, 128, 1024, 4096)
+            .expect("finite reverse asymmetric scene limits");
+        assert_eq!(
+            transform_limits_for(reverse).max_xml_bytes,
+            4096.min(litchi_drawingml::transform::Limits::DEFAULT.max_xml_bytes)
+        );
+        assert_eq!(text_body_limits_for(reverse, 2048).input_bytes(), 2048);
     }
 }
