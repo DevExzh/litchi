@@ -3444,7 +3444,8 @@ See [0063](0063-source-pptx-modern-comments.md).
   zero unreached cells, and all 7 ODP plus 6 XLSX focused tests pass. Both
   commands prove the memory shim, exact source/lock/environment and external
   target; its 3,483,689,639 bytes remain stable before and after. Earlier
-  receipts and the oversized cache remain preserved and superseded.
+  receipts remain preserved; the oversized cache was quarantined and later
+  pruned only after the specific regeneration/preservation audit below.
 
   Selected f6fe diagnostics pass 332 core tests, the iWork leaf API check,
   the non-iWork gate and static corpus dispositions. Facade testing returns
@@ -3481,7 +3482,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   unchanged wrappers, process/cap checks and active runner hash. Adoption
   waits until the currently running diagnostic gate exits.
 
-  Cleanups twenty-eight through thirty-three remove eleven merged leaves after
+  Cleanups twenty-eight through thirty-four remove thirteen merged leaves after
   independent payload/ref/ancestry/restore-layout verification. Branches,
   ignored locks, targets and validation evidence remain, including the
   rejected corpus leaf's local cache. The external corpus target's historical
@@ -3491,6 +3492,14 @@ See [0063](0063-source-pptx-modern-comments.md).
   benchmark/profile outputs remain intact. The immutable ODG baseline
   capture completes with all 460,379 entries, recorded externally under
   0362ugy; no build or native timing result is inferred from it.
+
+  A subsequent audited prune releases 20,181,409,792 allocated bytes from
+  the rejected corpus cache. All 544 retained wave-thirty files have a complete
+  filtered restore route with independently verified modes and dry-runs;
+  raw receipts and native/protocol outputs remain. Another 144 exact stale
+  example twins release 1,554,094,416 bytes of budget-target headroom while
+  preserving all benchmark/profile and failure artifacts. The two large
+  deletion receipts stay external with hashes and reproduction instructions.
 
   A documentation audit reconciles the settled legacy source-retention and
   OpenOptions decisions in design §16.3/§16.6 and removes the stale claim in
@@ -3508,8 +3517,25 @@ See [0063](0063-source-pptx-modern-comments.md).
   found a real OPC read-ahead retention failure plus four OPC and eight ODP
   stale doctest consumers. Reviewed ODP repair `21c47647af` now migrates all
   eight examples without changing production logic or assertions; all 19
-  doctests and the all-target compiler check pass. OPC retention and its
-  doctest migration remain in repair. A fresh composed
-  source freeze, full gate, all-68 inventory, actual OfficeCLI corpus replay,
+  doctests and the all-target compiler check pass. Reviewed OPC source
+  `cdbee64a36` and corrected receipt `42e3f2314c` release the retained window
+  through a weak archive link, preserve live clone ownership and source-change
+  precedence, and migrate all four doctests. All 1,207 native tests and 11
+  doctests pass; the existing independent ZIP64 fixture test remains explicitly
+  ignored. Strict all-target Clippy passes. Initial sparse-checkout failures
+  were resolved by restoring tracked fixtures. The configured read-ahead path
+  needs its own matched native ABBA comparison under 0362umc; the exact-policy
+  path performs no weak upgrade. The completed f6fe native selection records
+  201 chunks, with only those 13 repaired failures; its 83 ignored cases stay
+  explicit. No later step is claimed as run.
+
+  The clean diagnostic checkout now holds frozen source
+  `49c25ef67f62a8bb943e7c6a0bf464e49ae87d07`, with the dependency lock
+  unchanged. The reviewed 0362uva runner is adopted from its separate path.
+  Isolated workspace documentation passes with warnings denied in 1,057.472
+  seconds, with no competing builds and a 4,504,969,096-byte final target.
+  The fresh all-68 library inventory is now running sequentially on the same
+  source; every row still needs semantic disposition review. Full gate
+  completion on this source, all-68 closure, actual OfficeCLI corpus replay,
   glossary closure and quiet native qualification remain required. Only
   comprehensive redaction audit 22 is deferred. Nothing is pushed.
