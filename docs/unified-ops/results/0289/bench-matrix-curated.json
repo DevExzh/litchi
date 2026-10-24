@@ -3044,8 +3044,8 @@
    "reason": "W4b/W5 historical probe-adapter and native-protocol preparation receipts compare compatibility/protocol correctness, not a leaf-versus-unified operation pair; native timing remains unqualified."
   },
   {
-   "record": "0362um",
-   "reason": "Interrupted final-gate receipt with partial format, strict-profile and operations-test logs only. It records no leaf-versus-unified benchmark pair and explicitly is not an acceptance result."
+   "record": "0362um1",
+   "reason": "Interrupted full-gate and selected diagnostic-check receipts contain partial format, strict-profile and operations-test logs only. They record no leaf-versus-unified benchmark pair and explicitly are not acceptance results."
   },
   {
    "record": "0362up",
