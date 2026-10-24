@@ -32,6 +32,11 @@ source or entry-admission errors are returned to the caller instead of being
 converted into dummy values.  Successful entry admission is cached for the
 transaction, so repeated read projections do not rescan the source.
 
+Security admission remains ordered before source XML root/processing-
+instruction validation, preserving the established refusal precedence while
+deferring both checks.  Empty scene-splice requests also pass through
+admission, so they cannot hide a signed or malformed source.
+
 Focused unit coverage asserts that a packaged edit starts with no mutable
 draft, that an exact no-op commit does not materialize one, that the first
 slide operation does, and that root/PI refusal is deferred until commit.  The
@@ -44,10 +49,10 @@ The isolated worktree used Rust 1.95.0, one capped Cargo job at a time,
 `--offline --locked`, debug information disabled, incremental compilation
 disabled, and the workspace-local temporary directory from the coordinator
 environment.  The source validation commit was
-`337e4e67158f952f48003292b4f6e3bbd659c4ed`:
+`363a2497f9103a32d41aff47bb0d2c9bed040521`:
 
 * `cargo test --offline --locked -p litchi-odp --all-targets --all-features` —
-  passed (38 suites, 447 passed, 0 failed, 0 ignored, 0 measured).
+  passed (38 suites, 448 passed, 0 failed, 0 ignored, 0 measured).
 * `cargo clippy --offline --locked -p litchi-odp --all-targets --all-features -- -D warnings` — passed.
 * `cargo check --offline --locked -p litchi-ops --all-targets --all-features` — passed.
 * `rustfmt --edition 2024 --check` on the changed ODP source/tests and
