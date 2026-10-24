@@ -759,10 +759,11 @@ impl Transformed {
             ));
         }
         if transforms.len() > super::MAX_TRANSFORMS {
-            return Err(crate::Error::Limit {
-                resource: "DrawingML color transforms",
-                limit: super::MAX_TRANSFORMS,
-            });
+            return Err(crate::Error::limit(
+                crate::LimitKind::ColorTransforms,
+                transforms.len(),
+                super::MAX_TRANSFORMS,
+            ));
         }
         Ok(Self { base, transforms })
     }

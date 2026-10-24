@@ -463,10 +463,11 @@ fn position<R>(reader: &NsReader<R>) -> Result<usize> {
 impl Parsed {
     fn read(xml: &[u8]) -> Result<Self> {
         if xml.len() > MAX_PART_BYTES {
-            return Err(Error::Limit {
-                resource: "diagram data-model bytes",
-                limit: MAX_PART_BYTES,
-            });
+            return Err(Error::limit(
+                crate::LimitKind::DiagramDataModelBytes,
+                xml.len(),
+                MAX_PART_BYTES,
+            ));
         }
         let mut reader = NsReader::from_reader(xml);
         reader.config_mut().trim_text(false);
@@ -521,10 +522,11 @@ impl Parsed {
                             ..PointRecord::default()
                         };
                         if points.len() >= MAX_NODES * 16 {
-                            return Err(Error::Limit {
-                                resource: "diagram points",
-                                limit: MAX_NODES * 16,
-                            });
+                            return Err(Error::limit(
+                                crate::LimitKind::DiagramPoints,
+                                points.len() + 1,
+                                MAX_NODES * 16,
+                            ));
                         }
                         if empty {
                             points.push(record);
@@ -734,16 +736,22 @@ fn tree(
             continue;
         }
         if depth > MAX_DEPTH {
-            return Err(Error::Limit {
-                resource: "diagram node depth",
-                limit: MAX_DEPTH as usize,
-            });
+            let observed =
+                usize::try_from(depth).map_err(|_| invalid("diagram depth exceeds usize"))?;
+            let maximum = usize::try_from(MAX_DEPTH)
+                .map_err(|_| invalid("diagram depth limit exceeds usize"))?;
+            return Err(Error::limit(
+                crate::LimitKind::DiagramNodeDepth,
+                observed,
+                maximum,
+            ));
         }
         if entries.len() >= MAX_NODES {
-            return Err(Error::Limit {
-                resource: "diagram nodes",
-                limit: MAX_NODES,
-            });
+            return Err(Error::limit(
+                crate::LimitKind::DiagramNodes,
+                entries.len() + 1,
+                MAX_NODES,
+            ));
         }
         let point = content[id];
         let index = entries.len();
@@ -770,10 +778,11 @@ fn check_text(text: &str) -> Result<()> {
         return Err(invalid("diagram text holds a character XML cannot carry"));
     }
     if text.len() > 1024 * 1024 {
-        return Err(Error::Limit {
-            resource: "diagram node text bytes",
-            limit: 1024 * 1024,
-        });
+        return Err(Error::limit(
+            crate::LimitKind::DiagramNodeTextBytes,
+            text.len(),
+            1024 * 1024,
+        ));
     }
     Ok(())
 }
@@ -990,10 +999,11 @@ struct DrawnShape {
 
 fn read_drawing(xml: &[u8]) -> Result<(Vec<DrawnShape>, bool)> {
     if xml.len() > MAX_PART_BYTES {
-        return Err(Error::Limit {
-            resource: "diagram drawing bytes",
-            limit: MAX_PART_BYTES,
-        });
+        return Err(Error::limit(
+            crate::LimitKind::DiagramDrawingBytes,
+            xml.len(),
+            MAX_PART_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);

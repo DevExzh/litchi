@@ -1,7 +1,10 @@
 #![allow(clippy::expect_used, reason = "regression fixture assertions")]
 
 //! Exercise complete-part grammar independently of the family fragment codec.
-use litchi_drawingml::theme::family::{Family, part};
+use litchi_drawingml::{
+    Error, LimitKind,
+    theme::family::{Family, part},
+};
 
 fn theme(body: &str) -> String {
     format!(
@@ -185,12 +188,14 @@ fn inherited_namespace_decoration_respects_fragment_output_limit() {
             );
         } else {
             let error = part::read(source.as_bytes()).expect_err("decoration exceeds bound");
-            assert!(
-                error
-                    .to_string()
-                    .contains("decorated Theme Family XML bytes"),
-                "{error}"
-            );
+            assert!(matches!(
+                error,
+                Error::Limit {
+                    kind: LimitKind::XmlBytes,
+                    maximum: MAX_XML_BYTES,
+                    ..
+                }
+            ));
         }
     }
 }
@@ -414,10 +419,14 @@ fn active_namespace_cap_counts_nested_declarations_and_restores_on_scope_exit() 
             );
         } else {
             let error = part::read(source.as_bytes()).expect_err("one over active declaration cap");
-            assert!(
-                error.to_string().contains("active namespace bindings"),
-                "{error}"
-            );
+            assert!(matches!(
+                error,
+                Error::Limit {
+                    kind: LimitKind::NamespaceDeclarations,
+                    maximum,
+                    ..
+                } if maximum == part::MAX_ACTIVE_NAMESPACE_DECLARATIONS + 1,
+            ));
         }
     }
 }

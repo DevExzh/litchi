@@ -13,7 +13,7 @@ use litchi_drawingml::ink::{
     },
     actions::{self, ActionChild, ActionType, DataChild, Edit, LengthUnit, RootChild, TimeUnit},
 };
-use litchi_drawingml::{Error, Result};
+use litchi_drawingml::{Error, LimitKind, Result};
 
 fn expect_invalid<T>(result: Result<T>, fragment: &str) {
     match result {
@@ -26,17 +26,35 @@ fn expect_invalid<T>(result: Result<T>, fragment: &str) {
     }
 }
 
-fn expect_limit<T>(result: Result<T>, resource: &'static str, limit: usize) {
+fn expect_limit<T>(result: Result<T>, kind: LimitKind, maximum: usize) {
     match result {
         Err(Error::Limit {
-            resource: actual_resource,
-            limit: actual_limit,
+            kind: actual_kind,
+            observed,
+            maximum: actual_maximum,
         }) => {
-            assert_eq!(actual_resource, resource);
-            assert_eq!(actual_limit, limit);
+            assert_eq!(actual_kind, kind);
+            assert_eq!(actual_maximum, maximum);
+            assert!(observed > maximum);
         },
-        Err(other) => panic!("expected {resource:?} limit {limit}, got {other:?}"),
-        Ok(_) => panic!("expected {resource:?} limit {limit}, got success"),
+        Err(other) => panic!("expected {kind:?} limit {maximum}, got {other:?}"),
+        Ok(_) => panic!("expected {kind:?} limit {maximum}, got success"),
+    }
+}
+
+fn expect_invalid_limit<T>(result: Result<T>, kind: LimitKind, value: usize, maximum: usize) {
+    match result {
+        Err(Error::InvalidLimit {
+            kind: actual_kind,
+            value: actual_value,
+            maximum: actual_maximum,
+        }) => {
+            assert_eq!(actual_kind, kind);
+            assert_eq!(actual_value, value);
+            assert_eq!(actual_maximum, maximum);
+        },
+        Err(other) => panic!("expected InvalidLimit({kind:?}, {value}, {maximum}), got {other:?}"),
+        Ok(_) => panic!("expected InvalidLimit({kind:?}, {value}, {maximum}), got success"),
     }
 }
 
@@ -332,7 +350,10 @@ fn no_op_identity_edits_and_patches_are_exact_and_source_checked() {
         .expect("stale detached draft")
         .finish()
         .expect("stale prepared");
-    expect_invalid(stale.apply(no_op.patch()), "patch source is stale");
+    assert!(matches!(
+        stale.apply(no_op.patch()),
+        Err(Error::PatchConflict)
+    ));
 
     let mut changed_id = Edit::from_profile(&profile, EditOptions::default()).expect("edit");
     expect_invalid(
@@ -395,7 +416,38 @@ fn prepared_owner_routes_replay_and_optioned_edits_through_commit() {
             ..EditOptions::default()
         })
         .expect("owner entry must not scan the retained profile");
-    expect_limit(deferred.commit(), "ink action source bytes", source_limit);
+    expect_limit(deferred.commit(), LimitKind::SourceBytes, source_limit);
+}
+
+#[test]
+fn prepared_owner_rejects_explicit_policy_widening() {
+    let baseline = Draft::with_units(LengthUnit::Centimeter, TimeUnit::Millisecond)
+        .expect("draft")
+        .action(bare_action("prepared", ActionType::Add, "0"))
+        .expect("action")
+        .finish()
+        .expect("baseline owner");
+    let output_limit = baseline.as_bytes().len();
+    let prepared = Draft::new(
+        EditOptions {
+            max_output_bytes: output_limit,
+            ..EditOptions::default()
+        },
+        LengthUnit::Centimeter,
+        TimeUnit::Millisecond,
+    )
+    .expect("strict draft")
+    .action(bare_action("prepared", ActionType::Add, "0"))
+    .expect("action")
+    .finish()
+    .expect("strict owner");
+
+    expect_invalid_limit(
+        prepared.edit_with_options(EditOptions::default()),
+        LimitKind::OutputBytes,
+        EditOptions::default().max_output_bytes,
+        output_limit,
+    );
 }
 
 #[test]
@@ -575,9 +627,10 @@ fn failed_edits_are_atomic_and_invalid_selectors_do_not_mutate_source_snapshot()
 fn detached_limits_reserve_output_payload_nodes_depth_actions_groups_and_scalars() {
     let mut invalid_limits = default_limits();
     invalid_limits.max_output_bytes = 0;
-    expect_limit(
+    expect_invalid_limit(
         Draft::new(invalid_limits, LengthUnit::Meter, TimeUnit::Second),
-        "ink action output bytes",
+        LimitKind::OutputBytes,
+        0,
         litchi_drawingml::ink::MAX_SOURCE_BYTES,
     );
 
@@ -590,7 +643,7 @@ fn detached_limits_reserve_output_payload_nodes_depth_actions_groups_and_scalars
             .action(action())
             .expect("action")
             .finish(),
-        "ink action output bytes",
+        LimitKind::OutputBytes,
         64,
     );
 
@@ -606,7 +659,7 @@ fn detached_limits_reserve_output_payload_nodes_depth_actions_groups_and_scalars
             .action(with_payload)
             .expect("action")
             .finish(),
-        "ink action payload bytes",
+        LimitKind::PayloadBytes,
         4,
     );
 
@@ -618,7 +671,7 @@ fn detached_limits_reserve_output_payload_nodes_depth_actions_groups_and_scalars
             .action(action())
             .expect("action")
             .finish(),
-        "ink action XML nodes",
+        LimitKind::Nodes,
         1,
     );
 
@@ -633,7 +686,7 @@ fn detached_limits_reserve_output_payload_nodes_depth_actions_groups_and_scalars
             .action(nested)
             .expect("action")
             .finish(),
-        "ink action XML depth",
+        LimitKind::Depth,
         2,
     );
 
@@ -645,7 +698,7 @@ fn detached_limits_reserve_output_payload_nodes_depth_actions_groups_and_scalars
         .expect("first action")
         .action(bare_action("b", ActionType::Remove, "1"))
         .expect("second action");
-    expect_limit(two_actions.finish(), "ink action records", 1);
+    expect_limit(two_actions.finish(), LimitKind::Actions, 1);
 
     let mut group_limit = default_limits();
     group_limit.max_action_groups = 1;
@@ -658,7 +711,7 @@ fn detached_limits_reserve_output_payload_nodes_depth_actions_groups_and_scalars
         .expect("first group")
         .action_group(second_group)
         .expect("second group");
-    expect_limit(two_groups.finish(), "ink action groups", 1);
+    expect_limit(two_groups.finish(), LimitKind::ActionGroups, 1);
 
     let mut scalar_limit = default_limits();
     scalar_limit.max_scalar_bytes = 4;
@@ -669,7 +722,7 @@ fn detached_limits_reserve_output_payload_nodes_depth_actions_groups_and_scalars
             .action(long_type)
             .expect("action")
             .finish(),
-        "action type",
+        LimitKind::ScalarBytes,
         4,
     );
 }
@@ -690,7 +743,7 @@ fn edit_output_limit_is_checked_before_replacement_allocation() {
     .expect("queue expansion");
     expect_limit(
         edit.commit(),
-        "ink action output bytes",
+        LimitKind::OutputBytes,
         limits.max_output_bytes,
     );
     assert_eq!(profile.source(), source().as_slice());
@@ -980,15 +1033,15 @@ fn expect_aggregate_limit(
     profile: &actions::Profile,
     limits: EditOptions,
     action: ActionDraft,
-    resource: &'static str,
-    value: usize,
+    kind: LimitKind,
+    maximum: usize,
 ) {
     match Edit::new(profile.clone(), limits) {
-        Err(error) => expect_limit::<()>(Err(error), resource, value),
+        Err(error) => expect_limit::<()>(Err(error), kind, maximum),
         Ok(mut edit) => {
             edit.add_action(ActionParent::Root, action)
                 .expect("queue aggregate action");
-            expect_limit(edit.commit(), resource, value);
+            expect_limit(edit.commit(), kind, maximum);
         },
     }
 }
@@ -1002,7 +1055,7 @@ fn aggregate_existing_and_added_records_are_bounded() {
         &profile,
         action_limits,
         bare_action("aggregate-action", ActionType::Add, "3"),
-        "ink action records",
+        LimitKind::Actions,
         2,
     );
 
@@ -1012,7 +1065,7 @@ fn aggregate_existing_and_added_records_are_bounded() {
         &profile,
         node_limits,
         bare_action("aggregate-node", ActionType::Add, "3"),
-        "ink action XML nodes",
+        LimitKind::Nodes,
         2,
     );
 }

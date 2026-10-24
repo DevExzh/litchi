@@ -5,10 +5,11 @@
 //! exercise the fragment owner only.  Package placement remains the
 //! responsibility of a host format.
 
+use litchi_drawingml::Error;
 use litchi_drawingml::theme::family::{
-    self, DRAWINGML_NAMESPACE, Family, Guid, MAX_ATTRIBUTES, MAX_DEPTH, MAX_NAME_BYTES,
-    MAX_NAMESPACE_BYTES, MAX_NAMESPACE_DECLARATIONS, MAX_XML_BYTES, NAMESPACE, Package,
-    XML_NAMESPACE,
+    self, DRAWINGML_NAMESPACE, Family, Guid, MAX_ATTRIBUTE_VALUE_BYTES, MAX_ATTRIBUTES, MAX_DEPTH,
+    MAX_GUID_BYTES, MAX_NAME_BYTES, MAX_NAMESPACE_BYTES, MAX_NAMESPACE_DECLARATIONS, MAX_XML_BYTES,
+    NAMESPACE, Package, XML_NAMESPACE,
 };
 
 const NATIVE: &[u8] = include_bytes!("fixtures/theme-family-native.xml");
@@ -21,6 +22,29 @@ const FAMILY_WITH_OPAQUE_EXTENSION: &[u8] = br#"<thm15:themeFamily xmlns:thm15="
 
 fn family_value(name: &str) -> Family {
     Family::new(name, OFFICE_ID, OFFICE_VID).expect("valid theme-family value")
+}
+
+#[test]
+fn guid_bounds_keep_typed_limit_dimensions() {
+    let oversized_input = "x".repeat(MAX_ATTRIBUTE_VALUE_BYTES + 1);
+    assert!(matches!(
+        Guid::new(&oversized_input),
+        Err(family::ValueError::Limit {
+            kind: litchi_drawingml::LimitKind::AttributeValueBytes,
+            observed,
+            maximum: MAX_ATTRIBUTE_VALUE_BYTES,
+        }) if observed == oversized_input.len()
+    ));
+
+    let oversized_guid = "x".repeat(MAX_GUID_BYTES + 1);
+    assert!(matches!(
+        Guid::new(&oversized_guid),
+        Err(family::ValueError::Limit {
+            kind: litchi_drawingml::LimitKind::ScalarBytes,
+            observed,
+            maximum: MAX_GUID_BYTES,
+        }) if observed == oversized_guid.len()
+    ));
 }
 
 fn assert_send_sync<T: Send + Sync>() {}
@@ -472,7 +496,10 @@ fn exact_no_op_inverse_and_stale_source_guards_are_enforced() {
             .into_bytes(),
     )
     .unwrap();
-    assert!(stale.apply(changed.patch()).is_err());
+    assert!(matches!(
+        stale.apply(changed.patch()),
+        Err(Error::PatchConflict)
+    ));
 }
 
 #[test]
@@ -550,9 +577,10 @@ fn namespace_prefix_bound_accepts_exact_bytes_and_rejects_one_more() {
                 assert!(
                     matches!(
                         result,
-                        Err(litchi_drawingml::Error::Limit {
-                            resource: "theme family namespace prefix bytes",
-                            limit: MAX_NAMESPACE_BYTES,
+                        Err(Error::Limit {
+                            kind: litchi_drawingml::LimitKind::NamespacePrefixBytes,
+                            maximum: MAX_NAMESPACE_BYTES,
+                            ..
                         })
                     ),
                     "oversized declared prefix: {result:?}"

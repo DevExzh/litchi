@@ -126,10 +126,11 @@ pub fn write(value: &Value) -> Result<Vec<u8>> {
     }
 
     if output.len() > MAX_XML_BYTES {
-        return Err(Error::Limit {
-            resource: "DrawingML color XML",
-            limit: MAX_XML_BYTES,
-        });
+        return Err(Error::limit(
+            crate::LimitKind::XmlBytes,
+            output.len(),
+            MAX_XML_BYTES,
+        ));
     }
     Ok(output.into_bytes())
 }
@@ -379,10 +380,11 @@ fn parse_transform(
 
 fn push_transform(transforms: &mut Vec<Transform>, transform: Transform) -> Result<()> {
     if transforms.len() >= MAX_TRANSFORMS {
-        return Err(Error::Limit {
-            resource: "DrawingML color transforms",
-            limit: MAX_TRANSFORMS,
-        });
+        return Err(Error::limit(
+            crate::LimitKind::ColorTransforms,
+            transforms.len() + 1,
+            MAX_TRANSFORMS,
+        ));
     }
     transforms.push(transform);
     Ok(())

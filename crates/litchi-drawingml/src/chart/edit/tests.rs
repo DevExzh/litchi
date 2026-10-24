@@ -1,6 +1,7 @@
 //! Focused source-preserving chart transaction tests.
 
 use super::{DataLabelFlag, Package};
+use crate::Error;
 use crate::chart::data::TitleText;
 use crate::chart::types::{AxisPosition, DisplayBlanks};
 
@@ -89,7 +90,10 @@ fn stale_and_invalid_edits_are_rejected_atomically() {
             .into_bytes(),
     )
     .unwrap();
-    assert!(other.apply(changed.patch()).is_err());
+    assert!(matches!(
+        other.apply(changed.patch()),
+        Err(Error::PatchConflict)
+    ));
 
     let mut edit = snapshot.edit();
     assert!(edit.set_style(Some(49)).is_err());

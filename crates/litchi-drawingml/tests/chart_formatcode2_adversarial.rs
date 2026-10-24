@@ -7,7 +7,7 @@ use formatcode2::{
     read_attribute_shared_with_bindings, read_attribute_with_bindings, read_shared, write,
     write_attribute, write_attribute_to, write_to,
 };
-use litchi_drawingml::{Error, chart::extension::formatcode2};
+use litchi_drawingml::{Error, LimitKind, chart::extension::formatcode2};
 
 const ROOT_PREFIX: &str = "f";
 const MAX_LEXICAL_VALUE_BYTES: usize = MAX_VALUE_BYTES * 7;
@@ -47,30 +47,34 @@ fn assert_rejected(source: &[u8]) {
     }
 }
 
-fn assert_limit(source: &[u8], resource: &'static str, limit: usize) {
+fn assert_limit(source: &[u8], kind: LimitKind, maximum: usize) {
     match read(source) {
         Err(Error::Limit {
-            resource: actual_resource,
-            limit: actual_limit,
+            kind: actual_kind,
+            observed,
+            maximum: actual_maximum,
         }) => {
-            assert_eq!(actual_resource, resource);
-            assert_eq!(actual_limit, limit);
+            assert_eq!(actual_kind, kind);
+            assert_eq!(actual_maximum, maximum);
+            assert!(observed > maximum);
         },
-        Err(other) => panic!("expected Limit({resource:?}, {limit}), got {other:?}"),
+        Err(other) => panic!("expected Limit({kind:?}, {maximum}), got {other:?}"),
         Ok(value) => panic!("accepted over-budget formatcode2 value {:?}", value.value()),
     }
 }
 
-fn assert_attribute_limit(source: &[u8], resource: &'static str, limit: usize) {
+fn assert_attribute_limit(source: &[u8], kind: LimitKind, maximum: usize) {
     match read_attribute(source) {
         Err(Error::Limit {
-            resource: actual_resource,
-            limit: actual_limit,
+            kind: actual_kind,
+            observed,
+            maximum: actual_maximum,
         }) => {
-            assert_eq!(actual_resource, resource);
-            assert_eq!(actual_limit, limit);
+            assert_eq!(actual_kind, kind);
+            assert_eq!(actual_maximum, maximum);
+            assert!(observed > maximum);
         },
-        Err(other) => panic!("expected Limit({resource:?}, {limit}), got {other:?}"),
+        Err(other) => panic!("expected Limit({kind:?}, {maximum}), got {other:?}"),
         Ok(value) => panic!(
             "accepted over-budget formatcode2 attribute value {:?}",
             value.value()
@@ -81,18 +85,20 @@ fn assert_attribute_limit(source: &[u8], resource: &'static str, limit: usize) {
 fn assert_attribute_binding_limit(
     source: &[u8],
     bindings: &[(&str, &str)],
-    resource: &'static str,
-    limit: usize,
+    kind: LimitKind,
+    maximum: usize,
 ) {
     match read_attribute_with_bindings(source, bindings) {
         Err(Error::Limit {
-            resource: actual_resource,
-            limit: actual_limit,
+            kind: actual_kind,
+            observed,
+            maximum: actual_maximum,
         }) => {
-            assert_eq!(actual_resource, resource);
-            assert_eq!(actual_limit, limit);
+            assert_eq!(actual_kind, kind);
+            assert_eq!(actual_maximum, maximum);
+            assert!(observed > maximum);
         },
-        Err(other) => panic!("expected Limit({resource:?}, {limit}), got {other:?}"),
+        Err(other) => panic!("expected Limit({kind:?}, {maximum}), got {other:?}"),
         Ok(value) => panic!(
             "accepted over-budget inherited formatcode2 attribute value {:?}",
             value.value()
@@ -100,16 +106,18 @@ fn assert_attribute_binding_limit(
     }
 }
 
-fn assert_write_limit(value: &Element, resource: &'static str, limit: usize) {
+fn assert_write_limit(value: &Element, kind: LimitKind, maximum: usize) {
     match write(value) {
         Err(Error::Limit {
-            resource: actual_resource,
-            limit: actual_limit,
+            kind: actual_kind,
+            observed,
+            maximum: actual_maximum,
         }) => {
-            assert_eq!(actual_resource, resource);
-            assert_eq!(actual_limit, limit);
+            assert_eq!(actual_kind, kind);
+            assert_eq!(actual_maximum, maximum);
+            assert!(observed > maximum);
         },
-        Err(other) => panic!("expected Limit({resource:?}, {limit}), got {other:?}"),
+        Err(other) => panic!("expected Limit({kind:?}, {maximum}), got {other:?}"),
         Ok(output) => panic!(
             "wrote over-budget formatcode2 output of {} bytes",
             output.len()
@@ -620,7 +628,7 @@ fn qualified_attribute_namespace_and_output_limits_are_real() {
     );
     assert_attribute_limit(
         &source.into_bytes(),
-        "formatcode2 namespace bytes",
+        LimitKind::NamespacePrefixBytes,
         MAX_NAMESPACE_BYTES,
     );
 
@@ -631,9 +639,14 @@ fn qualified_attribute_namespace_and_output_limits_are_real() {
         .set_value("\u{1}".repeat(MAX_VALUE_BYTES))
         .unwrap();
     match write_attribute(&attribute) {
-        Err(Error::Limit { resource, limit }) => {
-            assert_eq!(resource, "formatcode2 attribute XML bytes");
-            assert_eq!(limit, MAX_XML_BYTES);
+        Err(Error::Limit {
+            kind,
+            maximum,
+            observed,
+        }) => {
+            assert_eq!(kind, LimitKind::XmlBytes);
+            assert_eq!(maximum, MAX_XML_BYTES);
+            assert!(observed > maximum);
         },
         other => panic!("expected qualified attribute output limit, got {other:?}"),
     }
@@ -647,7 +660,7 @@ fn namespace_prefix_uri_and_xml_input_limits_are_real_and_exact() {
     );
     assert_limit(
         source.as_bytes(),
-        "formatcode2 namespace bytes",
+        LimitKind::NamespacePrefixBytes,
         MAX_NAMESPACE_BYTES,
     );
 
@@ -655,7 +668,7 @@ fn namespace_prefix_uri_and_xml_input_limits_are_real_and_exact() {
     let source = format!(r#"<f:formatcode2 xmlns:f="{long_uri}">x</f:formatcode2>"#);
     assert_limit(
         source.as_bytes(),
-        "formatcode2 namespace bytes",
+        LimitKind::NamespaceBytes,
         MAX_NAMESPACE_BYTES,
     );
 
@@ -663,11 +676,7 @@ fn namespace_prefix_uri_and_xml_input_limits_are_real_and_exact() {
         r#"<f:formatcode2 xmlns:f="{NAMESPACE}"><!--{}-->x</f:formatcode2>"#,
         "x".repeat(MAX_XML_BYTES),
     );
-    assert_limit(
-        over_input.as_bytes(),
-        "formatcode2 XML bytes",
-        MAX_XML_BYTES,
-    );
+    assert_limit(over_input.as_bytes(), LimitKind::XmlBytes, MAX_XML_BYTES);
 
     let lexical = format!(
         r#"<f:formatcode2 xmlns:f="{NAMESPACE}">{}</f:formatcode2>"#,
@@ -675,7 +684,7 @@ fn namespace_prefix_uri_and_xml_input_limits_are_real_and_exact() {
     );
     assert_limit(
         lexical.as_bytes(),
-        "formatcode2 lexical value bytes",
+        LimitKind::LexicalValueBytes,
         MAX_LEXICAL_VALUE_BYTES,
     );
 
@@ -685,7 +694,7 @@ fn namespace_prefix_uri_and_xml_input_limits_are_real_and_exact() {
     );
     assert_limit(
         decoded_value.as_bytes(),
-        "formatcode2 value bytes",
+        LimitKind::TextBytes,
         MAX_VALUE_BYTES,
     );
 
@@ -696,7 +705,7 @@ fn namespace_prefix_uri_and_xml_input_limits_are_real_and_exact() {
     attributes.push_str(">x</f:formatcode2>");
     assert_limit(
         &attributes.into_bytes(),
-        "formatcode2 attributes",
+        LimitKind::XmlAttributes,
         MAX_ATTRIBUTES,
     );
 
@@ -707,7 +716,7 @@ fn namespace_prefix_uri_and_xml_input_limits_are_real_and_exact() {
     local_attribute_declarations.push_str(r#" f:formatcode2="x"/>"#);
     assert_attribute_limit(
         local_attribute_declarations.as_bytes(),
-        "formatcode2 attributes",
+        LimitKind::XmlAttributes,
         MAX_ATTRIBUTES,
     );
 
@@ -722,7 +731,7 @@ fn namespace_prefix_uri_and_xml_input_limits_are_real_and_exact() {
     assert_attribute_binding_limit(
         br#"<series f:formatcode2="x"/>"#,
         &bindings,
-        "formatcode2 inherited namespace bindings",
+        LimitKind::NamespaceDeclarations,
         MAX_ATTRIBUTES,
     );
 }
@@ -737,7 +746,7 @@ fn output_limit_charges_actual_xstring_expansion_before_allocating() {
     value
         .set_value("\u{1}".repeat(MAX_VALUE_BYTES))
         .expect("semantic value is under the value bound");
-    assert_write_limit(&value, "formatcode2 XML bytes", MAX_XML_BYTES);
+    assert_write_limit(&value, LimitKind::XmlBytes, MAX_XML_BYTES);
 }
 
 #[test]

@@ -11,7 +11,7 @@ use quick_xml::{
     reader::{NsReader, Reader},
 };
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 
 use super::super::{
     Blip, Child, Id, Inert, MAX_CHILDREN, MAX_DEPTH, MAX_FRAGMENT_BYTES, MAX_NODES, Metadata,
@@ -27,7 +27,11 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn read(xml: &[u8]) -> Result<Metadata> {
     if xml.len() > super::super::MAX_XML_BYTES {
-        return Err(limit("model3d XML bytes", super::super::MAX_XML_BYTES));
+        return Err(limit(
+            LimitKind::XmlBytes,
+            xml.len(),
+            super::super::MAX_XML_BYTES,
+        ));
     }
 
     let mut reader = NsReader::from_reader(xml);
@@ -141,7 +145,11 @@ pub fn read(xml: &[u8]) -> Result<Metadata> {
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn opaque(xml: &[u8]) -> Result<Inert> {
     if xml.len() > MAX_FRAGMENT_BYTES {
-        return Err(limit("model3d inert fragment bytes", MAX_FRAGMENT_BYTES));
+        return Err(limit(
+            LimitKind::InertFragmentBytes,
+            xml.len(),
+            MAX_FRAGMENT_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -225,7 +233,11 @@ pub fn write(metadata: &Metadata) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     write_inner(&mut output, metadata);
     if output.len() > super::super::MAX_XML_BYTES {
-        return Err(limit("model3d output bytes", super::super::MAX_XML_BYTES));
+        return Err(limit(
+            LimitKind::XmlBytes,
+            output.len(),
+            super::super::MAX_XML_BYTES,
+        ));
     }
     Ok(output)
 }
@@ -248,7 +260,11 @@ fn push_child(
     raw: Vec<u8>,
 ) -> Result<()> {
     if metadata.children.len() >= MAX_CHILDREN {
-        return Err(limit("model3d children", MAX_CHILDREN));
+        return Err(limit(
+            LimitKind::ModelChildren,
+            metadata.children.len() + 1,
+            MAX_CHILDREN,
+        ));
     }
     if local == "raster" && namespace == NAMESPACE {
         metadata
@@ -345,7 +361,8 @@ fn parse_raster(xml: &[u8], inherited: &[Namespace]) -> Result<Raster> {
     let _ = (root_start, root_end);
     if children.len() > super::super::MAX_RASTER_CHILDREN {
         return Err(limit(
-            "model3d raster children",
+            LimitKind::RasterChildren,
+            children.len(),
             super::super::MAX_RASTER_CHILDREN,
         ));
     }
@@ -362,7 +379,8 @@ fn push_raster_child(
 ) -> Result<()> {
     if children.len() >= super::super::MAX_RASTER_CHILDREN {
         return Err(limit(
-            "model3d raster children",
+            LimitKind::RasterChildren,
+            children.len() + 1,
             super::super::MAX_RASTER_CHILDREN,
         ));
     }
@@ -739,17 +757,17 @@ fn capture_namespace_element<R: std::io::BufRead>(
                     .checked_add(1)
                     .ok_or_else(|| invalid("model3d XML nesting is too deep"))?;
                 if depth > MAX_DEPTH {
-                    return Err(limit("model3d XML depth", MAX_DEPTH));
+                    return Err(limit(LimitKind::XmlDepth, depth, MAX_DEPTH));
                 }
                 nodes = nodes.saturating_add(1);
                 if nodes > MAX_NODES {
-                    return Err(limit("model3d XML nodes", MAX_NODES));
+                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                 }
             },
             Event::Empty(_) => {
                 nodes = nodes.saturating_add(1);
                 if nodes > MAX_NODES {
-                    return Err(limit("model3d XML nodes", MAX_NODES));
+                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                 }
             },
             Event::End(_) => {
@@ -794,7 +812,7 @@ fn capture_plain_element<R: std::io::BufRead>(
                     .checked_add(1)
                     .ok_or_else(|| invalid("model3d XML nesting is too deep"))?;
                 if depth > MAX_DEPTH {
-                    return Err(limit("model3d XML depth", MAX_DEPTH));
+                    return Err(limit(LimitKind::XmlDepth, depth, MAX_DEPTH));
                 }
             },
             Event::End(_) => {
@@ -857,11 +875,25 @@ fn require_root(local: &str, namespace: &str) -> Result<()> {
 }
 
 fn validation_error(error: &crate::model3d::Error) -> Error {
-    Error::Invalid(error.to_string())
+    match error {
+        crate::model3d::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(*kind, *observed, *maximum),
+        _ => Error::Invalid(error.to_string()),
+    }
 }
 
-fn value_error(error: impl std::fmt::Display) -> Error {
-    Error::Invalid(error.to_string())
+fn value_error(error: super::super::ValueError) -> Error {
+    match error {
+        super::super::ValueError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(kind, observed, maximum),
+        error => Error::Invalid(error.to_string()),
+    }
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {
@@ -872,6 +904,6 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }

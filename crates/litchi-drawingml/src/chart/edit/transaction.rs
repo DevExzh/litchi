@@ -9,15 +9,8 @@ use crate::chart::model::Chart;
 use crate::chart::types::{AxisPosition, DisplayBlanks, LegendPosition};
 use std::sync::Arc;
 
+pub use crate::LimitKind;
 pub use litchi_core::edit::Diagnostics;
-
-/// Resource dimensions reserved for future caller-configured chart bounds.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-#[non_exhaustive]
-pub enum LimitKind {
-    /// Complete chart-space XML bytes.
-    XmlBytes,
-}
 
 /// An immutable source snapshot of one host-neutral chart-space part.
 #[derive(Debug, Clone)]
@@ -383,9 +376,7 @@ impl Patch {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     fn apply(&self, source: &Package) -> Result<Package> {
         if source.xml.as_ref() != self.before.as_ref() {
-            return Err(Error::Invalid(
-                "chart patch source does not match its byte precondition".into(),
-            ));
+            return Err(Error::PatchConflict);
         }
         Package::from_xml(self.after.as_ref().to_vec())
     }

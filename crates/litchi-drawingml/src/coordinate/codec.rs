@@ -4,27 +4,40 @@ use std::fmt;
 use std::str::FromStr;
 
 use super::model::{Coordinate, Extent, MAX_BYTES, MAX_EMU, MIN_EMU, Repr, Unit};
+use crate::LimitKind;
 
 /// Failure to construct or parse a `DrawingML` coordinate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParseError {
     Empty,
-    TooLong { len: usize, max: usize },
+    Limit {
+        kind: LimitKind,
+        observed: usize,
+        maximum: usize,
+    },
     InvalidNumber,
     InvalidExtent,
     InvalidUnit,
-    ExtentOutOfRange { value: i64 },
-    OutOfRange { value: i64 },
+    ExtentOutOfRange {
+        value: i64,
+    },
+    OutOfRange {
+        value: i64,
+    },
 }
 
 impl fmt::Display for ParseError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Empty => formatter.write_str("DrawingML coordinate is empty"),
-            Self::TooLong { len, max } => {
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => {
                 write!(
                     formatter,
-                    "DrawingML coordinate uses {len} bytes; the limit is {max}"
+                    "DrawingML {kind} limit exceeded: observed {observed}, maximum {maximum}"
                 )
             },
             Self::InvalidNumber => formatter.write_str(
@@ -92,14 +105,16 @@ impl Coordinate {
         let len = number
             .len()
             .checked_add(unit.as_str().len())
-            .ok_or(ParseError::TooLong {
-                len: usize::MAX,
-                max: MAX_BYTES,
+            .ok_or(ParseError::Limit {
+                kind: LimitKind::LexicalValueBytes,
+                observed: usize::MAX,
+                maximum: MAX_BYTES,
             })?;
         if len > MAX_BYTES {
-            return Err(ParseError::TooLong {
-                len,
-                max: MAX_BYTES,
+            return Err(ParseError::Limit {
+                kind: LimitKind::LexicalValueBytes,
+                observed: len,
+                maximum: MAX_BYTES,
             });
         }
         let mut lexical = String::with_capacity(len);
@@ -115,9 +130,10 @@ impl Coordinate {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse(value: &str) -> Result<Self, ParseError> {
         if value.len() > MAX_BYTES {
-            return Err(ParseError::TooLong {
-                len: value.len(),
-                max: MAX_BYTES,
+            return Err(ParseError::Limit {
+                kind: LimitKind::LexicalValueBytes,
+                observed: value.len(),
+                maximum: MAX_BYTES,
             });
         }
         Self::parse_owned(value.to_owned())
@@ -128,9 +144,10 @@ impl Coordinate {
             return Err(ParseError::Empty);
         }
         if value.len() > MAX_BYTES {
-            return Err(ParseError::TooLong {
-                len: value.len(),
-                max: MAX_BYTES,
+            return Err(ParseError::Limit {
+                kind: LimitKind::LexicalValueBytes,
+                observed: value.len(),
+                maximum: MAX_BYTES,
             });
         }
 
@@ -216,9 +233,10 @@ impl Extent {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse(value: &str) -> Result<Self, ParseError> {
         if value.len() > MAX_BYTES {
-            return Err(ParseError::TooLong {
-                len: value.len(),
-                max: MAX_BYTES,
+            return Err(ParseError::Limit {
+                kind: LimitKind::LexicalValueBytes,
+                observed: value.len(),
+                maximum: MAX_BYTES,
             });
         }
         let value = value.trim_matches(xsd_whitespace);
@@ -316,9 +334,10 @@ fn normalize_measure(mut number: String, unit: Unit) -> Result<Coordinate, Parse
     let number_len = number.len();
     number.push_str(unit.as_str());
     if number.len() > MAX_BYTES {
-        return Err(ParseError::TooLong {
-            len: number.len(),
-            max: MAX_BYTES,
+        return Err(ParseError::Limit {
+            kind: LimitKind::LexicalValueBytes,
+            observed: number.len(),
+            maximum: MAX_BYTES,
         });
     }
     Ok(Coordinate(Repr::Measure {

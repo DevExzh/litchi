@@ -61,7 +61,8 @@ fn inherited_namespace_view_has_an_explicit_combined_byte_limit() {
                 matches!(
                     result,
                     Err(litchi_drawingml::Error::Limit {
-                        limit: formatcode2::MAX_XML_BYTES,
+                        kind: litchi_drawingml::LimitKind::XmlBytes,
+                        maximum: formatcode2::MAX_XML_BYTES,
                         ..
                     })
                 ),

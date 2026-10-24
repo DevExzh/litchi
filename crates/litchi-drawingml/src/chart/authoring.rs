@@ -806,10 +806,11 @@ impl Spec {
             }
         }
         if self.series.len() > MAX_SERIES {
-            return Err(Error::Limit {
-                resource: "authored chart series",
-                limit: MAX_SERIES,
-            });
+            return Err(Error::limit(
+                crate::LimitKind::ChartSeries,
+                self.series.len(),
+                MAX_SERIES,
+            ));
         }
         if self.variant.kind == Kind::Stock && !matches!(self.series.len(), 3 | 4) {
             return Err(Error::Invalid(
@@ -827,10 +828,11 @@ impl Spec {
             ));
         }
         if self.categories.len() > MAX_POINTS {
-            return Err(Error::Limit {
-                resource: "authored chart categories",
-                limit: MAX_POINTS,
-            });
+            return Err(Error::limit(
+                crate::LimitKind::ChartCategories,
+                self.categories.len(),
+                MAX_POINTS,
+            ));
         }
         let texts = self
             .title
@@ -841,10 +843,11 @@ impl Spec {
             .chain(self.series.iter().map(|series| &series.name));
         for text in texts {
             if text.len() > MAX_TEXT_BYTES {
-                return Err(Error::Limit {
-                    resource: "authored chart text bytes",
-                    limit: MAX_TEXT_BYTES,
-                });
+                return Err(Error::limit(
+                    crate::LimitKind::ChartTextBytes,
+                    text.len(),
+                    MAX_TEXT_BYTES,
+                ));
             }
         }
         if let Binding::Sheet { sheet, row, column } = &self.binding {
@@ -898,10 +901,11 @@ impl Spec {
                 )));
             }
             if series.values.len() > MAX_POINTS {
-                return Err(Error::Limit {
-                    resource: "authored chart series points",
-                    limit: MAX_POINTS,
-                });
+                return Err(Error::limit(
+                    crate::LimitKind::ChartPoints,
+                    series.values.len(),
+                    MAX_POINTS,
+                ));
             }
             if series.values.iter().any(|value| !value.is_finite()) {
                 return Err(Error::Invalid(format!(
@@ -912,10 +916,11 @@ impl Spec {
             total = total.saturating_add(series.values.len());
         }
         if total > MAX_TOTAL_POINTS {
-            return Err(Error::Limit {
-                resource: "authored chart points",
-                limit: MAX_TOTAL_POINTS,
-            });
+            return Err(Error::limit(
+                crate::LimitKind::ChartPoints,
+                total,
+                MAX_TOTAL_POINTS,
+            ));
         }
         Ok(())
     }

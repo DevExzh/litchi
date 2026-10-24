@@ -1,7 +1,7 @@
 use super::codec::{opaque, read, write};
 use super::{
-    Error, Id, Metadata, Raster, RasterChild, Reference, Relationship, Resolver, Target,
-    validate_relationships,
+    Error, Id, MAX_NAMESPACE_TEXT_BYTES, MAX_RELATIONSHIP_ID_BYTES, Metadata, Namespace, Raster,
+    RasterChild, Reference, Relationship, Resolver, Target, ValueError, validate_relationships,
 };
 
 const MODEL_XML: &[u8] = br#"<m3d:model3d xmlns:m3d="http://schemas.microsoft.com/office/drawing/2017/model3d" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:f="urn:future" r:embed="rIdModel" r:link="rIdLinked"><m3d:spPr><a:futureShape f:value="keep"/></m3d:spPr><m3d:camera/><m3d:trans/><m3d:attrSrcUrl f:source="keep"/><m3d:raster rName="Office Renderer" rVer="17.0"><m3d:blip r:embed="rIdRaster"><m3d:future/></m3d:blip><m3d:future f:payload="yes"/></m3d:raster><m3d:extLst><a:ext uri="urn:future"><f:payload/></a:ext></m3d:extLst><m3d:objViewport/><m3d:ptLight/></m3d:model3d>"#;
@@ -112,6 +112,29 @@ fn authoring_facade_can_replace_raster_without_losing_scene_children() {
             .windows(b"Renderer".len())
             .any(|window| window == b"Renderer")
     );
+}
+
+#[test]
+fn scalar_constructor_bounds_keep_typed_limit_dimensions() {
+    let relationship_id = "r".repeat(MAX_RELATIONSHIP_ID_BYTES + 1);
+    assert!(matches!(
+        Id::new(&relationship_id),
+        Err(ValueError::Limit {
+            kind: crate::LimitKind::AttributeValueBytes,
+            observed,
+            maximum: MAX_RELATIONSHIP_ID_BYTES,
+        }) if observed == relationship_id.len()
+    ));
+
+    let prefix = "p".repeat(MAX_NAMESPACE_TEXT_BYTES + 1);
+    assert!(matches!(
+        Namespace::new(Some(&prefix), "urn:future"),
+        Err(ValueError::Limit {
+            kind: crate::LimitKind::NamespacePrefixBytes,
+            observed,
+            maximum: MAX_NAMESPACE_TEXT_BYTES,
+        }) if observed == prefix.len()
+    ));
 }
 
 struct FixtureGraph;

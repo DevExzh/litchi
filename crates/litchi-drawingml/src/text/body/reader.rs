@@ -175,10 +175,11 @@ pub fn read(xml: &[u8]) -> Result<Body> {
 /// The errors of [`read`], under `limits`.
 pub fn read_with_options(xml: &[u8], scope: NamespaceResolver, limits: Limits) -> Result<Body> {
     if xml.len() > limits.input_bytes {
-        return Err(Error::Limit {
-            resource: "text body input bytes",
-            limit: limits.input_bytes,
-        });
+        return Err(Error::limit(
+            crate::LimitKind::InputBytes,
+            xml.len(),
+            limits.input_bytes,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -436,10 +437,11 @@ impl<'x> Builder<'x> {
     /// Refuses input larger than the configured physical byte bound.
     pub fn new(document: &'x [u8], limits: Limits) -> Result<Self> {
         if document.len() > limits.input_bytes {
-            return Err(Error::Limit {
-                resource: "text body input bytes",
-                limit: limits.input_bytes,
-            });
+            return Err(Error::limit(
+                crate::LimitKind::InputBytes,
+                document.len(),
+                limits.input_bytes,
+            ));
         }
         Ok(Self {
             document,
@@ -588,9 +590,12 @@ impl<'x> Builder<'x> {
             .text_bytes
             .checked_add(bytes)
             .filter(|next| *next <= self.limits.text_bytes)
-            .ok_or(Error::Limit {
-                resource: "text body text bytes",
-                limit: self.limits.text_bytes,
+            .ok_or_else(|| {
+                Error::limit(
+                    crate::LimitKind::TextBytes,
+                    self.text_bytes.saturating_add(bytes),
+                    self.limits.text_bytes,
+                )
             })?;
         Ok(())
     }
@@ -732,19 +737,23 @@ impl<'x> Builder<'x> {
             .nodes
             .checked_add(1)
             .filter(|nodes| *nodes <= self.limits.nodes)
-            .ok_or(Error::Limit {
-                resource: "text body elements",
-                limit: self.limits.nodes,
+            .ok_or_else(|| {
+                Error::limit(
+                    crate::LimitKind::TextBodyElements,
+                    self.nodes.saturating_add(1),
+                    self.limits.nodes,
+                )
             })?;
         Ok(())
     }
 
     fn check_depth(&self, frames: usize) -> Result<()> {
         if frames.saturating_add(self.skipped) > self.limits.depth {
-            return Err(Error::Limit {
-                resource: "text body nesting depth",
-                limit: self.limits.depth,
-            });
+            return Err(Error::limit(
+                crate::LimitKind::TextBodyNestingDepth,
+                frames.saturating_add(self.skipped),
+                self.limits.depth,
+            ));
         }
         Ok(())
     }

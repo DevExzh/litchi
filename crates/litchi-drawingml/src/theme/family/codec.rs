@@ -13,7 +13,7 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 
 use super::model::{Family, Guid, Source, checked_name, validate_xml_text};
 use super::{
@@ -32,7 +32,7 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 /// children.
 pub fn read(xml: &[u8]) -> Result<Family> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("theme family XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let parsed = scan(xml)?;
     let source = Arc::<[u8]>::from(xml);
@@ -52,7 +52,7 @@ pub fn read(xml: &[u8]) -> Result<Family> {
 /// source copy for package owners that already use shared part storage.
 pub fn read_shared(xml: Arc<[u8]>) -> Result<Family> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("theme family XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let parsed = scan(xml.as_ref())?;
     Ok(Family::from_source(Source {
@@ -228,7 +228,8 @@ fn is_xml_whitespace_character(character: char) -> bool {
 pub(crate) fn validate_general_ref(reference: &BytesRef<'_>) -> Result<Option<char>> {
     if reference.len() > MAX_ATTRIBUTE_VALUE_BYTES {
         return Err(limit(
-            "theme family general reference bytes",
+            LimitKind::ScalarBytes,
+            reference.len(),
             MAX_ATTRIBUTE_VALUE_BYTES,
         ));
     }
@@ -312,7 +313,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("theme family node count overflow"))?;
                 if nodes > MAX_NODES {
-                    return Err(limit("theme family XML nodes", MAX_NODES));
+                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                 }
                 let namespace = event_namespace.clone();
                 validate_element_name(&element)?;
@@ -342,7 +343,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                     kind
                 };
                 if stack.len() >= MAX_DEPTH {
-                    return Err(limit("theme family XML depth", MAX_DEPTH));
+                    return Err(limit(LimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
                 }
                 stack.push(Frame {
                     local,
@@ -355,7 +356,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("theme family node count overflow"))?;
                 if nodes > MAX_NODES {
-                    return Err(limit("theme family XML nodes", MAX_NODES));
+                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                 }
                 let namespace = event_namespace.clone();
                 validate_element_name(&element)?;
@@ -387,7 +388,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                     kind
                 };
                 if !root_closed && stack.len() >= MAX_DEPTH {
-                    return Err(limit("theme family XML depth", MAX_DEPTH));
+                    return Err(limit(LimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
                 }
             },
             Event::End(element) => {
@@ -527,7 +528,7 @@ fn validate_element_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]
             .checked_add(1)
             .ok_or_else(|| invalid("theme family attribute count overflow"))?;
         if count > MAX_ATTRIBUTES {
-            return Err(limit("theme family attributes", MAX_ATTRIBUTES));
+            return Err(limit(LimitKind::XmlAttributes, count, MAX_ATTRIBUTES));
         }
         let raw_name = attribute.key.as_ref();
         let name = std::str::from_utf8(raw_name).map_err(xml_error)?;
@@ -541,13 +542,15 @@ fn validate_element_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]
                 .ok_or_else(|| invalid("theme family namespace count overflow"))?;
             if namespaces > MAX_NAMESPACE_DECLARATIONS {
                 return Err(limit(
-                    "theme family namespace declarations",
+                    LimitKind::NamespaceDeclarations,
+                    namespaces,
                     MAX_NAMESPACE_DECLARATIONS,
                 ));
             }
             if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
                 return Err(limit(
-                    "theme family attribute value bytes",
+                    LimitKind::ScalarBytes,
+                    attribute.value.len(),
                     MAX_ATTRIBUTE_VALUE_BYTES,
                 ));
             }
@@ -559,19 +562,25 @@ fn validate_element_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]
                 .unwrap_or(&[]);
             if prefix.len() > MAX_NAMESPACE_BYTES {
                 return Err(limit(
-                    "theme family namespace prefix bytes",
+                    LimitKind::NamespacePrefixBytes,
+                    prefix.len(),
                     MAX_NAMESPACE_BYTES,
                 ));
             }
             validate_namespace_binding(prefix, &value)?;
             if value.len() > MAX_NAMESPACE_BYTES {
-                return Err(limit("theme family namespace bytes", MAX_NAMESPACE_BYTES));
+                return Err(limit(
+                    LimitKind::NamespaceBytes,
+                    value.len(),
+                    MAX_NAMESPACE_BYTES,
+                ));
             }
             continue;
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "theme family attribute value bytes",
+                LimitKind::ScalarBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
@@ -583,7 +592,8 @@ fn validate_element_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]
             ResolveResult::Unknown(prefix) => {
                 if prefix.len() > MAX_NAMESPACE_BYTES {
                     return Err(limit(
-                        "theme family namespace prefix bytes",
+                        LimitKind::NamespacePrefixBytes,
+                        prefix.len(),
                         MAX_NAMESPACE_BYTES,
                     ));
                 }
@@ -612,7 +622,8 @@ fn validate_element_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]
         seen.push((namespace, local));
         if value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "theme family attribute value bytes",
+                LimitKind::ScalarBytes,
+                value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
@@ -764,7 +775,11 @@ fn resolved_namespace(resolved: &ResolveResult<'_>) -> Result<Vec<u8>> {
     match resolved {
         ResolveResult::Bound(Namespace(value)) => {
             if value.len() > MAX_NAMESPACE_BYTES {
-                return Err(limit("theme family namespace bytes", MAX_NAMESPACE_BYTES));
+                return Err(limit(
+                    LimitKind::NamespaceBytes,
+                    value.len(),
+                    MAX_NAMESPACE_BYTES,
+                ));
             }
             std::str::from_utf8(value).map_err(xml_error)?;
             Ok(value.to_vec())
@@ -773,7 +788,8 @@ fn resolved_namespace(resolved: &ResolveResult<'_>) -> Result<Vec<u8>> {
         ResolveResult::Unknown(prefix) => {
             if prefix.len() > MAX_NAMESPACE_BYTES {
                 return Err(limit(
-                    "theme family namespace prefix bytes",
+                    LimitKind::NamespacePrefixBytes,
+                    prefix.len(),
                     MAX_NAMESPACE_BYTES,
                 ));
             }
@@ -795,7 +811,8 @@ fn validate_qname_prefix(name: QName<'_>) -> Result<()> {
         .is_some_and(|prefix| prefix.as_ref().len() > MAX_NAMESPACE_BYTES)
     {
         return Err(limit(
-            "theme family namespace prefix bytes",
+            LimitKind::NamespacePrefixBytes,
+            name.prefix().map_or(0, |prefix| prefix.as_ref().len()),
             MAX_NAMESPACE_BYTES,
         ));
     }
@@ -860,7 +877,7 @@ fn detached_len(name: &str, id: &str, variant_id: &str) -> Result<usize> {
         .and_then(|length| length.checked_add(b"\"/>".len()))
         .ok_or_else(|| invalid("theme family output length overflows"))?;
     if output_len > MAX_XML_BYTES {
-        return Err(limit("theme family output bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, output_len, MAX_XML_BYTES));
     }
     Ok(output_len)
 }
@@ -962,7 +979,7 @@ fn source_rewrite(source: &Source, value: &Family) -> Result<SourceRewrite> {
             .ok_or_else(|| invalid("theme family patched XML length overflows"))?;
     }
     if output_len > MAX_XML_BYTES {
-        return Err(limit("patched theme family XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, output_len, MAX_XML_BYTES));
     }
     Ok(SourceRewrite {
         output_len,
@@ -1108,7 +1125,7 @@ fn validate(value: &Family) -> Result<()> {
     let _ = Guid::new(value.variant_id().as_str()).map_err(Error::from)?;
     if let Some(source) = value.source_state() {
         if source.xml.len() > MAX_XML_BYTES {
-            return Err(limit("theme family source bytes", MAX_XML_BYTES));
+            return Err(limit(LimitKind::XmlBytes, source.xml.len(), MAX_XML_BYTES));
         }
         if source.root_start >= source.root_end || source.root_end > source.xml.len() {
             return Err(invalid("theme family source root range is invalid"));
@@ -1127,7 +1144,7 @@ fn source_is_exact(value: &Family) -> bool {
 
 fn bounded_output(output: Vec<u8>) -> Result<Vec<u8>> {
     if output.len() > MAX_XML_BYTES {
-        return Err(limit("theme family output bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, output.len(), MAX_XML_BYTES));
     }
     Ok(output)
 }
@@ -1166,8 +1183,8 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }
 
 fn xml_error(error: impl fmt::Display) -> Error {

@@ -23,59 +23,13 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::Error;
 use crate::Result;
-
-/// Caller-visible budget dimensions for detached action authoring and edits.
-///
-/// The dimensions map directly to [`EditOptions`] fields.  They are retained
-/// as typed vocabulary even though the shared DrawingML error carries the
-/// stable resource label for cross-family error handling.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-#[non_exhaustive]
-pub enum LimitKind {
-    /// The complete serialized action profile.
-    OutputBytes,
-    /// The retained source profile admitted to an edit.
-    SourceBytes,
-    /// One opaque payload element.
-    PayloadBytes,
-    /// Structural XML node count.
-    Nodes,
-    /// Structural XML depth.
-    Depth,
-    /// Action record count.
-    Actions,
-    /// Action-group record count.
-    ActionGroups,
-    /// Typed scalar or identifier bytes.
-    ScalarBytes,
-    /// Queued edit operation count.
-    EditOperations,
-}
+use crate::{Error, LimitKind};
 
 impl LimitKind {
-    /// Stable DrawingML error resource label for this action dimension.
     #[must_use]
-    pub const fn resource(self) -> &'static str {
-        match self {
-            Self::OutputBytes => "ink action output bytes",
-            Self::SourceBytes => "ink action source bytes",
-            Self::PayloadBytes => "ink action payload bytes",
-            Self::Nodes => "ink action XML nodes",
-            Self::Depth => "ink action XML depth",
-            Self::Actions => "ink action records",
-            Self::ActionGroups => "ink action groups",
-            Self::ScalarBytes => "ink action scalar bytes",
-            Self::EditOperations => "ink action edit operations",
-        }
-    }
-
-    fn error(self, limit: usize) -> Error {
-        Error::Limit {
-            resource: self.resource(),
-            limit,
-        }
+    fn invalid(self, value: usize, maximum: usize) -> Error {
+        Error::invalid_limit(self, value, maximum)
     }
 }
 
@@ -145,27 +99,68 @@ impl EditOptions {
     /// Validate a caller budget before any builder state is retained.
     pub fn validate(self) -> Result<()> {
         if self.max_output_bytes == 0 || self.max_output_bytes > super::MAX_SOURCE_BYTES {
-            return Err(LimitKind::OutputBytes.error(super::MAX_SOURCE_BYTES));
+            return Err(
+                LimitKind::OutputBytes.invalid(self.max_output_bytes, super::MAX_SOURCE_BYTES)
+            );
         }
         if self.max_payload_bytes == 0 || self.max_payload_bytes > MAX_PAYLOAD_BYTES {
-            return Err(LimitKind::PayloadBytes.error(MAX_PAYLOAD_BYTES));
+            return Err(LimitKind::PayloadBytes.invalid(self.max_payload_bytes, MAX_PAYLOAD_BYTES));
         }
         if self.max_nodes == 0 || self.max_nodes > super::MAX_NODES {
-            return Err(LimitKind::Nodes.error(super::MAX_NODES));
+            return Err(LimitKind::Nodes.invalid(self.max_nodes, super::MAX_NODES));
         }
         if self.max_depth == 0 || self.max_depth > super::MAX_DEPTH {
-            return Err(LimitKind::Depth.error(super::MAX_DEPTH));
+            return Err(LimitKind::Depth.invalid(self.max_depth, super::MAX_DEPTH));
         }
         if self.max_actions == 0 || self.max_actions > super::MAX_ACTIONS {
-            return Err(LimitKind::Actions.error(super::MAX_ACTIONS));
+            return Err(LimitKind::Actions.invalid(self.max_actions, super::MAX_ACTIONS));
         }
         if self.max_action_groups == 0 || self.max_action_groups > super::MAX_ACTION_GROUPS {
-            return Err(LimitKind::ActionGroups.error(super::MAX_ACTION_GROUPS));
+            return Err(
+                LimitKind::ActionGroups.invalid(self.max_action_groups, super::MAX_ACTION_GROUPS)
+            );
         }
         if self.max_scalar_bytes == 0 || self.max_scalar_bytes > MAX_SCALAR_BYTES {
-            return Err(LimitKind::ScalarBytes.error(MAX_SCALAR_BYTES));
+            return Err(LimitKind::ScalarBytes.invalid(self.max_scalar_bytes, MAX_SCALAR_BYTES));
         }
         Ok(())
+    }
+
+    /// Refuse an edit policy that would widen the policy which admitted its
+    /// immutable owner.  Tighter per-edit budgets remain valid; a caller must
+    /// reopen through a fresh owner to select a wider policy.
+    fn constrain_to(self, owner: Self) -> Result<Self> {
+        self.validate()?;
+        if self.max_output_bytes > owner.max_output_bytes {
+            return Err(
+                LimitKind::OutputBytes.invalid(self.max_output_bytes, owner.max_output_bytes)
+            );
+        }
+        if self.max_payload_bytes > owner.max_payload_bytes {
+            return Err(
+                LimitKind::PayloadBytes.invalid(self.max_payload_bytes, owner.max_payload_bytes)
+            );
+        }
+        if self.max_nodes > owner.max_nodes {
+            return Err(LimitKind::Nodes.invalid(self.max_nodes, owner.max_nodes));
+        }
+        if self.max_depth > owner.max_depth {
+            return Err(LimitKind::Depth.invalid(self.max_depth, owner.max_depth));
+        }
+        if self.max_actions > owner.max_actions {
+            return Err(LimitKind::Actions.invalid(self.max_actions, owner.max_actions));
+        }
+        if self.max_action_groups > owner.max_action_groups {
+            return Err(
+                LimitKind::ActionGroups.invalid(self.max_action_groups, owner.max_action_groups)
+            );
+        }
+        if self.max_scalar_bytes > owner.max_scalar_bytes {
+            return Err(
+                LimitKind::ScalarBytes.invalid(self.max_scalar_bytes, owner.max_scalar_bytes)
+            );
+        }
+        Ok(self)
     }
 }
 
@@ -186,7 +181,11 @@ impl OpaquePayload {
     pub fn new(bytes: impl AsRef<[u8]>) -> Result<Self> {
         let bytes = bytes.as_ref();
         if bytes.len() > MAX_PAYLOAD_BYTES {
-            return Err(limit("ink action payload bytes", MAX_PAYLOAD_BYTES));
+            return Err(limit(
+                LimitKind::PayloadBytes,
+                bytes.len(),
+                MAX_PAYLOAD_BYTES,
+            ));
         }
         let mut owned = Vec::new();
         owned
@@ -668,7 +667,8 @@ impl Draft {
         let output_len = draft_len(&self)?;
         if output_len > self.limits.max_output_bytes {
             return Err(limit(
-                "ink action output bytes",
+                LimitKind::OutputBytes,
+                output_len,
                 self.limits.max_output_bytes,
             ));
         }
@@ -684,7 +684,7 @@ impl Draft {
         if !matches_draft(&self, &profile) {
             return Err(invalid("ink action authoring readback differs from draft"));
         }
-        Ok(Prepared::from_profile(profile))
+        Ok(Prepared::from_profile(profile, self.limits))
     }
 }
 
@@ -693,13 +693,15 @@ impl Draft {
 pub struct Prepared {
     bytes: Arc<[u8]>,
     profile: Arc<Profile>,
+    options: EditOptions,
 }
 
 impl Prepared {
-    fn from_profile(profile: Profile) -> Self {
+    fn from_profile(profile: Profile, options: EditOptions) -> Self {
         Self {
             bytes: profile.shared_source(),
             profile: Arc::new(profile),
+            options,
         }
     }
 
@@ -717,12 +719,12 @@ impl Prepared {
 
     /// Start a source-backed edit with the default bounded options.
     pub fn edit(&self) -> Result<Edit> {
-        self.edit_with_options(EditOptions::default())
+        Edit::from_shared_profile(Arc::clone(&self.profile), self.options, self.options)
     }
 
     /// Start a source-backed edit with explicit bounded options.
     pub fn edit_with_options(&self, options: EditOptions) -> Result<Edit> {
-        Edit::from_shared_profile(Arc::clone(&self.profile), options)
+        Edit::from_shared_profile(Arc::clone(&self.profile), self.options, options)
     }
 
     /// Replay a source-checked patch and publish the resulting commit triad.
@@ -732,7 +734,7 @@ impl Prepared {
     /// visible, preserving the source-fidelity and limit checks of `Edit::commit`.
     pub fn apply(&self, patch: &Patch) -> Result<Commit> {
         if patch.before.as_ref() != self.bytes.as_ref() {
-            return Err(invalid("ink action patch source is stale"));
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             return Ok(Commit::new(
@@ -741,15 +743,24 @@ impl Prepared {
                 Diagnostics::UNCHANGED,
             ));
         }
+        // Check the recipient's complete output budget before copying the
+        // patch bytes.  Parsing below enforces the remaining structural
+        // dimensions, but this byte bound is the one that can be rejected
+        // without allocating the candidate output.
+        let maximum = self.options.max_output_bytes.min(super::MAX_SOURCE_BYTES);
+        if patch.after.len() > maximum {
+            return Err(limit(LimitKind::OutputBytes, patch.after.len(), maximum));
+        }
         let after = patch.apply_bytes(self.bytes.as_ref())?;
         let after: Arc<[u8]> = Arc::from(after.into_boxed_slice());
         let profile = read_profile_owned(after.clone())?;
-        validate_profile_limits(&profile, EditOptions::default())?;
+        validate_profile_limits(&profile, self.options)?;
         ensure_unique_profile_ids(&profile)?;
         Ok(Commit::new(
             Prepared {
                 bytes: after,
                 profile: Arc::new(profile),
+                options: self.options,
             },
             patch.clone(),
             Diagnostics::CHANGED,
@@ -782,7 +793,7 @@ impl Patch {
     /// exposing an untyped byte publication path.
     fn apply_bytes(&self, source: &[u8]) -> Result<Vec<u8>> {
         if source != self.before.as_ref() {
-            return Err(invalid("ink action patch source is stale"));
+            return Err(Error::PatchConflict);
         }
         copy_bytes(&self.after)
     }
@@ -823,6 +834,7 @@ pub type Commit = litchi_core::edit::Commit<Prepared, Patch>;
 #[derive(Clone, Debug)]
 pub struct Edit {
     profile: Arc<Profile>,
+    owner_options: EditOptions,
     options: EditOptions,
     operations: Vec<EditOp>,
 }
@@ -867,6 +879,7 @@ impl Edit {
         validate_profile_limits(&profile, options)?;
         Ok(Self {
             profile: Arc::new(profile),
+            owner_options: options,
             options,
             operations: Vec::new(),
         })
@@ -877,10 +890,15 @@ impl Edit {
         Self::new(profile.clone(), options)
     }
 
-    fn from_shared_profile(profile: Arc<Profile>, options: EditOptions) -> Result<Self> {
-        options.validate()?;
+    fn from_shared_profile(
+        profile: Arc<Profile>,
+        owner_options: EditOptions,
+        options: EditOptions,
+    ) -> Result<Self> {
+        let options = options.constrain_to(owner_options)?;
         Ok(Self {
             profile,
+            owner_options,
             options,
             operations: Vec::new(),
         })
@@ -1055,7 +1073,7 @@ impl Edit {
         let mut nodes = 1usize;
         let data_depth = action_depth_for_selector(&self.profile, action)?
             .checked_add(1)
-            .ok_or_else(|| limit("ink action XML depth", self.options.max_depth))?;
+            .ok_or_else(|| invalid("ink action XML depth overflow"))?;
         let mut max_depth = 0usize;
         validate_data_draft(
             &data,
@@ -1072,7 +1090,7 @@ impl Edit {
     pub fn add_data_group(&mut self, action: ActionSelector, group: DataGroupDraft) -> Result<()> {
         let group_depth = action_depth_for_selector(&self.profile, action)?
             .checked_add(1)
-            .ok_or_else(|| limit("ink action XML depth", self.options.max_depth))?;
+            .ok_or_else(|| invalid("ink action XML depth overflow"))?;
         let mut max_depth = 0usize;
         validate_data_group_draft(&group, self.options, group_depth, &mut max_depth, false)?;
         self.push(EditOp::AddDataGroup(action, group))
@@ -1174,10 +1192,13 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         let before = self.profile.source.clone();
         if self.operations.is_empty() {
-            validate_profile_limits(&self.profile, self.options)?;
+            if self.options != self.owner_options {
+                validate_profile_limits(&self.profile, self.options)?;
+            }
             let prepared = Prepared {
                 bytes: Arc::clone(&before),
                 profile: Arc::clone(&self.profile),
+                options: self.options,
             };
             let patch = Patch {
                 before: before.clone(),
@@ -1188,10 +1209,13 @@ impl Edit {
         let plans = plan_operations(&self.profile, &before, &self.operations, self.options)?;
         let after = emit_plans(&before, &plans, self.options)?;
         if after.as_slice() == before.as_ref() {
-            validate_profile_limits(&self.profile, self.options)?;
+            if self.options != self.owner_options {
+                validate_profile_limits(&self.profile, self.options)?;
+            }
             let prepared = Prepared {
                 bytes: Arc::clone(&before),
                 profile: Arc::clone(&self.profile),
+                options: self.options,
             };
             let patch = Patch {
                 before: before.clone(),
@@ -1206,6 +1230,7 @@ impl Edit {
         let prepared = Prepared {
             bytes: after.clone(),
             profile: Arc::new(profile),
+            options: self.options,
         };
         let patch = Patch { before, after };
         Ok(Commit::new(prepared, patch, Diagnostics::CHANGED))
@@ -1213,7 +1238,11 @@ impl Edit {
 
     fn push(&mut self, operation: EditOp) -> Result<()> {
         if self.operations.len() >= MAX_EDIT_OPERATIONS {
-            return Err(limit("ink action edit operations", MAX_EDIT_OPERATIONS));
+            return Err(limit(
+                LimitKind::EditOperations,
+                self.operations.len() + 1,
+                MAX_EDIT_OPERATIONS,
+            ));
         }
         self.operations
             .try_reserve(1)
@@ -1230,7 +1259,7 @@ fn checked_action_type(value: ActionType) -> Result<ActionType> {
 
 fn validate_scalar(value: &str, field: &'static str) -> Result<()> {
     if value.len() > MAX_SCALAR_BYTES || value.bytes().any(|byte| byte == 0) {
-        return Err(limit(field, MAX_SCALAR_BYTES));
+        return Err(limit(LimitKind::ScalarBytes, value.len(), MAX_SCALAR_BYTES));
     }
     super::validate_xml_characters(value, field)?;
     Ok(())
@@ -1251,7 +1280,7 @@ fn xml_id(value: &str) -> Result<Box<str>> {
 
 fn decimal(value: &str) -> Result<Box<str>> {
     if value.len() > MAX_SCALAR_BYTES {
-        return Err(limit("ink action startTime", MAX_SCALAR_BYTES));
+        return Err(limit(LimitKind::ScalarBytes, value.len(), MAX_SCALAR_BYTES));
     }
     let collapsed = super::collapse_xml_whitespace(value)?;
     super::validate_decimal(&collapsed)?;
@@ -1314,11 +1343,11 @@ fn validate_draft(draft: &Draft) -> Result<()> {
         let metrics = check_payload(payload, draft.limits, PayloadRoot::Definitions, true)?;
         nodes = nodes
             .checked_add(metrics.nodes)
-            .ok_or_else(|| limit("ink action XML nodes", draft.limits.max_nodes))?;
+            .ok_or_else(|| invalid("ink action XML node count overflow"))?;
         depth = depth.max(
             1usize
                 .checked_add(metrics.depth)
-                .ok_or_else(|| limit("ink action XML depth", draft.limits.max_depth))?,
+                .ok_or_else(|| invalid("ink action XML depth overflow"))?,
         );
     }
     if draft.xml_id.is_some() {
@@ -1328,8 +1357,10 @@ fn validate_draft(draft: &Draft) -> Result<()> {
             .as_deref()
             .is_some_and(|value| value.len() > draft.limits.max_scalar_bytes)
         {
+            let observed = draft.xml_id.as_deref().map_or(0, str::len);
             return Err(limit(
-                "ink action scalar bytes",
+                LimitKind::ScalarBytes,
+                observed,
                 draft.limits.max_scalar_bytes,
             ));
         }
@@ -1337,18 +1368,18 @@ fn validate_draft(draft: &Draft) -> Result<()> {
     for child in &draft.children {
         nodes = nodes
             .checked_add(1)
-            .ok_or_else(|| limit("ink action XML nodes", draft.limits.max_nodes))?;
+            .ok_or_else(|| invalid("ink action XML node count overflow"))?;
         match child {
             RootDraft::Action(action) => {
                 actions = actions
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action records", draft.limits.max_actions))?;
+                    .ok_or_else(|| invalid("ink action count overflow"))?;
                 validate_action_draft(action, draft.limits, &mut nodes, 2, &mut depth, true)?;
             },
             RootDraft::ActionGroup(group) => {
                 groups = groups
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action groups", draft.limits.max_action_groups))?;
+                    .ok_or_else(|| invalid("ink action-group count overflow"))?;
                 bounded_scalar(
                     group.action_type.as_str(),
                     "action group type",
@@ -1368,26 +1399,30 @@ fn validate_draft(draft: &Draft) -> Result<()> {
                 for action in &group.actions {
                     actions = actions
                         .checked_add(1)
-                        .ok_or_else(|| limit("ink action records", draft.limits.max_actions))?;
+                        .ok_or_else(|| invalid("ink action count overflow"))?;
                     nodes = nodes
                         .checked_add(1)
-                        .ok_or_else(|| limit("ink action XML nodes", draft.limits.max_nodes))?;
+                        .ok_or_else(|| invalid("ink action XML node count overflow"))?;
                     validate_action_draft(action, draft.limits, &mut nodes, 3, &mut depth, true)?;
                 }
             },
         }
     }
     if actions > draft.limits.max_actions {
-        return Err(limit("ink action records", draft.limits.max_actions));
+        return Err(limit(LimitKind::Actions, actions, draft.limits.max_actions));
     }
     if groups > draft.limits.max_action_groups {
-        return Err(limit("ink action groups", draft.limits.max_action_groups));
+        return Err(limit(
+            LimitKind::ActionGroups,
+            groups,
+            draft.limits.max_action_groups,
+        ));
     }
     if nodes > draft.limits.max_nodes {
-        return Err(limit("ink action XML nodes", draft.limits.max_nodes));
+        return Err(limit(LimitKind::Nodes, nodes, draft.limits.max_nodes));
     }
     if depth > draft.limits.max_depth {
-        return Err(limit("ink action XML depth", draft.limits.max_depth));
+        return Err(limit(LimitKind::Depth, depth, draft.limits.max_depth));
     }
     Ok(())
 }
@@ -1413,7 +1448,7 @@ fn validate_action_draft(
     for child in &action.children {
         *nodes = nodes
             .checked_add(1)
-            .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+            .ok_or_else(|| invalid("ink action XML node count overflow"))?;
         match child {
             ActionChildDraft::Property(property) => {
                 bounded_scalar(&property.name, "property name", limits)?;
@@ -1421,13 +1456,13 @@ fn validate_action_draft(
                 *max_depth = (*max_depth).max(
                     action_depth
                         .checked_add(1)
-                        .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?,
+                        .ok_or_else(|| invalid("ink action XML depth overflow"))?,
                 );
             },
             ActionChildDraft::Data(data) => {
                 let data_depth = action_depth
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?;
+                    .ok_or_else(|| invalid("ink action XML depth overflow"))?;
                 validate_data_draft(
                     data,
                     limits,
@@ -1450,15 +1485,15 @@ fn validate_action_draft(
                 }
                 let group_depth = action_depth
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?;
+                    .ok_or_else(|| invalid("ink action XML depth overflow"))?;
                 *max_depth = (*max_depth).max(group_depth);
                 let data_depth = group_depth
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?;
+                    .ok_or_else(|| invalid("ink action XML depth overflow"))?;
                 for data in &group.data {
                     *nodes = nodes
                         .checked_add(1)
-                        .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+                        .ok_or_else(|| invalid("ink action XML node count overflow"))?;
                     validate_data_draft(
                         data,
                         limits,
@@ -1496,7 +1531,7 @@ fn validate_data_draft(
     for child in &data.children {
         *nodes = nodes
             .checked_add(1)
-            .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+            .ok_or_else(|| invalid("ink action XML node count overflow"))?;
         match child {
             DataChildDraft::Transform(payload)
             | DataChildDraft::Trace(payload)
@@ -1510,10 +1545,10 @@ fn validate_data_draft(
                     check_payload(payload, limits, root, allow_inherited_payload_namespace)?;
                 *nodes = nodes
                     .checked_add(metrics.nodes.saturating_sub(1))
-                    .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+                    .ok_or_else(|| invalid("ink action XML node count overflow"))?;
                 let payload_depth = data_depth
                     .checked_add(metrics.depth)
-                    .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?;
+                    .ok_or_else(|| invalid("ink action XML depth overflow"))?;
                 *max_depth = (*max_depth).max(payload_depth);
             },
         }
@@ -1567,7 +1602,11 @@ fn check_payload(
     allow_inherited_namespace: bool,
 ) -> Result<PayloadMetrics> {
     if payload.0.len() > limits.max_payload_bytes {
-        return Err(limit("ink action payload bytes", limits.max_payload_bytes));
+        return Err(limit(
+            LimitKind::PayloadBytes,
+            payload.0.len(),
+            limits.max_payload_bytes,
+        ));
     }
     validate_payload_fragment(
         payload.as_bytes(),
@@ -1614,16 +1653,16 @@ fn validate_payload_fragment(
                 validate_payload_element(&element, &reader, limits)?;
                 nodes = nodes
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+                    .ok_or_else(|| invalid("ink action XML node count overflow"))?;
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?;
+                    .ok_or_else(|| invalid("ink action XML depth overflow"))?;
                 peak_depth = peak_depth.max(depth);
                 if nodes > limits.max_nodes {
-                    return Err(limit("ink action XML nodes", limits.max_nodes));
+                    return Err(limit(LimitKind::Nodes, nodes, limits.max_nodes));
                 }
                 if depth > limits.max_depth {
-                    return Err(limit("ink action XML depth", limits.max_depth));
+                    return Err(limit(LimitKind::Depth, depth, limits.max_depth));
                 }
                 if !root_seen {
                     root_seen = true;
@@ -1638,16 +1677,16 @@ fn validate_payload_fragment(
                 validate_payload_element(&element, &reader, limits)?;
                 nodes = nodes
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+                    .ok_or_else(|| invalid("ink action XML node count overflow"))?;
                 let element_depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?;
+                    .ok_or_else(|| invalid("ink action XML depth overflow"))?;
                 peak_depth = peak_depth.max(element_depth);
                 if element_depth > limits.max_depth {
-                    return Err(limit("ink action XML depth", limits.max_depth));
+                    return Err(limit(LimitKind::Depth, element_depth, limits.max_depth));
                 }
                 if nodes > limits.max_nodes {
-                    return Err(limit("ink action XML nodes", limits.max_nodes));
+                    return Err(limit(LimitKind::Nodes, nodes, limits.max_nodes));
                 }
                 if !root_seen {
                     root_seen = true;
@@ -1964,7 +2003,11 @@ fn payload_expanded_element_name<R: std::io::BufRead>(
     )?;
     let local = element_name.local_name();
     if local.as_ref().len() > limits.max_scalar_bytes {
-        return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+        return Err(limit(
+            LimitKind::ScalarBytes,
+            local.as_ref().len(),
+            limits.max_scalar_bytes,
+        ));
     }
     let mut local_copy = Vec::new();
     local_copy
@@ -1994,7 +2037,11 @@ fn payload_expanded_end_name<R: std::io::BufRead>(
         payload_resolved_namespace(resolved, reader, None, limits, allow_inherited_namespace)?;
     let local = element_name.local_name();
     if local.as_ref().len() > limits.max_scalar_bytes {
-        return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+        return Err(limit(
+            LimitKind::ScalarBytes,
+            local.as_ref().len(),
+            limits.max_scalar_bytes,
+        ));
     }
     let mut local_copy = Vec::new();
     local_copy
@@ -2055,7 +2102,11 @@ fn payload_decode_namespace<R: std::io::BufRead>(
     let unescaped =
         quick_xml::escape::unescape(&decoded).map_err(|error| xml_error(error.to_string()))?;
     if unescaped.len() > limits.max_scalar_bytes {
-        return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+        return Err(limit(
+            LimitKind::ScalarBytes,
+            unescaped.len(),
+            limits.max_scalar_bytes,
+        ));
     }
     super::validate_xml_characters(&unescaped, "ink action namespace")?;
     Ok(unescaped.into_owned().into_boxed_str())
@@ -2084,7 +2135,11 @@ fn validate_payload_attributes_with_namespaces<R: std::io::BufRead>(
         if raw_key.len() > limits.max_scalar_bytes
             || attribute.value.len() > limits.max_scalar_bytes
         {
-            return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+            return Err(limit(
+                LimitKind::ScalarBytes,
+                raw_key.len().max(attribute.value.len()),
+                limits.max_scalar_bytes,
+            ));
         }
         if attribute.value.contains(&b'<') {
             return Err(invalid(
@@ -2095,7 +2150,11 @@ fn validate_payload_attributes_with_namespaces<R: std::io::BufRead>(
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(|error| xml_error(error.to_string()))?;
         if value.len() > limits.max_scalar_bytes {
-            return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+            return Err(limit(
+                LimitKind::ScalarBytes,
+                value.len(),
+                limits.max_scalar_bytes,
+            ));
         }
         super::validate_xml_characters(&value, "ink action opaque attribute")?;
 
@@ -2152,7 +2211,11 @@ fn validate_payload_attributes_with_namespaces<R: std::io::BufRead>(
         };
         let local = local.as_ref();
         if local.len() > limits.max_scalar_bytes {
-            return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+            return Err(limit(
+                LimitKind::ScalarBytes,
+                local.len(),
+                limits.max_scalar_bytes,
+            ));
         }
         let mut local_copy = Vec::new();
         local_copy
@@ -2187,7 +2250,11 @@ fn payload_namespace<R: std::io::BufRead>(
     let unescaped =
         quick_xml::escape::unescape(&decoded).map_err(|error| xml_error(error.to_string()))?;
     if unescaped.len() > limits.max_scalar_bytes {
-        return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+        return Err(limit(
+            LimitKind::ScalarBytes,
+            unescaped.len(),
+            limits.max_scalar_bytes,
+        ));
     }
     super::validate_xml_characters(&unescaped, "ink action namespace")?;
     Ok(Some(unescaped.into_owned()))
@@ -2257,27 +2324,33 @@ fn validate_payload_element(
     limits: EditOptions,
 ) -> Result<()> {
     if element.name().as_ref().len() > limits.max_scalar_bytes {
-        return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+        return Err(limit(
+            LimitKind::ScalarBytes,
+            element.name().as_ref().len(),
+            limits.max_scalar_bytes,
+        ));
     }
     let mut attributes = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
-        attributes = attributes.checked_add(1).ok_or_else(|| {
-            limit(
-                "ink action XML attributes",
-                super::MAX_ATTRIBUTES_PER_ELEMENT,
-            )
-        })?;
+        attributes = attributes
+            .checked_add(1)
+            .ok_or_else(|| invalid("ink action XML attribute count overflow"))?;
         if attributes > super::MAX_ATTRIBUTES_PER_ELEMENT {
             return Err(limit(
-                "ink action XML attributes",
+                LimitKind::XmlAttributes,
+                attributes,
                 super::MAX_ATTRIBUTES_PER_ELEMENT,
             ));
         }
         if attribute.key.as_ref().len() > limits.max_scalar_bytes
             || attribute.value.len() > limits.max_scalar_bytes
         {
-            return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+            return Err(limit(
+                LimitKind::ScalarBytes,
+                attribute.key.as_ref().len().max(attribute.value.len()),
+                limits.max_scalar_bytes,
+            ));
         }
         if attribute.value.contains(&b'<') {
             return Err(invalid(
@@ -2288,7 +2361,11 @@ fn validate_payload_element(
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(|error| xml_error(error.to_string()))?;
         if value.len() > limits.max_scalar_bytes {
-            return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+            return Err(limit(
+                LimitKind::ScalarBytes,
+                value.len(),
+                limits.max_scalar_bytes,
+            ));
         }
         super::validate_xml_characters(&value, "ink action opaque attribute")?;
     }
@@ -2297,7 +2374,11 @@ fn validate_payload_element(
 
 fn bounded_scalar(value: &str, field: &'static str, limits: EditOptions) -> Result<()> {
     if value.len() > limits.max_scalar_bytes {
-        return Err(limit(field, limits.max_scalar_bytes));
+        return Err(limit(
+            LimitKind::ScalarBytes,
+            value.len(),
+            limits.max_scalar_bytes,
+        ));
     }
     super::validate_xml_characters(value, field)
 }
@@ -3249,7 +3330,8 @@ fn element_name(source: &[u8], tag: TagRange) -> Result<Box<[u8]>> {
         .ok_or_else(|| invalid("ink action element name range is invalid"))?;
     if name.is_empty() || name.len() > super::MAX_TOKEN_BYTES {
         return Err(limit(
-            "ink action element name bytes",
+            LimitKind::ActionElementNameBytes,
+            name.len(),
             super::MAX_TOKEN_BYTES,
         ));
     }
@@ -3790,7 +3872,11 @@ fn plan_attribute<'a>(
     }
     .and_then(|plan| {
         if plan.inserted_len > limits.max_output_bytes {
-            Err(limit("ink action output bytes", limits.max_output_bytes))
+            Err(limit(
+                LimitKind::OutputBytes,
+                plan.inserted_len,
+                limits.max_output_bytes,
+            ))
         } else {
             Ok(plan)
         }
@@ -4202,7 +4288,11 @@ fn emit_plans(source: &[u8], plans: &[Plan<'_>], limits: EditOptions) -> Result<
             .ok_or_else(|| invalid("ink action output length overflow"))?;
     }
     if output_len > limits.max_output_bytes || output_len > super::MAX_SOURCE_BYTES {
-        return Err(limit("ink action output bytes", limits.max_output_bytes));
+        return Err(limit(
+            LimitKind::OutputBytes,
+            output_len,
+            limits.max_output_bytes.min(super::MAX_SOURCE_BYTES),
+        ));
     }
     let mut output = Vec::new();
     output
@@ -4421,7 +4511,11 @@ fn emit_insert(output: &mut Vec<u8>, kind: &InsertKind<'_>) {
 
 fn validate_profile_limits(profile: &Profile, limits: EditOptions) -> Result<()> {
     if profile.source.len() > limits.max_output_bytes {
-        return Err(limit("ink action source bytes", limits.max_output_bytes));
+        return Err(limit(
+            LimitKind::SourceBytes,
+            profile.source.len(),
+            limits.max_output_bytes,
+        ));
     }
     let mut actions = 0usize;
     let mut groups = 0usize;
@@ -4430,22 +4524,26 @@ fn validate_profile_limits(profile: &Profile, limits: EditOptions) -> Result<()>
             RootChild::Action(action) => {
                 actions = actions
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action records", limits.max_actions))?;
+                    .ok_or_else(|| invalid("ink action count overflow"))?;
                 validate_profile_action(action, profile, limits)?;
             },
             RootChild::ActionGroup(group) => {
                 groups = groups
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action groups", limits.max_action_groups))?;
+                    .ok_or_else(|| invalid("ink action-group count overflow"))?;
                 validate_profile_group(group, profile, limits, &mut actions)?;
             },
         }
     }
     if actions > limits.max_actions {
-        return Err(limit("ink action records", limits.max_actions));
+        return Err(limit(LimitKind::Actions, actions, limits.max_actions));
     }
     if groups > limits.max_action_groups {
-        return Err(limit("ink action groups", limits.max_action_groups));
+        return Err(limit(
+            LimitKind::ActionGroups,
+            groups,
+            limits.max_action_groups,
+        ));
     }
     if let Some(span) = profile.definitions {
         check_span_payload(profile, span, limits)?;
@@ -4463,16 +4561,16 @@ fn validate_profile_limits(profile: &Profile, limits: EditOptions) -> Result<()>
             Event::Start(element) => {
                 nodes = nodes
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+                    .ok_or_else(|| invalid("ink action XML node count overflow"))?;
                 depth = depth
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?;
+                    .ok_or_else(|| invalid("ink action XML depth overflow"))?;
                 check_profile_attributes(&element, limits, &reader)?;
             },
             Event::Empty(element) => {
                 nodes = nodes
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+                    .ok_or_else(|| invalid("ink action XML node count overflow"))?;
                 check_profile_attributes(&element, limits, &reader)?;
             },
             Event::End(_) => depth = depth.saturating_sub(1),
@@ -4480,10 +4578,10 @@ fn validate_profile_limits(profile: &Profile, limits: EditOptions) -> Result<()>
             _ => {},
         }
         if nodes > limits.max_nodes {
-            return Err(limit("ink action XML nodes", limits.max_nodes));
+            return Err(limit(LimitKind::Nodes, nodes, limits.max_nodes));
         }
         if depth > limits.max_depth {
-            return Err(limit("ink action XML depth", limits.max_depth));
+            return Err(limit(LimitKind::Depth, depth, limits.max_depth));
         }
     }
     Ok(())
@@ -4495,20 +4593,36 @@ fn check_profile_attributes(
     reader: &Reader<&[u8]>,
 ) -> Result<()> {
     if element.name().as_ref().len() > limits.max_scalar_bytes {
-        return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+        return Err(limit(
+            LimitKind::ScalarBytes,
+            element.name().as_ref().len(),
+            limits.max_scalar_bytes,
+        ));
     }
     for attribute in element.unchecked_attributes() {
         let attribute = attribute.map_err(|error| xml_error(error.to_string()))?;
         if attribute.key.as_ref().len() > limits.max_scalar_bytes
             || attribute.value.as_ref().len() > limits.max_scalar_bytes
         {
-            return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+            return Err(limit(
+                LimitKind::ScalarBytes,
+                attribute
+                    .key
+                    .as_ref()
+                    .len()
+                    .max(attribute.value.as_ref().len()),
+                limits.max_scalar_bytes,
+            ));
         }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(|error| xml_error(error.to_string()))?;
         if value.len() > limits.max_scalar_bytes {
-            return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
+            return Err(limit(
+                LimitKind::ScalarBytes,
+                value.len(),
+                limits.max_scalar_bytes,
+            ));
         }
         super::validate_xml_characters(&value, "ink action attribute")?;
     }
@@ -4526,7 +4640,7 @@ fn validate_profile_group(
     for action in &group.actions {
         *actions = actions
             .checked_add(1)
-            .ok_or_else(|| limit("ink action records", limits.max_actions))?;
+            .ok_or_else(|| invalid("ink action count overflow"))?;
         validate_profile_action(action, profile, limits)?;
     }
     Ok(())
@@ -4567,18 +4681,28 @@ fn validate_profile_data(data: &ActionData, profile: &Profile, limits: EditOptio
 
 fn check_profile_scalar(
     value: Option<&str>,
-    field: &'static str,
+    _field: &'static str,
     limits: EditOptions,
 ) -> Result<()> {
-    if value.is_some_and(|value| value.len() > limits.max_scalar_bytes) {
-        return Err(limit(field, limits.max_scalar_bytes));
+    if let Some(value) = value
+        && value.len() > limits.max_scalar_bytes
+    {
+        return Err(limit(
+            LimitKind::ScalarBytes,
+            value.len(),
+            limits.max_scalar_bytes,
+        ));
     }
     Ok(())
 }
 
 fn check_span_payload(profile: &Profile, span: SourceSpan, limits: EditOptions) -> Result<()> {
     if span.end().saturating_sub(span.start()) > limits.max_payload_bytes {
-        return Err(limit("ink action payload bytes", limits.max_payload_bytes));
+        return Err(limit(
+            LimitKind::PayloadBytes,
+            span.end().saturating_sub(span.start()),
+            limits.max_payload_bytes,
+        ));
     }
     if span.end() > profile.source.len() {
         return Err(invalid("ink action payload source range is invalid"));
@@ -4659,10 +4783,10 @@ fn validate_batch_operations(
                 )?;
                 added_actions = added_actions
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action records", limits.max_actions))?;
+                    .ok_or_else(|| invalid("ink action count overflow"))?;
                 added_nodes = added_nodes
                     .checked_add(nodes)
-                    .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+                    .ok_or_else(|| invalid("ink action XML node count overflow"))?;
                 collect_draft_ids(action, &mut new_ids)?;
                 collect_draft_opaque_ids(action, &mut new_opaque_ids)?;
             },
@@ -4671,13 +4795,13 @@ fn validate_batch_operations(
                 validate_group_draft(group, limits, &mut group_nodes, &mut added_depth, false)?;
                 added_groups = added_groups
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action groups", limits.max_action_groups))?;
+                    .ok_or_else(|| invalid("ink action-group count overflow"))?;
                 added_actions = added_actions
                     .checked_add(group.actions.len())
-                    .ok_or_else(|| limit("ink action records", limits.max_actions))?;
+                    .ok_or_else(|| invalid("ink action count overflow"))?;
                 added_nodes = added_nodes
                     .checked_add(group_nodes)
-                    .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+                    .ok_or_else(|| invalid("ink action XML node count overflow"))?;
                 if let Some(id) = &group.xml_id {
                     push_id(&mut new_ids, id)?;
                 }
@@ -4693,17 +4817,17 @@ fn validate_batch_operations(
                 added_depth = added_depth.max(
                     action_depth
                         .checked_add(1)
-                        .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?,
+                        .ok_or_else(|| invalid("ink action XML depth overflow"))?,
                 );
                 added_nodes = added_nodes
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+                    .ok_or_else(|| invalid("ink action XML node count overflow"))?;
             },
             EditOp::AddData(selector, data) => {
                 let mut nodes = 1usize;
                 let data_depth = action_depth_for_selector(profile, *selector)?
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?;
+                    .ok_or_else(|| invalid("ink action XML depth overflow"))?;
                 validate_data_draft(
                     data,
                     limits,
@@ -4714,7 +4838,7 @@ fn validate_batch_operations(
                 )?;
                 added_nodes = added_nodes
                     .checked_add(nodes)
-                    .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+                    .ok_or_else(|| invalid("ink action XML node count overflow"))?;
                 collect_draft_data_ids(data, &mut new_ids)?;
                 collect_draft_data_opaque_ids(data, &mut new_opaque_ids)?;
             },
@@ -4725,7 +4849,7 @@ fn validate_batch_operations(
                 bounded_scalar(&group.name, "action data-group name", limits)?;
                 let group_depth = action_depth_for_selector(profile, *selector)?
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?;
+                    .ok_or_else(|| invalid("ink action XML depth overflow"))?;
                 added_depth = added_depth.max(group_depth);
                 if let Some(id) = &group.xml_id {
                     bounded_scalar(id, "xml:id", limits)?;
@@ -4735,7 +4859,7 @@ fn validate_batch_operations(
                     let mut nodes = 1usize;
                     let data_depth = group_depth
                         .checked_add(1)
-                        .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?;
+                        .ok_or_else(|| invalid("ink action XML depth overflow"))?;
                     validate_data_draft(
                         data,
                         limits,
@@ -4746,13 +4870,13 @@ fn validate_batch_operations(
                     )?;
                     added_nodes = added_nodes
                         .checked_add(nodes)
-                        .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+                        .ok_or_else(|| invalid("ink action XML node count overflow"))?;
                     collect_draft_data_ids(data, &mut new_ids)?;
                     collect_draft_data_opaque_ids(data, &mut new_opaque_ids)?;
                 }
                 added_nodes = added_nodes
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+                    .ok_or_else(|| invalid("ink action XML node count overflow"))?;
             },
             _ => {},
         }
@@ -4763,16 +4887,28 @@ fn validate_batch_operations(
     let remaining_groups = existing_groups.saturating_sub(removed_groups);
     let remaining_nodes = existing_nodes.saturating_sub(removed_nodes);
     if remaining_actions.saturating_add(added_actions) > limits.max_actions {
-        return Err(limit("ink action records", limits.max_actions));
+        return Err(limit(
+            LimitKind::Actions,
+            remaining_actions.saturating_add(added_actions),
+            limits.max_actions,
+        ));
     }
     if remaining_groups.saturating_add(added_groups) > limits.max_action_groups {
-        return Err(limit("ink action groups", limits.max_action_groups));
+        return Err(limit(
+            LimitKind::ActionGroups,
+            remaining_groups.saturating_add(added_groups),
+            limits.max_action_groups,
+        ));
     }
     if remaining_nodes.saturating_add(added_nodes) > limits.max_nodes {
-        return Err(limit("ink action XML nodes", limits.max_nodes));
+        return Err(limit(
+            LimitKind::Nodes,
+            remaining_nodes.saturating_add(added_nodes),
+            limits.max_nodes,
+        ));
     }
     if added_depth > limits.max_depth {
-        return Err(limit("ink action XML depth", limits.max_depth));
+        return Err(limit(LimitKind::Depth, added_depth, limits.max_depth));
     }
     let mut new_id_set = HashSet::new();
     new_id_set
@@ -4890,7 +5026,7 @@ fn count_nodes_in_spans(source: &[u8], spans: &[SourceSpan]) -> Result<usize> {
                 {
                     nodes = nodes
                         .checked_add(1)
-                        .ok_or_else(|| limit("ink action XML nodes", super::MAX_NODES))?;
+                        .ok_or_else(|| invalid("ink action XML node count overflow"))?;
                 }
             },
             Event::Eof => break,
@@ -4939,7 +5075,7 @@ fn source_node_count(source: &[u8]) -> Result<usize> {
             Event::Start(_) | Event::Empty(_) => {
                 nodes = nodes
                     .checked_add(1)
-                    .ok_or_else(|| limit("ink action XML nodes", super::MAX_NODES))?;
+                    .ok_or_else(|| invalid("ink action XML node count overflow"))?;
             },
             Event::Eof => break,
             _ => {},
@@ -4967,7 +5103,7 @@ fn validate_data_group_draft(
     }
     let data_depth = group_depth
         .checked_add(1)
-        .ok_or_else(|| limit("ink action XML depth", limits.max_depth))?;
+        .ok_or_else(|| invalid("ink action XML depth overflow"))?;
     for data in &group.data {
         let mut nodes = 1usize;
         validate_data_draft(
@@ -5005,7 +5141,7 @@ fn validate_group_draft(
     for action in &group.actions {
         *nodes = nodes
             .checked_add(1)
-            .ok_or_else(|| limit("ink action XML nodes", limits.max_nodes))?;
+            .ok_or_else(|| invalid("ink action XML node count overflow"))?;
         validate_action_draft(
             action,
             limits,
@@ -5176,7 +5312,8 @@ fn push_reference(
 fn copy_index_string(value: &str) -> Result<Box<str>> {
     if value.len() > super::MAX_ATTRIBUTE_VALUE_BYTES {
         return Err(limit(
-            "ink action reference value bytes",
+            LimitKind::ActionReferenceValueBytes,
+            value.len(),
             super::MAX_ATTRIBUTE_VALUE_BYTES,
         ));
     }
@@ -5314,7 +5451,8 @@ fn decode_opaque_attribute(
 ) -> Result<String> {
     if attribute.value.len() > super::MAX_ATTRIBUTE_VALUE_BYTES {
         return Err(limit(
-            "ink action opaque attribute value bytes",
+            LimitKind::ActionOpaqueAttributeValueBytes,
+            attribute.value.len(),
             super::MAX_ATTRIBUTE_VALUE_BYTES,
         ));
     }
@@ -5323,7 +5461,8 @@ fn decode_opaque_attribute(
         .map_err(|error| xml_error(error.to_string()))?;
     if value.len() > super::MAX_ATTRIBUTE_VALUE_BYTES {
         return Err(limit(
-            "ink action opaque attribute value bytes",
+            LimitKind::ActionOpaqueAttributeValueBytes,
+            value.len(),
             super::MAX_ATTRIBUTE_VALUE_BYTES,
         ));
     }
@@ -5841,7 +5980,8 @@ fn action_prefix(source: &[u8]) -> Result<Vec<u8>> {
                 let prefix = &name[..prefix_len];
                 if prefix.len() > super::MAX_TOKEN_BYTES {
                     return Err(limit(
-                        "ink action namespace prefix bytes",
+                        LimitKind::ActionNamespacePrefixBytes,
+                        prefix.len(),
                         super::MAX_TOKEN_BYTES,
                     ));
                 }
@@ -5870,21 +6010,10 @@ fn copy_bytes(bytes: &[u8]) -> Result<Vec<u8>> {
 fn invalid(message: impl Into<String>) -> Error {
     super::invalid(message)
 }
-fn limit(resource: &'static str, limit: usize) -> Error {
-    let kind = match resource {
-        "ink action output bytes" => Some(LimitKind::OutputBytes),
-        "ink action source bytes" => Some(LimitKind::SourceBytes),
-        "ink action payload bytes" => Some(LimitKind::PayloadBytes),
-        "ink action XML nodes" => Some(LimitKind::Nodes),
-        "ink action XML depth" => Some(LimitKind::Depth),
-        "ink action records" => Some(LimitKind::Actions),
-        "ink action groups" => Some(LimitKind::ActionGroups),
-        "ink action scalar bytes" => Some(LimitKind::ScalarBytes),
-        "ink action edit operations" => Some(LimitKind::EditOperations),
-        _ => None,
-    };
-    kind.map_or_else(|| super::limit(resource, limit), |kind| kind.error(limit))
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }
+
 fn xml_error(message: impl Into<String>) -> Error {
     Error::Xml(message.into())
 }
@@ -5979,6 +6108,43 @@ mod tests {
         assert_eq!(commit.patch().after(), original.as_slice());
         assert!(!commit.diagnostics().changed());
         assert!(commit.patch().is_noop());
+    }
+
+    #[test]
+    fn replay_checks_recipient_output_budget_before_copying_patch_bytes() {
+        let prepared = authored();
+        let mut edit = prepared.edit().expect("retained owner policy");
+        edit.set_property_value(
+            ChildSelector::Property {
+                action: ActionSelector::ordinal(0),
+                index: 0,
+            },
+            "0123456789".repeat(20),
+        )
+        .expect("bounded property");
+        let changed = edit.commit().expect("changed commit");
+        assert!(changed.patch().after().len() > changed.patch().before().len());
+
+        let recipient_maximum = changed.patch().after().len() - 1;
+        let recipient = Prepared {
+            bytes: Arc::clone(&prepared.bytes),
+            profile: Arc::clone(&prepared.profile),
+            options: EditOptions {
+                max_output_bytes: recipient_maximum,
+                ..prepared.options
+            },
+        };
+        let error = recipient
+            .apply(changed.patch())
+            .expect_err("recipient limit");
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed,
+                maximum,
+            } if observed == changed.patch().after().len() && maximum == recipient_maximum
+        ));
     }
 
     #[test]
@@ -6142,9 +6308,10 @@ mod tests {
             matches!(
                 error,
                 Error::Limit {
-                    resource: "ink action XML attributes",
-                    limit,
-                } if limit == super::super::MAX_ATTRIBUTES_PER_ELEMENT
+                    kind: LimitKind::XmlAttributes,
+                    maximum,
+                    ..
+                } if maximum == super::super::MAX_ATTRIBUTES_PER_ELEMENT
             ),
             "{error}"
         );

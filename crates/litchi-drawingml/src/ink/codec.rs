@@ -490,13 +490,25 @@ fn scan(xml: &[u8], mut projection: Projection<'_>) -> Result<Parsed> {
         return Err(invalid("InkML document root is absent or unterminated"));
     }
     if contexts.len() > MAX_CONTEXTS {
-        return Err(limit("InkML context nodes", MAX_CONTEXTS));
+        return Err(limit(
+            crate::LimitKind::InkMlContextNodes,
+            contexts.len(),
+            MAX_CONTEXTS,
+        ));
     }
     if traces.len() > MAX_TRACES {
-        return Err(limit("InkML traces", MAX_TRACES));
+        return Err(limit(
+            crate::LimitKind::InkMlTraces,
+            traces.len(),
+            MAX_TRACES,
+        ));
     }
     if brush_properties.len() > MAX_BRUSH_PROPERTIES {
-        return Err(limit("InkML brush properties", MAX_BRUSH_PROPERTIES));
+        return Err(limit(
+            crate::LimitKind::InkMlBrushProperties,
+            brush_properties.len(),
+            MAX_BRUSH_PROPERTIES,
+        ));
     }
     projection.finish()?;
     Ok(Parsed {
@@ -575,7 +587,11 @@ fn frame_for_start<R: std::io::BufRead>(
         let token = projection.select(SemanticKind::Context, start);
         if let Some(token) = token {
             if contexts.len() >= MAX_CONTEXTS {
-                return Err(limit("InkML context nodes", MAX_CONTEXTS));
+                return Err(limit(
+                    crate::LimitKind::InkMlContextNodes,
+                    contexts.len() + 1,
+                    MAX_CONTEXTS,
+                ));
             }
             let index = contexts.len();
             reserve_one(contexts, "InkML context records")?;
@@ -599,7 +615,11 @@ fn frame_for_start<R: std::io::BufRead>(
         let token = projection.select(SemanticKind::Trace, start);
         if let Some(token) = token {
             if traces.len() >= MAX_TRACES {
-                return Err(limit("InkML traces", MAX_TRACES));
+                return Err(limit(
+                    crate::LimitKind::InkMlTraces,
+                    traces.len() + 1,
+                    MAX_TRACES,
+                ));
             }
             let index = traces.len();
             reserve_one(traces, "InkML trace records")?;
@@ -623,7 +643,11 @@ fn frame_for_start<R: std::io::BufRead>(
         let token = projection.select(SemanticKind::BrushProperty, start);
         if let Some(token) = token {
             if brush_properties.len() >= MAX_BRUSH_PROPERTIES {
-                return Err(limit("InkML brush properties", MAX_BRUSH_PROPERTIES));
+                return Err(limit(
+                    crate::LimitKind::InkMlBrushProperties,
+                    brush_properties.len() + 1,
+                    MAX_BRUSH_PROPERTIES,
+                ));
             }
             let index = brush_properties.len();
             reserve_one(brush_properties, "InkML brush-property records")?;
@@ -679,7 +703,11 @@ fn parse_empty<R: std::io::BufRead>(
     {
         if let Some(token) = projection.select(SemanticKind::Context, start) {
             if contexts.len() >= MAX_CONTEXTS {
-                return Err(limit("InkML context nodes", MAX_CONTEXTS));
+                return Err(limit(
+                    crate::LimitKind::InkMlContextNodes,
+                    contexts.len() + 1,
+                    MAX_CONTEXTS,
+                ));
             }
             let mut context = parse_context(element, start, reader)?;
             context.source = SourceSpan::new(start, end);
@@ -702,7 +730,11 @@ fn parse_empty<R: std::io::BufRead>(
     {
         if let Some(token) = projection.select(SemanticKind::Trace, start) {
             if traces.len() >= MAX_TRACES {
-                return Err(limit("InkML traces", MAX_TRACES));
+                return Err(limit(
+                    crate::LimitKind::InkMlTraces,
+                    traces.len() + 1,
+                    MAX_TRACES,
+                ));
             }
             let mut trace = parse_trace(element, start, end, true, reader)?;
             trace.source = SourceSpan::new(start, end);
@@ -721,7 +753,11 @@ fn parse_empty<R: std::io::BufRead>(
     {
         if let Some(token) = projection.select(SemanticKind::BrushProperty, start) {
             if brush_properties.len() >= MAX_BRUSH_PROPERTIES {
-                return Err(limit("InkML brush properties", MAX_BRUSH_PROPERTIES));
+                return Err(limit(
+                    crate::LimitKind::InkMlBrushProperties,
+                    brush_properties.len() + 1,
+                    MAX_BRUSH_PROPERTIES,
+                ));
             }
             let mut property = parse_brush_property(element, start, end, true, reader)?;
             property.source = SourceSpan::new(start, end);
@@ -823,7 +859,11 @@ fn parse_brush_property<R: std::io::BufRead>(
     let name = attr(element, b"name", reader)?
         .ok_or_else(|| value_error(ValueError::MissingAttribute { name: "name" }))?;
     if name.len() > MAX_TOKEN_BYTES {
-        return Err(limit("InkML brush property name", MAX_TOKEN_BYTES));
+        return Err(limit(
+            crate::LimitKind::ScalarBytes,
+            name.len(),
+            MAX_TOKEN_BYTES,
+        ));
     }
     let value = attr(element, b"value", reader)?.unwrap_or_default();
     let units = attr(element, b"units", reader)?;
@@ -858,8 +898,15 @@ fn validate_link<R: std::io::BufRead>(
 }
 
 fn validate_reference_text(value: String) -> Result<Box<str>> {
-    if value.is_empty() || value.len() > 4096 || value.bytes().any(|byte| byte == 0) {
-        return Err(invalid("InkML reference text is invalid or overlong"));
+    if value.len() > 4096 {
+        return Err(limit(
+            crate::LimitKind::InkMlReferenceBytes,
+            value.len(),
+            4096,
+        ));
+    }
+    if value.is_empty() || value.bytes().any(|byte| byte == 0) {
+        return Err(invalid("InkML reference text is invalid"));
     }
     Ok(value.into_boxed_str())
 }
@@ -923,7 +970,8 @@ fn attr<R: std::io::BufRead>(
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "InkML attribute value bytes",
+                crate::LimitKind::InkMlAttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
@@ -1045,7 +1093,8 @@ fn validate_element<R: std::io::BufRead>(
         let attribute = attribute.map_err(xml_error)?;
         if attribute_keys.len() >= MAX_ATTRIBUTES_PER_ELEMENT {
             return Err(limit(
-                "InkML attributes per element",
+                crate::LimitKind::InkMlAttributesPerElement,
+                attribute_keys.len() + 1,
                 MAX_ATTRIBUTES_PER_ELEMENT,
             ));
         }
@@ -1055,7 +1104,8 @@ fn validate_element<R: std::io::BufRead>(
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "InkML attribute value bytes",
+                crate::LimitKind::InkMlAttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
@@ -1287,7 +1337,11 @@ fn reserve_one<T>(values: &mut Vec<T>, resource: &'static str) -> Result<()> {
 
 fn enforce_source_limit(source_len: usize) -> Result<()> {
     if source_len > MAX_SOURCE_BYTES {
-        Err(limit("InkML source bytes", MAX_SOURCE_BYTES))
+        Err(limit(
+            crate::LimitKind::InkMlSourceBytes,
+            source_len,
+            MAX_SOURCE_BYTES,
+        ))
     } else {
         Ok(())
     }
@@ -1315,7 +1369,7 @@ fn position<R: std::io::BufRead>(
 fn increment_nodes(nodes: &mut usize) -> Result<()> {
     let next = nodes
         .checked_add(1)
-        .ok_or_else(|| limit("InkML XML nodes", MAX_NODES))?;
+        .ok_or_else(|| invalid("InkML XML node count overflow"))?;
     enforce_nodes(next)?;
     *nodes = next;
     Ok(())
@@ -1323,7 +1377,7 @@ fn increment_nodes(nodes: &mut usize) -> Result<()> {
 
 fn enforce_nodes(nodes: usize) -> Result<()> {
     if nodes > MAX_NODES {
-        Err(limit("InkML XML nodes", MAX_NODES))
+        Err(limit(crate::LimitKind::InkMlXmlNodes, nodes, MAX_NODES))
     } else {
         Ok(())
     }
@@ -1331,7 +1385,7 @@ fn enforce_nodes(nodes: usize) -> Result<()> {
 
 fn enforce_depth(depth: usize) -> Result<()> {
     if depth > MAX_DEPTH {
-        Err(limit("InkML XML depth", MAX_DEPTH))
+        Err(limit(crate::LimitKind::InkMlXmlDepth, depth, MAX_DEPTH))
     } else {
         Ok(())
     }
@@ -1340,12 +1394,19 @@ fn enforce_depth(depth: usize) -> Result<()> {
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }
 fn xml_error(error: impl fmt::Display) -> Error {
     Error::Xml(error.to_string())
 }
-fn value_error(error: impl fmt::Display) -> Error {
-    Error::Invalid(error.to_string())
+fn value_error(error: ValueError) -> Error {
+    match error {
+        ValueError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(kind, observed, maximum),
+        error => Error::Invalid(error.to_string()),
+    }
 }

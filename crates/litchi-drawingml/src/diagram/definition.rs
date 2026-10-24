@@ -7,7 +7,7 @@
 //! interpreted.
 
 use crate::diagram::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT};
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 use litchi_ooxml_common::mce::process_str;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
@@ -70,11 +70,15 @@ impl DiagramDefinition {
 
     fn parse(xml: &str, root_name: &str) -> Result<Self> {
         if xml.len() > MAX_DEFINITION_XML {
-            return Err(limit("definition XML bytes"));
+            return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_DEFINITION_XML));
         }
         let processed = process_str(xml)?;
         if processed.len() > MAX_DEFINITION_XML {
-            return Err(limit("processed definition XML bytes"));
+            return Err(limit(
+                LimitKind::XmlBytes,
+                processed.len(),
+                MAX_DEFINITION_XML,
+            ));
         }
         let mut reader = NsReader::from_reader(processed.as_bytes());
         reader.config_mut().trim_text(true);
@@ -93,13 +97,13 @@ impl DiagramDefinition {
                 Event::Start(element) => {
                     depth = depth
                         .checked_add(1)
-                        .ok_or_else(|| limit("definition XML depth"))?;
+                        .ok_or_else(|| invalid("definition XML depth overflows"))?;
                     scan.visit(&reader, &element, depth)?;
                 },
                 Event::Empty(element) => {
                     let child_depth = depth
                         .checked_add(1)
-                        .ok_or_else(|| limit("definition XML depth"))?;
+                        .ok_or_else(|| invalid("definition XML depth overflows"))?;
                     scan.visit(&reader, &element, child_depth)?;
                 },
                 Event::End(_) => {
@@ -143,9 +147,12 @@ impl DefinitionScan<'_> {
         self.nodes = self
             .nodes
             .checked_add(1)
-            .ok_or_else(|| limit("definition XML node count"))?;
-        if self.nodes > MAX_NODES || depth > MAX_DEPTH {
-            return Err(limit("definition XML structure"));
+            .ok_or_else(|| invalid("definition XML node count overflows"))?;
+        if depth > MAX_DEPTH {
+            return Err(limit(LimitKind::XmlDepth, depth, MAX_DEPTH));
+        }
+        if self.nodes > MAX_NODES {
+            return Err(limit(LimitKind::XmlNodes, self.nodes, MAX_NODES));
         }
         let namespace = element_namespace(reader, element)?;
         let local = local_name(element)?;
@@ -236,8 +243,8 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(label: &str) -> Error {
-    invalid(format!("diagram {label} limit exceeded"))
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }
 
 #[cfg(test)]

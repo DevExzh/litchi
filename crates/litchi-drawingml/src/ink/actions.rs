@@ -12,6 +12,7 @@ use quick_xml::{
 };
 
 pub use crate::Error;
+pub use crate::LimitKind;
 use crate::Result;
 
 use super::{
@@ -38,7 +39,7 @@ pub mod builder {
     };
 }
 
-pub use edit::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch, Prepared};
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, Patch, Prepared};
 
 /// Maximum action records retained by one action part.
 pub const MAX_ACTIONS: usize = 65_536;
@@ -80,10 +81,10 @@ impl ActionType {
     }
 
     fn parse_with_empty(value: &str, allow_empty: bool) -> Result<Self> {
-        if (!allow_empty && value.is_empty())
-            || value.len() > 256
-            || value.bytes().any(|byte| byte == 0)
-        {
+        if value.len() > MAX_TOKEN_BYTES {
+            return Err(limit(LimitKind::ScalarBytes, value.len(), MAX_TOKEN_BYTES));
+        }
+        if (!allow_empty && value.is_empty()) || value.bytes().any(|byte| byte == 0) {
             return Err(invalid("ink action type is empty or overlong"));
         }
         Ok(match value {
@@ -603,7 +604,7 @@ impl Actions {
 /// exhausted resource limits.
 pub fn read(xml: &[u8]) -> Result<Actions> {
     if xml.len() > MAX_SOURCE_BYTES {
-        return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
+        return Err(limit(LimitKind::SourceBytes, xml.len(), MAX_SOURCE_BYTES));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -833,7 +834,7 @@ pub(crate) fn read_profile_owned(source: Arc<[u8]>) -> Result<Profile> {
 
 fn read_profile_with_source(xml: &[u8], owned_source: Option<Arc<[u8]>>) -> Result<Profile> {
     if xml.len() > MAX_SOURCE_BYTES {
-        return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
+        return Err(limit(LimitKind::SourceBytes, xml.len(), MAX_SOURCE_BYTES));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -1034,7 +1035,11 @@ fn read_profile_with_source(xml: &[u8], owned_source: Option<Arc<[u8]>>) -> Resu
 /// Write a strict profile using its exact retained source bytes.
 pub fn write_profile(profile: &Profile) -> Result<Vec<u8>> {
     if profile.source.len() > MAX_SOURCE_BYTES {
-        return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
+        return Err(limit(
+            LimitKind::SourceBytes,
+            profile.source.len(),
+            MAX_SOURCE_BYTES,
+        ));
     }
     let mut output = Vec::new();
     output
@@ -1067,7 +1072,11 @@ pub fn write_to<W: Write>(writer: &mut W, actions: &Actions) -> Result<()> {
 /// Returns an error when source validation fails.
 pub fn write(actions: &Actions) -> Result<Vec<u8>> {
     if actions.source().len() > MAX_SOURCE_BYTES {
-        return Err(limit("ink actions source bytes", MAX_SOURCE_BYTES));
+        return Err(limit(
+            LimitKind::SourceBytes,
+            actions.source().len(),
+            MAX_SOURCE_BYTES,
+        ));
     }
     Ok(actions.source().to_vec())
 }
@@ -1697,9 +1706,12 @@ fn profile_data_attributes<R: std::io::BufRead>(
     Ok((xml_id, name, reference))
 }
 
-fn strict_token(value: String, field: &'static str) -> Result<Box<str>> {
-    if value.len() > MAX_TOKEN_BYTES || value.bytes().any(|byte| byte == 0) {
-        return Err(limit(field, MAX_TOKEN_BYTES));
+fn strict_token(value: String, _field: &'static str) -> Result<Box<str>> {
+    if value.len() > MAX_TOKEN_BYTES {
+        return Err(limit(LimitKind::ScalarBytes, value.len(), MAX_TOKEN_BYTES));
+    }
+    if value.bytes().any(|byte| byte == 0) {
+        return Err(invalid("ink action token contains a NUL byte"));
     }
     Ok(value.into_boxed_str())
 }
@@ -1708,9 +1720,9 @@ fn increment_profile_action(root: &mut ProfileRoot) -> Result<()> {
     let next = root
         .action_count
         .checked_add(1)
-        .ok_or_else(|| limit("ink actions", MAX_ACTIONS))?;
+        .ok_or_else(|| invalid("ink action count overflow"))?;
     if next > MAX_ACTIONS {
-        return Err(limit("ink actions", MAX_ACTIONS));
+        return Err(limit(LimitKind::Actions, next, MAX_ACTIONS));
     }
     root.action_count = next;
     Ok(())
@@ -1720,9 +1732,9 @@ fn increment_profile_group(root: &mut ProfileRoot) -> Result<()> {
     let next = root
         .group_count
         .checked_add(1)
-        .ok_or_else(|| limit("ink action groups", MAX_ACTION_GROUPS))?;
+        .ok_or_else(|| invalid("ink action-group count overflow"))?;
     if next > MAX_ACTION_GROUPS {
-        return Err(limit("ink action groups", MAX_ACTION_GROUPS));
+        return Err(limit(LimitKind::ActionGroups, next, MAX_ACTION_GROUPS));
     }
     root.group_count = next;
     Ok(())
@@ -1746,7 +1758,8 @@ fn optional_attr<R: std::io::BufRead>(
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "ink actions attribute value bytes",
+                LimitKind::AttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
@@ -1774,7 +1787,8 @@ fn optional_xml_id<R: std::io::BufRead>(
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "ink actions attribute value bytes",
+                LimitKind::AttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
@@ -1910,7 +1924,8 @@ fn required_attr<R: std::io::BufRead>(
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "ink actions attribute value bytes",
+                LimitKind::AttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
@@ -1934,8 +1949,11 @@ fn required_attr<R: std::io::BufRead>(
 }
 
 fn validate_decimal(value: &str) -> Result<()> {
-    if value.is_empty() || value.len() > 256 {
-        return Err(invalid("ink action decimal is empty or overlong"));
+    if value.len() > MAX_TOKEN_BYTES {
+        return Err(limit(LimitKind::ScalarBytes, value.len(), MAX_TOKEN_BYTES));
+    }
+    if value.is_empty() {
+        return Err(invalid("ink action decimal is empty"));
     }
     let mut digits = 0usize;
     let mut dot = false;
@@ -1960,14 +1978,16 @@ fn validate_decimal(value: &str) -> Result<()> {
 }
 
 fn validate_unit(value: &str, name: &'static str) -> Result<()> {
+    if value.len() > MAX_TOKEN_BYTES {
+        return Err(limit(LimitKind::ScalarBytes, value.len(), MAX_TOKEN_BYTES));
+    }
     if value.is_empty()
-        || value.len() > MAX_TOKEN_BYTES
         || value
             .bytes()
             .any(|byte| byte == 0 || byte.is_ascii_whitespace())
     {
         return Err(invalid(format!(
-            "ink actions {name} is empty, overlong, or contains whitespace"
+            "ink actions {name} is empty or contains whitespace"
         )));
     }
     Ok(())
@@ -2091,7 +2111,8 @@ fn validate_element<R: std::io::BufRead>(
         let attribute = attribute.map_err(xml_error)?;
         if attribute_keys.len() >= MAX_ATTRIBUTES_PER_ELEMENT {
             return Err(limit(
-                "ink actions attributes per element",
+                LimitKind::XmlAttributes,
+                attribute_keys.len() + 1,
                 MAX_ATTRIBUTES_PER_ELEMENT,
             ));
         }
@@ -2101,7 +2122,8 @@ fn validate_element<R: std::io::BufRead>(
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "ink actions attribute value bytes",
+                LimitKind::AttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
@@ -2391,21 +2413,21 @@ fn pos<R: std::io::BufRead>(reader: &NsReader<R>, origin: ReaderOrigin) -> Resul
 fn increment_nodes(nodes: &mut usize) -> Result<()> {
     let next = nodes
         .checked_add(1)
-        .ok_or_else(|| limit("ink actions XML nodes", MAX_NODES))?;
+        .ok_or_else(|| invalid("ink action XML node count overflow"))?;
     enforce_nodes(next)?;
     *nodes = next;
     Ok(())
 }
 fn enforce_nodes(nodes: usize) -> Result<()> {
     if nodes > MAX_NODES {
-        Err(limit("ink actions XML nodes", MAX_NODES))
+        Err(limit(LimitKind::Nodes, nodes, MAX_NODES))
     } else {
         Ok(())
     }
 }
 fn enforce_depth(depth: usize) -> Result<()> {
     if depth > MAX_DEPTH {
-        Err(limit("ink actions XML depth", MAX_DEPTH))
+        Err(limit(LimitKind::Depth, depth, MAX_DEPTH))
     } else {
         Ok(())
     }
@@ -2413,16 +2435,16 @@ fn enforce_depth(depth: usize) -> Result<()> {
 fn increment_groups(groups: &mut usize) -> Result<()> {
     let next = groups
         .checked_add(1)
-        .ok_or_else(|| limit("ink action groups", MAX_ACTION_GROUPS))?;
+        .ok_or_else(|| invalid("ink action-group count overflow"))?;
     if next > MAX_ACTION_GROUPS {
-        return Err(limit("ink action groups", MAX_ACTION_GROUPS));
+        return Err(limit(LimitKind::ActionGroups, next, MAX_ACTION_GROUPS));
     }
     *groups = next;
     Ok(())
 }
 fn ensure_action_capacity(actions: &[Action]) -> Result<()> {
     if actions.len() >= MAX_ACTIONS {
-        Err(limit("ink actions", MAX_ACTIONS))
+        Err(limit(LimitKind::Actions, actions.len() + 1, MAX_ACTIONS))
     } else {
         Ok(())
     }
@@ -2430,8 +2452,8 @@ fn ensure_action_capacity(actions: &[Action]) -> Result<()> {
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }
 fn xml_error(error: impl fmt::Display) -> Error {
     Error::Xml(error.to_string())

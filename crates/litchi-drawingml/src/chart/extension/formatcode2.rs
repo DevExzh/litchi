@@ -21,7 +21,7 @@ use quick_xml::{
     reader::{NsReader, Reader},
 };
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// `[MS-ODRAWXML]` §2.44 target namespace.
@@ -230,7 +230,7 @@ struct Parsed {
 /// element-only placement rule; [`write()`] preserves the accepted source.
 pub fn read(xml: &[u8]) -> Result<Element> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("formatcode2 XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let parsed = scan(xml)?;
     let source = Arc::from(xml);
@@ -253,7 +253,7 @@ pub fn read(xml: &[u8]) -> Result<Element> {
 /// allocation.
 pub fn read_shared(xml: Arc<[u8]>) -> Result<Element> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("formatcode2 XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let parsed = scan(xml.as_ref())?;
     Ok(Element {
@@ -276,7 +276,7 @@ pub fn read_shared(xml: Arc<[u8]>) -> Result<Element> {
 /// end tag is supplied by the host outside this fragment.
 pub fn read_attribute(xml: &[u8]) -> Result<Attribute> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("formatcode2 attribute XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let parsed = scan_attribute(xml)?;
     let source = Arc::from(xml);
@@ -302,7 +302,7 @@ pub fn read_attribute(xml: &[u8]) -> Result<Attribute> {
 /// [`MAX_ATTRIBUTES`]; inherited declarations consume that temporary headroom.
 pub fn read_attribute_with_bindings(xml: &[u8], bindings: &[(&str, &str)]) -> Result<Attribute> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("formatcode2 attribute XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let parsed = scan_attribute_with_bindings(xml, bindings)?;
     Ok(Attribute {
@@ -319,7 +319,7 @@ pub fn read_attribute_with_bindings(xml: &[u8], bindings: &[(&str, &str)]) -> Re
 /// allocation.
 pub fn read_attribute_shared(xml: Arc<[u8]>) -> Result<Attribute> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("formatcode2 attribute XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let parsed = scan_attribute(xml.as_ref())?;
     Ok(Attribute {
@@ -338,7 +338,7 @@ pub fn read_attribute_shared_with_bindings(
     bindings: &[(&str, &str)],
 ) -> Result<Attribute> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("formatcode2 attribute XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let parsed = scan_attribute_with_bindings(xml.as_ref(), bindings)?;
     Ok(Attribute {
@@ -426,13 +426,26 @@ fn preflight_namespace_limits(xml: &[u8]) -> Result<()> {
                         invalid("formatcode2 namespace declaration count overflow")
                     })?;
                     if declarations > MAX_ATTRIBUTES {
-                        return Err(limit("formatcode2 attributes", MAX_ATTRIBUTES));
+                        return Err(limit(
+                            LimitKind::XmlAttributes,
+                            declarations,
+                            MAX_ATTRIBUTES,
+                        ));
                     }
                     let prefix = namespace_attribute_prefix(attribute.key)?;
-                    if prefix.len() > MAX_NAMESPACE_BYTES
-                        || attribute.value.as_ref().len() > MAX_NAMESPACE_BYTES
-                    {
-                        return Err(limit("formatcode2 namespace bytes", MAX_NAMESPACE_BYTES));
+                    if prefix.len() > MAX_NAMESPACE_BYTES {
+                        return Err(limit(
+                            LimitKind::NamespacePrefixBytes,
+                            prefix.len(),
+                            MAX_NAMESPACE_BYTES,
+                        ));
+                    }
+                    if attribute.value.as_ref().len() > MAX_NAMESPACE_BYTES {
+                        return Err(limit(
+                            LimitKind::NamespaceBytes,
+                            attribute.value.as_ref().len(),
+                            MAX_NAMESPACE_BYTES,
+                        ));
                     }
                     let _ = normalize_namespace_uri(attribute.value.as_ref())?;
                 }
@@ -532,11 +545,16 @@ fn local_namespace_prefixes(xml: &[u8]) -> Result<Vec<Vec<u8>>> {
                 }
                 let prefix = namespace_attribute_prefix(attribute.key)?;
                 if prefix.len() > MAX_NAMESPACE_BYTES {
-                    return Err(limit("formatcode2 namespace bytes", MAX_NAMESPACE_BYTES));
+                    return Err(limit(
+                        LimitKind::NamespacePrefixBytes,
+                        prefix.len(),
+                        MAX_NAMESPACE_BYTES,
+                    ));
                 }
                 if prefixes.len() >= MAX_ATTRIBUTES {
                     return Err(limit(
-                        "formatcode2 inherited namespace bindings",
+                        LimitKind::NamespaceDeclarations,
+                        prefixes.len() + 1,
                         MAX_ATTRIBUTES,
                     ));
                 }
@@ -557,7 +575,8 @@ fn checked_inherited_bindings<'a>(
 ) -> Result<Vec<(&'a [u8], &'a [u8])>> {
     if bindings.len() > MAX_ATTRIBUTES {
         return Err(limit(
-            "formatcode2 inherited namespace bindings",
+            LimitKind::NamespaceDeclarations,
+            bindings.len(),
             MAX_ATTRIBUTES,
         ));
     }
@@ -566,7 +585,11 @@ fn checked_inherited_bindings<'a>(
         let prefix = prefix.as_bytes();
         let namespace = namespace.as_bytes();
         if prefix.len() > MAX_NAMESPACE_BYTES || namespace.len() > MAX_NAMESPACE_BYTES {
-            return Err(limit("formatcode2 namespace bytes", MAX_NAMESPACE_BYTES));
+            return Err(limit(
+                LimitKind::NamespaceBytes,
+                prefix.len().max(namespace.len()),
+                MAX_NAMESPACE_BYTES,
+            ));
         }
         validate_xml_text(
             std::str::from_utf8(namespace).map_err(xml_error)?,
@@ -615,14 +638,14 @@ fn decorate_attribute_start_tag(xml: &[u8], additions: &[(&[u8], &[u8])]) -> Res
             .and_then(|length| length.checked_add(declaration_len))
             .and_then(|length| length.checked_add(escaped_len))
             .and_then(|length| length.checked_add(1))
-            .ok_or_else(|| limit("formatcode2 attribute XML bytes", MAX_XML_BYTES))?;
+            .ok_or_else(|| invalid("formatcode2 attribute XML length overflows"))?;
     }
     let output_len = xml
         .len()
         .checked_add(addition_len)
-        .ok_or_else(|| limit("formatcode2 attribute XML bytes", MAX_XML_BYTES))?;
+        .ok_or_else(|| invalid("formatcode2 attribute XML length overflows"))?;
     if output_len > MAX_XML_BYTES {
-        return Err(limit("formatcode2 attribute XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, output_len, MAX_XML_BYTES));
     }
     let mut output = Vec::new();
     output
@@ -666,7 +689,7 @@ fn escaped_xml_bytes_len(value: &[u8]) -> Result<usize> {
     text.chars().try_fold(0usize, |length, character| {
         length
             .checked_add(escaped_xml_character_len(character))
-            .ok_or_else(|| limit("formatcode2 attribute XML bytes", MAX_XML_BYTES))
+            .ok_or_else(|| invalid("formatcode2 attribute XML length overflows"))
     })
 }
 
@@ -701,7 +724,8 @@ fn attribute_projection(
             .map_err(xml_error)?;
         if lexical.len() > MAX_LEXICAL_VALUE_BYTES {
             return Err(limit(
-                "formatcode2 lexical value bytes",
+                LimitKind::LexicalValueBytes,
+                lexical.len(),
                 MAX_LEXICAL_VALUE_BYTES,
             ));
         }
@@ -726,9 +750,9 @@ fn rewrite_attribute(source: &AttributeSource, value: &str) -> Result<Vec<u8>> {
         .len()
         .checked_sub(source.value_range.end - source.value_range.start)
         .and_then(|length| length.checked_add(replacement_len))
-        .ok_or_else(|| limit("formatcode2 attribute XML bytes", MAX_XML_BYTES))?;
+        .ok_or_else(|| invalid("formatcode2 attribute XML length overflows"))?;
     if output_len > MAX_XML_BYTES {
-        return Err(limit("formatcode2 attribute XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, output_len, MAX_XML_BYTES));
     }
     let replacement = encode_xstring_xml(value, XStringContext::Attribute)?;
     let mut output = Vec::new();
@@ -743,7 +767,11 @@ fn rewrite_attribute(source: &AttributeSource, value: &str) -> Result<Vec<u8>> {
 
 fn validate_attribute_value(value: &Attribute) -> Result<()> {
     if value.value.as_str().len() > MAX_VALUE_BYTES {
-        return Err(limit("formatcode2 value bytes", MAX_VALUE_BYTES));
+        return Err(limit(
+            LimitKind::TextBytes,
+            value.value.value.len(),
+            MAX_VALUE_BYTES,
+        ));
     }
     Ok(())
 }
@@ -852,14 +880,18 @@ pub fn write_to<W: std::io::Write>(writer: &mut W, value: &Element) -> Result<()
 
 fn checked_value(value: &str) -> Result<Arc<str>> {
     if value.len() > MAX_VALUE_BYTES {
-        return Err(limit("formatcode2 value bytes", MAX_VALUE_BYTES));
+        return Err(limit(LimitKind::TextBytes, value.len(), MAX_VALUE_BYTES));
     }
     Ok(Arc::from(value))
 }
 
 fn validate_value(value: &Element) -> Result<()> {
     if value.value.as_str().len() > MAX_VALUE_BYTES {
-        return Err(limit("formatcode2 value bytes", MAX_VALUE_BYTES));
+        return Err(limit(
+            LimitKind::TextBytes,
+            value.value.as_str().len(),
+            MAX_VALUE_BYTES,
+        ));
     }
     Ok(())
 }
@@ -872,9 +904,9 @@ fn write_detached(value: &str) -> Result<Vec<u8>> {
         .checked_add(NAMESPACE.len())
         .and_then(|length| length.checked_add(content_len))
         .and_then(|length| length.checked_add(prefix.len() * 2 + 32))
-        .ok_or_else(|| limit("formatcode2 XML bytes", MAX_XML_BYTES))?;
+        .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
     if estimated > MAX_XML_BYTES {
-        return Err(limit("formatcode2 XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, estimated, MAX_XML_BYTES));
     }
     output
         .try_reserve_exact(estimated)
@@ -913,7 +945,7 @@ fn rewrite_source(source: &Source, value: &str) -> Result<Vec<u8>> {
         let replacement_len = if segment.kind == SegmentKind::CData && !value.contains("]]>") {
             12usize
                 .checked_add(encoded_xstring_len(value, XStringContext::Element)?)
-                .ok_or_else(|| limit("formatcode2 XML bytes", MAX_XML_BYTES))?
+                .ok_or_else(|| invalid("formatcode2 XML length overflows"))?
         } else {
             escaped_xstring_xml_len(value, XStringContext::Element)?
         };
@@ -921,12 +953,12 @@ fn rewrite_source(source: &Source, value: &str) -> Result<Vec<u8>> {
         output_len = output_len
             .checked_sub(segment.range.end - segment.range.start)
             .and_then(|length| length.checked_add(replacement_len))
-            .ok_or_else(|| limit("formatcode2 XML bytes", MAX_XML_BYTES))?;
+            .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
         for other in &source.segments {
             if other.range != segment.range {
                 output_len = output_len
                     .checked_sub(other.range.end - other.range.start)
-                    .ok_or_else(|| limit("formatcode2 XML bytes", MAX_XML_BYTES))?;
+                    .ok_or_else(|| invalid("formatcode2 XML length underflows"))?;
             }
         }
         ensure_output_limit(output_len)?;
@@ -952,7 +984,7 @@ fn rewrite_source(source: &Source, value: &str) -> Result<Vec<u8>> {
             .xml
             .len()
             .checked_add(escaped_len)
-            .ok_or_else(|| limit("formatcode2 XML bytes", MAX_XML_BYTES))?;
+            .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
         ensure_output_limit(output_len)?;
         let encoded = encode_xstring_xml(value, XStringContext::Element)?;
         replacements.push((start..start, encoded.into_bytes()));
@@ -977,13 +1009,13 @@ fn rewrite_empty_root(source: &Source, value: &str) -> Result<Vec<u8>> {
         .checked_add(1)
         .and_then(|length| length.checked_add(escaped_len))
         .and_then(|length| length.checked_add(2 + source.root_qname.len() + 1))
-        .ok_or_else(|| limit("formatcode2 XML bytes", MAX_XML_BYTES))?;
+        .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
     let output_len = source
         .xml
         .len()
         .checked_sub(raw.len())
         .and_then(|length| length.checked_add(replacement_len))
-        .ok_or_else(|| limit("formatcode2 XML bytes", MAX_XML_BYTES))?;
+        .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
     ensure_output_limit(output_len)?;
     let mut replacement = Vec::new();
     replacement
@@ -1017,7 +1049,7 @@ fn apply_replacements(
         output_len = output_len
             .checked_sub(range.end - range.start)
             .and_then(|length| length.checked_add(bytes.len()))
-            .ok_or_else(|| limit("formatcode2 XML bytes", MAX_XML_BYTES))?;
+            .ok_or_else(|| invalid("formatcode2 XML length overflows"))?;
     }
     ensure_output_limit(output_len)?;
     let mut output = Vec::new();
@@ -1084,10 +1116,10 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("formatcode2 node count overflow"))?;
                 if nodes > MAX_NODES {
-                    return Err(limit("formatcode2 XML nodes", MAX_NODES));
+                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                 }
                 if stack.len() >= MAX_DEPTH {
-                    return Err(limit("formatcode2 XML depth", MAX_DEPTH));
+                    return Err(limit(LimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
                 }
                 validate_element_name(&element)?;
                 validate_attributes(&element, &reader)?;
@@ -1119,7 +1151,7 @@ fn scan(xml: &[u8]) -> Result<Parsed> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("formatcode2 node count overflow"))?;
                 if nodes > MAX_NODES {
-                    return Err(limit("formatcode2 XML nodes", MAX_NODES));
+                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                 }
                 validate_element_name(&element)?;
                 validate_attributes(&element, &reader)?;
@@ -1264,7 +1296,11 @@ fn validate_qname_prefix(name: &[u8]) -> Result<()> {
     if let Some(colon) = name.iter().position(|byte| *byte == b':')
         && colon > MAX_NAMESPACE_BYTES
     {
-        return Err(limit("formatcode2 namespace bytes", MAX_NAMESPACE_BYTES));
+        return Err(limit(
+            LimitKind::NamespacePrefixBytes,
+            name.iter().position(|byte| *byte == b':').unwrap_or(0),
+            MAX_NAMESPACE_BYTES,
+        ));
     }
     Ok(())
 }
@@ -1278,7 +1314,7 @@ fn validate_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Re
             .checked_add(1)
             .ok_or_else(|| invalid("formatcode2 attribute count overflow"))?;
         if count > MAX_ATTRIBUTES {
-            return Err(limit("formatcode2 attributes", MAX_ATTRIBUTES));
+            return Err(limit(LimitKind::XmlAttributes, count, MAX_ATTRIBUTES));
         }
         let attribute = attribute.map_err(xml_error)?;
         let key_bytes = attribute.key.into_inner();
@@ -1298,8 +1334,19 @@ fn validate_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Re
         validate_xml_text(value.as_str(), "formatcode2 attribute value")?;
         if is_namespace_attribute(attribute.key) {
             let prefix = namespace_attribute_prefix(attribute.key)?;
-            if prefix.len() > MAX_NAMESPACE_BYTES || value.len() > MAX_NAMESPACE_BYTES {
-                return Err(limit("formatcode2 namespace bytes", MAX_NAMESPACE_BYTES));
+            if prefix.len() > MAX_NAMESPACE_BYTES {
+                return Err(limit(
+                    LimitKind::NamespacePrefixBytes,
+                    prefix.len(),
+                    MAX_NAMESPACE_BYTES,
+                ));
+            }
+            if value.len() > MAX_NAMESPACE_BYTES {
+                return Err(limit(
+                    LimitKind::NamespaceBytes,
+                    value.len(),
+                    MAX_NAMESPACE_BYTES,
+                ));
             }
             validate_namespace_binding(prefix, value.as_bytes())?;
         } else {
@@ -1310,13 +1357,21 @@ fn validate_attributes(element: &BytesStart<'_>, reader: &NsReader<&[u8]>) -> Re
                 ResolveResult::Unknown(prefix) => {
                     let prefix_bytes: &[u8] = prefix.as_ref();
                     if prefix_bytes.len() > MAX_NAMESPACE_BYTES {
-                        return Err(limit("formatcode2 namespace bytes", MAX_NAMESPACE_BYTES));
+                        return Err(limit(
+                            LimitKind::NamespacePrefixBytes,
+                            prefix_bytes.len(),
+                            MAX_NAMESPACE_BYTES,
+                        ));
                     }
                     return Err(invalid("formatcode2 attribute has an undeclared prefix"));
                 },
             };
             if namespace.len() > MAX_NAMESPACE_BYTES {
-                return Err(limit("formatcode2 namespace bytes", MAX_NAMESPACE_BYTES));
+                return Err(limit(
+                    LimitKind::NamespaceBytes,
+                    namespace.len(),
+                    MAX_NAMESPACE_BYTES,
+                ));
             }
             if !expanded.insert((namespace, local.into_inner().to_vec())) {
                 return Err(invalid(
@@ -1400,7 +1455,11 @@ fn validate_raw_text(value: &[u8]) -> Result<()> {
 
 fn validate_general_ref(reference: &BytesRef<'_>) -> Result<Option<char>> {
     if reference.len() > MAX_VALUE_BYTES {
-        return Err(limit("formatcode2 reference bytes", MAX_VALUE_BYTES));
+        return Err(limit(
+            LimitKind::ScalarBytes,
+            reference.len(),
+            MAX_VALUE_BYTES,
+        ));
     }
     if reference.is_char_ref() {
         let character = reference
@@ -1493,7 +1552,11 @@ fn resolved_namespace(resolved: &ResolveResult<'_>) -> Result<Vec<u8>> {
         ResolveResult::Unknown(prefix) => {
             let prefix_bytes: &[u8] = prefix.as_ref();
             if prefix_bytes.len() > MAX_NAMESPACE_BYTES {
-                return Err(limit("formatcode2 namespace bytes", MAX_NAMESPACE_BYTES));
+                return Err(limit(
+                    LimitKind::NamespacePrefixBytes,
+                    prefix_bytes.len(),
+                    MAX_NAMESPACE_BYTES,
+                ));
             }
             Err(invalid(format!(
                 "formatcode2 element has an undeclared prefix '{}',",
@@ -1505,7 +1568,11 @@ fn resolved_namespace(resolved: &ResolveResult<'_>) -> Result<Vec<u8>> {
 
 fn normalize_namespace_uri(raw: &[u8]) -> Result<Vec<u8>> {
     if raw.len() > MAX_NAMESPACE_BYTES {
-        return Err(limit("formatcode2 namespace bytes", MAX_NAMESPACE_BYTES));
+        return Err(limit(
+            LimitKind::NamespaceBytes,
+            raw.len(),
+            MAX_NAMESPACE_BYTES,
+        ));
     }
     let raw = std::str::from_utf8(raw).map_err(xml_error)?;
     let decoded = unescape_with(raw, resolve_xml_entity)
@@ -1513,7 +1580,11 @@ fn normalize_namespace_uri(raw: &[u8]) -> Result<Vec<u8>> {
         .into_owned();
     validate_xml_text(&decoded, "formatcode2 namespace URI")?;
     if decoded.len() > MAX_NAMESPACE_BYTES {
-        return Err(limit("formatcode2 namespace bytes", MAX_NAMESPACE_BYTES));
+        return Err(limit(
+            LimitKind::NamespaceBytes,
+            decoded.len(),
+            MAX_NAMESPACE_BYTES,
+        ));
     }
     Ok(decoded.into_bytes())
 }
@@ -1522,10 +1593,11 @@ fn append_lexical(value: &mut String, addition: &str) -> Result<()> {
     let length = value
         .len()
         .checked_add(addition.len())
-        .ok_or_else(|| limit("formatcode2 lexical value bytes", MAX_LEXICAL_VALUE_BYTES))?;
+        .ok_or_else(|| invalid("formatcode2 lexical value length overflows"))?;
     if length > MAX_LEXICAL_VALUE_BYTES {
         return Err(limit(
-            "formatcode2 lexical value bytes",
+            LimitKind::LexicalValueBytes,
+            length,
             MAX_LEXICAL_VALUE_BYTES,
         ));
     }
@@ -1537,10 +1609,11 @@ fn append_lexical_char(value: &mut String, character: char) -> Result<()> {
     let length = value
         .len()
         .checked_add(character.len_utf8())
-        .ok_or_else(|| limit("formatcode2 lexical value bytes", MAX_LEXICAL_VALUE_BYTES))?;
+        .ok_or_else(|| invalid("formatcode2 lexical value length overflows"))?;
     if length > MAX_LEXICAL_VALUE_BYTES {
         return Err(limit(
-            "formatcode2 lexical value bytes",
+            LimitKind::LexicalValueBytes,
+            length,
             MAX_LEXICAL_VALUE_BYTES,
         ));
     }
@@ -1601,9 +1674,9 @@ fn append_decoded(value: &mut String, addition: &str) -> Result<()> {
     let length = value
         .len()
         .checked_add(addition.len())
-        .ok_or_else(|| limit("formatcode2 value bytes", MAX_VALUE_BYTES))?;
+        .ok_or_else(|| invalid("formatcode2 value length overflows"))?;
     if length > MAX_VALUE_BYTES {
-        return Err(limit("formatcode2 value bytes", MAX_VALUE_BYTES));
+        return Err(limit(LimitKind::TextBytes, length, MAX_VALUE_BYTES));
     }
     value.push_str(addition);
     Ok(())
@@ -1613,9 +1686,9 @@ fn append_decoded_char(value: &mut String, character: char) -> Result<()> {
     let length = value
         .len()
         .checked_add(character.len_utf8())
-        .ok_or_else(|| limit("formatcode2 value bytes", MAX_VALUE_BYTES))?;
+        .ok_or_else(|| invalid("formatcode2 value length overflows"))?;
     if length > MAX_VALUE_BYTES {
-        return Err(limit("formatcode2 value bytes", MAX_VALUE_BYTES));
+        return Err(limit(LimitKind::TextBytes, length, MAX_VALUE_BYTES));
     }
     value.push(character);
     Ok(())
@@ -1634,7 +1707,7 @@ fn encoded_xstring_len(value: &str, context: XStringContext) -> Result<usize> {
             let addition = encoded_character_len(value.as_bytes(), index, character, context);
             length
                 .checked_add(addition)
-                .ok_or_else(|| limit("formatcode2 encoded value bytes", MAX_XML_BYTES))
+                .ok_or_else(|| invalid("formatcode2 encoded value length overflows"))
         })
 }
 
@@ -1659,7 +1732,7 @@ fn escaped_xstring_xml_len(value: &str, context: XStringContext) -> Result<usize
                 };
             length
                 .checked_add(addition)
-                .ok_or_else(|| limit("formatcode2 XML bytes", MAX_XML_BYTES))
+                .ok_or_else(|| invalid("formatcode2 XML length overflows"))
         })
 }
 
@@ -1791,7 +1864,7 @@ fn hex(byte: u8) -> Option<u16> {
 
 fn ensure_output_limit(output_len: usize) -> Result<()> {
     if output_len > MAX_XML_BYTES {
-        return Err(limit("formatcode2 XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, output_len, MAX_XML_BYTES));
     }
     Ok(())
 }
@@ -1871,6 +1944,6 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }

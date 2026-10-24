@@ -7,15 +7,8 @@ use crate::Result;
 
 use super::{Angle, Point, Size, Transform, codec, validation};
 
+pub use crate::LimitKind;
 pub use litchi_core::edit::Diagnostics;
-
-/// Resource dimensions reserved for future caller-configured transform bounds.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-#[non_exhaustive]
-pub enum LimitKind {
-    /// Complete transform XML bytes.
-    XmlBytes,
-}
 
 /// An immutable, cheaply clonable source snapshot of one `a:xfrm` element.
 ///
@@ -66,13 +59,6 @@ impl Package {
     #[must_use]
     pub const fn value(&self) -> &Transform {
         &self.value
-    }
-
-    /// Alias using the shared `DrawingML` vocabulary.
-    #[inline]
-    #[must_use]
-    pub const fn transform(&self) -> &Transform {
-        self.value()
     }
 
     /// Start an isolated edit based on this immutable snapshot.
@@ -232,9 +218,7 @@ impl Patch {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     fn apply(&self, source: &Package) -> Result<Package> {
         if source.value != self.before {
-            return Err(Error::Invalid(
-                "DrawingML transform patch source state does not match its precondition".into(),
-            ));
+            return Err(Error::PatchConflict);
         }
         let xml = if self.before == self.after {
             source.xml.as_ref().to_vec()

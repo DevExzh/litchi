@@ -688,10 +688,11 @@ fn attribute_name(attribute: &quick_xml::events::attributes::Attribute<'_>) -> S
 
 fn parse_tree(xml: &[u8]) -> Result<Node> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(Error::Limit {
-            resource: "chartex part bytes",
-            limit: MAX_XML_BYTES,
-        });
+        return Err(Error::limit(
+            crate::LimitKind::ChartexPartBytes,
+            xml.len(),
+            MAX_XML_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -736,10 +737,11 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
             Event::Start(element) => {
                 nodes += 1;
                 if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(Error::Limit {
-                        resource: "chartex XML nodes",
-                        limit: MAX_NODES,
-                    });
+                    return Err(Error::limit(
+                        crate::LimitKind::ChartexXmlNodes,
+                        nodes,
+                        MAX_NODES,
+                    ));
                 }
                 let node = open(&reader, &element)?;
                 stack.push(node);
@@ -747,10 +749,11 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
             Event::Empty(element) => {
                 nodes += 1;
                 if nodes > MAX_NODES {
-                    return Err(Error::Limit {
-                        resource: "chartex XML nodes",
-                        limit: MAX_NODES,
-                    });
+                    return Err(Error::limit(
+                        crate::LimitKind::ChartexXmlNodes,
+                        nodes,
+                        MAX_NODES,
+                    ));
                 }
                 let node = open(&reader, &element)?;
                 match stack.last_mut() {

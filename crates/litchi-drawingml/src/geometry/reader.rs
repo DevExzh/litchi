@@ -13,7 +13,7 @@
 use quick_xml::encoding::Decoder;
 use quick_xml::events::BytesStart;
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 
 use super::{
@@ -277,7 +277,11 @@ impl CustomGeometryBuilder {
             &mut self.geometry.guides
         };
         if target.len() >= MAX_GEOMETRY_GUIDES {
-            return Err(limit("guide count"));
+            return Err(limit(
+                LimitKind::GeometryGuides,
+                target.len() + 1,
+                MAX_GEOMETRY_GUIDES,
+            ));
         }
         target.push(Guide { name, formula });
         Ok(())
@@ -327,7 +331,16 @@ impl CustomGeometryBuilder {
             },
         };
         if at_limit {
-            return Err(limit("handle or connection site count"));
+            let (observed, maximum) = match &site {
+                PendingSite::Xy(_) | PendingSite::Polar(_) => {
+                    (self.geometry.adjust_handles.len() + 1, MAX_ADJUST_HANDLES)
+                },
+                PendingSite::Connection(_) => (
+                    self.geometry.connection_sites.len() + 1,
+                    MAX_CONNECTION_SITES,
+                ),
+            };
+            return Err(limit(LimitKind::GeometrySites, observed, maximum));
         }
         if self.pending_site.replace((site, false)).is_some() {
             return Err(invalid(
@@ -381,7 +394,11 @@ impl CustomGeometryBuilder {
 
     fn open_path(&mut self, element: &BytesStart<'_>, decoder: Decoder) -> Result<()> {
         if self.geometry.paths.len() >= MAX_GEOMETRY_PATHS {
-            return Err(limit("path count"));
+            return Err(limit(
+                LimitKind::GeometryPaths,
+                self.geometry.paths.len() + 1,
+                MAX_GEOMETRY_PATHS,
+            ));
         }
         let defaults = Path::default();
         let path = Path {
@@ -502,7 +519,11 @@ impl CustomGeometryBuilder {
             .as_mut()
             .ok_or_else(|| invalid("geometry path command outside a path"))?;
         if path.commands.len() >= MAX_PATH_COMMANDS {
-            return Err(limit("path command count"));
+            return Err(limit(
+                LimitKind::GeometryPathCommands,
+                path.commands.len() + 1,
+                MAX_PATH_COMMANDS,
+            ));
         }
         path.commands.push(command);
         Ok(())
@@ -572,6 +593,6 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(name: &str) -> Error {
-    invalid(format!("custom geometry {name} limit exceeded"))
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }

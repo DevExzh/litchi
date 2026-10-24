@@ -1,7 +1,11 @@
-use litchi_drawingml::svg_blip::{
-    Attribute, MAX_CONTEXT_DEPTH, MAX_NAMESPACE_DECLARATIONS, MAX_RELATIONSHIP_ID_BYTES, NAMESPACE,
-    Namespace, NamespaceContext, RELATIONSHIP_NAMESPACE, Reference, RelationshipId, SvgBlip,
-    XML_NAMESPACE, read, read_contextual, write, write_contextual, write_contextual_to,
+use litchi_drawingml::{
+    LimitKind,
+    svg_blip::{
+        Attribute, MAX_CONTEXT_DEPTH, MAX_NAMESPACE_DECLARATIONS, MAX_RELATIONSHIP_ID_BYTES,
+        NAMESPACE, Namespace, NamespaceContext, RELATIONSHIP_NAMESPACE, Reference, RelationshipId,
+        SvgBlip, ValueError, XML_NAMESPACE, read, read_contextual, write, write_contextual,
+        write_contextual_to,
+    },
 };
 
 const SVG_BLIP: &[u8] = br#"<asvg:svgBlip xmlns:asvg="http://schemas.microsoft.com/office/drawing/2016/SVG/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:future="urn:example:future" r:embed="rIdSvg" future:mode="preserve"><future:payload data="x"/></asvg:svgBlip>"#;
@@ -72,6 +76,29 @@ fn rejects_invalid_root_and_relationship_values() {
     assert!(Namespace::new(Some("xmlns"), "urn:invalid").is_err());
     assert!(Namespace::new(None, XML_NAMESPACE).is_err());
     assert!(Attribute::new("xmlns:future", "urn:invalid").is_err());
+}
+
+#[test]
+fn scalar_constructor_bounds_keep_typed_limit_dimensions() {
+    let relationship_id = "r".repeat(MAX_RELATIONSHIP_ID_BYTES + 1);
+    assert!(matches!(
+        RelationshipId::new(&relationship_id),
+        Err(ValueError::Limit {
+            kind: LimitKind::AttributeValueBytes,
+            observed,
+            maximum: MAX_RELATIONSHIP_ID_BYTES,
+        }) if observed == relationship_id.len()
+    ));
+
+    let attribute_value = "x".repeat(litchi_drawingml::svg_blip::MAX_ATTRIBUTE_VALUE_BYTES + 1);
+    assert!(matches!(
+        Attribute::new("future:value", &attribute_value),
+        Err(ValueError::Limit {
+            kind: LimitKind::AttributeValueBytes,
+            observed,
+            maximum: litchi_drawingml::svg_blip::MAX_ATTRIBUTE_VALUE_BYTES,
+        }) if observed == attribute_value.len()
+    ));
 }
 
 #[test]
@@ -370,9 +397,10 @@ fn is_declaration_limit(error: &litchi_drawingml::Error) -> bool {
     matches!(
         error,
         litchi_drawingml::Error::Limit {
-            resource: "SVG blip namespace declarations",
-            limit,
-        } if *limit == MAX_NAMESPACE_DECLARATIONS
+            kind: LimitKind::NamespaceDeclarations,
+            maximum,
+            ..
+        } if *maximum == MAX_NAMESPACE_DECLARATIONS
     )
 }
 

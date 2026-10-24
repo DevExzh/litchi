@@ -55,10 +55,271 @@ pub mod text;
 pub mod theme;
 pub mod transform;
 
+use std::fmt;
+
 use thiserror::Error;
 
 /// Result of a `DrawingML` read operation.
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Typed resource dimensions used by every bounded DrawingML reader and
+/// editor.
+///
+/// The enum is intentionally crate-wide because [`Error`] is the shared
+/// boundary for the chart, transform, theme, diagram, text, color, model3d,
+/// InkML, and action families.  Family modules may re-export the vocabulary
+/// they own, but a returned error always carries this nominal type rather
+/// than a resource string which callers would have to reinterpret.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete serialized output.
+    OutputBytes,
+    /// Retained source bytes.
+    SourceBytes,
+    /// One opaque payload.
+    PayloadBytes,
+    /// XML bytes for one family value.
+    XmlBytes,
+    /// XML node count.
+    XmlNodes,
+    /// XML nesting depth.
+    XmlDepth,
+    /// XML attribute count.
+    XmlAttributes,
+    /// Decoded XML attribute or scalar value bytes.
+    AttributeValueBytes,
+    /// Namespace prefix bytes.
+    NamespacePrefixBytes,
+    /// Namespace URI bytes.
+    NamespaceBytes,
+    /// Generic structural nodes.
+    Nodes,
+    /// Generic structural depth.
+    Depth,
+    /// Typed scalar bytes.
+    ScalarBytes,
+    /// Text bytes.
+    TextBytes,
+    /// Lexical (pre-decoding) value bytes.
+    LexicalValueBytes,
+    /// Source input bytes.
+    InputBytes,
+    /// Action records.
+    Actions,
+    /// Action groups.
+    ActionGroups,
+    /// Queued edit operations.
+    EditOperations,
+    /// Action element-name bytes.
+    ActionElementNameBytes,
+    /// Action namespace-prefix bytes.
+    ActionNamespacePrefixBytes,
+    /// Action opaque-attribute value bytes.
+    ActionOpaqueAttributeValueBytes,
+    /// Action reference value bytes.
+    ActionReferenceValueBytes,
+    /// InkML context nodes.
+    InkMlContextNodes,
+    /// InkML trace records.
+    InkMlTraces,
+    /// InkML brush properties.
+    InkMlBrushProperties,
+    /// InkML brush records.
+    InkMlBrushRecords,
+    /// InkML source bytes.
+    InkMlSourceBytes,
+    /// InkML output bytes.
+    InkMlOutputBytes,
+    /// InkML XML nodes.
+    InkMlXmlNodes,
+    /// InkML XML depth.
+    InkMlXmlDepth,
+    /// InkML identifier bytes.
+    InkMlIdentifierBytes,
+    /// InkML reference bytes.
+    InkMlReferenceBytes,
+    /// InkML trace text bytes.
+    InkMlTraceTextBytes,
+    /// InkML brush text bytes.
+    InkMlBrushTextBytes,
+    /// InkML retained authoring text.
+    InkMlRetainedAuthoringText,
+    /// InkML attributes per element.
+    InkMlAttributesPerElement,
+    /// InkML attribute value bytes.
+    InkMlAttributeValueBytes,
+    /// Chart series.
+    ChartSeries,
+    /// Chart categories.
+    ChartCategories,
+    /// Chart points.
+    ChartPoints,
+    /// Chart text bytes.
+    ChartTextBytes,
+    /// Chart-style color entries.
+    ChartStyleColors,
+    /// Chart-style variations.
+    ChartStyleVariations,
+    /// Chart-style color transforms.
+    ChartStyleTransforms,
+    /// Chart-style modifier records.
+    ChartStyleModifiers,
+    /// One chart-style modifier's bytes.
+    ChartStyleModifierBytes,
+    /// Chart-style retained string bytes.
+    ChartStyleStrings,
+    /// Extended-chart part bytes.
+    ChartexPartBytes,
+    /// Extended-chart XML nodes.
+    ChartexXmlNodes,
+    /// Color transform count.
+    ColorTransforms,
+    /// Diagram data-model bytes.
+    DiagramDataModelBytes,
+    /// Diagram drawing bytes.
+    DiagramDrawingBytes,
+    /// Diagram points.
+    DiagramPoints,
+    /// Diagram connections.
+    DiagramConnections,
+    /// Diagram data-model text bytes.
+    DiagramDataModelTextBytes,
+    /// Diagram data-model identifier bytes.
+    DiagramDataModelIdentifierBytes,
+    /// Diagram nodes.
+    DiagramNodes,
+    /// Diagram node depth.
+    DiagramNodeDepth,
+    /// Diagram node text bytes.
+    DiagramNodeTextBytes,
+    /// Custom-geometry guides.
+    GeometryGuides,
+    /// Custom-geometry handles or connection sites.
+    GeometrySites,
+    /// Custom-geometry paths.
+    GeometryPaths,
+    /// Custom-geometry path commands.
+    GeometryPathCommands,
+    /// SmartArt nodes.
+    SmartArtNodes,
+    /// SmartArt node depth.
+    SmartArtNodeDepth,
+    /// SmartArt node text bytes.
+    SmartArtNodeTextBytes,
+    /// Theme-family name bytes.
+    ThemeFamilyNameBytes,
+    /// Text-body elements.
+    TextBodyElements,
+    /// Text-body nesting depth.
+    TextBodyNestingDepth,
+    /// Model3D child records.
+    ModelChildren,
+    /// Model3D namespace declarations.
+    NamespaceDeclarations,
+    /// Model3D raster children.
+    RasterChildren,
+    /// Model3D renderer text.
+    RendererText,
+    /// Model3D inert fragment bytes.
+    InertFragmentBytes,
+    /// Model3D inert fragment nodes.
+    InertFragmentNodes,
+    /// Model3D inert fragment depth.
+    InertFragmentDepth,
+}
+
+impl LimitKind {
+    /// Stable diagnostic name for this dimension.
+    #[must_use]
+    pub const fn resource(self) -> &'static str {
+        match self {
+            Self::OutputBytes => "DrawingML output bytes",
+            Self::SourceBytes => "DrawingML source bytes",
+            Self::PayloadBytes => "DrawingML payload bytes",
+            Self::XmlBytes => "DrawingML XML bytes",
+            Self::XmlNodes => "DrawingML XML nodes",
+            Self::XmlDepth => "DrawingML XML depth",
+            Self::XmlAttributes => "DrawingML XML attributes",
+            Self::AttributeValueBytes => "DrawingML XML attribute value bytes",
+            Self::NamespacePrefixBytes => "DrawingML namespace prefix bytes",
+            Self::NamespaceBytes => "DrawingML namespace bytes",
+            Self::Nodes => "DrawingML nodes",
+            Self::Depth => "DrawingML depth",
+            Self::ScalarBytes => "DrawingML scalar bytes",
+            Self::TextBytes => "DrawingML text bytes",
+            Self::LexicalValueBytes => "DrawingML lexical value bytes",
+            Self::InputBytes => "DrawingML input bytes",
+            Self::Actions => "ink action records",
+            Self::ActionGroups => "ink action groups",
+            Self::EditOperations => "ink action edit operations",
+            Self::ActionElementNameBytes => "ink action element name bytes",
+            Self::ActionNamespacePrefixBytes => "ink action namespace prefix bytes",
+            Self::ActionOpaqueAttributeValueBytes => "ink action opaque attribute value bytes",
+            Self::ActionReferenceValueBytes => "ink action reference value bytes",
+            Self::InkMlContextNodes => "InkML context nodes",
+            Self::InkMlTraces => "InkML traces",
+            Self::InkMlBrushProperties => "InkML brush properties",
+            Self::InkMlBrushRecords => "InkML brush records",
+            Self::InkMlSourceBytes => "InkML source bytes",
+            Self::InkMlOutputBytes => "InkML output bytes",
+            Self::InkMlXmlNodes => "InkML XML nodes",
+            Self::InkMlXmlDepth => "InkML XML depth",
+            Self::InkMlIdentifierBytes => "InkML identifier bytes",
+            Self::InkMlReferenceBytes => "InkML reference bytes",
+            Self::InkMlTraceTextBytes => "InkML trace text bytes",
+            Self::InkMlBrushTextBytes => "InkML brush text bytes",
+            Self::InkMlRetainedAuthoringText => "InkML retained authoring text",
+            Self::InkMlAttributesPerElement => "InkML attributes per element",
+            Self::InkMlAttributeValueBytes => "InkML attribute value bytes",
+            Self::ChartSeries => "authored chart series",
+            Self::ChartCategories => "authored chart categories",
+            Self::ChartPoints => "authored chart points",
+            Self::ChartTextBytes => "authored chart text bytes",
+            Self::ChartStyleColors => "chart-style colors",
+            Self::ChartStyleVariations => "chart-style variations",
+            Self::ChartStyleTransforms => "chart-style color transforms",
+            Self::ChartStyleModifiers => "chart-style modifiers",
+            Self::ChartStyleModifierBytes => "chart-style modifier bytes",
+            Self::ChartStyleStrings => "chart-style strings",
+            Self::ChartexPartBytes => "chartex part bytes",
+            Self::ChartexXmlNodes => "chartex XML nodes",
+            Self::ColorTransforms => "DrawingML color transforms",
+            Self::DiagramDataModelBytes => "diagram data-model bytes",
+            Self::DiagramDrawingBytes => "diagram drawing bytes",
+            Self::DiagramPoints => "diagram points",
+            Self::DiagramConnections => "diagram connections",
+            Self::DiagramDataModelTextBytes => "diagram data-model text bytes",
+            Self::DiagramDataModelIdentifierBytes => "diagram data-model identifier bytes",
+            Self::DiagramNodes => "diagram nodes",
+            Self::DiagramNodeDepth => "diagram node depth",
+            Self::DiagramNodeTextBytes => "diagram node text bytes",
+            Self::GeometryGuides => "custom geometry guides",
+            Self::GeometrySites => "custom geometry sites",
+            Self::GeometryPaths => "custom geometry paths",
+            Self::GeometryPathCommands => "custom geometry path commands",
+            Self::SmartArtNodes => "SmartArt nodes",
+            Self::SmartArtNodeDepth => "SmartArt node depth",
+            Self::SmartArtNodeTextBytes => "SmartArt node text bytes",
+            Self::ThemeFamilyNameBytes => "theme family name bytes",
+            Self::TextBodyElements => "text body elements",
+            Self::TextBodyNestingDepth => "text body nesting depth",
+            Self::ModelChildren => "children",
+            Self::NamespaceDeclarations => "namespace declarations",
+            Self::RasterChildren => "raster children",
+            Self::RendererText => "renderer text",
+            Self::InertFragmentBytes => "inert fragment bytes",
+            Self::InertFragmentNodes => "inert fragment nodes",
+            Self::InertFragmentDepth => "inert fragment depth",
+        }
+    }
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.resource())
+    }
+}
 
 /// Failure to parse a shared `DrawingML` primitive.
 #[derive(Debug, Error)]
@@ -85,13 +346,52 @@ pub enum Error {
     Common(#[from] litchi_ooxml_common::XmlError),
 
     /// A bounded `DrawingML` codec resource was exhausted.
-    #[error("DrawingML {resource} exceeds the limit of {limit}")]
+    #[error("DrawingML {kind} limit exceeded: observed {observed}, maximum {maximum}")]
     Limit {
-        /// Resource whose configured bound was exceeded.
-        resource: &'static str,
+        /// Typed resource dimension whose configured bound was exceeded.
+        kind: LimitKind,
+        /// First observed value beyond the selected bound.
+        observed: usize,
         /// Active upper bound.
-        limit: usize,
+        maximum: usize,
     },
+
+    /// A caller supplied an invalid bounded-resource policy.
+    #[error("invalid DrawingML {kind} limit {value} (allowed 1..={maximum})")]
+    InvalidLimit {
+        /// Typed resource dimension being configured.
+        kind: LimitKind,
+        /// Rejected caller value.
+        value: usize,
+        /// Hard maximum accepted for this dimension.
+        maximum: usize,
+    },
+
+    /// A patch was made against a different immutable source owner.
+    #[error("DrawingML patch source does not match the recipient")]
+    PatchConflict,
+}
+
+impl Error {
+    /// Construct an observed typed limit failure.
+    #[must_use]
+    pub(crate) const fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Self {
+        Self::Limit {
+            kind,
+            observed,
+            maximum,
+        }
+    }
+
+    /// Construct an invalid typed limit failure.
+    #[must_use]
+    pub(crate) const fn invalid_limit(kind: LimitKind, value: usize, maximum: usize) -> Self {
+        Self::InvalidLimit {
+            kind,
+            value,
+            maximum,
+        }
+    }
 }
 
 impl From<quick_xml::Error> for Error {

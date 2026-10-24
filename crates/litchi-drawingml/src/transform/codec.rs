@@ -32,7 +32,7 @@ const MAX_NODES: usize = 128;
 /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
 pub fn read(xml: &[u8]) -> Result<Transform> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("DrawingML transform XML", MAX_XML_BYTES));
+        return Err(limit(crate::LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
 
     let mut reader = Reader::from_reader(xml);
@@ -53,9 +53,9 @@ pub fn read(xml: &[u8]) -> Result<Transform> {
             .into_owned();
         nodes = nodes
             .checked_add(1)
-            .ok_or_else(|| limit("DrawingML transform nodes", MAX_NODES))?;
+            .ok_or_else(|| limit(crate::LimitKind::XmlNodes, nodes, MAX_NODES))?;
         if nodes > MAX_NODES {
-            return Err(limit("DrawingML transform nodes", MAX_NODES));
+            return Err(limit(crate::LimitKind::XmlNodes, nodes, MAX_NODES));
         }
 
         match event {
@@ -313,9 +313,9 @@ fn consume_leaf(
             .into_owned();
         *nodes = nodes
             .checked_add(1)
-            .ok_or_else(|| limit("DrawingML transform nodes", MAX_NODES))?;
+            .ok_or_else(|| limit(crate::LimitKind::XmlNodes, *nodes, MAX_NODES))?;
         if *nodes > MAX_NODES {
-            return Err(limit("DrawingML transform nodes", MAX_NODES));
+            return Err(limit(crate::LimitKind::XmlNodes, *nodes, MAX_NODES));
         }
         match event {
             Event::End(element) if element.local_name().as_ref() == expected => return Ok(()),
@@ -428,7 +428,11 @@ fn write_size(xml: &mut String, name: &str, size: Size) -> std::fmt::Result {
 
 fn checked_output(output: Vec<u8>) -> Result<Vec<u8>> {
     if output.len() > MAX_XML_BYTES {
-        return Err(limit("DrawingML transform output", MAX_XML_BYTES));
+        return Err(limit(
+            crate::LimitKind::XmlBytes,
+            output.len(),
+            MAX_XML_BYTES,
+        ));
     }
     Ok(output)
 }
@@ -457,6 +461,6 @@ fn unqualified_attribute_value(
     litchi_ooxml_common::xml::unqualified_attribute_value(element, name, decoder).map_err(xml_error)
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }

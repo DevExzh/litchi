@@ -94,49 +94,63 @@ impl AuthoringLimits {
     ///
     /// Returns an error if a budget is zero or exceeds the shared hard cap.
     pub fn validate(self) -> Result<()> {
-        for (resource, value, maximum) in [
-            ("source bytes", self.max_source_bytes, MAX_SOURCE_BYTES),
-            ("output bytes", self.max_output_bytes, MAX_SOURCE_BYTES),
-            ("XML nodes", self.max_nodes, MAX_NODES),
-            ("XML depth", self.max_depth, MAX_DEPTH),
+        for (kind, value, maximum) in [
             (
-                "attributes per element",
+                crate::LimitKind::InkMlSourceBytes,
+                self.max_source_bytes,
+                MAX_SOURCE_BYTES,
+            ),
+            (
+                crate::LimitKind::InkMlOutputBytes,
+                self.max_output_bytes,
+                MAX_SOURCE_BYTES,
+            ),
+            (crate::LimitKind::InkMlXmlNodes, self.max_nodes, MAX_NODES),
+            (crate::LimitKind::InkMlXmlDepth, self.max_depth, MAX_DEPTH),
+            (
+                crate::LimitKind::InkMlAttributesPerElement,
                 self.max_attributes_per_element,
                 MAX_AUTHORING_ATTRIBUTES,
             ),
             (
-                "attribute value bytes",
+                crate::LimitKind::InkMlAttributeValueBytes,
                 self.max_attribute_value_bytes,
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ),
-            ("contexts", self.max_contexts, MAX_CONTEXTS),
-            ("brushes", self.max_brushes, MAX_AUTHORING_BRUSHES),
             (
-                "brush properties",
+                crate::LimitKind::InkMlContextNodes,
+                self.max_contexts,
+                MAX_CONTEXTS,
+            ),
+            (
+                crate::LimitKind::InkMlBrushRecords,
+                self.max_brushes,
+                MAX_AUTHORING_BRUSHES,
+            ),
+            (
+                crate::LimitKind::InkMlBrushProperties,
                 self.max_brush_properties,
                 MAX_BRUSH_PROPERTIES,
             ),
-            ("traces", self.max_traces, MAX_TRACES),
+            (crate::LimitKind::InkMlTraces, self.max_traces, MAX_TRACES),
             (
-                "identifier bytes",
+                crate::LimitKind::InkMlIdentifierBytes,
                 self.max_id_bytes,
                 MAX_AUTHORING_ID_BYTES,
             ),
             (
-                "reference bytes",
+                crate::LimitKind::InkMlReferenceBytes,
                 self.max_reference_bytes,
                 MAX_AUTHORING_REFERENCE_BYTES,
             ),
             (
-                "trace text bytes",
+                crate::LimitKind::InkMlTraceTextBytes,
                 self.max_trace_text_bytes,
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ),
         ] {
             if value == 0 || value > maximum {
-                return Err(invalid(format!(
-                    "InkML authoring {resource} budget must be in 1..={maximum}"
-                )));
+                return Err(Error::invalid_limit(kind, value, maximum));
             }
         }
         Ok(())
@@ -187,7 +201,11 @@ impl Draft {
         self.limits.validate()?;
         validate_context(&context, self.limits)?;
         if self.contexts.len() >= self.limits.max_contexts {
-            return Err(limit("InkML context records", self.limits.max_contexts));
+            return Err(limit(
+                crate::LimitKind::InkMlContextNodes,
+                self.contexts.len() + 1,
+                self.limits.max_contexts,
+            ));
         }
         let text_bytes = context_text_bytes(&context)?;
         ensure_retained_input(self.retained_input_bytes, text_bytes, self.limits)?;
@@ -196,12 +214,7 @@ impl Draft {
         self.retained_input_bytes = self
             .retained_input_bytes
             .checked_add(text_bytes)
-            .ok_or_else(|| {
-                limit(
-                    "InkML retained authoring text",
-                    retained_text_limit(self.limits),
-                )
-            })?;
+            .ok_or_else(|| invalid("InkML retained authoring text count overflow"))?;
         Ok(self)
     }
 
@@ -214,15 +227,20 @@ impl Draft {
         self.limits.validate()?;
         validate_brush(&brush, self.limits)?;
         if self.brushes.len() >= self.limits.max_brushes {
-            return Err(limit("InkML brush records", self.limits.max_brushes));
+            return Err(limit(
+                crate::LimitKind::InkMlBrushRecords,
+                self.brushes.len() + 1,
+                self.limits.max_brushes,
+            ));
         }
         let next_properties = self
             .property_count
             .checked_add(brush.properties.len())
-            .ok_or_else(|| limit("InkML brush properties", self.limits.max_brush_properties))?;
+            .ok_or_else(|| invalid("InkML brush-property count overflow"))?;
         if next_properties > self.limits.max_brush_properties {
             return Err(limit(
-                "InkML brush properties",
+                crate::LimitKind::InkMlBrushProperties,
+                next_properties,
                 self.limits.max_brush_properties,
             ));
         }
@@ -234,12 +252,7 @@ impl Draft {
         self.retained_input_bytes = self
             .retained_input_bytes
             .checked_add(text_bytes)
-            .ok_or_else(|| {
-                limit(
-                    "InkML retained authoring text",
-                    retained_text_limit(self.limits),
-                )
-            })?;
+            .ok_or_else(|| invalid("InkML retained authoring text count overflow"))?;
         Ok(self)
     }
 
@@ -252,7 +265,11 @@ impl Draft {
         self.limits.validate()?;
         validate_trace(&trace, self.limits)?;
         if self.traces.len() >= self.limits.max_traces {
-            return Err(limit("InkML trace records", self.limits.max_traces));
+            return Err(limit(
+                crate::LimitKind::InkMlTraces,
+                self.traces.len() + 1,
+                self.limits.max_traces,
+            ));
         }
         let text_bytes = trace_text_bytes(&trace)?;
         ensure_retained_input(self.retained_input_bytes, text_bytes, self.limits)?;
@@ -261,12 +278,7 @@ impl Draft {
         self.retained_input_bytes = self
             .retained_input_bytes
             .checked_add(text_bytes)
-            .ok_or_else(|| {
-                limit(
-                    "InkML retained authoring text",
-                    retained_text_limit(self.limits),
-                )
-            })?;
+            .ok_or_else(|| invalid("InkML retained authoring text count overflow"))?;
         Ok(self)
     }
 
@@ -287,7 +299,8 @@ impl Draft {
         let source_ids = self.validate_records()?;
         if self.limits.max_attributes_per_element < 2 {
             return Err(limit(
-                "InkML attributes per element",
+                crate::LimitKind::InkMlAttributesPerElement,
+                self.limits.max_attributes_per_element,
                 self.limits.max_attributes_per_element,
             ));
         }
@@ -301,18 +314,30 @@ impl Draft {
         validate_attribute_length("integer", self.limits)?;
         let node_count = self.node_count()?;
         if node_count > self.limits.max_nodes {
-            return Err(limit("InkML XML nodes", self.limits.max_nodes));
+            return Err(limit(
+                crate::LimitKind::InkMlXmlNodes,
+                node_count,
+                self.limits.max_nodes,
+            ));
         }
         let depth = self.required_depth();
         if depth > self.limits.max_depth {
-            return Err(limit("InkML XML depth", self.limits.max_depth));
+            return Err(limit(
+                crate::LimitKind::InkMlXmlDepth,
+                depth,
+                self.limits.max_depth,
+            ));
         }
 
         let mut length = LengthSink::new(self.limits.max_output_bytes);
         emit_document(&self, &source_ids, &mut length)?;
         let output_len = length.len;
         if output_len > self.limits.max_source_bytes {
-            return Err(limit("InkML source bytes", self.limits.max_source_bytes));
+            return Err(limit(
+                crate::LimitKind::InkMlSourceBytes,
+                output_len,
+                self.limits.max_source_bytes,
+            ));
         }
         let mut writer = XmlSink::new(output_len, self.limits.max_output_bytes)?;
         emit_document(&self, &source_ids, &mut writer)?;
@@ -425,7 +450,11 @@ impl Draft {
                     .checked_add(1)
                     .ok_or_else(|| invalid("InkML generated source identifier counter overflow"))?;
                 if candidate.len() > self.limits.max_id_bytes {
-                    return Err(limit("InkML identifier bytes", self.limits.max_id_bytes));
+                    return Err(limit(
+                        crate::LimitKind::InkMlIdentifierBytes,
+                        candidate.len(),
+                        self.limits.max_id_bytes,
+                    ));
                 }
                 validate_attribute_length(&candidate, self.limits)?;
                 if used_ids
@@ -455,27 +484,27 @@ impl Draft {
         if definition_contexts != 0 || !self.brushes.is_empty() {
             let context_definition_nodes = definition_contexts
                 .checked_mul(5)
-                .ok_or_else(|| limit("InkML XML nodes", self.limits.max_nodes))?;
+                .ok_or_else(|| invalid("InkML XML node count overflow"))?;
             count = count
                 .checked_add(1)
                 .and_then(|value| value.checked_add(context_definition_nodes))
                 .and_then(|value| value.checked_add(self.brushes.len()))
-                .ok_or_else(|| limit("InkML XML nodes", self.limits.max_nodes))?;
+                .ok_or_else(|| invalid("InkML XML node count overflow"))?;
             count = count
                 .checked_add(self.property_count)
-                .ok_or_else(|| limit("InkML XML nodes", self.limits.max_nodes))?;
+                .ok_or_else(|| invalid("InkML XML node count overflow"))?;
         }
         if !self.contexts.is_empty() || !self.traces.is_empty() {
             let annotation_nodes = self
                 .contexts
                 .len()
                 .checked_mul(4)
-                .ok_or_else(|| limit("InkML XML nodes", self.limits.max_nodes))?;
+                .ok_or_else(|| invalid("InkML XML node count overflow"))?;
             count = count
                 .checked_add(1)
                 .and_then(|value| value.checked_add(annotation_nodes))
                 .and_then(|value| value.checked_add(self.traces.len()))
-                .ok_or_else(|| limit("InkML XML nodes", self.limits.max_nodes))?;
+                .ok_or_else(|| invalid("InkML XML node count overflow"))?;
         }
         Ok(count)
     }
@@ -612,10 +641,18 @@ impl Prepared {
     pub fn from_bytes(bytes: &[u8], limits: AuthoringLimits) -> Result<Self> {
         limits.validate()?;
         if bytes.len() > limits.max_source_bytes {
-            return Err(limit("InkML source bytes", limits.max_source_bytes));
+            return Err(limit(
+                crate::LimitKind::InkMlSourceBytes,
+                bytes.len(),
+                limits.max_source_bytes,
+            ));
         }
         if bytes.len() > limits.max_output_bytes {
-            return Err(limit("InkML output bytes", limits.max_output_bytes));
+            return Err(limit(
+                crate::LimitKind::InkMlOutputBytes,
+                bytes.len(),
+                limits.max_output_bytes,
+            ));
         }
         preflight_import_limits(bytes, limits)?;
         let metadata = read_metadata(bytes)?;
@@ -750,7 +787,11 @@ fn preflight_import_limits(bytes: &[u8], limits: AuthoringLimits) -> Result<()> 
                 }
                 trace_text_seen = true;
                 if text.as_ref().len() > limits.max_trace_text_bytes {
-                    return Err(limit("InkML trace text bytes", limits.max_trace_text_bytes));
+                    return Err(limit(
+                        crate::LimitKind::InkMlTraceTextBytes,
+                        text.as_ref().len(),
+                        limits.max_trace_text_bytes,
+                    ));
                 }
             },
             Event::End(element) => {
@@ -808,41 +849,57 @@ fn preflight_element(
     preflight_attributes(element, limits)?;
     *nodes = nodes
         .checked_add(1)
-        .ok_or_else(|| limit("InkML XML nodes", limits.max_nodes))?;
+        .ok_or_else(|| invalid("InkML XML node count overflow"))?;
     if *nodes > limits.max_nodes {
-        return Err(limit("InkML XML nodes", limits.max_nodes));
+        return Err(limit(
+            crate::LimitKind::InkMlXmlNodes,
+            *nodes,
+            limits.max_nodes,
+        ));
     }
     let next_depth = depth
         .checked_add(1)
-        .ok_or_else(|| limit("InkML XML depth", limits.max_depth))?;
+        .ok_or_else(|| invalid("InkML XML depth overflow"))?;
     if next_depth > limits.max_depth {
-        return Err(limit("InkML XML depth", limits.max_depth));
+        return Err(limit(
+            crate::LimitKind::InkMlXmlDepth,
+            next_depth,
+            limits.max_depth,
+        ));
     }
     if !empty {
         *depth = next_depth;
     }
     match name {
-        b"msink:context" => {
-            increment_preflight(contexts, limits.max_contexts, "InkML context records")?
-        },
-        b"inkml:brush" => increment_preflight(brushes, limits.max_brushes, "InkML brush records")?,
+        b"msink:context" => increment_preflight(
+            contexts,
+            limits.max_contexts,
+            crate::LimitKind::InkMlContextNodes,
+        )?,
+        b"inkml:brush" => increment_preflight(
+            brushes,
+            limits.max_brushes,
+            crate::LimitKind::InkMlBrushRecords,
+        )?,
         b"inkml:brushProperty" => increment_preflight(
             properties,
             limits.max_brush_properties,
-            "InkML brush properties",
+            crate::LimitKind::InkMlBrushProperties,
         )?,
-        b"inkml:trace" => increment_preflight(traces, limits.max_traces, "InkML trace records")?,
+        b"inkml:trace" => {
+            increment_preflight(traces, limits.max_traces, crate::LimitKind::InkMlTraces)?
+        },
         _ => {},
     }
     Ok(())
 }
 
-fn increment_preflight(value: &mut usize, maximum: usize, resource: &'static str) -> Result<()> {
+fn increment_preflight(value: &mut usize, maximum: usize, kind: crate::LimitKind) -> Result<()> {
     *value = value
         .checked_add(1)
-        .ok_or_else(|| limit(resource, maximum))?;
+        .ok_or_else(|| invalid("InkML preflight count overflow"))?;
     if *value > maximum {
-        return Err(limit(resource, maximum));
+        return Err(limit(kind, *value, maximum));
     }
     Ok(())
 }
@@ -857,21 +914,20 @@ fn preflight_attributes(element: &BytesStart<'_>, limits: AuthoringLimits) -> Re
     for attribute in element.checked_attributes() {
         let attribute = attribute
             .map_err(|error| invalid(format!("InkML import attribute scan failed: {error}")))?;
-        count = count.checked_add(1).ok_or_else(|| {
-            limit(
-                "InkML attributes per element",
-                limits.max_attributes_per_element,
-            )
-        })?;
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| invalid("InkML attribute count overflow"))?;
         if count > limits.max_attributes_per_element {
             return Err(limit(
-                "InkML attributes per element",
+                crate::LimitKind::InkMlAttributesPerElement,
+                count,
                 limits.max_attributes_per_element,
             ));
         }
         if attribute.value.len() > MAX_ATTRIBUTE_VALUE_BYTES {
             return Err(limit(
-                "InkML attribute value bytes",
+                crate::LimitKind::InkMlAttributeValueBytes,
+                attribute.value.len(),
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
@@ -882,19 +938,32 @@ fn preflight_attributes(element: &BytesStart<'_>, limits: AuthoringLimits) -> Re
             })?;
         if value.len() > limits.max_attribute_value_bytes {
             return Err(limit(
-                "InkML attribute value bytes",
+                crate::LimitKind::InkMlAttributeValueBytes,
+                value.len(),
                 limits.max_attribute_value_bytes,
             ));
         }
         match attribute.key.as_ref() {
             b"xml:id" if value.len() > limits.max_id_bytes => {
-                return Err(limit("InkML identifier bytes", limits.max_id_bytes));
+                return Err(limit(
+                    crate::LimitKind::InkMlIdentifierBytes,
+                    value.len(),
+                    limits.max_id_bytes,
+                ));
             },
             b"id" if element_name == b"msink:context" && value.len() > limits.max_id_bytes => {
-                return Err(limit("InkML identifier bytes", limits.max_id_bytes));
+                return Err(limit(
+                    crate::LimitKind::InkMlIdentifierBytes,
+                    value.len(),
+                    limits.max_id_bytes,
+                ));
             },
             b"contextRef" | b"brushRef" if value.len() > limits.max_reference_bytes => {
-                return Err(limit("InkML reference bytes", limits.max_reference_bytes));
+                return Err(limit(
+                    crate::LimitKind::InkMlReferenceBytes,
+                    value.len(),
+                    limits.max_reference_bytes,
+                ));
             },
             b"xmlns:inkml" if element_name == b"inkml:ink" => {
                 if has_inkml_namespace || value.as_ref() != INKML_NAMESPACE {
@@ -945,13 +1014,25 @@ fn is_canonical_element_name(name: &[u8]) -> bool {
 
 fn validate_import_metadata_limits(metadata: &Metadata, limits: AuthoringLimits) -> Result<()> {
     if metadata.context_count() > limits.max_contexts {
-        return Err(limit("InkML context records", limits.max_contexts));
+        return Err(limit(
+            crate::LimitKind::InkMlContextNodes,
+            metadata.context_count(),
+            limits.max_contexts,
+        ));
     }
     if metadata.trace_count() > limits.max_traces {
-        return Err(limit("InkML trace records", limits.max_traces));
+        return Err(limit(
+            crate::LimitKind::InkMlTraces,
+            metadata.trace_count(),
+            limits.max_traces,
+        ));
     }
     if metadata.brush_property_count() > limits.max_brush_properties {
-        return Err(limit("InkML brush properties", limits.max_brush_properties));
+        return Err(limit(
+            crate::LimitKind::InkMlBrushProperties,
+            metadata.brush_property_count(),
+            limits.max_brush_properties,
+        ));
     }
     Ok(())
 }
@@ -1195,7 +1276,11 @@ fn parse_definitions(
             Event::Start(element) if element.name().as_ref() == b"inkml:brush" => {
                 brush_seen = true;
                 if parts.brushes.len() >= limits.max_brushes {
-                    return Err(limit("InkML brush records", limits.max_brushes));
+                    return Err(limit(
+                        crate::LimitKind::InkMlBrushRecords,
+                        parts.brushes.len() + 1,
+                        limits.max_brushes,
+                    ));
                 }
                 let id = required_attribute(&element, b"xml:id", "brush identifier")?;
                 let id = own_identifier(id, "brush identifier", limits.max_id_bytes)?;
@@ -1242,7 +1327,11 @@ fn parse_brush_definition(
         match parser.next()? {
             Event::Empty(element) if element.name().as_ref() == b"inkml:brushProperty" => {
                 if property_count >= limits.max_brush_properties {
-                    return Err(limit("InkML brush properties", limits.max_brush_properties));
+                    return Err(limit(
+                        crate::LimitKind::InkMlBrushProperties,
+                        property_count + 1,
+                        limits.max_brush_properties,
+                    ));
                 }
                 let _ = required_attribute(&element, b"name", "brush property name")?;
                 let _ = required_attribute(&element, b"value", "brush property value")?;
@@ -1313,7 +1402,11 @@ fn required_attribute(
 
 fn validate_import_identifier(value: &str, field: &'static str, maximum: usize) -> Result<()> {
     if value.len() > maximum {
-        return Err(limit("InkML identifier bytes", maximum));
+        return Err(limit(
+            crate::LimitKind::InkMlIdentifierBytes,
+            value.len(),
+            maximum,
+        ));
     }
     if !is_ncname(value) {
         return Err(invalid(format!("InkML {field} is not an XML NCName")));
@@ -1522,15 +1615,23 @@ impl BrushDraft {
     /// or allocation fails.
     pub fn property(mut self, property: BrushPropertyDraft) -> Result<Self> {
         if self.properties.len() >= MAX_BRUSH_PROPERTIES {
-            return Err(limit("InkML brush properties", MAX_BRUSH_PROPERTIES));
+            return Err(limit(
+                crate::LimitKind::InkMlBrushProperties,
+                self.properties.len() + 1,
+                MAX_BRUSH_PROPERTIES,
+            ));
         }
         let text_bytes = brush_property_text_bytes(&property)?;
         let next_text_bytes = self
             .property_text_bytes
             .checked_add(text_bytes)
-            .ok_or_else(|| limit("InkML brush text bytes", MAX_SOURCE_BYTES))?;
+            .ok_or_else(|| invalid("InkML brush text byte count overflow"))?;
         if next_text_bytes > MAX_SOURCE_BYTES {
-            return Err(limit("InkML brush text bytes", MAX_SOURCE_BYTES));
+            return Err(limit(
+                crate::LimitKind::InkMlBrushTextBytes,
+                next_text_bytes,
+                MAX_SOURCE_BYTES,
+            ));
         }
         try_reserve_one(&mut self.properties, "InkML brush properties")?;
         self.properties.push(property);
@@ -1702,9 +1803,13 @@ impl Sink for LengthSink {
         self.len = self
             .len
             .checked_add(bytes.len())
-            .ok_or_else(|| limit("InkML output bytes", self.max))?;
+            .ok_or_else(|| invalid("InkML output byte count overflow"))?;
         if self.len > self.max {
-            return Err(limit("InkML output bytes", self.max));
+            return Err(limit(
+                crate::LimitKind::InkMlOutputBytes,
+                self.len,
+                self.max,
+            ));
         }
         Ok(())
     }
@@ -1718,7 +1823,7 @@ struct XmlSink {
 impl XmlSink {
     fn new(expected: usize, max: usize) -> Result<Self> {
         if expected > max {
-            return Err(limit("InkML output bytes", max));
+            return Err(limit(crate::LimitKind::InkMlOutputBytes, expected, max));
         }
         let mut bytes = Vec::new();
         bytes
@@ -1738,9 +1843,9 @@ impl Sink for XmlSink {
             .bytes
             .len()
             .checked_add(bytes.len())
-            .ok_or_else(|| limit("InkML output bytes", self.max))?;
+            .ok_or_else(|| invalid("InkML output byte count overflow"))?;
         if next > self.max {
-            return Err(limit("InkML output bytes", self.max));
+            return Err(limit(crate::LimitKind::InkMlOutputBytes, next, self.max));
         }
         if self.bytes.capacity().saturating_sub(self.bytes.len()) < bytes.len() {
             self.bytes
@@ -1864,14 +1969,22 @@ fn validate_context(context: &ContextDraft, limits: AuthoringLimits) -> Result<(
     if let Some(id) = context.id.as_ref()
         && id.as_str().len() > limits.max_id_bytes
     {
-        return Err(limit("InkML identifier bytes", limits.max_id_bytes));
+        return Err(limit(
+            crate::LimitKind::InkMlIdentifierBytes,
+            id.as_str().len(),
+            limits.max_id_bytes,
+        ));
     }
     if let Some(id) = context.id.as_ref() {
         validate_attribute_length(id.as_str(), limits)?;
     }
     if let Some(id) = context.xml_id.as_deref() {
         if id.len() > limits.max_id_bytes {
-            return Err(limit("InkML identifier bytes", limits.max_id_bytes));
+            return Err(limit(
+                crate::LimitKind::InkMlIdentifierBytes,
+                id.len(),
+                limits.max_id_bytes,
+            ));
         }
         validate_attribute_length(id, limits)?;
     }
@@ -1924,7 +2037,8 @@ fn validate_context(context: &ContextDraft, limits: AuthoringLimits) -> Result<(
     attributes += usize::from(context.rotation_angle.is_some());
     if attributes > limits.max_attributes_per_element {
         return Err(limit(
-            "InkML attributes per element",
+            crate::LimitKind::InkMlAttributesPerElement,
+            attributes,
             limits.max_attributes_per_element,
         ));
     }
@@ -1933,15 +2047,24 @@ fn validate_context(context: &ContextDraft, limits: AuthoringLimits) -> Result<(
 
 fn validate_brush(brush: &BrushDraft, limits: AuthoringLimits) -> Result<()> {
     if brush.id.len() > limits.max_id_bytes {
-        return Err(limit("InkML identifier bytes", limits.max_id_bytes));
+        return Err(limit(
+            crate::LimitKind::InkMlIdentifierBytes,
+            brush.id.len(),
+            limits.max_id_bytes,
+        ));
     }
     validate_attribute_length(&brush.id, limits)?;
     if brush.properties.len() > limits.max_brush_properties {
-        return Err(limit("InkML brush properties", limits.max_brush_properties));
+        return Err(limit(
+            crate::LimitKind::InkMlBrushProperties,
+            brush.properties.len(),
+            limits.max_brush_properties,
+        ));
     }
     if brush.properties.len() > limits.max_attributes_per_element {
         return Err(limit(
-            "InkML brush properties",
+            crate::LimitKind::InkMlAttributesPerElement,
+            brush.properties.len(),
             limits.max_attributes_per_element,
         ));
     }
@@ -1956,7 +2079,11 @@ fn validate_brush(brush: &BrushDraft, limits: AuthoringLimits) -> Result<()> {
                 .is_some_and(|units| units.len() > limits.max_attribute_value_bytes)
         {
             return Err(limit(
-                "InkML attribute value bytes",
+                crate::LimitKind::InkMlAttributeValueBytes,
+                property
+                    .value
+                    .len()
+                    .max(property.units.as_ref().map_or(0, |units| units.len())),
                 limits.max_attribute_value_bytes,
             ));
         }
@@ -1967,7 +2094,8 @@ fn validate_brush(brush: &BrushDraft, limits: AuthoringLimits) -> Result<()> {
         let attributes = 2 + usize::from(property.units.is_some());
         if attributes > limits.max_attributes_per_element {
             return Err(limit(
-                "InkML attributes per element",
+                crate::LimitKind::InkMlAttributesPerElement,
+                attributes,
                 limits.max_attributes_per_element,
             ));
         }
@@ -1983,9 +2111,13 @@ fn ensure_retained_input(current: usize, incoming: usize, limits: AuthoringLimit
     let retained_limit = retained_text_limit(limits);
     let next = current
         .checked_add(incoming)
-        .ok_or_else(|| limit("InkML retained authoring text", retained_limit))?;
+        .ok_or_else(|| invalid("InkML retained authoring text count overflow"))?;
     if next > retained_limit {
-        return Err(limit("InkML retained authoring text", retained_limit));
+        return Err(limit(
+            crate::LimitKind::InkMlRetainedAuthoringText,
+            next,
+            retained_limit,
+        ));
     }
     Ok(())
 }
@@ -2073,11 +2205,19 @@ fn decimal_digit_count(value: u32) -> usize {
 
 fn validate_trace(trace: &TraceDraft, limits: AuthoringLimits) -> Result<()> {
     if trace.data.len() > limits.max_trace_text_bytes {
-        return Err(limit("InkML trace text bytes", limits.max_trace_text_bytes));
+        return Err(limit(
+            crate::LimitKind::InkMlTraceTextBytes,
+            trace.data.len(),
+            limits.max_trace_text_bytes,
+        ));
     }
     for reference in [&trace.context_ref, &trace.brush_ref].into_iter().flatten() {
         if reference.len() > limits.max_reference_bytes {
-            return Err(limit("InkML reference bytes", limits.max_reference_bytes));
+            return Err(limit(
+                crate::LimitKind::InkMlReferenceBytes,
+                reference.len(),
+                limits.max_reference_bytes,
+            ));
         }
         validate_attribute_length(reference, limits)?;
     }
@@ -2085,7 +2225,8 @@ fn validate_trace(trace: &TraceDraft, limits: AuthoringLimits) -> Result<()> {
         usize::from(trace.context_ref.is_some()) + usize::from(trace.brush_ref.is_some());
     if attributes > limits.max_attributes_per_element {
         return Err(limit(
-            "InkML attributes per element",
+            crate::LimitKind::InkMlAttributesPerElement,
+            attributes,
             limits.max_attributes_per_element,
         ));
     }
@@ -2095,7 +2236,8 @@ fn validate_trace(trace: &TraceDraft, limits: AuthoringLimits) -> Result<()> {
 fn validate_attribute_length(value: &str, limits: AuthoringLimits) -> Result<()> {
     if value.len() > limits.max_attribute_value_bytes {
         return Err(limit(
-            "InkML attribute value bytes",
+            crate::LimitKind::InkMlAttributeValueBytes,
+            value.len(),
             limits.max_attribute_value_bytes,
         ));
     }
@@ -2371,7 +2513,8 @@ fn own_reference(value: impl AsRef<str>) -> Result<Box<str>> {
     let value = value.as_ref();
     if value.len() > MAX_AUTHORING_REFERENCE_BYTES {
         return Err(limit(
-            "InkML reference bytes",
+            crate::LimitKind::InkMlReferenceBytes,
+            value.len(),
             MAX_AUTHORING_REFERENCE_BYTES,
         ));
     }
@@ -2431,8 +2574,8 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }
 
 #[cfg(test)]

@@ -12,6 +12,7 @@
 //! valid typed theme when the extension is present, and a parsed family edit
 //! keeps its exact source and opaque family markup.
 
+use litchi_drawingml::Error;
 use litchi_drawingml::theme::family::part;
 use litchi_drawingml::theme::{codec, family};
 
@@ -771,7 +772,10 @@ fn family_noop_and_stale_source_are_source_checked() {
     let other =
         family::Package::from_xml(source.iter().copied().chain(Some(b' ')).collect::<Vec<_>>())
             .expect("different source package");
-    assert!(other.apply(changed.patch()).is_err());
+    assert!(matches!(
+        other.apply(changed.patch()),
+        Err(Error::PatchConflict)
+    ));
 }
 
 #[test]

@@ -162,10 +162,11 @@ pub(crate) fn parse_scaled(value: &str, kind: &'static str) -> Result<i32> {
 /// Validate and return the original fragment without allocating a copy.
 pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(Error::Limit {
-            resource: "DrawingML color XML",
-            limit: MAX_XML_BYTES,
-        });
+        return Err(Error::limit(
+            crate::LimitKind::XmlBytes,
+            xml.len(),
+            MAX_XML_BYTES,
+        ));
     }
 
     let mut reader = Reader::from_reader(xml);
@@ -184,10 +185,7 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
                     .checked_add(1)
                     .ok_or_else(|| Error::Invalid("DrawingML color node count overflow".into()))?;
                 if nodes > MAX_NODES {
-                    return Err(Error::Limit {
-                        resource: "DrawingML color nodes",
-                        limit: MAX_NODES,
-                    });
+                    return Err(Error::limit(crate::LimitKind::XmlNodes, nodes, MAX_NODES));
                 }
                 if stack.is_empty() {
                     if root_seen {
@@ -198,10 +196,11 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
                     root_seen = true;
                 }
                 if stack.len() >= MAX_DEPTH {
-                    return Err(Error::Limit {
-                        resource: "DrawingML color depth",
-                        limit: MAX_DEPTH,
-                    });
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        stack.len(),
+                        MAX_DEPTH,
+                    ));
                 }
                 stack.push(element.name().as_ref().to_vec());
             },
@@ -210,10 +209,7 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
                     .checked_add(1)
                     .ok_or_else(|| Error::Invalid("DrawingML color node count overflow".into()))?;
                 if nodes > MAX_NODES {
-                    return Err(Error::Limit {
-                        resource: "DrawingML color nodes",
-                        limit: MAX_NODES,
-                    });
+                    return Err(Error::limit(crate::LimitKind::XmlNodes, nodes, MAX_NODES));
                 }
                 if stack.is_empty() {
                     if root_seen {

@@ -182,8 +182,9 @@ fn malformed_fragments_and_resource_exhaustion_are_rejected() {
     assert!(matches!(
         codec::read(transforms.as_bytes()),
         Err(crate::Error::Limit {
-            resource: "DrawingML color transforms",
-            limit: codec::MAX_TRANSFORMS,
+            kind: crate::LimitKind::ColorTransforms,
+            maximum: codec::MAX_TRANSFORMS,
+            ..
         })
     ));
 }

@@ -3,10 +3,10 @@
 //! opaque compatibility contract; these tests exercise only `read_profile`.
 
 use litchi_drawingml::{
-    Error,
+    Error, LimitKind,
     ink::{
         ACTION_NAMESPACE, INKML_NAMESPACE, MAX_ATTRIBUTE_VALUE_BYTES, MAX_DEPTH, MAX_NODES,
-        MAX_SOURCE_BYTES, actions,
+        MAX_SOURCE_BYTES, MAX_TOKEN_BYTES, actions,
     },
 };
 
@@ -32,16 +32,18 @@ fn assert_invalid(xml: &[u8]) {
     }
 }
 
-fn assert_limit(xml: &[u8], resource: &'static str, limit: usize) {
+fn assert_limit(xml: &[u8], kind: LimitKind, maximum: usize) {
     match actions::read_profile(xml) {
         Err(Error::Limit {
-            resource: actual_resource,
-            limit: actual_limit,
+            kind: actual_kind,
+            observed,
+            maximum: actual_maximum,
         }) => {
-            assert_eq!(actual_resource, resource);
-            assert_eq!(actual_limit, limit);
+            assert_eq!(actual_kind, kind);
+            assert_eq!(actual_maximum, maximum);
+            assert!(observed > maximum);
         },
-        Err(other) => panic!("expected {resource:?} limit {limit}, got {other:?}"),
+        Err(other) => panic!("expected {kind:?} limit {maximum}, got {other:?}"),
         Ok(profile) => panic!("accepted over-budget profile {:?}", profile.source()),
     }
 }
@@ -525,11 +527,7 @@ fn profile_depth_node_attribute_and_source_limits_are_bounded() {
         overflow_depth.push_str("</x:node>");
     }
     overflow_depth.push_str("</i:definitions></iact:actions>");
-    assert_limit(
-        overflow_depth.as_bytes(),
-        "ink actions XML depth",
-        MAX_DEPTH,
-    );
+    assert_limit(overflow_depth.as_bytes(), LimitKind::Depth, MAX_DEPTH);
 
     let mut exact_nodes = format!(
         r#"<iact:actions xmlns:iact="{ACTION_NAMESPACE}" xmlns:i="{INKML_NAMESPACE}" xmlns:x="urn:opaque" lengthUnit="m" timeUnit="s"><i:definitions>"#
@@ -548,11 +546,7 @@ fn profile_depth_node_attribute_and_source_limits_are_bounded() {
         overflow_nodes.push_str("<x:n/>");
     }
     overflow_nodes.push_str("</i:definitions></iact:actions>");
-    assert_limit(
-        overflow_nodes.as_bytes(),
-        "ink actions XML nodes",
-        MAX_NODES,
-    );
+    assert_limit(overflow_nodes.as_bytes(), LimitKind::Nodes, MAX_NODES);
 
     let mut attributes = format!(
         r#"<iact:actions xmlns:iact="{ACTION_NAMESPACE}" xmlns:i="{INKML_NAMESPACE}" xmlns:x="urn:opaque" lengthUnit="m" timeUnit="s"><i:definitions><x:container"#
@@ -561,14 +555,10 @@ fn profile_depth_node_attribute_and_source_limits_are_bounded() {
         attributes.push_str(&format!(r#" x:a{index}="v""#));
     }
     attributes.push_str("/></i:definitions></iact:actions>");
-    assert_limit(
-        attributes.as_bytes(),
-        "ink actions attributes per element",
-        256,
-    );
+    assert_limit(attributes.as_bytes(), LimitKind::XmlAttributes, 256);
 
     let over_source = vec![b' '; MAX_SOURCE_BYTES + 1];
-    assert_limit(&over_source, "ink actions source bytes", MAX_SOURCE_BYTES);
+    assert_limit(&over_source, LimitKind::SourceBytes, MAX_SOURCE_BYTES);
 }
 
 #[test]
@@ -579,7 +569,16 @@ fn attribute_value_hard_cap_is_reported_before_profile_retention() {
     );
     assert_limit(
         source.as_bytes(),
-        "ink actions attribute value bytes",
+        LimitKind::AttributeValueBytes,
         MAX_ATTRIBUTE_VALUE_BYTES,
     );
+}
+
+#[test]
+fn action_type_overflow_is_reported_as_a_typed_scalar_limit() {
+    let value = "x".repeat(MAX_TOKEN_BYTES + 1);
+    let source = format!(
+        r#"<iact:actions xmlns:iact="{ACTION_NAMESPACE}" lengthUnit="m" timeUnit="s"><iact:action type="{value}" startTime="0"/></iact:actions>"#
+    );
+    assert_limit(source.as_bytes(), LimitKind::ScalarBytes, MAX_TOKEN_BYTES);
 }

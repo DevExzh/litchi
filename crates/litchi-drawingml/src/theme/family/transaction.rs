@@ -7,15 +7,8 @@ use crate::Result;
 
 use super::{Family, codec};
 
+pub use crate::LimitKind;
 pub use litchi_core::edit::Diagnostics;
-
-/// Resource dimensions reserved for future caller-configured theme bounds.
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
-#[non_exhaustive]
-pub enum LimitKind {
-    /// Complete theme-family XML bytes.
-    XmlBytes,
-}
 
 /// An immutable, cheap-to-share Theme Family source snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -211,9 +204,7 @@ impl Patch {
         if !Arc::ptr_eq(&source.xml, &self.before.xml)
             && source.xml.as_ref() != self.before.xml.as_ref()
         {
-            return Err(Error::Invalid(
-                "theme family patch source does not match its byte precondition".into(),
-            ));
+            return Err(Error::PatchConflict);
         }
         if Arc::ptr_eq(&self.before.xml, &self.after.xml) {
             return Ok(source.clone());

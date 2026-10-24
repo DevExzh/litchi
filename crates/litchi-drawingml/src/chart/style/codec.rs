@@ -5,7 +5,7 @@ use super::model::{
     EntryKind, FontIndex, FontReference, Info, MarkerLayout, MarkerSymbol, Payload, Reference,
     Transform, TransformKind, Variation,
 };
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
@@ -201,7 +201,7 @@ fn parse_color_document(xml: &[u8]) -> Result<ColorDocument> {
             break;
         }
         if colors.len() >= MAX_COLORS {
-            return limit("chart color style colors");
+            return limit(LimitKind::ChartStyleColors, colors.len() + 1, MAX_COLORS);
         }
         colors.push(parse_drawing_color(child, &ignorable)?);
         cursor += 1;
@@ -215,7 +215,11 @@ fn parse_color_document(xml: &[u8]) -> Result<ColorDocument> {
         .is_some_and(|child| child.namespace == CS && child.name == "variation")
     {
         if variations.len() >= MAX_VARIATIONS {
-            return limit("chart color style variations");
+            return limit(
+                LimitKind::ChartStyleVariations,
+                variations.len() + 1,
+                MAX_VARIATIONS,
+            );
         }
         let child = children[cursor];
         reject_attributes(child, &[], &ignorable, "variation")?;
@@ -503,7 +507,11 @@ fn parse_transforms(node: &Node, ignorable: &HashSet<String>) -> Result<Vec<Tran
     let mut transforms = Vec::new();
     for child in semantic_children(node, ignorable)? {
         if transforms.len() >= MAX_TRANSFORMS {
-            return limit("chart style color transforms");
+            return limit(
+                LimitKind::ChartStyleTransforms,
+                transforms.len() + 1,
+                MAX_TRANSFORMS,
+            );
         }
         if !is_a(&child.namespace) {
             return invalid("color transform has the wrong namespace");
@@ -578,7 +586,7 @@ fn count_semantic_descendants(node: &Node, ignorable: &HashSet<String>) -> Resul
 
 fn parse_tree(xml: &[u8]) -> Result<Node> {
     if xml.len() > MAX_XML_BYTES {
-        return limit("chart style XML bytes");
+        return limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES);
     }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -592,15 +600,18 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
                 let node = make_node(&reader, &element, &mut strings)?;
                 stack.push(node);
                 nodes += 1;
-                if stack.len() > MAX_DEPTH || nodes > MAX_NODES {
-                    return limit("chart style XML structure");
+                if stack.len() > MAX_DEPTH {
+                    return limit(LimitKind::XmlDepth, stack.len(), MAX_DEPTH);
+                }
+                if nodes > MAX_NODES {
+                    return limit(LimitKind::XmlNodes, nodes, MAX_NODES);
                 }
             },
             Event::Empty(element) => {
                 let node = make_node(&reader, &element, &mut strings)?;
                 nodes += 1;
                 if nodes > MAX_NODES {
-                    return limit("chart style XML structure");
+                    return limit(LimitKind::XmlNodes, nodes, MAX_NODES);
                 }
                 append_node(node, &mut stack, &mut root)?;
             },
@@ -680,7 +691,11 @@ fn make_node(
             continue;
         }
         if attributes.len() >= MAX_ATTRIBUTES {
-            return limit("chart style element attributes");
+            return limit(
+                LimitKind::XmlAttributes,
+                attributes.len() + 1,
+                MAX_ATTRIBUTES,
+            );
         }
         let (namespace, local) = reader.resolver().resolve_attribute(item.key);
         let namespace = resolved(namespace)?;
@@ -849,8 +864,11 @@ fn modifiers(node: &Node, ignorable: &HashSet<String>) -> Result<Vec<String>> {
         .split_ascii_whitespace()
         .map(str::to_owned)
         .collect::<Vec<_>>();
-    if values.len() > MAX_MODIFIERS || values.iter().any(|value| value.len() > 256) {
-        return limit("chart style modifiers");
+    if values.len() > MAX_MODIFIERS {
+        return limit(LimitKind::ChartStyleModifiers, values.len(), MAX_MODIFIERS);
+    }
+    if let Some(observed) = values.iter().map(String::len).find(|length| *length > 256) {
+        return limit(LimitKind::ChartStyleModifierBytes, observed, 256);
     }
     Ok(values)
 }
@@ -935,9 +953,9 @@ fn validate_double(value: &str) -> Result<()> {
     Ok(())
 }
 
-fn check_string(value: &str, maximum: usize, label: &str) -> Result<()> {
+fn check_string(value: &str, maximum: usize, _label: &str) -> Result<()> {
     if value.len() > maximum {
-        return limit(label);
+        return limit(LimitKind::TextBytes, value.len(), maximum);
     }
     Ok(())
 }
@@ -947,7 +965,7 @@ fn add_strings(total: &mut usize, amount: usize) -> Result<()> {
         .checked_add(amount)
         .ok_or_else(|| invalid_error("chart style string count overflow"))?;
     if *total > MAX_STRING_BYTES {
-        return limit("chart style strings");
+        return limit(LimitKind::ChartStyleStrings, *total, MAX_STRING_BYTES);
     }
     Ok(())
 }
@@ -973,8 +991,8 @@ fn invalid_error(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit<T>(label: impl Into<String>) -> Result<T> {
-    invalid(format!("{} exceeds safety limit", label.into()))
+fn limit<T>(kind: LimitKind, observed: usize, maximum: usize) -> Result<T> {
+    Err(Error::limit(kind, observed, maximum))
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {

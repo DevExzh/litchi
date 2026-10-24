@@ -1,7 +1,7 @@
 //! Typed diagram data-model semantics and graph operations.
 
-use crate::Result;
 use crate::diagram::DiagramNode;
+use crate::{LimitKind, Result};
 use std::collections::{HashMap, HashSet};
 use std::fmt;
 use std::str::FromStr;
@@ -399,7 +399,11 @@ impl DiagramDataModel {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn add_point(&mut self, point: Point) -> Result<()> {
         if self.points.len() >= MAX_POINTS {
-            return Err(limit("diagram point count"));
+            return Err(limit(
+                LimitKind::DiagramPoints,
+                self.points.len() + 1,
+                MAX_POINTS,
+            ));
         }
         if self.point(point.id).is_some() || self.connection(point.id).is_some() {
             return Err(invalid(format!(
@@ -411,7 +415,11 @@ impl DiagramDataModel {
             return Err(invalid("diagram data model already has a document point"));
         }
         if point.text.len() > MAX_TEXT_BYTES {
-            return Err(limit("diagram text bytes"));
+            return Err(limit(
+                LimitKind::DiagramDataModelTextBytes,
+                point.text.len(),
+                MAX_TEXT_BYTES,
+            ));
         }
         if let Some(connection_id) = point.kind.connection()
             && let Some(connection) = self.connection(connection_id)
@@ -429,7 +437,11 @@ impl DiagramDataModel {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn add_connection(&mut self, connection: Connection) -> Result<()> {
         if self.connections.len() >= MAX_CONNECTIONS {
-            return Err(limit("diagram connection count"));
+            return Err(limit(
+                LimitKind::DiagramConnections,
+                self.connections.len() + 1,
+                MAX_CONNECTIONS,
+            ));
         }
         if self.connection(connection.id).is_some() || self.point(connection.id).is_some() {
             return Err(invalid(format!(

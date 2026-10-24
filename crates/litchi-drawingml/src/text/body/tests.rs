@@ -353,7 +353,7 @@ fn limits_bound_text_nodes_depth_and_input() {
     assert!(matches!(
         read_with_options(xml.as_bytes(), NamespaceResolver::default(), text_limit),
         Err(crate::Error::Limit {
-            resource: "text body text bytes",
+            kind: crate::LimitKind::TextBytes,
             ..
         })
     ));
@@ -361,7 +361,7 @@ fn limits_bound_text_nodes_depth_and_input() {
     assert!(matches!(
         read_with_options(xml.as_bytes(), NamespaceResolver::default(), node_limit),
         Err(crate::Error::Limit {
-            resource: "text body elements",
+            kind: crate::LimitKind::TextBodyElements,
             ..
         })
     ));
@@ -369,7 +369,7 @@ fn limits_bound_text_nodes_depth_and_input() {
     assert!(matches!(
         read_with_options(xml.as_bytes(), NamespaceResolver::default(), depth_limit),
         Err(crate::Error::Limit {
-            resource: "text body nesting depth",
+            kind: crate::LimitKind::TextBodyNestingDepth,
             ..
         })
     ));
@@ -377,7 +377,7 @@ fn limits_bound_text_nodes_depth_and_input() {
     assert!(matches!(
         read_with_options(xml.as_bytes(), NamespaceResolver::default(), input_limit),
         Err(crate::Error::Limit {
-            resource: "text body input bytes",
+            kind: crate::LimitKind::InputBytes,
             ..
         })
     ));
@@ -467,7 +467,7 @@ fn generated_break_and_tab_text_respects_the_budget() {
         assert!(matches!(
             read_with_options(xml.as_bytes(), NamespaceResolver::default(), limits),
             Err(crate::Error::Limit {
-                resource: "text body text bytes",
+                kind: crate::LimitKind::TextBytes,
                 ..
             })
         ));

@@ -321,22 +321,29 @@ impl Spec {
         while let Some((node, depth)) = stack.pop() {
             count += 1;
             if count > MAX_NODES {
-                return Err(Error::Limit {
-                    resource: "SmartArt nodes",
-                    limit: MAX_NODES,
-                });
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodes,
+                    count,
+                    MAX_NODES,
+                ));
             }
             if depth > MAX_DEPTH {
-                return Err(Error::Limit {
-                    resource: "SmartArt node depth",
-                    limit: MAX_DEPTH as usize,
-                });
+                let observed = usize::try_from(depth)
+                    .map_err(|_| Error::Invalid("SmartArt depth exceeds usize".into()))?;
+                let maximum = usize::try_from(MAX_DEPTH)
+                    .map_err(|_| Error::Invalid("SmartArt depth limit exceeds usize".into()))?;
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodeDepth,
+                    observed,
+                    maximum,
+                ));
             }
             if node.text.len() > MAX_NODE_TEXT {
-                return Err(Error::Limit {
-                    resource: "SmartArt node text bytes",
-                    limit: MAX_NODE_TEXT,
-                });
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodeTextBytes,
+                    node.text.len(),
+                    MAX_NODE_TEXT,
+                ));
             }
             if node.text.chars().any(|character| {
                 !matches!(character, '\t' | '\n' | '\r' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..)

@@ -9,7 +9,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::{NsReader, Reader};
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 
 use super::model::{
     Color, Face, FontSet, Override, Palette, Slot, System, Theme, validate_fonts, validate_name,
@@ -78,7 +78,7 @@ pub fn encode_part(name: &str, colors: &Palette, fonts: &FontSet) -> Result<Vec<
     push_fonts(&mut xml, fonts, false);
     xml.push_str(FORMAT_SCHEME);
     xml.push_str("</a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>");
-    bounded(xml.into_bytes(), "theme XML")
+    bounded(xml.into_bytes())
 }
 
 /// Encode a theme override part.
@@ -108,7 +108,7 @@ pub fn encode_override(value: &Override) -> Result<Vec<u8>> {
         push_fonts(&mut xml, fonts, false);
     }
     xml.push_str("</a:themeOverride>");
-    bounded(xml.into_bytes(), "theme override XML")
+    bounded(xml.into_bytes())
 }
 
 /// Parse a complete theme part.
@@ -169,13 +169,13 @@ pub fn replace_scheme(xml: &[u8], local: &[u8], replacement: &[u8]) -> Result<Ve
         })
         .ok_or_else(|| invalid("patched theme XML length overflows"))?;
     if output_len > MAX_XML_BYTES {
-        return Err(limit("patched theme XML", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, output_len, MAX_XML_BYTES));
     }
     let mut output = Vec::with_capacity(output_len);
     output.extend_from_slice(&xml[..range.start]);
     output.extend_from_slice(replacement);
     output.extend_from_slice(&xml[range.end..]);
-    bounded(output, "patched theme XML")
+    bounded(output)
 }
 
 /// Find one directly owned, losslessly replaceable scheme in a complete Theme
@@ -204,7 +204,7 @@ pub fn encode_palette_fragment(value: &Palette) -> Result<Vec<u8>> {
     validate_palette(value)?;
     let mut output = String::with_capacity(1024);
     push_palette(&mut output, value, true);
-    bounded(output.into_bytes(), "color palette XML")
+    bounded(output.into_bytes())
 }
 
 /// # Errors
@@ -215,7 +215,7 @@ pub fn encode_fonts_fragment(value: &FontSet) -> Result<Vec<u8>> {
     validate_fonts(value)?;
     let mut output = String::with_capacity(1024);
     push_fonts(&mut output, value, true);
-    bounded(output.into_bytes(), "font set XML")
+    bounded(output.into_bytes())
 }
 
 fn push_palette(xml: &mut String, value: &Palette, declare_namespace: bool) {
@@ -361,11 +361,11 @@ fn is_font_face_parent(stack: &[Frame]) -> bool {
 
 fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("theme XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     let processed = process_ooxml(xml)?;
     if processed.len() > MAX_XML_BYTES {
-        return Err(limit("processed theme XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, processed.len(), MAX_XML_BYTES));
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().check_end_names = true;
@@ -398,7 +398,7 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("theme node count overflow"))?;
                 if nodes > MAX_NODES {
-                    return Err(limit("theme XML nodes", MAX_NODES));
+                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                 }
                 let local = element.local_name().as_ref().to_vec();
                 let depth = stack.len();
@@ -430,7 +430,7 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                     parsed.name = attr(&element, b"name", reader.decoder())?;
                 }
                 if stack.len() >= MAX_DEPTH {
-                    return Err(limit("theme XML depth", MAX_DEPTH));
+                    return Err(limit(LimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
                 }
                 stack.push(Frame { local, drawingml });
             },
@@ -439,7 +439,7 @@ fn parse(xml: &[u8], root_name: &str) -> Result<Parsed> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("theme node count overflow"))?;
                 if nodes > MAX_NODES {
-                    return Err(limit("theme XML nodes", MAX_NODES));
+                    return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                 }
                 let local = element.local_name().as_ref().to_vec();
                 let depth = stack.len();
@@ -888,7 +888,7 @@ fn optional_attribute_value_range(raw: &[u8], wanted: &[u8]) -> Result<Option<Ra
 
 fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("theme XML bytes", MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_XML_BYTES));
     }
     if !matches!(target, b"clrScheme" | b"fontScheme") {
         return Err(invalid("unsupported theme scheme for replacement"));
@@ -920,7 +920,7 @@ fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>
             .checked_add(1)
             .ok_or_else(|| invalid("theme node count overflow"))?;
         if nodes > MAX_NODES {
-            return Err(limit("theme XML nodes", MAX_NODES));
+            return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
         }
         match event {
             Event::Start(element) => {
@@ -967,7 +967,7 @@ fn direct_scheme_range(xml: &[u8], target: &[u8]) -> Result<Option<Range<usize>>
                     )?;
                 }
                 if stack.len() >= MAX_DEPTH {
-                    return Err(limit("theme XML depth", MAX_DEPTH));
+                    return Err(limit(LimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
                 }
                 stack.push((start, Frame { local, drawingml }));
             },
@@ -1195,9 +1195,9 @@ fn ensure_supported_attributes(
     Ok(())
 }
 
-fn bounded(value: Vec<u8>, resource: &'static str) -> Result<Vec<u8>> {
+fn bounded(value: Vec<u8>) -> Result<Vec<u8>> {
     if value.len() > MAX_XML_BYTES {
-        return Err(limit(resource, MAX_XML_BYTES));
+        return Err(limit(LimitKind::XmlBytes, value.len(), MAX_XML_BYTES));
     }
     Ok(value)
 }
@@ -1222,8 +1222,8 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }
 
 #[cfg(test)]

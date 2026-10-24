@@ -21,9 +21,30 @@ consumers of its public chart, transform, theme-family, and ink-action APIs.
   `snapshot()`/`into_snapshot()` methods are deleted without compatibility
   aliases.
 - Raw canonical ink authoring now requires `AuthoringLimits` at
-  `ink::Prepared::from_bytes`. Source-backed action edits require `Limits` at
-  `Edit::{new,from_profile}`; `Edit::with_limits` is deleted without an alias.
-  Its commit uses the same core triad with `Prepared` as the checked package.
+  `ink::Prepared::from_bytes`. Source-backed action edits require
+  `EditOptions` at `Edit::{new,from_profile}`; `Edit::with_limits` is deleted
+  without an alias. `Prepared::edit_with_options` retains the admitting owner
+  policy and rejects a wider child policy.
+  Its commit uses the same core triad with `Prepared` as the checked package;
+  `Edit::commit` is the sole editor-publication spelling. Fresh-authoring
+  `Draft::finish` remains the authoring output and is not an editor alias.
+- `Prepared::edit` and `edit_with_options` share the retained profile and
+  source allocation in `Arc`. The unchanged-owner-policy no-op commit path
+  reuses cached admission facts in O(1); a narrower child policy performs the
+  necessary bounded scan. Changed replay checks the recipient output bound
+  before copying patch bytes and then validates the retained policy on the
+  read-back profile.
+
+- Every bounded DrawingML producer returns the crate-owned `LimitKind` with
+  the observed value and active maximum. Invalid caller policies use
+  `InvalidLimit`; stale source replay uses `PatchConflict`, including the
+  chart, transform, theme-family, and action owners. InkML model validation
+  preserves these typed dimensions when the codec wraps model errors. XML
+  attribute, namespace, scalar, lexical-coordinate, source-byte, and nested
+  model3d/SVG/theme-family constructor bounds use typed producer paths rather
+  than collapsing to `Invalid`; overflow and NUL/lexical failures remain
+  invalid-value errors. The public transform projection has no compatibility
+  alias.
 
 All chart, transform, theme-family, and ink-action tests, examples, DOCX/PPTX
 consumers, and durable decoder call sites were migrated in the commits that

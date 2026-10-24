@@ -1,6 +1,7 @@
 //! Focused conformance tests for typed DrawingML transforms.
 
 use super::{Angle, Package, Point, Size, Transform, codec};
+use crate::Error;
 
 const TRANSFORM_XML: &[u8] = br#"<x:xfrm xmlns:x="http://schemas.openxmlformats.org/drawingml/2006/main" flipV="true" rot=" 60000 "><x:off y="2" x="1"/><x:ext cx="3" cy="4"/><x:chOff x="-5" y="6"/><x:chExt cx="7" cy="8"/></x:xfrm>"#;
 
@@ -75,6 +76,15 @@ fn snapshots_replay_source_exactly_and_edits_are_atomic() {
         .apply(&inverse)
         .expect("inverse patch must apply to its commit");
     assert_eq!(restored.package().value(), package.value());
+
+    let other_xml = std::str::from_utf8(TRANSFORM_XML)
+        .expect("transform fixture is UTF-8")
+        .replace("60000", "60001");
+    let other = Package::from_xml(other_xml).expect("other transform source");
+    assert!(matches!(
+        other.apply(committed.patch()),
+        Err(Error::PatchConflict)
+    ));
 }
 
 #[test]
@@ -97,9 +107,10 @@ fn resource_limits_and_fragment_shape_are_checked() {
     let oversized = vec![b'x'; codec::MAX_XML_BYTES + 1];
     assert!(matches!(
         codec::read(&oversized),
-        Err(crate::Error::Limit {
-            resource: "DrawingML transform XML",
-            limit: codec::MAX_XML_BYTES,
+        Err(Error::Limit {
+            kind: crate::LimitKind::XmlBytes,
+            maximum: codec::MAX_XML_BYTES,
+            ..
         })
     ));
     assert!(codec::read(br#"<a:xfrm/><a:xfrm/>"#).is_err());

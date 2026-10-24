@@ -1,6 +1,6 @@
 //! `DrawingML` diagram data-model XML parsing and canonical writing.
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 use litchi_ooxml_common::mce::process_str;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
@@ -28,11 +28,19 @@ impl DiagramDataModel {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn parse(xml: &str) -> Result<Self> {
         if xml.len() > MAX_DATA_MODEL_XML {
-            return Err(limit("data-model XML bytes"));
+            return Err(limit(
+                LimitKind::DiagramDataModelBytes,
+                xml.len(),
+                MAX_DATA_MODEL_XML,
+            ));
         }
         let processed = process_str(xml)?;
         if processed.len() > MAX_DATA_MODEL_XML {
-            return Err(limit("processed data-model XML bytes"));
+            return Err(limit(
+                LimitKind::DiagramDataModelBytes,
+                processed.len(),
+                MAX_DATA_MODEL_XML,
+            ));
         }
         let mut reader = NsReader::from_reader(processed.as_bytes());
         // Text inside `a:t` is significant: preserve whitespace verbatim and
@@ -60,12 +68,15 @@ impl DiagramDataModel {
                 Event::Start(element) => {
                     depth = depth
                         .checked_add(1)
-                        .ok_or_else(|| limit("data-model XML depth"))?;
+                        .ok_or_else(|| invalid("data-model XML depth overflows"))?;
                     nodes = nodes
                         .checked_add(1)
-                        .ok_or_else(|| limit("data-model XML node count"))?;
-                    if nodes > MAX_NODES || depth > MAX_DEPTH {
-                        return Err(limit("data-model XML structure"));
+                        .ok_or_else(|| invalid("data-model XML node count overflows"))?;
+                    if depth > MAX_DEPTH {
+                        return Err(limit(LimitKind::XmlDepth, depth, MAX_DEPTH));
+                    }
+                    if nodes > MAX_NODES {
+                        return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                     }
                     let namespace = element_namespace(&reader, &element)?;
                     let local = local_name(&element)?;
@@ -107,7 +118,11 @@ impl DiagramDataModel {
                                     return Err(invalid("nested diagram point"));
                                 }
                                 if model.points.len() >= MAX_POINTS {
-                                    return Err(limit("diagram point count"));
+                                    return Err(limit(
+                                        LimitKind::DiagramPoints,
+                                        model.points.len() + 1,
+                                        MAX_POINTS,
+                                    ));
                                 }
                                 open_point = Some((depth, PointBuilder::from_element(&element)?));
                             },
@@ -161,12 +176,15 @@ impl DiagramDataModel {
                 Event::Empty(element) => {
                     nodes = nodes
                         .checked_add(1)
-                        .ok_or_else(|| limit("data-model XML node count"))?;
+                        .ok_or_else(|| invalid("data-model XML node count overflows"))?;
                     let child_depth = depth
                         .checked_add(1)
-                        .ok_or_else(|| limit("data-model XML depth"))?;
-                    if nodes > MAX_NODES || child_depth > MAX_DEPTH {
-                        return Err(limit("data-model XML structure"));
+                        .ok_or_else(|| invalid("data-model XML depth overflows"))?;
+                    if child_depth > MAX_DEPTH {
+                        return Err(limit(LimitKind::XmlDepth, child_depth, MAX_DEPTH));
+                    }
+                    if nodes > MAX_NODES {
+                        return Err(limit(LimitKind::XmlNodes, nodes, MAX_NODES));
                     }
                     let namespace = element_namespace(&reader, &element)?;
                     let local = local_name(&element)?;
@@ -206,7 +224,11 @@ impl DiagramDataModel {
                                     return Err(invalid("nested diagram point"));
                                 }
                                 if model.points.len() >= MAX_POINTS {
-                                    return Err(limit("diagram point count"));
+                                    return Err(limit(
+                                        LimitKind::DiagramPoints,
+                                        model.points.len() + 1,
+                                        MAX_POINTS,
+                                    ));
                                 }
                                 let builder = PointBuilder::from_element(&element)?;
                                 model.points.push(builder.finish()?);
@@ -258,7 +280,11 @@ impl DiagramDataModel {
                             .checked_add(text.len())
                             .is_none_or(|length| length > MAX_TEXT_BYTES)
                         {
-                            return Err(limit("diagram text bytes"));
+                            return Err(limit(
+                                LimitKind::DiagramDataModelTextBytes,
+                                text.len(),
+                                MAX_TEXT_BYTES,
+                            ));
                         }
                         builder.text.push_str(&text);
                     } else if depth == 0
@@ -281,7 +307,11 @@ impl DiagramDataModel {
                             .checked_add(text.len())
                             .is_none_or(|length| length > MAX_TEXT_BYTES)
                         {
-                            return Err(limit("diagram text bytes"));
+                            return Err(limit(
+                                LimitKind::DiagramDataModelTextBytes,
+                                text.len(),
+                                MAX_TEXT_BYTES,
+                            ));
                         }
                         builder.text.push_str(&text);
                     } else if depth == 0 {
@@ -667,7 +697,11 @@ fn parse_connection_tag(value: &str) -> Result<ConnectionTag> {
 
 fn push_connection(model: &mut DiagramDataModel, element: &BytesStart<'_>) -> Result<()> {
     if model.connections.len() >= MAX_CONNECTIONS {
-        return Err(limit("diagram connection count"));
+        return Err(limit(
+            LimitKind::DiagramConnections,
+            model.connections.len() + 1,
+            MAX_CONNECTIONS,
+        ));
     }
     let mut id = None;
     let mut tag = ConnectionTag::default();
