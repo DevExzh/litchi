@@ -21,7 +21,11 @@ The ODG correction and ODB/ODM correction are now assembled at
 | ODS | Source cells construct protection state; DDE and sheet-metadata constructors load source projections; package resource-count validation enumerates archive members; flat edits allocate per-sheet staging. | 0362ugc merged at `f144cd6029`; 0362ugca follow-up required to remove the new resource census from open. Other deferred parsing/protection, cheap admission and sparse flat staging remain. |
 | DOC | Primary/profiled and scoped families serialize/copy the source at entry; paragraph source-backed entry scans the source prefix. | 0362ugd, correction in progress. |
 | XLS | Primary and source-backed cells copy/index source state; scoped capture serializes the archive for comments, visibility, objects, names, charts and pivots. | 0362uge, correction in progress. |
-| XLSX | Source-backed worksheet and defined-name/cell constructors load and decode selected parts or workbook state before staging. | 0362ugf, correction in progress. |
+| XLSX source-backed | Worksheet and defined-name/cell constructors load and decode selected parts or workbook state before staging. | 0362ugf, source correction under validation; baseline reproduction is required for the three remaining slicer failures. |
+| XLSX pivot | Pivot cache/table/data entries load graphs and clone semantic drafts before an operation. | 0362ugn, separate correction assigned from `8bf4833ae5`. |
+| XLSX graph families | Metadata, calculation properties, connections, custom data, external links, data model and XML maps load selected graphs or snapshots at entry. | 0362ugo, separate correction assigned from `8bf4833ae5`. |
+| XLSX object families | Data-type icons, OLE objects, page breaks, revisions, rich-value refresh and surveys parse or copy selected source state at entry. | 0362ugp, separate correction assigned from `8bf4833ae5`. |
+| XLSX catalogs | Slicers and timelines census cache/worksheet parts; task panes load the web graph; smart tags parse selected worksheet XML. | 0362ugq, queued after the source-backed correction packet. |
 | Pages | Body-table constructors rebuild rooted inventories; chart data, drawable order, headers/footers and footnotes decode or copy selected/source graph state. | 0362ugg, correction in progress. |
 | Keynote | Text/name selection can decode a whole show; chart data and table/chart constructors decode selected payloads or scan the graph. | 0362ugh, correction in progress. |
 | Numbers | Title/image selection scans rooted graph state; chart and merge constructors retain decoded data/regions. | 0362ugi, correction in progress. |
@@ -101,6 +105,45 @@ cost relocation. The successor must derive the fact during an already-required
 traversal or defer admission until first use, preserving limits before
 retention. The 0362ugc test receipts remain valid for their exact source; no
 native/performance acceptance is claimed for the returned census change.
+
+## Follow-up review checkpoint, 2026-10-24
+
+The ordinary XLSX audit is pinned to `8bf4833ae5`. It found the four
+additional scopes above; retaining an Arc does not make a source-sized
+catalog scan O(1). The pivot, graph and object corrections use separate
+sparse worktrees with the actual root toolchain, Cargo and Clippy files
+verified against Git. Necessary bounded caller-selector ownership is allowed;
+source-name lookup and ambiguity scans remain deferred until first use.
+
+ODS successor `8507ec866e` is independently clear at source review: the
+resource census stays cold through open/edit/drop/handoff, and first staging,
+commit and replay retain admission before candidate retention/publication.
+The pinned full-suite and Clippy rerun is pending. ODP `00bc2e3454` likewise
+clears source review after moving security admission before root/PI checks
+and covering the empty-splice boundary; its prior 447-test receipt covers
+`337e4e6715`, not these later source changes.
+
+Other returns remain required before merging their leaves. DOC must retain
+profiled observers after a failed open, honor the caller's protection policy,
+and migrate the facade snapshot-budget accessor. XLS must retain the
+recipient source fence across independent content-matching replay and
+preserve typed source-change precedence during primary handoff. Pages must
+retain cumulative wire budgets, admit owned selector/text memory before
+retention, avoid repeated payload copies, and migrate standalone fuzz
+consumers. Numbers' named-selector scans are now deferred in `86c762d2a7`;
+that successor still needs review and runtime validation. PPT's native
+projection fence is corrected in `be48f33786`, with a deterministic in-flight
+source-change regression still required. PPTX and XLSB source reviews are
+clear after their final consumer/documentation corrections; Cargo validation
+on those exact sources remains pending.
+
+Keynote's remaining IWA failure was reproduced on clean baseline
+`c3f56b7a9d`. The fixture used equal per-entry and aggregate limits but
+expected the aggregate error for a replacement exceeding both. The narrow
+repair raises only the per-entry limit. The repaired full IWA log contains
+1,787 passing tests across 20 result blocks, including 1,696 unit tests and
+8 doctests. Its leaf receipt is being corrected to identify the tested
+working-tree overlays precisely; final review and merge remain pending.
 
 The reviewed glossary policy still parses as 55 profiles after these merges.
 This is neither a fresh rustdoc inventory nor the 53-check gate. Complete
