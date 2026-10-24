@@ -3439,9 +3439,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   Cleanup thirty subsequently found an undeclared local corpus target above
   20 billion apparent bytes. The unblessed/focused results retain their
   content evidence, but their claimed bounded-build provenance is returned
-  for correction. A fresh leaf is rerunning them with explicit external
-  target paths, command environments and before/after measurements; the
-  earlier cache and receipts remain quarantined.
+  for correction. Reviewed receipt correction `36cf4e3dad` closes that
+  return with fresh, explicitly unblessed commands: all 1,020 corpus files,
+  zero unreached cells, and all 7 ODP plus 6 XLSX focused tests pass. Both
+  commands prove the memory shim, exact source/lock/environment and external
+  target; its 3,483,689,639 bytes remain stable before and after. Earlier
+  receipts and the oversized cache remain preserved and superseded.
 
   Selected f6fe diagnostics pass 332 core tests, the iWork leaf API check,
   the non-iWork gate and static corpus dispositions. Facade testing returns
