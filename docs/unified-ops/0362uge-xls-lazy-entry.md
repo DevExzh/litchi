@@ -69,3 +69,11 @@ intentionally interrupted when these review blockers were reported; its
 partial external log is diagnostic only. Full XLS tests, all-target/all-feature
 Clippy, and affected facade/native consumer checks remain pending a fresh
 coordinator slot. No native timing or qualification claim is made here.
+
+The follow-up also keeps the recipient's original source fence when an
+equal-content cross-copy patch is rebased, and primary package guards
+re-check that original source if a composed-target version query fails. The
+public source-backed commit/replay regressions assert the documented
+`litchi_xls::Error::Io` boundary; output and read projections retain their
+typed source-change assertions. Chart and pivot retry tests verify a failed
+lazy capture does not consume the editor's private source state.

@@ -1179,22 +1179,37 @@ fn check_source_guard(guard: Option<&SourceGuard>) -> Result<()> {
     let Some(guard) = guard else {
         return Ok(());
     };
-    if let Some(workbook) = &guard.original {
-        workbook
-            .ensure_current()
-            .map_err(|error| Error::Package(PackageError::Source(error)))?;
-    }
-    let observed = guard
-        .source
-        .source_version()
-        .map_err(|error| Error::Package(PackageError::Source(SourceBackedError::from(error))))?;
+    check_original_source_guard(guard)?;
+    let observed = match guard.source.source_version() {
+        Ok(observed) => observed,
+        Err(error) => {
+            // A composed target can report the original mutation as an
+            // I/O/CFB error after the leading check. Re-fence the retained
+            // original owner before exposing that target error, just as the
+            // source-backed semantic owner does.
+            check_original_source_guard(guard)?;
+            return Err(Error::Package(PackageError::Source(
+                SourceBackedError::from(error),
+            )));
+        },
+    };
     if observed != guard.expected {
+        check_original_source_guard(guard)?;
         return Err(Error::Package(PackageError::Source(
             SourceBackedError::SourceChanged {
                 expected: guard.expected,
                 observed,
             },
         )));
+    }
+    Ok(())
+}
+
+fn check_original_source_guard(guard: &SourceGuard) -> Result<()> {
+    if let Some(workbook) = &guard.original {
+        workbook
+            .ensure_current()
+            .map_err(|error| Error::Package(PackageError::Source(error)))?;
     }
     Ok(())
 }

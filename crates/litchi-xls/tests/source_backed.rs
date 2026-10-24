@@ -2232,10 +2232,7 @@ fn source_backed_comments_fence_commit_output_replay_and_inverse() {
     )
     .unwrap();
     source.bump();
-    assert!(matches!(
-        edit.commit(),
-        Err(SourceBackedError::SourceChanged { .. })
-    ));
+    assert!(matches!(edit.commit(), Err(litchi_xls::Error::Io(_))));
 
     let (source, workbook) = deferred_comment_fixture();
     let mut edit = workbook.edit_comments().unwrap();
@@ -2260,11 +2257,11 @@ fn source_backed_comments_fence_commit_output_replay_and_inverse() {
     ));
     assert!(matches!(
         workbook.apply_comments(commit.patch()),
-        Err(SourceBackedError::SourceChanged { .. })
+        Err(litchi_xls::Error::Io(_))
     ));
     assert!(matches!(
         target.apply_comments(&commit.patch().inverse()),
-        Err(SourceBackedError::SourceChanged { .. })
+        Err(litchi_xls::Error::Io(_))
     ));
 }
 
@@ -2275,10 +2272,7 @@ fn source_backed_visibility_fences_commit_output_replay_and_inverse() {
     edit.hide(litchi_xls::sheet_visibility::Selector::Name("Visible"))
         .unwrap();
     source.bump();
-    assert!(matches!(
-        edit.commit(),
-        Err(SourceBackedError::SourceChanged { .. })
-    ));
+    assert!(matches!(edit.commit(), Err(litchi_xls::Error::Io(_))));
 
     let (source, workbook) = deferred_visibility_fixture();
     let mut edit = workbook.edit_sheet_visibility().unwrap();
@@ -2299,11 +2293,69 @@ fn source_backed_visibility_fences_commit_output_replay_and_inverse() {
     ));
     assert!(matches!(
         workbook.apply_sheet_visibility(commit.patch()),
-        Err(SourceBackedError::SourceChanged { .. })
+        Err(litchi_xls::Error::Io(_))
     ));
     assert!(matches!(
         target.apply_sheet_visibility(&commit.patch().inverse()),
-        Err(SourceBackedError::SourceChanged { .. })
+        Err(litchi_xls::Error::Io(_))
+    ));
+}
+
+#[test]
+fn source_backed_cross_copy_replay_retains_recipient_fence_for_output() {
+    let (source, workbook) = deferred_comment_fixture();
+    let original = source.bytes.as_ref().clone();
+    let mut edit = workbook.edit_comments().unwrap();
+    edit.replace(
+        litchi_xls::cell_values::Selector::Position(Position::new(0)),
+        Reference::new(0, 0).unwrap(),
+        litchi_xls::comments::Value::new("Author", "changed").unwrap(),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let recipient_source = Arc::new(CountingSource::new(original));
+    let recipient = SourceBackedWorkbook::from_read_at(recipient_source.clone()).unwrap();
+    let applied = recipient.apply_comments(commit.patch()).unwrap();
+
+    recipient_source.bump();
+    let mut output = Vec::new();
+    assert!(matches!(
+        applied.package().write_to(&mut output),
+        Err(litchi_xls::source_backed::OutputError::Package(
+            PackageError::Source(SourceBackedError::SourceChanged { .. })
+        ))
+    ));
+    let path = source_fence_temp_path("litchi-xls-rebased-source-fence");
+    let result = applied.package().save(&path);
+    let _ = std::fs::remove_file(path);
+    assert!(matches!(
+        result,
+        Err(litchi_xls::source_backed::OutputError::Package(
+            PackageError::Source(SourceBackedError::SourceChanged { .. })
+        ))
+    ));
+}
+
+#[test]
+fn lazy_chart_and_pivot_editors_can_retry_after_capture_failure() {
+    let (source, workbook) = deferred_visibility_fixture();
+    let package = Package::from_source(workbook).unwrap();
+    let mut charts = package.edit_charts().unwrap();
+    source.bump();
+    assert!(matches!(charts.charts(), Err(litchi_xls::Error::Io(_))));
+    assert!(matches!(charts.charts(), Err(litchi_xls::Error::Io(_))));
+
+    let (source, workbook) = deferred_visibility_fixture();
+    let package = Package::from_source(workbook).unwrap();
+    let mut pivots = package.edit_pivot_views().unwrap();
+    source.bump();
+    assert!(matches!(
+        pivots.worksheet_count(),
+        Err(litchi_xls::Error::Io(_))
+    ));
+    assert!(matches!(
+        pivots.worksheet_count(),
+        Err(litchi_xls::Error::Io(_))
     ));
 }
 

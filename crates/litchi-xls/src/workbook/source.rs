@@ -1512,7 +1512,7 @@ impl SourceBackedWorkbook {
             plan.rebase_to(&self.inner.cfb)
         }
         .map_err(crate::source_backed::overlay_error)?;
-        self.committed(plan)
+        self.committed_deferred(plan)
             .map_err(crate::source_backed::workbook_error)
     }
 
