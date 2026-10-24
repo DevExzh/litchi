@@ -8,8 +8,9 @@ source state before any operation is staged. These are required corrections,
 not accepted performance exceptions.
 
 This audit starts from assembled source `7559f44aa975254bd96f6e28eee17366b0ebeb6a`.
-The ODG correction and ODB/ODM correction are now assembled at
-`8779d059add6c90c74552801372c44f770db9f0f`. Other rows below remain open.
+ODG and ODB/ODM were assembled at `8779d059ad`. Reviewed DOC and the ODS
+resource-admission successor are assembled at `3676e21cfa`. Other rows below
+remain open; this is source integration, not final performance acceptance.
 
 ## Confirmed scopes
 
@@ -18,8 +19,8 @@ The ODG correction and ODB/ODM correction are now assembled at
 | ODG | Primary edit copied content and styles XML, including unused copies for pure joined package replacement. | 0362utf, reviewed and merged at `c3f56b7a9d`; lazy part state retains the source package and materializes on mutation. |
 | ODB, ODM | ODB copied content XML; ODM title edits read raw meta.xml and copied projected title strings. | 0362ugb and 0362ugb-a, reviewed and merged at `8779d059ad`; borrowed XML/title state and deferred changed-title publication. |
 | ODP | Package edit builds a complete mutable presentation and copies validated slides/source fragments; flat edit clones the slide vector. | 0362uga, correction in progress. The already-lazy tail-append entry is not this finding. |
-| ODS | Source cells construct protection state; DDE and sheet-metadata constructors load source projections; package resource-count validation enumerates archive members; flat edits allocate per-sheet staging. | 0362ugc merged at `f144cd6029`; 0362ugca follow-up required to remove the new resource census from open. Other deferred parsing/protection, cheap admission and sparse flat staging remain. |
-| DOC | Primary/profiled and scoped families serialize/copy the source at entry; paragraph source-backed entry scans the source prefix. | 0362ugd, correction in progress. |
+| ODS | Source cells construct protection state; DDE and sheet-metadata constructors load source projections; package resource-count validation enumerates archive members; flat edits allocate per-sheet staging. | 0362ugc merged at `f144cd6029`; reviewed and validated 0362ugca merged at `3676e21cfa`, removing the added open/edit census while retaining admission at staging, commit and replay. |
+| DOC | Primary/profiled and scoped families serialize/copy the source at entry; paragraph source-backed entry scans the source prefix. | 0362ugd and 0362ugd-a, reviewed and validated source/consumer correction merged at `cf7def80df`. |
 | XLS | Primary and source-backed cells copy/index source state; scoped capture serializes the archive for comments, visibility, objects, names, charts and pivots. | 0362uge, correction in progress. |
 | XLSX source-backed | Worksheet and defined-name/cell constructors load and decode selected parts or workbook state before staging. | 0362ugf, source correction under validation; baseline reproduction is required for the three remaining slicer failures. |
 | XLSX pivot | Pivot cache/table/data entries load graphs and clone semantic drafts before an operation. | 0362ugn, separate correction assigned from `8bf4833ae5`. |
@@ -118,22 +119,34 @@ source-name lookup and ambiguity scans remain deferred until first use.
 ODS successor `8507ec866e` is independently clear at source review: the
 resource census stays cold through open/edit/drop/handoff, and first staging,
 commit and replay retain admission before candidate retention/publication.
-The pinned full-suite and Clippy rerun is pending. ODP `00bc2e3454` likewise
+The pinned rerun passes 1,768 tests and strict all-target/all-feature Clippy on
+`1fdfcdcdba`; the only source delta after review removes redundant
+`#[must_use]`. Receipt `daf6a85bd4` is merged at `3676e21cfa`. ODP `00bc2e3454` likewise
 clears source review after moving security admission before root/PI checks
 and covering the empty-splice boundary; its prior 447-test receipt covers
 `337e4e6715`, not these later source changes.
 
-Other returns remain required before merging their leaves. DOC must retain
-profiled observers after a failed open, honor the caller's protection policy,
-and migrate the facade snapshot-budget accessor. XLS must retain the
+DOC source `251f33f1ce` now clears independent review and is merged at
+`cf7def80df`. Failed profiled opens retain their observers; strict and fallback
+paths retain the requested protection policy; ordinary edits remain Send/Sync
+while profiled callbacks may borrow non-Send state. Every affected facade and
+profiling consumer is migrated. The coordinator verified 1,445 passing default
+tests across 50 result blocks, 1,223 profiled tests, both strict Clippy checks,
+the DOC facade check and both standalone profiling checks. Record 0362ugd-a
+identifies the exact clean source and tested two-file overlay; its hash matches
+the committed final consumer delta. The original 1,222-test receipt remains
+historical. No native timing claim is made.
+
+Other returns remain required before merging their leaves. XLS must retain the
 recipient source fence across independent content-matching replay and
 preserve typed source-change precedence during primary handoff. Pages must
 retain cumulative wire budgets, admit owned selector/text memory before
 retention, avoid repeated payload copies, and migrate standalone fuzz
-consumers. Numbers' named-selector scans are now deferred in `86c762d2a7`;
-that successor still needs review and runtime validation. PPT's native
-projection fence is corrected in `be48f33786`, with a deterministic in-flight
-source-change regression still required. PPTX and XLSB source reviews are
+consumers. Numbers' named-selector scans are deferred in `86c762d2a7`, but review
+returned uncharged selector retention/first-use traversal and stale standalone
+fuzz consumers. PPT's native projection fence and deterministic in-flight
+source-change regression clear review at `2f24654376`; runtime validation
+remains pending. PPTX and XLSB source reviews are
 clear after their final consumer/documentation corrections; Cargo validation
 on those exact sources remains pending.
 
@@ -142,8 +155,9 @@ Keynote's remaining IWA failure was reproduced on clean baseline
 expected the aggregate error for a replacement exceeding both. The narrow
 repair raises only the per-entry limit. The repaired full IWA log contains
 1,787 passing tests across 20 result blocks, including 1,696 unit tests and
-8 doctests. Its leaf receipt is being corrected to identify the tested
-working-tree overlays precisely; final review and merge remain pending.
+8 doctests. Its leaf receipt has been returned for precise tested-overlay provenance.
+The worker must also remove unrelated standalone lockfile upgrades and admit
+owned selector memory before copying arbitrary names. Merge remains pending.
 
 The reviewed glossary policy still parses as 55 profiles after these merges.
 This is neither a fresh rustdoc inventory nor the 53-check gate. Complete
@@ -151,3 +165,11 @@ workspace Clippy on earlier source `8225b82dde` remains source-pinned evidence
 and does not cover the subsequent constructors. Native qualification must
 use the final assembled candidate. Comprehensive redaction audit 22 is the
 only deferral; its content-free error and diagnostic rules still apply.
+
+The source-backed XLSX packet at `02684ae108` now passes 2,542 tests and
+strict Clippy after the slicer failure was reproduced on baseline `7559f44aa9`
+and repaired. Ordinary slicer/timeline/task-pane/smart-tag source is committed
+at `d14748b233` for separate review and a fresh validation run. The pivot
+correction at `a99de1d698` is under source review; graph and object corrections
+remain in progress. These later commits do not inherit acceptance from the
+earlier source-backed test receipt.
