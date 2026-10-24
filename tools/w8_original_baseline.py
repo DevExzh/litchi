@@ -22,6 +22,7 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import subprocess
 import sys
 import tarfile
@@ -337,27 +338,82 @@ TRANSFORMS = (
     ("unified_merge", "Commit<Summary>.file"),
     ("unified_refresh", "Commit<Summary>.file"),
 )
+XLSB_RESOLUTION_SEQUENCE = '\n                        .resolve()\n                        .expect("xlsb worksheet resolution")'
+XLSB_RESOLUTION_LABEL = '.resolve().expect("xlsb worksheet resolution")'
+XLSB_RESOLUTION_TRANSFORMS = (
+    "native_set",
+    "native_import",
+    "native_merge",
+)
+
+
+def _method_segment(source: str, name: str) -> str:
+    match = re.search(rf"(?m)^        fn\s+{re.escape(name)}\s*\(", source)
+    if not match:
+        raise fail(f"probe has no method {name}()")
+    end = re.search(r"(?m)^        (?:fn|struct|enum|impl|#\[)", source[match.end() :])
+    stop = match.end() + end.start() if end else len(source)
+    return source[match.start() : stop]
 
 
 def consumer_adapter(source: str) -> tuple[bytes, list[dict[str, Any]]]:
+    resolution_count = source.count(".resolve()")
+    if resolution_count not in (0, len(XLSB_RESOLUTION_TRANSFORMS)):
+        raise fail("consumer adapter expected either the reviewed three XLSB resolution calls or none")
+    if source.count(XLSB_RESOLUTION_SEQUENCE) != resolution_count:
+        raise fail("consumer adapter found an unexpected XLSB resolution expression")
     if source.count(".into_file()") != len(TRANSFORMS):
         raise fail("corrected probe no longer has exactly four consumer into_file call sites")
-    positions: list[tuple[int, str, str]] = []
+    positions: list[tuple[int, str, str, str, str]] = []
+    if resolution_count:
+        for function in XLSB_RESOLUTION_TRANSFORMS:
+            segment = _method_segment(source, function)
+            if segment.count(".resolve()") != 1 or segment.count(XLSB_RESOLUTION_SEQUENCE) != 1:
+                raise fail(f"consumer adapter expected one reviewed XLSB resolution call in {function}()")
+            positions.append(
+                (
+                    source.index(segment) + segment.index(XLSB_RESOLUTION_SEQUENCE),
+                    function,
+                    XLSB_RESOLUTION_SEQUENCE,
+                    "",
+                    "xlsb_resolution",
+                )
+            )
     for function, old_api in TRANSFORMS:
         segment = provenance.function_segment(source, function)
         if segment.count(".into_file()") != 1:
             raise fail(f"consumer adapter expected one into_file call in {function}()")
-        positions.append((source.index(segment) + segment.index(".into_file()"), function, old_api))
+        positions.append(
+            (
+                source.index(segment) + segment.index(".into_file()"),
+                function,
+                ".into_file()",
+                ".file",
+                old_api,
+            )
+        )
     transformed = source
     records: list[dict[str, Any]] = []
-    for position, function, old_api in sorted(positions, reverse=True):
-        if transformed[position : position + len(".into_file()")] != ".into_file()":
+    for position, function, old_text, new_text, kind in sorted(positions, reverse=True):
+        if transformed[position : position + len(old_text)] != old_text:
             raise fail(f"consumer adapter replacement offset changed in {function}()")
-        transformed = transformed[:position] + ".file" + transformed[position + len(".into_file()") :]
-        records.append({"function": function, "old_accessor": ".into_file()", "new_accessor": ".file", "old_api": old_api})
+        transformed = transformed[:position] + new_text + transformed[position + len(old_text) :]
+        if kind == "xlsb_resolution":
+            records.append(
+                {
+                    "function": function,
+                    "old_accessor": XLSB_RESOLUTION_LABEL,
+                    "new_accessor": "",
+                    "old_api": "f2 cell_values::edit_cell_values() -> Result<Option<Edit>>",
+                }
+            )
+        else:
+            records.append({"function": function, "old_accessor": old_text, "new_accessor": new_text, "old_api": kind})
     records.reverse()
     if ".into_file()" in transformed:
         raise fail("consumer adapter left an into_file call in the standalone probe")
+    if ".resolve()" in transformed:
+        raise fail("consumer adapter left an XLSB resolution call in the standalone probe")
     return transformed.encode(), records
 
 

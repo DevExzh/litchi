@@ -42,6 +42,29 @@ Historical 0362ha/he/hf receipts retain their original d39 source identity;
 they describe the earlier qualification input and are not rewritten by this
 binding repair.
 
+## Pristine-f2 adapter compatibility
+
+The current probe's three XLSB calls are a consumer-only adaptation for the
+new deferred selector API.  The pristine f2 `cell_values::edit_cell_values`
+route does not expose that `.resolve().expect("xlsb worksheet resolution")`
+sequence, so `tools/w8_original_baseline.py` removes exactly one such pair in
+each of `native_set()`, `native_import()` and `native_merge()`.  It first
+requires exactly three `.resolve()` calls, checks those three method sites and
+rejects any extra or misplaced call.  The four existing `.into_file() ->
+.file` translations remain unchanged.
+
+As a strong compatibility control, the generated adapter from the current
+probe is byte-identical to the adapter generated from the d39 probe:
+
+* both are 74,719 bytes;
+* both have SHA-256
+  `3e14376c366fa911025212d7e7081ab5c3b5aaac804c1e01a1415fd5cd826ca0`;
+* the current transform receipt has seven entries (four result-field
+  translations and three XLSB removals), while the d39 receipt has the four
+  result-field translations only.
+
+The adapter test suite also rejects an accidental fourth `.resolve()` call.
+
 ## Frozen failure and validation
 
 The frozen pre-repair protocol log was
@@ -64,6 +87,14 @@ The preserved raw log is outside the repository at
 All 18 tests passed, with zero failures, errors or skips.  The route tests
 continued to prove the complete unique 109-route matrix and the adapter test
 continued to prove only the four legacy result-field translations.
+
+The successor adapter validation reran the same command after the f2
+translation was added.  Its raw log is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/final-w8-probe-binding/w8-binding-tests-adapter.log`:
+3,471 bytes, SHA-256
+`0a113676e195f019566954d16bb39a8e1a169620c6de687ee1ca57ed7099b930`.
+All 20 tests passed, with zero failures, errors or skips, including the
+byte-identity and extra-resolution fail-closed checks.
 
 No Cargo command, native build, native execution, timing run or qualification
 claim was made for this repair.
