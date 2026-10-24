@@ -61,7 +61,7 @@ Receipts:
 
 ```text
 python3 -m unittest tools.test_check_api_glossary tools.test_api_debt_inventory
-# 64 tests, OK
+# 67 tests, OK
 ```
 
 The change is tooling and glossary policy only; it does not alter format
@@ -87,7 +87,13 @@ The exact fixtures are `fixture::external_metadata::Commit` for the missing
 transitive aliases and unrelated targets, and
 `fixture::namespace_collision::Error` for both derive-macro visit orders.
 
-The returned-review receipt is 65 focused Python tests passing. No Cargo build
+The subsequent review of `837815f1c0` found one coverage ambiguity, also now
+covered by fixtures: duplicate supplied crate roots are rejected before the
+coverage union is formed, and a covered path must have a local definition
+crate ID and local nominal identity. An indexed foreign item or a re-exported
+foreign target cannot masquerade as the defining crate.
+
+The returned-review receipt is 67 focused Python tests passing. No Cargo build
 was run. The Python inventory was rerun against the frozen `49c25ef...`
 captures after the repair and produced the same 19,440-byte TSV and SHA-256
 listed above; those category counts remain diagnostic evidence and are still

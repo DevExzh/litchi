@@ -1101,6 +1101,15 @@ class RustdocTests(unittest.TestCase):
             self.assertEqual(inventory.main([str(capture)]), 0)
         self.assertIn("fixture\treplay_return\tfixture::returns::Package::apply_bad", output.getvalue())
 
+    def test_inventory_cli_rejects_duplicate_crate_roots(self):
+        output = io.StringIO()
+        error = io.StringIO()
+        with contextlib.redirect_stdout(output), contextlib.redirect_stderr(error):
+            self.assertEqual(
+                inventory.main([str(self.json_path), str(self.json_path)]), 2
+            )
+        self.assertIn("duplicate crate rustdoc input: fixture", error.getvalue())
+
     def test_cli_exit_codes_and_unknown_profile(self):
         policy_path = self.directory / "policy.json"
         for bans, expected in (([], 0), ([ban("old_method")], 1)):

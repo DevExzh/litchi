@@ -189,8 +189,15 @@ def auditable_commit_nominals(document, crate: str, delegated_globs=frozenset())
             methods.setdefault(path[:-1], set()).add(path[-1])
     covered = set()
     for path, kind in surface.exports.items():
+        item_id = surface.item_ids.get(path)
+        definition = surface.paths.get(str(item_id))
+        identity = (surface._nominal_identity(item_id)
+                    if item_id is not None else None)
         if (kind not in gate.TYPE_KINDS or not path or path[0] != crate
-                or surface.item_ids.get(path) not in surface.index):
+                or item_id not in surface.index
+                or not isinstance(definition, dict)
+                or definition.get("crate_id") != surface.crate_id
+                or identity is None or identity[0] != surface.crate_id):
             continue
         required = (FACADE_COMMIT_METHODS if path in FACADE_COMMIT_PATHS
                     else CORE_COMMIT_METHODS)
@@ -401,11 +408,15 @@ def main(argv=None) -> int:
         # each full graph; the second pass remains sequential so the
         # inventory does not retain all 1+ GiB of all-features JSON.
         crates = []
+        seen_crates = set()
         covered_nominals = set()
         for path in args.json:
             document = gate.read_json(path)
             root = str(document["root"])
             crate = document["index"][root]["name"]
+            if crate in seen_crates:
+                raise InventoryError(f"duplicate crate rustdoc input: {crate}")
+            seen_crates.add(crate)
             crates.append(crate)
             covered_nominals.update(
                 auditable_commit_nominals(

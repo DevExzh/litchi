@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import unittest
 
 from tools import api_debt_inventory as inventory
@@ -182,6 +183,35 @@ def commit_shape_fixture(crate: str, modules: tuple[str, ...], methods: tuple[st
 
 
 class InventoryOwnerCoverageTests(unittest.TestCase):
+    def test_nominal_coverage_requires_the_local_definition_identity(self):
+        methods = ("package", "into_package", "patch", "diagnostics", "into_parts")
+        path = ("fixture", "foreign", "Commit")
+        valid = commit_shape_fixture("fixture", ("foreign",), methods)
+        self.assertIn(path, inventory.auditable_commit_nominals(valid, "fixture"))
+
+        foreign_index_item = copy.deepcopy(valid)
+        foreign_index_item["index"]["2"]["crate_id"] = 99
+        foreign_index_item["paths"]["2"]["crate_id"] = 99
+        self.assertNotIn(
+            path, inventory.auditable_commit_nominals(foreign_index_item, "fixture")
+        )
+
+        reexport = copy.deepcopy(valid)
+        reexport["index"]["2"] = {
+            "name": "Commit", "crate_id": 0, "visibility": "public",
+            "inner": {"type_alias": {"type": {
+                "resolved_path": {"id": "foreign-target", "args": None},
+            }, "generics": {"params": [], "where_predicates": []}}},
+        }
+        reexport["paths"]["2"]["kind"] = "type_alias"
+        reexport["paths"]["foreign-target"] = {
+            "crate_id": 99, "path": ["fixture", "foreign", "Commit"],
+            "kind": "struct",
+        }
+        self.assertNotIn(
+            path, inventory.auditable_commit_nominals(reexport, "fixture")
+        )
+
     def test_file_accessors_are_scoped_to_the_unified_facade(self):
         methods = ("file", "into_file", "patch", "diagnostics", "into_parts")
         format_document = commit_shape_fixture("fixture", ("format",), methods)
