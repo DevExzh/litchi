@@ -52,9 +52,8 @@ through one gate.
 Private unit checks assert that all three package edit constructors retain no
 source payload at entry. Focused signed tests passed for metadata/property-set
 and worksheet-feature read, no-op commit, changed-write refusal, and no-op
-replay. Existing XLS metadata and worksheet-feature suites continue to cover
-changed output, exact no-op, replay and inverse behavior; the coordinator must
-run them after assigning the capped Cargo slot.
+replay. The final validation packet below records the full and focused XLS,
+Clippy, doctest, and affected consumer results.
 
 The source fix was validated in the isolated capped target after the initial
 source-only commit. The generated workspace lock is intentionally ignored and
@@ -64,7 +63,7 @@ The signed metadata/property-set test passed 1/1 and the signed
 worksheet-feature test passed 1/1. Their raw logs remain outside the checkout:
 `signed-metadata-4f08-v3.log` (under `.coord/xls-property-lazy`) and
 `signed-sheet-4f08-v2.log` (same directory). The broader focused XLS suite,
-strict Clippy, and affected `litchi-ops` checks remain queued. No native
+strict Clippy, and affected `litchi-ops` checks are recorded below. No native
 qualification, benchmark, or performance claim is made here; no binary or
 large evidence artifact belongs in this record.
 
@@ -102,6 +101,10 @@ locked resolution, and `LITCHI_MEM_MAX=20G`. The tracked root manifest
 `f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de`; the
 tracked `.cargo/config.toml` is 470 bytes with SHA-256
 `50b044c83828f2c448ee59c362afaa79de2dd47fbd390f0cd2888391f1d1119d`. The
+tracked `rust-toolchain.toml` is 86 bytes with SHA-256
+`e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310`; tracked
+`clippy.toml` is 2,165 bytes with SHA-256
+`f11517bc5872d96aab42ba6519db4e78f2fdcd44512ac70a1b45adbd9929b50c`. The
 ignored `Cargo.lock` is 139,592 bytes with SHA-256
 `6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`.
 The final target was 3,343,185,454 bytes, below the 20,000,000,000-byte cap;
@@ -183,3 +186,26 @@ the typed mapper unit passed 1/1 with the other all-feature targets filtered
 
 These are source/build and host-consumer checks only. No native qualification,
 benchmark, or performance claim is made by this packet.
+
+## Worksheet-feature fence successor
+
+Commit `4dce73b23fb5f5673c19e379884f62ad4600b032` applies the same result
+wrapper to worksheet-feature rendering and object-editor admission. A trailing
+original-source fence now runs even when those stages return an error; the
+successful path continues through the common republish fence. This is a source
+successor to `9fe06599d6`; the earlier `9fe` receipts above are not relabeled.
+
+On clean `4dce73b23f`, the focused command was:
+
+```text
+source /home/zhuhe/code/litchi-worktrees/.coord/xls-property-lazy/env.sh
+cargo test -p litchi-xls --test sheet_features --locked --offline --no-fail-fast
+```
+
+It passed 12/12 with 1 existing ignored evidence test; the external 917-byte
+`sheet-features-4dce.log` has SHA-256
+`65da5ad60352944e0c0179c75424b29ccd3e9e0f069fc2362e5d00de98df4510`.
+Strict `cargo clippy -p litchi-xls --all-targets --all-features --locked
+--offline -- -D warnings` also passed on the same clean source; its 376-byte
+`xls-clippy-4dce.log` has SHA-256
+`5e2cc8fa002efc7d30797ae25f313d99b2145c4f70d1ae4e3d1d256894a0f61c`.
