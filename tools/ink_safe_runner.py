@@ -4,9 +4,9 @@
 The committed ``ink-qualify.py``, ``ink-abba.py`` and ``ink-collect.py``
 protocols remain responsible for provenance and semantic checks.  This
 launcher owns only the process boundary: a systemd cgroup supplies the hard
-20,000,000,000-byte memory limit, zero swap and deadline, while this parent
-polls the newly-owned output and TMP trees and stops the unit on a cap breach.
-The output/TMP directories are fresh and are never reused.
+20,000,000,000-byte memory limit and zero swap, while this parent supplies the
+deadline, polls the newly-owned output and TMP trees, and kills the unit on a
+cap breach. The output/TMP directories are fresh and are never reused.
 """
 
 from __future__ import annotations
@@ -17,11 +17,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import resource
 import shutil
 import signal
 import subprocess
 import sys
 import time
+import re
 from typing import Sequence
 
 
@@ -35,6 +37,16 @@ PHASE_DEFAULT_DEADLINES = {
     "collect": 900,
 }
 _UNIT_CHARS = frozenset("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
+_UNIT_PROPERTIES = (
+    "ActiveState",
+    "SubState",
+    "Result",
+    "ControlGroup",
+    "MemoryCurrent",
+    "MemoryPeak",
+    "MainPID",
+    "ExecMainStatus",
+)
 
 
 class BoundaryError(RuntimeError):
@@ -162,35 +174,35 @@ class SafeInkCommand:
     def systemd_argv(self, command: Sequence[str]) -> list[str]:
         if not command or any(not isinstance(word, str) or not word for word in command):
             raise BoundaryError("inner command must be a non-empty argv")
+        child = [
+            sys.executable,
+            "-B",
+            str(Path(__file__).resolve()),
+            "--ink-child",
+            f"--fsize={self.limits.output_bytes}",
+            f"--tmp={self.tmp}",
+            "--",
+            *command,
+        ]
         return [
             self.systemd_run,
             "--user",
             "--scope",
-            "--wait",
-            "--collect",
-            "--quiet",
             f"--unit={self.unit}",
             f"--setenv=TMPDIR={self.tmp}",
-            "-p",
-            f"MemoryMax={self.limits.memory_bytes}",
-            "-p",
-            f"MemorySwapMax={self.limits.swap_bytes}",
-            "-p",
-            f"RuntimeMaxSec={self.limits.deadline_seconds:g}",
-            "-p",
-            "KillMode=control-group",
-            "-p",
-            "OOMPolicy=kill",
-            "-p",
-            f"LimitFSIZE={self.limits.output_bytes}",
+            "--property=MemoryAccounting=yes",
+            f"--property=MemoryMax={self.limits.memory_bytes}",
+            f"--property=MemorySwapMax={self.limits.swap_bytes}",
+            "--property=TasksMax=4096",
+            "--property=KillMode=control-group",
             "--",
-            *command,
+            *child,
         ]
 
     def _stop_owned(self, process: subprocess.Popen[bytes]) -> dict[str, object]:
         try:
             stop = subprocess.run(
-                [self.systemctl, "--user", "stop", self.unit],
+                [self.systemctl, "--user", "kill", "--kill-who=all", self.unit],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
                 check=False,
@@ -217,10 +229,75 @@ class SafeInkCommand:
                 pass
             process.wait(timeout=5)
         return {
+            "systemctl_action": "kill",
             "systemctl_exit": systemctl_exit,
             "systemctl_stderr": systemctl_stderr,
             "group_signal": group_signal,
             "returncode": process.returncode,
+        }
+
+    def _post_unit_state(self) -> dict[str, object]:
+        command = [
+            self.systemctl,
+            "--user",
+            "show",
+            "--no-pager",
+            f"--property={','.join(_UNIT_PROPERTIES)}",
+            self.unit,
+        ]
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            return {
+                "available": False,
+                "unit_gone": False,
+                "error": str(error),
+                "command": command,
+            }
+        if completed.returncode != 0:
+            stderr = completed.stderr[-4096:]
+            unit_gone = bool(
+                re.search(r"(?:not found|not loaded|no such unit|could not be found)", stderr, re.IGNORECASE)
+            )
+            return {
+                "available": False,
+                "unit_gone": unit_gone,
+                "returncode": completed.returncode,
+                "stderr": stderr,
+                "command": command,
+            }
+        properties = dict(
+            line.split("=", 1)
+            for line in completed.stdout.splitlines()
+            if "=" in line
+        )
+        if not properties:
+            return {
+                "available": False,
+                "unit_gone": False,
+                "command": command,
+            }
+        real_gc_shape = (
+            properties.get("ActiveState") == "inactive"
+            and properties.get("SubState") == "dead"
+            and properties.get("Result") == "success"
+            and properties.get("ControlGroup") == ""
+            and properties.get("MemoryCurrent") == "[not set]"
+            and properties.get("MemoryPeak") == "[not set]"
+            and properties.get("MainPID", "[not set]") in {"0", "[not set]"}
+            and properties.get("ExecMainStatus", "[not set]") in {"0", "[not set]"}
+        )
+        return {
+            "available": not real_gc_shape,
+            "unit_gone": real_gc_shape,
+            "properties": properties,
+            "command": command,
         }
 
     def _cleanup_tmp(self) -> bool:
@@ -273,6 +350,7 @@ class SafeInkCommand:
             tmp_before_cleanup = tree_bytes(self.tmp)
             tmp_cleaned = self._cleanup_tmp()
         ended = time.time_ns()
+        post_unit = self._post_unit_state()
         output_bytes = tree_bytes(self.output)
         log_hashes = {}
         for path in (stdout_path, stderr_path):
@@ -294,6 +372,7 @@ class SafeInkCommand:
             "returncode": returncode,
             "violation": violation,
             "cleanup": cleanup,
+            "post_unit": post_unit,
             "logs": log_hashes,
         }
         receipt_path = self.log_dir / "outer-receipt.json"
@@ -301,7 +380,29 @@ class SafeInkCommand:
         return receipt
 
 
+def _child_main(argv: Sequence[str]) -> int:
+    """Install byte-valued file/core limits, then exec the owned command."""
+
+    if len(argv) < 3 or not argv[0].startswith("--fsize=") or not argv[1].startswith("--tmp="):
+        raise BoundaryError("invalid child launcher arguments")
+    try:
+        fsize = int(argv[0].split("=", 1)[1])
+    except ValueError as error:
+        raise BoundaryError("invalid child file-size limit") from error
+    tmp = argv[1].split("=", 1)[1]
+    if not tmp or argv[2] != "--" or len(argv) == 3:
+        raise BoundaryError("child launcher requires -- followed by an argv")
+    resource.setrlimit(resource.RLIMIT_FSIZE, (fsize, fsize))
+    resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+    os.environ["TMPDIR"] = tmp
+    os.execvpe(argv[3], list(argv[3:]), os.environ.copy())
+    raise AssertionError("execvpe returned")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
+    raw = list(sys.argv[1:] if argv is None else argv)
+    if raw[:1] == ["--ink-child"]:
+        return _child_main(raw[1:])
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("phase", choices=tuple(PHASE_DEFAULT_DEADLINES))
     parser.add_argument("--output", type=Path, required=True)
@@ -313,11 +414,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--tmp-cap", type=int, default=TMP_MAX_BYTES)
     parser.add_argument("--systemd-run", default="/usr/bin/systemd-run")
     parser.add_argument("--systemctl", default="/usr/bin/systemctl")
-    parser.add_argument("command", nargs=argparse.REMAINDER)
-    args = parser.parse_args(argv)
-    command = list(args.command)
-    if command[:1] == ["--"]:
-        command = command[1:]
+    help_args = raw[: raw.index("--")] if "--" in raw else raw
+    if "--help" in help_args or "-h" in help_args:
+        parser.parse_args(help_args)
+    try:
+        separator = raw.index("--")
+    except ValueError:
+        parser.error("an inner command is required after --")
+    args = parser.parse_args(raw[:separator])
+    command = raw[separator + 1 :]
     if not command:
         parser.error("an inner command is required after --")
     deadline = args.deadline or PHASE_DEFAULT_DEADLINES[args.phase]

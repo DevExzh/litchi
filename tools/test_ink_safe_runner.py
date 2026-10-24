@@ -8,12 +8,12 @@ resource checks run in an ordinary test process.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 import stat
+import subprocess
+import sys
 import tempfile
 import unittest
-from unittest import mock
 
 from tools.ink_safe_runner import (
     BoundaryError,
@@ -50,6 +50,13 @@ class SafeInkRunnerTests(unittest.TestCase):
             "#!/bin/sh\n"
             "set -eu\n"
             f"printf '%s\\n' \"$*\" >> {str(self.fake_systemctl_log)!r}\n"
+            "case \" $* \" in\n"
+            "  *' show '*)\n"
+            "    printf '%s\\n' 'ActiveState=inactive' 'SubState=dead' 'Result=success' "
+            "'ControlGroup=' 'MemoryCurrent=[not set]' 'MemoryPeak=[not set]' 'MainPID=0' "
+            "'ExecMainStatus=0'\n"
+            "    ;;\n"
+            "esac\n"
             "exit 0\n",
             encoding="utf-8",
         )
@@ -76,16 +83,20 @@ class SafeInkRunnerTests(unittest.TestCase):
         )
         return runner, output, tmp, logs
 
-    def test_argv_binds_memory_swap_deadline_and_filesystem_limit(self) -> None:
+    def test_argv_binds_systemd_policy_and_child_file_limit(self) -> None:
         runner, _output, tmp, _logs = self._runner(deadline=17.5)
         argv = runner.systemd_argv(["/bin/true"])
-        self.assertIn(f"MemoryMax={MEMORY_MAX_BYTES}", argv)
-        self.assertIn(f"MemorySwapMax={SWAP_MAX_BYTES}", argv)
-        self.assertIn("RuntimeMaxSec=17.5", argv)
-        self.assertIn("KillMode=control-group", argv)
-        self.assertIn("OOMPolicy=kill", argv)
-        self.assertIn(f"LimitFSIZE={runner.limits.output_bytes}", argv)
+        self.assertIn(f"--property=MemoryMax={MEMORY_MAX_BYTES}", argv)
+        self.assertIn(f"--property=MemorySwapMax={SWAP_MAX_BYTES}", argv)
+        self.assertIn("--property=MemoryAccounting=yes", argv)
+        self.assertIn("--property=TasksMax=4096", argv)
+        self.assertIn("--property=KillMode=control-group", argv)
+        self.assertIn("--ink-child", argv)
+        self.assertIn(f"--fsize={runner.limits.output_bytes}", argv)
         self.assertIn(f"--setenv=TMPDIR={tmp}", argv)
+        self.assertNotIn("--wait", argv)
+        self.assertNotIn("--collect", argv)
+        self.assertNotIn(f"LimitFSIZE={runner.limits.output_bytes}", argv)
 
     def test_limits_cannot_be_raised_above_policy(self) -> None:
         with self.assertRaises(BoundaryError):
@@ -104,7 +115,9 @@ class SafeInkRunnerTests(unittest.TestCase):
         self.assertIsNone(receipt["violation"])
         self.assertFalse(tmp.exists())
         self.assertEqual((output / "result").read_text(encoding="utf-8"), "output")
-        self.assertFalse(self.fake_systemctl_log.exists())
+        self.assertTrue(self.fake_systemctl_log.exists())
+        self.assertIn("show", self.fake_systemctl_log.read_text(encoding="utf-8"))
+        self.assertTrue(receipt["post_unit"]["unit_gone"])
         self.assertTrue((logs / "outer-receipt.json").exists())
 
     def test_tmp_cap_stops_owned_unit_and_cleans_tmp(self) -> None:
@@ -121,17 +134,57 @@ class SafeInkRunnerTests(unittest.TestCase):
         self.assertTrue(self.fake_systemctl_log.exists())
 
     def test_output_cap_stops_owned_unit(self) -> None:
-        runner, output, _tmp, _logs = self._runner(output_cap=4)
+        runner, output, _tmp, _logs = self._runner(output_cap=4096)
         command = [
             "/bin/sh",
             "-c",
             f"mkdir -p {str(output)!r}; "
-            f"dd if=/dev/zero of={str(output / 'grow')!r} bs=1024 count=16 >/dev/null; sleep 5",
+            f"dd if=/dev/zero of={str(output / 'a')!r} bs=4096 count=1 >/dev/null; "
+            f"dd if=/dev/zero of={str(output / 'b')!r} bs=4096 count=1 >/dev/null; sleep 5",
         ]
         receipt = runner.run(command)
         self.assertEqual(receipt["status"], "failed")
         self.assertIn("output cap exceeded", receipt["violation"])
         self.assertTrue(self.fake_systemctl_log.exists())
+
+    def test_documented_phase_first_cli_runs_with_fake_systemd(self) -> None:
+        output = self.root / "cli-output"
+        tmp = self.root / "cli-tmp"
+        logs = self.root / "cli-logs"
+        script = Path(__file__).with_name("ink_safe_runner.py")
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "allocation",
+                "--output",
+                str(output),
+                "--tmp",
+                str(tmp),
+                "--log-dir",
+                str(logs),
+                "--unit",
+                "ink-cli-test-unit",
+                "--deadline",
+                "2",
+                "--output-cap",
+                "1000000",
+                "--tmp-cap",
+                "1000000",
+                "--systemd-run",
+                str(self.fake_systemd),
+                "--systemctl",
+                str(self.fake_systemctl),
+                "--",
+                "/bin/true",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((logs / "outer-receipt.json").is_file())
+        self.assertFalse(tmp.exists())
 
     def test_deadline_stops_owned_unit(self) -> None:
         runner, _output, tmp, _logs = self._runner(deadline=0.1)

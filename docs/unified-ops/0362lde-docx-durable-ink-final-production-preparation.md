@@ -25,7 +25,7 @@ after adding the bounded outer boundary; the previous v2 receipt remains
 identified only as historical provenance:
 
     /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/source-preparation.json
-    17358 bytes, SHA-256 a7ca83bd3a5f1e7fbfc5bc5fc1919b1b986de62da26d67df76dbd1f0424591e9
+    19402 bytes, SHA-256 3ca82bc19a237deefd6ba8639c0b87b07e235fed3bd992b1902a91442e05c826
 
 The superseded v2 receipt was 13,470 bytes with SHA-256
 8f231da0c97436b134b7589c77e3f3df4714d9dc9fa92ef15e9b2c3e06cb2e20. Its
@@ -55,10 +55,10 @@ The final source contains the same canonical probe and runners as 0362ld:
     README.md                   2649 bytes   33f90aa185e84c6bfdfaff90e8df8f41617f4a9481009622ef5d96c1a9edf7f8
     test_ink_qualification.py 10410 bytes  dddf5fce77460b90b857875fd09f21ae15c89cb58d2a1e2fb7f89037ca829a0d
 
-The committed outer boundary is tools/ink_safe_runner.py, 12,857 bytes,
-SHA-256 76cd6f888950b826e294e8345d149c9d463ffd9e5b378824dbce6c4096f4da.
-Its fake-boundary tests are tools/test_ink_safe_runner.py, 6,085 bytes,
-SHA-256 16c33e0fc2384a414508a2103e41f0417fcbf31f8e83698fb354e4cc37ccde01.
+The committed outer boundary is tools/ink_safe_runner.py, 16,643 bytes,
+SHA-256 f0522ceb54aa75c6a604536cb8fdb657f187c1d6a5a2b6003dff71da9a2e3398.
+Its fake-boundary tests are tools/test_ink_safe_runner.py, 8,136 bytes,
+SHA-256 af65a8e2201115f5d45b2a529924f36cdf58a9921189d6a28d9d8381691e6c91.
 The wrapper is source-only infrastructure: it does not alter the inner
 provenance, route, fidelity or allocation protocols.
 
@@ -155,10 +155,13 @@ Native ABBA, only after a quiet coordinator grant and successful correctness:
 
 The effective child TMPDIR is
 /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-native-472b-a1.
-The unit binds MemoryMax=20,000,000,000, MemorySwapMax=0,
-RuntimeMaxSec=7200, KillMode=control-group, OOMPolicy=kill and
-LimitFSIZE=1,000,000,000. The wrapper also polls aggregate output and TMP
-bytes and removes the owned TMP tree after termination.
+The systemd-259 scope binds MemoryAccounting=yes, MemoryMax=20,000,000,000,
+MemorySwapMax=0, TasksMax=4096 and KillMode=control-group. The child launcher
+sets byte-valued RLIMIT_FSIZE=1,000,000,000 and disables core dumps; the
+parent deadline monitor stops the named scope and its process group. The
+wrapper also polls aggregate output and TMP bytes and removes the owned TMP
+tree after termination. It deliberately does not pass the systemd-259
+incompatible --wait, --collect or LimitFSIZE scope assignment.
 
 The runner calibrates each of six routes to at least 500 ms, warms twice,
 then records five A,B,B,A blocks with a 150-ms minimum sample and the existing
@@ -178,6 +181,21 @@ bounded and uses a separate fresh output/TMP/log set:
 
 The effective child TMPDIR is
 /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-collect-472b-a1.
+
+## Actual outer-boundary preflight
+
+Before binding the corrected receipt, the documented phase-first CLI was run
+against the host's real systemd 259 with the harmless inner command /bin/true;
+no Ink binary, Cargo process or profiler was invoked. The exact preflight used
+fresh paths under
+/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/boundary-preflight-lD2Pu1/,
+returned zero, produced a complete outer receipt, and removed its TMP tree.
+The receipt is 2,646 bytes with SHA-256
+aa59978d2776907616404c7dcd1316877eb1ea7c9a535c796b40d82a8e3c6f95.
+The CLI stdout is 2,306 bytes with SHA-256
+156c5a4f4d5c933e99f18ae38f5d358a719ff3dc5bb43760d5b80f97551f6996;
+stderr is empty. The prior false-start receipt remains historical and is not
+relabelled.
 
 ## Source-only validation
 
@@ -366,8 +384,8 @@ accepted-receipt/artifact check passed for both endpoints, four binaries and
 four validation sets. The fresh output/TMP paths remained absent and CPU 29
 was present in the current affinity; neither fact is a timing or quiet grant.
 
-The new outer-boundary tests also passed without systemd, Cargo or native
-execution: seven fake-systemd lifecycle/resource tests cover argv policy
+The new outer-boundary tests also passed without Cargo or native execution:
+eight fake-systemd lifecycle/resource tests cover argv policy
 binding, fixed cap ceilings, normal TMPDIR propagation and cleanup, owned
 unit termination on TMP growth and deadline, and pairwise path rejection.
 The launcher and its tests both pass py_compile.
