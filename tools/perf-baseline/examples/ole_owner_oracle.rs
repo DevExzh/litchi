@@ -241,13 +241,13 @@ fn main() -> Result<(), Box<dyn StdError>> {
     let properties = check_properties(&corpus)?;
     write(&output.join("properties.tsv"), properties.as_bytes())?;
 
-    let doc_source = DocPackage::from_bytes(corpus.doc_archive.clone())?;
+    let doc_source = DocPackage::from_bytes(&corpus.doc_archive)?;
     let (doc_output, doc_proof) = check_doc(&doc_source)?;
     write(&output.join("doc-source.bin"), &corpus.doc_archive)?;
     write(&output.join("doc-edit.bin"), &doc_output)?;
     write(&output.join("doc-proof.tsv"), doc_proof.as_bytes())?;
 
-    let xls_source = XlsPackage::from_bytes(corpus.xls_archive.clone())?;
+    let xls_source = XlsPackage::from_bytes(&corpus.xls_archive)?;
     let (xls_output, xls_proof, opaque_source, opaque_output) =
         check_xls(&xls_source, &corpus.xls_archive)?;
     write(&output.join("xls-source.bin"), &corpus.xls_archive)?;
@@ -494,6 +494,7 @@ fn inventory(bytes: &[u8]) -> Result<Vec<StreamRecord>, Box<dyn StdError>> {
     file.visit_directory_entries(&[], SIBLINGS + 4, |file, sid| {
         let entry = file
             .directory_entry_by_sid(sid)
+            .cloned()
             .ok_or_else(|| "directory visitor returned an unknown SID".to_string())?;
         let name = entry.name.clone();
         let payload = if entry.entry_type == 2 {
@@ -766,12 +767,12 @@ fn check_xls(
     if bytes == source.to_bytes()? {
         return Err("XLS edit produced a source-identical output".into());
     }
-    let source_sheet = source
-        .cell_values()?
+    let source_values = source.cell_values()?;
+    let source_sheet = source_values
         .worksheet(XlsSelector::Name("Cells"))?
         .ok_or("XLS source worksheet was omitted")?;
-    let output_sheet = output
-        .cell_values()?
+    let output_values = output.cell_values()?;
+    let output_sheet = output_values
         .worksheet(XlsSelector::Name("Cells"))?
         .ok_or("XLS output worksheet was omitted")?;
     let mut proof = String::from("kind\trow\tvalue_bits\n");
@@ -812,7 +813,7 @@ fn check_xls(
 }
 
 fn check_history(corpus: &Corpus) -> Result<(String, Vec<u8>, Vec<u8>), Box<dyn StdError>> {
-    let doc_source = DocPackage::from_bytes(corpus.doc_archive.clone())?;
+    let doc_source = DocPackage::from_bytes(&corpus.doc_archive)?;
     let (doc_packages, doc_patches) = retain_doc_history(&doc_source)?;
     let mut doc_forward = doc_source.clone();
     for patch in &doc_patches {
@@ -828,7 +829,7 @@ fn check_history(corpus: &Corpus) -> Result<(String, Vec<u8>, Vec<u8>), Box<dyn 
         return Err("DOC retained history inverse did not restore source bytes".into());
     }
 
-    let xls_source = XlsPackage::from_bytes(corpus.xls_archive.clone())?;
+    let xls_source = XlsPackage::from_bytes(&corpus.xls_archive)?;
     let (xls_packages, xls_patches) = retain_xls_history(&xls_source)?;
     let mut xls_forward = xls_source.clone();
     for patch in &xls_patches {
@@ -891,7 +892,7 @@ fn allocator_evidence(output: &Path, corpus: &Corpus) -> Result<(), Box<dyn StdE
                 (0, 0, None)
             },
             "xls_cells" | "xls_cells_stage" => {
-                let package = XlsPackage::from_bytes(corpus.xls_archive.clone())?;
+                let package = XlsPackage::from_bytes(&corpus.xls_archive)?;
                 let mut edit = package.edit()?;
                 edit.set_value(
                     XlsSelector::Name("Cells"),
@@ -912,7 +913,7 @@ fn allocator_evidence(output: &Path, corpus: &Corpus) -> Result<(), Box<dyn StdE
                 // resulting live/retained counters are observable rather than
                 // a synthetic assertion.
                 if route == "doc_history" {
-                    let package = DocPackage::from_bytes(corpus.doc_archive.clone())?;
+                    let package = DocPackage::from_bytes(&corpus.doc_archive)?;
                     let (packages, patches) = retain_doc_history(&package)?;
                     let counts = (packages.len(), patches.len());
                     (
@@ -921,7 +922,7 @@ fn allocator_evidence(output: &Path, corpus: &Corpus) -> Result<(), Box<dyn StdE
                         Some(RetainedHistory::Doc(packages, patches)),
                     )
                 } else {
-                    let package = XlsPackage::from_bytes(corpus.xls_archive.clone())?;
+                    let package = XlsPackage::from_bytes(&corpus.xls_archive)?;
                     let (packages, patches) = retain_xls_history(&package)?;
                     let counts = (packages.len(), patches.len());
                     (

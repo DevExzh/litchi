@@ -1,0 +1,20 @@
+{
+  "command": [
+    "python3",
+    "-m",
+    "unittest",
+    "tools.test_prepare_ole_owner_inputs",
+    "tools.test_ole_owner_paired_runner",
+    "tools.test_validate_ole_owner_run",
+    "tools.test_legacy_native_qualification",
+    "tools.test_native_qualification_runner"
+  ],
+  "exit_code": 0,
+  "seconds": 22.91134658700321,
+  "source_index": "140cf705b771598b2fad269b929d9b3916d381f2",
+  "log": {
+    "path": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/ole-lock-composed/tooling.log",
+    "bytes": 397,
+    "sha256": "6ba976d38b6ffdb914bc180cebeaab18e264fdea9a3e18489cba55a8afe279b8"
+  }
+}

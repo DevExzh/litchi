@@ -15,9 +15,11 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import struct
+import tomllib
 from typing import Any, Mapping
 
 TOOLS_ROOT = Path(__file__).resolve().parents[1]
@@ -78,6 +80,23 @@ BASELINE_CFB_LIMITED_OPEN = "pub fn open_with_limits(mut reader: R, limits: OleF
 CANDIDATE_CFB_OPEN = "pub fn open(mut reader: R, limits: OleFileLimits) -> Result<Self, OleError>"
 CANDIDATE_CFB_NO_DEFAULT_OPEN = "pub fn open(reader: R) -> Result<Self, OleError>"
 CFB_SOURCE_PATH = Path("crates/litchi-cfb/src/file.rs")
+REVIEWED_LOCK_SHA256 = "bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a"
+BASELINE_LOCK_SHA256 = "450f43c6b74536ef552bd5e9a19e321a3c0dea745f645fecc0aa9abe37868e14"
+CANDIDATE_LOCK_SHA256 = "5a07adc1d62dea06dbac60986faa020007882506523dde49e4605708e1276aaf"
+LOCK_SOURCE = (
+    "external matched-harness lock retained by 0359j W5 qualification; "
+    "each driver lock is the reviewed base plus only its pinned local dependency edges"
+)
+LOCK_PATCH_POLICY: dict[str, dict[str, dict[str, list[str]]]] = {
+    "baseline": {
+        "litchi-perf-baseline": {"added": ["sha2 0.11.0"], "removed": []},
+    },
+    "candidate": {
+        "litchi-odraw": {"added": ["litchi-core"], "removed": []},
+        "litchi-perf-baseline": {"added": ["sha2 0.11.0"], "removed": []},
+    },
+}
+LOCK_HASH = re.compile(r"^[0-9a-f]{64}$")
 PROBE_NAME = "ole_w5_probe.rs"
 CLONE_NAME = "ole_package_clone_probe.rs"
 ORACLE_NAME = "ole_owner_oracle.rs"
@@ -148,6 +167,90 @@ def _hash_record(record: Mapping[str, Any], label: str) -> None:
     digest, size = _sha256(path)
     _same(record.get("sha256"), digest, f"{label} SHA-256")
     _same(record.get("bytes"), size, f"{label} byte count")
+
+
+def _lock_document(path: Path, label: str) -> dict[str, Any]:
+    try:
+        value = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
+        raise ValidationError(f"cannot read {label} as Cargo.lock TOML: {error}") from error
+    if not isinstance(value, dict):
+        raise ValidationError(f"{label} must contain a TOML object")
+    return value
+
+
+def _lock_packages(document: Mapping[str, Any], label: str) -> dict[tuple[str, str, str | None], Mapping[str, Any]]:
+    packages = document.get("package")
+    if not isinstance(packages, list) or not packages:
+        raise ValidationError(f"{label} has no Cargo.lock packages")
+    result: dict[tuple[str, str, str | None], Mapping[str, Any]] = {}
+    for index, package in enumerate(packages):
+        if not isinstance(package, Mapping):
+            raise ValidationError(f"{label} package {index} is not an object")
+        name = package.get("name")
+        version = package.get("version")
+        source = package.get("source")
+        if not isinstance(name, str) or not isinstance(version, str) or (source is not None and not isinstance(source, str)):
+            raise ValidationError(f"{label} package {index} identity is malformed")
+        key = (name, version, source)
+        if key in result:
+            raise ValidationError(f"{label} contains duplicate package identity {key!r}")
+        result[key] = package
+    return result
+
+
+def _lock_registry_identity(packages: Mapping[tuple[str, str, str | None], Mapping[str, Any]], label: str) -> tuple[tuple[str, str, str, str], ...]:
+    identity: list[tuple[str, str, str, str]] = []
+    for (name, version, source), package in packages.items():
+        if source is None:
+            continue
+        if not source.startswith("registry+"):
+            raise ValidationError(f"{label} has an unreviewed non-registry source: {name} {version}")
+        checksum = package.get("checksum")
+        if not isinstance(checksum, str) or not LOCK_HASH.fullmatch(checksum):
+            raise ValidationError(f"{label} registry package lacks a valid checksum: {name} {version}")
+        identity.append((name, version, source, checksum))
+    return tuple(sorted(identity))
+
+
+def _validate_lock_patch(base: Path, selected: Path, role: str) -> dict[str, Any]:
+    if role not in LOCK_PATCH_POLICY:
+        raise ValidationError(f"unknown driver lock role: {role}")
+    base_packages = _lock_packages(_lock_document(base, "reviewed base lock"), "reviewed base lock")
+    selected_packages = _lock_packages(_lock_document(selected, f"{role} driver lock"), f"{role} driver lock")
+    if _lock_registry_identity(base_packages, "reviewed base lock") != _lock_registry_identity(selected_packages, f"{role} driver lock"):
+        raise ValidationError(f"{role} driver lock changes a registry package identity")
+    if set(base_packages) != set(selected_packages):
+        raise ValidationError(f"{role} driver lock changes the package identity set")
+    expected = LOCK_PATCH_POLICY[role]
+    observed: dict[str, dict[str, list[str]]] = {}
+    for key in base_packages:
+        base_package = base_packages[key]
+        selected_package = selected_packages[key]
+        if {name: value for name, value in base_package.items() if name != "dependencies"} != {
+            name: value for name, value in selected_package.items() if name != "dependencies"
+        }:
+            raise ValidationError(f"{role} driver lock changes package metadata for {key[0]} {key[1]}")
+        base_dependencies = base_package.get("dependencies", [])
+        selected_dependencies = selected_package.get("dependencies", [])
+        if not isinstance(base_dependencies, list) or not isinstance(selected_dependencies, list):
+            raise ValidationError(f"{role} driver lock dependency list is malformed for {key[0]} {key[1]}")
+        allowed = expected.get(key[0], {"added": [], "removed": []})
+        added = sorted(set(selected_dependencies) - set(base_dependencies))
+        removed = sorted(set(base_dependencies) - set(selected_dependencies))
+        observed[key[0]] = {"added": added, "removed": removed}
+        if added != sorted(allowed["added"]) or removed != sorted(allowed["removed"]):
+            raise ValidationError(
+                f"{role} driver lock dependency patch differs for {key[0]}: added={added!r}, removed={removed!r}"
+            )
+        if [item for item in selected_dependencies if item not in allowed["added"]] != base_dependencies:
+            raise ValidationError(f"{role} driver lock reorders or duplicates dependencies for {key[0]}")
+    return {
+        "base_sha256": REVIEWED_LOCK_SHA256,
+        "role": role,
+        "patches": observed,
+        "policy": expected,
+    }
 
 
 def _validate_toolchain(toolchain: Mapping[str, Any]) -> None:
@@ -437,8 +540,29 @@ def _validate_preparation(preparation: Mapping[str, Any], manifest: Mapping[str,
         _same(names, {"Cargo.toml", "Cargo.lock", "ole_w5_probe.rs", "ole_package_clone_probe.rs", "ole_owner_oracle.rs"}, f"preparation.{endpoint} driver files")
         for index, item in enumerate(files):
             _hash_record(_mapping(item, "driver file"), f"preparation.{endpoint}.driver[{index}]")
+        role = "baseline" if endpoint == "before" else "candidate"
+        driver_locks = _mapping(shared.get("driver_locks"), "preparation.driver_locks")
+        _same(set(driver_locks), {"baseline", "candidate"}, "preparation driver lock roles")
+        driver_lock = _mapping(driver_locks.get(role), f"preparation.{role} driver lock")
+        expected_lock_hash = BASELINE_LOCK_SHA256 if role == "baseline" else CANDIDATE_LOCK_SHA256
+        _same(driver_lock.get("provenance"), LOCK_SOURCE, f"preparation.{role} driver lock provenance")
+        _same(driver_lock.get("sha256"), expected_lock_hash, f"preparation.{role} driver lock pin")
+        _same(driver_lock.get("base_sha256"), REVIEWED_LOCK_SHA256, f"preparation.{role} lock base pin")
+        _same(driver_lock.get("role"), role, f"preparation.{role} lock role")
+        _same(driver_lock.get("policy"), LOCK_PATCH_POLICY[role], f"preparation.{role} lock policy")
+        driver_lock_path = _path(driver_lock.get("path"), f"preparation.{role} driver lock")
+        _hash_record(driver_lock, f"preparation.{role} driver lock")
+        _same(
+            _validate_lock_patch(
+                _path(_mapping(shared.get("reviewed_lock"), "preparation.reviewed_lock").get("path"), "reviewed lock"),
+                driver_lock_path,
+                role,
+            ),
+            {key: driver_lock[key] for key in ("base_sha256", "role", "patches", "policy")},
+            f"preparation.{role} lock graph",
+        )
         shared_hashes = {
-            "Cargo.lock": _mapping(shared.get("lock"), "preparation.lock").get("sha256"),
+            "Cargo.lock": expected_lock_hash,
             CLONE_NAME: _mapping(shared.get("clone_probe"), "preparation.clone_probe").get("sha256"),
             ORACLE_NAME: _mapping(shared.get("oracle_probe"), "preparation.oracle_probe").get("sha256"),
             PROBE_NAME: (
@@ -471,7 +595,7 @@ def _validate_preparation(preparation: Mapping[str, Any], manifest: Mapping[str,
     for name, provenance in (
         ("reviewed_probe", "external matched-harness artifact from 0359j; historical source a84650cd70390641f7734dc1f3362bcb9cd1e025 tools/perf-baseline/examples/ole_w5_probe.rs"),
         ("clone_probe", "external matched-harness artifact from 0359j; historical source a84650cd70390641f7734dc1f3362bcb9cd1e025 tools/perf-baseline/examples/ole_package_clone_probe.rs"),
-        ("lock", "external matched-harness lock retained by 0359j W5 qualification; Cargo.lock from the reviewed current driver"),
+        ("reviewed_lock", LOCK_SOURCE),
     ):
         item = _mapping(shared.get(name), f"preparation.{name}")
         _same(item.get("provenance"), provenance, f"preparation.{name} provenance")
@@ -479,7 +603,7 @@ def _validate_preparation(preparation: Mapping[str, Any], manifest: Mapping[str,
         pin_name = {
             "reviewed_probe": "reviewed_probe_sha256",
             "clone_probe": "clone_probe_sha256",
-            "lock": "lock_sha256",
+            "reviewed_lock": "reviewed_lock_sha256",
         }[name]
         _same(item.get("sha256"), pins.get(pin_name), f"manifest {pin_name}")
     oracle = _mapping(shared.get("oracle_probe"), "preparation.oracle_probe")

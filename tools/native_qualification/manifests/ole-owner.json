@@ -15,9 +15,20 @@
     "candidate_adapter_policy": "CFB limits arity only; no implementation overlay",
     "clone_probe_sha256": "0a23c99ed8958e0df1aa51e5f37e7a949328149074b2096613c972d2b8cf6e98",
     "clone_probe_provenance": "external matched-harness artifact from 0359j; historical source a84650cd70390641f7734dc1f3362bcb9cd1e025 tools/perf-baseline/examples/ole_package_clone_probe.rs",
-    "lock_sha256": "bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a",
-    "lock_provenance": "external matched-harness lock retained by 0359j W5 qualification; Cargo.lock from the reviewed current driver",
-    "oracle_source_sha256": "49df705ccd92e498efc51388cb3d00310de453a12e84d1919128c52ffeddee95"
+    "reviewed_lock_sha256": "bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a",
+    "baseline_lock_sha256": "450f43c6b74536ef552bd5e9a19e321a3c0dea745f645fecc0aa9abe37868e14",
+    "candidate_lock_sha256": "5a07adc1d62dea06dbac60986faa020007882506523dde49e4605708e1276aaf",
+    "lock_provenance": "external matched-harness lock retained by 0359j W5 qualification; each driver lock is the reviewed base plus only its pinned local dependency edges",
+    "lock_patch_policy": {
+      "baseline": {
+        "litchi-perf-baseline": {"added": ["sha2 0.11.0"], "removed": []}
+      },
+      "candidate": {
+        "litchi-odraw": {"added": ["litchi-core"], "removed": []},
+        "litchi-perf-baseline": {"added": ["sha2 0.11.0"], "removed": []}
+      }
+    },
+    "oracle_source_sha256": "60b506c1bfc277c260933730ce2f754e59f4745d40c753ffa95900b49d276daf"
   },
   "routes": [
     "open",
