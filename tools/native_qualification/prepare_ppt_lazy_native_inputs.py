@@ -177,7 +177,16 @@ def _materialize_tracked_baseline_fixture(
             raise PreparationError(f"baseline tracked fixture bytes differ: {relative}")
         return False
     result = subprocess.run(
-        ["git", "-C", str(root), "checkout-index", "--force", "--", str(relative)],
+        [
+            "git",
+            "-C",
+            str(root),
+            "checkout-index",
+            "--force",
+            "--ignore-skip-worktree-bits",
+            "--",
+            str(relative),
+        ],
         check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
