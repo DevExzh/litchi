@@ -3987,3 +3987,11 @@ See [0063](0063-source-pptx-modern-comments.md).
   active. No performance regression is waived, and the prepared packets alone
   do not establish acceptance. Only redaction audit 22 is deferred. Nothing is
   pushed.
+
+- Coordinator cleanup update (2026-10-24, two merged gate leaves):
+  Cleanup wave 48 removes the merged zip gate repair and Numbers Snappy leaves
+  without force. Both branches and their two ignored lockfiles (279,058 bytes)
+  remain preserved. Restore exercises and independent artifact, mode, ancestry
+  and absence checks pass. Record 0362ul17 binds the receipts. The removed
+  checkouts contained 12.51 GB of regular files; native endpoints, targets and
+  the protected trunk probe remain untouched. The staging hold is released.
