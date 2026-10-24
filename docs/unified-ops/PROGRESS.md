@@ -4414,3 +4414,20 @@ See [0063](0063-source-pptx-modern-comments.md).
   setup-only attempt. Neither attempt is counted as passed before its
   terminal receipt. Cleanup review continues for inactive merged leaves;
   no additional leaf has yet been removed. Nothing is pushed.
+
+- Coordinator cleanup wave 54 (2026-10-24):
+  Removed the clean, merged W4 integration checkout without force and kept
+  its branch at `f3fed35c0d`. All thirteen ignored files (6,960,154 bytes)
+  are quarantined with exact identities; sparse restoration passed. Root
+  review passes 44 applicable postchecks, including the protected trunk
+  probe and retained active source roots. Record 0362ul34 preserves the
+  corrected preaudit count and directory-mode audit distinction. The
+  checkout-allocation reduction is approximately 7.54 GB after quarantine;
+  no isolated filesystem free-space delta is claimed. No target, native
+  evidence or foreign process was removed. The integration hold is released.
+
+  Supplemental tooling reconciliation distinguishes the historical
+  nine-module failure from the still-pending 9781 tooling row. A separate
+  leaf is registering the newly accepted suites for the current source;
+  the runner used by active documentation remains unchanged. The owner
+  signed-batch contract choice and actual native qualification remain open.
