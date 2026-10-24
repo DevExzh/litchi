@@ -124,8 +124,7 @@ Native ABBA, only after a quiet coordinator grant and successful correctness:
 
 The runner calibrates each of six routes to at least 500 ms, warms twice,
 then records five A,B,B,A blocks with a 150-ms minimum sample and the existing
-host-overlap, descendant, output-growth, RSS, target-growth and unrelated-tool
-guards. Collection is:
+host-overlap, descendant and unrelated-process guards. Collection is:
 
     python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-collect.py \
       /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final \
@@ -198,3 +197,102 @@ The complete reduced receipt, binaries and validation outputs remain outside
 Git at the run root above. Prior c796/e157 receipts remain historical and
 untouched. Native allocation capture, timing, ABBA and any acceptance claim
 remain pending their separate coordinator grants.
+
+## Source-only native handoff audit
+
+The accepted receipt and protected binaries were rechecked without invoking
+Cargo, a native binary, a profiler or either measurement runner. `build.json`
+is the external f318 receipt above. Its endpoint refs are the immutable d040
+baseline and 472b candidate; the candidate source is HEAD
+`472b6705475b073e7fe08f6e11ee17fb1e29f838`, tree
+`ebc1cee05f124c0c63977aff07a23288c19e7d00`. The input lock, both materialized
+source locks and the reviewed lock path remain SHA-256
+`4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1`.
+The protected normal and allocator paths and hashes are the four rows in the
+build result above; every path exists and matches f318. The canonical tools
+are unchanged: `ink-qualify.py` SHA-256
+`4bcbc6e5165befba18dc7d8b63f08d081371cebd236f26e531cce99cb21441a1`,
+`ink-abba.py` SHA-256
+`8452005f92732982f86c20cebd3262322ed0add404e51b385c959ee1355aa016`, and
+`ink-collect.py` SHA-256
+`e744cdb6c9a40c8404dac75a4ca60eb9c1d6bfd3b92bfb75b5e2f735f147f03e`.
+
+The next fresh external paths are bound as follows; none existed during this
+source-only audit:
+
+    allocation receipts: .../run-final/allocation-472b-a1
+    native ABBA receipts: .../run-final/native-472b-a1
+    reduced collector output: .../run-final/evidence-472b-a1
+    allocation TMPDIR: .../tmp-allocation-472b-a1
+    native TMPDIR: .../tmp-native-472b-a1
+
+The exact allocation invocation is the existing runner, which reads and
+hash-binds `run-final/build.json` before using its protected allocation
+binaries:
+
+    TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-allocation-472b-a1 \
+    python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-qualify.py allocation \
+      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final \
+      --attempt allocation-472b-a1
+
+It performs 24 untimed probe invocations: six routes, 100 iterations each,
+in base/candidate/candidate/base order, and requires paired checksum, output,
+allocation, allocated, retained and peak values. The runner explicitly marks
+this phase `unqualified; allocation counts only; concurrent builds permitted`;
+it has no CPU pin or host-quiet snapshot. Therefore it is not a timing or
+quiet-window claim.
+
+After the quiet native phase, the exact ABBA invocation is:
+
+    TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/tmp-native-472b-a1 \
+    python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-abba.py \
+      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/build-base/ink-native \
+      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/build-candidate/ink-native \
+      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/native-472b-a1 \
+      --build-manifest /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/build.json \
+      --cpu 29
+
+CPU 29 is currently in the host affinity, but that is not a coordinator quiet
+grant. The runner itself performs the concrete checks: external output path;
+complete f318 provenance and binary digest; CPU affinity; `taskset`; before,
+during and after `/proc` snapshots; forbidden compiler/profiler/other-probe
+process detection; descendant-aware host-overlap detection; zero exit/overlap; route and
+iteration identity; positive timing; equal checksum/output digests; a
+500-ms-per-route calibration floor; two warmups; a 150-ms minimum accepted
+sample; final binary/build-manifest revalidation. It runs six route cases,
+with five ABBA blocks and four legs per block, so accepted legs alone have an
+18-second lower bound (120 × 150 ms), plus calibration, warmup and guard
+overhead; the actual wall time is deliberately not claimed here.
+
+The concrete guard gap is now stated accurately: this committed `ink-abba.py`
+does not implement output-growth, RSS or target-growth checks. The earlier
+sentence naming those checks was an overstatement and has been corrected;
+this handoff adds no hypothetical replacement requirement. The collector's
+actual checks remain provenance, lock/compiler/registry equality, complete
+validation outputs, complete six-route native receipts, and blocker-free host
+snapshots.
+
+Once allocation and native receipts exist, the exact collector invocation is:
+
+    python3 /home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source/docs/unified-ops/results/0362l/ink-collect.py \
+      /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final \
+      --allocation allocation-472b-a1 \
+      --out /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/run-final/evidence-472b-a1
+
+It requires a complete native attempt, so it is intentionally not run during
+this source-only handoff.
+
+The current-source tests also passed without Cargo or native execution:
+
+    PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest \
+      docs.unified-ops.results.0362l.test_ink_qualification -v
+    PYTHONDONTWRITEBYTECODE=1 python3 -B -m py_compile \
+      docs/unified-ops/results/0362l/ink-qualify.py \
+      docs/unified-ops/results/0362l/ink-abba.py \
+      docs/unified-ops/results/0362l/ink-collect.py \
+      docs/unified-ops/results/0362l/test_ink_qualification.py
+
+All seven unit tests passed, compilation passed, and the standalone
+accepted-receipt/artifact check passed for both endpoints, four binaries and
+four validation sets. The fresh output/TMP paths remained absent and CPU 29
+was present in the current affinity; neither fact is a timing or quiet grant.
