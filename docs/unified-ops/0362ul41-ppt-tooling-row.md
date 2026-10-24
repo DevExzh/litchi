@@ -73,5 +73,39 @@ qualification tests consequently raised
 The wrapper environment must be repaired before a wrapper-row pass is
 accepted; Cargo steps retain their explicit target guard.
 
-This is a failure receipt, not a full-gate acceptance claim.  The generated
-snapshot/matrix repairs and the hermetic wrapper rerun remain open.
+The scoped snapshot/matrix and wrapper repairs were committed as
+`02080ded637029036dd03764c9f86495a9a6e5fb`,
+`1e5f80db71a08535a4a4b867e74e532683ba98ff`, and
+`8d1184fc38ad8e5c81fb428c7f50613f210c0495`:
+
+* the 17 non-benchmark result directories are explicitly classified in the
+  curated matrix as source/protocol/tooling evidence with no invented rows;
+* only the Python `tooling-unit` step omits `CARGO_TARGET_DIR` and
+  `LITCHI_GATE_TARGET_ROOT`; Cargo-producing steps retain both the target
+  environment and the runner's subreaper policy; and
+* the tooling child is explicitly the nearest subreaper, so its lifecycle
+  tests own and reap their adopted descendants.  The W8 cleanup retains
+  identity-checked termination and fail-closed diagnostics.
+
+## Final wrapper-row receipt
+
+From clean commit
+`8d1184fc38ad8e5c81fb428c7f50613f210c0495`, the exact runner command was:
+
+```text
+env -u PYTHONPATH -u CARGO_TARGET_DIR python3 docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py --root /home/zhuhe/code/litchi-worktrees/uo2-ppt-tooling-row --target /home/zhuhe/code/litchi-worktrees/uo2-ppt-tooling-row/target --state /home/zhuhe/code/litchi-worktrees/.coord/ppt-tooling-row-8d1184fc38-state --only tooling-unit
+```
+
+The current 33-module `tooling-unit` row passed: 1679 tests in 105.38685154914856
+seconds, exit 0.  The wrapper log is
+`/home/zhuhe/code/litchi-worktrees/.coord/ppt-tooling-row-8d1184fc38-run.log`
+(3674 bytes, SHA-256
+`cf22d2ea0d98fc7cf377a954e88a96ea166bdc8a75166b4a09b5e1621062112e`); its
+child log is
+`/home/zhuhe/code/litchi-worktrees/.coord/ppt-tooling-row-8d1184fc38-state/48-tooling-unit-attempt-1792885613938334100-3447097.log`
+(634981 bytes, SHA-256
+`b70a9c2cefc35a27258df375aaaf2af10dbb0babd6b3851151b04e927de29357`).
+The runner receipt records `cargo_target_trace=[]`, zero target bytes, and
+exit 0; this was a source/fake-Python tooling run and did not invoke Cargo or
+native qualification.  The earlier failed receipts above remain immutable
+diagnostic history; this final receipt closes the tooling-row requirement.
