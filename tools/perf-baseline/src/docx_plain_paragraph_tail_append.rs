@@ -1407,7 +1407,8 @@ mod tests {
                     litchi_docx::SemanticLimits::default()
                         .paragraph_copy(limits_for(1, xml.len()).unwrap())
                 )
-                .edit_plain_paragraph_copy(),
+                .edit_plain_paragraph_copy()
+                .and_then(|edit| edit.projected().map(|_| ())),
             Err(CopyError::Refused(_))
         ));
     }

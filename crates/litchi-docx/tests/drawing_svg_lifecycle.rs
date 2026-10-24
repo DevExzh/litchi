@@ -1513,6 +1513,40 @@ fn lifecycle_single_picture_selection_does_not_read_unrelated_media() {
 }
 
 #[test]
+fn deferred_svg_owner_constructor_does_not_materialize_pending_output() {
+    let source_bytes = two_raster_fixture("deferred-svg-constructor");
+    let selected_range = payload_range(&source_bytes, "word/media/image1.png");
+    let unrelated_range = payload_range(&source_bytes, "word/media/image2.png");
+    let source =
+        ObservedSource::new(source_bytes).with_media_ranges(selected_range, unrelated_range);
+    let source_handle = source.clone();
+    let package = source_backed::Package::from_read_at(Arc::new(source)).unwrap();
+    let mut edit = package.edit_svg([0usize]).unwrap();
+    edit.attach_svg(
+        0usize,
+        Input::borrowed(b"<svg xmlns=\"http://www.w3.org/2000/svg\"/>"),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let selected_reads = source_handle.selected_reads();
+    let unrelated_reads = source_handle.unrelated_reads();
+    assert_eq!(
+        unrelated_reads, 0,
+        "the first commit did not need the other raster"
+    );
+
+    // The committed package owns a deferred output.  Merely selecting the
+    // next SVG edit must retain its policy without streaming that output.
+    let deferred_edit = commit
+        .package()
+        .edit_svg([0usize])
+        .expect("a deferred owner retains the SVG selector policy");
+    assert_eq!(source_handle.selected_reads(), selected_reads);
+    assert_eq!(source_handle.unrelated_reads(), unrelated_reads);
+    drop(deferred_edit);
+}
+
+#[test]
 fn source_picture_inventory_keeps_unrequested_rasters_cold() {
     let bytes = two_raster_fixture("lazy-resource-inventory");
     let first = payload_range(&bytes, "word/media/image1.png");

@@ -22,6 +22,14 @@ read-only projections are fallible `&self` accessors returning owned,
 cheaply-clonable snapshots. All tracked DOCX and facade consumers were migrated
 in this correction; no compatibility alias or eager fallback was added.
 
+The follow-up cold-path proof also keeps SVG selector admission on the
+deferred owner's retained read policy: constructing the next SVG edit does not
+materialize the pending output from the preceding commit. The focused lifecycle
+test checks that the selected raster and an untouched raster retain their read
+counts across that constructor. The source-backed budget and plain-paragraph
+copy refusal tests now force their first projection explicitly, so their
+limit/refusal assertions still cover first use rather than the lazy constructor.
+
 The source checks in this worktree are `rustfmt --edition 2024` and
 `git diff --check`. Runtime tests, strict Clippy and the full gate remain
 pending the coordinator's isolated Cargo slot. No performance qualification is

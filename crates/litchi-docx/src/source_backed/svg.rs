@@ -227,10 +227,11 @@ impl Package {
         I: IntoIterator<Item = S>,
         S: Into<PictureSelector>,
     {
-        let selector_limit = self
-            .physical_package()?
-            .read_limits()
-            .max_total_relationships();
+        // Reading the retained policy must not materialize a pending output
+        // from a prior source-backed commit.  The record constructor below
+        // performs the physical source check and inventory capture only when
+        // the first operation, projection or commit needs it.
+        let selector_limit = self.read_limits().max_total_relationships();
         let mut selected = Vec::new();
         for selector in selectors {
             if selected.len() >= selector_limit {

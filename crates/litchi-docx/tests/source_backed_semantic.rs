@@ -586,9 +586,12 @@ fn source_edit_budget_refuses_before_main_payload_capture() {
     let package = source_backed::Package::from_read_at(source.clone()).unwrap();
     let maximum = document.len().saturating_sub(1);
 
-    let result = package.edit_with_options(
-        litchi_docx::document::EditOptions::default().max_snapshot_bytes(maximum),
-    );
+    let edit = package
+        .edit_with_options(
+            litchi_docx::document::EditOptions::default().max_snapshot_bytes(maximum),
+        )
+        .expect("the lazy constructor retains the edit policy");
+    let result = edit.source().map(|_| ());
     assert!(matches!(
         result,
         Err(litchi_docx::document::Error::Limit {
