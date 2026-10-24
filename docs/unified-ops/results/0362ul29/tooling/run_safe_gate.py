@@ -79,6 +79,7 @@ def lock_hashes(root: Path) -> dict[str, str]:
         "crates/litchi-core/fuzz/Cargo.lock",
         "crates/litchi-ops/fuzz/Cargo.lock",
         "crates/litchi/fuzz/Cargo.lock",
+        "crates/litchi-rtf/fuzz/Cargo.lock",
     )
     result: dict[str, str] = {}
     for relative in relative_paths:
@@ -780,7 +781,7 @@ def make_steps(root: Path, state_dir: Path, target: Path) -> list[dict]:
         shell("python-bindings", "bash crates/pyo3-litchi/tests/run_tests.sh"),
         direct("feature-matrix", ["python3", "tools/check_feature_matrix.py"]),
         direct("feature-matrix-clippy", ["python3", "tools/check_feature_matrix.py", "--only", "facade,facade-aggregate", "--all-targets", "--clippy"]),
-        shell("fuzz", "set -e; export CARGO_TARGET_DIR=\"$CARGO_TARGET_DIR/fuzz\"; cargo check -q --manifest-path crates/litchi-core/fuzz/Cargo.toml --bins; cargo check -q --manifest-path crates/litchi-ops/fuzz/Cargo.toml --bins; cargo check -q --manifest-path crates/litchi-ops/fuzz/Cargo.toml --bins --features apply; cargo check -q --manifest-path crates/litchi/fuzz/Cargo.toml --bins; cargo run -q --release --manifest-path crates/litchi-ops/fuzz/Cargo.toml --bin smoke_batch_payload; cargo run -q --release --manifest-path crates/litchi-ops/fuzz/Cargo.toml --features apply --bin smoke_batch_payload"),
+        shell("fuzz", "set -e; export CARGO_TARGET_DIR=\"$CARGO_TARGET_DIR/fuzz\"; cargo check -q --manifest-path crates/litchi-core/fuzz/Cargo.toml --bins; cargo check -q --manifest-path crates/litchi-rtf/fuzz/Cargo.toml --bins; cargo check -q --manifest-path crates/litchi-ops/fuzz/Cargo.toml --bins; cargo check -q --manifest-path crates/litchi-ops/fuzz/Cargo.toml --bins --features apply; cargo check -q --manifest-path crates/litchi/fuzz/Cargo.toml --bins; cargo run -q --release --manifest-path crates/litchi-ops/fuzz/Cargo.toml --bin smoke_batch_payload; cargo run -q --release --manifest-path crates/litchi-ops/fuzz/Cargo.toml --features apply --bin smoke_batch_payload"),
         shell("goldens", f"bash {COORD / 'scripts/check-goldens.sh'}"),
         shell("golden-clean", "test -z \"$(git status --short | grep -v '^[AMDR] ' || true)\""),
         shell("perf-harness-check", "cd tools/perf-baseline && cargo check --locked --all-targets"),

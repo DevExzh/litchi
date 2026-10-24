@@ -17,10 +17,17 @@ litchi-doc = "0.0.1"
 ```
 
 ```rust
-use litchi_doc::{Limits, OpenOptions, Package};
+use litchi_doc::{OpenOptions, Package, SourceLimits};
 
-let limits = Limits::default().with_max_package_bytes(32 * 1024 * 1024)?;
-let package = Package::open_with_options("example.doc", OpenOptions::default().with_limits(limits))?;
+let limits = SourceLimits::builder()
+    .max_input_bytes(32 * 1024 * 1024)?
+    .max_entry_bytes(32 * 1024 * 1024)?
+    .max_aggregate_bytes(32 * 1024 * 1024)?
+    .build()?;
+let package = Package::open_with_options(
+    "example.doc",
+    OpenOptions::default().source_limits(limits),
+)?;
 let document = package.document();
 println!("paragraphs: {}", document.paragraph_count()?);
 # Ok::<(), litchi_doc::Error>(())

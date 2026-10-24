@@ -5,8 +5,8 @@ fake format families. The `query_plan` libFuzzer target also compiles and runs
 plans with bounded output. This validates the engine, not production adapters.
 
 Batch payloads (record 0334): `batch_payload` feeds arbitrary bytes to
-`batch::from_bytes_with_limits` (64 KiB, 64 items), the OfficeCLI batch JSON
-ingress. Every input either fails with `corrupt_batch` or `limit_exceeded`, or
+`batch::from_bytes` with a required `SourceLimits` profile (64 KiB, 64 items),
+the OfficeCLI batch JSON ingress. Every input either fails with `corrupt_batch` or `limit_exceeded`, or
 decodes to `BatchItem`s that validate, survive `into_owned`, lower their path
 fields through `PathArg::parse` and their selector through `Query::parse` (to a
 display fixed point or a typed path/selector refusal), and serialize to a
