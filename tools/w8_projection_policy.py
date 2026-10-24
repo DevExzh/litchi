@@ -47,10 +47,10 @@ POLICY_VERSION = "0362yh-v1"
 # Filled after the reviewed policy file is assembled.  A fixed digest is
 # deliberate: an arbitrary policy path or edited JSON cannot become an
 # accepted graph rule merely by being passed on the command line.
-REVIEWED_POLICY_SHA256 = "5f198d0e4462529783538b6a7fa2f5a8cab025bc191f9ce582f150a9cd696d2e"
+REVIEWED_POLICY_SHA256 = "afb0d053a98ddb3d26d50d1d90944aab0fcc6c536c2cd99024162d49642d3d7f"
 
 BASELINE_COMMIT = "f2bbbc8d07ab5da26c180f1ff74813d39f632d54"
-FINAL_COMMIT = "f6fe430a4d19d94aa360c0e9ed03ebd757265225"
+FINAL_COMMIT = "49c25ef67f62a8bb943e7c6a0bf464e49ae87d07"
 TARGET = "x86_64-unknown-linux-gnu"
 PROFILE = "release"
 PROBE_SHA256 = "21c8e3833c96411a612a2631f98093bd70cf0a5c28b2952c3d15873f464e54b0"
@@ -192,7 +192,7 @@ FIXED_INPUTS: dict[str, dict[str, Any]] = {
     },
     "after": {
         "source_commit": FINAL_COMMIT,
-        "source": {"bytes": 6_629_089_280, "sha256": "cf533108be38b84f8c2ac4de536d6196e16c701c84f9a70645d05810db6d7f3b"},
+        "source": {"bytes": 6_630_123_520, "sha256": "127d81f130c6782c9329844b0992adb5b76b5f5e7d5258f3d95d1360e620db10"},
         "workspace_manifest": {"path": "docs/unified-ops/results/0362yh/images/after/Cargo.toml", "bytes": 10_672, "sha256": "f5ec007892023b38f1deaef1ce20714db58b58448a3bea088be3b847b84570de"},
         "package_manifest": {"path": "docs/unified-ops/results/0362yh/images/after/litchi-ops.Cargo.toml", "bytes": 13_489, "sha256": "b22e9ff3a31366cd0bf85bd0d65b8add84cb89c612535ae905ea578b9a0eaf1d"},
         "toolchain": {"path": "docs/unified-ops/results/0362yh/images/after/rust-toolchain.toml", "bytes": 86, "sha256": TOOLCHAIN_SHA256},

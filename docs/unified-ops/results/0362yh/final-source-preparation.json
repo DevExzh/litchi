@@ -1,0 +1,96 @@
+{
+  "schema": "litchi_w8_final_source_preparation.v1",
+  "status": "candidate_protocol_only",
+  "acceptance_claim": false,
+  "build_performed": false,
+  "timing_performed": false,
+  "inventory_review_complete": false,
+  "baseline": {
+    "source_commit": "f2bbbc8d07ab5da26c180f1ff74813d39f632d54",
+    "source_archive": {
+      "bytes": 6614528000,
+      "sha256": "de625729ec8e6f8055e619443ad31bf1a91719cd31465975f951d54dbc1c2280"
+    },
+    "lock": {
+      "bytes": 139441,
+      "sha256": "1b9b10ae7a9fd65db3b8b29a5bedad1aa560473c10b462f8a7d654c169335b2c"
+    },
+    "source_assembly": {
+      "overlay": "consumer_only_compatibility_adapter",
+      "adapter_patch": {
+        "bytes": 153482,
+        "sha256": "3e05d33946c7a9a2fea5c84cda33c799fbf8cd3c92fbcf890812736641ed01cd"
+      }
+    },
+    "projection": {
+      "bytes": 145931,
+      "sha256": "b070ddb516a0223f9f21509de6564c7c5690d26e955047a922d4d837b7522335"
+    }
+  },
+  "candidate": {
+    "source_commit": "49c25ef67f62a8bb943e7c6a0bf464e49ae87d07",
+    "source_archive": {
+      "bytes": 6630123520,
+      "sha256": "127d81f130c6782c9329844b0992adb5b76b5f5e7d5258f3d95d1360e620db10"
+    },
+    "source_assembly": {
+      "overlay": "none",
+      "bytes": 499,
+      "sha256": "9483fafa50bc30de029a824eca2b1fb2a8ad288d1cb589118bc98e9d0b0a9f13"
+    },
+    "lock": {
+      "bytes": 139591,
+      "sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6"
+    },
+    "projection": {
+      "bytes": 146453,
+      "sha256": "586cbbe06a8591322488a9650bbc098ad4b9f2f137c95e2ea80617728cbcd2e5"
+    }
+  },
+  "shared_workload": {
+    "probe": {
+      "bytes": 75035,
+      "sha256": "21c8e3833c96411a612a2631f98093bd70cf0a5c28b2952c3d15873f464e54b0"
+    },
+    "fixture": {
+      "bytes": 4231,
+      "sha256": "b7439d899a940b4135dd44081554a4aa9d7e70c19e2ccd3339440baad5ca7e09"
+    },
+    "target": "x86_64-unknown-linux-gnu",
+    "profile": "release",
+    "all_features": true,
+    "route_count": 109,
+    "toolchain_sha256": "e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310"
+  },
+  "graph": {
+    "registry_package_count": 518,
+    "registry_identities_checksums_dependencies_equal": true,
+    "local_edge_additions": [
+      {"package": "litchi-iwa-core", "added": ["smallvec 1.16.3"]},
+      {"package": "litchi-odraw", "added": ["litchi-core"]},
+      {"package": "litchi-ops", "added": ["litchi-biff", "litchi-ograph", "sha2 0.11.1", "soapberry-zip"]},
+      {"package": "litchi-ppt", "added": ["siphasher"]},
+      {"package": "litchi-xlsb", "added": ["sha2 0.11.1"]},
+      {"package": "litchi-xlsx", "added": ["sha2 0.11.1"]}
+    ],
+    "removed_edges": []
+  },
+  "stale_inputs_rejected": [
+    {
+      "kind": "f2_endpoint_receipt",
+      "adapter_patch": {
+        "bytes": 153188,
+        "sha256": "a6ffa1cc542caba1bac4d57fdf9a8e614300c8f3ac9a60716fe86dde74c7175e"
+      },
+      "reason": "does not bind the reviewed 153482-byte consumer-only adapter"
+    },
+    {
+      "kind": "b673_f2_workspace",
+      "lock": {
+        "bytes": 139591,
+        "sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6"
+      },
+      "reason": "uses the candidate lock instead of the immutable historical f2 lock"
+    }
+  ]
+}

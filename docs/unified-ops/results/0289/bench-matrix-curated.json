@@ -3057,7 +3057,7 @@
   },
   {
    "record": "0362yh",
-   "reason": "W8 original-to-final projection policy, immutable endpoint capability and pair-receipt protocol checks only; no Cargo build, native qualification, ABBA timing, or leaf-versus-unified performance pair. The f6fe pins remain diagnostic until the final production source freeze is selected."
+   "reason": "W8 original-to-final projection policy, immutable endpoint capability and pair-receipt protocol checks only; no Cargo build, native qualification, ABBA timing, or leaf-versus-unified performance pair. Candidate source pin 49c remains protocol-only pending final source inventory review, endpoint builds, untimed validation, pair receipt, and native ABBA review."
   },
   {
    "record": "0362uva",
