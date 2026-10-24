@@ -410,7 +410,9 @@ executed in continuously buildable, dependency-ordered phases per ADR 0008.
   `WorkbookModel::{Owned, Source}`. Wiring Edit transactions requires no
   re-open.
 
-### 16.3 Obstacles to the flat `File` enum (all addressed in M0a)
+### 16.3 Obstacles to the flat `File` enum (identified in M0a)
+
+The following migration issues were resolved through M0a and subsequent waves.
 
 1. Two `Result` types (typed `litchi_core::Error` vs the sheet family's
    `Box<dyn Error>`) unify to the typed error — breaking, accepted per
@@ -419,16 +421,16 @@ executed in continuously buildable, dependency-ordered phases per ADR 0008.
    mapper).
 3. Per-variant `#[cfg]` feature gates plus nested unix/windows target gates
    carry over mechanically.
-4. Divergent open options (docx/pptx `SourceLimits`, doc `OpenOptions`, iwork
-   `Options`) converge on one unified `OpenOptions` (enum of per-format
-   options; default `open()` covers the common case) — exact shape is an open
-   micro-decision.
+4. Divergent open options converge on the non-exhaustive unified `OpenOptions`
+   struct, with common controls and per-format fields. Default `open()` covers
+   the common case; configured opens use the same options contract (0351).
 5. The CSV/TSV trait-object path exits the enum (§16.1).
 6. Sidecar state relocation (§16.2).
 7. Eager/source duality normalizes per format following the sheet adapter
    pattern (one enum variant, two-state owner inside).
-8. Legacy `Doc`/`Ppt` variants currently drop their packages after open —
-   retention is an open micro-decision.
+8. Legacy `Doc`/`Ppt` variants retain the leaf's editable owner/source by
+   default. `OpenOptions::retain_source(false)` explicitly releases the
+   retained source and makes later edits unavailable.
 
 ### 16.4 Leaf access after migration
 
@@ -458,20 +460,23 @@ executed in continuously buildable, dependency-ordered phases per ADR 0008.
 - Gates updated in the same commits: `tools/crate_boundaries.json` (new
   `litchi → litchi-ops` edge), the ADR 0024 inventory,
   `tools/non_iwork_gate.py` (`EXPECTED_BULK_PACKAGES` 46 → 47), and
-  `tools/check_iwork_public_api.py` if the iwork surface moves. Note there is
-  no checked-in API snapshot gate for the non-iWork facade today (the rustdoc
-  gates cover iwork only); the §14 registry/schema golden snapshots close
-  that hole going forward.
+  `tools/check_iwork_public_api.py` if the iwork surface moves. The rustdoc
+  glossary gate now checks registered non-iWork and iWork profiles through
+  `tools/check_api_glossary.py`. `tools/final_api_inventory.py` supplies the
+  separate inventory of all 68 direct libraries; its fresh final capture
+  and dispositions remain required. The §14 registry/schema goldens remain
+  part of the gate.
 
-### 16.6 Decision points needing sign-off
+### 16.6 Settled migration decisions
 
-- **Legacy package retention**: whether the `Doc`/`Ppt` variants of `File`
-  retain their source-backed packages at open (memory cost) to prepare for
-  the legacy write wave, or stay read-models until that wave arrives.
-- **Unified `OpenOptions` shape**: enum-of-per-format-options vs
-  default-`open()`-plus-per-format-escape-hatches.
-- **iwork facade timing**: when `litchi::iwork::Document` merges into the
-  unified surface (at the iWork wave vs earlier).
+- **Legacy package retention**: ADR 0033 §4 requires each `File` variant,
+  including legacy binaries, to retain its editable owner by default.
+  The implemented source-release option is explicit (§16.3).
+- **Unified `OpenOptions` shape**: the non-exhaustive struct carries common
+  controls and per-format policies; options enter through configured open
+  and edit entry points (0351).
+- **iWork facade timing**: record 0306 retired `litchi::iwork::Document`;
+  `File::{Pages, Keynote, Numbers}` is the unified surface (§16.4).
 
 ## Open micro-decisions (deferred to implementation)
 
@@ -481,8 +486,6 @@ executed in continuously buildable, dependency-ordered phases per ADR 0008.
   join/three-way composition of independent edits gets a public verb (the
   machinery exists in the per-format durable layers; §14 currently gates it
   only as an acceptance criterion).
-- The three migration decision points in §16.6 (legacy package retention,
-  unified `OpenOptions` shape, iwork facade timing).
 - Error-code closed list finalized against OfficeCLI's **full** taxonomy (an
   earlier draft of this section listed only a subset): `not_found`,
   `path_not_found`, `zero_matches`, `out_of_range`, `range_target_not_found`,

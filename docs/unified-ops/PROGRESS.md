@@ -3473,13 +3473,21 @@ See [0063](0063-source-pptx-modern-comments.md).
   unchanged wrappers, process/cap checks and active runner hash. Adoption
   waits until the currently running diagnostic gate exits.
 
-  Cleanups twenty-eight and twenty-nine remove three merged leaves after
+  Cleanups twenty-eight through thirty-one remove eight merged leaves after
   independent payload/ref/ancestry/restore-layout verification. Branches,
-  ignored locks, targets and validation evidence remain. Removing 126 exact
+  ignored locks, targets and validation evidence remain, including the
+  rejected corpus leaf's local cache. The external corpus target's historical
+  size snapshot is explicitly superseded by the approved rerun; all 14,437
+  cleanup-thirty payloads and 94 hardlink groups verify. Removing 126 exact
   duplicate build executables restores 3,712,220,600 bytes of gate headroom;
   benchmark/profile outputs remain intact. The immutable ODG baseline
   capture completes with all 460,379 entries, recorded externally under
   0362ugy; no build or native timing result is inferred from it.
+
+  A documentation audit reconciles the settled legacy source-retention and
+  OpenOptions decisions in design §16.3/§16.6 and removes the stale claim in
+  §16.5 that rustdoc gates cover only iWork. Final qualification and inventory
+  requirements remain explicit.
 
   Source integration remains staging. Strict all-target/all-feature checks
   for the 19 native gate packages and ODS pass on f6fe; the remaining native
