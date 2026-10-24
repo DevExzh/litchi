@@ -10,8 +10,9 @@
   `signed_native_qualification.py`, `validate_signed_native.py` and their
   failure-case tests. `signed_native_memory.py` is the external allocation
   collector and `signed_native_finalize.py` is the only completion collector:
-  a latency manifest can be inspected on its own, but the final status cannot
-  become `complete` without the endpoint-bound memory summary. The probe is an
+  a latency manifest ends at `status = latency_complete` and can be inspected
+  on its own, but the final status cannot become `complete` without the
+  endpoint-bound memory summary. The probe is an
   external qualification consumer; it does not change a format crate or the
   frozen 109-route W8 probe.
 
@@ -160,19 +161,26 @@ requires the matrix's expected disposition.
    snapshots before, during and after each child. Children have explicit
    timeout, RSS and stdout/stderr caps; every timeout or guard failure kills
    the process group, waits for it, records the failed-after receipt and then
-   checks the host again. Each route calibrates to at least 500 ms, rejects
-   samples below 150 ms, and runs at least five outer blocks. Final-only
-   blocks are exactly leaf, facade, facade, leaf.
+   checks the host again. Validation binds the exact taskset/mode/route argv,
+   raw stdout object and retained output-byte/RSS values to that receipt; a
+   child receipt with a changed route, JSON, cap or failed-after field is
+   rejected. Each route calibrates to at least 500 ms, rejects samples below
+   150 ms, and runs at least five outer blocks. Final-only blocks are exactly
+   leaf, facade, facade, leaf.
 5. Allocation evidence is separate and per fixture. The probe introduces no
    allocator or `unsafe` code. The external memory runner profiles the same
    uninstrumented final binary with identical setup for each fixture, route
    and call count `1`, `8` and `128`; its scope is explicitly the whole
    process, including fixture open and setup, and profiler overhead is
    reported. It runs `/usr/bin/heaptrack --record-only` followed by the
-   reviewed `tools/perf_resource_profile.py` parser (or an owner-approved
-   valgrind Massif equivalent), keeps raw captures outside Git, and commits
-   only hash-bound reduced summaries. These profiles are bounded-retention
-   evidence, not native latency samples.
+   reviewed `tools/perf_resource_profile.py` parser (SHA-256
+   `e80c9706189f942ccce645685dafea8612e5e0dc6ea5e659bd1490ffc3256cc4`; an
+   owner-approved valgrind Massif equivalent would require a new reviewed
+   parser identity), keeps raw captures outside Git, and commits only
+   hash-bound reduced summaries. The validator recomputes every retained
+   allocation/heap/RSS metric from the retained print and histogram and
+   requires the final memory summary itself to be canonical JSON. These
+   profiles are bounded-retention evidence, not native latency samples.
 
 6. Run `signed_native_finalize.py` only after both receipts have been checked.
    It revalidates endpoint archives, role-specific lock closures and registry

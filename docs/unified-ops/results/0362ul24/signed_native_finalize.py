@@ -31,6 +31,10 @@ def canonical(value: object) -> bytes:
 
 
 def load(path: Path, label: str) -> dict[str, Any]:
+    path = Path(path)
+    VALIDATE.reject_symlink_path(path, label)
+    if not path.is_file():
+        raise ValueError(f"{label} is not a regular file")
     return VALIDATE.load_json(path.resolve(), label)
 
 
@@ -41,12 +45,19 @@ def collect(
     after_manifest: Path,
     output: Path,
 ) -> dict[str, Any]:
+    before_manifest = Path(before_manifest)
+    after_manifest = Path(after_manifest)
+    VALIDATE.reject_symlink_path(before_manifest, "before endpoint manifest")
+    VALIDATE.reject_symlink_path(after_manifest, "after endpoint manifest")
+    after_manifest_resolved = after_manifest.resolve()
     latency = load(latency_path, "latency qualification")
     memory = load(memory_path, "memory qualification")
     VALIDATE.require_external(latency_path, "latency qualification")
     VALIDATE.require_external(memory_path, "memory qualification")
-    before = VALIDATE.validate_endpoint_manifest(before_manifest.resolve(), "before")
-    after = VALIDATE.validate_endpoint_manifest(after_manifest.resolve(), "after")
+    if VALIDATE.canonical(memory) != memory_path.read_bytes():
+        raise ValueError("memory qualification is not canonical JSON")
+    before = VALIDATE.validate_endpoint_manifest(before_manifest, "before")
+    after = VALIDATE.validate_endpoint_manifest(after_manifest, "after")
     pair = VALIDATE.validate_pair(before, after)
     VALIDATE.validate_abba(latency)
     fixture_manifest = VALIDATE.load_json(Path(after["fixtures"]["path"]), "after fixtures")
@@ -56,11 +67,19 @@ def collect(
     memory_routes = tuple(sorted(VALIDATE.FINAL_ONLY))
     if not isinstance(memory_rows, list) or {row.get("route") for row in memory_rows if isinstance(row, dict)} != set(memory_routes):
         raise ValueError("memory summary does not contain every final signed timed route")
-    if memory.get("endpoint", {}).get("manifest") != str(after_manifest.resolve()):
+    if memory.get("endpoint", {}).get("manifest") != str(after_manifest_resolved):
         raise ValueError("memory summary endpoint manifest differs from final endpoint")
-    VALIDATE.validate_memory_summary(memory, after, fixture_names, memory_routes)
+    VALIDATE.validate_memory_summary(
+        memory,
+        after,
+        fixture_names,
+        memory_routes,
+        VALIDATE.artifact(after_manifest),
+    )
     if memory.get("source") != latency.get("provenance", {}).get("pair"):
         raise ValueError("memory and latency endpoint pair provenance differs")
+    output = Path(output)
+    VALIDATE.reject_symlink_path(output, "final qualification output")
     output = output.resolve()
     repository = HERE.parents[3].resolve()
     if output == repository or repository in output.parents:
@@ -72,17 +91,17 @@ def collect(
         "status": "complete",
         "source": pair,
         "before": {
-            "manifest": VALIDATE.artifact(before_manifest.resolve()),
+            "manifest": VALIDATE.artifact(before_manifest),
             "source_commit": before["source_commit"],
             "binary": before["binary"],
         },
         "after": {
-            "manifest": VALIDATE.artifact(after_manifest.resolve()),
+            "manifest": VALIDATE.artifact(after_manifest),
             "source_commit": after["source_commit"],
             "binary": after["binary"],
         },
-        "latency": VALIDATE.artifact(latency_path.resolve()),
-        "memory": VALIDATE.artifact(memory_path.resolve()),
+        "latency": VALIDATE.artifact(latency_path),
+        "memory": VALIDATE.artifact(memory_path),
         "memory_status": memory["status"],
         "routes": len(latency["routes"]),
         "memory_rows": len(memory["rows"]),

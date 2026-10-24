@@ -27,8 +27,13 @@ TARGET_NS = 500_000_000
 MIN_SAMPLE_NS = 150_000_000
 MAX_CALLS = 2_000_000
 MIN_ABBA_ROUNDS = 5
+CHILD_OUTPUT_LIMIT = 4 * 1024 * 1024
+CHILD_RSS_LIMIT = 20 * 1024 * 1024 * 1024
+MEMORY_OUTPUT_LIMIT = 4 * 1024 * 1024
+MEMORY_RSS_LIMIT = 20 * 1024 * 1024 * 1024
 BASELINE_SOURCE_COMMIT = "f2bbbc8d07ab5da26c180f1ff74813d39f632d54"
 CANDIDATE_SOURCE_COMMIT = "472b6705475b073e7fe08f6e11ee17fb1e29f838"
+REVIEWED_PARSER_SHA256 = "e80c9706189f942ccce645685dafea8612e5e0dc6ea5e659bd1490ffc3256cc4"
 
 ROUTES = (
     "signed_leaf/noop_commit",
@@ -94,6 +99,7 @@ REVIEWED_W8_POLICY_JSON = REPOSITORY / "docs/unified-ops/results/0362yh/original
 REVIEWED_W8_BEFORE_PROJECTION = (
     REPOSITORY / "docs/unified-ops/results/0362yh/images/before/projection.json"
 )
+_REVIEWED_PARSER_MODULE: Any | None = None
 REVIEWED_W8_AFTER_PROJECTION = (
     REPOSITORY / "docs/unified-ops/results/0362yh/images/after/projection.json"
 )
@@ -107,7 +113,21 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def reject_symlink_path(path: Path, label: str) -> None:
+    """Reject a path or any existing parent symlink before canonicalizing it."""
+    raw = Path(path)
+    lexical = raw if raw.is_absolute() else Path.cwd() / raw
+    for parent in (lexical, *lexical.parents):
+        try:
+            if parent.is_symlink():
+                raise ValueError(f"{label} may not traverse a symlink: {parent}")
+        except OSError as error:
+            raise ValueError(f"{label} cannot inspect {parent}: {error}") from error
+
+
 def artifact(path: Path) -> dict[str, object]:
+    path = Path(path)
+    reject_symlink_path(path, "artifact")
     path = path.resolve()
     if not path.is_file():
         raise ValueError(f"artifact is not a file: {path}")
@@ -129,6 +149,22 @@ def load_json(path: Path, label: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{label} is not a JSON object")
     return value
+
+
+def recompute_heap_metrics(print_path: Path, histogram_path: Path) -> dict[str, Any]:
+    global _REVIEWED_PARSER_MODULE
+    parser_path = REPOSITORY / "tools/perf_resource_profile.py"
+    if _REVIEWED_PARSER_MODULE is None:
+        spec = importlib.util.spec_from_file_location("reviewed_perf_resource_profile", parser_path)
+        if spec is None or spec.loader is None:
+            raise ValueError("reviewed memory parser cannot be loaded")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _REVIEWED_PARSER_MODULE = module
+    module = _REVIEWED_PARSER_MODULE
+    parsed = module.parse_heaptrack_print(print_path, retained=False)
+    parsed["allocated_bytes"] = module.parse_heaptrack_histogram(histogram_path)
+    return parsed
 
 
 def checked_hash(value: object, label: str) -> str:
@@ -158,6 +194,8 @@ def checked_artifact(row: object, label: str) -> dict[str, object]:
 
 
 def require_external(path: Path, label: str) -> None:
+    path = Path(path)
+    reject_symlink_path(path, label)
     resolved = path.resolve()
     if resolved == REPOSITORY or REPOSITORY in resolved.parents:
         raise ValueError(f"{label} must be outside this checkout")
@@ -227,8 +265,10 @@ def load_fixture_manifest(value: dict[str, Any], label: str = "fixtures") -> dic
             raise ValueError(f"{label}.fixtures[{index}] native target is incomplete")
         labels.add(name)
         formats.add(format_name)
-    if len(formats) != 7:
-        raise ValueError(f"{label} covers {len(formats)} formats, expected 7 signed formats")
+    if formats != set(NATIVE_FORMATS):
+        raise ValueError(
+            f"{label} formats are {sorted(formats)}, expected {sorted(NATIVE_FORMATS)}"
+        )
     return value
 
 
@@ -457,36 +497,41 @@ def _validate_capabilities_receipt(
     evidence = capabilities.get("evidence")
     if not isinstance(evidence, dict) or set(evidence) != set(ROUTES):
         raise ValueError(f"{label}.capabilities_receipt evidence is incomplete")
+    cpu = capabilities.get("cpu")
+    if not isinstance(cpu, int):
+        raise ValueError(f"{label}.capabilities_receipt CPU binding is missing")
     endpoint_kind = "before" if endpoint["source_commit"] == BASELINE_SOURCE_COMMIT else "final"
     for route in ROUTES:
         child_artifact = _capability_receipt_path(evidence[route], f"{label}.{route}.receipt")
         require_external(Path(str(child_artifact["path"])), f"{label}.{route}.receipt")
-        child = load_json(Path(str(child_artifact["path"])), f"{label}.{route}.receipt")
-        if child.get("schema") != "litchi_signed_native_child.v1" or child.get("mode") != "validate":
-            raise ValueError(f"{label}.{route}: capability child receipt is invalid")
-        if child.get("route") != route or child.get("binary") != endpoint["binary"]:
-            raise ValueError(f"{label}.{route}: capability child identity differs")
-        if child.get("fixture_root") != endpoint["fixture_root"] or child.get("fixture_manifest") != endpoint["fixtures"]:
-            raise ValueError(f"{label}.{route}: capability child fixture binding differs")
-        if child.get("exit_code") != 0 or child.get("timed_out") is not False:
-            raise ValueError(f"{label}.{route}: capability child did not finish successfully")
-        if child.get("guard_error") is not None or child.get("after_guard_error") is not None:
-            raise ValueError(f"{label}.{route}: capability child guard failed")
-        failed_after = child.get("failed_after")
-        if not isinstance(failed_after, dict) or failed_after.get("process_group_empty") is not True:
-            raise ValueError(f"{label}.{route}: capability child process group is not closed")
-        stdout = checked_artifact(child.get("stdout"), f"{label}.{route}.stdout")
-        require_external(Path(str(stdout["path"])), f"{label}.{route}.stdout")
-        result = load_json(Path(str(stdout["path"])), f"{label}.{route}.stdout")
-        if result.get("route") != route:
-            raise ValueError(f"{label}.{route}: capability stdout route differs")
-        validate_correctness_receipt(result, route, endpoint=endpoint_kind)
+        child_path = Path(str(child_artifact["path"]))
+        result = load_json(child_path, f"{label}.{route}.receipt")
+        stdout = result.get("stdout")
+        if not isinstance(stdout, dict):
+            raise ValueError(f"{label}.{route}: capability stdout binding is missing")
+        stdout_path = Path(str(checked_artifact(stdout, f"{label}.{route}.stdout")["path"]))
+        child_value = load_json(stdout_path, f"{label}.{route}.stdout")
+        child_value["_receipt"] = str(child_path)
+        validate_child_receipt(
+            child_value,
+            expected_route=route,
+            expected_mode="validate",
+            expected_calls=None,
+            expected_binary=endpoint["binary"],
+            expected_fixture_root=endpoint["fixture_root"],
+            expected_fixture_manifest=endpoint["fixtures"],
+            expected_cpu=cpu,
+            output_path=child_path.parent,
+            expected_endpoint=endpoint_kind,
+        )
 
 
 def validate_endpoint_manifest(path: Path, label: str) -> dict[str, Any]:
-    path = path.resolve()
-    if path.is_symlink() or not path.is_file():
+    path = Path(path)
+    reject_symlink_path(path, label)
+    if not path.is_file():
         raise ValueError(f"{label} is not a regular endpoint manifest")
+    path = path.resolve()
     require_external(path, label)
     value = load_json(path, label)
     if canonical(value) != path.read_bytes():
@@ -541,7 +586,11 @@ def validate_endpoint_manifest(path: Path, label: str) -> dict[str, Any]:
     source_record = load_json(source_path, f"{label}.source")
     if canonical(source_record) != source_path.read_bytes():
         raise ValueError(f"{label}.source is not canonical JSON")
-    if Path(identity["source_capture"]).resolve() != Path(value["source"]["path"]).resolve():
+    source_capture_path = Path(identity["source_capture"])
+    reject_symlink_path(source_capture_path, f"{label}.source_identity.source_capture")
+    source_artifact_path = Path(value["source"]["path"])
+    reject_symlink_path(source_artifact_path, f"{label}.source")
+    if source_capture_path.resolve() != source_artifact_path.resolve():
         raise ValueError(f"{label}.source_identity.source_capture is not the source artifact")
     for field in ("commit", "source_ref", "source_capture", "source_root", "tree_sha256", "archive", "adapter"):
         source_field = "source_archive" if field == "archive" else field
@@ -628,20 +677,23 @@ def validate_endpoint_manifest(path: Path, label: str) -> dict[str, Any]:
         raise ValueError(f"{label}.fixture_root must be an existing absolute directory")
     root_path = Path(root)
     repository = REPOSITORY
-    if root_path.resolve() == repository or repository in root_path.resolve().parents:
+    reject_symlink_path(root_path, f"{label}.fixture_root")
+    root_resolved = root_path.resolve()
+    if root_resolved == repository or repository in root_resolved.parents:
         raise ValueError(f"{label}.fixture_root must be external to this checkout")
-    if root_path.is_symlink():
-        raise ValueError(f"{label}.fixture_root may not be a symlink")
     expected_manifest = root_path / "docs/unified-ops/results/0362ul24/fixtures.json"
-    if fixtures_path.resolve() != expected_manifest.resolve() or fixtures_path.is_symlink():
+    reject_symlink_path(fixtures_path, f"{label}.fixtures")
+    reject_symlink_path(expected_manifest, f"{label}.expected_fixture_manifest")
+    if fixtures_path.resolve() != expected_manifest.resolve():
         raise ValueError(f"{label}.fixtures is not the manifest the Rust probe loads")
     for index, fixture in enumerate(fixture_value["fixtures"]):
         relative = checked_relative_path(fixture.get("relative_path"), f"{label}.fixtures[{index}].relative_path")
         fixture_path = root_path / relative
-        if fixture_path.is_symlink() or not fixture_path.is_file():
+        reject_symlink_path(fixture_path, f"{label}.fixtures[{index}]")
+        if not fixture_path.is_file():
             raise ValueError(f"{label}.fixtures[{index}] is not a regular staged file")
         resolved = fixture_path.resolve()
-        if not resolved.is_relative_to(root_path.resolve()):
+        if not resolved.is_relative_to(root_resolved):
             raise ValueError(f"{label}.fixtures[{index}] escapes fixture_root")
         if sha256(resolved) != fixture["input_sha256"]:
             raise ValueError(f"{label}.fixtures[{index}] input hash differs")
@@ -980,14 +1032,22 @@ def validate_child_receipt(
     expected_fixture_manifest: dict[str, object],
     expected_cpu: int,
     output_path: Path,
+    expected_endpoint: str = "final",
 ) -> dict[str, Any]:
     if not isinstance(value, dict) or not isinstance(value.get("_receipt"), str):
         raise ValueError(f"{expected_route}: child receipt binding is missing")
-    receipt_path = Path(value["_receipt"]).resolve()
+    if expected_mode not in {"validate", "measure", "calibrate"}:
+        raise ValueError(f"{expected_route}: unsupported timed child mode")
+    receipt_raw_path = Path(value["_receipt"])
+    reject_symlink_path(receipt_raw_path, f"{expected_route} child receipt")
+    if not receipt_raw_path.is_file():
+        raise ValueError(f"{expected_route}: child receipt is not a regular file")
+    receipt_path = receipt_raw_path.resolve()
+    output_path = Path(output_path)
+    reject_symlink_path(output_path, f"{expected_route} qualification output")
+    output_path = output_path.resolve()
     if not receipt_path.is_relative_to(output_path):
         raise ValueError(f"{expected_route}: child receipt escapes qualification output")
-    if receipt_path.is_symlink() or not receipt_path.is_file():
-        raise ValueError(f"{expected_route}: child receipt is not a regular file")
     receipt = load_json(receipt_path, f"{expected_route} child receipt")
     if receipt.get("schema") != "litchi_signed_native_child.v1":
         raise ValueError(f"{expected_route}: child receipt schema is invalid")
@@ -995,8 +1055,8 @@ def validate_child_receipt(
         raise ValueError(f"{expected_route}: child receipt identity differs")
     if expected_calls is not None and receipt.get("calls") != expected_calls:
         raise ValueError(f"{expected_route}: child receipt call count differs")
-    if expected_calls is None and expected_mode == "calibrate" and receipt.get("calls") is not None:
-        raise ValueError(f"{expected_route}: calibration child unexpectedly has a measure call count")
+    if expected_calls is None and expected_mode in {"validate", "calibrate"} and receipt.get("calls") is not None:
+        raise ValueError(f"{expected_route}: non-measure child unexpectedly has a measure call count")
     if receipt.get("binary") != expected_binary:
         raise ValueError(f"{expected_route}: child receipt binary differs")
     if receipt.get("fixture_root") != expected_fixture_root:
@@ -1004,13 +1064,27 @@ def validate_child_receipt(
     if receipt.get("fixture_manifest") != expected_fixture_manifest:
         raise ValueError(f"{expected_route}: child fixture manifest differs")
     command = receipt.get("command")
+    expected_command = [
+        "taskset",
+        "-c",
+        str(expected_cpu),
+        str(expected_binary["path"]),
+        "--mode",
+        expected_mode,
+        "--route",
+        expected_route,
+        "--blocks",
+        "1",
+    ]
+    if expected_mode == "measure":
+        if expected_calls is None:
+            raise ValueError(f"{expected_route}: measure child call count is missing")
+        expected_command.extend(("--calls", str(expected_calls)))
     if (
         not isinstance(command, list)
-        or len(command) < 4
-        or command[:3] != ["taskset", "-c", str(expected_cpu)]
-        or str(command[3]) != str(expected_binary["path"])
+        or command != expected_command
     ):
-        raise ValueError(f"{expected_route}: child CPU command is not bound")
+        raise ValueError(f"{expected_route}: child argv is not bound to the expected route/mode")
     if receipt.get("exit_code") != 0 or receipt.get("timed_out") is not False:
         raise ValueError(f"{expected_route}: child did not finish successfully")
     if receipt.get("guard_error") is not None or receipt.get("after_guard_error") is not None:
@@ -1018,8 +1092,14 @@ def validate_child_receipt(
     if (
         not isinstance(receipt.get("process_group"), int)
         or receipt["process_group"] <= 0
+        or not isinstance(receipt.get("rss_max_bytes"), int)
+        or receipt["rss_max_bytes"] < 0
+        or receipt["rss_max_bytes"] > CHILD_RSS_LIMIT
         or not isinstance(receipt.get("aggregate_rss_max_bytes"), int)
         or receipt["aggregate_rss_max_bytes"] < 0
+        or receipt["aggregate_rss_max_bytes"] > CHILD_RSS_LIMIT
+        or receipt.get("rss_limit_bytes") != CHILD_RSS_LIMIT
+        or receipt.get("output_limit_bytes") != CHILD_OUTPUT_LIMIT
     ):
         raise ValueError(f"{expected_route}: aggregate process guard is missing")
     failed_after = receipt.get("failed_after")
@@ -1028,12 +1108,22 @@ def validate_child_receipt(
         or failed_after.get("process_group_empty") is not True
         or failed_after.get("guard_error") is not None
         or failed_after.get("after_guard_error") is not None
+        or failed_after.get("timed_out") is not False
+        or not isinstance(failed_after.get("rss_max_bytes"), int)
+        or failed_after["rss_max_bytes"] != receipt.get("rss_max_bytes")
+        or failed_after["rss_max_bytes"] > CHILD_RSS_LIMIT
+        or failed_after.get("rss_limit_bytes") != CHILD_RSS_LIMIT
+        or failed_after.get("output_limit_bytes") != CHILD_OUTPUT_LIMIT
     ):
         raise ValueError(f"{expected_route}: failed-after process-group receipt is incomplete")
     snapshots = receipt.get("host_snapshots")
     if not isinstance(snapshots, list) or len(snapshots) < 2:
         raise ValueError(f"{expected_route}: child host snapshots are incomplete")
-    if not isinstance(receipt.get("during_snapshots"), int) or receipt["during_snapshots"] < 1:
+    if (
+        not isinstance(receipt.get("during_snapshots"), int)
+        or receipt["during_snapshots"] < 1
+        or len(snapshots) != receipt["during_snapshots"] + 2
+    ):
         raise ValueError(f"{expected_route}: child has no during snapshot")
     for index, snapshot in enumerate(snapshots):
         snapshot_artifact = checked_artifact(snapshot, f"{expected_route}.host[{index}]")
@@ -1042,16 +1132,36 @@ def validate_child_receipt(
         host = load_json(Path(snapshot_artifact["path"]), f"{expected_route}.host[{index}]")
         if host.get("blockers") != []:
             raise ValueError(f"{expected_route}: host snapshot has blockers")
+    outputs: dict[str, dict[str, object]] = {}
     for name in ("stdout", "stderr"):
         child_output = checked_artifact(receipt.get(name), f"{expected_route}.{name}")
         if not Path(str(child_output["path"])).is_relative_to(output_path):
             raise ValueError(f"{expected_route}: child output escapes qualification output")
+        outputs[name] = child_output
     failed_after = receipt["failed_after"]
     for key in ("stdout_bytes", "stderr_bytes"):
-        if not isinstance(failed_after.get(key), int) or failed_after[key] > CHILD_OUTPUT_LIMIT:
+        output_name = key.removesuffix("_bytes")
+        if (
+            not isinstance(failed_after.get(key), int)
+            or failed_after[key] > CHILD_OUTPUT_LIMIT
+            or failed_after[key] != outputs[output_name]["bytes"]
+        ):
             raise ValueError(f"{expected_route}: failed-after output cap is missing")
     if failed_after.get("exit_code") != receipt.get("exit_code"):
         raise ValueError(f"{expected_route}: failed-after exit code differs")
+    if failed_after.get("aggregate_rss_max_bytes") != receipt.get("aggregate_rss_max_bytes"):
+        raise ValueError(f"{expected_route}: failed-after RSS receipt differs")
+    stdout_value = load_json(Path(str(outputs["stdout"]["path"])), f"{expected_route}.stdout")
+    expected_value = dict(value)
+    expected_value.pop("_receipt", None)
+    if stdout_value != expected_value:
+        raise ValueError(f"{expected_route}: child stdout does not match the bound route result")
+    if expected_mode == "measure":
+        validate_measure(stdout_value, expected_route, expected_calls or 0)
+    elif expected_mode == "calibrate":
+        validate_calibration(stdout_value, expected_route)
+    else:
+        validate_correctness_receipt(stdout_value, expected_route, endpoint=expected_endpoint)
     if receipt_path.stat().st_size <= 0:
         raise ValueError(f"{expected_route}: child receipt is empty")
     return receipt
@@ -1060,8 +1170,8 @@ def validate_child_receipt(
 def validate_abba(manifest: dict[str, Any]) -> None:
     if manifest.get("schema") != "litchi_signed_native_qualification.v1":
         raise ValueError("qualification manifest schema is invalid")
-    if manifest.get("status") != "complete":
-        raise ValueError("qualification manifest is not complete")
+    if manifest.get("status") != "latency_complete":
+        raise ValueError("qualification manifest is not a complete latency receipt")
     rounds = manifest.get("rounds")
     if not isinstance(rounds, int) or rounds < MIN_ABBA_ROUNDS:
         raise ValueError("qualification needs at least five ABBA rounds")
@@ -1071,8 +1181,10 @@ def validate_abba(manifest: dict[str, Any]) -> None:
     if not isinstance(output, str) or not Path(output).is_absolute() or not Path(output).is_dir():
         raise ValueError("qualification output directory is not bound")
     repository = REPOSITORY
-    output_path = Path(output).resolve()
-    if Path(output).is_symlink() or output_path == repository or repository in output_path.parents:
+    output_raw_path = Path(output)
+    reject_symlink_path(output_raw_path, "qualification output")
+    output_path = output_raw_path.resolve()
+    if output_path == repository or repository in output_path.parents:
         raise ValueError("qualification output must be external to this checkout")
     provenance = manifest.get("provenance")
     if not isinstance(provenance, dict):
@@ -1267,7 +1379,11 @@ def _finite_ratio(value: object, expected: float, route: str) -> None:
 
 
 def validate_memory_summary(
-    value: dict[str, Any], endpoint: dict[str, Any], fixture_names: set[str], routes: tuple[str, ...]
+    value: dict[str, Any],
+    endpoint: dict[str, Any],
+    fixture_names: set[str],
+    routes: tuple[str, ...],
+    expected_manifest_artifact: dict[str, object] | None = None,
 ) -> None:
     if value.get("schema") != "litchi_signed_native_memory.v1":
         raise ValueError("memory summary schema is invalid")
@@ -1283,8 +1399,10 @@ def validate_memory_summary(
     if not isinstance(raw_root, str) or not Path(raw_root).is_absolute():
         raise ValueError("memory raw_root must be absolute")
     repository = REPOSITORY
-    raw_path = Path(raw_root).resolve()
-    if Path(raw_root).is_symlink() or not raw_path.is_dir() or raw_path == repository or repository in raw_path.parents:
+    raw_root_path = Path(raw_root)
+    reject_symlink_path(raw_root_path, "memory raw artifacts")
+    raw_path = raw_root_path.resolve()
+    if not raw_path.is_dir() or raw_path == repository or repository in raw_path.parents:
         raise ValueError("memory raw artifacts must be outside the repository")
     rows = value.get("rows")
     if not isinstance(rows, list):
@@ -1297,11 +1415,13 @@ def validate_memory_summary(
         raise ValueError("memory endpoint provenance is missing")
     manifest_artifact = checked_artifact(endpoint_value.get("manifest_artifact"), "memory endpoint manifest")
     require_external(Path(str(manifest_artifact["path"])), "memory endpoint manifest")
-    if manifest_artifact != endpoint.get("manifest_artifact", manifest_artifact):
-        # Callers may provide the validated endpoint without a manifest field;
-        # in that case the artifact was still checked above.
-        if endpoint.get("manifest_artifact") is not None:
-            raise ValueError("memory endpoint manifest differs")
+    if expected_manifest_artifact is None:
+        raise ValueError("memory endpoint manifest must be bound to the validated endpoint path")
+    expected_manifest = checked_artifact(expected_manifest_artifact, "validated endpoint manifest")
+    if manifest_artifact != expected_manifest:
+        raise ValueError("memory endpoint manifest differs from the validated endpoint")
+    if endpoint_value.get("manifest") != expected_manifest["path"]:
+        raise ValueError("memory endpoint manifest path differs from its artifact")
     if endpoint_value.get("source_commit") != CANDIDATE_SOURCE_COMMIT:
         raise ValueError("memory endpoint source commit is not the final capture")
     if endpoint_value.get("binary") != endpoint["binary"]:
@@ -1314,8 +1434,12 @@ def validate_memory_summary(
     if not isinstance(tooling, dict) or not isinstance(tooling.get("heaptrack"), str) or not isinstance(tooling.get("heaptrack_print"), str):
         raise ValueError("memory profiler tool provenance is missing")
     parser_artifact = checked_artifact(tooling.get("parser"), "memory parser")
-    if not parser_artifact["path"].endswith("tools/perf_resource_profile.py"):
-        raise ValueError("memory parser is not the reviewed resource parser")
+    reviewed_parser = (REPOSITORY / "tools/perf_resource_profile.py").resolve()
+    if (
+        Path(str(parser_artifact["path"])) != reviewed_parser
+        or parser_artifact["sha256"] != REVIEWED_PARSER_SHA256
+    ):
+        raise ValueError("memory parser is not the pinned reviewed resource parser")
     expected = {(name, route, calls) for name in fixture_names for route in routes for calls in (1, 8, 128)}
     observed: set[tuple[str, str, int]] = set()
     for index, row in enumerate(rows):
@@ -1334,22 +1458,11 @@ def validate_memory_summary(
             raise ValueError(f"memory row {index} has a different scope")
         if row.get("binary") != endpoint["binary"]:
             raise ValueError(f"memory row {index} is bound to a different binary")
-        command = row.get("command")
-        cpu = value.get("cpu")
-        if (
-            not isinstance(cpu, int)
-            or not isinstance(command, list)
-            or len(command) < 8
-            or command[:3] != ["/usr/bin/heaptrack", "--record-only", "-o"]
-            or command[4:7] != ["taskset", "-c", str(cpu)]
-            or str(command[7]) != str(endpoint["binary"]["path"])
-        ):
-            raise ValueError(f"memory row {index} CPU/profiler command is not bound")
         if (
             not isinstance(row.get("rss_max_bytes"), int)
             or row["rss_max_bytes"] < 0
-            or row["rss_max_bytes"] > 20 * 1024 * 1024 * 1024
-            or row.get("rss_limit_bytes") != 20 * 1024 * 1024 * 1024
+            or row["rss_max_bytes"] > MEMORY_RSS_LIMIT
+            or row.get("rss_limit_bytes") != MEMORY_RSS_LIMIT
         ):
             raise ValueError(f"memory row {index} RSS cap receipt is invalid")
         if (
@@ -1357,14 +1470,40 @@ def validate_memory_summary(
             or row["process_group"] <= 0
             or not isinstance(row.get("aggregate_rss_max_bytes"), int)
             or row["aggregate_rss_max_bytes"] < 0
+            or row["aggregate_rss_max_bytes"] > MEMORY_RSS_LIMIT
+            or row["aggregate_rss_max_bytes"] != row["rss_max_bytes"]
         ):
             raise ValueError(f"memory row {index} process guard is incomplete")
         checked_outputs: dict[str, dict[str, object]] = {}
         for artifact_name in ("capture", "print", "histogram", "stdout", "stderr"):
             checked = checked_artifact(row.get(artifact_name), f"memory row {index}.{artifact_name}")
-            if not Path(str(checked["path"])).resolve().is_relative_to(raw_path):
+            if not Path(str(checked["path"])).is_relative_to(raw_path):
                 raise ValueError(f"memory row {index}.{artifact_name} escapes raw_root")
             checked_outputs[artifact_name] = checked
+        command = row.get("command")
+        cpu = value.get("cpu")
+        capture_path = Path(str(checked_outputs["capture"]["path"]))
+        expected_prefix = capture_path.parent / "heaptrack-profile"
+        expected_command = [
+            "/usr/bin/heaptrack",
+            "--record-only",
+            "-o",
+            str(expected_prefix),
+            "taskset",
+            "-c",
+            str(cpu),
+            str(endpoint["binary"]["path"]),
+            "--mode",
+            "memory",
+            "--route",
+            route,
+            "--calls",
+            str(calls),
+            "--blocks",
+            "1",
+        ]
+        if not isinstance(cpu, int) or command != expected_command:
+            raise ValueError(f"memory row {index} CPU/profiler command is not bound")
         probe = load_json(Path(str(checked_outputs["stdout"]["path"])), f"memory row {index}.stdout")
         probe_rows = probe.get("fixtures")
         if (
@@ -1387,11 +1526,12 @@ def validate_memory_summary(
             or len(snapshots) < 2
             or not isinstance(row.get("during_snapshots"), int)
             or row["during_snapshots"] < 1
+            or len(snapshots) != row["during_snapshots"] + 2
         ):
             raise ValueError(f"memory row {index} host snapshots are incomplete")
         for snapshot in snapshots:
             snapshot_artifact = checked_artifact(snapshot, f"memory row {index}.host")
-            snapshot_path = Path(str(snapshot_artifact["path"])).resolve()
+            snapshot_path = Path(str(snapshot_artifact["path"]))
             if not snapshot_path.is_relative_to(raw_path):
                 raise ValueError(f"memory row {index} host snapshot escapes raw_root")
             snapshot_value = load_json(snapshot_path, f"memory row {index} host snapshot")
@@ -1404,18 +1544,34 @@ def validate_memory_summary(
             or failed_after.get("exit_code") != 0
             or failed_after.get("guard_error") is not None
             or failed_after.get("after_guard_error") is not None
+            or failed_after.get("timed_out") is not False
+            or failed_after.get("rss_max_bytes") != row["rss_max_bytes"]
+            or failed_after.get("rss_limit_bytes") != MEMORY_RSS_LIMIT
+            or failed_after.get("output_limit_bytes") != MEMORY_OUTPUT_LIMIT
             or not isinstance(failed_after.get("stdout_bytes"), int)
             or not isinstance(failed_after.get("stderr_bytes"), int)
-            or failed_after["stdout_bytes"] > 4 * 1024 * 1024
-            or failed_after["stderr_bytes"] > 4 * 1024 * 1024
+            or failed_after["stdout_bytes"] > MEMORY_OUTPUT_LIMIT
+            or failed_after["stderr_bytes"] > MEMORY_OUTPUT_LIMIT
+            or failed_after["stdout_bytes"] != checked_outputs["stdout"]["bytes"]
+            or failed_after["stderr_bytes"] != checked_outputs["stderr"]["bytes"]
+            or failed_after.get("aggregate_rss_max_bytes") != row["aggregate_rss_max_bytes"]
         ):
             raise ValueError(f"memory row {index} failed-after guard receipt is incomplete")
         parsed = row.get("parsed")
         if not isinstance(parsed, dict) or parsed.get("status") != "ok":
             raise ValueError(f"memory row {index} has no parsed heap totals")
+        recomputed = recompute_heap_metrics(
+            Path(str(checked_outputs["print"]["path"])),
+            Path(str(checked_outputs["histogram"]["path"])),
+        )
+        if recomputed.get("status") != "ok":
+            raise ValueError(f"memory row {index} retained heaptrack output is not parseable")
         for metric in ("allocation_calls", "temporary_allocations", "peak_heap_bytes", "peak_rss_bytes", "allocated_bytes"):
             metric_value = parsed.get(metric)
             if not isinstance(metric_value, (int, float)) or not math.isfinite(float(metric_value)) or metric_value < 0:
                 raise ValueError(f"memory row {index}.{metric} is missing or non-finite")
+            recomputed_value = recomputed.get(metric)
+            if recomputed_value != metric_value:
+                raise ValueError(f"memory row {index}.{metric} does not match retained output")
     if observed != expected:
         raise ValueError("memory summary is missing a fixture/route/call tuple")

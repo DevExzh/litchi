@@ -6,6 +6,7 @@ import copy
 import importlib.util
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -222,7 +223,7 @@ def final_only_manifest() -> dict:
     }
 
 
-def validate_shape(manifest: dict) -> None:
+def validate_shape(manifest: dict, *, keep_status: bool = False) -> None:
     output = Path(tempfile.mkdtemp())
     before = {
         "binary": {"path": "before", "sha256": "a" * 64},
@@ -239,7 +240,6 @@ def validate_shape(manifest: dict) -> None:
     pair = {"shared": {}, "baseline_capability_gaps": []}
     manifest.update(
         {
-            "status": "complete",
             "output": str(output),
             "provenance": {
                 "pair": pair,
@@ -255,6 +255,8 @@ def validate_shape(manifest: dict) -> None:
             "guard": "reviewed W8 full /proc guard before/during/after every child",
         }
     )
+    if not keep_status:
+        manifest["status"] = "latency_complete"
     with mock.patch.object(VALIDATE, "checked_artifact", return_value={"path": "x"}), \
         mock.patch.object(VALIDATE, "require_external"), \
         mock.patch.object(VALIDATE, "validate_endpoint_manifest", side_effect=[before, after]), \
@@ -268,6 +270,10 @@ class SignedNativeValidatorTests(unittest.TestCase):
         VALIDATE.load_fixture_manifest(fixture_manifest())
         invalid = fixture_manifest()
         invalid["fixtures"][-1]["format"] = "DOC"
+        with self.assertRaises(ValueError):
+            VALIDATE.load_fixture_manifest(invalid)
+        invalid = fixture_manifest()
+        invalid["fixtures"][0]["format"] = "ODT"
         with self.assertRaises(ValueError):
             VALIDATE.load_fixture_manifest(invalid)
 
@@ -409,6 +415,11 @@ class SignedNativeValidatorTests(unittest.TestCase):
     def test_manifest_rejects_an_incomplete_abba(self) -> None:
         manifest = final_only_manifest()
         validate_shape(manifest)
+        manifest = final_only_manifest()
+        manifest["status"] = "complete"
+        with self.assertRaises(ValueError):
+            validate_shape(manifest, keep_status=True)
+        manifest = final_only_manifest()
         del manifest["routes"][-1]
         with self.assertRaises(ValueError):
             validate_shape(manifest)
@@ -473,6 +484,140 @@ class SignedNativeValidatorTests(unittest.TestCase):
             QUALIFICATION.paired_route("signed_leaf/noop_write"),
             "signed_facade/noop_write",
         )
+
+    def test_child_receipt_happy_path_and_mutations_are_checked(self) -> None:
+        route = "signed_leaf/noop_write"
+        binary = Path(sys.executable).resolve()
+        fixture_manifest = {"path": "/tmp/signed-fixtures.json", "bytes": 1, "sha256": "a" * 64}
+        with tempfile.TemporaryDirectory(prefix="signed-child-receipt-") as directory:
+            output = Path(directory)
+            stdout_path = output / "child.stdout.json"
+            stderr_path = output / "child.stderr"
+            stdout_value = {
+                "schema": VALIDATE.SCHEMA,
+                "route": route,
+                "mode": "measure",
+                "calls": 1,
+                "fixture_count": 1,
+                "elapsed_ns": VALIDATE.MIN_SAMPLE_NS,
+                "operations": 1,
+            }
+            stdout_path.write_text(json.dumps(stdout_value), encoding="utf-8")
+            stderr_path.write_text("", encoding="utf-8")
+            host_paths = []
+            for index in range(3):
+                host = output / f"host-{index}.json"
+                host.write_text('{"blockers": []}\n', encoding="utf-8")
+                host_paths.append(VALIDATE.artifact(host))
+            command = [
+                "taskset",
+                "-c",
+                "1",
+                str(binary),
+                "--mode",
+                "measure",
+                "--route",
+                route,
+                "--blocks",
+                "1",
+                "--calls",
+                "1",
+            ]
+            receipt = {
+                "schema": "litchi_signed_native_child.v1",
+                "label": "happy",
+                "command": command,
+                "binary": VALIDATE.artifact(binary),
+                "route": route,
+                "mode": "measure",
+                "calls": 1,
+                "fixture_root": "/tmp/signed-fixtures",
+                "fixture_manifest": fixture_manifest,
+                "started_ns": 1,
+                "finished_ns": 2,
+                "exit_code": 0,
+                "host_snapshots": host_paths,
+                "during_snapshots": 1,
+                "process_group": 1234,
+                "rss_max_bytes": 0,
+                "aggregate_rss_max_bytes": 0,
+                "timeout_seconds": 300.0,
+                "output_limit_bytes": VALIDATE.CHILD_OUTPUT_LIMIT,
+                "rss_limit_bytes": VALIDATE.CHILD_RSS_LIMIT,
+                "timed_out": False,
+                "guard_error": None,
+                "after_guard_error": None,
+                "failed_after": {
+                    "exit_code": 0,
+                    "guard_error": None,
+                    "after_guard_error": None,
+                    "timed_out": False,
+                    "rss_max_bytes": 0,
+                    "aggregate_rss_max_bytes": 0,
+                    "rss_limit_bytes": VALIDATE.CHILD_RSS_LIMIT,
+                    "output_limit_bytes": VALIDATE.CHILD_OUTPUT_LIMIT,
+                    "process_group_empty": True,
+                    "stdout_bytes": stdout_path.stat().st_size,
+                    "stderr_bytes": stderr_path.stat().st_size,
+                },
+                "stdout": VALIDATE.artifact(stdout_path),
+                "stderr": VALIDATE.artifact(stderr_path),
+            }
+            receipt_path = output / "happy.receipt.json"
+            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            value = dict(stdout_value)
+            value["_receipt"] = str(receipt_path)
+            kwargs = {
+                "expected_route": route,
+                "expected_mode": "measure",
+                "expected_calls": 1,
+                "expected_binary": receipt["binary"],
+                "expected_fixture_root": "/tmp/signed-fixtures",
+                "expected_fixture_manifest": fixture_manifest,
+                "expected_cpu": 1,
+                "output_path": output,
+            }
+            VALIDATE.validate_child_receipt(value, **kwargs)
+
+            stdout_path.write_text(json.dumps({**stdout_value, "route": "signed_facade/noop_write"}), encoding="utf-8")
+            with self.assertRaises(ValueError):
+                VALIDATE.validate_child_receipt(value, **kwargs)
+            stdout_path.write_text(json.dumps(stdout_value), encoding="utf-8")
+            receipt["command"][7] = "signed_facade/noop_write"
+            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                VALIDATE.validate_child_receipt(value, **kwargs)
+            receipt["command"][7] = route
+            receipt["aggregate_rss_max_bytes"] = VALIDATE.CHILD_RSS_LIMIT + 1
+            receipt["failed_after"]["aggregate_rss_max_bytes"] = VALIDATE.CHILD_RSS_LIMIT + 1
+            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                VALIDATE.validate_child_receipt(value, **kwargs)
+            receipt["aggregate_rss_max_bytes"] = 0
+            receipt["failed_after"]["aggregate_rss_max_bytes"] = 0
+            receipt["rss_max_bytes"] = VALIDATE.CHILD_RSS_LIMIT + 1
+            receipt["failed_after"]["rss_max_bytes"] = VALIDATE.CHILD_RSS_LIMIT + 1
+            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                VALIDATE.validate_child_receipt(value, **kwargs)
+            receipt["rss_max_bytes"] = 0
+            receipt["failed_after"]["rss_max_bytes"] = 0
+            receipt["failed_after"]["stdout_bytes"] += 1
+            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                VALIDATE.validate_child_receipt(value, **kwargs)
+            receipt["failed_after"]["stdout_bytes"] = stdout_path.stat().st_size
+            receipt["command"][5] = "validate"
+            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                VALIDATE.validate_child_receipt(value, **kwargs)
+            receipt["command"][5] = "measure"
+            stdout_path.write_text("not-json\n", encoding="utf-8")
+            receipt["stdout"] = VALIDATE.artifact(stdout_path)
+            receipt["failed_after"]["stdout_bytes"] = stdout_path.stat().st_size
+            receipt_path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            with self.assertRaises(ValueError):
+                VALIDATE.validate_child_receipt(value, **kwargs)
 
     def test_memory_summary_rejects_unpaired_call_counts(self) -> None:
         with self.assertRaises(ValueError):

@@ -55,6 +55,8 @@ def sha256(path: Path) -> str:
 
 
 def artifact(path: Path) -> dict[str, object]:
+    path = Path(path)
+    VALIDATE.reject_symlink_path(path, "memory artifact")
     path = path.resolve()
     if not path.is_file():
         raise ValueError(f"artifact is not a file: {path}")
@@ -74,6 +76,8 @@ def tool_version(tool: str) -> str:
 
 
 def outside_git(path: Path) -> None:
+    path = Path(path)
+    VALIDATE.reject_symlink_path(path, "memory external path")
     path = path.resolve()
     try:
         root = Path(
@@ -218,7 +222,7 @@ def run_profile(
                 if guard_error is None:
                     guard_error = str(error)
                 during_path = raw / f"{during_label}.host.json"
-                if during_path.is_file():
+                if during_path.is_file() and not during_path.is_symlink():
                     during_hosts.append(str(during_path.resolve()))
             if guard_error is not None:
                 stop_group(process, process_group)
@@ -247,6 +251,10 @@ def run_profile(
         "guard_error": guard_error,
         "after_guard_error": after_error,
         "timed_out": timed_out,
+        "rss_max_bytes": max_rss,
+        "rss_limit_bytes": RSS_LIMIT,
+        "output_limit_bytes": OUTPUT_LIMIT,
+        "aggregate_rss_max_bytes": max_rss,
         "process_group_empty": not process_group_members(process_group),
         "stdout_bytes": stdout_path.stat().st_size,
         "stderr_bytes": stderr_path.stat().st_size,
@@ -322,16 +330,24 @@ def run_profile(
 
 
 def run(args: argparse.Namespace) -> dict[str, Any]:
-    summary = args.summary.resolve()
-    raw_root = args.raw_root.resolve()
+    summary_path = Path(args.summary)
+    raw_root_path = Path(args.raw_root)
+    VALIDATE.reject_symlink_path(summary_path, "memory summary")
+    VALIDATE.reject_symlink_path(raw_root_path, "memory raw root")
+    summary = summary_path.resolve()
+    raw_root = raw_root_path.resolve()
     outside_git(raw_root)
     outside_git(summary.parent)
     if summary.exists():
         raise ValueError(f"refusing to overwrite summary: {summary}")
-    before = VALIDATE.validate_endpoint_manifest(args.before_manifest.resolve(), "before")
-    after = VALIDATE.validate_endpoint_manifest(args.after_manifest.resolve(), "after")
+    before_manifest = Path(args.before_manifest)
+    after_manifest = Path(args.after_manifest)
+    before = VALIDATE.validate_endpoint_manifest(before_manifest, "before")
+    after = VALIDATE.validate_endpoint_manifest(after_manifest, "after")
     pair = VALIDATE.validate_pair(before, after)
-    binary = args.binary.resolve()
+    binary_path = Path(args.binary)
+    VALIDATE.reject_symlink_path(binary_path, "memory binary")
+    binary = binary_path.resolve()
     if VALIDATE.artifact(binary)["sha256"] != after["binary"]["sha256"]:
         raise ValueError("memory binary does not match the final endpoint manifest")
     fixture_value = VALIDATE.load_json(Path(after["fixtures"]["path"]), "after fixtures")
@@ -365,8 +381,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "status": "complete",
         "source": pair,
         "endpoint": {
-            "manifest": str(args.after_manifest.resolve()),
-            "manifest_artifact": VALIDATE.artifact(args.after_manifest.resolve()),
+            "manifest": str(after_manifest.resolve()),
+            "manifest_artifact": VALIDATE.artifact(after_manifest),
             "source_commit": after["source_commit"],
             "binary": after["binary"],
             "fixture_manifest": after["fixtures"],
@@ -388,6 +404,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         after,
         {fixture["name"] for fixture in fixture_value["fixtures"]},
         routes,
+        VALIDATE.artifact(after_manifest),
     )
     summary.parent.mkdir(parents=True, exist_ok=True)
     summary.write_bytes(canonical(result))

@@ -189,7 +189,7 @@ def child(
                     if guard_error is None:
                         guard_error = str(error)
                     during_path = output / f"{during_label}.host.json"
-                    if during_path.is_file():
+                    if during_path.is_file() and not during_path.is_symlink():
                         during_hosts.append(str(during_path.resolve()))
                 if guard_error is not None:
                     stop_group()
@@ -215,6 +215,8 @@ def child(
             "timed_out": timed_out,
             "rss_max_bytes": rss_max,
             "aggregate_rss_max_bytes": rss_max,
+            "rss_limit_bytes": CHILD_RSS_LIMIT,
+            "output_limit_bytes": CHILD_OUTPUT_LIMIT,
             "process_group_empty": process_group is None or not process_group_members(process_group),
             "stdout_bytes": stdout_path.stat().st_size if stdout_path.exists() else 0,
             "stderr_bytes": stderr_path.stat().st_size if stderr_path.exists() else 0,
@@ -241,6 +243,7 @@ def child(
                 "stdout_bytes": stdout_path.stat().st_size if stdout_path.exists() else 0,
                 "stderr_bytes": stderr_path.stat().st_size if stderr_path.exists() else 0,
                 "process_group_empty": process_group is None or not process_group_members(process_group),
+                "aggregate_rss_max_bytes": rss_max,
             }
         )
     host_paths = [before_host, *during_hosts, after_host] if after_host else [before_host, *during_hosts]
@@ -470,18 +473,23 @@ def run(
         raise ValueError("at least five ABBA rounds are required")
     if cpu not in os.sched_getaffinity(0):
         raise ValueError(f"CPU {cpu} is unavailable")
-    if output.is_symlink():
-        raise ValueError("qualification output may not be a symlink")
+    VALIDATE.reject_symlink_path(output, "qualification output")
     if output.exists() and any(output.iterdir()):
         raise ValueError(f"refusing to overwrite nonempty output {output}")
     repository = Path(__file__).resolve().parents[4]
     if output.resolve() == repository or repository in output.resolve().parents:
         raise ValueError("qualification output must be outside the checkout")
     output.mkdir(parents=True, exist_ok=True)
-    before = VALIDATE.validate_endpoint_manifest(before_manifest.resolve(), "before")
-    after = VALIDATE.validate_endpoint_manifest(after_manifest.resolve(), "after")
+    VALIDATE.reject_symlink_path(before_manifest, "before endpoint manifest")
+    VALIDATE.reject_symlink_path(after_manifest, "after endpoint manifest")
+    before = VALIDATE.validate_endpoint_manifest(before_manifest, "before")
+    after = VALIDATE.validate_endpoint_manifest(after_manifest, "after")
     pair = VALIDATE.validate_pair(before, after)
-    if before_binary.resolve() == after_binary.resolve():
+    VALIDATE.reject_symlink_path(before_binary, "before endpoint binary")
+    VALIDATE.reject_symlink_path(after_binary, "after endpoint binary")
+    before_binary = before_binary.resolve()
+    after_binary = after_binary.resolve()
+    if before_binary == after_binary:
         raise ValueError("before and after binaries must be distinct")
     if VALIDATE.artifact(before_binary)["sha256"] != before["binary"]["sha256"]:
         raise ValueError("before binary does not match its endpoint manifest")
@@ -569,7 +577,7 @@ def run(
         manifest["routes"].append(row)
         save(output / "manifest.json", manifest)
     W8.guard(output, "finished")
-    manifest["status"] = "complete"
+    manifest["status"] = "latency_complete"
     save(output / "manifest.json", manifest)
     VALIDATE.validate_abba(manifest)
     return manifest
@@ -586,11 +594,11 @@ def main() -> int:
     parser.add_argument("--after-manifest", required=True, type=Path)
     args = parser.parse_args()
     manifest = run(
-        args.before.resolve(),
-        args.after.resolve(),
-        args.before_manifest.resolve(),
-        args.after_manifest.resolve(),
-        args.output.resolve(),
+        args.before,
+        args.after,
+        args.before_manifest,
+        args.after_manifest,
+        args.output,
         args.rounds,
         args.cpu,
     )
@@ -599,7 +607,7 @@ def main() -> int:
             {
                 "status": manifest["status"],
                 "routes": len(manifest["routes"]),
-                "output": str(args.output.resolve()),
+                "output": str(Path(args.output).resolve()),
             }
         )
     )
