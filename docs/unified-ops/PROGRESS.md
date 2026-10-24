@@ -4365,3 +4365,27 @@ See [0063](0063-source-pptx-modern-comments.md).
   A fresh isolated documentation selection is prepared pending the runner
   assessment. Candidate performance execution remains held while the affected
   source and required receipt rebinding are determined.
+
+- Coordinator admission-contract and documentation update (2026-10-24):
+  Further review traces the signed PPTX mismatch to the explicit batch
+  preflight, rather than a coalescer failure. The existing DOCX admission
+  test requires refusal before the iterator is polled; the older PPTX
+  equivalence test requires the same path error as an individual command.
+  Those requirements cannot both hold for an unread item. The owner has been
+  asked which contract should govern. No production change or proposed test
+  narrowing is accepted while that decision is pending; signed exact no-ops,
+  cancellation and source-freshness checks remain protected.
+
+  The runner-ownership fix merges at `21fcafa7ef`. It excludes the controller
+  and its pre-existing ancestry by PID and start time. Independent review and
+  the composed tree both pass nineteen tests, including a real failing child
+  and escaped-child cleanup. The isolated `wsdoc` selection is now running
+  against unchanged 9781 source with that repaired runner. Other compiler and
+  measurement jobs remain held; the separate core/ops/facade documentation
+  selection has not started.
+
+  Original-f2 signed-consumer preparation completes its source-only closure
+  verification. Adapter composition is under review; candidate preparation
+  and actual builds remain held. DOC, Ink and PPT execution-adapter repairs
+  continue against concrete review findings. None of these preparations is
+  performance acceptance, and nothing is pushed.
