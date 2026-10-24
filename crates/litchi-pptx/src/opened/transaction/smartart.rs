@@ -134,12 +134,15 @@ impl Edit {
             );
         }
         let authored = |error: litchi_drawingml::Error| drawing_error(error, "authored SmartArt");
+        let limits = Limits::default();
         let blobs = [
-            spec.data_xml(Some(&ids[4])).map_err(authored)?.into_bytes(),
-            spec.layout_xml().into_bytes(),
-            quick_style_xml().into_bytes(),
-            colors_xml().into_bytes(),
-            spec.drawing_xml(bounds.2, bounds.3)
+            spec.data_xml(Some(&ids[4]), &limits)
+                .map_err(authored)?
+                .into_bytes(),
+            spec.layout_xml(&limits).map_err(authored)?.into_bytes(),
+            quick_style_xml(&limits).map_err(authored)?.into_bytes(),
+            colors_xml(&limits).map_err(authored)?.into_bytes(),
+            spec.drawing_xml(bounds.2, bounds.3, &limits)
                 .map_err(authored)?
                 .into_bytes(),
         ];

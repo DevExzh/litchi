@@ -643,22 +643,22 @@ fn apply(parts: &SmartArtParts, change: Change, extent: (i64, i64)) -> Result<Sm
         let relationship = outline.drawing_relationship.as_deref().unwrap_or("rId0");
         Ok(SmartArtParts {
             data: spec
-                .data_xml(Some(relationship))
+                .data_xml(Some(relationship), &limits)
                 .map_err(invalid)?
                 .into_bytes(),
-            layout: spec.layout_xml().into_bytes(),
+            layout: spec.layout_xml(&limits).map_err(invalid)?.into_bytes(),
             quick_style: if all {
-                quick_style_xml().into_bytes()
+                quick_style_xml(&limits).map_err(invalid)?.into_bytes()
             } else {
                 parts.quick_style.clone()
             },
             colors: if all {
-                colors_xml().into_bytes()
+                colors_xml(&limits).map_err(invalid)?.into_bytes()
             } else {
                 parts.colors.clone()
             },
             drawing: Some(
-                spec.drawing_xml(extent.0, extent.1)
+                spec.drawing_xml(extent.0, extent.1, &limits)
                     .map_err(invalid)?
                     .into_bytes(),
             ),

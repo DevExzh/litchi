@@ -25,8 +25,44 @@ pub fn graphic_frame(
     width: i64,
     height: i64,
     data_rel_id: &str,
-) -> String {
-    let mut xml = String::with_capacity(1024 + data_rel_id.len() * 4);
+    limits: &Limits,
+) -> litchi_drawingml::Result<String> {
+    limits.validate()?;
+    let max_input = limits.input_bytes_value().min(16 * 1024 * 1024);
+    if data_rel_id.len() > max_input {
+        return Err(litchi_drawingml::Error::Limit {
+            kind: litchi_drawingml::LimitKind::InputBytes,
+            observed: data_rel_id.len(),
+            maximum: max_input,
+        });
+    }
+    let escaped_len = data_rel_id.bytes().try_fold(0_usize, |length, byte| {
+        let extra = match byte {
+            b'&' => 4,
+            b'<' | b'>' => 3,
+            b'"' | b'\'' => 5,
+            _ => 0,
+        };
+        length.checked_add(1 + extra).ok_or_else(|| {
+            litchi_drawingml::Error::Invalid("diagram relationship ID length overflows".to_owned())
+        })
+    })?;
+    let estimate = 2048_usize
+        .checked_add(escaped_len.checked_mul(4).ok_or_else(|| {
+            litchi_drawingml::Error::Invalid("diagram graphic-frame length overflows".to_owned())
+        })?)
+        .ok_or_else(|| {
+            litchi_drawingml::Error::Invalid("diagram graphic-frame length overflows".to_owned())
+        })?;
+    let max_output = limits.output_bytes_value().min(16 * 1024 * 1024);
+    if estimate > max_output {
+        return Err(litchi_drawingml::Error::Limit {
+            kind: litchi_drawingml::LimitKind::DiagramDrawingBytes,
+            observed: estimate,
+            maximum: max_output,
+        });
+    }
+    let mut xml = String::with_capacity(estimate);
     let data_rel_id = escape_attribute(data_rel_id);
     let prefix_len = data_rel_id
         .trim_end_matches(|character: char| character.is_ascii_digit())
@@ -64,7 +100,14 @@ pub fn graphic_frame(
     xml.push_str("qs\" r:cs=\"");
     xml.push_str(base_rel_id);
     xml.push_str("cs\"/></a:graphicData></a:graphic></p:graphicFrame>");
-    xml
+    if xml.len() > max_output {
+        return Err(litchi_drawingml::Error::Limit {
+            kind: litchi_drawingml::LimitKind::DiagramDrawingBytes,
+            observed: xml.len(),
+            maximum: max_output,
+        });
+    }
+    Ok(xml)
 }
 
 fn escape_attribute(value: &str) -> String {
@@ -99,14 +142,14 @@ mod tests {
         );
         let graphic = Builder::new(Kind::List).add_item("Item").build();
         assert_eq!(graphic.node_count(), 1);
-        let xml = graphic_frame(5, 1000, 2000, 4000, 3000, "rId10");
+        let xml = graphic_frame(5, 1000, 2000, 4000, 3000, "rId10", &Limits::default()).unwrap();
         assert!(xml.contains("r:dm=\"rId10\""));
         assert!(xml.contains("r:lo=\"rIdlo\""));
     }
 
     #[test]
     fn relationship_id_is_escaped_without_panicking_on_empty_input() {
-        let xml = graphic_frame(1, 0, 0, 1, 1, "r&Id");
+        let xml = graphic_frame(1, 0, 0, 1, 1, "r&Id", &Limits::default()).unwrap();
         assert!(xml.contains("r:dm=\"r&amp;Id\""));
     }
 }

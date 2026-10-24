@@ -1,7 +1,7 @@
 # 0362dvf — DrawingML diagram raw limits
 
-- Status: source and consumer migration plus focused capped qualification
-  complete; ready for coordinator merge.
+- Status: source and consumer migration plus the coordinator repair pass
+  complete; focused capped qualification is pending a granted Cargo slot.
 - Base: `2f7db7ee7fa01893e9099217fc4243687d196f63`.
 
 ## Policy
@@ -36,6 +36,26 @@ SmartArt leaves, examples, tests, and the unified SmartArt performance harness
 pass `diagram::Limits` explicitly (default policies are selected at callers
 that do not retain a narrower package policy). The authoring recognition path
 also carries the selected policy through `Spec::{from_parts,recognize}`.
+
+## Coordinator repair pass
+
+The follow-up pass closes the five review findings from the first packet:
+
+* `edit::read_drawing` counts every `dsp:sp` globally (including sibling and
+  empty shapes), rather than using the open-element stack as a shape budget;
+* both raw readers track `root_seen`, `root_closed`, depth and stacks, reject
+  duplicate or trailing roots and non-whitespace trailing markup, and refuse
+  EOF while a root remains open;
+* `Spec::recognize` checks both direct inputs against the selected input policy
+  and regenerates through the bounded `data_xml` and `layout_xml` paths;
+* authoring `Spec::{data_xml,layout_xml,drawing_xml}` and
+  `{quick_style_xml,colors_xml}` now require `&Limits`, preflight their
+  scaled output estimates, and retain final typed output checks; and
+* PPTX `shape::diagram::graphic_frame` now uses the canonical `&Limits`
+  policy, bounded relationship/output sizing, and migrated tests/examples.
+
+The repair is source-only pending the coordinator's requested focused Cargo
+slot; no new fixtures, binaries, or measurement artifacts are included.
 
 No fixture or performance artifact is added by this source migration. The
 focused qualification used one build job, offline locked dependencies, the

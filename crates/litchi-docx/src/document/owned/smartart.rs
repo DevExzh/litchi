@@ -200,7 +200,7 @@ impl Edit<Package> {
     /// use litchi_core::Position;
     /// use litchi_docx::Package;
     /// use litchi_docx::document::{ElementPath, ElementStep, NewSmartArt};
-    /// use litchi_drawingml::diagram::authoring::{Layout, Spec};
+    /// use litchi_drawingml::diagram::{Limits, authoring::{Layout, Spec}};
     ///
     /// let mut builder = litchi_docx::Builder::new()?;
     /// builder.document()?.add_paragraph_with_text("Steps: ");
@@ -214,8 +214,9 @@ impl Edit<Package> {
     /// let mut parts = edit.smartart_parts(&id)?.expect("the graphic");
     /// let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\nShip")?;
     /// let drawing = parts.drawing.take().expect("a cached drawing");
-    /// parts.data = spec.data_xml(Some("rId0"))?.into_bytes();
-    /// parts.drawing = Some(spec.drawing_xml(5_760_000, 3_240_000)?.into_bytes());
+    /// let limits = Limits::default();
+    /// parts.data = spec.data_xml(Some("rId0"), &limits)?.into_bytes();
+    /// parts.drawing = Some(spec.drawing_xml(5_760_000, 3_240_000, &limits)?.into_bytes());
     /// assert_ne!(parts.drawing.as_deref(), Some(drawing.as_slice()));
     /// assert!(edit.set_smartart(&id, parts)?);
     /// let package = edit.commit()?.into_package();
@@ -583,18 +584,25 @@ impl Edit<Package> {
             ct::DML_DIAGRAM_COLORS,
             ct::DML_DIAGRAM_DRAWING,
         ];
+        let limits = Limits::default();
         let blobs = [
             smartart
                 .spec
-                .data_xml(Some(&ids[4]))
+                .data_xml(Some(&ids[4]), &limits)
                 .map_err(|_| invalid())?
                 .into_bytes(),
-            smartart.spec.layout_xml().into_bytes(),
-            quick_style_xml().into_bytes(),
-            colors_xml().into_bytes(),
             smartart
                 .spec
-                .drawing_xml(width, height)
+                .layout_xml(&limits)
+                .map_err(|_| invalid())?
+                .into_bytes(),
+            quick_style_xml(&limits)
+                .map_err(|_| invalid())?
+                .into_bytes(),
+            colors_xml(&limits).map_err(|_| invalid())?.into_bytes(),
+            smartart
+                .spec
+                .drawing_xml(width, height, &limits)
                 .map_err(|_| invalid())?
                 .into_bytes(),
         ];

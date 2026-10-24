@@ -163,7 +163,7 @@ impl Limits {
         self.node_text_bytes
     }
 
-    pub(crate) fn validate(self) -> crate::Result<()> {
+    pub fn validate(self) -> crate::Result<()> {
         for (kind, value, maximum) in [
             (
                 crate::LimitKind::InputBytes,

@@ -570,6 +570,8 @@ impl Parsed {
         let mut root_close = None;
         let mut root_prefix = None;
         let mut strict = false;
+        let mut root_seen = false;
+        let mut root_closed = false;
         let mut pending_rel: Option<(usize, usize)> = None;
         loop {
             buffer.clear();
@@ -595,15 +597,24 @@ impl Parsed {
                     let local_name = element.local_name();
                     let local = local_name.as_ref().to_vec();
                     let dgm = is_dgm(ns);
+                    if root_closed {
+                        return Err(invalid("trailing markup follows the diagram data model"));
+                    }
                     if depth == 0 {
+                        if root_seen {
+                            return Err(invalid("the diagram data model has multiple roots"));
+                        }
                         if !dgm || local != b"dataModel" {
                             return Err(invalid("the part is not a diagram data model"));
                         }
+                        root_seen = true;
                         strict = ns == Ns::DgmStrict;
                         root_prefix = prefix_of(element);
                         if empty {
                             return Err(invalid("the diagram data model is empty"));
                         }
+                    } else if dgm && local == b"dataModel" {
+                        return Err(invalid("the diagram data model has a nested root"));
                     }
                     let parent = stack.last().map(Vec::as_slice);
                     if dgm && local == b"pt" && parent == Some(b"ptLst".as_slice()) {
@@ -699,11 +710,18 @@ impl Parsed {
                     }
                 },
                 Event::End(ref element) => {
+                    if depth == 0 || stack.is_empty() {
+                        return Err(invalid("unexpected diagram data model end"));
+                    }
                     let local_name = element.local_name();
                     let local = local_name.as_ref().to_vec();
+                    if depth == 1 && (!is_dgm(ns) || local != b"dataModel") {
+                        return Err(invalid("the diagram data model root is not closed"));
+                    }
                     stack.pop();
-                    depth = depth.saturating_sub(1);
+                    depth -= 1;
                     if depth == 0 {
+                        root_closed = true;
                         root_close = Some(event_start);
                     }
                     if is_dgm(ns) && local == b"pt" && depth == 2 {
@@ -723,8 +741,28 @@ impl Parsed {
                 },
                 Event::Eof => break,
                 Event::DocType(_) => return Err(invalid("document type in a diagram part")),
+                Event::Text(text) => {
+                    if text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
+                        return Err(invalid(
+                            "non-whitespace text is outside the diagram data model",
+                        ));
+                    }
+                },
+                Event::CData(data) => {
+                    if data.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
+                        return Err(invalid("CDATA is outside the diagram data model"));
+                    }
+                },
+                Event::GeneralRef(_) => {
+                    return Err(invalid(
+                        "entity reference is outside the diagram data model",
+                    ));
+                },
                 _ => {},
             }
+        }
+        if !root_seen || !root_closed || depth != 0 || !stack.is_empty() {
+            return Err(invalid("unterminated diagram data model"));
         }
         let root_close = root_close.ok_or_else(|| invalid("unterminated diagram data model"))?;
         let document = points
@@ -1347,7 +1385,9 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
     let mut xml_nodes = 0_usize;
     let mut depth = 0_usize;
     let mut strict = false;
-    let mut root = true;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut shape_count = 0_usize;
     loop {
         buffer.clear();
         let event_start = position(&reader)?;
@@ -1358,6 +1398,9 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
         let event_end = position(&reader)?;
         match event {
             Event::Start(ref element) => {
+                if root_closed {
+                    return Err(invalid("trailing markup follows the diagram drawing"));
+                }
                 account_xml_node(&mut xml_nodes, limits)?;
                 let event_depth = depth
                     .checked_add(1)
@@ -1372,11 +1415,16 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
                 }
                 let drawing = ns == Ns::Drawing;
                 let local = element.local_name();
-                if root {
-                    root = false;
+                if depth == 0 {
+                    if root_seen {
+                        return Err(invalid("the diagram drawing has multiple roots"));
+                    }
                     if !drawing || local.as_ref() != b"drawing" {
                         return Err(invalid("the part is not a diagram drawing"));
                     }
+                    root_seen = true;
+                } else if drawing && local.as_ref() == b"drawing" {
+                    return Err(invalid("the diagram drawing has a nested root"));
                 }
                 if drawing && local.as_ref() == b"txBody" {
                     let body = read_body(
@@ -1398,10 +1446,13 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
                 }
                 if drawing && local.as_ref() == b"sp" {
                     let max_shapes = limits.nodes_value().min(MAX_NODES);
-                    if models.len() >= max_shapes {
+                    shape_count = shape_count
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("diagram shape count overflows"))?;
+                    if shape_count > max_shapes {
                         return Err(Error::limit(
                             crate::LimitKind::DiagramNodes,
-                            models.len() + 1,
+                            shape_count,
                             max_shapes,
                         ));
                     }
@@ -1413,6 +1464,9 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
                 depth = event_depth;
             },
             Event::Empty(ref element) => {
+                if root_closed {
+                    return Err(invalid("trailing markup follows the diagram drawing"));
+                }
                 account_xml_node(&mut xml_nodes, limits)?;
                 let event_depth = depth
                     .checked_add(1)
@@ -1425,19 +1479,71 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
                         max_depth,
                     ));
                 }
+                let drawing = ns == Ns::Drawing;
+                let local = element.local_name();
+                if depth == 0 {
+                    if root_seen {
+                        return Err(invalid("the diagram drawing has multiple roots"));
+                    }
+                    if !drawing || local.as_ref() != b"drawing" {
+                        return Err(invalid("the part is not a diagram drawing"));
+                    }
+                    root_seen = true;
+                    return Err(invalid("the diagram drawing root is empty"));
+                }
+                if drawing && local.as_ref() == b"sp" {
+                    let max_shapes = limits.nodes_value().min(MAX_NODES);
+                    shape_count = shape_count
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("diagram shape count overflows"))?;
+                    if shape_count > max_shapes {
+                        return Err(Error::limit(
+                            crate::LimitKind::DiagramNodes,
+                            shape_count,
+                            max_shapes,
+                        ));
+                    }
+                }
                 if is_dml(ns) && !strict {
                     strict = ns == Ns::DmlStrict;
                 }
-                let _ = element;
             },
-            Event::End(_) => {
+            Event::End(ref element) => {
+                if depth == 0 || models.is_empty() {
+                    return Err(invalid("unexpected diagram drawing end"));
+                }
+                if depth == 1 && (ns != Ns::Drawing || element.local_name().as_ref() != b"drawing")
+                {
+                    return Err(invalid("the diagram drawing root is not closed"));
+                }
                 models.pop();
-                depth = depth.saturating_sub(1);
+                depth -= 1;
+                if depth == 0 {
+                    root_closed = true;
+                }
             },
             Event::Eof => break,
             Event::DocType(_) => return Err(invalid("document type in a diagram part")),
+            Event::Text(text) => {
+                if text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
+                    return Err(invalid(
+                        "non-whitespace text is outside the diagram drawing",
+                    ));
+                }
+            },
+            Event::CData(data) => {
+                if data.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
+                    return Err(invalid("CDATA is outside the diagram drawing"));
+                }
+            },
+            Event::GeneralRef(_) => {
+                return Err(invalid("entity reference is outside the diagram drawing"));
+            },
             _ => {},
         }
+    }
+    if !root_seen || !root_closed || depth != 0 || !models.is_empty() {
+        return Err(invalid("unterminated diagram drawing"));
     }
     Ok((shapes, strict))
 }

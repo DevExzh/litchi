@@ -561,7 +561,15 @@ fn test_complex_hierarchies() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn validate_graphic_frame() -> Result<(), Box<dyn std::error::Error>> {
-    let frame = graphic_frame(2, 914_400, 1_600_000, 7_315_200, 3_800_000, "rId10");
+    let frame = graphic_frame(
+        2,
+        914_400,
+        1_600_000,
+        7_315_200,
+        3_800_000,
+        "rId10",
+        &Limits::default(),
+    )?;
     let xml = format!(
         r#"<p:spTree xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">{frame}</p:spTree>"#
     );

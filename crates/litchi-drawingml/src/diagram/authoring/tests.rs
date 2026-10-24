@@ -33,7 +33,7 @@ fn every_layout_writes_parts_that_read_back() {
     for layout in Layout::ALL {
         let limits = Limits::default();
         let spec = sample(layout);
-        let data = spec.data_xml(Some("rId7")).unwrap();
+        let data = spec.data_xml(Some("rId7"), &limits).unwrap();
         let outline = Outline::read(data.as_bytes(), &limits).unwrap();
         assert_eq!(
             outline.layout_type_id.as_deref(),
@@ -50,15 +50,23 @@ fn every_layout_writes_parts_that_read_back() {
         assert_eq!(Spec::from_outline(layout, &outline), spec);
         // The legacy validating reader accepts the model.
         crate::diagram::DiagramDataModel::parse(&data, &limits).unwrap();
-        let layout_xml = spec.layout_xml();
+        let layout_xml = spec.layout_xml(&limits).unwrap();
         crate::diagram::DiagramDefinition::parse_layout(&layout_xml, &limits).unwrap();
-        crate::diagram::DiagramDefinition::parse_quick_style(&quick_style_xml(), &limits).unwrap();
-        crate::diagram::DiagramDefinition::parse_colors(&colors_xml(), &limits).unwrap();
-        let drawing = spec.drawing_xml(5_486_400, 3_200_400).unwrap();
+        crate::diagram::DiagramDefinition::parse_quick_style(
+            &quick_style_xml(&limits).unwrap(),
+            &limits,
+        )
+        .unwrap();
+        crate::diagram::DiagramDefinition::parse_colors(&colors_xml(&limits).unwrap(), &limits)
+            .unwrap();
+        let drawing = spec.drawing_xml(5_486_400, 3_200_400, &limits).unwrap();
         assert!(drawing.contains("Ship &lt;now&gt;"));
         // Deterministic.
-        assert_eq!(drawing, spec.drawing_xml(5_486_400, 3_200_400).unwrap());
-        assert_eq!(data, spec.data_xml(Some("rId7")).unwrap());
+        assert_eq!(
+            drawing,
+            spec.drawing_xml(5_486_400, 3_200_400, &limits).unwrap()
+        );
+        assert_eq!(data, spec.data_xml(Some("rId7"), &limits).unwrap());
         // Recognized as authored, and only then.
         assert_eq!(
             Spec::from_parts(data.as_bytes(), layout_xml.as_bytes(), &limits).unwrap(),
@@ -96,14 +104,35 @@ fn bounds_are_enforced() {
     assert!(matches!(spec.validate(), Err(Error::Limit { .. })));
     let bad = Spec::new(Layout::List).with_node(Node::new("a\u{1}"));
     assert!(bad.validate().is_err());
-    assert!(Spec::new(Layout::List).drawing_xml(0, 10).is_err());
+    assert!(
+        Spec::new(Layout::List)
+            .drawing_xml(0, 10, &Limits::default())
+            .is_err()
+    );
+    let defaults = Limits::default();
+    let tiny_output = Limits::new(
+        defaults.input_bytes_value(),
+        1,
+        defaults.xml_nodes_value(),
+        defaults.xml_depth_value(),
+        defaults.points_value(),
+        defaults.connections_value(),
+        defaults.data_text_bytes_value(),
+        defaults.nodes_value(),
+        defaults.node_depth_value(),
+        defaults.node_text_bytes_value(),
+    );
+    assert!(matches!(
+        Spec::new(Layout::List).data_xml(None, &tiny_output),
+        Err(Error::Limit { .. })
+    ));
 }
 
 #[test]
 fn empty_spec_writes_valid_parts() {
     let limits = Limits::default();
     let spec = Spec::new(Layout::Cycle);
-    let data = spec.data_xml(None).unwrap();
+    let data = spec.data_xml(None, &limits).unwrap();
     assert!(
         Outline::read(data.as_bytes(), &limits)
             .unwrap()
@@ -111,7 +140,7 @@ fn empty_spec_writes_valid_parts() {
             .is_empty()
     );
     assert!(
-        spec.drawing_xml(100, 100)
+        spec.drawing_xml(100, 100, &limits)
             .unwrap()
             .contains("</dsp:spTree>")
     );

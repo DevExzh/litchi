@@ -124,9 +124,12 @@ fn main() -> Outcome<()> {
             spec.nodes_mut()[0].text = "Design".to_owned();
             let relationship = outline.drawing_relationship.as_deref().unwrap_or("rId0");
             let mut next = parts.clone();
-            next.data = spec.data_xml(Some(relationship))?.into_bytes();
-            next.layout = spec.layout_xml().into_bytes();
-            next.drawing = Some(spec.drawing_xml(5_760_000, 3_240_000)?.into_bytes());
+            next.data = spec.data_xml(Some(relationship), &limits)?.into_bytes();
+            next.layout = spec.layout_xml(&limits)?.into_bytes();
+            next.drawing = Some(
+                spec.drawing_xml(5_760_000, 3_240_000, &limits)?
+                    .into_bytes(),
+            );
             edit.set_smartart(&diagram, next)?;
             Ok(edit.commit()?.into_package())
         },
@@ -210,9 +213,12 @@ fn main() -> Outcome<()> {
             spec.nodes_mut()[0].text = "Design".to_owned();
             let relationship = outline.drawing_relationship.as_deref().unwrap_or("rId0");
             let mut next = parts.clone();
-            next.data = spec.data_xml(Some(relationship))?.into_bytes();
-            next.layout = spec.layout_xml().into_bytes();
-            next.drawing = Some(spec.drawing_xml(5_760_000, 3_240_000)?.into_bytes());
+            next.data = spec.data_xml(Some(relationship), &limits)?.into_bytes();
+            next.layout = spec.layout_xml(&limits)?.into_bytes();
+            next.drawing = Some(
+                spec.drawing_xml(5_760_000, 3_240_000, &limits)?
+                    .into_bytes(),
+            );
             edit.set_smartart(&diagram, next)?;
             Ok(edit.commit()?.into_package())
         },

@@ -78,12 +78,12 @@ fn leaf_change(parts: &SmartArtParts, route: Route) -> Result<SmartArtParts> {
     )?;
     Ok(SmartArtParts {
         data: spec
-            .data_xml(outline.drawing_relationship.as_deref())?
+            .data_xml(outline.drawing_relationship.as_deref(), &limits)?
             .into_bytes(),
         layout: parts.layout.clone(),
         quick_style: parts.quick_style.clone(),
         colors: parts.colors.clone(),
-        drawing: Some(spec.drawing_xml(BOUNDS.2, BOUNDS.3)?.into_bytes()),
+        drawing: Some(spec.drawing_xml(BOUNDS.2, BOUNDS.3, &limits)?.into_bytes()),
     })
 }
 
