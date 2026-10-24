@@ -3444,7 +3444,8 @@ See [0063](0063-source-pptx-modern-comments.md).
   zero unreached cells, and all 7 ODP plus 6 XLSX focused tests pass. Both
   commands prove the memory shim, exact source/lock/environment and external
   target; its 3,483,689,639 bytes remain stable before and after. Earlier
-  receipts and the oversized cache remain preserved and superseded.
+  receipts remain preserved; the oversized cache was quarantined and later
+  pruned only after the specific regeneration/preservation audit below.
 
   Selected f6fe diagnostics pass 332 core tests, the iWork leaf API check,
   the non-iWork gate and static corpus dispositions. Facade testing returns
@@ -3491,6 +3492,14 @@ See [0063](0063-source-pptx-modern-comments.md).
   benchmark/profile outputs remain intact. The immutable ODG baseline
   capture completes with all 460,379 entries, recorded externally under
   0362ugy; no build or native timing result is inferred from it.
+
+  A subsequent audited prune releases 20,181,409,792 allocated bytes from
+  the rejected corpus cache. All 544 retained wave-thirty files have a complete
+  filtered restore route with independently verified modes and dry-runs;
+  raw receipts and native/protocol outputs remain. Another 144 exact stale
+  example twins release 1,554,094,416 bytes of budget-target headroom while
+  preserving all benchmark/profile and failure artifacts. The two large
+  deletion receipts stay external with hashes and reproduction instructions.
 
   A documentation audit reconciles the settled legacy source-retention and
   OpenOptions decisions in design §16.3/§16.6 and removes the stale claim in
