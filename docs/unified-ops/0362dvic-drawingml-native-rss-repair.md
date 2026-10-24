@@ -28,7 +28,7 @@ or measure helper processes. The paired DrawingML runner supplies the observer
 only for ABBA and receives the direct process object returned by its one
 `Popen` call. No global `Popen` patch or child discovery scan is used.
 
-For every direct probe/validator child, the observer writes a fresh
+For every direct probe child, the observer writes a fresh
 `external-process-resource.jsonl` row after the child exits. The row contains:
 
 - PID plus the kernel boot ID and `/proc/<pid>/stat` start-time ticks, so PID
@@ -49,9 +49,11 @@ all of these checks is rejected. A very short child may produce an explicit
 qualification claim.
 
 The validator also requires the sidecar event set to be exactly the qualified
-ABBA probe set. The validator child itself is journaled in the final runner
-receipt, but is not used as a probe qualification event because it appends its
-row after reading the probe sidecar.
+ABBA probe set. The generic event journal still records the validator control
+process, but the external observer deliberately excludes the exact
+`validator-drawingml-raw-identity` event. This keeps the final sidecar hash
+unchanged across validator handoff and leaves its event set exactly equal to
+the qualified probe set.
 
 ## Focused checks
 
@@ -65,6 +67,7 @@ python3 tools/test_native_qualification_runner.py        # 23 passed
 ```
 
 The DrawingML tests include mutation cases for argv identity, source binding,
-and the sidecar line pointer. A separate Python child smoke check captured a
-positive independent RSS/VmHWM sample through the observer. No performance or
-native acceptance result is inferred from these checks.
+and the sidecar line pointer, plus validator-handoff and fast-child-unavailable
+controls. A separate Python child smoke check captured a positive independent
+RSS/VmHWM sample through the observer. No performance or native acceptance
+result is inferred from these checks.

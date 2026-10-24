@@ -257,6 +257,55 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
                         mode="normal",
                     )
 
+    def test_validator_control_handoff_does_not_change_sidecar_receipt(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="drawingml-raw-handoff-") as directory:
+            output = Path(directory)
+            observer = paired.ExternalResourceObserver(output)
+
+            class ProbeToken:
+                def finish(self, returncode: int | None) -> dict:
+                    return {
+                        "schema": paired.EXTERNAL_RESOURCE_SCHEMA,
+                        "event_id": "abba-01-baseline-raw-native",
+                        "leg": "baseline",
+                        "status": "captured",
+                        "returncode": returncode,
+                    }
+
+            observer.process_finished(ProbeToken(), returncode=0)
+            before = observer.receipt()
+            self.assertIsNone(
+                observer.process_started(event_id="validator-drawingml-raw-identity")
+            )
+            after = observer.receipt()
+            self.assertEqual(after, before)
+            self.assertEqual(after["records"], 1)
+
+    def test_fast_child_is_recorded_unavailable_without_claim(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="drawingml-raw-fast-child-") as directory:
+            output = Path(directory)
+            observer = paired.ExternalResourceObserver(output)
+            token = observer.process_started(
+                event_id="abba-01-baseline-raw-native",
+                leg="baseline",
+                argv=["/external/drawingml-raw-native"],
+                cwd=output,
+                identity={
+                    "source_root": "/external/drawingml-source",
+                    "head": "a" * 40,
+                    "identity_sha256": "b" * 64,
+                },
+                process=type("FastProcess", (), {"pid": 999999999})(),
+            )
+            self.assertIsNotNone(token)
+            observer.process_finished(token, returncode=0)
+            record = json.loads(
+                (output / paired.EXTERNAL_RESOURCE_FILENAME).read_text(encoding="utf-8")
+            )
+            self.assertEqual(record["status"], "unavailable")
+            self.assertEqual(record["sample_count"], 0)
+            self.assertIn("disappeared", record["reason"])
+
     def test_reviewed_adapter_hashes_bind_checked_in_sources(self) -> None:
         import hashlib
 
