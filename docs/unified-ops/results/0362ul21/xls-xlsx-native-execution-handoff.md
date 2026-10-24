@@ -7,7 +7,7 @@ hash-bound external packet is:
 `/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/sheet-native-execution-handoff-472b-slot3-final.json`
 
 Packet SHA-256:
-`4de228cd683c19231742a7d417e4792244575a7661b34a7b62bb89017516b03f`.
+`a636b75665ffd69730db34eea610c9b7bf6986c67d7520b3eb8a841e9f2d3e18`.
 
 The reviewed F3 role-split driver is commit `d447c8c0b9efe2d4394c47419cb7768ec63834fc`,
 SHA-256 `419dfe0d55a0f8ba3cef3ad5ee247917da46a4b0c4d7efb3916a377fa771284b`.
