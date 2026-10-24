@@ -79,6 +79,8 @@ struct CountingReadAt {
     bytes: Arc<Vec<u8>>,
     reads: AtomicUsize,
     revision: AtomicU64,
+    version_observations: AtomicUsize,
+    bump_at_version: AtomicUsize,
     change_on_next_read: AtomicBool,
     truncate_on_next_read: AtomicBool,
 }
@@ -89,6 +91,8 @@ impl CountingReadAt {
             bytes: Arc::new(bytes),
             reads: AtomicUsize::new(0),
             revision: AtomicU64::new(0),
+            version_observations: AtomicUsize::new(0),
+            bump_at_version: AtomicUsize::new(0),
             change_on_next_read: AtomicBool::new(false),
             truncate_on_next_read: AtomicBool::new(false),
         }
@@ -100,6 +104,14 @@ impl CountingReadAt {
 
     fn bump(&self) {
         self.revision.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn bump_after_versions(&self, additional: usize) {
+        let target = self
+            .version_observations
+            .load(Ordering::SeqCst)
+            .saturating_add(additional);
+        self.bump_at_version.store(target, Ordering::SeqCst);
     }
 
     fn arm_change_on_next_read(&self) {
@@ -133,6 +145,11 @@ impl ReadAt for CountingReadAt {
     }
 
     fn version(&self) -> io::Result<SourceVersion> {
+        let ordinal = self.version_observations.fetch_add(1, Ordering::SeqCst) + 1;
+        if self.bump_at_version.load(Ordering::SeqCst) == ordinal {
+            self.bump_at_version.store(0, Ordering::SeqCst);
+            self.bump();
+        }
         Ok(SourceVersion::new(
             0x584c_535f_4f57_4e52,
             self.revision.load(Ordering::SeqCst),
@@ -243,6 +260,62 @@ fn signed_owner_publishes_exactly_and_allows_identity_editing() {
     assert_eq!(commit.patch().before(), bytes.as_slice());
     assert_eq!(commit.patch().after(), bytes.as_slice());
     assert_eq!(commit.into_package().to_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn signed_source_property_edit_reports_freshness_before_policy_refusal() {
+    let source = Arc::new(CountingReadAt::new(signed_package()));
+    let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let package = Package::from_source(workbook).unwrap();
+    let mut edit = package.edit_property_sets().unwrap();
+    edit.before().unwrap();
+    source.bump();
+    assert!(matches!(
+        edit.edit_summary_information(|_| Ok(())),
+        Err(PackageError::Source(
+            SourceBackedError::SourceChanged { .. }
+        ))
+    ));
+}
+
+#[test]
+fn property_set_render_rechecks_a_dynamic_source_after_last_read() {
+    let source = Arc::new(CountingReadAt::new(fixture("ole/xls/Simple.xls")));
+    let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let package = Package::from_source(workbook).unwrap();
+    let mut edit = package.edit_property_sets().unwrap();
+    edit.edit_summary_information(|property| property.set_title("changed"))
+        .unwrap();
+    // Four version observations belong to the leading `check_source`; the
+    // next one is the property-set render fence added after editor.finish.
+    source.bump_after_versions(5);
+    assert!(matches!(
+        edit.commit(),
+        Err(PackageError::Source(
+            SourceBackedError::SourceChanged { .. }
+        ))
+    ));
+}
+
+#[test]
+fn property_set_publication_rechecks_a_dynamic_source_after_candidate_admission() {
+    let source = Arc::new(CountingReadAt::new(fixture("ole/xls/Simple.xls")));
+    let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let package = Package::from_source(workbook).unwrap();
+    let mut edit = package.edit_property_sets().unwrap();
+    edit.edit_summary_information(|property| property.set_title("changed"))
+        .unwrap();
+    // The render fence is followed by the two publication fences (before
+    // and after admitting the candidate). Bump at that final observation so
+    // candidate construction succeeds but publication still refuses a stale
+    // original owner.
+    source.bump_after_versions(7);
+    assert!(matches!(
+        edit.commit(),
+        Err(PackageError::Source(
+            SourceBackedError::SourceChanged { .. }
+        ))
+    ));
 }
 
 #[test]

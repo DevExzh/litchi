@@ -815,6 +815,7 @@ impl Edit {
         author: &str,
         text: &str,
     ) -> Result<Option<usize>> {
+        self.ensure_ready()?;
         self.step()?;
         if column > 255 {
             return Err(refused(
@@ -902,6 +903,7 @@ impl Edit {
         author: &str,
         text: &str,
     ) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         if target.1 > 255 {
             return Err(refused(
@@ -1000,6 +1002,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] when the cell has no note.
     pub fn remove_note(&mut self, sheet: usize, row: u16, column: u16) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let (layout, _, position, note_index) = self.note_object(sheet, row, column)?;
         self.replace(&layout, note_index, note_index + 1, &[])?;
@@ -1038,6 +1041,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] for an anchor outside the grid.
     pub fn add_shape(&mut self, sheet: usize, spec: &ShapeSpec) -> Result<usize> {
+        self.ensure_ready()?;
         self.step()?;
         spec.anchor.check()?;
         let count = self.drawing_positions(sheet, false)?.len();
@@ -1115,6 +1119,7 @@ impl Edit {
     /// Returns [`Error::Refused`] for an image that is not PNG or JPEG
     /// or an anchor outside the grid.
     pub fn add_picture(&mut self, sheet: usize, spec: &PictureSpec) -> Result<usize> {
+        self.ensure_ready()?;
         self.step()?;
         spec.anchor.check()?;
         let kind = image_kind(&spec.data).ok_or(refused(
@@ -1302,6 +1307,7 @@ impl Edit {
         index: usize,
         change: &DrawingChange,
     ) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let position = *self
             .drawing_positions(sheet, picture)?
@@ -1390,6 +1396,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] when there is no such drawing.
     pub fn remove_drawing(&mut self, sheet: usize, picture: bool, index: usize) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let position = *self
             .drawing_positions(sheet, picture)?

@@ -2,12 +2,14 @@
 //! fixtures, and every edit family on a fresh and an opened workbook, read
 //! back through this reader and the eager worksheet reader.
 
+use litchi_cfb::{OleFile, OleWriter};
 use litchi_xls::Package;
 use litchi_xls::sheet_features::edit::{
     Anchor, DrawingChange, Format, FormatRule, Hyperlink, PageBreak, Picture, Shape, ShapeGeometry,
     Style, Threshold, Validation,
 };
 use litchi_xls::sheet_features::{Area, DrawingKind, FeatureSet, RuleType};
+use std::io::Cursor;
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> Package {
@@ -21,12 +23,26 @@ fn fixture(name: &str) -> Package {
 /// compound file around it is re-rendered).
 fn stream(package: &Package) -> Vec<u8> {
     let bytes = package.to_bytes().unwrap();
-    let mut ole = litchi_cfb::OleFile::open(std::io::Cursor::new(bytes)).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes)).unwrap();
     ole.open_stream(&["Workbook"]).unwrap()
 }
 
 fn fresh() -> Package {
     Package::new().unwrap()
+}
+
+fn signed() -> Package {
+    let source = fresh().to_bytes().unwrap();
+    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &workbook).unwrap();
+    writer
+        .create_stream(&["DigitalSignature"], b"opaque signature")
+        .unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    Package::from_bytes(&output.into_inner()).unwrap()
 }
 
 /// The package reopened from its bytes (eager), so the result is checked by
@@ -645,6 +661,33 @@ fn an_exact_no_op_keeps_the_package() {
         commit.package().to_bytes().unwrap(),
         source.to_bytes().unwrap()
     );
+}
+
+#[test]
+fn signed_feature_reads_and_noops_preserve_bytes_but_changes_refuse() {
+    let source = signed();
+    let bytes = source.to_bytes().unwrap();
+    let mut edit = source.edit_sheet_features().unwrap();
+    let _ = edit.features(0, FeatureSet::PAGE_BREAKS).unwrap();
+    let noop = edit.commit().unwrap();
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.package().to_bytes().unwrap(), bytes);
+    assert_eq!(
+        source
+            .apply_sheet_features(noop.patch())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap(),
+        bytes
+    );
+
+    let mut changed = source.edit_sheet_features().unwrap();
+    changed.set_row_breaks(0, &[PageBreak::new(5)]).unwrap();
+    assert!(matches!(
+        changed.commit(),
+        Err(litchi_xls::sheet_features::edit::Error::Signed)
+    ));
 }
 
 #[test]

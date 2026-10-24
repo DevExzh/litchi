@@ -13,6 +13,7 @@ use crate::Package;
 /// package.
 pub use crate::package::{Error, Result};
 use litchi_cfb::{OleError, OleFile, OleFileLimits};
+use litchi_ole_common::object::Limits as ObjectLimits;
 use litchi_ole_common::property_set::document_summary::Snapshot as DocumentSummary;
 use litchi_ole_common::property_set::summary_information::Snapshot as SummaryInformation;
 use litchi_ole_common::property_set::{
@@ -43,7 +44,19 @@ impl Snapshot {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let mut ole = OleFile::open(Cursor::new(bytes.clone()))?;
+        Self::from_bytes_with_cfb_limits(bytes, OleFileLimits::default())
+    }
+
+    /// Parse a property-set source under the package's retained CFB policy.
+    ///
+    /// This is crate-private because the public snapshot constructor keeps
+    /// the codec's default profile; package owners pass the profile that
+    /// admitted their source when an edit first materializes.
+    pub(crate) fn from_bytes_with_cfb_limits(
+        bytes: Vec<u8>,
+        cfb_limits: OleFileLimits,
+    ) -> Result<Self> {
+        let mut ole = OleFile::open_with_limits(Cursor::new(bytes.clone()), cfb_limits)?;
         validate_host(&mut ole)?;
 
         // A blank standard section (no property, not even a code page)
@@ -124,8 +137,9 @@ impl Snapshot {
 pub struct Edit {
     /// The package a commit republishes; `None` only for codec-level tests.
     base: Option<Package>,
-    source: Snapshot,
-    editor: PropertySetEdit,
+    signed: bool,
+    source: Option<Snapshot>,
+    editor: Option<PropertySetEdit>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -139,43 +153,140 @@ impl Edit {
         if base.is_encrypted() {
             return Err(Error::EncryptionPolicy);
         }
-        let source = Snapshot::from_bytes(base.to_bytes()?)?;
-        let editor = PropertySetEdit::new(source.bytes.to_vec(), OleFileLimits::default())
-            .map_err(crate::Error::from)?;
         Ok(Self {
             base: Some(base.clone()),
-            source,
-            editor,
+            signed: base.is_signed(),
+            source: None,
+            editor: None,
         })
     }
 
     /// A codec-level edit of a bare property-set snapshot (tests only).
     #[cfg(test)]
     fn detached(source: Snapshot) -> Result<Self> {
-        let editor = PropertySetEdit::new(source.bytes.to_vec(), OleFileLimits::default())
-            .map_err(crate::Error::from)?;
+        let signed = {
+            let ole = OleFile::open(Cursor::new(source.bytes.to_vec()))?;
+            [
+                "_xmlsignatures",
+                "_signatures",
+                "DigitalSignature",
+                "\u{0005}DigitalSignature",
+            ]
+            .iter()
+            .any(|name| ole.exists(&[*name]))
+        };
+        let editor = if signed {
+            None
+        } else {
+            Some(
+                PropertySetEdit::new(source.bytes.to_vec(), OleFileLimits::default())
+                    .map_err(crate::Error::from)?,
+            )
+        };
         Ok(Self {
             base: None,
-            source,
+            signed,
+            source: Some(source),
             editor,
         })
     }
 
+    /// Materialize the owned property-set source and editor on first use.
+    ///
+    /// The locals are installed only after both parses succeed, so a failed
+    /// admission can be retried without leaving half-built staging state.
+    fn ensure_ready(&mut self) -> Result<()> {
+        if self.source.is_some() {
+            return Ok(());
+        }
+        let base = self.base.as_ref().ok_or(Error::InvalidData(
+            "a detached property-set edit lost its source",
+        ))?;
+        let (_, cfb_limits) =
+            base.edit_profile(ObjectLimits::default(), OleFileLimits::default())?;
+        let source = Snapshot::from_bytes_with_cfb_limits(base.to_bytes()?, cfb_limits)?;
+        if self.signed {
+            self.source = Some(source);
+            return Ok(());
+        }
+        let editor =
+            PropertySetEdit::new(source.bytes.to_vec(), cfb_limits).map_err(crate::Error::from)?;
+        self.source = Some(source);
+        self.editor = Some(editor);
+        Ok(())
+    }
+
+    fn editor_ref(&mut self) -> Result<&PropertySetEdit> {
+        self.ensure_ready()?;
+        self.check_signed_source()?;
+        self.editor
+            .as_ref()
+            .ok_or(Error::Reader(crate::Error::Signed))
+    }
+
+    fn editor_mut_ready(&mut self) -> Result<&mut PropertySetEdit> {
+        self.ensure_ready()?;
+        self.check_signed_source()?;
+        self.editor
+            .as_mut()
+            .ok_or(Error::Reader(crate::Error::Signed))
+    }
+
+    /// Recheck a dynamic original source before a signed edit reports its
+    /// policy refusal. This is a version-only fence; full bytes are checked
+    /// once at publication by [`Self::check_source`].
+    fn check_signed_source(&self) -> Result<()> {
+        if !self.signed {
+            return Ok(());
+        }
+        let Some(base) = &self.base else {
+            return Ok(());
+        };
+        base.ensure_source_fence()
+    }
+
     /// The shared property-set editor, for the package metadata transaction.
-    pub(crate) const fn editor(&self) -> &PropertySetEdit {
-        &self.editor
+    pub(crate) fn editor(&mut self) -> Result<&PropertySetEdit> {
+        self.editor_ref()
     }
 
     /// Mutable access to the shared editor, for the package metadata
     /// transaction.
-    pub(crate) fn editor_mut(&mut self) -> &mut PropertySetEdit {
-        &mut self.editor
+    pub(crate) fn editor_mut(&mut self) -> Result<&mut PropertySetEdit> {
+        self.editor_mut_ready()
     }
 
     /// Returns the immutable package source used for conflict checks.
-    #[must_use]
-    pub const fn before(&self) -> &Snapshot {
-        &self.source
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the deferred source cannot be materialized.
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_ready()?;
+        self.source
+            .as_ref()
+            .ok_or(Error::InvalidData("a property-set edit lost its source"))
+    }
+
+    /// The materialized read snapshot, retained for signed no-op admission
+    /// and package metadata projection.
+    pub(crate) fn snapshot(&mut self) -> Result<&Snapshot> {
+        self.before()
+    }
+
+    /// Refuse to publish a transaction whose package source changed after
+    /// its first materialization.
+    pub(crate) fn check_source(&self) -> Result<()> {
+        let (Some(base), Some(source)) = (&self.base, &self.source) else {
+            return Ok(());
+        };
+        if base.to_bytes()?.as_slice() != source.bytes() {
+            return Err(Error::Reader(crate::Error::PatchConflict {
+                operation: "edit property sets",
+                reason: "the package source changed while the edit was staged",
+            }));
+        }
+        Ok(())
     }
 
     /// Applies a typed PIDSI edit, staging only an actual section change.
@@ -191,7 +302,9 @@ impl Edit {
             &mut litchi_ole_common::property_set::summary_information::Edit<'_>,
         ) -> std::result::Result<(), OleError>,
     {
-        let section = self.editor.property_set(Binding::SummaryInformation)?;
+        let section = self
+            .editor_ref()?
+            .property_set(Binding::SummaryInformation)?;
         let snapshot = match section {
             Some(section) if !section.is_empty() => {
                 litchi_ole_common::property_set::summary_information::Snapshot::from_section(
@@ -206,7 +319,7 @@ impl Edit {
         edit(&mut typed)?;
         let commit = typed.commit()?;
         if commit.diagnostics().changed() {
-            self.editor
+            self.editor_mut_ready()?
                 .replace(Binding::SummaryInformation, commit.into_package())?;
         }
         Ok(())
@@ -227,7 +340,7 @@ impl Edit {
         ) -> std::result::Result<(), OleError>,
     {
         let section = self
-            .editor
+            .editor_ref()?
             .property_set(Binding::DocumentSummaryInformation)?;
         let snapshot = match section {
             Some(section) if !section.is_empty() => {
@@ -241,7 +354,7 @@ impl Edit {
         edit(&mut typed)?;
         let commit = typed.commit()?;
         if commit.diagnostics().changed() {
-            self.editor
+            self.editor_mut_ready()?
                 .replace(Binding::DocumentSummaryInformation, commit.into_package())?;
         }
         Ok(())
@@ -257,7 +370,7 @@ impl Edit {
         F: FnOnce(&mut Section) -> std::result::Result<(), litchi_ole_common::Error>,
     {
         let current = self
-            .editor
+            .editor_ref()?
             .property_set(Binding::UserDefinedProperties)?
             .unwrap_or_else(|| {
                 let mut section = Section::new(USER_DEFINED_PROPERTIES_FMTID);
@@ -267,7 +380,7 @@ impl Edit {
         let mut candidate = current.clone();
         edit(&mut candidate)?;
         if candidate != current {
-            self.editor
+            self.editor_mut_ready()?
                 .replace(Binding::UserDefinedProperties, candidate)?;
         }
         Ok(())
@@ -279,7 +392,9 @@ impl Edit {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn remove_user_defined_properties(&mut self) -> Result<Option<Section>> {
-        Ok(self.editor.remove(Binding::UserDefinedProperties)?)
+        Ok(self
+            .editor_mut_ready()?
+            .remove(Binding::UserDefinedProperties)?)
     }
 
     /// Validate and publish the staged edits as a new package.
@@ -293,6 +408,9 @@ impl Edit {
             "a detached property-set edit has no package",
         ))?;
         let (patch, changed) = self.finish()?;
+        if changed && base.is_signed() {
+            return Err(Error::Reader(crate::Error::Signed));
+        }
         let package = if changed {
             crate::package::republish(&base, patch.after.to_vec())?
         } else {
@@ -304,10 +422,32 @@ impl Edit {
     /// Render the staged edits into a whole-package patch without
     /// republishing it (the metadata family republishes it itself).
     pub(crate) fn finish(self) -> Result<(Patch, bool)> {
-        let before = self.source.bytes().to_vec();
-        let bytes = self.editor.finish().map_err(crate::Error::from)?;
-        let changed = bytes != before;
-        Ok((Patch::new(before, bytes), changed))
+        let mut this = self;
+        this.ensure_ready()?;
+        this.check_source()?;
+        let source = this
+            .source
+            .take()
+            .ok_or(Error::InvalidData("a property-set edit lost its source"))?;
+        let result = (|| {
+            let editor = match this.editor.take() {
+                Some(editor) => editor,
+                None => {
+                    let before = source.bytes().to_vec();
+                    return Ok((Patch::new(before.clone(), before), false));
+                },
+            };
+            let before = source.bytes().to_vec();
+            let bytes = editor.finish().map_err(crate::Error::from)?;
+            let changed = bytes != before;
+            Ok((Patch::new(before, bytes), changed))
+        })();
+        // Rendering can fail after the leading source check. Prefer a
+        // concurrent source change over either a render error or success.
+        if let Some(base) = this.base.as_ref() {
+            base.ensure_source_fence()?;
+        }
+        result
     }
 }
 
@@ -375,15 +515,18 @@ impl Package {
     /// Returns an error when the compound file or a property set is
     /// malformed.
     pub fn property_sets(&self) -> Result<Snapshot> {
-        Snapshot::from_bytes(self.to_bytes()?)
+        let (_, cfb_limits) =
+            self.edit_profile(ObjectLimits::default(), OleFileLimits::default())?;
+        Snapshot::from_bytes_with_cfb_limits(self.to_bytes()?, cfb_limits)
     }
 
     /// Start a property-set edit of this package.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::EncryptionPolicy`] for an encrypted workbook, or an
-    /// error when the compound file cannot be read.
+    /// Returns [`Error::EncryptionPolicy`] for an encrypted workbook. A
+    /// compound-file error is returned by the first property-set verb or
+    /// commit, after the deferred source is materialized.
     pub fn edit_property_sets(&self) -> Result<Edit> {
         Edit::new(self)
     }
@@ -401,6 +544,9 @@ impl Package {
             }));
         }
         let changed = !patch.is_noop();
+        if changed && self.is_signed() {
+            return Err(Error::Reader(crate::Error::Signed));
+        }
         let package = if changed {
             crate::package::republish(self, patch.after.to_vec())?
         } else {
@@ -575,18 +721,33 @@ mod tests {
     }
 
     #[test]
-    fn signed_and_encrypted_sources_are_refused_before_mutation() {
-        assert!(
-            Snapshot::from_bytes(package_bytes(Some("DigitalSignature")))
-                .map(Edit::detached)
-                .unwrap()
-                .is_err()
-        );
+    fn signed_sources_allow_exact_noops_but_refuse_changes() {
+        let source = package_bytes(Some("DigitalSignature"));
+        let transaction = Edit::detached(Snapshot::from_bytes(source.clone()).unwrap()).unwrap();
+        let (patch, changed) = transaction.finish().unwrap();
+        assert!(!changed);
+        assert_eq!(patch.before(), source.as_slice());
+        assert_eq!(patch.after(), source.as_slice());
+
+        let mut transaction = Edit::detached(Snapshot::from_bytes(source).unwrap()).unwrap();
+        assert!(matches!(
+            transaction.edit_summary_information(|edit| edit.set_title("changed")),
+            Err(Error::Reader(crate::Error::Signed))
+        ));
+
         assert!(
             Snapshot::from_bytes(package_bytes(Some("EncryptedPackage")))
                 .map(Edit::detached)
                 .unwrap()
                 .is_err()
         );
+    }
+
+    #[test]
+    fn package_edit_entry_keeps_source_and_editor_cold() {
+        let package = crate::Builder::new().build().unwrap();
+        let edit = Edit::new(&package).unwrap();
+        assert!(edit.source.is_none());
+        assert!(edit.editor.is_none());
     }
 }

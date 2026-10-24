@@ -596,6 +596,14 @@ impl Package {
         }
     }
 
+    /// Check the retained dynamic source without materializing its bytes.
+    ///
+    /// Scoped edit families use this version-only fence when a policy error
+    /// must not hide a concurrent source change.
+    pub(crate) fn ensure_source_fence(&self) -> Result<()> {
+        ensure_source_fence(&self.inner)
+    }
+
     /// Borrow the retained eager reader, materializing a source-backed reader
     /// only on this explicit compatibility escape.
     pub fn reader_ref(&self) -> Result<&crate::raw::Reader<Cursor<Vec<u8>>>> {
@@ -604,36 +612,40 @@ impl Package {
 
     /// Admit edited bytes under this package's retained read policy.
     pub(crate) fn republish_bytes(&self, bytes: Vec<u8>) -> Result<Self> {
-        match self.inner.policy {
-            RetainedPolicy::Eager {
-                source_limits,
-                leniency,
-                compatibility_profile,
-            } => Self::from_owned_bytes(
-                bytes,
-                OpenOptions::default()
-                    .source_limits(source_limits)
-                    .leniency(leniency)
-                    .compatibility_profile(compatibility_profile),
-            ),
-            RetainedPolicy::Source { limits, leniency } => {
-                let cfb_limits = self
-                    .source()
-                    .map(SharedOleFile::limits)
-                    .ok_or(Error::InvalidData("source-backed XLS package lost its CFB"))?;
-                let cfb = Arc::new(SharedOleFile::open_with_limits(
-                    Arc::new(litchi_core::OwnedSource::new(bytes)),
-                    cfb_limits,
-                )?);
-                let workbook = SourceBackedWorkbook::from_shared_ole_file_with_options(
-                    cfb,
-                    crate::SourceBackedOptions::default()
-                        .limits(limits)
-                        .leniency(leniency),
-                )?;
-                Self::from_source(workbook)
-            },
-        }
+        ensure_source_fence(&self.inner)?;
+        let result = (|| -> Result<Self> {
+            match self.inner.policy {
+                RetainedPolicy::Eager {
+                    source_limits,
+                    leniency,
+                    compatibility_profile,
+                } => Self::from_owned_bytes(
+                    bytes,
+                    OpenOptions::default()
+                        .source_limits(source_limits)
+                        .leniency(leniency)
+                        .compatibility_profile(compatibility_profile),
+                ),
+                RetainedPolicy::Source { limits, leniency } => {
+                    let cfb_limits = self
+                        .source()
+                        .map(SharedOleFile::limits)
+                        .ok_or(Error::InvalidData("source-backed XLS package lost its CFB"))?;
+                    let cfb = Arc::new(SharedOleFile::open_with_limits(
+                        Arc::new(litchi_core::OwnedSource::new(bytes)),
+                        cfb_limits,
+                    )?);
+                    let workbook = SourceBackedWorkbook::from_shared_ole_file_with_options(
+                        cfb,
+                        crate::SourceBackedOptions::default()
+                            .limits(limits)
+                            .leniency(leniency),
+                    )?;
+                    Self::from_source(workbook)
+                },
+            }
+        })();
+        finish_source_fence(&self.inner, result)
     }
 
     /// The Workbook stream (`Workbook`, or `Book` from older producers), read
@@ -717,6 +729,12 @@ impl Package {
     #[must_use]
     pub fn is_encrypted(&self) -> bool {
         self.encryption().is_some()
+    }
+
+    /// Whether the retained input carries a compound-file signature stream.
+    #[must_use]
+    pub(crate) fn is_signed(&self) -> bool {
+        self.inner.signed
     }
 
     /// Return the password-to-open profile retained from source admission.
@@ -1246,7 +1264,17 @@ fn source_fence_workbook(inner: &PackageInner) -> Option<&SourceBackedWorkbook> 
 
 fn ensure_source_fence(inner: &PackageInner) -> Result<()> {
     if let Some(workbook) = source_fence_workbook(inner) {
-        workbook.ensure_current().map_err(Error::Source)?;
+        return workbook.ensure_current().map_err(Error::Source);
+    }
+    if let PackageState::Source { cfb, .. } = &inner.state {
+        let expected = cfb.captured_source_version();
+        let observed = cfb.source_version().map_err(SourceBackedError::from)?;
+        if observed != expected {
+            return Err(Error::Source(SourceBackedError::SourceChanged {
+                expected,
+                observed,
+            }));
+        }
     }
     Ok(())
 }
@@ -1569,5 +1597,108 @@ fn sheet_catalog(inner: &PackageInner) -> Result<&[crate::SheetMetadata]> {
             Ok(catalog.get_or_init(|| captured.into_boxed_slice()))
         },
         PackageState::Eager { reader, .. } => Ok(reader.sheets()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, Package};
+    use crate::{Builder, SourceBackedError, SourceBackedWorkbook};
+    use litchi_cfb::OleError;
+    use litchi_core::{ReadAt, SourceVersion};
+    use std::io;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
+    struct AdmissionSource {
+        bytes: Arc<[u8]>,
+        observations: AtomicUsize,
+        revision: AtomicU64,
+        bump_after: AtomicUsize,
+    }
+
+    impl AdmissionSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes: Arc::from(bytes),
+                observations: AtomicUsize::new(0),
+                revision: AtomicU64::new(0),
+                bump_after: AtomicUsize::new(0),
+            }
+        }
+
+        fn bump_after_next_observation(&self) {
+            let next = self.observations.load(Ordering::SeqCst).saturating_add(1);
+            self.bump_after.store(next, Ordering::SeqCst);
+        }
+
+        fn package(self: &Arc<Self>) -> Package {
+            let reader: Arc<dyn ReadAt> = self.clone();
+            let workbook = SourceBackedWorkbook::from_read_at(reader).unwrap();
+            Package::from_source(workbook).unwrap()
+        }
+    }
+
+    impl ReadAt for AdmissionSource {
+        fn len(&self) -> io::Result<u64> {
+            u64::try_from(self.bytes.len())
+                .map_err(|_| io::Error::other("source length does not fit u64"))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let start = usize::try_from(offset)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
+            if start >= self.bytes.len() || output.is_empty() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - start);
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            let ordinal = self.observations.fetch_add(1, Ordering::SeqCst) + 1;
+            let observed =
+                SourceVersion::new(0x584c_535f_4144_4d49, self.revision.load(Ordering::SeqCst));
+            if self.bump_after.load(Ordering::SeqCst) == ordinal {
+                self.bump_after.store(0, Ordering::SeqCst);
+                self.revision.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(observed)
+        }
+    }
+
+    fn source_bytes() -> Vec<u8> {
+        let mut builder = Builder::new();
+        let sheet = builder.add_worksheet("Sheet1").unwrap();
+        builder.write_number(sheet, 0, 0, 1.0).unwrap();
+        builder.build().unwrap().to_bytes().unwrap()
+    }
+
+    #[test]
+    fn republish_keeps_candidate_admission_error_when_source_is_stable() {
+        let source = Arc::new(AdmissionSource::new(source_bytes()));
+        let package = source.package();
+
+        let error = package.republish_bytes(vec![0, 1, 2]).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Cfb(OleError::NotOleFile | OleError::InvalidFormat(_))
+        ));
+    }
+
+    #[test]
+    fn republish_promotes_source_change_over_candidate_admission_error() {
+        let source = Arc::new(AdmissionSource::new(source_bytes()));
+        let package = source.package();
+        // The hook mutates the original immediately after the leading source
+        // observation returns, while invalid candidate admission is pending.
+        source.bump_after_next_observation();
+
+        let error = package.republish_bytes(vec![0, 1, 2]).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Source(SourceBackedError::SourceChanged { .. })
+        ));
     }
 }

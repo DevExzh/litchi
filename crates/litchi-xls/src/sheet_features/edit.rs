@@ -64,6 +64,8 @@ pub enum Error {
     },
     /// A patch's source does not match the package receiving it.
     PatchConflict,
+    /// A changed write of a signed workbook; remove the signature explicitly.
+    Signed,
 }
 
 impl fmt::Display for Error {
@@ -83,6 +85,9 @@ impl fmt::Display for Error {
             Self::PatchConflict => formatter.write_str(
                 "the worksheet-feature patch source does not match the package receiving it",
             ),
+            Self::Signed => {
+                formatter.write_str("changed worksheet features require explicit signature removal")
+            },
         }
     }
 }
@@ -92,7 +97,8 @@ impl std::error::Error for Error {
         match self {
             Self::Package(error) => Some(error),
             Self::Records(error) => Some(error),
-            _ => None,
+            Self::Refused(_) | Self::Limit { .. } => None,
+            Self::Signed | Self::PatchConflict => None,
         }
     }
 }
@@ -108,6 +114,7 @@ impl From<crate::Error> for Error {
         match error {
             crate::Error::Refused(refusal) => Self::Refused(refusal),
             crate::Error::PatchConflict { .. } => Self::PatchConflict,
+            crate::Error::Signed => Self::Signed,
             other => Self::Records(other),
         }
     }
@@ -245,7 +252,7 @@ impl Commit {
 /// The staged features of one package.
 pub struct Edit {
     base: Package,
-    source: Arc<[u8]>,
+    source: Option<Arc<[u8]>>,
     stream: Vec<u8>,
     operations: usize,
 }
@@ -270,14 +277,29 @@ impl Edit {
         if base.is_encrypted() {
             return Err(Error::Package(crate::package::Error::EncryptionPolicy));
         }
-        let source = base.workbook_stream()?;
-        Globals::parse(&source)?;
         Ok(Self {
             base: base.clone(),
-            stream: source.to_vec(),
-            source,
+            source: None,
+            stream: Vec::new(),
             operations: 0,
         })
+    }
+
+    /// Materialize and validate the Workbook stream on first use.
+    ///
+    /// The source and mutable copy are installed together only after the
+    /// global record parse succeeds, so a failed first operation leaves the
+    /// edit retryable.
+    pub(super) fn ensure_ready(&mut self) -> Result<()> {
+        if self.source.is_some() {
+            return Ok(());
+        }
+        let source = self.base.workbook_stream()?;
+        Globals::parse(&source)?;
+        let stream = source.to_vec();
+        self.source = Some(source);
+        self.stream = stream;
+        Ok(())
     }
 
     fn step(&mut self) -> Result<()> {
@@ -305,7 +327,8 @@ impl Edit {
     ///
     /// Returns an error when the position is not a worksheet or its records
     /// are malformed.
-    pub fn features(&self, sheet: usize, select: FeatureSet) -> Result<Features> {
+    pub fn features(&mut self, sheet: usize, select: FeatureSet) -> Result<Features> {
+        self.ensure_ready()?;
         let (globals, layout) = self.sheet(sheet)?;
         Ok(read::read(&self.stream, &globals, &layout, sheet, select)?)
     }
@@ -338,6 +361,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] for more than 1,026 breaks.
     pub fn set_row_breaks(&mut self, sheet: usize, breaks: &[PageBreak]) -> Result<()> {
+        self.ensure_ready()?;
         self.set_breaks(sheet, HORIZONTAL_PAGE_BREAKS, breaks, LAST_COLUMN)
     }
 
@@ -349,6 +373,7 @@ impl Edit {
     /// Returns [`Error::Refused`] for more than 1,026 breaks or a column
     /// outside the grid.
     pub fn set_column_breaks(&mut self, sheet: usize, breaks: &[PageBreak]) -> Result<()> {
+        self.ensure_ready()?;
         if breaks.iter().any(|item| item.index > 255) {
             return Err(refused(
                 RefusalKind::InvalidValue,
@@ -435,6 +460,7 @@ impl Edit {
     /// Returns [`Error::Refused`] for a link without a target or a value
     /// outside its BIFF8 bound.
     pub fn add_hyperlink(&mut self, sheet: usize, link: &HyperlinkSpec) -> Result<usize> {
+        self.ensure_ready()?;
         self.step()?;
         let bytes = encode::hyperlink(link)
             .map_err(|_| refused(RefusalKind::InvalidValue, "the hyperlink cannot be encoded"))?;
@@ -456,6 +482,7 @@ impl Edit {
         index: usize,
         link: &HyperlinkSpec,
     ) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let bytes = encode::hyperlink(link)
             .map_err(|_| refused(RefusalKind::InvalidValue, "the hyperlink cannot be encoded"))?;
@@ -473,6 +500,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] when there is no such hyperlink.
     pub fn remove_hyperlink(&mut self, sheet: usize, index: usize) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let (first, end) = *Self::hyperlink_units(&layout).get(index).ok_or(refused(
@@ -518,6 +546,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] for a validation outside its BIFF8 bounds.
     pub fn add_validation(&mut self, sheet: usize, spec: &ValidationSpec) -> Result<usize> {
+        self.ensure_ready()?;
         self.step()?;
         let bytes = encode::validation(spec).map_err(|_| {
             refused(
@@ -556,6 +585,7 @@ impl Edit {
         index: usize,
         spec: &ValidationSpec,
     ) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let bytes = encode::validation(spec).map_err(|_| {
             refused(
@@ -579,6 +609,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] when there is no such validation.
     pub fn remove_validation(&mut self, sheet: usize, index: usize) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let (dval, rules) = Self::validation_records(&layout);
@@ -676,6 +707,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] for a format outside its BIFF8 bounds.
     pub fn add_format(&mut self, sheet: usize, format: &Format) -> Result<usize> {
+        self.ensure_ready()?;
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let identifier = self.next_format_identifier(&layout);
@@ -696,6 +728,7 @@ impl Edit {
     /// [`Error::Refused`] when it holds more than one rule or a `CFEx`
     /// extends it.
     pub fn set_format(&mut self, sheet: usize, index: usize, format: &Format) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let (first, end, future, identifier) =
@@ -732,6 +765,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] when there is no such format.
     pub fn set_format_ranges(&mut self, sheet: usize, index: usize, ranges: &[Area]) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let (first, end, future, identifier) =
@@ -777,6 +811,7 @@ impl Edit {
     ///
     /// Returns [`Error::Refused`] when there is no such format.
     pub fn remove_format(&mut self, sheet: usize, index: usize) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         let (_, layout) = self.sheet(sheet)?;
         let (first, end, future, identifier) =
@@ -826,6 +861,7 @@ impl Edit {
     /// Returns [`Error::Refused`] for a range outside the grid and
     /// [`Error::Refused`] for source layouts the editor does not rewrite.
     pub fn set_auto_filter(&mut self, sheet: usize, area: Option<Area>) -> Result<()> {
+        self.ensure_ready()?;
         self.step()?;
         if let Some(area) = area {
             if area.last_column > 255 || area.last_column - area.first_column > 255 {
@@ -1023,11 +1059,23 @@ impl Edit {
     /// Returns an error when the edited stream cannot be written into the
     /// package or the result does not reopen.
     pub fn commit(self) -> Result<Commit> {
-        let operations = self.operations;
-        if self.stream.as_slice() == &*self.source {
-            let bytes: Arc<[u8]> = Arc::from(self.base.to_bytes()?);
+        let mut this = self;
+        this.ensure_ready()?;
+        let operations = this.operations;
+        let source =
+            this.source
+                .take()
+                .ok_or(Error::Package(crate::package::Error::InvalidData(
+                    "worksheet-feature edit lost its source stream",
+                )))?;
+        let current_stream = this.base.workbook_stream()?;
+        if current_stream.as_ref() != source.as_ref() {
+            return Err(Error::PatchConflict);
+        }
+        if this.stream.as_slice() == &*source {
+            let bytes: Arc<[u8]> = Arc::from(this.base.to_bytes()?);
             return Ok(Commit {
-                package: self.base,
+                package: this.base,
                 patch: Patch {
                     before: Arc::clone(&bytes),
                     after: bytes,
@@ -1038,27 +1086,38 @@ impl Edit {
                 },
             });
         }
-        let before: Arc<[u8]> = Arc::from(self.base.to_bytes()?);
-        let name = workbook_stream_name(&before)?;
-        let package = ObjectPackage::open_with_options(
-            before.to_vec(),
-            ObjectOpenOptions::new()
-                .targets(Targets::default())
-                .limits(ObjectLimits::default()),
-        )
-        .map_err(|error| Error::Records(error.into()))?;
-        let mut editor = package
-            .edit()
+        if this.base.is_signed() {
+            return Err(Error::Signed);
+        }
+        let result = (|| -> Result<(Arc<[u8]>, Vec<u8>)> {
+            let before: Arc<[u8]> = Arc::from(this.base.to_bytes()?);
+            let name = workbook_stream_name(&before)?;
+            let package = ObjectPackage::open_with_options(
+                before.to_vec(),
+                ObjectOpenOptions::new()
+                    .targets(Targets::default())
+                    .limits(ObjectLimits::default()),
+            )
             .map_err(|error| Error::Records(error.into()))?;
-        editor
-            .put_stream_shared(&[name.to_owned()], Arc::from(self.stream))
-            .map_err(|error| Error::Records(error.into()))?;
-        let committed = editor
-            .commit()
-            .map_err(|error| Error::Records(error.into()))?;
-        let rendered = committed.package().source_shared().as_ref().clone();
+            let mut editor = package
+                .edit()
+                .map_err(|error| Error::Records(error.into()))?;
+            editor
+                .put_stream_shared(&[name.to_owned()], Arc::from(this.stream))
+                .map_err(|error| Error::Records(error.into()))?;
+            let committed = editor
+                .commit()
+                .map_err(|error| Error::Records(error.into()))?;
+            let rendered = committed.package().source_shared().as_ref().clone();
+            Ok((before, rendered))
+        })();
+        // Rendering or candidate construction can fail after the leading
+        // source check. Prefer a concurrent source change over that error;
+        // successful publication is fenced again by `republish` below.
+        this.base.ensure_source_fence()?;
+        let (before, rendered) = result?;
         let after: Arc<[u8]> = Arc::from(rendered.as_slice());
-        let package = crate::package::republish(&self.base, rendered)?;
+        let package = crate::package::republish(&this.base, rendered)?;
         Ok(Commit {
             package,
             patch: Patch { before, after },
@@ -1118,6 +1177,130 @@ pub fn compile_formula(formula: &str) -> Result<Vec<u8>> {
     })
 }
 
+#[cfg(test)]
+mod tests {
+    use super::{Edit, Error};
+    use crate::{Builder, SourceBackedError, SourceBackedWorkbook};
+    use litchi_core::{ReadAt, SourceVersion};
+    use std::io;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
+    struct SourceHook {
+        bytes: Arc<[u8]>,
+        observations: AtomicUsize,
+        revision: AtomicU64,
+        bump_at: AtomicUsize,
+    }
+
+    impl SourceHook {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes: Arc::from(bytes),
+                observations: AtomicUsize::new(0),
+                revision: AtomicU64::new(0),
+                bump_at: AtomicUsize::new(0),
+            }
+        }
+
+        fn bump_after_versions(&self, additional: usize) {
+            self.bump_at.store(
+                self.observations
+                    .load(Ordering::SeqCst)
+                    .saturating_add(additional),
+                Ordering::SeqCst,
+            );
+        }
+    }
+
+    impl ReadAt for SourceHook {
+        fn len(&self) -> io::Result<u64> {
+            u64::try_from(self.bytes.len())
+                .map_err(|_| io::Error::other("source length does not fit u64"))
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let start = usize::try_from(offset)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
+            if start >= self.bytes.len() || output.is_empty() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - start);
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            let ordinal = self.observations.fetch_add(1, Ordering::SeqCst) + 1;
+            let observed =
+                SourceVersion::new(0x584c_535f_4645_4154, self.revision.load(Ordering::SeqCst));
+            if self.bump_at.load(Ordering::SeqCst) == ordinal {
+                self.bump_at.store(0, Ordering::SeqCst);
+                self.revision.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(observed)
+        }
+    }
+
+    fn source_bytes() -> Vec<u8> {
+        let mut builder = Builder::new();
+        let sheet = builder.add_worksheet("Sheet1").unwrap();
+        builder.write_number(sheet, 0, 0, 1.0).unwrap();
+        builder.build().unwrap().to_bytes().unwrap()
+    }
+
+    fn oversized_edit(source: &Arc<SourceHook>) -> Edit {
+        let reader: Arc<dyn ReadAt> = source.clone();
+        let workbook = SourceBackedWorkbook::from_read_at(reader).unwrap();
+        let package = crate::Package::from_source(workbook).unwrap();
+        let mut edit = Edit::new(&package).unwrap();
+        edit.ensure_ready().unwrap();
+        edit.stream = vec![0; 128 * 1024 * 1024 + 1];
+        edit
+    }
+
+    #[test]
+    fn package_edit_entry_keeps_workbook_stream_cold() {
+        let package = Builder::new().build().unwrap();
+        let edit = Edit::new(&package).unwrap();
+        assert!(edit.source.is_none());
+        assert!(edit.stream.is_empty());
+    }
+
+    #[test]
+    fn render_error_keeps_the_stable_admission_limit() {
+        let source = Arc::new(SourceHook::new(source_bytes()));
+        let edit = oversized_edit(&source);
+
+        assert!(matches!(
+            edit.commit(),
+            Err(Error::Records(crate::Error::Object(
+                litchi_ole_common::Error::Limit {
+                    kind: litchi_ole_common::LimitKind::StreamBytes,
+                    ..
+                }
+            )))
+        ));
+    }
+
+    #[test]
+    fn render_error_prefers_a_source_change_seen_after_the_leading_fence() {
+        let source = Arc::new(SourceHook::new(source_bytes()));
+        let edit = oversized_edit(&source);
+        // Object-package admission rejects a stream over its finite limit.
+        // The hook bumps immediately after `before`'s last source observation,
+        // leaving that admission error to the trailing owner fence.
+        source.bump_after_versions(5);
+
+        assert!(matches!(
+            edit.commit(),
+            Err(Error::Package(crate::package::Error::Source(
+                SourceBackedError::SourceChanged { .. }
+            )))
+        ));
+    }
+}
+
 /// Apply a patch to the exact package it was made from.
 pub(super) fn apply(package: &Package, patch: &Patch) -> Result<Commit> {
     let bytes = package.to_bytes().map_err(crate::scoped::package_error)?;
@@ -1133,6 +1316,9 @@ pub(super) fn apply(package: &Package, patch: &Patch) -> Result<Commit> {
                 operations: 0,
             },
         });
+    }
+    if package.is_signed() {
+        return Err(Error::Signed);
     }
     Ok(Commit {
         package: crate::package::republish(package, patch.after().to_vec())?,

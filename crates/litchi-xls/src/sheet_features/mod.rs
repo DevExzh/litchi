@@ -181,8 +181,9 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`edit::Error::Package`] for an encrypted workbook or when the
-    /// Workbook stream cannot be read.
+    /// Returns [`edit::Error::Package`] for an encrypted workbook. Workbook
+    /// stream errors are returned by the first feature verb or commit after
+    /// deferred materialization.
     pub fn edit_sheet_features(&self) -> edit::Result<edit::Edit> {
         edit::Edit::new(self)
     }

@@ -112,6 +112,11 @@ fn notes_add_get_set_remove() {
         assert_eq!(removed.query("comment").unwrap().count(), 0);
         assert_eq!(stream(&removed), before);
     }
+    let duplicate_target = added
+        .file
+        .set("/Sheet1/comment[2]", props! { "ref" => "A1" })
+        .unwrap_err();
+    assert_eq!(duplicate_target.code(), Code::InvalidValue);
     let error = added
         .file
         .add("/Sheet1", NewNode::new("comment").prop("ref", "B2"))

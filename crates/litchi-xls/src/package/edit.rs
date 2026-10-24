@@ -1337,10 +1337,8 @@ mod tests {
 
         fn version(&self) -> io::Result<SourceVersion> {
             let ordinal = self.observations.fetch_add(1, Ordering::Relaxed) + 1;
-            let observed = SourceVersion::new(
-                0x584c_535f_4144_4d49,
-                self.revision.load(Ordering::Relaxed),
-            );
+            let observed =
+                SourceVersion::new(0x584c_535f_4144_4d49, self.revision.load(Ordering::Relaxed));
             if self.bump_after.load(Ordering::Relaxed) == ordinal {
                 self.revision.fetch_add(1, Ordering::Relaxed);
             }

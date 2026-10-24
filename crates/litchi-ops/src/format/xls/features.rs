@@ -1299,6 +1299,3 @@ fn break_value(kind: Kind, item: PageBreak, key: BreakKey) -> Option<Value<'stat
         BreakKey::Max => partial.then(|| int(item.max)),
     }
 }
-
-/// The `Code` of a missing feature, for the write module.
-pub(super) const MISSING: Code = Code::PathNotFound;

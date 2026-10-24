@@ -33,7 +33,7 @@ use super::node::{Item, Node};
 use super::spec::Kind;
 use super::write::{StepPatch, WriteCommit};
 use super::{Nav, Xls};
-use crate::error::{Code, Error, Result};
+use crate::error::{Code, Error, Result, refusal_code};
 use crate::new_node::NewNode;
 use crate::placement::Placement as NodePlacement;
 use crate::props::Props;
@@ -54,14 +54,7 @@ fn invalid(key: &'static str, message: impl Into<String>) -> Error {
 fn native(leaf: sf::edit::Error) -> Error {
     use sf::edit::Error as Leaf;
     match leaf {
-        Leaf::Refused(refusal) => {
-            let code = match refusal.kind() {
-                litchi_core::edit::RefusalKind::InvalidValue => Code::InvalidValue,
-                litchi_core::edit::RefusalKind::NotFound => features::MISSING,
-                _ => Code::UnsupportedCapability,
-            };
-            error(code, refusal.reason())
-        },
+        Leaf::Refused(refusal) => error(refusal_code(refusal.kind()), refusal.reason()),
         Leaf::Limit {
             observed, maximum, ..
         } => error(
@@ -69,9 +62,10 @@ fn native(leaf: sf::edit::Error) -> Error {
             format!("the worksheet drawing holds at most {maximum} shapes ({observed} requested)"),
         ),
         Leaf::PatchConflict => error(
-            Code::InternalError,
+            Code::InvalidInput,
             "a worksheet-feature patch met another package",
         ),
+        Leaf::Signed => super::signature::refusal(FileFormat::Xls),
         Leaf::Package(error) => Error::from(error).with_format(FileFormat::Xls),
         Leaf::Records(error) => Error::from(error).with_format(FileFormat::Xls),
         _ => error(Code::InternalError, "the worksheet-feature edit failed"),
@@ -626,17 +620,8 @@ impl Xls {
             }
         }
         let (commit, ()) = publish!(self, limits, |edit| {
-            match edit.set_note(sheet, cell, target, &author, &text) {
-                Err(sf::edit::Error::Refused(refusal))
-                    if refusal.reason().contains("already has") =>
-                {
-                    return Err(
-                        error(Code::InvalidArgument, "the target cell already has a note")
-                            .with_property("ref"),
-                    );
-                },
-                result => result.map_err(native)?,
-            }
+            edit.set_note(sheet, cell, target, &author, &text)
+                .map_err(native)?;
         });
         Ok(commit)
     }
@@ -2915,4 +2900,41 @@ pub(super) fn feature_kind(name: &str, props: &Props<'_>) -> Option<(Kind, Optio
     };
     let kind = <Kind as crate::path::navigate::ElementKind>::from_name(canonical)?;
     features::is_feature(kind).then_some((kind, None))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::native;
+    use crate::error::Code;
+    use litchi_core::edit::{Refusal, RefusalKind};
+
+    #[test]
+    fn native_uses_typed_leaf_classification() {
+        assert_eq!(
+            native(litchi_xls::sheet_features::edit::Error::Refused(
+                Refusal::new(RefusalKind::Protected, "set_note", "the workbook is signed",),
+            ))
+            .code(),
+            Code::DocumentProtected
+        );
+        assert_eq!(
+            native(litchi_xls::sheet_features::edit::Error::Refused(
+                Refusal::new(
+                    RefusalKind::InvalidValue,
+                    "set_note",
+                    "the target cell already has a note",
+                ),
+            ))
+            .code(),
+            Code::InvalidValue
+        );
+        assert_eq!(
+            native(litchi_xls::sheet_features::edit::Error::PatchConflict).code(),
+            Code::InvalidInput
+        );
+        assert_eq!(
+            native(litchi_xls::sheet_features::edit::Error::Signed).code(),
+            Code::DocumentProtected
+        );
+    }
 }
