@@ -318,6 +318,7 @@ def load_manifest(path: Path) -> dict[str, Any]:
         "w4b-xlsb",
         "w4-xlsx-raw",
         "w5-legacy",
+        "drawingml-raw",
         "legacy-rtf",
         "legacy-ole-properties",
         "legacy-xls-properties",
@@ -339,13 +340,13 @@ def load_manifest(path: Path) -> dict[str, Any]:
         raise RunnerError("shared must be an object")
     output = _resolve_path(str(data.get("output_dir", "")))
     preparation_receipt: Path | None = None
-    if data.get("lane") == "w4-xlsx-raw":
+    if data.get("lane") in {"w4-xlsx-raw", "drawingml-raw"}:
         value = data["shared"].get("preparation_receipt")
         if not isinstance(value, str) or not value:
-            raise RunnerError("XLSX raw lane needs a preparation receipt")
+            raise RunnerError(f"{data['lane']} needs a preparation receipt")
         preparation_receipt = _resolve_path(value)
         if _under(preparation_receipt, output) or preparation_receipt == output:
-            raise RunnerError("XLSX preparation receipt must be outside the fresh output directory")
+            raise RunnerError(f"{data['lane']} preparation receipt must be outside the fresh output directory")
     elif str(data.get("lane", "")).startswith("legacy-"):
         value = data.get("preparation_receipt")
         if not isinstance(value, str) or not value:
@@ -487,6 +488,9 @@ def _validate_lane_workload(data: Mapping[str, Any]) -> None:
     if lane == "w4-xlsx-raw":
         _validate_xlsx_raw_workload(data)
         return
+    if lane == "drawingml-raw":
+        _validate_drawingml_raw_workload(data)
+        return
     expected_programs = expected[lane]
     for leg, spec in data["legs"].items():
         actual = [(program["id"], program["argv"]) for program in spec["programs"]]
@@ -624,6 +628,198 @@ def _validate_xlsx_raw_workload(data: Mapping[str, Any]) -> None:
         raise RunnerError("XLSX raw validator must bind its reports to both source legs and the preparation receipt")
     if validator.get("cwd") != "{output_dir}":
         raise RunnerError("XLSX raw validator must run from the output directory")
+
+
+def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
+    """Validate one source-fenced DrawingML raw profile.
+
+    The outer DrawingML runner materializes one instance of this generic
+    manifest for each of the five production parents.  Keeping the workload
+    checks here makes every profile inherit the same Cargo path, binary,
+    fresh-process, ABBA, and validator guards as the established native
+    lanes.
+    """
+
+    manifest_path = "tools/perf-baseline/Cargo.toml"
+    expected_build_ids = ["drawingml_raw_native", "drawingml_raw_allocator"]
+    expected_program_ids = ["raw-native", "raw-allocator"]
+    expected_bins = ["drawingml-raw-native", "drawingml-raw-allocator"]
+    profile_lane = data.get("drawingml_profile")
+    drawingml_lane = data.get("drawingml_lane", profile_lane)
+    endpoint = data.get("drawingml_endpoint", "raw")
+    owner_route = data.get("drawingml_owner_route")
+    raw_scope = data.get("drawingml_raw_scope")
+    owner_lanes = {
+        "drawingml-chart": "drawingml-chart-raw",
+        "drawingml-theme-family": "drawingml-theme-ink",
+        "drawingml-ink-actions": "drawingml-theme-ink",
+        "drawingml-transform": "drawingml-geometry-color-formatcode2-transform",
+    }
+    raw_lanes = {
+        "drawingml-chart-raw",
+        "drawingml-diagram-raw",
+        "drawingml-text-media-raw",
+        "drawingml-theme-ink",
+        "drawingml-geometry-color-formatcode2-transform",
+    }
+    if not isinstance(profile_lane, str) or not profile_lane:
+        raise RunnerError("drawingml raw profile name is required")
+    if not isinstance(drawingml_lane, str) or not drawingml_lane:
+        raise RunnerError("drawingml raw lane is required")
+    if drawingml_lane not in raw_lanes:
+        raise RunnerError("drawingml raw lane is not reviewed")
+    if endpoint not in {"raw", "owner"}:
+        raise RunnerError("drawingml endpoint must be raw or owner")
+    if endpoint == "owner":
+        if owner_route not in owner_lanes or owner_lanes[owner_route] != drawingml_lane:
+            raise RunnerError("drawingml owner route is not reviewed for this lane")
+        if raw_scope is not None:
+            raise RunnerError("drawingml owner endpoint carries a raw scope")
+    else:
+        if owner_route is not None:
+            raise RunnerError("drawingml raw endpoint carries an owner route")
+        if raw_scope not in {None, "bulk", "family"}:
+            raise RunnerError("drawingml raw scope is not reviewed")
+    for field in (
+        "baseline_workspace_lock_sha256",
+        "candidate_workspace_lock_sha256",
+    ):
+        value = data.get(field)
+        if not isinstance(value, str) or len(value) != 64 or value != value.lower() or any(
+            character not in "0123456789abcdef" for character in value
+        ):
+            raise RunnerError(f"{field} must carry a lowercase workspace-lock SHA-256")
+    for field in ("baseline_workspace_lock_bytes", "candidate_workspace_lock_bytes"):
+        value = data.get(field)
+        if not isinstance(value, int) or value <= 0:
+            raise RunnerError(f"{field} must carry a positive workspace-lock byte count")
+    for leg, spec in data["legs"].items():
+        commands = spec["build"]
+        if [command["id"] for command in commands] != expected_build_ids:
+            raise RunnerError(f"{leg} does not preserve the DrawingML raw build command order")
+        for command, binary_name in zip(commands, expected_bins):
+            argv = command["argv"]
+            expected_prefix = ["cargo", "build", "--release", "--locked"]
+            if argv[:4] != expected_prefix or "--manifest-path" not in argv:
+                raise RunnerError(f"{leg}/{command['id']} does not use the locked perf-baseline manifest")
+            manifest_index = argv.index("--manifest-path")
+            if argv[manifest_index + 1] != manifest_path:
+                raise RunnerError(f"{leg}/{command['id']} uses a different manifest")
+            if argv[manifest_index + 2 :].count("--bin") != 1:
+                raise RunnerError(f"{leg}/{command['id']} changes the reviewed DrawingML raw binary route")
+            bin_index = argv.index("--bin", manifest_index + 2)
+            if argv[bin_index + 1 :] != [binary_name]:
+                raise RunnerError(f"{leg}/{command['id']} changes the reviewed DrawingML raw binary route")
+            feature_args = argv[manifest_index + 2 : bin_index]
+            if any(value not in {"--no-default-features", "--features"} for value in feature_args):
+                raise RunnerError(f"{leg}/{command['id']} has an unreviewed Cargo feature argument")
+            if feature_args.count("--features") > 1 or feature_args.count("--no-default-features") > 1:
+                raise RunnerError(f"{leg}/{command['id']} repeats a Cargo feature argument")
+            if "--features" in feature_args:
+                feature_index = feature_args.index("--features")
+                if feature_index + 1 >= len(feature_args) or not feature_args[feature_index + 1]:
+                    raise RunnerError(f"{leg}/{command['id']} has an empty Cargo feature set")
+            expected_feature_names = data.get(
+                "drawingml_baseline_features" if leg == "before" else "drawingml_candidate_features",
+                [],
+            )
+            if not isinstance(expected_feature_names, list) or any(
+                not isinstance(value, str) or not value for value in expected_feature_names
+            ):
+                raise RunnerError(f"{leg}/{command['id']} has invalid reviewed feature metadata")
+            expected_feature_args = ["--no-default-features"] if leg == "before" else []
+            if expected_feature_names:
+                expected_feature_args.extend(["--features", ",".join(expected_feature_names)])
+            if feature_args != expected_feature_args:
+                raise RunnerError(f"{leg}/{command['id']} changed the reviewed Cargo feature set")
+            if command["artifacts"] != [f"{{target_dir}}/release/{binary_name}"]:
+                raise RunnerError(f"{leg}/{command['id']} artifact path differs")
+        programs = spec["programs"]
+        if [program["id"] for program in programs] != expected_program_ids:
+            raise RunnerError(f"{leg} does not preserve the paired DrawingML raw program order")
+        revision = str(spec.get("source_revision", ""))
+        if len(revision) != 40 or revision != revision.lower() or any(char not in "0123456789abcdef" for char in revision):
+            raise RunnerError(f"{leg} must carry the observed lowercase source revision")
+        expected_role = "baseline" if leg == "before" else "candidate"
+        for program, mode, binary_name in zip(programs, ("normal", "allocator"), expected_bins):
+            expected_argv = [
+                "--lane",
+                drawingml_lane,
+                "--endpoint",
+                endpoint,
+            ]
+            if owner_route is not None:
+                expected_argv.extend(["--owner-route", str(owner_route)])
+            if raw_scope is not None:
+                expected_argv.extend(["--raw-scope", str(raw_scope)])
+            expected_argv.extend([
+                "--role",
+                expected_role,
+                "--mode",
+                mode,
+                "--fixture",
+                "{fixture}",
+                "--source-revision",
+                revision,
+                "--iterations",
+                "1",
+                "--warmups",
+                "3",
+                "--blocks",
+                "5",
+                "--samples",
+                "20",
+                "--target-ms",
+                "500",
+                "--minimum-ms",
+                "150",
+                "--json",
+                "{output}",
+            ])
+            if program["argv"] != expected_argv:
+                raise RunnerError(f"{leg}/{program['id']} changes the DrawingML raw probe arguments")
+            if program["binary"] != f"{{target_dir}}/release/{binary_name}":
+                raise RunnerError(f"{leg}/{program['id']} binary path differs")
+            output_name = f"{{output_dir}}/dml-{'native' if mode == 'normal' else 'allocator'}-{{leg}}-{{index}}.json"
+            if program.get("outputs") != [output_name]:
+                raise RunnerError(f"{leg}/{program['id']} output path differs")
+            if program.get("stdout") != output_name.removesuffix(".json") + ".stdout":
+                raise RunnerError(f"{leg}/{program['id']} stdout path differs")
+            if program.get("stderr") != output_name.removesuffix(".json") + ".stderr":
+                raise RunnerError(f"{leg}/{program['id']} stderr path differs")
+            if program.get("require_stdout") is not False:
+                raise RunnerError(f"{leg}/{program['id']} must write its report through --json")
+
+    validators = data.get("validators", [])
+    if len(validators) != 1 or validators[0].get("id") != "drawingml-raw-identity":
+        raise RunnerError("DrawingML raw profile needs exactly one identity/fidelity validator")
+    validator = validators[0]
+    if validator.get("outputs") != ["{output_dir}/summary.json"] or validator.get("cwd") != "{output_dir}":
+        raise RunnerError("DrawingML raw validator output/cwd differs")
+    expected_validator_argv = [
+        "python3",
+        "{source_root}/tools/native_qualification/drawingml_raw_validator.py",
+        "--output-dir",
+        "{output_dir}",
+        "--lane",
+        drawingml_lane,
+        "--endpoint",
+        endpoint,
+        "--fixture",
+        "{fixture}",
+        "--baseline-revision",
+        str(data["legs"]["before"]["source_revision"]),
+        "--candidate-revision",
+        str(data["legs"]["after"]["source_revision"]),
+        "--source-fence",
+        str(data.get("source_fence", "")),
+    ]
+    if validator.get("argv") != expected_validator_argv:
+        raise RunnerError("DrawingML raw validator is not bound to both source revisions and its fence")
+    if validator.get("script") != "{source_root}/tools/native_qualification/drawingml_raw_validator.py":
+        raise RunnerError("DrawingML raw validator script path differs")
+    if validator.get("require_stdout") is not False:
+        raise RunnerError("DrawingML raw validator must write summary.json, not claim stdout")
 
 
 def _validate_xlsx_preparation_manifest(data: Mapping[str, Any]) -> None:

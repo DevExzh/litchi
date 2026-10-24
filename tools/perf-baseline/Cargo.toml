@@ -18,6 +18,20 @@ rtf-legacy-api = []
 # `current-owner-api,legacy-property-api`.
 current-owner-api = []
 current-property-api = []
+# The DrawingML owner transition is measured against the common pre-owner
+# source (945eb1d6...).  This gate selects the Package/Edit owner branch; it
+# is independent from the Theme-part caller-limit gate below because the
+# 11728 parent already has Package/Edit while retaining *_with_limit parts.
+drawingml-owner-current = []
+# The complete Theme-part raw route crossed its caller-limit API separately
+# from the detached owner transition.  The historical 11728 parent keeps the
+# explicit *_with_limit methods; current source uses part::Limits.
+drawingml-theme-family-current = []
+# The final Ink actions raw/editor boundary added the required typed reader
+# policy after the historical 2f7/996/11728 parents. Keep this independent
+# from the detached Package/Edit owner gate so those parents retain their
+# one-argument `read_profile` API while the candidate passes Limits explicitly.
+drawingml-ink-limits-current = []
 allocator-metrics = []
 current-xlsx-raw-opc = []
 legacy-xlsx-raw-opc = []
@@ -111,12 +125,21 @@ name = "xls_source_attribution"
 path = "src/bin/xls_source_attribution.rs"
 required-features = ["xls-source-attribution"]
 
+[[bin]]
+name = "drawingml-raw-native"
+path = "src/bin/drawingml_raw_native.rs"
+
+[[bin]]
+name = "drawingml-raw-allocator"
+path = "src/bin/drawingml_raw_allocator.rs"
+
 [dependencies]
 litchi-cfb = { path = "../../crates/litchi-cfb", features = ["write"] }
 litchi-core = { path = "../../crates/litchi-core" }
 litchi-crypto = { path = "../../crates/litchi-crypto", features = ["ooxml"] }
 litchi-doc = { path = "../../crates/litchi-doc", features = ["performance-diagnostics"] }
 litchi-docx = { path = "../../crates/litchi-docx" }
+litchi-drawingml = { path = "../../crates/litchi-drawingml" }
 litchi-odf-common = { path = "../../crates/litchi-odf-common" }
 litchi-odraw = { path = "../../crates/litchi-odraw" }
 litchi-odp = { path = "../../crates/litchi-odp" }

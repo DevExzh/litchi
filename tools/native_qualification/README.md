@@ -241,3 +241,31 @@ python3 tools/native_qualification/validate_ole_owner_run.py \
   --measurements /external/native-final/ole-owner-run1/measurements.json \
   --runner tools/native_qualification/ole_owner_paired_runner.py
 ```
+
+## DrawingML raw protocol
+
+`drawingml_raw_paired_runner.py` and `manifests/drawingml-raw.json` add five
+source-fenced raw profiles plus a separate theme-family route and four
+detached-owner profiles: chart, diagram, text/media, theme/InkML bulk, and
+geometry/color/formatcode2/transform. Every endpoint is materialized into this
+generic runner, so it retains the same source/lock/probe identity, Cargo
+path, target/address-space, process-quietness, fresh-output, and ABBA guards.
+Run `prepare_drawingml_raw_inputs.py` once for each historical parent before
+the build phase; it copies only the reviewed adapter paths and preserves the
+historical 52ed workspace lock on each recorded baseline and the separately
+supplied final-candidate workspace-lock SHA (4100 after source freeze); neither
+lock is copied over the other. The perf-baseline lock is independently hashed
+as well.
+
+The checked-in probe is an explicit adapter boundary while the raw and owner
+API branches converge. It calls the production raw codecs and detached
+Package/Edit owners directly; owner before legs use the common pre-owner
+945eb1d6 source with the legacy adapter branch. `drawingml_raw_validator.py` rejects a
+short leg, altered sample shape, missing source or fixture identity, an
+allocator elapsed claim, or a qualified row without outside-clock fidelity
+and typed-refusal receipts. Theme bulk and theme-family use separate exact
+parents (996651b6 and 11728db); the family route additionally records actual
+complete-part `add_family`/`replace_family`/`remove_family` calls under its
+typed limit policy. Owner routes never reuse a raw baseline.
+It never promotes an absolute current-source profile into a
+candidate-versus-baseline claim.
