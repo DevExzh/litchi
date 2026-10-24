@@ -5,7 +5,9 @@ catalog, batch, typed-limit, pivot, graph and object families.
 
 The composed integration started at `7ed6fb0ca71f4c15f3c3a3b6b9afdb056e46b610`.
 The final source tip for this receipt is
-`25fe21158fbe10e9919e0774bbc7eda5c68f31ad`. This provenance correction
+`784d0ea83e54936677ebd5fc1d798eacd6d5c88f`; the composed consumer tip before
+the planning-guard repair was `25fe21158fbe10e9919e0774bbc7eda5c68f31ad`.
+This provenance correction
 supersedes the initial receipt commit `6bed5eb062379473994a4482330a35cfc425a2ae`.
 
 This was not one clean-tree run. Each row below records the exact committed
@@ -17,9 +19,8 @@ XLSX implementation files, so the all-target result is not claimed for the
 later lint tip. Subsequent consumer checks likewise identify their overlays
 explicitly.
 
-XLSX doctest validation from the earlier assignment is intentionally omitted
-from this receipt; it was transferred to the 0362ugea XLSX worker, whose final
-suite includes `--doc`.
+The earlier XLS doctest assignment was transferred to the 0362ugea XLS follow-up.
+The XLSX doctest result below remains part of this receipt.
 
 ## Environment
 
@@ -39,7 +40,7 @@ suite includes `--doc`.
   `CARGO_PROFILE_DEV_DEBUG=0`, `CARGO_PROFILE_TEST_DEBUG=0`,
   `CARGO_PROFILE_RELEASE_DEBUG=0`, `CARGO_NET_OFFLINE=true`,
   `LITCHI_MEM_MAX=20G`
-- Final target size: `3,415,574,738` bytes
+- Final target size: `5,092,401,674` bytes
 - No native build, timing, allocator, or performance qualification was run.
 
 The tracked sparse fixture needed by the XLSX corpus oracle was materialized
@@ -66,6 +67,7 @@ above. Logs are retained outside the repository under
 | Check | Exact source state | Command | Result and external log |
 | --- | --- | --- | --- |
 | XLSX all targets | clean `520efdd0ab8ca7e2ddc3a1943fd03f2cd5770420` | `cargo test --offline --locked -p litchi-xlsx --all-features --all-targets --no-fail-fast` | 98 test binaries, 2,558 passed, 0 failed, 0 ignored; `xlsx-all-targets-520efdd0ab-final.log`, 258,738 bytes, SHA-256 `5df96e8622758fe25fceaea3739ebd594479dd65b004f67351826c67e48fc9f8` |
+| XLSX doctests | clean `520efdd0ab8ca7e2ddc3a1943fd03f2cd5770420` | `cargo test --offline --locked -p litchi-xlsx --all-features --doc` | 36 passed (35 ordinary doctests and 1 compile-fail doctest), 0 failed; `xlsx-doctests-520efdd0ab.log`, 4,057 bytes, SHA-256 `4e696a7945e711382ea01a926ba694e40c049eeda946a3301b2a4176c53d3da7` |
 | Strict XLSX Clippy | `520efdd0ab8ca7e2ddc3a1943fd03f2cd5770420` + dirty overlay equivalent to `519eb99c6cbd20a6a921752d715c779051a14194`; overlay SHA-256 `870ace9802e1f9d3e7da319652a812ab4ce727a686ce00af5d3b3a78dacbe542` | `cargo clippy --offline --locked -p litchi-xlsx --all-features --all-targets -- -D warnings` | Exit 0; `xlsx-clippy-520efdd0ab-final2.log`, 168 bytes, SHA-256 `41bb06327ad47e14fa78cec5a2221abe2c3f2894af8137cf022f36f473e93947` |
 | Ops all targets/features | `151cc504a2436958f2cfc7b2b634ca4761efa3f1` + dirty overlay equivalent to `a06d70c2fea76dd2b78115d53be60e4a308e117c`; overlay SHA-256 `f3f9510e8b79daca3795ab8a5d1bf6214cbc481202291307b2822f6805ff23bc` | `cargo check --offline --locked -p litchi-ops --all-features --all-targets` | Exit 0, including `odf_shared_triad_qualification`; `ops-check-odf-fix3.log`, 166 bytes, SHA-256 `588d9d5a28a8fb632e4420b634546144d98ee1a7a4a9c5e4c757c356d025c070` |
 | Perf baseline | `a06d70c2fea76dd2b78115d53be60e4a308e117c` + dirty overlay equivalent to `158b57f3d08f93b792a2cf2cb9e53ea36a350386`; overlay SHA-256 `963ea059980706b36e90d96bea2453bd34a6bc25e28c234d3b985df7a0944422` | `cargo check --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --all-targets --all-features` | Exit 0; `perf-baseline-check-xlsx-api.log`, 178 bytes, SHA-256 `bd00072f3c71b6a252bc2ca49f7d10c74be4ca5272259b51e8f029a02a01bbc8` |
@@ -73,6 +75,9 @@ above. Logs are retained outside the repository under
 | XLSX batch perf consumer | `158b57f3d08f93b792a2cf2cb9e53ea36a350386` + dirty overlay equivalent to `25fe21158fbe10e9919e0774bbc7eda5c68f31ad`; overlay SHA-256 `6b4f4204c246cc8f91e1f97b2836231396a3cd8c42162ac3f65a623d4ff0516e` | `cargo check --offline --locked --manifest-path tools/perf-baseline/unified-xlsx-batch/Cargo.toml --all-targets --all-features` | Exit 0; `perf-unified-xlsx-batch-check-final.log`, 203 bytes, SHA-256 `0731123db61173844e110c3010c73120bc155f8ecb8df308c5a3c7525eb89c79` |
 | XLSX raw-identity perf consumer | `158b57f3d08f93b792a2cf2cb9e53ea36a350386` + dirty overlay equivalent to `25fe21158fbe10e9919e0774bbc7eda5c68f31ad`; overlay SHA-256 `6b4f4204c246cc8f91e1f97b2836231396a3cd8c42162ac3f65a623d4ff0516e` | `cargo check --offline --locked --manifest-path tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml --all-targets --all-features` | Exit 0; only existing dead-code warnings in the shared allocation harness; `perf-unified-xlsx-raw-identity-check.log`, 4,490 bytes, SHA-256 `1cc89dfed2e6da947f3b61ca26b9ff5a011901f159c5ef758ff82263a255781f` |
 | Unified-ops fuzz consumer | `158b57f3d08f93b792a2cf2cb9e53ea36a350386` + dirty overlay equivalent to `25fe21158fbe10e9919e0774bbc7eda5c68f31ad`; overlay SHA-256 `6b4f4204c246cc8f91e1f97b2836231396a3cd8c42162ac3f65a623d4ff0516e` | `cargo check --offline --manifest-path crates/litchi-ops/fuzz/Cargo.toml --all-targets --features apply` | Exit 0; `ops-fuzz-check-offline.log`, 1,988 bytes, SHA-256 `696778cc30c5e6070bffaf0467dfdc92cc653eb0bf9dc66483835fd20b83bd3b` |
+| Planning guard valid route | `b7310e777a5de6d28543ea1bb91ee9fc8604bfc5` + dirty overlay equivalent to `784d0ea83e54936677ebd5fc1d798eacd6d5c88f`; overlay SHA-256 `c9fcd5637c400282a45a57d475935b5df6b8de3456facb641a04b3a5793b8ffa` | `cargo run --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --bin xlsx_planning_guard -- --shape medium --case valid --warmup 0 --samples 1` | Untimed correctness route passed: source unchanged, snapshot values valid, empty commit exact no-op; no timing claim. `xlsx-planning-guard-valid-fixed.log`, 2,854 bytes, SHA-256 `840a5df300cad6d52ac7c4d787bfc599a7b60636be7a7e7157629b75022c7e30` |
+| Planning guard late validator | `b7310e777a5de6d28543ea1bb91ee9fc8604bfc5` + dirty overlay equivalent to `784d0ea83e54936677ebd5fc1d798eacd6d5c88f`; overlay SHA-256 `c9fcd5637c400282a45a57d475935b5df6b8de3456facb641a04b3a5793b8ffa` | `cargo run --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --bin xlsx_planning_guard -- --shape medium --case late-validator --warmup 0 --samples 1` | Untimed correctness route passed: exact typed `Invalid`, exact unknown-element message, source unchanged, retry preserved; no timing claim. `xlsx-planning-guard-late-validator-fixed.log`, 3,072 bytes, SHA-256 `184dc0d8382883ca594d08701c02d516ac89e8425efad5716b5f9d4bda773470` |
+| Planning guard late raw | `b7310e777a5de6d28543ea1bb91ee9fc8604bfc5` + dirty overlay equivalent to `784d0ea83e54936677ebd5fc1d798eacd6d5c88f`; overlay SHA-256 `c9fcd5637c400282a45a57d475935b5df6b8de3456facb641a04b3a5793b8ffa` | `cargo run --offline --locked --manifest-path tools/perf-baseline/Cargo.toml --bin xlsx_planning_guard -- --shape medium --case late-raw --warmup 0 --samples 1` | Untimed correctness route passed: exact typed `Invalid`, exact boolean message, source unchanged, retry preserved; no timing claim. `xlsx-planning-guard-late-raw-fixed.log`, 2,905 bytes, SHA-256 `c37723c9775232a8b75fe85ddd1930377891c9f99def600c81207dd5bc59fa56` |
 
 The standalone `unified-xlsx-batch` lock required an offline refresh because
 the composed `litchi-ops` feature graph added the tracked `litchi-sheet-text`
