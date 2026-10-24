@@ -160,7 +160,9 @@ def _generated_fixture_identity(parts: list[Mapping[str, Any]]) -> str:
     for part in parts:
         payload += (
             f"{part['part_id']}\0{part['source_sha256']}\0"
-            f"{part['changed_sha256']}\0{part['malformed_sha256']}\0"
+            f"{part['source_bytes']}\0{part['changed_sha256']}\0"
+            f"{part['changed_bytes']}\0{part['malformed_sha256']}\0"
+            f"{part['malformed_bytes']}\0"
         )
     return hashlib.sha256(payload.encode()).hexdigest()
 
@@ -268,8 +270,16 @@ def _validate_rows(
             f"{path}: generated fixture part identity is missing or duplicated",
         )
         generated_seen.add(part_id)
-        for key in ("source_sha256", "changed_sha256", "malformed_sha256"):
+        for key, size_key in (
+            ("source_sha256", "source_bytes"),
+            ("changed_sha256", "changed_bytes"),
+            ("malformed_sha256", "malformed_bytes"),
+        ):
             _expect(_is_hash(generated.get(key)), f"{path}: generated fixture {key} is missing")
+            _expect(
+                isinstance(generated.get(size_key), int) and generated[size_key] >= 0,
+                f"{path}: generated fixture {size_key} is missing",
+            )
     _expect(
         _is_hash(report.get("generated_fixture_sha256"))
         and report["generated_fixture_sha256"] == _generated_fixture_identity(generated_parts),

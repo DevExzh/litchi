@@ -480,6 +480,7 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
             "id": "drawingml-fixture-preflight",
             "compare": [
                 "fixture_sha256",
+                "fixture_bytes",
                 "fixture_lane_identity_sha256",
                 "generated_fixture_sha256",
                 "generated_fixture_parts",

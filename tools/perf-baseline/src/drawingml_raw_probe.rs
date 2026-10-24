@@ -459,8 +459,11 @@ struct RawFidelityReceipt {
 struct GeneratedFixturePart {
     part_id: &'static str,
     source_sha256: String,
+    source_bytes: usize,
     changed_sha256: String,
+    changed_bytes: usize,
     malformed_sha256: String,
+    malformed_bytes: usize,
 }
 
 #[derive(Debug)]
@@ -2299,8 +2302,11 @@ fn build_generated_fixture_parts(case: &LaneCase) -> Vec<GeneratedFixturePart> {
         .map(|part| GeneratedFixturePart {
             part_id: part.id,
             source_sha256: sha256(&part.source),
+            source_bytes: part.source.len(),
             changed_sha256: sha256(&part.changed),
+            changed_bytes: part.changed.len(),
             malformed_sha256: sha256(&part.malformed),
+            malformed_bytes: part.malformed.len(),
         })
         .collect()
 }
@@ -2312,9 +2318,15 @@ fn generated_fixture_identity(parts: &[GeneratedFixturePart]) -> String {
         identity.push('\0');
         identity.push_str(&part.source_sha256);
         identity.push('\0');
+        identity.push_str(&part.source_bytes.to_string());
+        identity.push('\0');
         identity.push_str(&part.changed_sha256);
         identity.push('\0');
+        identity.push_str(&part.changed_bytes.to_string());
+        identity.push('\0');
         identity.push_str(&part.malformed_sha256);
+        identity.push('\0');
+        identity.push_str(&part.malformed_bytes.to_string());
         identity.push('\0');
     }
     sha256(identity.as_bytes())
@@ -4206,6 +4218,13 @@ fn vec_write_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, P
                 .filter(|part| matches!(part.kind, PartKind::Theme | PartKind::Color))
                 .map(|part| part.id)
                 .collect::<Vec<_>>(),
+            "scanner_helper_parts": case
+                .parts
+                .iter()
+                .filter(|part| part.kind == PartKind::Blip)
+                .map(|part| part.id)
+                .collect::<Vec<_>>(),
+            "scanner_helper_scope": "scanner_helper",
             "typed_writer_parts": case
                 .parts
                 .iter()
@@ -4218,6 +4237,7 @@ fn vec_write_operation(case: &LaneCase, timed: bool) -> Result<OperationValue, P
                             | PartKind::Geometry
                             | PartKind::Theme
                             | PartKind::Color
+                            | PartKind::Blip
                     )
                 })
                 .map(|part| part.id)

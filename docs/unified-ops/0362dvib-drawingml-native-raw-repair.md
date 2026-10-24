@@ -11,9 +11,9 @@ The probe now:
 - parses each source and changed fixture into a typed `PreparedValue` before
   timed writer rows; `entry_read` times only the reader, `vec_write` times only
   the writer, and shared-reader rows time only the shared reader;
-- freezes source, changed, and malformed generated-fixture hashes before the
-  first warmup and compares that receipt across every paired baseline and
-  candidate leg;
+- freezes source, changed, and malformed generated-fixture hashes and byte
+  lengths before the first warmup, and compares that receipt across every
+  paired baseline and candidate leg;
 - compares typed semantic models after a write, retaining exact-source checks
   only for formatcode2, SVG blips, theme-family values/parts, and the strict
   InkML action profile (for both source and changed fixtures); the image blip
@@ -24,14 +24,17 @@ The probe now:
   bounded partial output is reported and checked against its cap. Diagram and
   Theme Family part rows are named source-edit-and-serialize operations;
 - runs an untimed fixture-preflight child for each source endpoint before any
-  warmup or ABBA child, comparing the source/changed/malformed generated
-  identities across baseline and candidate. These control events are retained
+  warmup or ABBA child, comparing the descriptor hash/byte length and the
+  source/changed/malformed generated hashes/byte lengths across baseline and
+  candidate. These control events are retained
   in the runner journal with `measured=false` and are excluded from measured
   RSS/timing children. The SVG preflight intentionally uses a contextual
   parsed value and contextual writer; ordinary sink, fidelity, and standalone
   Vec/String routes intentionally use their standalone prepared values;
   the existing post-run validator comparison across all qualified reports is
   retained as a second handoff check;
+- keeps image-blip `find_first_embed`/`write_embed` helper work in a separate
+  scanner-helper receipt; it is not reported as a typed writer;
 - passes the current typed limits through the `drawingml-raw-current`,
   `drawingml-theme-family-current`, and `drawingml-ink-limits-current`
   feature gates while preserving the historical one-argument baseline APIs.

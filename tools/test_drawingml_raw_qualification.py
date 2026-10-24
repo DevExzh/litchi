@@ -111,6 +111,7 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         paired.generic._validate_drawingml_raw_workload(materialized)
         self.assertEqual(materialized["abba_order"], list(paired.generic.ABBA_ORDER))
         self.assertEqual(materialized["legs"]["before"]["lock_paths"], ["Cargo.lock", "tools/perf-baseline/Cargo.lock"])
+        self.assertIn("fixture_bytes", materialized["controls"][0]["compare"])
 
     def test_probe_is_real_source_backed_adapter(self) -> None:
         source = (ROOT / "tools/perf-baseline/src/drawingml_raw_probe.rs").read_text(encoding="utf-8")
@@ -138,6 +139,9 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         self.assertIn("PreparedValue", source)
         self.assertIn("semantic_changed_differs", source)
         self.assertIn("generated_fixture_parts", source)
+        self.assertIn("source_bytes", source)
+        self.assertIn("changed_bytes", source)
+        self.assertIn("malformed_bytes", source)
         self.assertIn("--preflight", source)
         self.assertIn("output_limit_attempt", source)
         self.assertIn("partial_output_allowed", source)
@@ -145,6 +149,8 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         self.assertIn("source_edit_serialize", source)
         self.assertIn('"string_output"', source)
         self.assertIn('"vec_output"', source)
+        self.assertIn('"scanner_helper_parts"', source)
+        self.assertIn('"scanner_helper_scope"', source)
         self.assertIn("read(xml,scope,limits)", source)
         self.assertIn("write_contextual_to", source)
         self.assertIn("read_svg_contextual_value", source)
@@ -175,14 +181,19 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
             {
                 "part_id": "chart",
                 "source_sha256": "a" * 64,
+                "source_bytes": 1,
                 "changed_sha256": "b" * 64,
+                "changed_bytes": 2,
                 "malformed_sha256": "c" * 64,
+                "malformed_bytes": 3,
             }
         ]
         identity = validator._generated_fixture_identity(parts)
         self.assertEqual(identity, validator._generated_fixture_identity(parts))
         changed = [dict(parts[0], malformed_sha256="d" * 64)]
         self.assertNotEqual(identity, validator._generated_fixture_identity(changed))
+        resized = [dict(parts[0], malformed_bytes=4)]
+        self.assertNotEqual(identity, validator._generated_fixture_identity(resized))
 
     def test_reviewed_adapter_hashes_bind_checked_in_sources(self) -> None:
         import hashlib

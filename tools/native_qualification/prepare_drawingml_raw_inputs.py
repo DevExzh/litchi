@@ -47,11 +47,11 @@ STATIC_REVIEWED_ADAPTER_SHA256 = {
     "Cargo.lock": HISTORICAL_WORKSPACE_LOCK_SHA256,
     "tools/perf-baseline/Cargo.toml": "2ee64a7b5dbbb1dda5f017da8bb71f8d69f53e096fe9911d90b08d79afd200f3",
     "tools/perf-baseline/src/lib.rs": "99b2595d031c9d0ece1a5b46e17d0ddc017629c7e69655909508a28e725aed04",
-    "tools/perf-baseline/src/drawingml_raw_probe.rs": "b8c1c1951d47bb1127ad6be7f34256ac9f2d58a0d25863f2c7315025bf2f728b",
+    "tools/perf-baseline/src/drawingml_raw_probe.rs": "f31eefd6b5e0a6442a2c2e90f6af0a08d73bc30cf4a249f25e4db21d81d9459c",
     "tools/perf-baseline/src/bin/drawingml_raw_native.rs": "c64e5cb9436622d383a55f6720c940344c7575cc56404ab6459133afbc63116e",
     "tools/perf-baseline/src/bin/drawingml_raw_allocator.rs": "6dd60e14b760bf7562017ddc99b9356699a13155eb88a46cdb62a81aa3b0d3b9",
     "tools/perf-baseline/src/bin/support/drawingml_counting_allocator.rs": "3db5f3a49cf1c3e5ef496f6f3a787f94e74fa3d995879af578a60cb910d13117",
-    "tools/native_qualification/drawingml_raw_validator.py": "ce6004d4f10a6c879eda75396188cafed0adc896abdacb50a3ee9db9a24945da",
+    "tools/native_qualification/drawingml_raw_validator.py": "f966ca1ed4fd58546de5fe2c5345bb04f2e69fe9c79b841b546dd1aba1287ab2",
     "tools/native_qualification/fixtures/drawingml_raw_fixtures.json": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
 }
 

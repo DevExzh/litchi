@@ -764,6 +764,7 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
         raise RunnerError("DrawingML raw fixture-preflight control id differs")
     if control.get("compare") != [
         "fixture_sha256",
+        "fixture_bytes",
         "fixture_lane_identity_sha256",
         "generated_fixture_sha256",
         "generated_fixture_parts",
