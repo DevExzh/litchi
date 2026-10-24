@@ -775,6 +775,21 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             self.assertFalse(observer.path.exists())
 
     def _overlap_fixture(self, root: Path, *, max_jobs: int = 4, expires: str | None = None):
+        return self._overlap_fixture_with_sources(
+            root,
+            max_jobs=max_jobs,
+            expires=expires,
+            source_roots=(ROOT, ROOT),
+        )
+
+    def _overlap_fixture_with_sources(
+        self,
+        root: Path,
+        *,
+        max_jobs: int = 4,
+        expires: str | None = None,
+        source_roots: tuple[Path, Path],
+    ):
         permit = root / "permit.json"
         manifest_path = root / "manifest.json"
         lease_dir = root / "leases"
@@ -785,12 +800,12 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             "build_execution": {"class": "compile_only", "permit_path": str(permit)},
             "legs": {
                 "before": {
-                    "source_root": str(ROOT),
+                    "source_root": str(source_roots[0]),
                     "target_dir": str(root / "target-before"),
                     "build": [{"id": "build", "argv": ["cargo", "build"], "artifacts": ["{target_dir}/probe"]}],
                 },
                 "after": {
-                    "source_root": str(ROOT),
+                    "source_root": str(source_roots[1]),
                     "target_dir": str(root / "target-after"),
                     "build": [{"id": "build", "argv": ["cargo", "build"], "artifacts": ["{target_dir}/probe"]}],
                 },
@@ -812,12 +827,70 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                     "allowed_lanes": ["w5-legacy"],
                     "allowed_manifest_sha256": [manifest_hash],
                     "allowed_command_classes": ["cargo-build", "cargo-check", "cargo-clippy", "cargo-test"],
+                    "manifest_bindings": [{
+                        "path": str(manifest_path),
+                        "sha256": manifest_hash,
+                        "lane": "w5-legacy",
+                        "source_roots": [str(source_roots[0].resolve()), str(source_roots[1].resolve())],
+                        "target_dirs": [str(root / "target-before"), str(root / "target-after")],
+                    }],
                     "lease_dir": str(lease_dir),
                 }
             ),
             encoding="utf-8",
         )
         return manifest, manifest_path, permit, lease_dir
+
+    @staticmethod
+    def _make_fake_cargo_source(root: Path, *, sleep_seconds: float) -> Path:
+        """Create a tiny committed source tree whose cargo symlink is bash.
+
+        Invoking ``cargo build`` with cwd at this tree makes bash execute the
+        tracked ``build`` script while /proc still exposes the exact Cargo
+        argv that the overlap protocol classifies.  This exercises the real
+        SafeRunner subprocess/lease path without invoking Cargo or native
+        code.
+        """
+
+        root.mkdir(parents=True, exist_ok=False)
+        (root / "Cargo.lock").write_text("# fake lock for runner tests\n", encoding="utf-8")
+        build = root / "build"
+        build.write_text(
+            "#!/bin/bash\n"
+            "set -eu\n"
+            "trap 'exit 143' TERM\n"
+            "mkdir -p \"$CARGO_TARGET_DIR\"\n"
+            "printf '#!/bin/sh\\nexit 0\\n' > \"$CARGO_TARGET_DIR/probe\"\n"
+            "chmod +x \"$CARGO_TARGET_DIR/probe\"\n"
+            f"sleep {sleep_seconds}\n",
+            encoding="utf-8",
+        )
+        build.chmod(0o755)
+        (root / "cargo").symlink_to("/bin/bash")
+        subprocess.run(["git", "init", "--quiet", str(root)], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(
+            ["git", "-C", str(root), "add", "Cargo.lock", "build", "cargo"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Native runner test",
+                "-c",
+                "user.email=native-runner-test@example.invalid",
+                "commit",
+                "--quiet",
+                "-m",
+                "fake cargo source",
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+        return root / "cargo"
 
     @staticmethod
     def _peer_entry(pid: int, starttime: str, argv: list[str]) -> dict[str, object]:
@@ -850,14 +923,23 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             "permit_sha256": lease.permit_hash,
             "root_pid": pid,
             "root_starttime": starttime,
+            "controller_pid": pid,
+            "controller_starttime": starttime,
             "lane": "w5-legacy",
             "manifest_path": str(lease.manifest_path),
             "manifest_sha256": hashlib.sha256(lease.manifest_path.read_bytes()).hexdigest(),
             "command_class": "cargo-build",
             "allowed_command_classes": ["cargo-build"],
             "phase": "build",
-            "source_roots": [str(ROOT)],
-            "target_dirs": [str(Path(path).parent / "peer-target")],
+            "phase_id": "peer-build",
+            "phase_argv": ["cargo", "build"],
+            "phase_cwd": str(ROOT),
+            "phase_target_dir": str(Path(lease.manifest["legs"]["before"]["target_dir"]).resolve()),
+            "source_roots": [str(ROOT), str(lease.manifest["legs"]["after"]["source_root"])],
+            "target_dirs": [
+                str(Path(lease.manifest["legs"]["before"]["target_dir"]).resolve()),
+                str(Path(lease.manifest["legs"]["after"]["target_dir"]).resolve()),
+            ],
             "created_utc": runner._now(),
             "expires_utc": lease.permit["expires_utc"],
         }
@@ -933,6 +1015,74 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             with self.assertRaisesRegex(runner.RunnerError, "expired"):
                 runner.BuildOverlapLease(manifest, manifest_path)
 
+    def test_compile_overlap_lease_rejects_tampered_peer_manifest_bindings(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-binding-") as directory:
+            root = Path(directory)
+            manifest, manifest_path, _permit, lease_dir = self._overlap_fixture(root)
+            lease = runner.BuildOverlapLease(manifest, manifest_path)
+            lease.acquire()
+            own = runner._read_proc(os.getpid())
+            assert own is not None
+            peer_path = lease_dir / "peer.json"
+            self._write_peer_lease(lease, peer_path)
+            peer = self._peer_entry(999991, "peer-start", ["cargo", "build"])
+            original = json.loads(peer_path.read_text(encoding="utf-8"))
+            mutations = (
+                ("manifest_path", str(root / "unadmitted-manifest.json"), "manifest binding is not admitted"),
+                ("source_roots", [str(ROOT), str(root / "wrong-source")], "source_roots differ"),
+                ("target_dirs", [str(root / "wrong-before"), str(root / "target-after")], "target_dirs differ"),
+            )
+            for key, replacement, reason in mutations:
+                value = dict(original)
+                value[key] = replacement
+                peer_path.write_text(json.dumps(value), encoding="utf-8")
+                snapshot = {os.getpid(): own, 999991: peer}
+                with mock.patch.object(runner, "_proc_snapshot", return_value=snapshot):
+                    with self.assertRaisesRegex(runner.RunnerError, reason):
+                        lease.peer_snapshots(snapshot)
+            lease.release()
+
+    def test_compile_overlap_lease_rejects_peer_expiry_after_permit(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-expiry-binding-") as directory:
+            root = Path(directory)
+            manifest, manifest_path, _permit, lease_dir = self._overlap_fixture(root)
+            lease = runner.BuildOverlapLease(manifest, manifest_path)
+            lease.acquire()
+            own = runner._read_proc(os.getpid())
+            assert own is not None
+            peer_path = lease_dir / "peer.json"
+            self._write_peer_lease(lease, peer_path)
+            value = json.loads(peer_path.read_text(encoding="utf-8"))
+            value["expires_utc"] = (
+                lease.expires + runner._dt.timedelta(seconds=1)
+            ).isoformat()
+            peer_path.write_text(json.dumps(value), encoding="utf-8")
+            peer = self._peer_entry(999991, "peer-start", ["cargo", "build"])
+            snapshot = {os.getpid(): own, 999991: peer}
+            with mock.patch.object(runner, "_proc_snapshot", return_value=snapshot):
+                with self.assertRaisesRegex(runner.RunnerError, "expiry differs"):
+                    lease.peer_snapshots(snapshot)
+            lease.release()
+
+    def test_compile_overlap_lease_rejects_expired_peer_record(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-expired-record-") as directory:
+            root = Path(directory)
+            manifest, manifest_path, _permit, lease_dir = self._overlap_fixture(root)
+            lease = runner.BuildOverlapLease(manifest, manifest_path)
+            lease.acquire()
+            own = runner._read_proc(os.getpid())
+            assert own is not None
+            expired = (runner._dt.datetime.now(runner._dt.timezone.utc) - runner._dt.timedelta(seconds=1)).isoformat()
+            lease.permit["expires_utc"] = expired
+            peer_path = lease_dir / "peer.json"
+            self._write_peer_lease(lease, peer_path)
+            peer = self._peer_entry(999991, "peer-start", ["cargo", "build"])
+            snapshot = {os.getpid(): own, 999991: peer}
+            with mock.patch.object(runner, "_proc_snapshot", return_value=snapshot):
+                with self.assertRaisesRegex(runner.RunnerError, "active build lease is expired"):
+                    lease.peer_snapshots(snapshot)
+            lease.release()
+
     def test_compile_overlap_lease_rejects_pid_reuse_and_disallowed_phase(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-build-overlap-phase-") as directory:
             root = Path(directory)
@@ -983,19 +1133,20 @@ class NativeQualificationRunnerTests(unittest.TestCase):
     def test_expired_compile_lease_reaps_child_and_writes_failed_receipt(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-build-overlap-expiry-child-") as directory:
             root = Path(directory)
-            manifest, manifest_path, permit, _lease_dir = self._overlap_fixture(
+            source = self._make_fake_cargo_source(root / "source", sleep_seconds=5.0)
+            manifest, manifest_path, permit, _lease_dir = self._overlap_fixture_with_sources(
                 root,
                 expires=(runner._dt.datetime.now(runner._dt.timezone.utc) + runner._dt.timedelta(seconds=1)).isoformat(),
+                source_roots=(source.parent, source.parent),
             )
-            fake_cargo = root / "cargo"
-            fake_cargo.write_text("#!/bin/sh\ntrap 'exit 143' TERM\nsleep 5\n", encoding="utf-8")
-            fake_cargo.chmod(0o755)
             for leg in manifest["legs"].values():
-                leg["build"][0]["argv"] = [str(fake_cargo), "build"]
+                leg["build"][0]["argv"] = [str(source), "build"]
                 leg["allow_dirty"] = True
             manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             permit_value = json.loads(permit.read_text(encoding="utf-8"))
-            permit_value["allowed_manifest_sha256"] = [hashlib.sha256(manifest_path.read_bytes()).hexdigest()]
+            manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+            permit_value["allowed_manifest_sha256"] = [manifest_hash]
+            permit_value["manifest_bindings"][0]["sha256"] = manifest_hash
             permit.write_text(json.dumps(permit_value), encoding="utf-8")
             # The permit is intentionally made short-lived only after the
             # manifest/lease identity is complete, avoiding a startup race.
@@ -1004,11 +1155,9 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             ).isoformat()
             permit.write_text(json.dumps(permit_value), encoding="utf-8")
             safe = runner.SafeRunner(manifest, manifest_path, "build", None)
-            own = runner._read_proc(os.getpid())
-            assert own is not None
+            safe.guard.offenders = lambda *args, **kwargs: []
             with self.assertRaisesRegex(runner.RunnerError, "expired"):
-                with mock.patch.object(runner, "_proc_snapshot", return_value={os.getpid(): own}):
-                    safe.build()
+                safe.build()
             receipt = json.loads((root / "output" / "build-receipt.json").read_text(encoding="utf-8"))
             self.assertEqual(receipt["status"], "failed")
             self.assertEqual(receipt["build_execution"]["class"], "compile_only")
@@ -1018,6 +1167,154 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             event = json.loads(events[0])
             self.assertIn("expired", event["runner_error"])
             self.assertEqual(event["post_exit_descendants"], [])
+
+    def test_compile_overlap_two_safe_runners_bind_real_cargo_children(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-integration-") as directory:
+            root = Path(directory)
+            source_parent = root / "sources"
+            source_parent.mkdir()
+            sources = [
+                self._make_fake_cargo_source(source_parent / f"source-{index}", sleep_seconds=2.0)
+                for index in range(4)
+            ]
+            permit = root / "permit.json"
+            lease_dir = root / "leases"
+            manifests: list[Path] = []
+            manifest_values: list[dict[str, object]] = []
+            for index in range(2):
+                manifest_path = root / f"manifest-{index}.json"
+                manifest = {
+                    "schema": runner.SCHEMA,
+                    "lane": "w5-legacy",
+                    "output_dir": str(root / f"output-{index}"),
+                    "build_execution": {"class": "compile_only", "permit_path": str(permit)},
+                    "legs": {
+                        "before": {
+                            "source_root": str(sources[index * 2].parent),
+                            "target_dir": str(root / f"target-{index}-before"),
+                            "build": [{
+                                "id": "build",
+                                "argv": [str(sources[index * 2]), "build"],
+                                "artifacts": ["{target_dir}/probe"],
+                            }],
+                        },
+                        "after": {
+                            "source_root": str(sources[index * 2 + 1].parent),
+                            "target_dir": str(root / f"target-{index}-after"),
+                            "build": [{
+                                "id": "build",
+                                "argv": [str(sources[index * 2 + 1]), "build"],
+                                "artifacts": ["{target_dir}/probe"],
+                            }],
+                        },
+                    },
+                }
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                manifests.append(manifest_path)
+                manifest_values.append(manifest)
+            expires = (runner._dt.datetime.now(runner._dt.timezone.utc) + runner._dt.timedelta(seconds=30)).isoformat()
+            bindings = []
+            hashes = []
+            for manifest_path, manifest in zip(manifests, manifest_values):
+                manifest_hash = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+                hashes.append(manifest_hash)
+                bindings.append({
+                    "path": str(manifest_path.resolve()),
+                    "sha256": manifest_hash,
+                    "lane": "w5-legacy",
+                    "source_roots": [
+                        str(Path(manifest["legs"]["before"]["source_root"]).resolve()),
+                        str(Path(manifest["legs"]["after"]["source_root"]).resolve()),
+                    ],
+                    "target_dirs": [
+                        str(Path(manifest["legs"]["before"]["target_dir"]).resolve()),
+                        str(Path(manifest["legs"]["after"]["target_dir"]).resolve()),
+                    ],
+                })
+            permit.write_text(
+                json.dumps({
+                    "schema": runner.BUILD_PERMIT_SCHEMA,
+                    "grant_id": "integration-grant",
+                    "job_group": "integration-group",
+                    "expires_utc": expires,
+                    "max_jobs": 2,
+                    "allowed_lanes": ["w5-legacy"],
+                    "allowed_manifest_sha256": hashes,
+                    "allowed_command_classes": ["cargo-build"],
+                    "manifest_bindings": bindings,
+                    "lease_dir": str(lease_dir),
+                }),
+                encoding="utf-8",
+            )
+            helper = root / "run-safe-build.py"
+            helper.write_text(
+                "import json, pathlib, sys\n"
+                "import time\n"
+                "tools = pathlib.Path(sys.argv[1]).resolve()\n"
+                "sys.path.insert(0, str(tools))\n"
+                "import native_qualification_runner as runner\n"
+                "manifest_path = pathlib.Path(sys.argv[2]).resolve()\n"
+                "runner.LITCHI_ROOTS = (pathlib.Path(sys.argv[3]).resolve(),)\n"
+                "time.sleep(float(sys.argv[4]))\n"
+                "manifest = json.loads(manifest_path.read_text(encoding='utf-8'))\n"
+                "runner.SafeRunner(manifest, manifest_path, 'build', None).build()\n",
+                encoding="utf-8",
+            )
+            processes = [
+                subprocess.Popen(
+                    [
+                        sys.executable,
+                        str(helper),
+                        str(ROOT / "tools"),
+                        str(manifest_path),
+                        str(source_parent),
+                        "0.0" if index == 0 else "0.35",
+                    ],
+                    cwd=str(ROOT),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+                for manifest_path in manifests
+            ]
+            results = []
+            for process in processes:
+                stdout, stderr = process.communicate(timeout=30)
+                results.append((process.returncode, stdout, stderr))
+            for returncode, stdout, stderr in results:
+                self.assertEqual(returncode, 0, msg=f"helper failed: stdout={stdout}\nstderr={stderr}")
+            event_ranges: list[tuple[runner._dt.datetime, runner._dt.datetime]] = []
+            for index in range(2):
+                receipt = json.loads((root / f"output-{index}" / "build-receipt.json").read_text(encoding="utf-8"))
+                self.assertEqual(receipt["status"], "passed")
+                self.assertEqual(receipt["build_execution"]["class"], "compile_only")
+                owned_jobs = receipt["build_execution"]["owned_jobs"]
+                self.assertEqual(len(owned_jobs), 2)
+                self.assertTrue(all(job["command_class"] == "cargo-build" for job in owned_jobs))
+                self.assertTrue(all(job["phase"] == "build" for job in owned_jobs))
+                events = [
+                    json.loads(line)
+                    for line in (root / f"output-{index}" / "events-build.jsonl").read_text(encoding="utf-8").splitlines()
+                ]
+                self.assertEqual(len(events), 2)
+                for event in events:
+                    owned = event["overlap"]["owned_job"]
+                    self.assertEqual(owned["command_class"], "cargo-build")
+                    self.assertEqual(owned["phase_id"], event["event_id"])
+                    event_ranges.append(
+                        (
+                            runner._parse_utc(event["start_utc"], "event start"),
+                            runner._parse_utc(event["end_utc"], "event end"),
+                        )
+                    )
+            self.assertTrue(
+                any(
+                    left_start < right_end and right_start < left_end
+                    for index, (left_start, left_end) in enumerate(event_ranges)
+                    for right_start, right_end in event_ranges[index + 1 :]
+                ),
+                "the two SafeRunner Cargo child event intervals never overlapped",
+            )
 
 
 if __name__ == "__main__":
