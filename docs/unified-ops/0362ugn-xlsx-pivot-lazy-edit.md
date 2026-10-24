@@ -16,12 +16,13 @@ source-bound error and replay behavior.  Package mutation-policy checks remain
 at the public entry point; no work moved into package open.
 
 The edit `before` accessors are now fallible `&mut self` getters because they
-can trigger first-use parsing.  Server-format reset is likewise fallible so a
-retryable materialization and bounded clone failure cannot be discarded.  The
-table-data tests migrate malformed, diagnostic, missing-owner, and exact
-retained-byte assertions to the first-use boundary and exercise retry after a
-failed getter.  Source fidelity, signed/no-op behavior, inverse patches,
-candidate validation, and all existing low-level consumers remain unchanged.
+can trigger first-use parsing.  Cached-name and server-format reset are
+likewise fallible so a retryable materialization and bounded clone failure
+cannot be discarded.  The table-data tests migrate malformed, diagnostic,
+missing-owner, and exact retained-byte assertions to the first-use boundary
+and exercise retry after a failed getter.  Source fidelity, signed/no-op
+behavior, inverse patches, candidate validation, and all existing low-level
+consumers remain unchanged.
 
 Validation is pending the coordinator's single Cargo slot; static formatting,
 tracked-consumer scans, and the staged-file repository-size guard are the
