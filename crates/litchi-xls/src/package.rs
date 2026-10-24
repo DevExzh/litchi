@@ -596,6 +596,14 @@ impl Package {
         }
     }
 
+    /// Check the retained dynamic source without materializing its bytes.
+    ///
+    /// Scoped edit families use this version-only fence when a policy error
+    /// must not hide a concurrent source change.
+    pub(crate) fn ensure_source_fence(&self) -> Result<()> {
+        ensure_source_fence(&self.inner)
+    }
+
     /// Borrow the retained eager reader, materializing a source-backed reader
     /// only on this explicit compatibility escape.
     pub fn reader_ref(&self) -> Result<&crate::raw::Reader<Cursor<Vec<u8>>>> {

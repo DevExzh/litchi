@@ -242,7 +242,7 @@ impl Edit {
         let Some(base) = &self.base else {
             return Ok(());
         };
-        crate::package::ensure_source_fence(&base.inner)
+        base.ensure_source_fence()
     }
 
     /// The shared property-set editor, for the package metadata transaction.
