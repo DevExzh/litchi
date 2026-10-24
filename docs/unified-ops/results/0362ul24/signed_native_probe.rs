@@ -376,6 +376,21 @@ fn direct_native_noop(fixture: &Fixture) -> Value {
                 .expect("DOCX native no-op");
             let output = commit.package().to_bytes().expect("DOCX native bytes");
             assert_eq!(output, fixture.signed, "DOCX native no-op bytes");
+            let source = litchi_docx::source_backed::Package::from_read_at(Arc::new(
+                OwnedSource::new(fixture.signed.clone()),
+            ))
+            .expect("DOCX source native package");
+            let commit = source
+                .edit()
+                .expect("DOCX source native edit")
+                .commit()
+                .expect("DOCX source native no-op");
+            let mut output = Vec::new();
+            commit
+                .package()
+                .write_to(&mut output)
+                .expect("DOCX source native bytes");
+            assert_eq!(output, fixture.signed, "DOCX source native no-op bytes");
             "exact_noop"
         },
         "PPTX" => {
@@ -391,6 +406,21 @@ fn direct_native_noop(fixture: &Fixture) -> Value {
                 package.to_bytes().expect("PPTX native bytes"),
                 fixture.signed
             );
+            let source = litchi_pptx::source::Package::from_read_at(Arc::new(OwnedSource::new(
+                fixture.signed.clone(),
+            )))
+            .expect("PPTX source native package");
+            let commit = source
+                .edit()
+                .expect("PPTX source native edit")
+                .commit()
+                .expect("PPTX source native no-op");
+            let mut output = Vec::new();
+            commit
+                .package()
+                .write_to(&mut output)
+                .expect("PPTX source native bytes");
+            assert_eq!(output, fixture.signed, "PPTX source native no-op bytes");
             "exact_noop"
         },
         "XLSX" => {
@@ -405,6 +435,21 @@ fn direct_native_noop(fixture: &Fixture) -> Value {
                 commit.package().to_bytes().expect("XLSX native bytes"),
                 fixture.signed
             );
+            let source = litchi_xlsx::SourceBackedWorkbook::from_read_at(Arc::new(
+                OwnedSource::new(fixture.signed.clone()),
+            ))
+            .expect("XLSX source native package");
+            let commit = source
+                .edit_defined_names()
+                .expect("XLSX source native edit")
+                .commit()
+                .expect("XLSX source native no-op");
+            let mut output = Vec::new();
+            commit
+                .package()
+                .write_to(&mut output)
+                .expect("XLSX source native bytes");
+            assert_eq!(output, fixture.signed, "XLSX source native no-op bytes");
             "exact_noop"
         },
         "XLSB" => {
