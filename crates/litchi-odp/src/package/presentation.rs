@@ -26,7 +26,7 @@ type FamilyResult<T> = Result<T, litchi_odf_common::Error>;
 /// ```no_run
 /// use litchi_odp::Package;
 ///
-/// # fn main() -> CoreResult<(), litchi_odp::Error> {
+/// # fn main() -> std::result::Result<(), litchi_odp::Error> {
 /// let presentation = Package::open("slides.odp")?.presentation()?;
 ///
 /// // Get slide count
