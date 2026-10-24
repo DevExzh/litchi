@@ -17,3 +17,9 @@ The coordinator preserves every existing six raw and five owner operation row. T
 Independent review confirms unchanged coverage, sample counts, duration thresholds and all four baseline fences. One stale sentence about paired fixture comparison was corrected before committing the plan: that comparison already runs before ABBA and remains mandatory. The first external draft (55bbf4ee) remains unchanged.
 
 Owner/harness integration and raw fidelity/timing are assigned to separate leaves. Their consumers, validators, fixtures, records and hash bindings must migrate together. The fresh all-68 API capture is independent of this benchmark return; its documentation failure is recorded in 0362dvk. No native performance acceptance or push is claimed.
+
+## Harness isolation integration
+
+Reviewed source change `1ad640cc656bee4d563ff694585fc33ff0622a16` merges at `47ea67dc442b8d6ab3c26a5f371c543d7cc2a9ee`. Ordinary performance-harness defaults now select the current RTF and DrawingML adapters. The DrawingML module and binaries require their probe feature, and paired profiles explicitly select it with the appropriate historical/current gates. Generic manifest validation checks the exact feature arguments. The baseline fences remain unchanged.
+
+Independent review finds no blocking source issue and passes sixteen tests from the exact committed source. The composed compile-driver, DrawingML qualification and generic runner suites then pass all forty tests; the [receipt](results/0362dvie/harness-isolation-tooling.json) binds the merged source and log. Actual broad historical/current Cargo validation, the timing/fidelity repairs above and final native qualification remain required.
