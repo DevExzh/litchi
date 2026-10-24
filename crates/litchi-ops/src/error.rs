@@ -1606,6 +1606,10 @@ impl Classify for litchi_doc::Error {
             Self::Object(error) => error.classify(),
             Self::Io(error) => error.classify(),
             Self::Ole(error) => error.classify(),
+            Self::CustomXml(error) => error.classify(),
+            Self::Vba(error) => error.classify(),
+            Self::Signature(error) => error.classify(),
+            Self::Crypto(error) => error.classify(),
             Self::PatchConflict => Class::of(Code::InvalidInput),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
@@ -1813,6 +1817,9 @@ impl Classify for litchi_xls::Error {
     fn classify(&self) -> Class {
         match self {
             Self::Object(error) => error.classify(),
+            Self::Vba(error) => error.classify(),
+            Self::CustomXml(error) => error.classify(),
+            Self::Signature(error) => error.classify(),
             Self::InvalidLimit { .. } | Self::EncryptionEntropyRequired => {
                 Class::of(Code::InvalidArgument)
             },
@@ -1847,8 +1854,7 @@ impl Classify for litchi_xls::Error {
             },
             Self::WorksheetNotFound(_) => Class::of(Code::NotFound),
             Self::Allocation(_) => Class::of(Code::InternalError),
-            Self::Vba(_)
-            | Self::InvalidRecord { .. }
+            Self::InvalidRecord { .. }
             | Self::MalformedFilePass(_)
             | Self::InvalidLength { .. }
             | Self::UnexpectedEndOfStream(_)
@@ -2028,6 +2034,10 @@ impl Classify for litchi_ppt::Error {
             Self::Authoring(error) => error.classify(),
             Self::Io(error) => error.classify(),
             Self::Ole(error) => error.classify(),
+            Self::Object(error) => error.classify(),
+            Self::CustomXml(error) => error.classify(),
+            #[cfg(feature = "sign")]
+            Self::Signature(error) => error.classify(),
             Self::Graph(error) => error.classify(),
             Self::Limit { .. } | Self::ResourceLimit(_) => Class::of(Code::LimitExceeded),
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
@@ -2466,6 +2476,42 @@ impl Classify for litchi_sign::Error {
             },
             Self::Key(_) => Class::of(Code::InvalidArgument),
             Self::Sign(_) => Class::of(Code::InternalError),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
+#[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
+impl Classify for litchi_ole_common::custom_xml::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Ole(error) => error.classify(),
+            Self::ResourceLimit(_) => Class::of(Code::LimitExceeded),
+            Self::Invalid(_) | Self::Xml(_) => Class::of(Code::CorruptFile),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
+#[cfg(any(feature = "doc", feature = "xls"))]
+impl Classify for litchi_vba::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Cfb(error) => error.classify(),
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::UnsupportedCodePage(_) => Class::of(Code::UnsupportedCapability),
+            Self::InvalidData(_) => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
+#[cfg(feature = "doc")]
+impl Classify for litchi_crypto::spaces::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::Ole(error) => error.classify(),
+            Self::Invalid(_) => Class::of(Code::CorruptFile),
             _ => Class::of(Code::CorruptFile),
         }
     }

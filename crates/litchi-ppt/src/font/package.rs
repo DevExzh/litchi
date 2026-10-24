@@ -34,7 +34,7 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// Returns an error if the package cannot be opened or its font records
     /// are malformed.
-    pub fn fonts(&mut self, limits: crate::font::Limits) -> Result<FontCollections> {
+    pub fn fonts(&mut self, limits: Limits) -> Result<FontCollections> {
         self.presentation()?.fonts_with_limits(limits)
     }
 }

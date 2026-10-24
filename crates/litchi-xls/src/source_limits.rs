@@ -87,6 +87,24 @@ impl SourceLimits {
     pub const fn max_aggregate_bytes(self) -> usize {
         self.aggregate_bytes
     }
+
+    /// Return the component-wise stricter combination of two profiles.
+    ///
+    /// A raw reader may accept a narrower request than the profile that
+    /// admitted its source, but it must never widen that retained ingress
+    /// policy. This helper keeps that rule explicit at every raw boundary.
+    #[must_use]
+    pub const fn constrained_by(self, other: Self) -> Self {
+        Self {
+            input_bytes: min_usize(self.input_bytes, other.input_bytes),
+            entry_bytes: min_usize(self.entry_bytes, other.entry_bytes),
+            aggregate_bytes: min_usize(self.aggregate_bytes, other.aggregate_bytes),
+        }
+    }
+}
+
+const fn min_usize(left: usize, right: usize) -> usize {
+    if left < right { left } else { right }
 }
 
 /// Consuming builder for a checked [`SourceLimits`] profile.
@@ -211,5 +229,22 @@ mod tests {
                 }) if observed == kind && actual == value as u64 && bound == maximum as u64
             ));
         }
+    }
+
+    #[test]
+    fn constrained_profile_never_widens_ingress() {
+        let retained = SourceLimits::builder()
+            .max_input_bytes(64)
+            .unwrap()
+            .max_entry_bytes(32)
+            .unwrap()
+            .max_aggregate_bytes(48)
+            .unwrap()
+            .build()
+            .unwrap();
+        let requested = SourceLimits::default();
+        let effective = retained.constrained_by(requested);
+        assert_eq!(effective, retained);
+        assert_eq!(requested.constrained_by(retained), retained);
     }
 }

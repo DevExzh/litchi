@@ -44,6 +44,7 @@ pub(crate) fn is_isolatable_shape_error(error: &crate::package::Error) -> bool {
         | Error::Io(_)
         | Error::Ole(_)
         | Error::Object(_)
+        | Error::CustomXml(_)
         | Error::Graph(_)
         | Error::StreamNotFound(_)
         | Error::InvalidLimit { .. }
@@ -55,5 +56,7 @@ pub(crate) fn is_isolatable_shape_error(error: &crate::package::Error) -> bool {
         | Error::InvalidPassword
         | Error::UnsupportedEncryption(_)
         | Error::MalformedEncryptionHeader(_) => false,
+        #[cfg(feature = "sign")]
+        Error::Signature(_) => false,
     }
 }

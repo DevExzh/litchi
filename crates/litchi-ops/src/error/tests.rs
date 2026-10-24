@@ -1437,6 +1437,76 @@ fn compound_file_signature_errors_are_classified() {
     );
 }
 
+#[cfg(feature = "doc")]
+#[test]
+fn legacy_doc_foreign_boundaries_delegate_classification_before_core_projection() {
+    assert_code(
+        litchi_doc::Error::Signature(litchi_sign::Error::Limit("secret-limit".into())),
+        Code::LimitExceeded,
+    );
+    assert_code(
+        litchi_doc::Error::Signature(litchi_sign::Error::Cfb(litchi_cfb::OleError::Io(
+            io::Error::other("secret-io"),
+        ))),
+        Code::IoError,
+    );
+    assert_code(
+        litchi_doc::Error::Signature(litchi_sign::Error::Unsupported("secret-unsupported".into())),
+        Code::UnsupportedCapability,
+    );
+    assert_code(
+        litchi_doc::Error::Vba(litchi_vba::Error::Limit {
+            kind: litchi_vba::LimitKind::Modules,
+            observed: 2,
+            maximum: 1,
+        }),
+        Code::LimitExceeded,
+    );
+    assert_code(
+        litchi_doc::Error::Crypto(litchi_crypto::spaces::Error::PatchConflict),
+        Code::InvalidInput,
+    );
+}
+
+#[cfg(feature = "xls")]
+#[test]
+fn legacy_xls_foreign_boundaries_delegate_classification() {
+    assert_code(
+        litchi_xls::Error::Signature(litchi_sign::Error::Limit("secret-limit".into())),
+        Code::LimitExceeded,
+    );
+    assert_code(
+        litchi_xls::Error::Vba(litchi_vba::Error::UnsupportedCodePage(65_535)),
+        Code::UnsupportedCapability,
+    );
+    assert_code(
+        litchi_xls::Error::CustomXml(litchi_ole_common::custom_xml::Error::ResourceLimit(
+            "secret-limit".into(),
+        )),
+        Code::LimitExceeded,
+    );
+}
+
+#[cfg(feature = "ppt")]
+#[test]
+fn legacy_ppt_custom_xml_boundary_delegates_classification() {
+    assert_code(
+        litchi_ppt::Error::CustomXml(litchi_ole_common::custom_xml::Error::ResourceLimit(
+            "secret-limit".into(),
+        )),
+        Code::LimitExceeded,
+    );
+}
+
+#[cfg(all(feature = "ppt", feature = "sign"))]
+#[test]
+fn legacy_ppt_signature_boundary_delegates_classification() {
+    assert_code(
+        litchi_ppt::Error::Signature(litchi_sign::Error::Limit("secret-limit".into())),
+        Code::LimitExceeded,
+    );
+}
+
 #[cfg(feature = "docx")]
 #[test]
 fn docx_owning_policy_refusal_is_an_unsupported_capability() {

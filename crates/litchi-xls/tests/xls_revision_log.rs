@@ -5,7 +5,9 @@
 use std::io::Cursor;
 
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_xls::{Builder, REVISION_LOG_STREAM_NAME, Revision, RevisionType, raw::Reader};
+use litchi_xls::{
+    Builder, REVISION_LOG_STREAM_NAME, Revision, RevisionType, SourceLimits, raw::Reader,
+};
 
 // BIFF8 record types (MS-XLS 2.3 record enumeration values).
 const EOF_RECORD_TYPE: u16 = 0x000A;
@@ -160,7 +162,12 @@ fn workbook_without_revision_log_reports_none() {
     let bytes = workbook_container(&[]);
     let mut workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert!(!workbook.has_revision_log());
-    assert!(workbook.revision_log().unwrap().is_none());
+    assert!(
+        workbook
+            .revision_log(&SourceLimits::default())
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
@@ -170,7 +177,7 @@ fn workbook_exposes_revision_log_stream() {
     assert!(workbook.has_revision_log());
 
     let log = workbook
-        .revision_log()
+        .revision_log(&SourceLimits::default())
         .unwrap()
         .expect("revision log present");
     assert!(log.info().is_shared());
@@ -208,5 +215,5 @@ fn malformed_revision_log_surfaces_an_error() {
     let bytes = workbook_container(&[(REVISION_LOG_STREAM_NAME, malformed)]);
     let mut workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert!(workbook.has_revision_log());
-    assert!(workbook.revision_log().is_err());
+    assert!(workbook.revision_log(&SourceLimits::default()).is_err());
 }

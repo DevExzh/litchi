@@ -1,9 +1,9 @@
 # 0362zac — legacy raw Reader limits and owned errors
 
-Status: implementation packet, based on `e35cede32ae730d351ce9d29d243c35edd321ddf`.
-This record covers the legacy DOC, PPT and XLS cursor-backed readers. It does
-not claim that the full gate has run; the coordinator-owned Cargo slot was
-unavailable while this packet was prepared.
+Status: preparation packet, based on `e35cede32ae730d351ce9d29d243c35edd321ddf`.
+This record covers the initial legacy DOC, PPT and XLS cursor-backed reader
+boundary. Its validation and required typed-error repair are recorded in
+follow-up `0362zaca`.
 
 ## Boundary decision
 
@@ -47,7 +47,7 @@ migrated:
 | XLS | `custom_xml_data_store(Limits)` | caller-selected Custom XML limits |
 | XLS | `vba(&litchi_vba::Limits)` | caller-selected MS-OVBA limits |
 | XLS | `signatures(&Policy)` | caller-selected signature policy |
-| XLS | `revision_log()` | the Reader retains its ingress `SourceLimits`; CFB declared-stream preflight runs before materialization and the lazy method checks the retained per-entry ceiling before the revision parser |
+| XLS | `revision_log(&SourceLimits)` | the Reader retains its ingress `SourceLimits`; CFB declared-stream preflight runs before materialization and the lazy method checks the component-wise stricter requested profile before the revision parser |
 
 XLS now stores the selected `SourceLimits` in the raw Reader and exposes a
 read-only profile getter. Its validation-only constructor initializes the
@@ -59,13 +59,11 @@ the lazy parser boundary.
 ## Raw output receiver ruling
 
 DOC `to_bytes`, `write_to`, `save`, and `save_with_durability` retain
-`&mut self`. They are source transport operations on the generic `Read + Seek`
-CFB reader: `litchi_cfb::OleFile::open_stream` and the source-preserving write
-path must seek/read through the underlying cursor. Converting these methods to
-`&self` would require copying the source or changing the shared CFB substrate,
-neither of which is justified for this boundary packet. The exception is
-narrowly limited to raw codec transport; the DOC package owner outputs remain
-`&self`, as required by the owner contract.
+`&mut self`. Existing contract records 0351 §2.1.6 and 0359a §4 classify these
+as raw cursor/codec transport methods; 0362rd records the same substrate scope.
+This packet therefore does not invent a new owner exception: the raw reader is
+the explicitly permitted mutable codec model, while the DOC package owner
+outputs remain `&self`, as required by the owner contract.
 
 ## Consumer migration and checks
 
@@ -74,7 +72,7 @@ security-corpus consumers in `tools/perf-baseline` use the new explicit APIs.
 `litchi-vba` is declared directly by that tool because the raw method's
 required limit type is intentionally not hidden behind a format alias.
 
-Completed without Cargo:
+Completed during preparation without Cargo:
 
 ```text
 git diff --check                         PASS
@@ -82,5 +80,5 @@ raw API consumer search                  PASS (no legacy raw no-argument calls)
 staged-size/binary guard                 pending until commit staging
 ```
 
-Cargo tests/checks and the full glossary/inventory gate remain coordinator work
-after this commit is merged into the pinned staging tip.
+The full glossary/inventory gate remains coordinator work after this commit is
+merged into the pinned staging tip.

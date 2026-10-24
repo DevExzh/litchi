@@ -611,7 +611,10 @@ fn package_owner_accepts_official_rrdhead_code_pages_and_keeps_unicode_user_name
         assert_eq!(target.user_names().users()[0].user_name(), "Élodie");
 
         let mut workbook = Reader::new(Cursor::new(target.finish())).unwrap();
-        let revision = workbook.revision_log().unwrap().unwrap();
+        let revision = workbook
+            .revision_log(&litchi_xls::SourceLimits::default())
+            .unwrap()
+            .unwrap();
         assert_eq!(revision.headers()[0].head().code_page(), code_page);
         assert_eq!(revision.headers()[0].head().user_name(), "Alice");
     }

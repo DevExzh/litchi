@@ -497,10 +497,16 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// The result is a typed, inert model of the RRD revision records.
     /// Parsing never applies, rejects, or replays any recorded revision.
+    /// `limits` is required at this raw boundary. It is constrained by the
+    /// source profile retained when this reader was admitted, so a caller can
+    /// narrow the operation but cannot widen the ingress policy.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn revision_log(&mut self) -> Result<Option<crate::revision_log::RevisionLog>> {
+    pub fn revision_log(
+        &mut self,
+        limits: &SourceLimits,
+    ) -> Result<Option<crate::revision_log::RevisionLog>> {
         let Some(name) =
             crate::revision_log::find_revision_log_stream(&self.ole_file.list_streams())
                 .map(str::to_owned)
@@ -509,7 +515,8 @@ impl<R: Read + Seek> Reader<R> {
         };
         let data = self.ole_file.open_stream(&[name.as_str()])?;
         let observed = data.len();
-        let maximum = self.source_limits.max_entry_bytes();
+        let effective_limits = self.source_limits.constrained_by(*limits);
+        let maximum = effective_limits.max_entry_bytes();
         if observed > maximum {
             return Err(Error::Limit {
                 kind: LimitKind::EntryBytes,

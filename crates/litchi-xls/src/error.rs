@@ -51,7 +51,6 @@ impl fmt::Display for LimitKind {
 }
 
 /// Errors that can occur during XLS file parsing
-#[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
     /// I/O error
@@ -212,15 +211,177 @@ pub enum Error {
     Eof(&'static str),
 }
 
+impl fmt::Debug for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Preserve the established diagnostics for the native error arms.
+        // The foreign boundaries added by the unified API deliberately expose
+        // only their variant names; their typed causes remain available from
+        // `source()`.
+        match self {
+            Error::Io(error) => formatter.debug_tuple("Error::Io").field(error).finish(),
+            Error::Cfb(error) => formatter.debug_tuple("Error::Cfb").field(error).finish(),
+            Error::Object(error) => formatter.debug_tuple("Error::Object").field(error).finish(),
+            Error::Vba(_) => formatter.write_str("Error::Vba(..)"),
+            Error::CustomXml(_) => formatter.write_str("Error::CustomXml(..)"),
+            Error::Signature(_) => formatter.write_str("Error::Signature(..)"),
+            Error::Graph(error) => formatter.debug_tuple("Error::Graph").field(error).finish(),
+            Error::InvalidRecord {
+                record_type,
+                message,
+            } => formatter
+                .debug_struct("Error::InvalidRecord")
+                .field("record_type", record_type)
+                .field("message", message)
+                .finish(),
+            Error::UnsupportedBiffVersion(version) => formatter
+                .debug_tuple("Error::UnsupportedBiffVersion")
+                .field(version)
+                .finish(),
+            Error::PasswordProtected => formatter.write_str("Error::PasswordProtected"),
+            Error::PasswordRequired => formatter.write_str("Error::PasswordRequired"),
+            Error::InvalidPassword => formatter.write_str("Error::InvalidPassword"),
+            Error::UnsupportedEncryption(kind) => formatter
+                .debug_tuple("Error::UnsupportedEncryption")
+                .field(kind)
+                .finish(),
+            Error::MalformedFilePass(message) => formatter
+                .debug_tuple("Error::MalformedFilePass")
+                .field(message)
+                .finish(),
+            Error::InvalidLength { expected, found } => formatter
+                .debug_struct("Error::InvalidLength")
+                .field("expected", expected)
+                .field("found", found)
+                .finish(),
+            Error::Allocation(context) => formatter
+                .debug_tuple("Error::Allocation")
+                .field(context)
+                .finish(),
+            Error::UnexpectedEndOfStream(context) => formatter
+                .debug_tuple("Error::UnexpectedEndOfStream")
+                .field(context)
+                .finish(),
+            Error::InvalidFormula(message) => formatter
+                .debug_tuple("Error::InvalidFormula")
+                .field(message)
+                .finish(),
+            Error::InvalidCellReference(reference) => formatter
+                .debug_tuple("Error::InvalidCellReference")
+                .field(reference)
+                .finish(),
+            Error::WorksheetNotFound(name) => formatter
+                .debug_tuple("Error::WorksheetNotFound")
+                .field(name)
+                .finish(),
+            Error::InvalidFormat(code) => formatter
+                .debug_tuple("Error::InvalidFormat")
+                .field(code)
+                .finish(),
+            Error::Encoding(message) => formatter
+                .debug_tuple("Error::Encoding")
+                .field(message)
+                .finish(),
+            Error::UnsupportedFeature(feature) => formatter
+                .debug_tuple("Error::UnsupportedFeature")
+                .field(feature)
+                .finish(),
+            Error::InvalidData(message) => formatter
+                .debug_tuple("Error::InvalidData")
+                .field(message)
+                .finish(),
+            Error::Refused(refusal) => formatter
+                .debug_tuple("Error::Refused")
+                .field(refusal)
+                .finish(),
+            Error::PatchConflict { operation, reason } => formatter
+                .debug_struct("Error::PatchConflict")
+                .field("operation", operation)
+                .field("reason", reason)
+                .finish(),
+            Error::Signed => formatter.write_str("Error::Signed"),
+            Error::Internal(reason) => formatter
+                .debug_tuple("Error::Internal")
+                .field(reason)
+                .finish(),
+            Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => formatter
+                .debug_struct("Error::InvalidLimit")
+                .field("kind", kind)
+                .field("value", value)
+                .field("maximum", maximum)
+                .finish(),
+            Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => formatter
+                .debug_struct("Error::Limit")
+                .field("kind", kind)
+                .field("observed", observed)
+                .field("maximum", maximum)
+                .finish(),
+            Error::StringTooLong {
+                field,
+                utf16_units,
+                limit,
+            } => formatter
+                .debug_struct("Error::StringTooLong")
+                .field("field", field)
+                .field("utf16_units", utf16_units)
+                .field("limit", limit)
+                .finish(),
+            Error::TooMany { collection, limit } => formatter
+                .debug_struct("Error::TooMany")
+                .field("collection", collection)
+                .field("limit", limit)
+                .finish(),
+            Error::RecordTooLong {
+                record,
+                bytes,
+                limit,
+            } => formatter
+                .debug_struct("Error::RecordTooLong")
+                .field("record", record)
+                .field("bytes", bytes)
+                .field("limit", limit)
+                .finish(),
+            Error::SourceBoundWorksheetMutation { operation } => formatter
+                .debug_struct("Error::SourceBoundWorksheetMutation")
+                .field("operation", operation)
+                .finish(),
+            Error::WeakEncryptionRequiresExplicitPolicy => {
+                formatter.write_str("Error::WeakEncryptionRequiresExplicitPolicy")
+            },
+            Error::EncryptionEntropyRequired => {
+                formatter.write_str("Error::EncryptionEntropyRequired")
+            },
+            Error::Metadata(error) => formatter
+                .debug_tuple("Error::Metadata")
+                .field(error)
+                .finish(),
+            Error::EncryptedMetadata => formatter.write_str("Error::EncryptedMetadata"),
+            Error::UnexpectedRecordType { expected, found } => formatter
+                .debug_struct("Error::UnexpectedRecordType")
+                .field("expected", expected)
+                .field("found", found)
+                .finish(),
+            Error::Eof(context) => formatter.debug_tuple("Error::Eof").field(context).finish(),
+        }
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::Io(e) => write!(f, "I/O error: {e}"),
             Error::Cfb(e) => write!(f, "CFB error: {e}"),
             Error::Object(e) => write!(f, "OLE object error: {e}"),
-            Error::Vba(e) => write!(f, "VBA project error: {e}"),
-            Error::CustomXml(e) => write!(f, "Custom XML error: {e}"),
-            Error::Signature(e) => write!(f, "signature verification error: {e}"),
+            Error::Vba(_) => f.write_str("XLS VBA operation failed"),
+            Error::CustomXml(_) => f.write_str("XLS Custom XML operation failed"),
+            Error::Signature(_) => f.write_str("XLS signature operation failed"),
             Error::Graph(e) => write!(f, "Office Graph error: {e}"),
             Error::InvalidRecord {
                 record_type,
@@ -808,5 +969,22 @@ mod tests {
         // The CFB error doesn't have a source (unit variant), but test the variant
         let display = format!("{}", err);
         assert!(display.contains("Stream not found"));
+    }
+
+    #[test]
+    fn new_foreign_boundaries_redact_payloads_but_keep_typed_sources() {
+        let payload = "xls-secret-foreign-payload";
+        let errors = [
+            Error::Vba(litchi_vba::Error::InvalidData(payload.to_string())),
+            Error::CustomXml(litchi_ole_common::custom_xml::Error::Invalid(
+                payload.to_string(),
+            )),
+            Error::Signature(litchi_sign::Error::Xml(payload.to_string())),
+        ];
+        for error in errors {
+            assert!(error.source().is_some());
+            assert!(!error.to_string().contains(payload));
+            assert!(!format!("{error:?}").contains(payload));
+        }
     }
 }
