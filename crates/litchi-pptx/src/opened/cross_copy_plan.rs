@@ -1762,12 +1762,12 @@ fn build_candidate(
         transfers,
         destination_view,
     } = inputs;
-    // A recompressing candidate is published by clone-and-apply.  It must
-    // therefore never be re-opened under the destination's source policy:
-    // adding the copied closure may legitimately exceed a member ceiling that
-    // admitted the destination itself.  Transferring candidates still reopen
-    // their exact archive, because that reopen is what authorizes the source
-    // compressed spans they publish.
+    // A recompressing candidate is published by clone-and-apply when its
+    // candidate reopen is refused by the destination's read policy: adding
+    // the copied closure may legitimately exceed a member ceiling that
+    // admitted the destination itself. We still attempt the exact archive
+    // reopen first, and transferring candidates require that reopen because
+    // it authorizes the source-compressed spans they publish.
     let recompressing = transfers.is_empty();
     let archive_limit = limits.max_patch_bytes();
     let mut transferred = Vec::new();
