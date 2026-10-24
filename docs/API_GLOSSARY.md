@@ -164,7 +164,7 @@ line. A line is ✅ when the wave's gate registrations pass.
 | Wave | Crates | Immutable owner | Commit triad / no snapshot | No `Transaction`/`rollback`/`is_changed` | `Refused` replaces `UnsafeEdit` | Limits through options | Gate |
 |---|---|---|---|---|---|---|---|
 | F0 foundation | `litchi-core`, gate | ➖ | ✅ shared types | ✅ bans on clean crates | ✅ shared types, ops classification | ➖ | ✅ 0351 |
-| W1 | DOCX | ✅ (0355; `litchi_docx::Package`, `source_backed::Package`, `Document`) | ✅ (0355; 23 families registered; source-backed streaming families keep part-level commits, W1b) | ✅ (0355; banned in both `docx` profiles) | ✅ (0355; `Refused`/`PatchConflict`/`Internal`) | ✅ (0355; `SemanticLimits` on `OpenOptions`) | ✅ 0355 |
+| W1 | DOCX | ✅ (0355; `litchi_docx::Package`, `source_backed::Package`, `Document`) | ✅ (0355, 0355a; 23 families registered; the 13 source-backed families use `edit_x` → `Edit` → `commit` → `Package::apply_x`, with `Package::write_to`/`save` as the only output; the former part-level publishers and `*Publication` results are removed) | ✅ (0355; banned in both `docx` profiles) | ✅ (0355; `Refused`/`PatchConflict`/`Internal`) | ✅ (0355; `SemanticLimits` on `OpenOptions`) | ✅ 0355, 0355a |
 | W2 | PPTX | ✅ `Package`, `source::Package` (0356, 0356a, 0356b) | ✅ 47 registered families; source-backed editing on `source::Package` (`edit`, `edit_svg_images`, `edit_cross_slide_copy`), no public raw `OpcPackage` mutator (0356a), no public `SourceBackedPresentationEditor` (0356b) | ✅ (0252) | ✅ (0356) | ✅ (0356) | ✅ (0356, 0356a) |
 | W3 | PPT | ✅ | ✅ 12 scoped families publish a `Package` (0357) | ✅ banned crate-wide (0357) | ➖ (typed `slide_order`/`text_edit` refusals gain `kind()`) | ✅ `raw::Reader`/`SourceBackedPackage` `*_with_options`, `_with_limits` banned (0357) | ✅ 0357 |
 | W4 | XLSX, XLSB, `litchi-ooxml-common` | ✅ XLSX/XLSB owner and projection source implementation assembled (`0360`, `0360b`; both merge-bases verified) | ✅ XLSX/XLSB scoped commit/accessor implementation assembled (`0360`, `0360b`) | ✅ XLSX/XLSB family bans and replay implementation assembled (`0360`, `0360b`, `0362u`) | ✅ XLSX/XLSB typed refusal/limit implementation assembled (`0360`, `0360b`) | ✅ XLSX/XLSB options and typed `LimitKind` implementation assembled (`0360`, `0360b`) | 🔴 final native/performance qualification and full workspace gate remain |
@@ -173,15 +173,26 @@ line. A line is ✅ when the wave's gate registrations pass.
 | W7 | iWork (Pages, Keynote, Numbers; host `litchi-iwa`) | ✅ (host `litchi_iwa::Package`, `Document`; host editors are `Builder` drafts, 0361) | ✅ host primary raw package family `litchi_iwa::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` with `Package::{edit, apply}` (0361la), plus `into_parts` on 93 commits, `family_methods` on `pages`, `numbers-*`, `keynote-*`, six single-operation lifecycle families with an `Edit` (0361) | ✅ | ✅ typed per-family `Refusal` with `kind()` in `Error::Refused`, `Limit` for `LimitExceeded` (0361) | ✅ `MergeReader::*_with_options`, `Workbook::from_sheets_with_options`, `media::OpenOptions`; `_with_limits` banned (0361) | ✅ 0361, 0361la |
 | W8 | unified `File` (`litchi-ops`, facade, CLI, Python) | ➖ | ✅ Part A and primary Commit/BatchCommit accessor shape is assembled (0362, 0362u) | ➖ | ✅ DOC body/source-backed refusal classification is assembled (0362) | ✅ Part A options/required raw-limit surface is assembled (0362) | ✅ content-matching replay implementation is assembled across the unified format consumers (0362m, 0362u); 🔴 native/ABBA qualification, signed-native review and the final workspace gate remain |
 
-### Final contract audit boundary (2026-10-23)
+### Final contract audit boundary (2026-10-24)
 
-This glossary reconciliation is against the composed source at
-`8225b82dde7bac272e9e77789a78751ae07aaa2a` (the Pages metadata shared-triad
-leaf is `8db74400ef`, with the later shared-type closure recorded by `0362us`)
-and the records cited above. The no-build audit did not generate new rustdoc JSON;
-the Oct-20 files under `.coord/api-contract/rustdoc/` are stale inputs and are
-not evidence of current conformance. A red cell below is assigned required
-engineering work, not an accepted exception:
+This glossary reconciliation is now bound to the fresh all-68 API capture at
+`472b6705475b073e7fe08f6e11ee17fb1e29f838`, tree
+`ebc1cee05f124c0c63977aff07a23288c19e7d00`, recorded in
+[0362ul21](unified-ops/0362ul21-final-api-capture-and-glossary-return.md).
+All 68 packages ran fresh with hidden items, all features, offline/locked
+Cargo, one job and the 20 GB cap; no capture artifact was reused. The fresh
+84-row inventory is SHA-256
+`161754e5dbe5b7d149b8631a507e6c1a1b222bf2b780e14f84cb48cdec5039c8`.
+The external blank disposition scaffold is explicitly not a review: its 84
+`UNASSIGNED_REQUIRED_REVIEW` rows have SHA-256
+`57d486415c0e940160a3e0ed29bee08b79b14b013773973a06827e2b17445529`.
+The reviewed 84-row disposition remains the 0362ul14 file (SHA-256
+`3b0d48c38a4cc53e319c720d5e5ef4a1378631b10de5ec13190b03f5d3ad1a3e`), and
+the independent 472b receipt (SHA-256
+`6bd44bf07454ce459f9b0cfb27c91a0718bd12a2b9bc02b08a011e3c3ed2b2f3`)
+revalidates those roles against the fresh source. This is API evidence only;
+it does not turn the all-feature JSON into a feature-specific gate. A red cell
+below is assigned required engineering work, not an accepted exception:
 
 - W4 XLSX and W4b XLSB source implementation is assembled: both
   `git merge-base --is-ancestor 3c55c62986 HEAD` and
@@ -203,15 +214,18 @@ engineering work, not an accepted exception:
   ABBA qualification and the final workspace gate remain open; this is not a
   performance acceptance claim. OLE's commit-only/fixed-error correction is
   already integrated (`39a7a2729b`, `1a5f56f45d`, `02c9f44c78`).
-- 0362rd kept standalone CFB and soapberry ZIP transport methods in separate
-  substrate follow-up scope. The CFB limits rows are now canonicalized and
-  consumer-closed by 0362zad; soapberry ZIP remains separate follow-up scope.
-  Any public format re-export or foreign surface is still required in its
-  owning format lane.
+- 0362rd's separate CFB and generic ZIP substrate ownership is historical. The
+  CFB rows are canonicalized and consumer-closed by 0362zad, and the generic
+  ZIP rows and cache-policy aliases are canonicalized with every tracked
+  consumer migrated by 0362zae/0362zaea. The corrected Soapberry profile
+  passes in the fresh OPC/DOCX validation receipt below; no generic ZIP API
+  debt is implied by the old separate-follow-up wording. Any public format
+  re-export or foreign surface remains assigned to its owning format lane.
 - The old OPC `*_with_limits`/alias findings in 0362rd are closed in the
-  assembled source (the source-only scan found no public OPC suffix rows), but
-  the absence of fresh rustdoc means the dedicated OPC profile still needs a
-  coordinator rerun before it is called complete.
+  assembled source. 0362ul19 records fresh feature-specific `opc-minimal` and
+  `opc-full` rustdoc/glossary passes, alongside `docx-minimal`, `docx-full`
+  and the corrected `soapberry-zip` profile. These checks are source/API
+  evidence, not native qualification or the final workspace gate.
 - W6's package owners and public ODF raw/codec limit paths are source-closed:
   `litchi-odf-common::package::Archive::new(data, ArchiveLimits)`,
   `Archive::read_manifest_xml(XmlStreamLimits)`, and the bounded
@@ -220,12 +234,14 @@ engineering work, not an accepted exception:
   qualification and ODF owner/performance work remain open and must not be
   treated as acceptance of those results.
 
-The PPT first-commit measurement remains the accepted bounded residual
-(`0362j`, `4c15580614`), and XLS concrete-iterator/deferred-reopen and ODraw
+The 0362j record closes the 0357b PPT first-commit/replay regression for its
+measured workload and preserves its native measurements; it is not a bounded
+residual exception or final new native qualification. The current PPT native
+qualification remains open. XLS concrete-iterator/deferred-reopen and ODraw
 API residuals are closed by `0362y`/`904bf4df8c`/`91a578db22` and
 `0362v`/`841e730798`, respectively; their coordinator qualification is not
 recast as an API exception. Item 22's redaction audit is the only permitted
-deferral.
+audit deferral.
 
 ## 3. Open, create, save
 
