@@ -39,3 +39,41 @@ The iWork native protocol suite ran 20 tests with one fixture-identity error;
 Both logs are under `.coord/final-acceptance-2026-10-24/`. These checks remain
 required corrections; source identities will only be refreshed after review
 of the intervening source and fixture changes. No native timing was run.
+
+
+## ODG baseline prerequisite
+
+A fresh external baseline endpoint at
+`.coord/odg-joined-baseline-ad524` retains clean tracked source
+`ad52437f5e5e2c71ea476eedd5ddcf61aee2021d`. Offline lock generation under
+Rust/Cargo 1.95.0 produced the 139,592-byte `6d7895e6...` lock. That original
+artifact is retained as
+`.coord/odg-joined-baseline-ad524-evidence/Cargo.lock.baseline-generated-6d7895e6`.
+It validates against the baseline, correcting an earlier untested assumption
+that it was incompatible. Its dependency resolution differs from the
+candidate, so it is not the lock selected for the matched comparison.
+
+Seeding the baseline with the candidate's 139,591-byte ignored lock,
+SHA-256 `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`,
+passes offline locked all-features metadata. The coordinator independently
+traversed the ODG dependency graphs and verified equality of all 228 external
+package name/version/source/checksum rows. The baseline production tree and
+tracked status remain unchanged. This is dependency preparation only; no
+native binary, timing or acceptance result is claimed.
+
+The external evidence directory is
+`.coord/odg-joined-baseline-ad524-evidence/`. Its source-bound metadata is
+regenerated with `cargo metadata --offline --locked --all-features
+--format-version 1 --manifest-path <endpoint>/Cargo.toml`, after sourcing the
+capped `.coord/odg-native-protocol/env.sh` and overriding target/TMP to that
+external evidence directory. The baseline endpoint above uses the seeded
+candidate lock; the candidate capture used clean diagnostic source `2dfc4f134d`.
+
+- `baseline-metadata-seeded-candidate-lock.json`: 3,093,862 bytes, SHA-256
+  `62ee160686d542e080da8bcf40a13a0532311fc3f3a2f14fee669402b94b81a5`.
+- `candidate-metadata-all-features.json`: 3,057,334 bytes, SHA-256
+  `10b9dd7a55e854223a44340f68b08367de7d60bf7866159f8d9cfa37b70e5385`.
+
+These large metadata artifacts remain outside Git. The separate ODF
+shared-triad baseline remains `173dd5330476713714871007316794b9a3a1bdaa`;
+ODG preparation does not qualify that separate lane.
