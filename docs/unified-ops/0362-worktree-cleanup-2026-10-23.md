@@ -755,3 +755,27 @@ Receipt:
 The adjacent manifest has SHA-256
 `4c2d6760f6722120286db58fd290a250d3a2d74ec02de3f5ddf067c3985ae0f5`.
 `restore.py` restores the three ignored files after worktree recreation.
+
+## Seventeenth cleanup, 2026-10-24
+
+A fresh process audit allowed removal of the clean, merged ODS lazy-entry
+worktree without force. Branch `uo2/ods-lazy-entry` remains at
+`daf6a85bd40b6d7e714091f691cc7c85c4327808`, ancestral to integration
+`a3eb017da2`. The apparent checkout size was 440,249,548 bytes. Its sole
+ignored file, the 139,591-byte Cargo.lock, is hash-quarantined with SHA-256
+`76340b069df633ff1c63c98e93e8b10c1e7711164ca2515f490872142ab46c72`.
+The coordinator independently verified its bytes, retained branch, ancestry,
+removed-path absence and the protected external target/log root's existence.
+That 3,025,233,257-byte external root remains untouched.
+
+Receipt:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/seventeenth-wave/receipt.md`
+(1,535 bytes, SHA-256
+`1e6bb0a6aacfe283a36fbc55abdd6316bc5f8ff93b9db3f8a48eb77ed0ad61c5`).
+The adjacent 622-byte manifest has SHA-256
+`41d818e1e8929cb44d19ca64a97ef649fd085c0932920ad91e2b15e43cd1854c`;
+the 1,419-byte restore helper has SHA-256
+`c38ee4c6558f7a6872a076a246912061a64125730aa9dbf6e4bdca3d24b6d068`.
+Recreate with `git worktree add` using the retained branch, then run that
+`restore.py`. XLS and PPTX leaves remain untouched because foreign searches
+still hold their files. No build target or measurement artifact was removed.
