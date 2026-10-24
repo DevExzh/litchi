@@ -151,6 +151,52 @@ class SafeInkRunnerTests(unittest.TestCase):
         self.assertIn("output cap exceeded", receipt["violation"])
         self.assertTrue(self.fake_systemctl_log.exists())
 
+    def test_fast_exit_output_cap_is_failed(self) -> None:
+        runner, output, _tmp, _logs = self._runner(output_cap=4096)
+        command = [
+            "/bin/sh",
+            "-c",
+            f"mkdir -p {str(output)!r}; "
+            f"dd if=/dev/zero of={str(output / 'a')!r} bs=4096 count=1 >/dev/null; "
+            f"dd if=/dev/zero of={str(output / 'b')!r} bs=4096 count=1 >/dev/null",
+        ]
+        receipt = runner.run(command)
+        self.assertEqual(receipt["status"], "failed")
+        self.assertIn("output cap exceeded", receipt["violation"])
+        self.assertEqual(receipt["returncode"], 0)
+        self.assertIsNotNone(receipt["cleanup"])
+
+    def test_fast_exit_tmp_cap_is_failed(self) -> None:
+        runner, _output, tmp, _logs = self._runner(tmp_cap=4096)
+        command = [
+            "/bin/sh",
+            "-c",
+            "dd if=/dev/zero of=\"$TMPDIR/a\" bs=4096 count=1 >/dev/null; "
+            "dd if=/dev/zero of=\"$TMPDIR/b\" bs=4096 count=1 >/dev/null",
+        ]
+        receipt = runner.run(command)
+        self.assertEqual(receipt["status"], "failed")
+        self.assertIn("TMP cap exceeded", receipt["violation"])
+        self.assertEqual(receipt["returncode"], 0)
+        self.assertIsNotNone(receipt["cleanup"])
+        self.assertFalse(tmp.exists())
+
+    def test_exact_output_and_tmp_caps_are_accepted(self) -> None:
+        runner, output, tmp, _logs = self._runner(output_cap=4096, tmp_cap=4096)
+        command = [
+            "/bin/sh",
+            "-c",
+            f"mkdir -p {str(output)!r}; "
+            f"dd if=/dev/zero of={str(output / 'a')!r} bs=4096 count=1 >/dev/null; "
+            "dd if=/dev/zero of=\"$TMPDIR/a\" bs=4096 count=1 >/dev/null",
+        ]
+        receipt = runner.run(command)
+        self.assertEqual(receipt["status"], "complete")
+        self.assertIsNone(receipt["violation"])
+        self.assertEqual(receipt["output"]["bytes"], 4096)
+        self.assertEqual(receipt["tmp"]["bytes_before_cleanup"], 4096)
+        self.assertFalse(tmp.exists())
+
     def test_documented_phase_first_cli_runs_with_fake_systemd(self) -> None:
         output = self.root / "cli-output"
         tmp = self.root / "cli-tmp"

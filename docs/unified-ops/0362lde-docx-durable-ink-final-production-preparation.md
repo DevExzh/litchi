@@ -25,7 +25,7 @@ after adding the bounded outer boundary; the previous v2 receipt remains
 identified only as historical provenance:
 
     /home/zhuhe/code/litchi-worktrees/.coord/durable-ink-final-472b/source-preparation.json
-    21619 bytes, SHA-256 ee0216cc5527a8b7082e0dac6a7282787efdb4d0a3a11626a7b02225165b9001
+    21715 bytes, SHA-256 68259481ceb41a58cc2371457f06a942f86cd62c2ba5f3ade6d5180a15a8620f
 
 The superseded v2 receipt was 13,470 bytes with SHA-256
 8f231da0c97436b134b7589c77e3f3df4714d9dc9fa92ef15e9b2c3e06cb2e20. Its
@@ -55,10 +55,10 @@ The final source contains the same canonical probe and runners as 0362ld:
     README.md                   2649 bytes   33f90aa185e84c6bfdfaff90e8df8f41617f4a9481009622ef5d96c1a9edf7f8
     test_ink_qualification.py 10410 bytes  dddf5fce77460b90b857875fd09f21ae15c89cb58d2a1e2fb7f89037ca829a0d
 
-The committed outer boundary is tools/ink_safe_runner.py, 16,835 bytes,
-SHA-256 f184664f29c1504e9d070931dcb476be2ac680fb5d7c5d62785f6fcdb41b4c16.
-Its fake-boundary tests are tools/test_ink_safe_runner.py, 8,356 bytes,
-SHA-256 ee98cfa591f5c5def975b79e9de7746fac4b45a31fcc517d33016fba0c080a58.
+The committed outer boundary is tools/ink_safe_runner.py, 17,630 bytes,
+SHA-256 1bc982f4495a16c30ac4ca2779351aec1e420781a6d6cb7c2b1f33ccff88fede.
+Its fake-boundary tests are tools/test_ink_safe_runner.py, 10,397 bytes,
+SHA-256 ee6ac475191373c7fe581c2767da55c98449db964b60a5ea5fc9e49e60095499.
 The wrapper is source-only infrastructure: it does not alter the inner
 provenance, route, fidelity or allocation protocols.
 
@@ -403,7 +403,8 @@ four validation sets. The fresh output/TMP paths remained absent and CPU 29
 was present in the current affinity; neither fact is a timing or quiet grant.
 
 The new outer-boundary tests also passed without Cargo or native execution:
-eight fake-systemd lifecycle/resource tests cover argv policy
+eleven fake-systemd lifecycle/resource tests cover argv policy
 binding, fixed cap ceilings, normal TMPDIR propagation and cleanup, owned
-unit termination on TMP growth and deadline, and pairwise path rejection.
+unit termination on TMP growth and deadline, post-exit output/TMP over-cap
+snapshots, exact-boundary acceptance, and pairwise path rejection.
 The launcher and its tests both pass py_compile.
