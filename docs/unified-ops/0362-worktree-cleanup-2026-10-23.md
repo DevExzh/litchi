@@ -1460,3 +1460,39 @@ this evidence directory to restore its ignored payloads. The retained
 leaves; a new cleanup requires a fresh holder and identity audit. Active
 CFB, DrawingML, ZIP and legacy raw leaves, external targets, frozen source
 and the trunk's constructor probe are preserved.
+
+## Thirty-ninth cleanup: raw legacy, ZIP and exact source roles
+
+At staging `2021a41c4cb217844131892138a7d0452a81d6c1`, three clean merged
+leaves were removed non-forced; their branch refs remain:
+
+| Removed worktree | Retained branch tip | Retained files | Bytes |
+| --- | --- | ---: | ---: |
+| `uo2-legacy-raw-boundary` | `6a55d251d29607c8c2020c9046821dc66ee3c395` | 1 | 139606 |
+| `uo2-zip-explicit-limits` | `0e3cfc0e1cb0efe8c371623e42c347aa90640461` | 1 | 139591 |
+| `uo2-final-contract-inventory-readiness` | `22aed11db8db678cbcac68725ec52a9f0083f884` | 9 | 287389 |
+
+All eleven payloads (566,586 apparent bytes; 618,496 allocated bytes) remain
+in quarantine. Restoration is exercised in temporary sparse worktrees with
+hash and mode checks. The coordinator independently verifies every payload,
+branch tip and merge ancestry, removed paths and the protected 15-byte trunk
+constructor probe. Cleanup sends no signals and changes no external target,
+active source or native endpoint. The concurrent DrawingML directory mtime
+change is recorded separately from cleanup. Exact physical disk reclamation
+was not measured; retained payload bytes are not described as reclaimed.
+
+Evidence remains outside Git under
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave39/`:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `manifest.json` | 62625 | `a27af2789018991e7fc2a7eb9b2234a76c2c772ebf31c40b94f0d07c757439d0` |
+| `receipt.json` | 109941 | `54becaf7a51d26c6b7202856c620ff8ae51769d4d1a07de71ced862e948297d9` |
+| `prepare_cleanup.py` | 6928 | `f7b529737ad45c387f8419d4fb6328cc1033751e0c9cd4ee0ab38ca4b9e3c1e1` |
+| `restore.py` | 4828 | `d7077650b69a82b252c044489872a63889d4a862a31cfd6c16aae8c40f796758` |
+
+The independent coordinator receipt is `root-verification.json`, SHA-256
+`78a792acf6c99df2cae5aa4ba823add8ae381db4adc4969ea65a1a21a5acdd8e`.
+Recreate a selected worktree at its retained branch, then run
+`python3 restore.py <leaf>` in this evidence directory. A later cleanup must
+repeat holder and identity checks.

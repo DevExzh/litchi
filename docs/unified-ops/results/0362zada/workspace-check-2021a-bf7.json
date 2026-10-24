@@ -1,0 +1,25 @@
+{
+  "source_phase": "resolved CFB merge before commit",
+  "head": "2021a41c4cb217844131892138a7d0452a81d6c1",
+  "merge_head": "bf7f48741bc02d1f5e736a7a732c25808d28af36",
+  "tree": "115e8f2579d548eca447095b51f5b89ce08665a0",
+  "command": [
+    "cargo",
+    "check",
+    "--workspace",
+    "--offline",
+    "--locked",
+    "--all-features",
+    "--all-targets",
+    "--message-format=short"
+  ],
+  "root_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+  "target": "/home/zhuhe/code/litchi-worktrees/.coord/target-cfb-explicit-limits",
+  "started_utc": "2026-10-24T10:44:10.785237+00:00",
+  "exit_code": 101,
+  "wall_seconds": 188.8092302310106,
+  "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/cfb-composed/workspace-check-2021a-bf7.log",
+  "log_bytes": 13943,
+  "log_sha256": "e16a4924a35feb66af31c48ee8228ad62b02b18ac66ad09a60602a7bb2787ea0",
+  "lock_unchanged": true
+}
