@@ -8,8 +8,12 @@
   signature policy test matrix.
 - Required companion files: `results/0362ul24/signed_native_probe.rs`,
   `signed_native_qualification.py`, `validate_signed_native.py` and their
-  failure-case tests. The probe is an external qualification consumer; it
-  does not change a format crate or the frozen 109-route W8 probe.
+  failure-case tests. `signed_native_memory.py` is the external allocation
+  collector and `signed_native_finalize.py` is the only completion collector:
+  a latency manifest can be inspected on its own, but the final status cannot
+  become `complete` without the endpoint-bound memory summary. The probe is an
+  external qualification consumer; it does not change a format crate or the
+  frozen 109-route W8 probe.
 
 ## 1. Evidence boundary
 
@@ -123,7 +127,7 @@ requires the matrix's expected disposition.
    exactly `472b6705475b073e7fe08f6e11ee17fb1e29f838` from the immutable
    `final-api-capture-472b670547/source` checkout. The driver verifies a clean
    tree, writes a separate external package, runs `cargo generate-lockfile
-   --offline`, `cargo metadata --locked --format-version=1 --no-deps`, and
+   --offline`, `cargo metadata --offline --locked --format-version=1`, and
    `cargo build --offline --locked --release`, then executes `--mode list` and
    every `--mode validate` route to derive the endpoint capability map. The
    endpoint manifests bind the source root/ref/tree hash, source archive,
@@ -132,6 +136,16 @@ requires the matrix's expected disposition.
    between endpoints; the adapter selects the f2 public-field/limits and
    XLSB `Option<Edit>` APIs through its consumer feature rather than changing
    a production crate.
+   The staged fixture root and its canonical `fixtures.json` are external to
+   both immutable source trees. Their artifact path and SHA-256 are passed to
+   the probe as `LITCHI_SIGNED_FIXTURE_MANIFEST` and
+   `LITCHI_SIGNED_FIXTURE_MANIFEST_SHA256`; `LITCHI_SIGNED_FIXTURE_ROOT` is a
+   separate root-containment input.
+   The endpoint `Cargo.lock` files remain role-specific; validation does not
+   compare their bytes. It compares each generated selected closure against
+   the fixed `tools/w8_projection_policy.py` registry identities, checksums
+   and dependency edges, and permits only the reviewed local edge delta plus
+   the external `signed-native-consumer` package.
 2. Run correctness/preflight and direct native checks before timing. A route
    that fails any byte, signature-state, refusal, source-freshness or budget
    proof is rejected before calibration.
@@ -160,7 +174,12 @@ requires the matrix's expected disposition.
    only hash-bound reduced summaries. These profiles are bounded-retention
    evidence, not native latency samples.
 
-## 6. Acceptance rules
+6. Run `signed_native_finalize.py` only after both receipts have been checked.
+   It revalidates endpoint archives, role-specific lock closures and registry
+   identities, every latency child receipt, every external memory artifact and
+   the exact fixture/route/call matrix before writing `status = complete`.
+
+## 7. Acceptance rules
 
 - A producer or synthetic signature-presence fixture is accepted only when
   `signature_presence`, `origin`, format and source bytes all match the

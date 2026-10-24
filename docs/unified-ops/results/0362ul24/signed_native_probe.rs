@@ -173,7 +173,9 @@ fn endpoint() -> &'static str {
 }
 
 fn manifest_path(root: &Path) -> PathBuf {
-    root.join("docs/unified-ops/results/0362ul24/fixtures.json")
+    std::env::var_os("LITCHI_SIGNED_FIXTURE_MANIFEST")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| root.join("docs/unified-ops/results/0362ul24/fixtures.json"))
 }
 
 fn string_field<'a>(object: &'a serde_json::Map<String, Value>, key: &str) -> &'a str {
@@ -291,7 +293,34 @@ fn signed_compound_file(plain: Vec<u8>) -> Vec<u8> {
 }
 
 fn load_fixtures(root: &Path) -> Vec<Fixture> {
-    let manifest = fs::read_to_string(manifest_path(root)).expect("signed fixture manifest");
+    let manifest_file = manifest_path(root);
+    let root_canonical = fs::canonicalize(root).expect("fixture root canonical path");
+    let root_metadata = fs::symlink_metadata(root).expect("fixture root metadata");
+    assert!(
+        root_metadata.is_dir(),
+        "fixture root is not a regular directory"
+    );
+    let manifest_metadata =
+        fs::symlink_metadata(&manifest_file).expect("fixture manifest metadata");
+    assert!(
+        manifest_metadata.is_file(),
+        "fixture manifest is not a regular file"
+    );
+    let manifest_canonical =
+        fs::canonicalize(&manifest_file).expect("fixture manifest canonical path");
+    assert!(
+        manifest_canonical.starts_with(&root_canonical),
+        "fixture manifest escapes fixture root"
+    );
+    let manifest_bytes = fs::read(&manifest_file).expect("signed fixture manifest");
+    if let Some(expected) = std::env::var_os("LITCHI_SIGNED_FIXTURE_MANIFEST_SHA256") {
+        assert_eq!(
+            digest(&manifest_bytes),
+            expected.to_string_lossy().as_ref(),
+            "fixture manifest hash"
+        );
+    }
+    let manifest = String::from_utf8(manifest_bytes).expect("signed fixture UTF-8");
     let value: Value = serde_json::from_str(&manifest).expect("signed fixture JSON");
     let rows = value
         .get("fixtures")
@@ -303,14 +332,30 @@ fn load_fixtures(root: &Path) -> Vec<Fixture> {
             let relative = string_field(object, "relative_path");
             let relative_path = Path::new(relative);
             assert!(
-                !relative_path.is_absolute()
+                !relative.is_empty()
+                    && !relative_path.is_absolute()
                     && !relative_path
                         .components()
                         .any(|component| matches!(component, std::path::Component::ParentDir))
-                    && !relative.contains('\\'),
+                    && !relative_path.components().any(|component| matches!(
+                        component,
+                        std::path::Component::RootDir | std::path::Component::Prefix(_)
+                    )) && !relative_path.components().any(|component| {
+                    matches!(component, std::path::Component::Normal(part) if part == "3rdparty")
+                }) && !relative.contains('\\'),
                 "fixture path must be a portable relative path: {relative}"
             );
             let plain_path = root.join(relative);
+            let plain_metadata = fs::symlink_metadata(&plain_path).expect("fixture metadata");
+            assert!(
+                plain_metadata.is_file(),
+                "fixture is not a regular file: {relative}"
+            );
+            let plain_canonical = fs::canonicalize(&plain_path).expect("fixture canonical path");
+            assert!(
+                plain_canonical.starts_with(&root_canonical),
+                "fixture escapes fixture root: {relative}"
+            );
             let plain = fs::read(&plain_path)
                 .unwrap_or_else(|error| panic!("{}: {error}", plain_path.display()));
             let expected = string_field(object, "input_sha256");
@@ -638,6 +683,7 @@ fn no_op_write(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Value> {
     row["output_sha256"] = json!(output_sha256);
     row["output_equals_source"] =
         json!(bytes == fixture.signed.len() && output_sha256 == fixture.source_sha256);
+    row["source_after_sha256"] = json!(digest(&endpoint.to_bytes()?));
     row["stream_bounded"] = json!(writes > 0 && max_write_bytes <= 8192);
     row["bytes"] = json!(bytes);
     row["writes"] = json!(writes);
@@ -670,15 +716,19 @@ fn changed_refusal(fixture: &Fixture, facade: bool) -> Value {
     let original = property_value(&endpoint, fixture);
     let changed = same_width(&original);
     let before = endpoint.to_bytes().expect("source bytes");
-    let error = endpoint
-        .edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &changed)))
-        .expect_err("changed signed edit must refuse");
+    let (error, publication_attempts) =
+        match endpoint.edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &changed))) {
+            Err(error) => (error, 0usize),
+            Ok(_) => panic!("changed signed edit crossed the publication boundary"),
+        };
     let mut row = signed_row(fixture, &file);
     row["status"] = json!("expected_refusal");
     row["refusal_kind"] = json!("ProtectedDocument");
     row["code"] = json!(error.code().as_str());
+    row["source_before_sha256"] = json!(digest(&before));
     row["source_after_sha256"] = json!(digest(&endpoint.to_bytes().expect("source remains")));
-    row["output_published"] = json!(false);
+    row["publication_attempts"] = json!(publication_attempts);
+    row["output_published"] = json!(publication_attempts != 0);
     assert_eq!(error.code(), Code::DocumentProtected);
     assert_eq!(before, endpoint.to_bytes().expect("source remains bytes"));
     row
@@ -695,17 +745,21 @@ fn unsigned_negative(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Valu
     let commit = unsigned
         .edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))
         .expect("authorized unsigned no-op");
-    let error = commit_api::patch(&commit)
-        .apply(&endpoint_file(&file, facade))
-        .expect_err("unsigned no-op patch must conflict with signed publication");
     let recipient = endpoint_file(&file, facade);
+    let recipient_before = recipient.to_bytes()?;
+    let (error, publication_attempts) = match commit_api::patch(&commit).apply(&recipient) {
+        Err(error) => (error, 0usize),
+        Ok(_) => panic!("unsigned no-op patch crossed the publication boundary"),
+    };
     let mut row = signed_row(fixture, &file);
     row["status"] = json!("expected_refusal");
     row["refusal_kind"] = json!("PatchConflict");
     row["code"] = json!(error.code().as_str());
     row["re_marked_signed"] = json!(false);
     row["recipient_signed_after"] = json!(recipient.is_signed());
-    row["output_published"] = json!(false);
+    row["source_before_sha256"] = json!(digest(&recipient_before));
+    row["publication_attempts"] = json!(publication_attempts);
+    row["output_published"] = json!(publication_attempts != 0);
     assert_eq!(error.code(), Code::InvalidInput);
     Ok(row)
 }
@@ -738,17 +792,24 @@ fn source_freshness(fixture: &Fixture, facade: bool) -> litchi_ops::Result<Value
     let patch_commit =
         endpoint.edit(|edit| edit.set(fixture.target.as_str(), props(fixture, &value)))?;
     let patch = commit_api::patch(&patch_commit).clone();
+    let source_before = endpoint.to_bytes()?;
     let mut changed = fixture.signed.clone();
     changed[0] ^= 1;
     fs::write(&path, &changed).expect("mutate source fixture");
-    let error = patch.apply(&endpoint).expect_err("source freshness fence");
+    let (error, publication_attempts) = match patch.apply(&endpoint) {
+        Err(error) => (error, 0usize),
+        Ok(_) => panic!("source freshness fence crossed the publication boundary"),
+    };
     let _ = fs::remove_file(&path);
     let mut row = signed_row(fixture, &opened);
     row["status"] = json!("expected_refusal");
     row["refusal_kind"] = json!("SourceChanged");
     row["code"] = json!(error.code().as_str());
+    row["source_before_sha256"] = json!(digest(&source_before));
     row["source_mutated_sha256"] = json!(digest(&changed));
-    row["output_published"] = json!(false);
+    row["source_after_sha256"] = json!(digest(&changed));
+    row["publication_attempts"] = json!(publication_attempts);
+    row["output_published"] = json!(publication_attempts != 0);
     assert_eq!(error.code(), Code::IoError);
     Ok(row)
 }
@@ -772,11 +833,14 @@ fn budget(fixture: &Fixture, facade: bool) -> Value {
         .build()
         .expect("semantic limits");
     let value = property_value(&endpoint, fixture);
-    let error = commit_api::edit(&endpoint, limits, |edit| {
+    let source_before = endpoint.to_bytes().expect("budget source before");
+    let (error, publication_attempts) = match commit_api::edit(&endpoint, limits, |edit| {
         edit.set(fixture.target.as_str(), props(fixture, &value))?;
         edit.set(fixture.target.as_str(), props(fixture, &value))
-    })
-    .expect_err("one-operation limit");
+    }) {
+        Err(error) => (error, 0usize),
+        Ok(_) => panic!("budget limit crossed the publication boundary"),
+    };
     let limit_kind = match error.leaf() {
         Source::Transaction(TransactionError::Limit { kind, .. }) => limit_kind_name(*kind),
         other => panic!("budget refusal was not a transaction limit: {other:?}"),
@@ -786,8 +850,10 @@ fn budget(fixture: &Fixture, facade: bool) -> Value {
     row["refusal_kind"] = json!("LimitExceeded");
     row["code"] = json!(error.code().as_str());
     row["limit_kind"] = json!(limit_kind);
+    row["source_before_sha256"] = json!(digest(&source_before));
     row["source_after_sha256"] = json!(digest(&endpoint.to_bytes().expect("budget source")));
-    row["output_published"] = json!(false);
+    row["publication_attempts"] = json!(publication_attempts);
+    row["output_published"] = json!(publication_attempts != 0);
     assert_eq!(error.code(), Code::LimitExceeded);
     assert_eq!(limit_kind, "operations");
     row
@@ -1089,6 +1155,7 @@ fn mode_value(mode: &str, route: &str, fixtures: &[Fixture], calls: usize) -> Va
             "route": route,
             "mode": "memory",
             "calls": requested,
+            "fixture_count": fixtures.len(),
             "operations": requested.saturating_mul(fixtures.len()),
             "scope": "whole_process_including_fixture_open_and_setup",
             "fixtures": proofs,
@@ -1113,6 +1180,7 @@ fn mode_value(mode: &str, route: &str, fixtures: &[Fixture], calls: usize) -> Va
             "route": route,
             "mode": "calibrate",
             "common_calls": common_calls,
+            "fixture_count": fixtures.len(),
             "elapsed_ns": total_elapsed,
             "operations": operations,
             "target_ns": TARGET_NS,
@@ -1123,6 +1191,7 @@ fn mode_value(mode: &str, route: &str, fixtures: &[Fixture], calls: usize) -> Va
         "route": route,
         "mode": "measure",
         "calls": requested,
+        "fixture_count": fixtures.len(),
         "elapsed_ns": total_elapsed,
         "operations": operations,
     })

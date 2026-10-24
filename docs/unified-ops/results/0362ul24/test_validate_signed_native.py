@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 
 HERE = Path(__file__).resolve().parent
@@ -72,8 +73,10 @@ def route_row(route: str, **overrides: object) -> dict:
         "target_changed": False,
         "signed_clone_still_refuses": True,
         "source_after_sha256": "a" * 64,
+        "source_before_sha256": "a" * 64,
         "source_mutated_sha256": "d" * 64,
         "output_published": False,
+        "publication_attempts": 0,
         "recipient_signed_after": True,
         "limit_kind": "operations",
         "stream_sha256": "c" * 64,
@@ -107,6 +110,7 @@ def route_row(route: str, **overrides: object) -> dict:
                 "status": "expected_refusal",
                 "refusal_kind": "SourceChanged",
                 "code": "io_error",
+                "source_after_sha256": "d" * 64,
             }
         )
     if route.endswith("/budget"):
@@ -160,6 +164,7 @@ def final_only_manifest() -> dict:
             "mode": "measure",
             "calls": 1,
             "elapsed_ns": VALIDATE.TARGET_NS,
+            "fixture_count": 1,
             "operations": 1,
         }
         blocks = [
@@ -187,6 +192,7 @@ def final_only_manifest() -> dict:
                         "mode": "calibrate",
                         "common_calls": 1,
                         "elapsed_ns": VALIDATE.TARGET_NS,
+                        "fixture_count": 1,
                         "operations": 1,
                         "target_ns": VALIDATE.TARGET_NS,
                     },
@@ -196,6 +202,7 @@ def final_only_manifest() -> dict:
                         "mode": "calibrate",
                         "common_calls": 1,
                         "elapsed_ns": VALIDATE.TARGET_NS,
+                        "fixture_count": 1,
                         "operations": 1,
                         "target_ns": VALIDATE.TARGET_NS,
                     },
@@ -213,6 +220,47 @@ def final_only_manifest() -> dict:
         "minimum_sample_ns": VALIDATE.MIN_SAMPLE_NS,
         "routes": rows,
     }
+
+
+def validate_shape(manifest: dict) -> None:
+    output = Path(tempfile.mkdtemp())
+    before = {
+        "binary": {"path": "before", "sha256": "a" * 64},
+        "fixtures": {"path": "fixtures", "sha256": "b" * 64},
+        "fixture_root": "/tmp/before-fixtures",
+        "source_commit": VALIDATE.BASELINE_SOURCE_COMMIT,
+    }
+    after = {
+        "binary": {"path": "after", "sha256": "c" * 64},
+        "fixtures": {"path": "fixtures", "sha256": "b" * 64},
+        "fixture_root": "/tmp/after-fixtures",
+        "source_commit": VALIDATE.CANDIDATE_SOURCE_COMMIT,
+    }
+    pair = {"shared": {}, "baseline_capability_gaps": []}
+    manifest.update(
+        {
+            "status": "complete",
+            "output": str(output),
+            "provenance": {
+                "pair": pair,
+                "before_manifest": {"path": "before.json"},
+                "after_manifest": {"path": "after.json"},
+                "before_binary": before["binary"],
+                "after_binary": after["binary"],
+                "before_source_commit": before["source_commit"],
+                "after_source_commit": after["source_commit"],
+                "cpu": 1,
+            },
+            "cpu": 1,
+            "guard": "reviewed W8 full /proc guard before/during/after every child",
+        }
+    )
+    with mock.patch.object(VALIDATE, "checked_artifact", return_value={"path": "x"}), \
+        mock.patch.object(VALIDATE, "require_external"), \
+        mock.patch.object(VALIDATE, "validate_endpoint_manifest", side_effect=[before, after]), \
+        mock.patch.object(VALIDATE, "validate_pair", return_value=pair), \
+        mock.patch.object(VALIDATE, "validate_child_receipt"):
+        VALIDATE.validate_abba(manifest)
 
 
 class SignedNativeValidatorTests(unittest.TestCase):
@@ -236,6 +284,19 @@ class SignedNativeValidatorTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 VALIDATE.load_fixture_manifest(invalid)
 
+    def test_fixture_manifest_rejects_3rdparty_paths(self) -> None:
+        invalid = fixture_manifest()
+        invalid["fixtures"][0]["relative_path"] = "test-data/3rdparty/signed.bin"
+        with self.assertRaises(ValueError):
+            VALIDATE.load_fixture_manifest(invalid)
+
+    def test_shared_graph_uses_the_fixed_w8_policy(self) -> None:
+        before, after, evidence = VALIDATE._reviewed_w8_projection_pair()
+        self.assertEqual(before["schema"], "litchi_w8_dependency_projection.v1")
+        self.assertEqual(after["schema"], "litchi_w8_dependency_projection.v1")
+        self.assertEqual(evidence["registry_package_count"], 518)
+        self.assertTrue(evidence["registry_identities_checksums_dependencies_equal"])
+
     def test_signed_noop_requires_exact_bytes_and_native_noop(self) -> None:
         route = "signed_leaf/noop_commit"
         VALIDATE.validate_correctness_receipt(receipt(route), route)
@@ -256,6 +317,10 @@ class SignedNativeValidatorTests(unittest.TestCase):
         for route in ("signed_leaf/refusal", "signed_leaf/budget"):
             invalid = receipt(route)
             invalid["fixtures"][0]["output_published"] = True
+            with self.assertRaises(ValueError):
+                VALIDATE.validate_correctness_receipt(invalid, route)
+            invalid = receipt(route)
+            invalid["fixtures"][0].pop("publication_attempts")
             with self.assertRaises(ValueError):
                 VALIDATE.validate_correctness_receipt(invalid, route)
 
@@ -316,6 +381,7 @@ class SignedNativeValidatorTests(unittest.TestCase):
             "common_calls": 10,
             "elapsed_ns": VALIDATE.TARGET_NS,
             "target_ns": VALIDATE.TARGET_NS,
+            "fixture_count": 1,
             "operations": 10,
         }
         self.assertEqual(VALIDATE.validate_calibration(calibration, route), 10)
@@ -328,23 +394,28 @@ class SignedNativeValidatorTests(unittest.TestCase):
             "mode": "measure",
             "calls": 10,
             "elapsed_ns": VALIDATE.MIN_SAMPLE_NS,
+            "fixture_count": 1,
             "operations": 10,
         }
         VALIDATE.validate_measure(sample, route, 10)
+        sample["operations"] = 11
+        with self.assertRaises(ValueError):
+            VALIDATE.validate_measure(sample, route, 10)
+        sample["operations"] = 10
         sample["elapsed_ns"] -= 1
         with self.assertRaises(ValueError):
             VALIDATE.validate_measure(sample, route, 10)
 
     def test_manifest_rejects_an_incomplete_abba(self) -> None:
         manifest = final_only_manifest()
-        VALIDATE.validate_abba(manifest)
+        validate_shape(manifest)
         del manifest["routes"][-1]
         with self.assertRaises(ValueError):
-            VALIDATE.validate_abba(manifest)
+            validate_shape(manifest)
         manifest = final_only_manifest()
         manifest["rounds"] = 4
         with self.assertRaises(ValueError):
-            VALIDATE.validate_abba(manifest)
+            validate_shape(manifest)
 
     def test_final_only_requires_leaf_facade_abba_and_unique_routes(self) -> None:
         manifest = final_only_manifest()
@@ -352,11 +423,16 @@ class SignedNativeValidatorTests(unittest.TestCase):
             {"side": "facade", "value": manifest["routes"][0]["blocks"][0]["legs"][0]["value"]}
         ] * 4
         with self.assertRaises(ValueError):
+            validate_shape(manifest)
+
+    def test_abba_requires_external_provenance_and_child_receipts(self) -> None:
+        manifest = final_only_manifest()
+        with self.assertRaises(ValueError):
             VALIDATE.validate_abba(manifest)
         manifest = final_only_manifest()
         manifest["routes"][1]["route"] = manifest["routes"][0]["route"]
         with self.assertRaises(ValueError):
-            VALIDATE.validate_abba(manifest)
+            validate_shape(manifest)
 
     def test_pair_rejects_same_source_and_binary_identity(self) -> None:
         def endpoint(commit: str, binary_path: str, binary_hash: str, tree: str) -> dict:
@@ -404,6 +480,22 @@ class SignedNativeValidatorTests(unittest.TestCase):
                 {
                     "schema": "litchi_signed_native_memory.v1",
                     "call_counts": [1, 8],
+                },
+                {},
+                set(),
+                (),
+            )
+
+    def test_memory_summary_requires_endpoint_and_tool_provenance(self) -> None:
+        with self.assertRaises(ValueError):
+            VALIDATE.validate_memory_summary(
+                {
+                    "schema": "litchi_signed_native_memory.v1",
+                    "status": "complete",
+                    "call_counts": [1, 8, 128],
+                    "scope": "whole_process_including_fixture_open_and_setup; profiler overhead included",
+                    "raw_root": "/tmp/signed-memory",
+                    "rows": [],
                 },
                 {},
                 set(),

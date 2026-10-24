@@ -52,6 +52,42 @@ def load(path: Path, label: str) -> dict[str, Any]:
     return VALIDATE.load_json(path, label)
 
 
+def process_group_members(pgid: int) -> set[int]:
+    members: set[int] = set()
+    for entry in Path("/proc").iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            stat = (entry / "stat").read_text()
+            close = stat.rfind(")")
+            fields = stat[close + 2 :].split()
+            if int(fields[2]) == pgid:
+                members.add(int(entry.name))
+        except (FileNotFoundError, PermissionError, ValueError, IndexError):
+            continue
+    return members
+
+
+def process_rss(pid: int) -> int:
+    try:
+        for line in Path(f"/proc/{pid}/status").read_text().splitlines():
+            if line.startswith("VmRSS:"):
+                return int(line.split()[1]) * 1024
+    except (FileNotFoundError, PermissionError, ValueError, IndexError):
+        return 0
+    return 0
+
+
+def aggregate_group_rss(pgid: int) -> int:
+    return sum(process_rss(pid) for pid in process_group_members(pgid))
+
+
+def wait_for_group_exit(pgid: int, timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and process_group_members(pgid):
+        time.sleep(0.1)
+
+
 def child(
     output: Path,
     label: str,
@@ -84,6 +120,8 @@ def child(
         command.extend(("--calls", str(calls)))
     environment = dict(os.environ)
     environment["LITCHI_SIGNED_FIXTURE_ROOT"] = endpoint["fixture_root"]
+    environment["LITCHI_SIGNED_FIXTURE_MANIFEST"] = endpoint["fixtures"]["path"]
+    environment["LITCHI_SIGNED_FIXTURE_MANIFEST_SHA256"] = endpoint["fixtures"]["sha256"]
     environment["LITCHI_SIGNED_ENDPOINT"] = (
         "before" if label.startswith("before") else "after"
     )
@@ -97,24 +135,16 @@ def child(
     failed_after: dict[str, Any] | None = None
     timed_out = False
     rss_max = 0
+    process_group: int | None = None
     process: subprocess.Popen[bytes] | None = None
     exit_code: int | None = None
     pending_error: BaseException | None = None
 
-    def rss_bytes(pid: int) -> int:
-        try:
-            for line in Path(f"/proc/{pid}/status").read_text().splitlines():
-                if line.startswith("VmRSS:"):
-                    return int(line.split()[1]) * 1024
-        except (FileNotFoundError, PermissionError, ValueError, IndexError):
-            return 0
-        return 0
-
     def stop_group() -> None:
-        if process is None or process.poll() is not None:
+        if process is None or process_group is None:
             return
         try:
-            os.killpg(process.pid, signal.SIGKILL)
+            os.killpg(process_group, signal.SIGKILL)
         except ProcessLookupError:
             pass
         try:
@@ -122,6 +152,7 @@ def child(
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=5)
+        wait_for_group_exit(process_group)
 
     try:
         with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
@@ -132,13 +163,17 @@ def child(
                 env=environment,
                 start_new_session=True,
             )
+            # ``start_new_session`` makes the child PID the process-group ID;
+            # using it directly also remains safe if the root exits before
+            # the first polling turn.
+            process_group = process.pid
             deadline = time.monotonic() + CHILD_TIMEOUT_S
             checks = 0
             while process.poll() is None:
                 if time.monotonic() >= deadline:
                     timed_out = True
                     guard_error = f"child exceeded {CHILD_TIMEOUT_S:.1f}s timeout"
-                rss_max = max(rss_max, rss_bytes(process.pid))
+                rss_max = max(rss_max, aggregate_group_rss(process_group))
                 if rss_max > CHILD_RSS_LIMIT and guard_error is None:
                     guard_error = f"child exceeded {CHILD_RSS_LIMIT} byte RSS cap"
                 if (
@@ -170,7 +205,7 @@ def child(
         if process is not None:
             exit_code = process.wait(timeout=5)
     finally:
-        if process is not None and process.poll() is None:
+        if process_group is not None:
             stop_group()
         finished_ns = time.time_ns()
         failed_after = {
@@ -179,9 +214,16 @@ def child(
             "guard_error": guard_error,
             "timed_out": timed_out,
             "rss_max_bytes": rss_max,
+            "aggregate_rss_max_bytes": rss_max,
+            "process_group_empty": process_group is None or not process_group_members(process_group),
             "stdout_bytes": stdout_path.stat().st_size if stdout_path.exists() else 0,
             "stderr_bytes": stderr_path.stat().st_size if stderr_path.exists() else 0,
         }
+    if (
+        (stdout_path.exists() and stdout_path.stat().st_size > CHILD_OUTPUT_LIMIT)
+        or (stderr_path.exists() and stderr_path.stat().st_size > CHILD_OUTPUT_LIMIT)
+    ) and guard_error is None:
+        guard_error = f"child exceeded {CHILD_OUTPUT_LIMIT} byte output cap"
     after_host: str | None = None
     after_error: str | None = None
     try:
@@ -191,6 +233,17 @@ def child(
         if guard_error is None:
             guard_error = after_error
     exit_code = process.returncode if process is not None else exit_code
+    if failed_after is not None:
+        failed_after.update(
+            {
+                "guard_error": guard_error,
+                "after_guard_error": after_error,
+                "stdout_bytes": stdout_path.stat().st_size if stdout_path.exists() else 0,
+                "stderr_bytes": stderr_path.stat().st_size if stderr_path.exists() else 0,
+                "process_group_empty": process_group is None or not process_group_members(process_group),
+            }
+        )
+    host_paths = [before_host, *during_hosts, after_host] if after_host else [before_host, *during_hosts]
     receipt = {
         "schema": "litchi_signed_native_child.v1",
         "label": label,
@@ -199,12 +252,16 @@ def child(
         "route": route,
         "mode": mode,
         "calls": calls,
+        "fixture_root": endpoint["fixture_root"],
+        "fixture_manifest": endpoint["fixtures"],
         "started_ns": started_ns,
         "finished_ns": finished_ns,
         "exit_code": exit_code,
-        "host_snapshots": [before_host, *during_hosts, after_host] if after_host else [before_host, *during_hosts],
+        "host_snapshots": [VALIDATE.artifact(Path(path)) for path in host_paths],
         "during_snapshots": len(during_hosts),
+        "process_group": process_group,
         "rss_max_bytes": rss_max,
+        "aggregate_rss_max_bytes": rss_max,
         "timeout_seconds": CHILD_TIMEOUT_S,
         "output_limit_bytes": CHILD_OUTPUT_LIMIT,
         "rss_limit_bytes": CHILD_RSS_LIMIT,
@@ -413,8 +470,13 @@ def run(
         raise ValueError("at least five ABBA rounds are required")
     if cpu not in os.sched_getaffinity(0):
         raise ValueError(f"CPU {cpu} is unavailable")
+    if output.is_symlink():
+        raise ValueError("qualification output may not be a symlink")
     if output.exists() and any(output.iterdir()):
         raise ValueError(f"refusing to overwrite nonempty output {output}")
+    repository = Path(__file__).resolve().parents[4]
+    if output.resolve() == repository or repository in output.resolve().parents:
+        raise ValueError("qualification output must be outside the checkout")
     output.mkdir(parents=True, exist_ok=True)
     before = VALIDATE.validate_endpoint_manifest(before_manifest.resolve(), "before")
     after = VALIDATE.validate_endpoint_manifest(after_manifest.resolve(), "after")
@@ -438,7 +500,17 @@ def run(
         "target_ns": VALIDATE.TARGET_NS,
         "minimum_sample_ns": VALIDATE.MIN_SAMPLE_NS,
         "guard": "reviewed W8 full /proc guard before/during/after every child",
-        "provenance": pair,
+        "output": str(output.resolve()),
+        "provenance": {
+            "pair": pair,
+            "before_manifest": VALIDATE.artifact(before_manifest),
+            "after_manifest": VALIDATE.artifact(after_manifest),
+            "before_binary": before["binary"],
+            "after_binary": after["binary"],
+            "before_source_commit": before["source_commit"],
+            "after_source_commit": after["source_commit"],
+            "cpu": cpu,
+        },
         "status": "running",
         "routes": [],
     }
