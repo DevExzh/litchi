@@ -613,13 +613,12 @@ fn family_edit_preserves_unknown_attributes_children_and_exact_inverse() {
             .any(|window| window == b"<x:future value=\"keep\"/>")
     );
 
+    let inverse = commit.patch().clone().inverse();
     let restored = commit
-        .patch()
-        .clone()
-        .inverse()
-        .apply(commit.package())
+        .package()
+        .apply(&inverse)
         .expect("exact inverse family patch");
-    assert_eq!(restored.xml_bytes(), source.as_slice());
+    assert_eq!(restored.package().xml_bytes(), source.as_slice());
 }
 
 #[test]
@@ -772,7 +771,7 @@ fn family_noop_and_stale_source_are_source_checked() {
     let other =
         family::Package::from_xml(source.iter().copied().chain(Some(b' ')).collect::<Vec<_>>())
             .expect("different source package");
-    assert!(changed.patch().apply(&other).is_err());
+    assert!(other.apply(changed.patch()).is_err());
 }
 
 #[test]

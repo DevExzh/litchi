@@ -1054,7 +1054,7 @@ fn decode_intents(bytes: &[u8], limits: EditOptions) -> Result<Vec<SemanticInten
 }
 
 fn decode_prepared(bytes: &[u8], maximum: usize) -> Result<litchi_drawingml::ink::Prepared> {
-    let authoring_limits = litchi_drawingml::ink::AuthoringLimits {
+    let authoring_limits = litchi_drawingml::ink::builder::AuthoringLimits {
         max_source_bytes: maximum,
         max_output_bytes: maximum,
         ..Default::default()

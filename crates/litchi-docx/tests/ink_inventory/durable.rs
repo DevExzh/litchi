@@ -1492,7 +1492,7 @@ fn durable_semantic_intent_tampering_is_rejected_after_recomputing_blob_and_targ
 
     let altered_payload = Prepared::from_bytes(
         &replace_once(replacement.as_bytes(), b"0 0", b"9 9"),
-        litchi_drawingml::ink::AuthoringLimits::default(),
+        litchi_drawingml::ink::builder::AuthoringLimits::default(),
     )
     .unwrap();
     let mut altered = Package::from_reader(Cursor::new(&original)).unwrap();
@@ -1536,7 +1536,7 @@ fn durable_coherent_alternate_intent_replays_to_its_matching_target() {
 
     let altered_payload = Prepared::from_bytes(
         &replace_once(replacement.as_bytes(), b"0 0", b"9 9"),
-        litchi_drawingml::ink::AuthoringLimits::default(),
+        litchi_drawingml::ink::builder::AuthoringLimits::default(),
     )
     .unwrap();
     let mut expected = Package::from_reader(Cursor::new(&original)).unwrap();

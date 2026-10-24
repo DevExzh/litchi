@@ -69,13 +69,12 @@ fn snapshots_replay_source_exactly_and_edits_are_atomic() {
     assert!(replayed.diagnostics().changed());
     assert_eq!(replayed.package().value(), committed.package().value());
 
+    let inverse = committed.patch().clone().inverse();
     let restored = committed
-        .patch()
-        .clone()
-        .inverse()
-        .apply(committed.package())
+        .package()
+        .apply(&inverse)
         .expect("inverse patch must apply to its commit");
-    assert_eq!(restored.value(), package.value());
+    assert_eq!(restored.package().value(), package.value());
 }
 
 #[test]

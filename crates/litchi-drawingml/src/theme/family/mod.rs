@@ -11,9 +11,10 @@ mod model;
 pub mod part;
 mod transaction;
 
+pub use crate::Error;
 pub use codec::{read, read_shared, write, write_to};
 pub use model::{Family, Guid, ValueError};
-pub use transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Package, Patch};
+pub use transaction::{Commit, Diagnostics, Edit, LimitKind, Package, Patch};
 
 /// XML namespace defined by `[MS-ODRAWXML]` §2.4 and schema §5.17.
 pub const NAMESPACE: &str = "http://schemas.microsoft.com/office/thememl/2012/main";

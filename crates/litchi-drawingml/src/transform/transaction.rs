@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-pub use crate::Error;
+use crate::Error;
 use crate::Result;
 
 use super::{Angle, Point, Size, Transform, codec, validation};
@@ -230,7 +230,7 @@ impl Patch {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn apply(&self, source: &Package) -> Result<Package> {
+    fn apply(&self, source: &Package) -> Result<Package> {
         if source.value != self.before {
             return Err(Error::Invalid(
                 "DrawingML transform patch source state does not match its precondition".into(),

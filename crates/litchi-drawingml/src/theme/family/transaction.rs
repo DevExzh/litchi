@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-pub use crate::Error;
+use crate::Error;
 use crate::Result;
 
 use super::{Family, codec};
@@ -207,7 +207,7 @@ impl Patch {
     }
 
     /// Apply this patch only to the exact source snapshot from which it came.
-    pub fn apply(&self, source: &Package) -> Result<Package> {
+    fn apply(&self, source: &Package) -> Result<Package> {
         if !Arc::ptr_eq(&source.xml, &self.before.xml)
             && source.xml.as_ref() != self.before.xml.as_ref()
         {

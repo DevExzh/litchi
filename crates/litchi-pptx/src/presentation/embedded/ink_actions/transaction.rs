@@ -55,7 +55,7 @@ impl Draft {
             profile_limits(self.source.limits()),
         )?;
         edit(&mut profile_edit)?;
-        let committed = profile_edit.finish()?;
+        let committed = profile_edit.commit()?;
         self.replace_profile(selector, committed.package().profile().clone())
     }
 
@@ -369,12 +369,12 @@ impl Change {
 
 /// Shared action profile limits selected by the owner transaction.
 #[must_use]
-pub fn default_profile_limits() -> actions::Limits {
-    actions::Limits::default()
+pub fn default_profile_limits() -> actions::builder::EditOptions {
+    actions::builder::EditOptions::default()
 }
 
-fn profile_limits(limits: super::model::Limits) -> actions::Limits {
-    let mut profile_limits = actions::Limits::default();
+fn profile_limits(limits: super::model::Limits) -> actions::builder::EditOptions {
+    let mut profile_limits = actions::builder::EditOptions::default();
     profile_limits.max_output_bytes = profile_limits.max_output_bytes.min(limits.target_bytes);
     profile_limits.max_payload_bytes = profile_limits.max_payload_bytes.min(limits.target_bytes);
     profile_limits

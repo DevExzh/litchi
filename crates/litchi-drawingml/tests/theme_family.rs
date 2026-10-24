@@ -442,26 +442,28 @@ fn exact_no_op_inverse_and_stale_source_guards_are_enforced() {
     );
     let reopened = Package::from_xml(snapshot.xml_bytes())
         .expect("equal bytes must reopen as a separate source allocation");
-    let reopened_changed = changed
-        .patch()
-        .apply(&reopened)
+    let reopened_changed = reopened
+        .apply(changed.patch())
         .expect("forward patch must apply to equal reopened bytes");
-    assert_eq!(reopened_changed.xml_bytes(), changed.package().xml_bytes());
-    let reopened_restored = changed
-        .patch()
-        .clone()
-        .inverse()
-        .apply(&reopened_changed)
+    assert_eq!(
+        reopened_changed.package().xml_bytes(),
+        changed.package().xml_bytes()
+    );
+    let inverse = changed.patch().clone().inverse();
+    let reopened_restored = reopened_changed
+        .package()
+        .apply(&inverse)
         .expect("inverse patch must apply to equal reopened changed bytes");
-    assert_eq!(reopened_restored.xml_bytes(), FAMILY_WITH_OPAQUE_EXTENSION);
+    assert_eq!(
+        reopened_restored.package().xml_bytes(),
+        FAMILY_WITH_OPAQUE_EXTENSION
+    );
 
     let restored = changed
-        .patch()
-        .clone()
-        .inverse()
-        .apply(changed.package())
+        .package()
+        .apply(&inverse)
         .expect("inverse patch must apply to its commit");
-    assert_eq!(restored.xml_bytes(), FAMILY_WITH_OPAQUE_EXTENSION);
+    assert_eq!(restored.package().xml_bytes(), FAMILY_WITH_OPAQUE_EXTENSION);
 
     let stale = Package::from_xml(
         std::str::from_utf8(FAMILY_WITH_OPAQUE_EXTENSION)
@@ -470,7 +472,7 @@ fn exact_no_op_inverse_and_stale_source_guards_are_enforced() {
             .into_bytes(),
     )
     .unwrap();
-    assert!(changed.patch().apply(&stale).is_err());
+    assert!(stale.apply(changed.patch()).is_err());
 }
 
 #[test]

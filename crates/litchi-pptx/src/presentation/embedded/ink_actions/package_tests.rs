@@ -15,7 +15,10 @@
 
 use crate::Package;
 use crate::presentation::embedded::ink_actions;
-use litchi_drawingml::ink::actions::{ActionSelector, ActionType, ChildSelector};
+use litchi_drawingml::ink::actions::{
+    ActionType,
+    builder::{ActionSelector, ChildSelector},
+};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, Part, SourceLimitKind, SourceLimits};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};

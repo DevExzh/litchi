@@ -2,7 +2,7 @@
 
 use super::model::DataLabelFlag;
 use super::{codec, validation};
-pub use crate::Error;
+use crate::Error;
 use crate::Result;
 use crate::chart::data::TitleText;
 use crate::chart::model::Chart;
@@ -381,7 +381,7 @@ impl Patch {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn apply(&self, source: &Package) -> Result<Package> {
+    fn apply(&self, source: &Package) -> Result<Package> {
         if source.xml.as_ref() != self.before.as_ref() {
             return Err(Error::Invalid(
                 "chart patch source does not match its byte precondition".into(),

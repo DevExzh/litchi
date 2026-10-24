@@ -23,16 +23,57 @@ use quick_xml::{
     reader::NsReader,
 };
 
-pub use crate::Error;
+use crate::Error;
 use crate::Result;
 
-/// No caller-selected limit dimension is exposed by this source-backed
-/// profile; the bounded [`Limits`] value owns all active budgets.
+/// Caller-visible budget dimensions for detached action authoring and edits.
+///
+/// The dimensions map directly to [`EditOptions`] fields.  They are retained
+/// as typed vocabulary even though the shared DrawingML error carries the
+/// stable resource label for cross-family error handling.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 #[non_exhaustive]
 pub enum LimitKind {
     /// The complete serialized action profile.
     OutputBytes,
+    /// One opaque payload element.
+    PayloadBytes,
+    /// Structural XML node count.
+    Nodes,
+    /// Structural XML depth.
+    Depth,
+    /// Action record count.
+    Actions,
+    /// Action-group record count.
+    ActionGroups,
+    /// Typed scalar or identifier bytes.
+    ScalarBytes,
+    /// Queued edit operation count.
+    EditOperations,
+}
+
+impl LimitKind {
+    /// Stable DrawingML error resource label for this action dimension.
+    #[must_use]
+    pub const fn resource(self) -> &'static str {
+        match self {
+            Self::OutputBytes => "ink action output bytes",
+            Self::PayloadBytes => "ink action payload bytes",
+            Self::Nodes => "ink action XML nodes",
+            Self::Depth => "ink action XML depth",
+            Self::Actions => "ink action records",
+            Self::ActionGroups => "ink action groups",
+            Self::ScalarBytes => "ink action scalar bytes",
+            Self::EditOperations => "ink action edit operations",
+        }
+    }
+
+    fn error(self, limit: usize) -> Error {
+        Error::Limit {
+            resource: self.resource(),
+            limit,
+        }
+    }
 }
 
 pub use litchi_core::edit::Diagnostics;
@@ -59,14 +100,14 @@ const MAX_EDIT_OPERATIONS: usize = 65_536;
 const MAX_SCALAR_BYTES: usize = 256;
 const MAX_PAYLOAD_BYTES: usize = super::MAX_SOURCE_BYTES;
 
-/// Limits for one detached construction or source-backed edit.
+/// EditOptions for one detached construction or source-backed edit.
 ///
 /// The limits are caller-facing budgets below the strict reader's hard
 /// ceilings.  An edit checks the complete resulting source before allocating
 /// its replacement buffer.  Opaque payload bytes are bounded here and are
 /// still checked again by `read_profile` when the value is finished.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Limits {
+pub struct EditOptions {
     /// Maximum complete output/source bytes.
     pub max_output_bytes: usize,
     /// Maximum one opaque payload byte length.
@@ -83,7 +124,7 @@ pub struct Limits {
     pub max_scalar_bytes: usize,
 }
 
-impl Default for Limits {
+impl Default for EditOptions {
     fn default() -> Self {
         Self {
             max_output_bytes: super::MAX_SOURCE_BYTES,
@@ -97,29 +138,29 @@ impl Default for Limits {
     }
 }
 
-impl Limits {
+impl EditOptions {
     /// Validate a caller budget before any builder state is retained.
     pub fn validate(self) -> Result<()> {
         if self.max_output_bytes == 0 || self.max_output_bytes > super::MAX_SOURCE_BYTES {
-            return Err(limit("ink action output bytes", super::MAX_SOURCE_BYTES));
+            return Err(LimitKind::OutputBytes.error(super::MAX_SOURCE_BYTES));
         }
         if self.max_payload_bytes == 0 || self.max_payload_bytes > MAX_PAYLOAD_BYTES {
-            return Err(limit("ink action payload bytes", MAX_PAYLOAD_BYTES));
+            return Err(LimitKind::PayloadBytes.error(MAX_PAYLOAD_BYTES));
         }
         if self.max_nodes == 0 || self.max_nodes > super::MAX_NODES {
-            return Err(limit("ink action XML nodes", super::MAX_NODES));
+            return Err(LimitKind::Nodes.error(super::MAX_NODES));
         }
         if self.max_depth == 0 || self.max_depth > super::MAX_DEPTH {
-            return Err(limit("ink action XML depth", super::MAX_DEPTH));
+            return Err(LimitKind::Depth.error(super::MAX_DEPTH));
         }
         if self.max_actions == 0 || self.max_actions > super::MAX_ACTIONS {
-            return Err(limit("ink action records", super::MAX_ACTIONS));
+            return Err(LimitKind::Actions.error(super::MAX_ACTIONS));
         }
         if self.max_action_groups == 0 || self.max_action_groups > super::MAX_ACTION_GROUPS {
-            return Err(limit("ink action groups", super::MAX_ACTION_GROUPS));
+            return Err(LimitKind::ActionGroups.error(super::MAX_ACTION_GROUPS));
         }
         if self.max_scalar_bytes == 0 || self.max_scalar_bytes > MAX_SCALAR_BYTES {
-            return Err(limit("ink action scalar bytes", MAX_SCALAR_BYTES));
+            return Err(LimitKind::ScalarBytes.error(MAX_SCALAR_BYTES));
         }
         Ok(())
     }
@@ -150,11 +191,6 @@ impl OpaquePayload {
             .map_err(|_| invalid("ink action payload allocation failed"))?;
         owned.extend_from_slice(bytes);
         Ok(Self(owned.into_boxed_slice()))
-    }
-
-    /// Alias for [`OpaquePayload::new`] when the caller already has bytes.
-    pub fn from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::new(bytes)
     }
 
     /// Borrow the exact payload bytes.
@@ -191,11 +227,6 @@ impl PropertyDraft {
     #[must_use]
     pub fn value(&self) -> &str {
         &self.value
-    }
-
-    /// Alias for [`PropertyDraft::new`].
-    pub fn with_value(name: impl AsRef<str>, value: impl AsRef<str>) -> Result<Self> {
-        Self::new(name, value)
     }
 }
 
@@ -327,11 +358,6 @@ impl DataGroupDraft {
         self.data.push(data);
         Ok(self)
     }
-
-    /// Alias for [`DataGroupDraft::data`].
-    pub fn add_data(self, data: ActionDataDraft) -> Result<Self> {
-        self.data(data)
-    }
 }
 
 /// A detached `CT_Action` builder.
@@ -389,11 +415,6 @@ impl ActionDraft {
         Ok(self)
     }
 
-    /// Alias for [`ActionDraft::property`].
-    pub fn add_property(self, property: PropertyDraft) -> Result<Self> {
-        self.property(property)
-    }
-
     /// Append one action-data child.
     pub fn data(mut self, data: ActionDataDraft) -> Result<Self> {
         self.children
@@ -404,11 +425,6 @@ impl ActionDraft {
         Ok(self)
     }
 
-    /// Alias for [`ActionDraft::data`].
-    pub fn add_data(self, data: ActionDataDraft) -> Result<Self> {
-        self.data(data)
-    }
-
     /// Append one nonempty action-data group.
     pub fn data_group(mut self, group: DataGroupDraft) -> Result<Self> {
         self.children
@@ -417,11 +433,6 @@ impl ActionDraft {
         self.data_seen = true;
         self.children.push(ActionChildDraft::DataGroup(group));
         Ok(self)
-    }
-
-    /// Alias for [`ActionDraft::data_group`].
-    pub fn add_data_group(self, group: DataGroupDraft) -> Result<Self> {
-        self.data_group(group)
     }
 }
 
@@ -484,11 +495,6 @@ impl ActionGroupDraft {
             .map_err(|_| invalid("ink action-group allocation failed"))?;
         self.actions.push(action);
         Ok(self)
-    }
-
-    /// Alias for [`ActionGroupDraft::action`].
-    pub fn add_action(self, action: ActionDraft) -> Result<Self> {
-        self.action(action)
     }
 }
 
@@ -579,7 +585,7 @@ pub enum ChildSelector {
 /// A detached bounded action value under construction.
 #[derive(Clone, Debug)]
 pub struct Draft {
-    limits: Limits,
+    limits: EditOptions,
     xml_id: Option<Box<str>>,
     length_unit: LengthUnit,
     time_unit: TimeUnit,
@@ -595,7 +601,7 @@ enum RootDraft {
 
 impl Draft {
     /// Start a detached action value with caller limits and required units.
-    pub fn new(limits: Limits, length_unit: LengthUnit, time_unit: TimeUnit) -> Result<Self> {
+    pub fn new(limits: EditOptions, length_unit: LengthUnit, time_unit: TimeUnit) -> Result<Self> {
         limits.validate()?;
         Ok(Self {
             limits,
@@ -609,12 +615,12 @@ impl Draft {
 
     /// Start with default limits.
     pub fn with_units(length_unit: LengthUnit, time_unit: TimeUnit) -> Result<Self> {
-        Self::new(Limits::default(), length_unit, time_unit)
+        Self::new(EditOptions::default(), length_unit, time_unit)
     }
 
     /// Borrow the active budgets.
     #[must_use]
-    pub const fn limits(&self) -> Limits {
+    pub const fn limits(&self) -> EditOptions {
         self.limits
     }
 
@@ -644,11 +650,6 @@ impl Draft {
         Ok(self)
     }
 
-    /// Alias for [`Draft::action`].
-    pub fn add_action(self, action: ActionDraft) -> Result<Self> {
-        self.action(action)
-    }
-
     /// Append a direct nonempty action group.
     pub fn action_group(mut self, group: ActionGroupDraft) -> Result<Self> {
         self.children
@@ -656,11 +657,6 @@ impl Draft {
             .map_err(|_| invalid("ink action root allocation failed"))?;
         self.children.push(RootDraft::ActionGroup(group));
         Ok(self)
-    }
-
-    /// Alias for [`Draft::action_group`].
-    pub fn add_action_group(self, group: ActionGroupDraft) -> Result<Self> {
-        self.action_group(group)
     }
 
     /// Validate, preflight, emit, and immediately read back the value.
@@ -693,14 +689,14 @@ impl Draft {
 #[derive(Clone, Debug)]
 pub struct Prepared {
     bytes: Arc<[u8]>,
-    profile: Profile,
+    profile: Arc<Profile>,
 }
 
 impl Prepared {
     fn from_profile(profile: Profile) -> Self {
         Self {
-            bytes: profile.source.clone(),
-            profile,
+            bytes: profile.shared_source(),
+            profile: Arc::new(profile),
         }
     }
 
@@ -710,22 +706,51 @@ impl Prepared {
         &self.bytes
     }
 
-    /// Alias for [`Prepared::as_bytes`].
-    #[must_use]
-    pub fn source(&self) -> &[u8] {
-        self.as_bytes()
-    }
-
     /// Borrow the strict typed readback.
     #[must_use]
     pub fn profile(&self) -> &Profile {
-        &self.profile
+        self.profile.as_ref()
     }
 
-    /// Alias for [`Prepared::profile`].
-    #[must_use]
-    pub fn readback(&self) -> &Profile {
-        self.profile()
+    /// Start a source-backed edit with the default bounded options.
+    pub fn edit(&self) -> Result<Edit> {
+        self.edit_with_options(EditOptions::default())
+    }
+
+    /// Start a source-backed edit with explicit bounded options.
+    pub fn edit_with_options(&self, options: EditOptions) -> Result<Edit> {
+        Edit::from_shared_profile(Arc::clone(&self.profile), options)
+    }
+
+    /// Replay a source-checked patch and publish the resulting commit triad.
+    ///
+    /// A no-op reuses this prepared owner and its immutable source allocation.
+    /// Changed patches are read back through the strict profile before becoming
+    /// visible, preserving the source-fidelity and limit checks of `Edit::commit`.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
+        if patch.before.as_ref() != self.bytes.as_ref() {
+            return Err(invalid("ink action patch source is stale"));
+        }
+        if patch.is_noop() {
+            return Ok(Commit::new(
+                self.clone(),
+                patch.clone(),
+                Diagnostics::UNCHANGED,
+            ));
+        }
+        let after = patch.apply_bytes(self.bytes.as_ref())?;
+        let after: Arc<[u8]> = Arc::from(after.into_boxed_slice());
+        let profile = read_profile_owned(after.clone())?;
+        validate_profile_limits(&profile, EditOptions::default())?;
+        ensure_unique_profile_ids(&profile)?;
+        Ok(Commit::new(
+            Prepared {
+                bytes: after,
+                profile: Arc::new(profile),
+            },
+            patch.clone(),
+            Diagnostics::CHANGED,
+        ))
     }
 
     /// Return a cloned byte vector for a sink or host-owned buffer.
@@ -747,8 +772,12 @@ pub struct Patch {
 }
 
 impl Patch {
-    /// Apply this patch only to the exact source from which it was made.
-    pub fn apply(&self, source: &[u8]) -> Result<Vec<u8>> {
+    /// Apply this raw byte patch only to the exact source from which it was made.
+    ///
+    /// This helper stays private to the owner routes.  Public callers replay
+    /// through [`Prepared::apply`], which returns the commit triad rather than
+    /// exposing an untyped byte publication path.
+    fn apply_bytes(&self, source: &[u8]) -> Result<Vec<u8>> {
         if source != self.before.as_ref() {
             return Err(invalid("ink action patch source is stale"));
         }
@@ -787,11 +816,11 @@ impl Patch {
 /// content-free diagnostics.
 pub type Commit = litchi_core::edit::Commit<Prepared, Patch>;
 
-/// A source-backed transaction over one strict profile.
+/// A source-backed edit over one strict profile.
 #[derive(Clone, Debug)]
 pub struct Edit {
-    profile: Profile,
-    limits: Limits,
+    profile: Arc<Profile>,
+    options: EditOptions,
     operations: Vec<EditOp>,
 }
 
@@ -830,31 +859,41 @@ enum ChildParent {
 
 impl Edit {
     /// Start an edit with explicit output/resource limits.
-    pub fn new(profile: Profile, limits: Limits) -> Result<Self> {
-        limits.validate()?;
-        validate_profile_limits(&profile, limits)?;
+    pub fn new(profile: Profile, options: EditOptions) -> Result<Self> {
+        options.validate()?;
+        validate_profile_limits(&profile, options)?;
         Ok(Self {
-            profile,
-            limits,
+            profile: Arc::new(profile),
+            options,
             operations: Vec::new(),
         })
     }
 
     /// Clone a profile into a source-backed edit with explicit limits.
-    pub fn from_profile(profile: &Profile, limits: Limits) -> Result<Self> {
-        Self::new(profile.clone(), limits)
+    pub fn from_profile(profile: &Profile, options: EditOptions) -> Result<Self> {
+        Self::new(profile.clone(), options)
+    }
+
+    fn from_shared_profile(profile: Arc<Profile>, options: EditOptions) -> Result<Self> {
+        options.validate()?;
+        validate_profile_limits(profile.as_ref(), options)?;
+        Ok(Self {
+            profile,
+            options,
+            operations: Vec::new(),
+        })
     }
 
     /// Borrow the unchanged source snapshot.
     #[must_use]
     pub fn profile(&self) -> &Profile {
-        &self.profile
+        self.profile.as_ref()
     }
 
     /// Queue an action-type replacement.
     pub fn set_action_type(&mut self, selector: ActionSelector, value: ActionType) -> Result<()> {
         checked_action_type(value.clone())?;
-        bounded_scalar(value.as_str(), "action type", self.limits)?;
+        bounded_scalar(value.as_str(), "action type", self.options)?;
         self.push(EditOp::SetActionType(selector, value))
     }
 
@@ -865,7 +904,7 @@ impl Edit {
         value: impl AsRef<str>,
     ) -> Result<()> {
         let value = decimal(value.as_ref())?;
-        bounded_scalar(&value, "ink action startTime", self.limits)?;
+        bounded_scalar(&value, "ink action startTime", self.options)?;
         self.push(EditOp::SetStartTime(selector, value))
     }
 
@@ -876,7 +915,7 @@ impl Edit {
         value: impl AsRef<str>,
     ) -> Result<()> {
         let value = scalar(value.as_ref(), "property name")?;
-        bounded_scalar(&value, "property name", self.limits)?;
+        bounded_scalar(&value, "property name", self.options)?;
         self.push(EditOp::SetPropertyName(selector, value))
     }
 
@@ -887,21 +926,21 @@ impl Edit {
         value: impl AsRef<str>,
     ) -> Result<()> {
         let value = scalar(value.as_ref(), "property value")?;
-        bounded_scalar(&value, "property value", self.limits)?;
+        bounded_scalar(&value, "property value", self.options)?;
         self.push(EditOp::SetPropertyValue(selector, value))
     }
 
     /// Queue an action-data name replacement.
     pub fn set_data_name(&mut self, selector: DataSelector, value: impl AsRef<str>) -> Result<()> {
         let value = scalar(value.as_ref(), "action data name")?;
-        bounded_scalar(&value, "action data name", self.limits)?;
+        bounded_scalar(&value, "action data name", self.options)?;
         self.push(EditOp::SetDataName(selector, value))
     }
 
     /// Queue an action-group type replacement.
     pub fn set_action_group_type(&mut self, group: usize, value: ActionType) -> Result<()> {
         checked_action_type(value.clone())?;
-        bounded_scalar(value.as_str(), "action group type", self.limits)?;
+        bounded_scalar(value.as_str(), "action group type", self.options)?;
         self.push(EditOp::SetActionGroupType(group, value))
     }
 
@@ -912,7 +951,7 @@ impl Edit {
         value: impl AsRef<str>,
     ) -> Result<()> {
         let value = decimal(value.as_ref())?;
-        bounded_scalar(&value, "action group startTime", self.limits)?;
+        bounded_scalar(&value, "action group startTime", self.options)?;
         self.push(EditOp::SetActionGroupStartTime(group, value))
     }
 
@@ -926,18 +965,8 @@ impl Edit {
             return Err(invalid("ink action selector is not a data group"));
         }
         let value = scalar(value.as_ref(), "action data-group name")?;
-        bounded_scalar(&value, "action data-group name", self.limits)?;
+        bounded_scalar(&value, "action data-group name", self.options)?;
         self.push(EditOp::SetDataGroupName(selector, value))
-    }
-
-    /// Alias for [`Edit::set_action_group_type`].
-    pub fn set_group_type(&mut self, group: usize, value: ActionType) -> Result<()> {
-        self.set_action_group_type(group, value)
-    }
-
-    /// Alias for [`Edit::set_action_group_start_time`].
-    pub fn set_group_start_time(&mut self, group: usize, value: impl AsRef<str>) -> Result<()> {
-        self.set_action_group_start_time(group, value)
     }
 
     /// Queue an action-data reference replacement.
@@ -950,7 +979,7 @@ impl Edit {
             .map(|value| scalar(value.as_ref(), "action data reference"))
             .transpose()?;
         if let Some(value) = &value {
-            bounded_scalar(value, "action data reference", self.limits)?;
+            bounded_scalar(value, "action data reference", self.options)?;
         }
         self.push(EditOp::SetDataReference(selector, value))
     }
@@ -997,7 +1026,7 @@ impl Edit {
         let mut max_depth = 0usize;
         validate_action_draft(
             &action,
-            self.limits,
+            self.options,
             &mut nodes,
             action_depth,
             &mut max_depth,
@@ -1010,13 +1039,8 @@ impl Edit {
     pub fn add_action_group(&mut self, group: ActionGroupDraft) -> Result<()> {
         let mut nodes = 1usize;
         let mut max_depth = 0usize;
-        validate_group_draft(&group, self.limits, &mut nodes, &mut max_depth, false)?;
+        validate_group_draft(&group, self.options, &mut nodes, &mut max_depth, false)?;
         self.push(EditOp::AddGroup(group))
-    }
-
-    /// Alias for [`Edit::add_action_group`].
-    pub fn add_group(&mut self, group: ActionGroupDraft) -> Result<()> {
-        self.add_action_group(group)
     }
 
     /// Append a property to an existing action, before its data children.
@@ -1029,11 +1053,11 @@ impl Edit {
         let mut nodes = 1usize;
         let data_depth = action_depth_for_selector(&self.profile, action)?
             .checked_add(1)
-            .ok_or_else(|| limit("ink action XML depth", self.limits.max_depth))?;
+            .ok_or_else(|| limit("ink action XML depth", self.options.max_depth))?;
         let mut max_depth = 0usize;
         validate_data_draft(
             &data,
-            self.limits,
+            self.options,
             &mut nodes,
             data_depth,
             &mut max_depth,
@@ -1046,9 +1070,9 @@ impl Edit {
     pub fn add_data_group(&mut self, action: ActionSelector, group: DataGroupDraft) -> Result<()> {
         let group_depth = action_depth_for_selector(&self.profile, action)?
             .checked_add(1)
-            .ok_or_else(|| limit("ink action XML depth", self.limits.max_depth))?;
+            .ok_or_else(|| limit("ink action XML depth", self.options.max_depth))?;
         let mut max_depth = 0usize;
-        validate_data_group_draft(&group, self.limits, group_depth, &mut max_depth, false)?;
+        validate_data_group_draft(&group, self.options, group_depth, &mut max_depth, false)?;
         self.push(EditOp::AddDataGroup(action, group))
     }
 
@@ -1067,11 +1091,6 @@ impl Edit {
         self.push(EditOp::MoveChild(from, before))
     }
 
-    /// Alias for [`Edit::move_child_before`].
-    pub fn move_child(&mut self, from: ChildSelector, before: ChildSelector) -> Result<()> {
-        self.move_child_before(from, before)
-    }
-
     /// Move two data children within one action-data group.
     pub fn move_group_data_before(
         &mut self,
@@ -1079,11 +1098,6 @@ impl Edit {
         before: DataSelector,
     ) -> Result<()> {
         self.push(EditOp::MoveGroupData(from, before))
-    }
-
-    /// Alias for [`Edit::move_group_data_before`].
-    pub fn move_group_data(&mut self, from: DataSelector, before: DataSelector) -> Result<()> {
-        self.move_group_data_before(from, before)
     }
 
     /// Remove all direct children from an action while retaining its start tag.
@@ -1099,11 +1113,6 @@ impl Edit {
     /// Remove a direct root action group.
     pub fn remove_action_group(&mut self, index: usize) -> Result<()> {
         self.push(EditOp::RemoveGroup(index))
-    }
-
-    /// Alias for [`Edit::remove_action_group`].
-    pub fn remove_group(&mut self, index: usize) -> Result<()> {
-        self.remove_action_group(index)
     }
 
     /// Remove a selected property.
@@ -1158,20 +1167,26 @@ impl Edit {
     /// operation. Scalar intents for one source attribute are coalesced;
     /// conflicting structural ranges are refused. With no queued operations,
     /// the original source allocation is replayed exactly.
-    pub fn finish(self) -> Result<Commit> {
+    pub fn commit(self) -> Result<Commit> {
         let before = self.profile.source.clone();
         if self.operations.is_empty() {
-            let prepared = Prepared::from_profile(self.profile);
+            let prepared = Prepared {
+                bytes: Arc::clone(&before),
+                profile: Arc::clone(&self.profile),
+            };
             let patch = Patch {
                 before: before.clone(),
                 after: before,
             };
             return Ok(Commit::new(prepared, patch, Diagnostics::UNCHANGED));
         }
-        let plans = plan_operations(&self.profile, &before, &self.operations, self.limits)?;
-        let after = emit_plans(&before, &plans, self.limits)?;
+        let plans = plan_operations(&self.profile, &before, &self.operations, self.options)?;
+        let after = emit_plans(&before, &plans, self.options)?;
         if after.as_slice() == before.as_ref() {
-            let prepared = Prepared::from_profile(self.profile);
+            let prepared = Prepared {
+                bytes: Arc::clone(&before),
+                profile: Arc::clone(&self.profile),
+            };
             let patch = Patch {
                 before: before.clone(),
                 after: before,
@@ -1180,24 +1195,14 @@ impl Edit {
         }
         let after: Arc<[u8]> = Arc::from(after.into_boxed_slice());
         let profile = read_profile_owned(after.clone())?;
-        validate_profile_limits(&profile, self.limits)?;
+        validate_profile_limits(&profile, self.options)?;
         ensure_unique_profile_ids(&profile)?;
         let prepared = Prepared {
             bytes: after.clone(),
-            profile,
+            profile: Arc::new(profile),
         };
         let patch = Patch { before, after };
         Ok(Commit::new(prepared, patch, Diagnostics::CHANGED))
-    }
-
-    /// Alias for [`Edit::finish`].
-    pub fn commit(self) -> Result<Commit> {
-        self.finish()
-    }
-
-    /// Return the checked edited value without discarding the patch.
-    pub fn prepare(self) -> Result<Prepared> {
-        Ok(self.finish()?.into_package())
     }
 
     fn push(&mut self, operation: EditOp) -> Result<()> {
@@ -1383,7 +1388,7 @@ fn validate_draft(draft: &Draft) -> Result<()> {
 
 fn validate_action_draft(
     action: &ActionDraft,
-    limits: Limits,
+    limits: EditOptions,
     nodes: &mut usize,
     action_depth: usize,
     max_depth: &mut usize,
@@ -1465,7 +1470,7 @@ fn validate_action_draft(
 
 fn validate_data_draft(
     data: &ActionDataDraft,
-    limits: Limits,
+    limits: EditOptions,
     nodes: &mut usize,
     data_depth: usize,
     max_depth: &mut usize,
@@ -1551,7 +1556,7 @@ impl PayloadRoot {
 
 fn check_payload(
     payload: &OpaquePayload,
-    limits: Limits,
+    limits: EditOptions,
     expected_root: PayloadRoot,
     allow_inherited_namespace: bool,
 ) -> Result<PayloadMetrics> {
@@ -1574,7 +1579,7 @@ fn check_payload(
 /// direct character content and disappear from the typed readback.
 fn validate_payload_fragment(
     payload: &[u8],
-    limits: Limits,
+    limits: EditOptions,
     expected_root: PayloadRoot,
     allow_inherited_namespace: bool,
 ) -> Result<PayloadMetrics> {
@@ -1718,7 +1723,7 @@ fn validate_payload_fragment(
 fn validate_payload_root(
     payload: &[u8],
     expected: PayloadRoot,
-    limits: Limits,
+    limits: EditOptions,
     allow_inherited_namespace: bool,
 ) -> Result<()> {
     let mut reader = NsReader::from_reader(payload);
@@ -1813,7 +1818,7 @@ struct PayloadExpandedName {
 
 fn validate_payload_namespace_grammar(
     payload: &[u8],
-    limits: Limits,
+    limits: EditOptions,
     allow_inherited_namespace: bool,
 ) -> Result<()> {
     let mut reader = NsReader::from_reader(payload);
@@ -1935,7 +1940,7 @@ fn payload_expanded_element_name<R: std::io::BufRead>(
     element: &quick_xml::events::BytesStart<'_>,
     resolved: &ResolveResult<'_>,
     reader: &NsReader<R>,
-    limits: Limits,
+    limits: EditOptions,
     allow_inherited_namespace: bool,
 ) -> Result<PayloadExpandedName> {
     let element_name = element.name();
@@ -1970,7 +1975,7 @@ fn payload_expanded_end_name<R: std::io::BufRead>(
     element: &quick_xml::events::BytesEnd<'_>,
     resolved: &ResolveResult<'_>,
     reader: &NsReader<R>,
-    limits: Limits,
+    limits: EditOptions,
     allow_inherited_namespace: bool,
 ) -> Result<PayloadExpandedName> {
     let element_name = element.name();
@@ -2000,7 +2005,7 @@ fn payload_resolved_namespace<R: std::io::BufRead>(
     resolved: &ResolveResult<'_>,
     reader: &NsReader<R>,
     element: Option<&quick_xml::events::BytesStart<'_>>,
-    limits: Limits,
+    limits: EditOptions,
     allow_inherited_namespace: bool,
 ) -> Result<Option<Box<str>>> {
     match resolved {
@@ -2035,7 +2040,7 @@ fn payload_resolved_namespace<R: std::io::BufRead>(
 fn payload_decode_namespace<R: std::io::BufRead>(
     value: &[u8],
     reader: &NsReader<R>,
-    limits: Limits,
+    limits: EditOptions,
 ) -> Result<Box<str>> {
     let decoded = reader
         .decoder()
@@ -2053,7 +2058,7 @@ fn payload_decode_namespace<R: std::io::BufRead>(
 fn validate_payload_attributes_with_namespaces<R: std::io::BufRead>(
     element: &quick_xml::events::BytesStart<'_>,
     reader: &NsReader<R>,
-    limits: Limits,
+    limits: EditOptions,
     allow_inherited_namespace: bool,
 ) -> Result<()> {
     let mut expanded = HashSet::new();
@@ -2164,7 +2169,7 @@ fn validate_payload_attributes_with_namespaces<R: std::io::BufRead>(
 fn payload_namespace<R: std::io::BufRead>(
     resolved: &ResolveResult<'_>,
     reader: &NsReader<R>,
-    limits: Limits,
+    limits: EditOptions,
 ) -> Result<Option<String>> {
     let ResolveResult::Bound(Namespace(value)) = resolved else {
         return Ok(None);
@@ -2243,7 +2248,7 @@ fn validate_payload_reference_codepoint(codepoint: u32) -> Result<()> {
 fn validate_payload_element(
     element: &quick_xml::events::BytesStart<'_>,
     reader: &Reader<&[u8]>,
-    limits: Limits,
+    limits: EditOptions,
 ) -> Result<()> {
     if element.name().as_ref().len() > limits.max_scalar_bytes {
         return Err(limit("ink action scalar bytes", limits.max_scalar_bytes));
@@ -2284,7 +2289,7 @@ fn validate_payload_element(
     Ok(())
 }
 
-fn bounded_scalar(value: &str, field: &'static str, limits: Limits) -> Result<()> {
+fn bounded_scalar(value: &str, field: &'static str, limits: EditOptions) -> Result<()> {
     if value.len() > limits.max_scalar_bytes {
         return Err(limit(field, limits.max_scalar_bytes));
     }
@@ -3364,7 +3369,7 @@ fn plan_operations<'a>(
     profile: &Profile,
     source: &'a [u8],
     operations: &'a [EditOp],
-    limits: Limits,
+    limits: EditOptions,
 ) -> Result<Vec<Plan<'a>>> {
     validate_batch_operations(profile, source, operations, limits)?;
     let prefix: Arc<[u8]> = Arc::from(action_prefix(source)?.into_boxed_slice());
@@ -3752,7 +3757,7 @@ fn plan_attribute<'a>(
     name: &'static [u8],
     value: &'a str,
     order: usize,
-    limits: Limits,
+    limits: EditOptions,
 ) -> Result<Plan<'a>> {
     let tag = start_tag(source, span)?;
     if let Some(attribute) = find_attr(source, tag, name)? {
@@ -3791,7 +3796,7 @@ fn plan_data_reference<'a>(
     span: SourceSpan,
     value: Option<&'a str>,
     order: usize,
-    _limits: Limits,
+    _limits: EditOptions,
 ) -> Result<Option<Plan<'a>>> {
     let tag = start_tag(source, span)?;
     if let Some(attribute) = find_attr(source, tag, b"ref")? {
@@ -4175,7 +4180,7 @@ fn validate_plan_ranges(plans: &[Plan<'_>]) -> Result<()> {
     Ok(())
 }
 
-fn emit_plans(source: &[u8], plans: &[Plan<'_>], limits: Limits) -> Result<Vec<u8>> {
+fn emit_plans(source: &[u8], plans: &[Plan<'_>], limits: EditOptions) -> Result<Vec<u8>> {
     let mut output_len = source.len();
     for plan in plans {
         if plan.nested || plan.suppressed {
@@ -4408,7 +4413,7 @@ fn emit_insert(output: &mut Vec<u8>, kind: &InsertKind<'_>) {
     }
 }
 
-fn validate_profile_limits(profile: &Profile, limits: Limits) -> Result<()> {
+fn validate_profile_limits(profile: &Profile, limits: EditOptions) -> Result<()> {
     if profile.source.len() > limits.max_output_bytes {
         return Err(limit("ink action source bytes", limits.max_output_bytes));
     }
@@ -4480,7 +4485,7 @@ fn validate_profile_limits(profile: &Profile, limits: Limits) -> Result<()> {
 
 fn check_profile_attributes(
     element: &quick_xml::events::BytesStart<'_>,
-    limits: Limits,
+    limits: EditOptions,
     reader: &Reader<&[u8]>,
 ) -> Result<()> {
     if element.name().as_ref().len() > limits.max_scalar_bytes {
@@ -4507,7 +4512,7 @@ fn check_profile_attributes(
 fn validate_profile_group(
     group: &ActionGroup,
     profile: &Profile,
-    limits: Limits,
+    limits: EditOptions,
     actions: &mut usize,
 ) -> Result<()> {
     check_profile_scalar(group.xml_id.as_deref(), "xml:id", limits)?;
@@ -4521,7 +4526,7 @@ fn validate_profile_group(
     Ok(())
 }
 
-fn validate_profile_action(action: &Action, profile: &Profile, limits: Limits) -> Result<()> {
+fn validate_profile_action(action: &Action, profile: &Profile, limits: EditOptions) -> Result<()> {
     check_profile_scalar(action.xml_id.as_deref(), "xml:id", limits)?;
     check_profile_scalar(Some(&action.start_time), "ink action startTime", limits)?;
     check_profile_scalar(Some(action.action_type.as_str()), "action type", limits)?;
@@ -4544,7 +4549,7 @@ fn validate_profile_action(action: &Action, profile: &Profile, limits: Limits) -
     Ok(())
 }
 
-fn validate_profile_data(data: &ActionData, profile: &Profile, limits: Limits) -> Result<()> {
+fn validate_profile_data(data: &ActionData, profile: &Profile, limits: EditOptions) -> Result<()> {
     check_profile_scalar(data.xml_id.as_deref(), "xml:id", limits)?;
     check_profile_scalar(Some(&data.name), "action data name", limits)?;
     check_profile_scalar(data.reference.as_deref(), "action data reference", limits)?;
@@ -4554,14 +4559,18 @@ fn validate_profile_data(data: &ActionData, profile: &Profile, limits: Limits) -
     Ok(())
 }
 
-fn check_profile_scalar(value: Option<&str>, field: &'static str, limits: Limits) -> Result<()> {
+fn check_profile_scalar(
+    value: Option<&str>,
+    field: &'static str,
+    limits: EditOptions,
+) -> Result<()> {
     if value.is_some_and(|value| value.len() > limits.max_scalar_bytes) {
         return Err(limit(field, limits.max_scalar_bytes));
     }
     Ok(())
 }
 
-fn check_span_payload(profile: &Profile, span: SourceSpan, limits: Limits) -> Result<()> {
+fn check_span_payload(profile: &Profile, span: SourceSpan, limits: EditOptions) -> Result<()> {
     if span.end().saturating_sub(span.start()) > limits.max_payload_bytes {
         return Err(limit("ink action payload bytes", limits.max_payload_bytes));
     }
@@ -4575,7 +4584,7 @@ fn validate_batch_operations(
     profile: &Profile,
     source: &[u8],
     operations: &[EditOp],
-    limits: Limits,
+    limits: EditOptions,
 ) -> Result<()> {
     let id_index = build_id_index(profile)?;
     let mut removed_spans = Vec::new();
@@ -4935,7 +4944,7 @@ fn source_node_count(source: &[u8]) -> Result<usize> {
 
 fn validate_data_group_draft(
     group: &DataGroupDraft,
-    limits: Limits,
+    limits: EditOptions,
     group_depth: usize,
     max_depth: &mut usize,
     allow_inherited_payload_namespace: bool,
@@ -4969,7 +4978,7 @@ fn validate_data_group_draft(
 
 fn validate_group_draft(
     group: &ActionGroupDraft,
-    limits: Limits,
+    limits: EditOptions,
     nodes: &mut usize,
     max_depth: &mut usize,
     allow_inherited_payload_namespace: bool,
@@ -5856,7 +5865,18 @@ fn invalid(message: impl Into<String>) -> Error {
     super::invalid(message)
 }
 fn limit(resource: &'static str, limit: usize) -> Error {
-    super::limit(resource, limit)
+    let kind = match resource {
+        "ink action output bytes" => Some(LimitKind::OutputBytes),
+        "ink action payload bytes" => Some(LimitKind::PayloadBytes),
+        "ink action XML nodes" => Some(LimitKind::Nodes),
+        "ink action XML depth" => Some(LimitKind::Depth),
+        "ink action records" => Some(LimitKind::Actions),
+        "ink action groups" => Some(LimitKind::ActionGroups),
+        "ink action scalar bytes" => Some(LimitKind::ScalarBytes),
+        "ink action edit operations" => Some(LimitKind::EditOperations),
+        _ => None,
+    };
+    kind.map_or_else(|| super::limit(resource, limit), |kind| kind.error(limit))
 }
 fn xml_error(message: impl Into<String>) -> Error {
     Error::Xml(message.into())
@@ -5911,7 +5931,7 @@ mod tests {
         let prepared = authored();
         let original = prepared.as_bytes().to_vec();
         let profile = prepared.profile().clone();
-        let mut edit = Edit::new(profile, Limits::default()).expect("edit");
+        let mut edit = Edit::new(profile, EditOptions::default()).expect("edit");
         edit.set_property_value(
             ChildSelector::Property {
                 action: ActionSelector::ordinal(0),
@@ -5926,7 +5946,7 @@ mod tests {
             .expect("future id");
         edit.add_action(ActionParent::Root, added)
             .expect("add action");
-        let commit = edit.finish().expect("commit");
+        let commit = edit.commit().expect("commit");
         assert_ne!(commit.package().as_bytes(), original.as_slice());
         assert!(
             commit
@@ -5935,21 +5955,18 @@ mod tests {
                 .windows(b"value=\"style\"".len())
                 .any(|window| window == b"value=\"style\"")
         );
-        let inverse = commit
-            .patch()
-            .inverse()
-            .apply(commit.package().as_bytes())
-            .expect("inverse");
-        assert_eq!(inverse, original);
-        assert!(commit.patch().apply(b"<stale/>").is_err());
+        let inverse = commit.patch().clone().inverse();
+        let restored = commit.package().apply(&inverse).expect("inverse replay");
+        assert_eq!(restored.package().as_bytes(), original.as_slice());
+        assert!(commit.patch().apply_bytes(b"<stale/>").is_err());
     }
 
     #[test]
     fn no_op_edit_replays_exact_source() {
         let prepared = authored();
         let original = prepared.as_bytes().to_vec();
-        let edit = Edit::new(prepared.profile().clone(), Limits::default()).expect("edit");
-        let commit = edit.finish().expect("no-op");
+        let edit = Edit::new(prepared.profile().clone(), EditOptions::default()).expect("edit");
+        let commit = edit.commit().expect("no-op");
         assert_eq!(commit.package().as_bytes(), original.as_slice());
         assert_eq!(commit.patch().before(), original.as_slice());
         assert_eq!(commit.patch().after(), original.as_slice());
@@ -5977,10 +5994,11 @@ mod tests {
             .expect("second action")
             .with_xml_id("g2")
             .expect("second id");
-        let mut edit = Edit::from_profile(prepared.profile(), Limits::default()).expect("edit");
+        let mut edit =
+            Edit::from_profile(prepared.profile(), EditOptions::default()).expect("edit");
         edit.add_action(ActionParent::Group(0), second)
             .expect("group insertion");
-        let commit = edit.finish().expect("group commit");
+        let commit = edit.commit().expect("group commit");
         assert_eq!(commit.package().profile().action_groups().count(), 1);
         assert_eq!(
             commit
@@ -5993,12 +6011,12 @@ mod tests {
                 .len(),
             2
         );
-        let mut reorder =
-            Edit::from_profile(commit.package().profile(), Limits::default()).expect("reorder");
+        let mut reorder = Edit::from_profile(commit.package().profile(), EditOptions::default())
+            .expect("reorder");
         reorder
             .move_before(ActionSelector::grouped(0, 1), ActionSelector::grouped(0, 0))
             .expect("move");
-        let reordered = reorder.finish().expect("reordered commit");
+        let reordered = reorder.commit().expect("reordered commit");
         assert_eq!(
             reordered
                 .package()
@@ -6014,9 +6032,9 @@ mod tests {
 
     #[test]
     fn caller_output_limit_is_checked_before_authoring_buffer() {
-        let limits = Limits {
+        let limits = EditOptions {
             max_output_bytes: 1,
-            ..Limits::default()
+            ..EditOptions::default()
         };
         let draft = Draft::new(limits, LengthUnit::Meter, TimeUnit::Second)
             .expect("limits")
@@ -6097,13 +6115,18 @@ mod tests {
         let Event::Empty(element) = reader.read_event().expect("payload root") else {
             unreachable!("the payload is one empty element");
         };
-        validate_payload_attributes_with_namespaces(&element, &reader, Limits::default(), true)
-            .expect("inherited prefixes resolve");
+        validate_payload_attributes_with_namespaces(
+            &element,
+            &reader,
+            EditOptions::default(),
+            true,
+        )
+        .expect("inherited prefixes resolve");
 
         // The payload is refused by the per-element attribute cap, as before.
         let error = validate_payload_fragment(
             payload.as_bytes(),
-            Limits::default(),
+            EditOptions::default(),
             PayloadRoot::Transform,
             true,
         )
@@ -6123,15 +6146,24 @@ mod tests {
     #[test]
     fn an_inherited_prefix_the_tag_also_declares_is_refused_as_before() {
         let accepted = b"<iact:transform><child iact:x=\"1\"/></iact:transform>";
-        validate_payload_fragment(accepted, Limits::default(), PayloadRoot::Transform, true)
-            .expect("an inherited attribute prefix resolves");
+        validate_payload_fragment(
+            accepted,
+            EditOptions::default(),
+            PayloadRoot::Transform,
+            true,
+        )
+        .expect("an inherited attribute prefix resolves");
 
         // `bad=v` ends the reader's namespace scope before `xmlns:iact`, so
         // `iact:x` is unresolved although its tag declares `iact`.
         let refused = b"<iact:transform><child iact:x=\"1\" bad=v xmlns:iact=\"urn:other\"/></iact:transform>";
-        let error =
-            validate_payload_fragment(refused, Limits::default(), PayloadRoot::Transform, true)
-                .unwrap_err();
+        let error = validate_payload_fragment(
+            refused,
+            EditOptions::default(),
+            PayloadRoot::Transform,
+            true,
+        )
+        .unwrap_err();
         assert!(
             matches!(
                 &error,

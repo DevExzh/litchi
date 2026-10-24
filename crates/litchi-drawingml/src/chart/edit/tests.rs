@@ -66,13 +66,12 @@ fn no_op_replays_source_and_changed_edits_keep_opaque_xml() {
     assert!(replayed.diagnostics().changed());
     assert_eq!(replayed.package().xml_bytes(), commit.package().xml_bytes());
 
+    let inverse = commit.patch().clone().inverse();
     let restored = commit
-        .patch()
-        .clone()
-        .inverse()
-        .apply(commit.package())
+        .package()
+        .apply(&inverse)
         .expect("inverse patch must restore source");
-    assert_eq!(restored.xml_bytes(), CHART);
+    assert_eq!(restored.package().xml_bytes(), CHART);
 }
 
 #[test]
@@ -81,7 +80,7 @@ fn stale_and_invalid_edits_are_rejected_atomically() {
     let mut changed_edit = snapshot.edit();
     changed_edit.set_style(Some(9)).unwrap();
     let changed = changed_edit.commit().unwrap();
-    assert!(changed.patch().apply(&snapshot).is_ok());
+    assert!(snapshot.apply(changed.patch()).is_ok());
 
     let other = Package::from_xml(
         std::str::from_utf8(CHART)
@@ -90,7 +89,7 @@ fn stale_and_invalid_edits_are_rejected_atomically() {
             .into_bytes(),
     )
     .unwrap();
-    assert!(changed.patch().apply(&other).is_err());
+    assert!(other.apply(changed.patch()).is_err());
 
     let mut edit = snapshot.edit();
     assert!(edit.set_style(Some(49)).is_err());

@@ -2190,18 +2190,26 @@ serialization. The action profile follows the same triad with `Prepared` as
 its checked package value.
 
 Raw authoring remains explicitly bounded: `ink::Prepared::from_bytes` requires
-an `AuthoringLimits` value, and `ink::actions::Edit::{new, from_profile}`
-require `Limits`. The former `_with_limits` entry points are deleted without
-aliases or deprecations. Every chart, transform, theme-family, and ink-action
-consumer uses the focused `Edit`/`Commit` shape in the same migration.
+an `ink::builder::AuthoringLimits` value, and
+`ink::actions::Edit::{new, from_profile}` require
+`actions::builder::EditOptions`. Fresh action and InkML authoring
+types live under `ink::actions::builder` and `ink::builder`; their old
+compatibility spellings are deleted without aliases or deprecations. Action
+owners expose `Prepared::{edit, edit_with_options, apply}` and publish only
+through `Edit::commit`; raw `Patch::apply` is private. Every chart,
+transform, theme-family, and ink-action consumer uses the focused
+`Edit`/`Commit` shape in the same migration.
 
 | Name | Status |
 |---|---|
 | `litchi_drawingml::{chart, transform}::{Package, Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0362dv; registered family triads and replay) |
 | `litchi_drawingml::theme::family::{Package, Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0362dv; exact opaque-markup preservation) |
 | `litchi_drawingml::ink::actions::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0362dv; `Prepared` package triad) |
+| `litchi_drawingml::ink::actions::builder::{Draft, ActionDraft, ActionGroupDraft, ActionDataDraft, DataGroupDraft, PropertyDraft, OpaquePayload, EditOptions}` | adopted (0362dva; canonical fresh-action authoring) |
+| `litchi_drawingml::ink::builder::{Draft, Prepared, AuthoringLimits}` | adopted (0362dva; canonical fresh InkML authoring) |
 | `litchi_drawingml::ink::Prepared::from_bytes(bytes, AuthoringLimits)` | adopted (0362dv; required raw limit) |
 | `litchi_drawingml::chart::Package::apply`, `transform::Package::apply`, `theme::family::Package::apply` | adopted (0362dv; source-checked replay returns `Commit`) |
+| `litchi_drawingml::ink::actions::Prepared::{edit, edit_with_options, apply}` | adopted (0362dva; O(1) shared owner routes and commit triads) |
 
 ## Per-series chart keys and warn-mode failures (record 0271)
 

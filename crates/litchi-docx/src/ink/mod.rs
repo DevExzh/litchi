@@ -53,9 +53,11 @@ pub use authoring::{
     HorizontalRelativeFrom, ImageDimensions, ImageType, Placement, Point, Style, VerticalAlignment,
     VerticalPosition, VerticalRelativeFrom, WrapMode,
 };
+pub use litchi_drawingml::ink::builder::{
+    AuthoringLimits, BrushDraft, BrushPropertyDraft, ContextDraft, Draft, TraceDraft,
+};
 pub use litchi_drawingml::ink::{
-    AuthoringLimits, BrushDraft, BrushPropertyDraft, BrushPropertyName, ContextDraft, ContextKind,
-    Draft, EffectiveBrushProperty, Guid, InkEffect, Prepared, SemanticType, TraceDraft,
+    BrushPropertyName, ContextKind, EffectiveBrushProperty, Guid, InkEffect, Prepared, SemanticType,
 };
 pub use model::{Annotation, BrushProperty, Context, Limits, Location, Snapshot};
 pub use transaction::{Commit, Destination, Diagnostics, Edit, EditOptions, Patch};

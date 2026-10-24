@@ -22,13 +22,23 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::first_wins;
 
 #[path = "actions_edit.rs"]
-pub mod edit;
+mod edit;
 
-pub use edit::{
-    ActionDataDraft, ActionDraft, ActionGroupDraft, ActionParent, ActionSelector, ChildSelector,
-    Commit, DataChildDraft, DataGroupDraft, DataSelector, Diagnostics, Draft, Edit, LimitKind,
-    Limits, OpaquePayload, Patch, Prepared, PropertyDraft,
-};
+/// Detached action-value builders.
+///
+/// Builder values are fresh authoring inputs.  They do not publish a
+/// source-backed edit; call [`builder::Draft::finish`] to emit a checked detached
+/// [`Prepared`] value, or use [`super::actions::Edit`] for source-backed
+/// editing and [`Edit::commit`] for publication.
+pub mod builder {
+    pub use super::edit::{
+        ActionDataDraft, ActionDraft, ActionGroupDraft, ActionParent, ActionSelector,
+        ChildSelector, DataChildDraft, DataGroupDraft, DataSelector, Draft, EditOptions,
+        OpaquePayload, PropertyDraft,
+    };
+}
+
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch, Prepared};
 
 /// Maximum action records retained by one action part.
 pub const MAX_ACTIONS: usize = 65_536;
