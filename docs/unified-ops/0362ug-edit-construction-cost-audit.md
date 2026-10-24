@@ -250,3 +250,33 @@ by 0351 §2.4.2.
 The four owned build slots now cover composed iWork, composed XLSX, XLSB and
 DOCX. PPT runtime validation remains queued. Native endpoints stay unresolved
 until final source freeze; no required engineering work is waived.
+
+## Validation follow-up, 2026-10-24
+
+Pages correction `57b14d3f2a` clears scoped review of all three new persistent
+lazy ledgers (table name, appearance and merge). Failed resolution retains the
+charged ledger and the next attempt reuses it; typed retry tests cover the
+operation-work ceilings. The modified name Edit's Debug now reports presence
+and byte count only. The coordinator verified the final Pages log: 719 tests
+across 61 result blocks, with no failures or ignored tests, and actual root
+configuration matching the source. Strict Pages Clippy also passes. Remaining
+combined iWork consumers and the final receipt are still in progress.
+
+DOCX validation corrections clear review at `d85c59cf91`. Signature admission
+uses the retained physical source before the effective-topology branch, so a
+chained deferred edit does not fail by demanding a materialized package.
+Formatting consumers force their deferred projections; typed errors,
+no-op/signature behavior, retry state and bounded paragraph routes remain.
+Full runtime validation continues. XLSB validation corrections clear independent
+review at `51c8628446`; their runtime/consumer checks continue. XLSX corrections
+through `8c39f97fe1`
+clear review; the later `d486a2490f` only forces the first data-model read in
+three refusal tests. Its combined runtime validation continues.
+
+The PPT validation leaf is composed with integration `d0e1782f9b` at
+`7ae7e9144b`, retaining the reviewed native source-fence correction. It awaits
+the next build slot. The final gate runner's first post-exit successor
+`7f8b1a01e5` passes its verifier but is returned: a detached `setsid()` helper
+can escape the current process-group lookup and write the target after a pass.
+An independent controlled reproduction establishes the gap. Ownership tracking
+and its detached-child regression must be corrected before final gate use.

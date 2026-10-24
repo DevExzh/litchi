@@ -779,3 +779,27 @@ the 1,419-byte restore helper has SHA-256
 Recreate with `git worktree add` using the retained branch, then run that
 `restore.py`. XLS and PPTX leaves remain untouched because foreign searches
 still hold their files. No build target or measurement artifact was removed.
+
+## Eighteenth cleanup, 2026-10-24
+
+After the foreign PPTX search exited, a fresh audit found no process users of
+the clean, merged PPTX lazy-entry leaf. It was removed without force; branch
+`uo2/pptx-lazy-entry` remains at
+`e59c72184dde29c2820c5d42a01d22de3ed532ea`, ancestral to integration
+`d0e1782f9b`. The apparent checkout size was 362,854,381 bytes. Its ignored
+139,592-byte Cargo.lock is quarantined with SHA-256
+`6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`.
+The coordinator verified the quarantine, ancestry, retained ref and removed
+path. The external PPTX target/log root remains at its protected location;
+its recorded apparent size is 4,888,455,639 bytes. No target or measurement
+artifact was deleted. The foreign-held XLS worktree remains untouched.
+
+Receipt:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/eighteenth-wave/receipt.md`
+(1,714 bytes, SHA-256
+`3915081cbca99113e2168143409e845a63fca85e5cee34966c40add0f3246bcf`).
+The adjacent 624-byte manifest has SHA-256
+`1d19a0a91f68870a0b01ea4bb14e668dcc63640da0436a7c98c07cbe7153a1cf`;
+the 1,419-byte restore helper has SHA-256
+`a1f109fcc2acd13afa949ac1e682cfd2a89b30337956f185d0c52d4ce980469b`.
+Recreate the worktree from the retained branch, then run that `restore.py`.
