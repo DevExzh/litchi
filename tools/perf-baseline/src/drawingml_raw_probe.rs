@@ -1368,21 +1368,21 @@ fn read_theme(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
     write_theme_value(&read_theme_value(bytes)?)
 }
 
-#[cfg(any(feature = "drawingml-theme-family-current"))]
+#[cfg(feature = "drawingml-raw-current")]
 fn read_family_value(bytes: &[u8]) -> Result<dml::theme::family::Family, ProbeFailure> {
     dml::theme::family::read(bytes, dml::theme::family::Limits::DEFAULT)
         .map_err(|error| classify(error, bytes.len()))
 }
 
-#[cfg(not(any(feature = "drawingml-theme-family-current")))]
+#[cfg(not(feature = "drawingml-raw-current"))]
 fn read_family_value(bytes: &[u8]) -> Result<dml::theme::family::Family, ProbeFailure> {
     dml::theme::family::read(bytes).map_err(|error| classify(error, bytes.len()))
 }
 
 fn write_family_value(value: &dml::theme::family::Family) -> Result<Vec<u8>, ProbeFailure> {
-    #[cfg(any(feature = "drawingml-theme-family-current"))]
+    #[cfg(feature = "drawingml-raw-current")]
     let result = dml::theme::family::write(value, dml::theme::family::Limits::DEFAULT);
-    #[cfg(not(any(feature = "drawingml-theme-family-current")))]
+    #[cfg(not(feature = "drawingml-raw-current"))]
     let result = dml::theme::family::write(value);
     result.map_err(|error| classify(error, 0))
 }
@@ -1391,7 +1391,7 @@ fn read_family(bytes: &[u8]) -> Result<Vec<u8>, ProbeFailure> {
     write_family_value(&read_family_value(bytes)?)
 }
 
-#[cfg(any(feature = "drawingml-theme-family-current"))]
+#[cfg(feature = "drawingml-raw-current")]
 fn read_theme_family_part_value(
     bytes: &[u8],
 ) -> Result<dml::theme::family::part::Snapshot, ProbeFailure> {
@@ -1399,7 +1399,7 @@ fn read_theme_family_part_value(
         .map_err(|error| classify(error, bytes.len()))
 }
 
-#[cfg(not(any(feature = "drawingml-theme-family-current")))]
+#[cfg(not(feature = "drawingml-raw-current"))]
 fn read_theme_family_part_value(
     bytes: &[u8],
 ) -> Result<dml::theme::family::part::Snapshot, ProbeFailure> {
@@ -1669,16 +1669,10 @@ fn write_prepared_to<W: Write>(
                 .map_err(|error| io_failure(error, output.len()))
         },
         (PartKind::ThemeFamily, PreparedValue::ThemeFamily(value)) => {
-            #[cfg(any(
-                feature = "drawingml-raw-current",
-                feature = "drawingml-theme-family-current"
-            ))]
+            #[cfg(feature = "drawingml-raw-current")]
             let result =
                 dml::theme::family::write_to(writer, value, dml::theme::family::Limits::DEFAULT);
-            #[cfg(not(any(
-                feature = "drawingml-raw-current",
-                feature = "drawingml-theme-family-current"
-            )))]
+            #[cfg(not(feature = "drawingml-raw-current"))]
             let result = dml::theme::family::write_to(writer, value);
             result.map_err(|error| classify(error, 0))
         },
@@ -1735,9 +1729,8 @@ fn output_limit_supported(kind: PartKind) -> bool {
         | PartKind::Geometry
         | PartKind::Color
         | PartKind::Transform => cfg!(feature = "drawingml-raw-current"),
-        PartKind::ThemeFamily | PartKind::ThemeFamilyPart => {
-            cfg!(feature = "drawingml-theme-family-current")
-        },
+        PartKind::ThemeFamily => cfg!(feature = "drawingml-raw-current"),
+        PartKind::ThemeFamilyPart => cfg!(feature = "drawingml-theme-family-current"),
         PartKind::InkActions => cfg!(any(
             feature = "drawingml-raw-current",
             feature = "drawingml-ink-limits-current"
@@ -1947,7 +1940,7 @@ fn write_theme_value_limited(
     ))
 }
 
-#[cfg(feature = "drawingml-theme-family-current")]
+#[cfg(feature = "drawingml-raw-current")]
 fn write_family_value_limited<W: Write>(
     writer: &mut W,
     value: &dml::theme::family::Family,
@@ -1957,7 +1950,7 @@ fn write_family_value_limited<W: Write>(
         .map_err(|error| classify(error, maximum.saturating_add(1)))
 }
 
-#[cfg(not(feature = "drawingml-theme-family-current"))]
+#[cfg(not(feature = "drawingml-raw-current"))]
 fn write_family_value_limited<W: Write>(
     _writer: &mut W,
     _value: &dml::theme::family::Family,
@@ -3997,24 +3990,24 @@ fn read_shared_value(part: &SharedPart) -> Result<PreparedValue, ProbeFailure> {
             ))
         },
         PartKind::ThemeFamily => {
-            #[cfg(feature = "drawingml-theme-family-current")]
+            #[cfg(feature = "drawingml-raw-current")]
             let value = dml::theme::family::read_shared(
                 std::sync::Arc::clone(&part.source),
                 dml::theme::family::Limits::DEFAULT,
             );
-            #[cfg(not(feature = "drawingml-theme-family-current"))]
+            #[cfg(not(feature = "drawingml-raw-current"))]
             let value = dml::theme::family::read_shared(std::sync::Arc::clone(&part.source));
             Ok(PreparedValue::ThemeFamily(
                 value.map_err(|error| classify(error, part.source.len()))?,
             ))
         },
         PartKind::ThemeFamilyPart => {
-            #[cfg(feature = "drawingml-theme-family-current")]
+            #[cfg(feature = "drawingml-raw-current")]
             let value = dml::theme::family::part::read_shared(
                 std::sync::Arc::clone(&part.source),
                 dml::theme::family::part::Limits::DEFAULT,
             );
-            #[cfg(not(feature = "drawingml-theme-family-current"))]
+            #[cfg(not(feature = "drawingml-raw-current"))]
             let value = dml::theme::family::part::read_shared(std::sync::Arc::clone(&part.source));
             Ok(PreparedValue::ThemeFamilyPart(
                 value.map_err(|error| classify(error, part.source.len()))?,
