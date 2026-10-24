@@ -209,11 +209,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     assert!(family::read(empty_prefix_family.as_bytes(), family::Limits::DEFAULT).is_err());
     assert!(
-        part::read(&replace_once(
-            &native,
-            &native_fragment,
-            empty_prefix_family.as_bytes()
-        ))
+        part::read(
+            &replace_once(&native, &native_fragment, empty_prefix_family.as_bytes()),
+            part::Limits::DEFAULT
+        )
         .is_err()
     );
     let default_xml_family = format!(
@@ -221,11 +220,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     assert!(family::read(default_xml_family.as_bytes(), family::Limits::DEFAULT).is_err());
     assert!(
-        part::read(&replace_once(
-            &native,
-            &native_fragment,
-            default_xml_family.as_bytes()
-        ))
+        part::read(
+            &replace_once(&native, &native_fragment, default_xml_family.as_bytes()),
+            part::Limits::DEFAULT
+        )
         .is_err()
     );
     let invalid_root = replace_once(
@@ -243,11 +241,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         "standalone oversized namespace prefix",
     );
     assert_namespace_prefix_limit(
-        part::read(&replace_once(
-            &native,
-            &native_fragment,
-            oversized_prefix_family.as_bytes(),
-        )),
+        part::read(
+            &replace_once(
+                &native,
+                &native_fragment,
+                oversized_prefix_family.as_bytes(),
+            ),
+            part::Limits::DEFAULT,
+        ),
         "complete-part oversized namespace prefix",
     );
     let exact_prefix = "p".repeat(family::MAX_NAMESPACE_BYTES);
@@ -256,11 +257,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     assert!(family::read(exact_prefix_family.as_bytes(), family::Limits::DEFAULT).is_ok());
     assert!(
-        part::read(&replace_once(
-            &native,
-            &native_fragment,
-            exact_prefix_family.as_bytes(),
-        ))
+        part::read(
+            &replace_once(&native, &native_fragment, exact_prefix_family.as_bytes(),),
+            part::Limits::DEFAULT
+        )
         .is_ok()
     );
     cases.push(Case {

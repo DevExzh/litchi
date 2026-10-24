@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         family::write(&authored, family::Limits::DEFAULT)?,
     )?;
 
-    let snapshot = Package::from_xml(fs::read(fixture)?)?;
+    let snapshot = Package::from_xml(fs::read(fixture)?, family::Limits::DEFAULT)?;
     let mut edit = snapshot.edit();
     edit.set_name("Office Theme (caller edit)")?;
     edit.set_variant_id("{00000000-0000-0000-0000-000000000001}")?;
