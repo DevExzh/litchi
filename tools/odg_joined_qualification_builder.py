@@ -773,7 +773,7 @@ def build(manifest_path: Path) -> dict[str, Any]:
                 event["guard_after"] = _quiet_guard(plan["max_load"], f"after-{name}-{kind}")
                 binary_key = "allocator_binary" if kind == "allocator" else "binary"
                 binary = Path(endpoint[binary_key])
-                if not binary.is_file() or not os.access(binary, os.X_OK):
+                if binary.is_symlink() or not binary.is_file() or not os.access(binary, os.X_OK):
                     raise RunFailure(f"{name}/{kind}: expected executable was not produced: {binary}")
                 event["artifact"] = binary_identity(binary)
                 event["source_before"] = {"ref": endpoint["ref"], "tree": endpoint["tree"]}
