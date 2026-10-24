@@ -57,6 +57,24 @@ def owner_fixture() -> dict:
     return {"root": 0, "includes_private": False, "index": index, "paths": paths}
 
 
+def delegated_glob_fixture() -> dict:
+    """Add a foreign glob whose target module is intentionally not embedded."""
+    document = owner_fixture()
+    document["index"]["0"]["inner"]["module"]["items"].append(10)
+    document["index"]["10"] = {
+        "name": "external",
+        "crate_id": 0,
+        "visibility": "public",
+        "inner": {"use": {"name": "external", "id": 11, "is_glob": True}},
+    }
+    document["paths"]["11"] = {
+        "path": ["external", "module"],
+        "kind": "module",
+        "crate_id": 99,
+    }
+    return document
+
+
 class InventoryOwnerCoverageTests(unittest.TestCase):
     def test_policy_owner_name_outside_heuristic_covers_alias_once(self):
         document = owner_fixture()
@@ -95,6 +113,65 @@ class InventoryOwnerCoverageTests(unittest.TestCase):
         self.assertEqual(
             inventory.policy_immutable_owners("fixture", profiles),
             frozenset({("fixture", "OddOwner")}),
+        )
+
+    def test_policy_delegated_globs_union_all_profiles_for_crate(self):
+        profiles = [
+            {"package": "fixture", "delegated_globs": ["external"]},
+            {"package": "fixture", "delegated_globs": ["other"]},
+            {"package": "another", "delegated_globs": ["ignored"]},
+        ]
+        self.assertEqual(
+            inventory.policy_delegated_globs("fixture", profiles),
+            frozenset({"external", "other"}),
+        )
+
+    def test_missing_delegated_inputs_are_reported(self):
+        profiles = [{"package": "fixture", "delegated_globs": ["external"]}]
+        self.assertEqual(
+            inventory.missing_delegated_inputs({"fixture"}, profiles),
+            {"fixture": ("external",)},
+        )
+        self.assertEqual(
+            inventory.missing_delegated_inputs({"fixture", "external"}, profiles),
+            {},
+        )
+
+    def test_facade_policy_covers_all_all_features_foreign_glob_roots(self):
+        profiles = inventory.gate.checked_policy(
+            inventory.gate.read_json(inventory.gate.POLICY)
+        )
+        expected = frozenset({
+            "litchi_cfb", "litchi_core", "litchi_crypto", "litchi_doc",
+            "litchi_docx", "litchi_drawingml", "litchi_eval", "litchi_formula",
+            "litchi_fonts", "litchi_imgconv", "litchi_keynote", "litchi_odf_common",
+            "litchi_odp", "litchi_ods", "litchi_odraw", "litchi_odt",
+            "litchi_ole_common", "litchi_opc", "litchi_pages", "litchi_ppt",
+            "litchi_pptx", "litchi_rtf", "litchi_sheet", "litchi_sheet_text",
+            "litchi_sign", "litchi_xls", "litchi_xlsb", "litchi_xlsx",
+        })
+        self.assertTrue(
+            expected <= inventory.policy_delegated_globs("litchi", profiles),
+            inventory.policy_delegated_globs("litchi", profiles),
+        )
+
+    def test_declared_delegated_glob_is_processed_without_hiding_undeclared_glob(self):
+        document = delegated_glob_fixture()
+        with self.assertRaisesRegex(ValueError, "glob target requires module"):
+            list(inventory.rows(
+                document, "fixture", result_rules=[], immutable_owners=set(),
+                delegated_globs=frozenset(),
+            ))
+        findings = list(inventory.rows(
+            document, "fixture", result_rules=[],
+            immutable_owners={"fixture::OddOwner"},
+            delegated_globs=frozenset({"external"}),
+        ))
+        self.assertIn(
+            ("replay_return", "fixture::AliasOwner::apply_change",
+             "return contract unverified",
+             "register and satisfy Result<family::Commit> in result_methods"),
+            findings,
         )
 
     def test_missing_policy_owner_fails_closed(self):
