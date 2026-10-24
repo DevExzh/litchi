@@ -7,7 +7,9 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import tempfile
 import unittest
+from unittest import mock
 
 from tools import w8_projection_policy as policy
 
@@ -87,6 +89,151 @@ class ProjectionPolicyTests(unittest.TestCase):
         changed["lock"]["sha256"] = "changed"
         with self.assertRaises(RuntimeError):
             runner.shared_identity(before, changed)
+
+    def test_pair_receipt_requires_opaque_full_validation_result(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            receipt = Path(directory) / "receipt.json"
+            receipt.write_bytes(policy.canonical({}))
+            with self.assertRaises(policy.ProjectionPolicyError):
+                policy.verify_pair_receipt(
+                    policy.ROOT / policy.POLICY_RELATIVE, receipt, {}, {}
+                )
+
+    def test_pair_receipt_binds_metadata_and_route_order(self) -> None:
+        expected = {
+            "schema": policy.PAIR_SCHEMA,
+            "policy": {
+                "schema": policy.POLICY_SCHEMA,
+                "version": policy.POLICY_VERSION,
+                "sha256": policy.REVIEWED_POLICY_SHA256,
+            },
+            "workload": {"routes": ["docx/open_get"], "route_count": 1},
+            "status": "verified_protocol_only",
+        }
+        before = policy._ValidatedEndpoint({})
+        after = policy._ValidatedEndpoint({})
+        with tempfile.TemporaryDirectory() as directory:
+            receipt = Path(directory) / "receipt.json"
+            receipt.write_bytes(policy.canonical(expected))
+            with mock.patch.object(policy, "_receipt_from_validated", return_value=expected):
+                self.assertEqual(
+                    policy.verify_pair_receipt(
+                        policy.ROOT / policy.POLICY_RELATIVE, receipt, before, after
+                    ),
+                    expected,
+                )
+                tampered = dict(expected)
+                tampered["workload"] = {"routes": ["docx/save"], "route_count": 1}
+                receipt.write_bytes(policy.canonical(tampered))
+                with self.assertRaises(policy.ProjectionPolicyError):
+                    policy.verify_pair_receipt(
+                        policy.ROOT / policy.POLICY_RELATIVE, receipt, before, after
+                    )
+
+    def test_standalone_pair_uses_complete_endpoint_validator(self) -> None:
+        class FakeRunner:
+            def __init__(self, message: str) -> None:
+                self.message = message
+
+            def endpoint_manifest(self, path: Path, binary: Path, label: str) -> dict[str, object]:
+                self.args = (path, binary, label)
+                raise RuntimeError(self.message)
+
+        for message in ("source assembly patch artifact identity is stale", "source archive identity is stale"):
+            with self.subTest(message=message):
+                fake = FakeRunner(message)
+                with mock.patch.object(policy, "_runner_module", return_value=fake):
+                    with self.assertRaises(policy.ProjectionPolicyError) as raised:
+                        policy.validate_endpoint_manifest(Path("before.json"), Path("before"), "before")
+                self.assertIn("complete W8 validator", str(raised.exception))
+
+    def test_source_assembly_patch_file_tamper_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def write(name: str, payload: bytes) -> dict[str, object]:
+                path = root / name
+                path.write_bytes(payload)
+                return policy.artifact(path)
+
+            source = write("source.tar", b"source archive")
+            lock = write("Cargo.lock", b"lock")
+            probe = write("probe.rs", b"probe")
+            fixture = write("fixture.json", b"fixture")
+            workspace = write("Cargo.toml", b"workspace")
+            package = write("litchi-ops.Cargo.toml", b"package")
+            toolchain = write("rust-toolchain.toml", b"toolchain")
+            projection = write("projection.json", b"projection")
+            patch_path = root / "adapter.patch"
+            patch = write("adapter.patch", b"adapter")
+            assembly = {
+                "schema": "litchi_w8_source_assembly.v1",
+                "source_commit": policy.BASELINE_COMMIT,
+                "resolved_commit": policy.BASELINE_COMMIT,
+                "source_archive": source,
+                "overlay": {
+                    "kind": "compatibility",
+                    "description": "test adapter",
+                    "base_commit": policy.BASELINE_COMMIT,
+                    "patch": patch,
+                },
+            }
+            assembly_path = root / "source-assembly.json"
+            assembly_path.write_bytes(policy.canonical(assembly))
+            assembly_artifact = policy.artifact(assembly_path)
+            manifest_path = root / "endpoint.json"
+            manifest_path.write_bytes(policy.canonical({"schema": "litchi_file_endpoint.v1"}))
+            endpoint = {
+                "schema": "litchi_file_endpoint.v1",
+                "source_commit": policy.BASELINE_COMMIT,
+                "dependency_projection_sha256": projection["sha256"],
+                "source": source,
+                "lock": lock,
+                "probe": probe,
+                "fixture": fixture,
+                "dependency_projection": projection,
+                "workspace_manifest": workspace,
+                "package_manifest": package,
+                "toolchain": toolchain,
+                "source_assembly": assembly_artifact,
+            }
+            fields = policy._ValidatedEndpoint({
+                "manifest": policy.artifact(manifest_path),
+                "source_commit": policy.BASELINE_COMMIT,
+                "dependency_projection_sha256": projection["sha256"],
+                "source": source,
+                "lock": lock,
+                "probe": probe,
+                "fixture": fixture,
+                "workspace_manifest": workspace,
+                "package_manifest": package,
+                "toolchain": toolchain,
+                "routes": ["docx/open_get"],
+            })
+            fixed = copy.deepcopy(policy.FIXED_INPUTS)
+            fixed["before"].update({
+                "source": source,
+                "lock": lock,
+                "workspace_manifest": workspace,
+                "package_manifest": package,
+                "toolchain": toolchain,
+                "projection": projection,
+                "source_assembly": {
+                    "overlay_kind": "compatibility",
+                    "overlay_base_commit": policy.BASELINE_COMMIT,
+                    "patch_bytes": patch["bytes"],
+                    "patch_sha256": patch["sha256"],
+                },
+            })
+            with mock.patch.object(policy, "FIXED_INPUTS", fixed), \
+                mock.patch.object(policy, "PROBE_BYTES", probe["bytes"]), \
+                mock.patch.object(policy, "PROBE_SHA256", probe["sha256"]), \
+                mock.patch.object(policy, "FIXTURE_BYTES", fixture["bytes"]), \
+                mock.patch.object(policy, "FIXTURE_SHA256", fixture["sha256"]):
+                policy._check_fields_fixed(endpoint, fields, "before")
+                patch_path.write_bytes(b"tampered adapter")
+                with self.assertRaises(policy.ProjectionPolicyError):
+                    policy._check_fields_fixed(endpoint, fields, "before")
 
 
 if __name__ == "__main__":

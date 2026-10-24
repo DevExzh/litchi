@@ -682,20 +682,25 @@ def main() -> int:
     if out.exists() and any(out.iterdir()):
         parser.error(f"refusing to overwrite nonempty output directory {out}")
     out.mkdir(parents=True, exist_ok=True)
-    before_endpoint = endpoint_manifest(args.before_manifest.resolve(), before, "before")
-    after_endpoint = endpoint_manifest(args.after_manifest.resolve(), after, "after")
-    if args.original_to_final_policy is None:
-        # The ordinary protocol remains strict shared identity.  The explicit
-        # original-to-final policy is opt-in and cannot loosen this path.
-        shared = shared_identity(before_endpoint, after_endpoint)
-    else:
+    pair_policy = None
+    if args.original_to_final_policy is not None:
         repo_root = Path(__file__).resolve().parents[4]
         if str(repo_root) not in sys.path:
             sys.path.insert(0, str(repo_root))
         from tools import w8_projection_policy
 
+        pair_policy = w8_projection_policy
+    if pair_policy is None:
+        before_endpoint = endpoint_manifest(args.before_manifest.resolve(), before, "before")
+        after_endpoint = endpoint_manifest(args.after_manifest.resolve(), after, "after")
+        # The ordinary protocol remains strict shared identity.  The explicit
+        # original-to-final policy is opt-in and cannot loosen this path.
+        shared = shared_identity(before_endpoint, after_endpoint)
+    else:
+        before_endpoint = pair_policy.validate_endpoint_manifest(args.before_manifest.resolve(), before, "before")
+        after_endpoint = pair_policy.validate_endpoint_manifest(args.after_manifest.resolve(), after, "after")
         receipt_path = args.original_to_final_receipt.resolve()
-        pair = w8_projection_policy.verify_pair_receipt(
+        pair = pair_policy.verify_pair_receipt(
             args.original_to_final_policy.resolve(), receipt_path, before_endpoint, after_endpoint,
         )
         shared = {

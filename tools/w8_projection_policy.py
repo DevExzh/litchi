@@ -11,15 +11,16 @@ module; callers cannot supply a replacement policy or a set of convenient
 hashes.
 
 The module does not build or execute a probe.  Endpoint manifests have
-already passed the ordinary artifact and 109-route checks before the runner
-calls the in-memory verifier.  The standalone ``pair`` command performs the
-same artifact checks while producing the pair receipt before a timing run.
+already passed the complete existing endpoint validator before the runner
+calls the in-memory verifier.  The standalone ``pair`` command invokes that
+same validator for both endpoints before producing a pair receipt.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -202,6 +203,53 @@ class ProjectionPolicyError(RuntimeError):
     """A reviewed policy or endpoint failed closed."""
 
 
+_VALIDATION_TOKEN = object()
+
+
+class _ValidatedEndpoint(dict[str, Any]):
+    """Opaque fields returned only by the full W8 endpoint validator."""
+
+    __slots__ = ("_token",)
+
+    def __init__(self, fields: dict[str, Any]) -> None:
+        super().__init__(fields)
+        self._token = _VALIDATION_TOKEN
+
+
+def _runner_module() -> Any:
+    path = ROOT / "docs/unified-ops/results/0362h/run.py"
+    spec = importlib.util.spec_from_file_location("litchi_w8_qualification_runner", path)
+    if spec is None or spec.loader is None:
+        raise fail(f"cannot load the existing W8 endpoint validator: {path}")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as error:
+        raise fail(f"cannot load the existing W8 endpoint validator: {error}") from error
+    return module
+
+
+def validate_endpoint_manifest(path: Path, binary: Path, label: str) -> _ValidatedEndpoint:
+    """Run the complete runner endpoint validator and retain its opaque result."""
+    try:
+        fields = _runner_module().endpoint_manifest(path.resolve(), binary.resolve(), label)
+    except Exception as error:
+        if isinstance(error, ProjectionPolicyError):
+            raise
+        raise fail(f"{label} endpoint failed the complete W8 validator: {error}") from error
+    if not isinstance(fields, dict) or not fields.get("manifest") or not fields.get("routes"):
+        raise fail(f"{label} endpoint validator returned incomplete fields")
+    return _ValidatedEndpoint(fields)
+
+
+def _validated_manifest(path: Path, label: str) -> _ValidatedEndpoint:
+    value = _load_json(path.resolve(), f"{label} endpoint")
+    binary = value.get("binary")
+    if not isinstance(binary, dict) or not isinstance(binary.get("path"), str):
+        raise fail(f"{label} endpoint has no binary path for complete validation")
+    return validate_endpoint_manifest(path, Path(binary["path"]), label)
+
+
 def fail(message: str) -> ProjectionPolicyError:
     return ProjectionPolicyError(message)
 
@@ -226,12 +274,6 @@ def artifact(path: Path) -> dict[str, Any]:
     if not path.is_file() or path.is_symlink():
         raise fail(f"artifact is not a regular file: {path}")
     return {"path": str(path), "bytes": path.stat().st_size, "sha256": digest(path)}
-
-
-def checked_commit(value: object, label: str) -> str:
-    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{40}", value):
-        raise fail(f"{label} is not a full source commit")
-    return value
 
 
 def _fixed_path(relative: str, label: str) -> Path:
@@ -422,80 +464,6 @@ def _load_json(path: Path, label: str) -> dict[str, Any]:
     return value
 
 
-def _actual_artifact(row: object, label: str) -> dict[str, Any]:
-    if not isinstance(row, dict) or not isinstance(row.get("path"), str):
-        raise fail(f"{label} artifact is missing")
-    actual = artifact(Path(row["path"]))
-    if actual["bytes"] != row.get("bytes") or actual["sha256"] != row.get("sha256"):
-        raise fail(f"{label} artifact identity is stale")
-    return actual
-
-
-def _endpoint(path: Path, label: str) -> dict[str, Any]:
-    value = _load_json(path.resolve(), f"{label} endpoint")
-    if value.get("schema") != "litchi_file_endpoint.v1":
-        raise fail(f"{label} endpoint schema is invalid")
-    commit = checked_commit(value.get("source_commit"), f"{label}.source_commit")
-    rows: dict[str, dict[str, Any]] = {}
-    for name in (
-        "source", "lock", "probe", "fixture", "dependency_projection",
-        "workspace_manifest", "package_manifest", "toolchain", "source_assembly",
-    ):
-        rows[name] = _actual_artifact(value.get(name), f"{label}.{name}")
-    projection = _load_json(Path(rows["dependency_projection"]["path"]), f"{label}.projection")
-    if rows["dependency_projection"]["sha256"] != value.get("dependency_projection_sha256"):
-        raise fail(f"{label} projection hash is not bound to the endpoint")
-    fixture = _load_json(Path(rows["fixture"]["path"]), f"{label}.fixture")
-    routes = provenance.fixture_routes(fixture, f"{label}.fixture")
-    assembly = _load_json(Path(rows["source_assembly"]["path"]), f"{label}.source_assembly")
-    return {
-        "path": path.resolve(),
-        "value": value,
-        "commit": commit,
-        "rows": rows,
-        "projection": projection,
-        "fixture": fixture,
-        "routes": routes,
-        "assembly": assembly,
-    }
-
-
-def _check_endpoint_fixed(endpoint: dict[str, Any], side: str) -> None:
-    expected = FIXED_INPUTS[side]
-    expected_commit = expected["source_commit"]
-    if endpoint["commit"] != expected_commit:
-        raise fail(f"{side} source commit is not the reviewed full commit")
-    for name in ("workspace_manifest", "package_manifest", "toolchain", "lock", "projection"):
-        fixed = expected[name]
-        actual = endpoint["rows"][name]
-        if (actual["bytes"], actual["sha256"]) != (fixed["bytes"], fixed["sha256"]):
-            raise fail(f"{side} {name} does not match the reviewed fixed pre/post image")
-    for name, bytes_, sha in (("source", expected["source"]["bytes"], expected["source"]["sha256"]), ("probe", PROBE_BYTES, PROBE_SHA256), ("fixture", FIXTURE_BYTES, FIXTURE_SHA256)):
-        actual = endpoint["rows"][name]
-        if (actual["bytes"], actual["sha256"]) != (bytes_, sha):
-            raise fail(f"{side} {name} is not the reviewed artifact")
-    assembly = endpoint["assembly"]
-    fixed_assembly = expected["source_assembly"]
-    if (
-        assembly.get("schema") != "litchi_w8_source_assembly.v1"
-        or assembly.get("source_commit") != expected_commit
-        or assembly.get("resolved_commit") != expected_commit
-    ):
-        raise fail(f"{side} source assembly is not bound to the reviewed commit")
-    source_archive = assembly.get("source_archive")
-    if not isinstance(source_archive, dict) or (source_archive.get("bytes"), source_archive.get("sha256")) != (endpoint["rows"]["source"]["bytes"], endpoint["rows"]["source"]["sha256"]):
-        raise fail(f"{side} source assembly archive differs from the endpoint source")
-    overlay = assembly.get("overlay")
-    if not isinstance(overlay, dict) or overlay.get("kind") != fixed_assembly["overlay_kind"]:
-        raise fail(f"{side} source assembly overlay kind is not reviewed")
-    if fixed_assembly["overlay_kind"] == "compatibility":
-        if overlay.get("base_commit") != fixed_assembly["overlay_base_commit"]:
-            raise fail(f"{side} source assembly overlay base is not f2")
-        patch = overlay.get("patch")
-        if not isinstance(patch, dict) or patch.get("bytes") != fixed_assembly["patch_bytes"] or patch.get("sha256") != fixed_assembly["patch_sha256"]:
-            raise fail(f"{side} source assembly adapter patch is not the reviewed consumer-only patch")
-
-
 def _check_fields_fixed(endpoint: dict[str, Any], fields: dict[str, Any], side: str) -> None:
     """Check a runner-validated endpoint without hashing its source archive again."""
     expected = FIXED_INPUTS[side]
@@ -522,12 +490,22 @@ def _check_fields_fixed(endpoint: dict[str, Any], fields: dict[str, Any], side: 
         if name == "dependency_projection":
             if (row.get("bytes"), row.get("sha256")) != (expected["projection"]["bytes"], expected["projection"]["sha256"]):
                 raise fail(f"{side} endpoint {name} differs from the reviewed fixed image")
+            actual = artifact(Path(row["path"]))
+            if (actual["bytes"], actual["sha256"]) != (row.get("bytes"), row.get("sha256")):
+                raise fail(f"{side} dependency projection artifact identity is stale")
             return row
         if name == "source_assembly":
+            actual = artifact(Path(row["path"]))
+            if (actual["bytes"], actual["sha256"]) != (row.get("bytes"), row.get("sha256")):
+                raise fail(f"{side} source assembly artifact identity is stale")
             return row
         field = fields.get(name, {})
         if not isinstance(field, dict) or (row.get("bytes"), row.get("sha256")) != (field.get("bytes"), field.get("sha256")):
             raise fail(f"{side} endpoint {name} identity differs from the runner fields")
+        if name != "source":
+            actual = artifact(Path(row["path"]))
+            if (actual["bytes"], actual["sha256"]) != (row.get("bytes"), row.get("sha256")):
+                raise fail(f"{side} {name} artifact identity is stale")
         return row
 
     for name in ("source", "lock", "probe", "fixture", "workspace_manifest", "package_manifest", "toolchain"):
@@ -556,48 +534,62 @@ def _check_fields_fixed(endpoint: dict[str, Any], fields: dict[str, Any], side: 
         patch = overlay.get("patch")
         if not isinstance(patch, dict) or patch.get("bytes") != fixed_assembly["patch_bytes"] or patch.get("sha256") != fixed_assembly["patch_sha256"]:
             raise fail(f"{side} source assembly adapter patch is not the reviewed consumer-only patch")
+        try:
+            actual_patch = artifact(Path(patch["path"]))
+        except (KeyError, ProjectionPolicyError) as error:
+            raise fail(f"{side} source assembly adapter patch artifact is unavailable") from error
+        if actual_patch["bytes"] != patch["bytes"] or actual_patch["sha256"] != patch["sha256"]:
+            raise fail(f"{side} source assembly adapter patch artifact identity is stale")
 
 
-def verify_pair(policy_path: Path, before_path: Path, after_path: Path) -> dict[str, Any]:
-    """Verify real endpoint artifacts and return the canonical pair receipt."""
-    policy = load_reviewed_policy(policy_path)
-    before = _endpoint(before_path, "before")
-    after = _endpoint(after_path, "after")
-    _check_endpoint_fixed(before, "before")
-    _check_endpoint_fixed(after, "after")
-    if before["routes"] != after["routes"] or len(before["routes"]) != 109:
+def _require_validated(fields: object, side: str) -> _ValidatedEndpoint:
+    if not isinstance(fields, _ValidatedEndpoint) or fields._token is not _VALIDATION_TOKEN:
+        raise fail(f"{side} endpoint was not returned by the complete W8 endpoint validator")
+    return fields
+
+
+def _receipt_from_validated(policy: dict[str, Any], before: object, after: object) -> dict[str, Any]:
+    before_fields = _require_validated(before, "before")
+    after_fields = _require_validated(after, "after")
+    before_value = _load_json(Path(before_fields["manifest"]["path"]), "before endpoint")
+    after_value = _load_json(Path(after_fields["manifest"]["path"]), "after endpoint")
+    _check_fields_fixed(before_value, before_fields, "before")
+    _check_fields_fixed(after_value, after_fields, "after")
+    before_projection = _load_json(Path(before_value["dependency_projection"]["path"]), "before projection")
+    after_projection = _load_json(Path(after_value["dependency_projection"]["path"]), "after projection")
+    projection_delta = validate_projection_pair(before_projection, after_projection)
+    before_fixture = _load_json(Path(before_value["fixture"]["path"]), "before fixture")
+    after_fixture = _load_json(Path(after_value["fixture"]["path"]), "after fixture")
+    before_routes = provenance.fixture_routes(before_fixture, "before fixture")
+    after_routes = provenance.fixture_routes(after_fixture, "after fixture")
+    if before_routes != after_routes or before_routes != before_fields["routes"] or after_routes != after_fields["routes"] or len(before_routes) != 109:
         raise fail("before/after route order is not the exact reviewed 109-route order")
-    projection_delta = validate_projection_pair(before["projection"], after["projection"])
-    receipt = {
+
+    def endpoint_part(fields: _ValidatedEndpoint) -> dict[str, Any]:
+        return {
+            "manifest": dict(fields["manifest"]),
+            "source_commit": fields["source_commit"],
+            "source_sha256": fields["source"]["sha256"],
+            "workspace_manifest_sha256": fields["workspace_manifest"]["sha256"],
+            "package_manifest_sha256": fields["package_manifest"]["sha256"],
+            "lock_sha256": fields["lock"]["sha256"],
+            "projection_sha256": fields["dependency_projection_sha256"],
+        }
+
+    return {
         "schema": PAIR_SCHEMA,
         "policy": {
             "schema": policy["schema"],
             "version": policy["policy_version"],
             "sha256": REVIEWED_POLICY_SHA256,
         },
-        "before": {
-            "manifest": artifact(before_path),
-            "source_commit": before["commit"],
-            "source_sha256": before["rows"]["source"]["sha256"],
-            "workspace_manifest_sha256": before["rows"]["workspace_manifest"]["sha256"],
-            "package_manifest_sha256": before["rows"]["package_manifest"]["sha256"],
-            "lock_sha256": before["rows"]["lock"]["sha256"],
-            "projection_sha256": before["rows"]["dependency_projection"]["sha256"],
-        },
-        "after": {
-            "manifest": artifact(after_path),
-            "source_commit": after["commit"],
-            "source_sha256": after["rows"]["source"]["sha256"],
-            "workspace_manifest_sha256": after["rows"]["workspace_manifest"]["sha256"],
-            "package_manifest_sha256": after["rows"]["package_manifest"]["sha256"],
-            "lock_sha256": after["rows"]["lock"]["sha256"],
-            "projection_sha256": after["rows"]["dependency_projection"]["sha256"],
-        },
+        "before": endpoint_part(before_fields),
+        "after": endpoint_part(after_fields),
         "workload": {
             "probe_sha256": PROBE_SHA256,
             "fixture_sha256": FIXTURE_SHA256,
             "route_count": 109,
-            "routes": before["routes"],
+            "routes": before_routes,
         },
         "build": {
             "target": TARGET,
@@ -608,7 +600,14 @@ def verify_pair(policy_path: Path, before_path: Path, after_path: Path) -> dict[
         "projection": projection_delta,
         "status": "verified_protocol_only",
     }
-    return receipt
+
+
+def verify_pair(policy_path: Path, before_path: Path, after_path: Path) -> dict[str, Any]:
+    """Run the complete endpoint validator and return the canonical pair receipt."""
+    policy = load_reviewed_policy(policy_path)
+    before = _validated_manifest(before_path, "before")
+    after = _validated_manifest(after_path, "after")
+    return _receipt_from_validated(policy, before, after)
 
 
 def write_pair_receipt(policy_path: Path, before_path: Path, after_path: Path, output: Path) -> dict[str, Any]:
@@ -621,7 +620,7 @@ def write_pair_receipt(policy_path: Path, before_path: Path, after_path: Path, o
     return {"path": str(output), "bytes": output.stat().st_size, "sha256": digest(output)}
 
 
-def verify_pair_receipt(policy_path: Path, receipt_path: Path, before_fields: dict[str, Any], after_fields: dict[str, Any]) -> dict[str, Any]:
+def verify_pair_receipt(policy_path: Path, receipt_path: Path, before_fields: object, after_fields: object) -> dict[str, Any]:
     """Verify a precomputed pair receipt against already-validated endpoints.
 
     The runner has just hashed the large source archives while checking each
@@ -630,32 +629,9 @@ def verify_pair_receipt(policy_path: Path, receipt_path: Path, before_fields: di
     """
     policy = load_reviewed_policy(policy_path)
     receipt = _load_json(receipt_path.resolve(), "original-to-final pair receipt")
-    if receipt.get("schema") != PAIR_SCHEMA or receipt.get("policy") != {
-        "schema": POLICY_SCHEMA,
-        "version": POLICY_VERSION,
-        "sha256": REVIEWED_POLICY_SHA256,
-    }:
-        raise fail("pair receipt is not bound to the reviewed policy version")
-    for side, fields in (("before", before_fields), ("after", after_fields)):
-        endpoint = _load_json(Path(fields["manifest"]["path"]), f"{side} endpoint")
-        _check_fields_fixed(endpoint, fields, side)
-        manifest = receipt[side].get("manifest") if isinstance(receipt.get(side), dict) else None
-        if not isinstance(manifest, dict) or manifest.get("sha256") != fields["manifest"]["sha256"] or manifest.get("bytes") != fields["manifest"]["bytes"]:
-            raise fail(f"{side} pair receipt is not bound to the endpoint manifest")
-    # Re-read only the small projection JSONs and fixed endpoint manifests.
-    before_value = _load_json(Path(before_fields["manifest"]["path"]), "before endpoint")
-    after_value = _load_json(Path(after_fields["manifest"]["path"]), "after endpoint")
-    before_projection = _load_json(Path(before_value["dependency_projection"]["path"]), "before projection")
-    after_projection = _load_json(Path(after_value["dependency_projection"]["path"]), "after projection")
-    delta = validate_projection_pair(before_projection, after_projection)
-    before_routes = provenance.fixture_routes(_load_json(Path(before_value["fixture"]["path"]), "before fixture"))
-    after_routes = provenance.fixture_routes(_load_json(Path(after_value["fixture"]["path"]), "after fixture"))
-    if before_routes != after_routes or before_fields.get("routes") != before_routes or after_fields.get("routes") != after_routes:
-        raise fail("before/after route order is not the exact reviewed 109-route order")
-    if receipt.get("projection") != delta or receipt.get("workload", {}).get("route_count") != 109:
-        raise fail("pair receipt projection proof is stale")
-    if receipt.get("workload", {}).get("routes") != before_routes:
-        raise fail("pair receipt route order is stale")
+    expected = _receipt_from_validated(policy, before_fields, after_fields)
+    if receipt != expected:
+        raise fail("pair receipt metadata is stale or does not bind every endpoint/build/workload field")
     return receipt
 
 

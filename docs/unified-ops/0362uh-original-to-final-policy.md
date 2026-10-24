@@ -33,12 +33,15 @@ assembly is the f2 archive plus the consumer-only compatibility adapter; the
 after assembly has no overlay.  No caller-supplied hashes, allowlists, source
 overrides or candidate-manifest overlay can replace these pins.
 
-`tools/w8_projection_policy.py pair` creates a canonical pair receipt after
-checking both complete endpoint manifests.  The ABBA runner consumes that
-receipt after its normal endpoint validation and rechecks the small fixed
-projections and source-assembly metadata without hashing either multi-gigabyte
-source archive a second time.  Route order and all endpoint artifact
-identities remain bound to the receipt.
+`tools/w8_projection_policy.py pair` invokes the existing complete endpoint
+validator for both manifests before creating a canonical pair receipt.  The
+receipt binds both source commits and archive identities, every manifest/lock/
+projection/probe/fixture identity, the complete build selection, and the exact
+route order.  The ABBA runner uses the same complete validator in pair mode,
+then rechecks the small fixed projections and source-assembly metadata without
+hashing either multi-gigabyte source archive a second time.  Adapter patches,
+source-assembly records, binaries, build receipts and untimed validation
+receipts therefore cannot be replaced by receipt-only metadata.
 
 This is a protocol/provenance record only.  It performs no Cargo build, native
 qualification, or timing run.  The f6fe pins are diagnostic until the final
