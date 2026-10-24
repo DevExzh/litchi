@@ -20,7 +20,7 @@ use crate::error::{Error, Result};
 use litchi_core::unit::EMUS_PER_INCH;
 use litchi_core::xml::escape_xml;
 use litchi_drawingml::diagram::{
-    DGM_NAMESPACE, DiagramNode, SmartArt as DiagramSmartArt, generate_smartart_colors_xml,
+    DGM_NAMESPACE, DiagramNode, Limits, SmartArt as DiagramSmartArt, generate_smartart_colors_xml,
     generate_smartart_data_xml, generate_smartart_layout_xml, generate_smartart_quickstyle_xml,
 };
 use std::fmt::Write as FmtWrite;
@@ -98,7 +98,7 @@ pub struct SmartArt {
     /// Anchor height in EMUs.
     pub(crate) height_emu: i64,
     /// Per-document key used to bind the four relationship IDs at save time;
-    /// assigned by `MutableDocument::add_smart_art`.
+    /// assigned by `Document::add_smart_art`.
     pub(crate) anchor_key: String,
 }
 
@@ -170,13 +170,14 @@ impl SmartArt {
 
     /// Generate the four diagram part bodies (data, layout, quick style,
     /// colors) for this diagram.
-    pub(crate) fn generate_parts(&self) -> SmartArtPartXml {
-        SmartArtPartXml {
-            data_xml: generate_smartart_data_xml(&self.smartart),
-            layout_xml: generate_smartart_layout_xml(&self.smartart),
-            quick_style_xml: generate_smartart_quickstyle_xml(),
-            colors_xml: generate_smartart_colors_xml(),
-        }
+    pub(crate) fn generate_parts(&self) -> Result<SmartArtPartXml> {
+        let limits = Limits::default();
+        Ok(SmartArtPartXml {
+            data_xml: generate_smartart_data_xml(&self.smartart, &limits)?,
+            layout_xml: generate_smartart_layout_xml(&self.smartart, &limits)?,
+            quick_style_xml: generate_smartart_quickstyle_xml(&limits)?,
+            colors_xml: generate_smartart_colors_xml(&limits)?,
+        })
     }
 
     /// Serialize the `<w:drawing>` anchor with the `dgm:relIds` reference.

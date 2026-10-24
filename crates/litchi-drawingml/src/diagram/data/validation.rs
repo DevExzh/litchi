@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt;
 
 use super::{
-    Conformance, Connection, ConnectionType, DiagramDataModel, Id, MAX_CONNECTIONS,
+    Conformance, Connection, ConnectionType, DiagramDataModel, Id, Limits, MAX_CONNECTIONS,
     MAX_DATA_MODEL_XML, MAX_POINTS, MAX_TEXT_BYTES, Point, PointType,
 };
 
@@ -16,24 +16,27 @@ impl DiagramDataModel {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn validate(&self) -> Result<()> {
-        self.serialized_xml_len(Conformance::Transitional)
+    pub fn validate(&self, limits: &Limits) -> Result<()> {
+        limits.validate()?;
+        self.serialized_xml_len(Conformance::Transitional, limits)
             .map(|_| ())
     }
 
-    fn validated_xml_capacity(&self) -> Result<usize> {
-        if self.points.len() > MAX_POINTS {
+    fn validated_xml_capacity(&self, limits: &Limits) -> Result<usize> {
+        let max_points = limits.points_value().min(MAX_POINTS);
+        if self.points.len() > max_points {
             return Err(limit(
                 LimitKind::DiagramPoints,
                 self.points.len(),
-                MAX_POINTS,
+                max_points,
             ));
         }
-        if self.connections.len() > MAX_CONNECTIONS {
+        let max_connections = limits.connections_value().min(MAX_CONNECTIONS);
+        if self.connections.len() > max_connections {
             return Err(limit(
                 LimitKind::DiagramConnections,
                 self.connections.len(),
-                MAX_CONNECTIONS,
+                max_connections,
             ));
         }
         let mut xml_capacity = 256usize;
@@ -54,11 +57,12 @@ impl DiagramDataModel {
                 }
                 document_seen = true;
             }
-            if point.text.len() > MAX_TEXT_BYTES {
+            let max_text_bytes = limits.data_text_bytes_value().min(MAX_TEXT_BYTES);
+            if point.text.len() > max_text_bytes {
                 return Err(limit(
                     LimitKind::DiagramDataModelTextBytes,
                     point.text.len(),
-                    MAX_TEXT_BYTES,
+                    max_text_bytes,
                 ));
             }
             let has_modeled_children = !point.text.is_empty()
@@ -149,16 +153,17 @@ impl DiagramDataModel {
         }
         Ok(xml_capacity.min(MAX_DATA_MODEL_XML))
     }
-    pub(super) fn serialized_xml_len(&self, conformance: Conformance) -> Result<usize> {
-        self.validated_xml_capacity()?;
+    pub(super) fn serialized_xml_len(
+        &self,
+        conformance: Conformance,
+        limits: &Limits,
+    ) -> Result<usize> {
+        self.validated_xml_capacity(limits)?;
         let mut count = XmlByteCount::default();
         self.write_validated_xml(&mut count, conformance)?;
-        if count.0 > MAX_DATA_MODEL_XML {
-            return Err(limit(
-                LimitKind::DiagramDataModelBytes,
-                count.0,
-                MAX_DATA_MODEL_XML,
-            ));
+        let max_output = limits.output_bytes_value().min(MAX_DATA_MODEL_XML);
+        if count.0 > max_output {
+            return Err(limit(LimitKind::DiagramDataModelBytes, count.0, max_output));
         }
         Ok(count.0)
     }

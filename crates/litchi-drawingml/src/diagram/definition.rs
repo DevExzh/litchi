@@ -6,7 +6,7 @@
 //! header as inert metadata; the layout algorithm and style bodies are not
 //! interpreted.
 
-use crate::diagram::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT};
+use crate::diagram::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT, Limits};
 use crate::{Error, LimitKind, Result};
 use litchi_ooxml_common::mce::process_str;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -46,8 +46,8 @@ impl DiagramDefinition {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn parse_layout(xml: &str) -> Result<Self> {
-        Self::parse(xml, "layoutDef")
+    pub fn parse_layout(xml: &str, limits: &Limits) -> Result<Self> {
+        Self::parse(xml, "layoutDef", limits)
     }
 
     /// Parse a diagram quick-style part (`dgm:styleDef`).
@@ -55,8 +55,8 @@ impl DiagramDefinition {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn parse_quick_style(xml: &str) -> Result<Self> {
-        Self::parse(xml, "styleDef")
+    pub fn parse_quick_style(xml: &str, limits: &Limits) -> Result<Self> {
+        Self::parse(xml, "styleDef", limits)
     }
 
     /// Parse a diagram colors part (`dgm:colorsDef`).
@@ -64,21 +64,19 @@ impl DiagramDefinition {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn parse_colors(xml: &str) -> Result<Self> {
-        Self::parse(xml, "colorsDef")
+    pub fn parse_colors(xml: &str, limits: &Limits) -> Result<Self> {
+        Self::parse(xml, "colorsDef", limits)
     }
 
-    fn parse(xml: &str, root_name: &str) -> Result<Self> {
-        if xml.len() > MAX_DEFINITION_XML {
-            return Err(limit(LimitKind::XmlBytes, xml.len(), MAX_DEFINITION_XML));
+    fn parse(xml: &str, root_name: &str, limits: &Limits) -> Result<Self> {
+        limits.validate()?;
+        let max_input = limits.input_bytes_value().min(MAX_DEFINITION_XML);
+        if xml.len() > max_input {
+            return Err(limit(LimitKind::XmlBytes, xml.len(), max_input));
         }
         let processed = process_str(xml)?;
-        if processed.len() > MAX_DEFINITION_XML {
-            return Err(limit(
-                LimitKind::XmlBytes,
-                processed.len(),
-                MAX_DEFINITION_XML,
-            ));
+        if processed.len() > max_input {
+            return Err(limit(LimitKind::XmlBytes, processed.len(), max_input));
         }
         let mut reader = NsReader::from_reader(processed.as_bytes());
         reader.config_mut().trim_text(true);
@@ -88,6 +86,9 @@ impl DiagramDefinition {
             root_name,
             root_seen: false,
             nodes: 0,
+            max_nodes: limits.xml_nodes_value().min(MAX_NODES),
+            max_depth: limits.xml_depth_value().min(MAX_DEPTH),
+            max_categories: limits.nodes_value(),
         };
         let mut buffer = Vec::new();
         let mut depth = 0usize;
@@ -135,6 +136,9 @@ struct DefinitionScan<'a> {
     root_name: &'a str,
     root_seen: bool,
     nodes: usize,
+    max_nodes: usize,
+    max_depth: usize,
+    max_categories: usize,
 }
 
 impl DefinitionScan<'_> {
@@ -148,11 +152,11 @@ impl DefinitionScan<'_> {
             .nodes
             .checked_add(1)
             .ok_or_else(|| invalid("definition XML node count overflows"))?;
-        if depth > MAX_DEPTH {
-            return Err(limit(LimitKind::XmlDepth, depth, MAX_DEPTH));
+        if depth > self.max_depth {
+            return Err(limit(LimitKind::XmlDepth, depth, self.max_depth));
         }
-        if self.nodes > MAX_NODES {
-            return Err(limit(LimitKind::XmlNodes, self.nodes, MAX_NODES));
+        if self.nodes > self.max_nodes {
+            return Err(limit(LimitKind::XmlNodes, self.nodes, self.max_nodes));
         }
         let namespace = element_namespace(reader, element)?;
         let local = local_name(element)?;
@@ -184,6 +188,13 @@ impl DefinitionScan<'_> {
             },
             "cat" => {
                 if let Some(category_type) = attribute(element, "type")? {
+                    if self.definition.categories.len() >= self.max_categories {
+                        return Err(limit(
+                            LimitKind::DiagramNodes,
+                            self.definition.categories.len() + 1,
+                            self.max_categories,
+                        ));
+                    }
                     let priority = attribute(element, "pri")?.and_then(|value| value.parse().ok());
                     self.definition.categories.push(DiagramCategory {
                         category_type,
@@ -251,6 +262,18 @@ fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
 mod tests {
     use super::*;
 
+    fn parse_layout(xml: &str) -> Result<DiagramDefinition> {
+        DiagramDefinition::parse_layout(xml, &Limits::default())
+    }
+
+    fn parse_quick_style(xml: &str) -> Result<DiagramDefinition> {
+        DiagramDefinition::parse_quick_style(xml, &Limits::default())
+    }
+
+    fn parse_colors(xml: &str) -> Result<DiagramDefinition> {
+        DiagramDefinition::parse_colors(xml, &Limits::default())
+    }
+
     #[test]
     fn parses_layout_definition() {
         let xml = concat!(
@@ -262,7 +285,7 @@ mod tests {
             "<dgm:layoutNode name=\"diagram\"/>",
             "</dgm:layoutDef>"
         );
-        let definition = DiagramDefinition::parse_layout(xml).unwrap();
+        let definition = parse_layout(xml).unwrap();
         assert_eq!(
             definition.unique_id.as_deref(),
             Some("urn:microsoft.com/office/officeart/2005/8/layout/cycle2")
@@ -292,7 +315,7 @@ mod tests {
             "<dgm:catLst><dgm:cat type=\"simple\" pri=\"10100\"/></dgm:catLst>",
             "</dgm:styleDef>"
         );
-        let definition = DiagramDefinition::parse_quick_style(style).unwrap();
+        let definition = parse_quick_style(style).unwrap();
         assert_eq!(
             definition.unique_id.as_deref(),
             Some("urn:test/quickstyle/simple1")
@@ -305,7 +328,7 @@ mod tests {
             "<dgm:catLst><dgm:cat type=\"accent1\" pri=\"11200\"/></dgm:catLst>",
             "</dgm:colorsDef>"
         );
-        let definition = DiagramDefinition::parse_colors(colors).unwrap();
+        let definition = parse_colors(colors).unwrap();
         assert_eq!(
             definition.unique_id.as_deref(),
             Some("urn:test/colors/accent1_2")
@@ -316,7 +339,7 @@ mod tests {
     #[test]
     fn rejects_mismatched_root() {
         let xml = "<dgm:colorsDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>";
-        assert!(DiagramDefinition::parse_layout(xml).is_err());
-        assert!(DiagramDefinition::parse_colors(xml).is_ok());
+        assert!(parse_layout(xml).is_err());
+        assert!(parse_colors(xml).is_ok());
     }
 }

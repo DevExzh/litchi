@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use litchi_drawingml::diagram::Limits as DiagramLimits;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 use sha2::{Digest, Sha256};
@@ -5794,7 +5795,8 @@ fn smartart_add_replace_and_remove_keep_the_part_graph_consistent() -> Result<()
     // The parts read back, and the data names the slide's drawing relationship.
     let mut edit = added.opened_presentation()?.edit();
     let parts = edit.smartart(0_usize, "Diagram 1")?;
-    let outline = Outline::read(&parts.data).map_err(|error| Error::Invalid(error.to_string()))?;
+    let outline = Outline::read(&parts.data, &DiagramLimits::default())
+        .map_err(|error| Error::Invalid(error.to_string()))?;
     assert_eq!(outline.entries.len(), 4);
     assert!(parts.drawing.is_some());
     assert!(!edit.set_smartart(0_usize, "Diagram 1", parts.clone())?);
@@ -5811,7 +5813,7 @@ fn smartart_add_replace_and_remove_keep_the_part_graph_consistent() -> Result<()
         .smartart(0_usize, "Diagram 1")?;
     assert!(read.drawing.is_none());
     assert_eq!(
-        Outline::read(&read.data)
+        Outline::read(&read.data, &DiagramLimits::default())
             .map_err(|error| Error::Invalid(error.to_string()))?
             .drawing_relationship,
         None

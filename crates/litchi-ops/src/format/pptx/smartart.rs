@@ -35,6 +35,7 @@ use std::sync::Arc;
 
 use litchi_core::Position;
 use litchi_core::selector::{Path, Predicate, Step};
+use litchi_drawingml::diagram::Limits;
 use litchi_drawingml::diagram::authoring::{
     Layout, Node as SpecNode, Spec, colors_xml, quick_style_xml,
 };
@@ -92,7 +93,7 @@ pub(super) fn outline(file: &Pptx, tree: &TreeItem) -> Result<Option<Arc<Outline
     let Some(xml) = file.slide_diagram_xml(slide as usize, &relationship_id)? else {
         return Ok(None);
     };
-    Outline::read(&xml)
+    Outline::read(&xml, &Limits::default())
         .map(|outline| Some(Arc::new(outline)))
         .map_err(|error| leaf_error(drawing_code(&error, Code::CorruptFile), error))
 }
@@ -211,10 +212,12 @@ enum Change {
 
 /// The new parts after `change`, for a frame of `extents`.
 fn apply(parts: &SmartArtParts, change: Change, extents: (i64, i64)) -> Result<SmartArtParts> {
+    let limits = Limits::default();
     let corrupt =
         |error: litchi_drawingml::Error| leaf_error(drawing_code(&error, Code::CorruptFile), error);
-    let outline = Outline::read(&parts.data).map_err(corrupt)?;
-    let authored = Spec::recognize(&outline, &parts.data, &parts.layout).map_err(corrupt)?;
+    let outline = Outline::read(&parts.data, &limits).map_err(corrupt)?;
+    let authored =
+        Spec::recognize(&outline, &parts.data, &parts.layout, &limits).map_err(corrupt)?;
     let regenerate = |spec: &Spec, all: bool| -> Result<SmartArtParts> {
         spec.validate()
             .map_err(|error| leaf_error(drawing_code(&error, Code::InvalidValue), error))?;
@@ -277,13 +280,14 @@ fn apply(parts: &SmartArtParts, change: Change, extents: (i64, i64)) -> Result<S
             let invalid = |error: litchi_drawingml::Error| {
                 leaf_error(drawing_code(&error, Code::InvalidValue), error)
             };
-            let data = diagram_edit::set_text(&parts.data, id, &text).map_err(invalid)?;
+            let data = diagram_edit::set_text(&parts.data, id, &text, &limits).map_err(invalid)?;
             if data == parts.data {
                 return Ok(parts.clone());
             }
             let drawing = match &parts.drawing {
                 Some(drawing) => {
-                    diagram_edit::drawing_text(drawing, &parts.data, id, &text).map_err(invalid)?
+                    diagram_edit::drawing_text(drawing, &parts.data, id, &text, &limits)
+                        .map_err(invalid)?
                 },
                 None => None,
             };

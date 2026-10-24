@@ -998,7 +998,7 @@ impl Package {
                     break names;
                 }
             };
-            let parts = smartart.generate_parts();
+            let parts = smartart.generate_parts()?;
             for (partname, content_type, xml) in [
                 (&data_name, ct::DML_DIAGRAM_DATA, parts.data_xml),
                 (&layout_name, ct::DML_DIAGRAM_LAYOUT, parts.layout_xml),

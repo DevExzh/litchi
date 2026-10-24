@@ -9,7 +9,8 @@
 
 use litchi_pptx::Package;
 use litchi_pptx::shape::diagram::{
-    Builder, Graphic, Kind, Node, colors_xml, data_xml, drawing_xml, layout_xml, quickstyle_xml,
+    Builder, Graphic, Kind, Limits, Node, colors_xml, data_xml, drawing_xml, layout_xml,
+    quickstyle_xml,
 };
 
 const X: i64 = 914_400;
@@ -53,12 +54,13 @@ fn hierarchy() -> Graphic {
     value
 }
 
-fn part_bytes(value: &Graphic) -> usize {
-    data_xml(value).len()
-        + layout_xml(value).len()
-        + drawing_xml(value, X, Y, WIDTH, HEIGHT).len()
-        + colors_xml().len()
-        + quickstyle_xml().len()
+fn part_bytes(value: &Graphic) -> Result<usize, Box<dyn std::error::Error>> {
+    let limits = Limits::default();
+    Ok(data_xml(value, &limits)?.len()
+        + layout_xml(value, &limits)?.len()
+        + drawing_xml(value, X, Y, WIDTH, HEIGHT, &limits)?.len()
+        + colors_xml(&limits)?.len()
+        + quickstyle_xml(&limits)?.len())
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -211,7 +213,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             title,
             value.diagram_type,
             value.node_count(),
-            part_bytes(value),
+            part_bytes(value)?,
         );
     }
 
@@ -239,7 +241,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     value.diagram_type,
                     value.layout_name.as_deref().unwrap_or("default"),
                     value.node_count(),
-                    part_bytes(value),
+                    part_bytes(value)?,
                 ),
                 X,
                 Y,

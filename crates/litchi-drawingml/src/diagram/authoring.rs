@@ -33,6 +33,7 @@ mod tests;
 
 use litchi_core::xml::escape_xml;
 
+use super::Limits;
 use super::edit::{DRAWING_NAMESPACE, Outline};
 use crate::{Error, Result};
 
@@ -384,8 +385,8 @@ impl Spec {
     /// # Errors
     ///
     /// Returns an error when `data` is not a readable diagram data model.
-    pub fn from_parts(data: &[u8], layout: &[u8]) -> Result<Option<Self>> {
-        Self::recognize(&Outline::read(data)?, data, layout)
+    pub fn from_parts(data: &[u8], layout: &[u8], limits: &Limits) -> Result<Option<Self>> {
+        Self::recognize(&Outline::read(data, limits)?, data, layout, limits)
     }
 
     /// [`Self::from_parts`] for a data model already read as `outline`.
@@ -393,7 +394,13 @@ impl Spec {
     /// # Errors
     ///
     /// Returns an error when regenerating the data model fails.
-    pub fn recognize(outline: &Outline, data: &[u8], layout: &[u8]) -> Result<Option<Self>> {
+    pub fn recognize(
+        outline: &Outline,
+        data: &[u8],
+        layout: &[u8],
+        limits: &Limits,
+    ) -> Result<Option<Self>> {
+        limits.validate()?;
         let Some(kind) = outline
             .layout_type_id
             .as_deref()

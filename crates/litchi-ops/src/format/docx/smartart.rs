@@ -36,6 +36,7 @@ use litchi_core::FileFormat;
 use litchi_core::selector::{Path, Predicate, Step as PathStep};
 use litchi_docx::document::{NewSmartArt, SmartArtParts};
 use litchi_docx::smartart::Diagram;
+use litchi_drawingml::diagram::Limits;
 use litchi_drawingml::diagram::authoring::{
     Layout, Node as SpecNode, Spec, colors_xml, quick_style_xml,
 };
@@ -182,7 +183,7 @@ impl SmartArtValue {
             return Ok(Arc::clone(outline));
         }
         let xml = data_xml(docx, &self.diagram)?;
-        let outline = Arc::new(Outline::read(&xml).map_err(|source| {
+        let outline = Arc::new(Outline::read(&xml, &Limits::default()).map_err(|source| {
             error(
                 drawing_code(&source, Code::CorruptFile),
                 "the SmartArt data model does not read",
@@ -627,14 +628,16 @@ fn foreign_structure() -> Error {
 
 /// The parts after `change`, for a drawing of `extent` (record 0284 §3).
 fn apply(parts: &SmartArtParts, change: Change, extent: (i64, i64)) -> Result<SmartArtParts> {
+    let limits = Limits::default();
     let corrupt = |source: litchi_drawingml::Error| {
         leaf_error(drawing_code(&source, Code::CorruptFile), source)
     };
     let invalid = |source: litchi_drawingml::Error| {
         leaf_error(drawing_code(&source, Code::InvalidValue), source)
     };
-    let outline = Outline::read(&parts.data).map_err(corrupt)?;
-    let authored = Spec::recognize(&outline, &parts.data, &parts.layout).map_err(corrupt)?;
+    let outline = Outline::read(&parts.data, &limits).map_err(corrupt)?;
+    let authored =
+        Spec::recognize(&outline, &parts.data, &parts.layout, &limits).map_err(corrupt)?;
     let regenerate = |spec: &Spec, all: bool| -> Result<SmartArtParts> {
         spec.validate().map_err(invalid)?;
         let relationship = outline.drawing_relationship.as_deref().unwrap_or("rId0");
@@ -687,13 +690,14 @@ fn apply(parts: &SmartArtParts, change: Change, extent: (i64, i64)) -> Result<Sm
                 return regenerate(&spec, false);
             }
             let id = &outline.entries.get(index).ok_or_else(missing_node)?.id;
-            let data = diagram_edit::set_text(&parts.data, id, &text).map_err(invalid)?;
+            let data = diagram_edit::set_text(&parts.data, id, &text, &limits).map_err(invalid)?;
             if data == parts.data {
                 return Ok(parts.clone());
             }
             let drawing = match &parts.drawing {
                 Some(drawing) => {
-                    diagram_edit::drawing_text(drawing, &parts.data, id, &text).map_err(invalid)?
+                    diagram_edit::drawing_text(drawing, &parts.data, id, &text, &limits)
+                        .map_err(invalid)?
                 },
                 None => None,
             };

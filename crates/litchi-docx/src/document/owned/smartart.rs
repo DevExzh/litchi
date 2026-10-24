@@ -16,7 +16,7 @@ use litchi_core::Position;
 use litchi_drawingml::diagram::authoring::{Spec, colors_xml, quick_style_xml};
 use litchi_drawingml::diagram::edit as diagram_edit;
 use litchi_drawingml::diagram::{
-    DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
+    DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL, Limits,
     MS_DIAGRAM_DRAWING_REL, STRICT_DIAGRAM_COLORS_REL, STRICT_DIAGRAM_DATA_REL,
     STRICT_DIAGRAM_LAYOUT_REL, STRICT_DIAGRAM_QUICK_STYLE_REL,
 };
@@ -236,7 +236,7 @@ impl Edit<Package> {
         let located = self
             .locate_smartart(data_relationship_id)?
             .ok_or_else(not_found)?;
-        diagram_edit::Outline::read(&parts.data).map_err(drawing_error)?;
+        diagram_edit::Outline::read(&parts.data, &Limits::default()).map_err(drawing_error)?;
         let SmartArtParts {
             data,
             layout,
@@ -303,8 +303,9 @@ impl Edit<Package> {
             (None, Some((None, _))) => None,
             (None, None) => None,
         };
-        let data = diagram_edit::set_drawing_reference(&data, relationship.as_deref())
-            .map_err(drawing_error)?;
+        let data =
+            diagram_edit::set_drawing_reference(&data, relationship.as_deref(), &Limits::default())
+                .map_err(drawing_error)?;
         replace(&located.data.1, data, self)?;
         replace(&located.layout.1, layout, self)?;
         replace(&located.quick_style.1, quick_style, self)?;

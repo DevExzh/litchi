@@ -12,7 +12,7 @@ pub use model::{
     Conformance, Connection, ConnectionType, DiagramDataModel, Id, IdError, Point, PointType,
 };
 
-pub(crate) use crate::diagram::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT};
+pub(crate) use crate::diagram::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT, Limits};
 
 pub(super) const MAX_DATA_MODEL_XML: usize = 16 * 1024 * 1024;
 pub(super) const MAX_NODES: usize = 200_000;

@@ -9,7 +9,7 @@
 
 use litchi_drawingml::diagram::authoring::{Spec, colors_xml, quick_style_xml};
 use litchi_drawingml::diagram::{
-    DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
+    DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL, Limits,
     MS_DIAGRAM_DRAWING_REL, edit as diagram_edit,
 };
 use litchi_opc::constants::content_type as ct;
@@ -223,7 +223,7 @@ impl Edit {
         let targets = targets(&self.working, &selected.part_name, shape.into())?;
         let read_error =
             |error: litchi_drawingml::Error| drawing_error(error, "SmartArt data model");
-        diagram_edit::Outline::read(&parts.data).map_err(read_error)?;
+        diagram_edit::Outline::read(&parts.data, &Limits::default()).map_err(read_error)?;
         let mut candidate = self.working.clone();
         let SmartArtParts {
             data,
@@ -265,8 +265,9 @@ impl Edit {
             },
             (None, None) => None,
         };
-        let data = diagram_edit::set_drawing_reference(&data, relationship.as_deref())
-            .map_err(read_error)?;
+        let data =
+            diagram_edit::set_drawing_reference(&data, relationship.as_deref(), &Limits::default())
+                .map_err(read_error)?;
         for (name, bytes) in [
             (&targets.data, data),
             (&targets.layout, layout),
@@ -485,7 +486,7 @@ fn targets(package: &OpcPackage, slide: &PackURI, shape: crate::shape::Key<'_>) 
         "diagramColors",
         ct::DML_DIAGRAM_COLORS,
     )?;
-    let outline = diagram_edit::Outline::read(package.get_part(&data)?.blob())
+    let outline = diagram_edit::Outline::read(package.get_part(&data)?.blob(), &Limits::default())
         .map_err(|error| drawing_error(error, "SmartArt data model"))?;
     let drawing = match outline.drawing_relationship {
         Some(id) => match owner.rels().get(&id) {
@@ -519,7 +520,9 @@ pub(crate) fn drawing_relationship(
         return None;
     }
     let name = found.target_partname().ok()?;
-    let outline = diagram_edit::Outline::read(package.get_part(&name).ok()?.blob()).ok()?;
+    let outline =
+        diagram_edit::Outline::read(package.get_part(&name).ok()?.blob(), &Limits::default())
+            .ok()?;
     let id = outline.drawing_relationship?;
     let drawing = owner.rels().get(&id)?;
     (drawing.reltype() == MS_DIAGRAM_DRAWING_REL).then_some(id)

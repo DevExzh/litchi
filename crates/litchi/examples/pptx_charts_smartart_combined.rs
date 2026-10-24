@@ -8,7 +8,7 @@
 //! Run with: cargo run --example pptx_charts_smartart_combined --features ooxml
 
 use litchi::pptx::chart::encode as encode_chart;
-use litchi::pptx::shape::diagram::{Builder, Graphic, Kind, Node, data_xml};
+use litchi::pptx::shape::diagram::{Builder, Graphic, Kind, Limits, Node, data_xml};
 use litchi::pptx::{Chart, ChartSeries, ChartType, Package};
 
 const X: i64 = 914_400;
@@ -240,12 +240,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     for (index, (_, value)) in diagrams.iter().enumerate() {
+        let limits = Limits::default();
         println!(
             "  diagram {}: {:?}, {} nodes, {} bytes of data XML",
             index + 1,
             value.diagram_type,
             value.node_count(),
-            data_xml(value).len()
+            data_xml(value, &limits)?.len()
         );
     }
 

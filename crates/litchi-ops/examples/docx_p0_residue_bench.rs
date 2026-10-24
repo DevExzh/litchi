@@ -117,9 +117,10 @@ fn main() -> Outcome<()> {
         || {
             let mut edit = package.edit()?;
             let parts = edit.smartart_parts(&diagram)?.ok_or("the graphic")?;
-            let outline = Outline::read(&parts.data)?;
-            let mut spec =
-                Spec::recognize(&outline, &parts.data, &parts.layout)?.ok_or("authored")?;
+            let limits = litchi_drawingml::diagram::Limits::default();
+            let outline = Outline::read(&parts.data, &limits)?;
+            let mut spec = Spec::recognize(&outline, &parts.data, &parts.layout, &limits)?
+                .ok_or("authored")?;
             spec.nodes_mut()[0].text = "Design".to_owned();
             let relationship = outline.drawing_relationship.as_deref().unwrap_or("rId0");
             let mut next = parts.clone();
@@ -202,9 +203,10 @@ fn main() -> Outcome<()> {
             let package = litchi_docx::Package::from_bytes(&bytes)?;
             let mut edit = package.edit()?;
             let parts = edit.smartart_parts(&diagram)?.ok_or("the graphic")?;
-            let outline = Outline::read(&parts.data)?;
-            let mut spec =
-                Spec::recognize(&outline, &parts.data, &parts.layout)?.ok_or("authored")?;
+            let limits = litchi_drawingml::diagram::Limits::default();
+            let outline = Outline::read(&parts.data, &limits)?;
+            let mut spec = Spec::recognize(&outline, &parts.data, &parts.layout, &limits)?
+                .ok_or("authored")?;
             spec.nodes_mut()[0].text = "Design".to_owned();
             let relationship = outline.drawing_relationship.as_deref().unwrap_or("rId0");
             let mut next = parts.clone();

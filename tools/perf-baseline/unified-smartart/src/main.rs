@@ -60,18 +60,22 @@ fn corpus(count: usize) -> Result<Vec<u8>> {
     for index in 0..count {
         edit.add_smartart(0_usize, &spec()?, &format!("Diagram {}", index + 1), BOUNDS)?;
     }
-    let mut package = edit.commit()?.into_package();
+    let package = edit.commit()?.into_package();
     Ok(package.to_bytes()?)
 }
 
 /// The hand-written leaf change of the first graphic's parts.
 fn leaf_change(parts: &SmartArtParts, route: Route) -> Result<SmartArtParts> {
-    let mut spec = Spec::from_parts(&parts.data, &parts.layout)?.ok_or("not authored")?;
+    let limits = litchi_drawingml::diagram::Limits::default();
+    let mut spec = Spec::from_parts(&parts.data, &parts.layout, &limits)?.ok_or("not authored")?;
     match route {
         Route::NodeText => spec.nodes_mut()[1].text = "Make".to_owned(),
         _ => spec.nodes_mut().push(Node::new("Learn")),
     }
-    let outline = litchi_drawingml::diagram::edit::Outline::read(&parts.data)?;
+    let outline = litchi_drawingml::diagram::edit::Outline::read(
+        &parts.data,
+        &litchi_drawingml::diagram::Limits::default(),
+    )?;
     Ok(SmartArtParts {
         data: spec
             .data_xml(outline.drawing_relationship.as_deref())?

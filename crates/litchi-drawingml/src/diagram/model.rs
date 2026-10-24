@@ -6,7 +6,8 @@
 //! colors, pre-rendered drawing). The model is shared by the format modules
 //! (`docx`, `pptx`); format-specific anchoring lives in those modules.
 
-use crate::{Error, Result};
+use crate::diagram::Limits;
+use crate::{Error, LimitKind, Result};
 use litchi_core::xml::escape_xml;
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -152,18 +153,48 @@ impl SmartArt {
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn parse_data_xml(xml: &str) -> Result<Vec<DiagramNode>> {
+    pub fn parse_data_xml(xml: &str, limits: &Limits) -> Result<Vec<DiagramNode>> {
+        limits.validate()?;
+        let max_input = limits.input_bytes_value().min(16 * 1024 * 1024);
+        if xml.len() > max_input {
+            return Err(Error::limit(
+                LimitKind::DiagramDataModelBytes,
+                xml.len(),
+                max_input,
+            ));
+        }
         let xml = litchi_ooxml_common::mce::process_str(xml)?;
+        if xml.len() > max_input {
+            return Err(Error::limit(
+                LimitKind::DiagramDataModelBytes,
+                xml.len(),
+                max_input,
+            ));
+        }
         let mut reader = Reader::from_str(xml.as_ref());
         reader.config_mut().trim_text(true);
 
         let mut nodes = Vec::new();
         let mut current_text = String::new();
         let mut in_text = false;
+        let mut depth = 0usize;
+        let mut xml_nodes = 0usize;
+        let max_depth = limits.xml_depth_value().min(128);
+        let max_xml_nodes = limits.xml_nodes_value().min(200_000);
+        let max_nodes = limits.nodes_value().min(200_000);
+        let max_text = limits.node_text_bytes_value().min(1024 * 1024);
 
         loop {
             match reader.read_event() {
                 Ok(Event::Start(e)) => {
+                    xml_nodes = xml_nodes.saturating_add(1);
+                    if xml_nodes > max_xml_nodes {
+                        return Err(Error::limit(LimitKind::XmlNodes, xml_nodes, max_xml_nodes));
+                    }
+                    depth = depth.saturating_add(1);
+                    if depth > max_depth {
+                        return Err(Error::limit(LimitKind::XmlDepth, depth, max_depth));
+                    }
                     let local = e.local_name();
                     if local.as_ref() == b"t" {
                         in_text = true;
@@ -175,12 +206,38 @@ impl SmartArt {
                     if local.as_ref() == b"t" {
                         in_text = false;
                         if !current_text.trim().is_empty() {
+                            if nodes.len() >= max_nodes {
+                                return Err(Error::limit(
+                                    LimitKind::DiagramNodes,
+                                    nodes.len() + 1,
+                                    max_nodes,
+                                ));
+                            }
                             nodes.push(DiagramNode::new(current_text.trim()));
                         }
+                    }
+                    depth = depth.saturating_sub(1);
+                },
+                Ok(Event::Empty(_)) => {
+                    xml_nodes = xml_nodes.saturating_add(1);
+                    if xml_nodes > max_xml_nodes {
+                        return Err(Error::limit(LimitKind::XmlNodes, xml_nodes, max_xml_nodes));
+                    }
+                    let child_depth = depth.saturating_add(1);
+                    if child_depth > max_depth {
+                        return Err(Error::limit(LimitKind::XmlDepth, child_depth, max_depth));
                     }
                 },
                 Ok(Event::Text(e)) => {
                     if in_text && let Ok(text) = std::str::from_utf8(e.as_ref()) {
+                        let observed = current_text.len().saturating_add(text.len());
+                        if observed > max_text {
+                            return Err(Error::limit(
+                                LimitKind::DiagramNodeTextBytes,
+                                observed,
+                                max_text,
+                            ));
+                        }
                         current_text.push_str(text);
                     }
                 },
@@ -188,6 +245,10 @@ impl SmartArt {
                 Err(e) => return Err(Error::Xml(e.to_string())),
                 _ => {},
             }
+        }
+
+        if depth != 0 {
+            return Err(Error::Invalid("unterminated SmartArt data XML".to_owned()));
         }
 
         Ok(nodes)
@@ -248,10 +309,23 @@ impl SmartArtBuilder {
     }
 }
 
-/// Generate `SmartArt` data XML.
-#[must_use]
-pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
-    let mut xml = String::with_capacity(2048);
+/// Generate `SmartArt` data XML under the caller's bounded policy.
+pub fn generate_smartart_data_xml(smartart: &SmartArt, limits: &Limits) -> Result<String> {
+    limits.validate()?;
+    let (node_count, text_bytes) = validate_smartart(smartart, limits)?;
+    let estimate = estimate_smartart_output(node_count, text_bytes, 2048, 2048)?;
+    ensure_output(estimate, limits, LimitKind::DiagramDataModelBytes)?;
+    let xml = generate_smartart_data_xml_unchecked(smartart, node_count, estimate);
+    ensure_output(xml.len(), limits, LimitKind::DiagramDataModelBytes)?;
+    Ok(xml)
+}
+
+fn generate_smartart_data_xml_unchecked(
+    smartart: &SmartArt,
+    node_count: usize,
+    capacity: usize,
+) -> String {
+    let mut xml = String::with_capacity(capacity);
 
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
     xml.push_str(
@@ -331,7 +405,7 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
     // Flatten diagram nodes (including hierarchy children) into a linear
     // sequence with parent references so that we can build the SmartArt data
     // graph.
-    let mut flat_nodes: Vec<(i32, i32, &DiagramNode)> = Vec::new();
+    let mut flat_nodes: Vec<(i32, i32, &DiagramNode)> = Vec::with_capacity(node_count);
     let mut next_model_id: i32 = 1;
 
     fn flatten_nodes<'a>(
@@ -489,11 +563,17 @@ pub fn generate_smartart_data_xml(smartart: &SmartArt) -> String {
     xml
 }
 
-/// Generate `SmartArt` layout XML.
-///
-/// This generates a simple layout definition for the diagram.
-#[must_use]
-pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
+/// Generate `SmartArt` layout XML under the caller's bounded policy.
+pub fn generate_smartart_layout_xml(smartart: &SmartArt, limits: &Limits) -> Result<String> {
+    limits.validate()?;
+    let _ = validate_smartart(smartart, limits)?;
+    ensure_output(64 * 1024, limits, LimitKind::XmlBytes)?;
+    let xml = generate_smartart_layout_xml_unchecked(smartart);
+    ensure_output(xml.len(), limits, LimitKind::XmlBytes)?;
+    Ok(xml)
+}
+
+fn generate_smartart_layout_xml_unchecked(smartart: &SmartArt) -> String {
     let mut xml = String::with_capacity(4096);
 
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
@@ -720,18 +800,33 @@ pub fn generate_smartart_layout_xml(smartart: &SmartArt) -> String {
     xml
 }
 
-/// Generate `SmartArt` drawing XML.
-///
-/// This converts the `SmartArt` to a `DrawingML` representation.
-#[must_use]
+/// Generate `SmartArt` drawing XML under the caller's bounded policy.
 pub fn generate_smartart_drawing_xml(
     smartart: &SmartArt,
     x: i64,
     y: i64,
     width: i64,
     height: i64,
+    limits: &Limits,
+) -> Result<String> {
+    limits.validate()?;
+    let (node_count, text_bytes) = validate_smartart(smartart, limits)?;
+    let estimate = estimate_smartart_output(node_count, text_bytes, 4096, 3072)?;
+    ensure_output(estimate, limits, LimitKind::DiagramDrawingBytes)?;
+    let xml = generate_smartart_drawing_xml_unchecked(smartart, x, y, width, height, estimate);
+    ensure_output(xml.len(), limits, LimitKind::DiagramDrawingBytes)?;
+    Ok(xml)
+}
+
+fn generate_smartart_drawing_xml_unchecked(
+    smartart: &SmartArt,
+    x: i64,
+    y: i64,
+    width: i64,
+    height: i64,
+    capacity: usize,
 ) -> String {
-    let mut xml = String::with_capacity(4096);
+    let mut xml = String::with_capacity(capacity);
 
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
     // Use the Microsoft extension namespace for diagram drawings (dsp), as used by
@@ -875,9 +970,97 @@ fn index_i64(value: usize) -> i64 {
     i64::try_from(value).unwrap_or(i64::MAX)
 }
 
-/// Generate `SmartArt` colors XML.
-#[must_use]
-pub fn generate_smartart_colors_xml() -> String {
+fn validate_smartart(smartart: &SmartArt, limits: &Limits) -> Result<(usize, usize)> {
+    let max_nodes = limits.nodes_value().min(200_000);
+    let max_depth = limits.node_depth_value().min(128);
+    let max_text = limits.node_text_bytes_value().min(1024 * 1024);
+    let mut count = 0usize;
+    let mut text_bytes = 0usize;
+    if smartart.nodes.len() > max_nodes {
+        return Err(Error::limit(
+            LimitKind::DiagramNodes,
+            max_nodes + 1,
+            max_nodes,
+        ));
+    }
+    let mut stack = Vec::with_capacity(smartart.nodes.len());
+    for node in smartart.nodes.iter().rev() {
+        stack.push((node, 0));
+    }
+    while let Some((node, depth)) = stack.pop() {
+        count = count.saturating_add(1);
+        if count > max_nodes {
+            return Err(Error::limit(LimitKind::DiagramNodes, count, max_nodes));
+        }
+        if depth > max_depth {
+            return Err(Error::limit(LimitKind::DiagramNodeDepth, depth, max_depth));
+        }
+        if node.text.len() > max_text {
+            return Err(Error::limit(
+                LimitKind::DiagramNodeTextBytes,
+                node.text.len(),
+                max_text,
+            ));
+        }
+        text_bytes = text_bytes
+            .checked_add(node.text.len())
+            .ok_or_else(|| Error::Invalid("SmartArt text length overflows".to_owned()))?;
+        if node.text.chars().any(|character| {
+            !matches!(character, '\t' | '\n' | '\r' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..)
+        }) {
+            return Err(Error::Invalid(
+                "SmartArt node text holds a character XML cannot carry".to_owned(),
+            ));
+        }
+        let pending_capacity = max_nodes.saturating_sub(count).saturating_sub(stack.len());
+        if node.children.len() > pending_capacity {
+            return Err(Error::limit(
+                LimitKind::DiagramNodes,
+                max_nodes + 1,
+                max_nodes,
+            ));
+        }
+        stack.extend(node.children.iter().map(|child| (child, depth + 1)));
+    }
+    Ok((count, text_bytes))
+}
+
+fn estimate_smartart_output(
+    count: usize,
+    text_bytes: usize,
+    base: usize,
+    per_node: usize,
+) -> Result<usize> {
+    let escaped_text = text_bytes
+        .checked_mul(6)
+        .ok_or_else(|| Error::Invalid("SmartArt output length overflows".to_owned()))?;
+    base.checked_add(
+        count
+            .checked_mul(per_node)
+            .ok_or_else(|| Error::Invalid("SmartArt output length overflows".to_owned()))?,
+    )
+    .and_then(|value| value.checked_add(escaped_text))
+    .ok_or_else(|| Error::Invalid("SmartArt output length overflows".to_owned()))
+}
+
+fn ensure_output(observed: usize, limits: &Limits, kind: LimitKind) -> Result<()> {
+    let maximum = limits.output_bytes_value().min(16 * 1024 * 1024);
+    if observed > maximum {
+        return Err(Error::limit(kind, observed, maximum));
+    }
+    Ok(())
+}
+
+/// Generate `SmartArt` colors XML under the caller's bounded policy.
+pub fn generate_smartart_colors_xml(limits: &Limits) -> Result<String> {
+    limits.validate()?;
+    ensure_output(16 * 1024, limits, LimitKind::XmlBytes)?;
+    let xml = generate_smartart_colors_xml_unchecked();
+    ensure_output(xml.len(), limits, LimitKind::XmlBytes)?;
+    Ok(xml)
+}
+
+fn generate_smartart_colors_xml_unchecked() -> String {
     let mut xml = String::with_capacity(1024);
 
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
@@ -904,9 +1087,16 @@ pub fn generate_smartart_colors_xml() -> String {
     xml
 }
 
-/// Generate `SmartArt` quick style XML.
-#[must_use]
-pub fn generate_smartart_quickstyle_xml() -> String {
+/// Generate `SmartArt` quick style XML under the caller's bounded policy.
+pub fn generate_smartart_quickstyle_xml(limits: &Limits) -> Result<String> {
+    limits.validate()?;
+    ensure_output(16 * 1024, limits, LimitKind::XmlBytes)?;
+    let xml = generate_smartart_quickstyle_xml_unchecked();
+    ensure_output(xml.len(), limits, LimitKind::XmlBytes)?;
+    Ok(xml)
+}
+
+fn generate_smartart_quickstyle_xml_unchecked() -> String {
     let mut xml = String::with_capacity(1024);
 
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
@@ -956,5 +1146,110 @@ mod tests {
         assert_eq!(smartart.diagram_type, DiagramType::List);
         assert_eq!(smartart.node_count(), 3);
         assert!(smartart.text().contains("Item 1"));
+    }
+
+    #[test]
+    fn raw_policy_bounds_smartart_reader_and_generators() {
+        let defaults = Limits::default();
+        let invalid = Limits::new(
+            0,
+            defaults.output_bytes_value(),
+            defaults.xml_nodes_value(),
+            defaults.xml_depth_value(),
+            defaults.points_value(),
+            defaults.connections_value(),
+            defaults.data_text_bytes_value(),
+            defaults.nodes_value(),
+            defaults.node_depth_value(),
+            defaults.node_text_bytes_value(),
+        );
+        let source = concat!(
+            "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">",
+            "<dgm:ptLst><dgm:pt><dgm:t>A B</dgm:t></dgm:pt></dgm:ptLst>",
+            "</dgm:dataModel>"
+        );
+        assert!(matches!(
+            SmartArt::parse_data_xml(source, &invalid),
+            Err(Error::InvalidLimit { .. })
+        ));
+        assert_eq!(
+            SmartArt::parse_data_xml(source, &defaults)
+                .unwrap()
+                .iter()
+                .map(|node| node.text.as_str())
+                .collect::<Vec<_>>(),
+            ["A B"]
+        );
+
+        let smartart = SmartArtBuilder::new(DiagramType::Process)
+            .add_item("A & B")
+            .add_item("C")
+            .build();
+        let data = generate_smartart_data_xml(&smartart, &defaults).unwrap();
+        assert!(data.contains("A &amp; B"));
+        assert!(
+            !generate_smartart_layout_xml(&smartart, &defaults)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            !generate_smartart_drawing_xml(&smartart, 0, 0, 100, 100, &defaults)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(!generate_smartart_colors_xml(&defaults).unwrap().is_empty());
+        assert!(
+            !generate_smartart_quickstyle_xml(&defaults)
+                .unwrap()
+                .is_empty()
+        );
+
+        let tiny_output = Limits::new(
+            defaults.input_bytes_value(),
+            1,
+            defaults.xml_nodes_value(),
+            defaults.xml_depth_value(),
+            defaults.points_value(),
+            defaults.connections_value(),
+            defaults.data_text_bytes_value(),
+            defaults.nodes_value(),
+            defaults.node_depth_value(),
+            defaults.node_text_bytes_value(),
+        );
+        assert!(matches!(
+            generate_smartart_data_xml(&smartart, &tiny_output),
+            Err(Error::Limit {
+                kind: LimitKind::DiagramDataModelBytes,
+                ..
+            })
+        ));
+        assert!(matches!(
+            generate_smartart_layout_xml(&smartart, &tiny_output),
+            Err(Error::Limit {
+                kind: LimitKind::XmlBytes,
+                ..
+            })
+        ));
+        assert!(matches!(
+            generate_smartart_drawing_xml(&smartart, 0, 0, 100, 100, &tiny_output),
+            Err(Error::Limit {
+                kind: LimitKind::DiagramDrawingBytes,
+                ..
+            })
+        ));
+        assert!(matches!(
+            generate_smartart_colors_xml(&tiny_output),
+            Err(Error::Limit {
+                kind: LimitKind::XmlBytes,
+                ..
+            })
+        ));
+        assert!(matches!(
+            generate_smartart_quickstyle_xml(&tiny_output),
+            Err(Error::Limit {
+                kind: LimitKind::XmlBytes,
+                ..
+            })
+        ));
     }
 }

@@ -6,10 +6,10 @@
 //! `Builder`) without copying the diagram payload.
 
 pub use litchi_drawingml::diagram::{
-    DiagramNode as Node, DiagramType as Kind, SmartArt as Graphic, SmartArtBuilder as Builder,
-    generate_smartart_colors_xml as colors_xml, generate_smartart_data_xml as data_xml,
-    generate_smartart_drawing_xml as drawing_xml, generate_smartart_layout_xml as layout_xml,
-    generate_smartart_quickstyle_xml as quickstyle_xml,
+    DiagramNode as Node, DiagramType as Kind, Limits, SmartArt as Graphic,
+    SmartArtBuilder as Builder, generate_smartart_colors_xml as colors_xml,
+    generate_smartart_data_xml as data_xml, generate_smartart_drawing_xml as drawing_xml,
+    generate_smartart_layout_xml as layout_xml, generate_smartart_quickstyle_xml as quickstyle_xml,
 };
 
 /// Generate a `PresentationML` graphic frame for a diagram.
