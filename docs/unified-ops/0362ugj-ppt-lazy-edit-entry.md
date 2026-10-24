@@ -7,7 +7,7 @@ timing, ABBA, allocation, or performance-qualification claim.
 ## Source boundary
 
 The final clean source tip is
-`1cb09b9c4ac3513bf628fa90a23e5485cdb68690` (`uo2/ppt-lazy-entry`).  Its
+`c7931891205aed2af0336c121848c95f90c3ba87` (`uo2/ppt-lazy-entry`).  Its
 history retains the validated PPT implementation and consumer fixes:
 
 * `e4bc2f967e` — lazy PPT edit construction;
@@ -16,10 +16,12 @@ history retains the validated PPT implementation and consumer fixes:
 * `fa2abab399` — strict Clippy migration for fallible projections;
 * `ca125d2ba1f52692f42efc17adc4b0990dd41fac` — final PPT facade and ops
   consumer migration;
-* `2274f4cff95160397e304f5805d8fa4cbee258ca` — standalone PPT slide-boundary
+* `2274f4cff95160397e304f5805d8fa4cbee258ca` — standalone PPTX slide-boundary
   consumer migration;
 * `1cb09b9c4ac3513bf628fa90a23e5485cdb68690` — ODG joined-probe consumer
   migration and this receipt.
+* `c7931891205aed2af0336c121848c95f90c3ba87` — refreshed ODG joined-probe
+  source bindings.
 
 The PPT crate and its facade consumers are byte-identical between `ca125d2ba1`
 and the final tip.  Therefore the PPT tests, doctests, Clippy check, and
@@ -85,6 +87,33 @@ done
 The static checks `rustfmt --edition 2024` on the changed standalone Rust
 sources, `git diff --check`, and the repository large-evidence/binary guards
 also passed.  The final checkout was clean.
+
+## Binding follow-up
+
+The qualification bindings now match the reviewed tracked probe sources at
+the final tip.  `common` is 17,863 bytes with SHA-256
+`cdbe48f55e51ba6a35285c0b0a321e36c4d07c616053be685c9865d79fa3b9c5`,
+`baseline` is 11,351 bytes with SHA-256
+`8b3adac40dee59156fa667d6478779f7c63a28c60c1253f4e0187140a57a5a40`, and
+`candidate` is 13,180 bytes with SHA-256
+`ba4dab289b8786c83882925d3afb50ff131805a575fced4ea6c735d1f0256fbc`.
+The allocator binding is unchanged.  The test manifest factory and reviewed
+manifest checks consume these same fixed identities, so generated manifests
+cannot retain the superseded probe bytes.
+
+The build-free contract test command was:
+
+```text
+python3 -m unittest -v tools.test_odg_joined_qualification
+```
+
+At source content committed as `c793189120`, it exited 0 with all 26 tests
+passing and no failures or skips.  The raw log is retained outside the
+repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-entry/validation-bindings-0686/odg-joined-tests.log`
+(4,971 bytes, SHA-256
+`3e4067a47107b23e486a2f811c44b7c73c7e11a06a66739c2df450d2d93c7b52`).  No
+Cargo command or native qualification was run for this follow-up.
 
 ## ODG candidate overlay provenance
 
