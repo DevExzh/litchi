@@ -24,11 +24,11 @@ remain open; this is source integration, not final performance acceptance.
 | DOC | Primary/profiled and scoped families serialize/copy the source at entry; paragraph source-backed entry scans the source prefix. | 0362ugd and 0362ugd-a, reviewed and validated source/consumer correction merged at `cf7def80df`. |
 | XLS | Primary and source-backed cells copy/index source state; scoped capture serializes the archive for comments, visibility, objects, names, charts and pivots. | 0362uge, reviewed and validated source/freshness correction merged at `50d4f4b88d`; the additional property/feature scope below remains required. |
 | XLS properties and features | Metadata parses/copies properties, property-set entry captures the whole CFB, and worksheet features parse/copy the Workbook stream. | 0362ugea, deferred source and signed exact no-op correction under validation; facade refusal mapping and cached-source fencing are under review. |
-| XLSX source-backed | Worksheet and defined-name/cell constructors load and decode selected parts or workbook state before staging. | 0362ugf/0362ugs, composed package tests and strict checks pass at recorded source boundaries; a planning-guard consumer still requires first-use/error/retry correction before merge. |
-| XLSX pivot | Pivot cache/table/data entries load graphs and clone semantic drafts before an operation. | 0362ugn, reviewed correction composed and validated under 0362ugs; merge pending the remaining composed consumer repair. |
-| XLSX graph families | Metadata, calculation properties, connections, custom data, external links, data model and XML maps load selected graphs or snapshots at entry. | 0362ugo, reviewed correction composed and validated under 0362ugs; merge pending the remaining composed consumer repair. |
-| XLSX object families | Data-type icons, OLE objects, page breaks, revisions, rich-value refresh and surveys parse or copy selected source state at entry. | 0362ugp, reviewed correction composed and validated under 0362ugs; merge pending the remaining composed consumer repair. |
-| XLSX catalogs | Slicers and timelines census cache/worksheet parts; task panes load the web graph; smart tags parse selected worksheet XML. | 0362ugq, reviewed correction composed and validated under 0362ugs; merge pending the remaining composed consumer repair. |
+| XLSX source-backed | Worksheet and defined-name/cell constructors load and decode selected parts or workbook state before staging. | 0362ugf/0362ugs, reviewed composed correction and planning-guard consumer merged at `3d129677ce`; package/consumer validation is pinned to the exact sources in 0362ugs. |
+| XLSX pivot | Pivot cache/table/data entries load graphs and clone semantic drafts before an operation. | 0362ugn, reviewed composed correction and validation receipt 0362ugs merged at `3d129677ce`. |
+| XLSX graph families | Metadata, calculation properties, connections, custom data, external links, data model and XML maps load selected graphs or snapshots at entry. | 0362ugo, reviewed composed correction and validation receipt 0362ugs merged at `3d129677ce`. |
+| XLSX object families | Data-type icons, OLE objects, page breaks, revisions, rich-value refresh and surveys parse or copy selected source state at entry. | 0362ugp, reviewed composed correction and validation receipt 0362ugs merged at `3d129677ce`. |
+| XLSX catalogs | Slicers and timelines census cache/worksheet parts; task panes load the web graph; smart tags parse selected worksheet XML. | 0362ugq, reviewed composed correction and validation receipt 0362ugs merged at `3d129677ce`. |
 | Pages | Body-table constructors rebuild rooted inventories; chart data, drawable order, headers/footers and footnotes decode or copy selected/source graph state. | 0362ugg/0362ugr, reviewed and validated correction merged at `9ea602e0e1`. |
 | Keynote | Text/name selection can decode a whole show; chart data and table/chart constructors decode selected payloads or scan the graph. | 0362ugh/0362ugr, reviewed and validated correction merged at `9ea602e0e1`. |
 | Numbers | Title/image selection scans rooted graph state; chart and merge constructors retain decoded data/regions. | 0362ugi/0362ugr, reviewed and validated correction merged at `9ea602e0e1`. |
@@ -347,3 +347,28 @@ complete Workbook stream. These three families are the finite follow-up scope;
 other public Package edit entries checked are already lazy. This is engineering
 work before source freeze, not an accepted exception. The current XLS getter
 is infallible; its eventual migration must follow the actual corrected API.
+
+
+## XLSX composed merge, 2026-10-24
+
+Source `784d0ea83e`, final receipt `7201866b32` and the composed source-backed,
+catalog, pivot, graph and object corrections merge at `3d129677ce`. Independent
+review confirms lazy admission, retained budgets, source/signature behavior,
+retry atomicity and the migrated consumers. The coordinator verified all twelve
+closed log identities, actual root configuration, used lockfiles and four
+consumer/lint overlay hashes plus the final planning-guard overlay.
+
+The recorded package run has 2,558 passing tests across 98 result blocks and
+36 passing doctests with no ignored tests. Strict Clippy covers the documented
+implementation lint overlay; it does not relabel the earlier clean-source test
+run. Operations, standalone performance consumers and the fuzz consumer compile.
+The guard's valid, late-validator and late-raw diagnostic routes prove exact
+no-op/source preservation or typed first-use refusal and retry preservation.
+Unknown cell attributes remain supported and preserved; the stale validator
+fixture now uses an explicitly unsupported child element. Debug timing fields
+from these diagnostic runs are excluded from performance evidence.
+
+The only merge conflict was formatting of the XLS/PPT metadata benchmark.
+Resolution preserves their currently infallible property getters and the
+already-fallible DOC getter. Pending PPT and XLS-property source changes must
+migrate their own getters when they merge. No native qualification is claimed.
