@@ -72,7 +72,7 @@ fn complete_project_round_trips_from_the_macros_storage() {
         ["Module1", "ThisDocument"]
     );
 
-    let project = package.vba().unwrap().unwrap();
+    let project = package.vba(&Limits::default()).unwrap().unwrap();
     assert_eq!(project.name(), "DocumentTools");
     assert_eq!(project.modules().len(), 2);
     assert!(
@@ -103,7 +103,7 @@ fn project_storage_remains_clear_when_document_streams_are_encrypted() {
         .unwrap();
 
     let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
-    let project = package.vba().unwrap().unwrap();
+    let project = package.vba(&Limits::default()).unwrap().unwrap();
     assert_eq!(project.name(), "EncryptedDocument");
     assert_eq!(project.modules()[0].name(), "Module1");
 
@@ -130,7 +130,7 @@ fn failed_build_is_atomic_and_project_can_be_cleared() {
     assert!(writer.set_vba_with(replacement, &limits).is_err());
 
     let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
-    let project = package.vba().unwrap().unwrap();
+    let project = package.vba(&Limits::default()).unwrap().unwrap();
     assert_eq!(project.name(), "ExistingProject");
     assert!(project.modules().is_empty());
 

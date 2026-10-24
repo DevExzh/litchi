@@ -1586,9 +1586,14 @@ fn preflight_picture_bullet_publication(
 
 /// Read the live picture-bullet collection from a cursor-backed package.
 impl<R: std::io::Read + std::io::Seek> crate::raw::Reader<R> {
-    /// Read the live picture-bullet collection under the reader's limits.
-    pub fn picture_bullets(&mut self) -> Result<Option<PictureBulletCollection>> {
-        self.presentation()?.picture_bullets()
+    /// Read the live picture-bullet collection under caller-selected limits.
+    /// The presentation constrains its record budget by the reader's inherited
+    /// source limits before parsing.
+    pub fn picture_bullets(
+        &mut self,
+        limits: PictureBulletLimits,
+    ) -> Result<Option<PictureBulletCollection>> {
+        self.presentation()?.picture_bullets_with_limits(limits)
     }
 }
 
@@ -2140,7 +2145,7 @@ mod tests {
             crate::raw::Reader::from_reader(std::io::Cursor::new(bytes.clone())).unwrap();
         assert_eq!(
             package
-                .picture_bullets()
+                .picture_bullets(PictureBulletLimits::default())
                 .unwrap()
                 .unwrap()
                 .get(4)

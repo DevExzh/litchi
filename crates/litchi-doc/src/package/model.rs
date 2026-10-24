@@ -301,7 +301,6 @@ pub enum EncryptionKind {
 }
 
 /// Error types for DOC file parsing.
-#[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
     /// IO error
@@ -310,6 +309,14 @@ pub enum Error {
     Ole(OleError),
     /// Shared OLE object capture or publication failure.
     Object(litchi_ole_common::Error),
+    /// Legacy Custom XML data-store parsing failure.
+    CustomXml(litchi_ole_common::custom_xml::Error),
+    /// Inert MS-OVBA project parsing failure.
+    Vba(litchi_vba::Error),
+    /// XML signature verification failure.
+    Signature(litchi_sign::Error),
+    /// MS-OFFCRYPTO DataSpaces inspection or patch failure.
+    Crypto(litchi_crypto::spaces::Error),
     /// Invalid DOC format
     InvalidFormat(String),
     /// Stream not found
@@ -366,6 +373,81 @@ pub enum Error {
     },
 }
 
+impl std::fmt::Debug for Error {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Keep the historical native diagnostics available for the old
+        // variants, while the newly exposed foreign boundaries remain
+        // content-free. Their typed causes are still available through
+        // `source()`.
+        match self {
+            Self::Io(error) => formatter.debug_tuple("Error::Io").field(error).finish(),
+            Self::Ole(error) => formatter.debug_tuple("Error::Ole").field(error).finish(),
+            Self::Object(error) => formatter.debug_tuple("Error::Object").field(error).finish(),
+            Self::CustomXml(_) => formatter.write_str("Error::CustomXml(..)"),
+            Self::Vba(_) => formatter.write_str("Error::Vba(..)"),
+            Self::Signature(_) => formatter.write_str("Error::Signature(..)"),
+            Self::Crypto(_) => formatter.write_str("Error::Crypto(..)"),
+            Self::InvalidFormat(value) => formatter
+                .debug_tuple("Error::InvalidFormat")
+                .field(value)
+                .finish(),
+            Self::StreamNotFound(value) => formatter
+                .debug_tuple("Error::StreamNotFound")
+                .field(value)
+                .finish(),
+            Self::Corrupted(value) => formatter
+                .debug_tuple("Error::Corrupted")
+                .field(value)
+                .finish(),
+            Self::PatchConflict => formatter.write_str("Error::PatchConflict"),
+            Self::Allocation { resource, source } => formatter
+                .debug_struct("Error::Allocation")
+                .field("resource", resource)
+                .field("source", source)
+                .finish(),
+            Self::ProtectionDenied(state) => formatter
+                .debug_tuple("Error::ProtectionDenied")
+                .field(state)
+                .finish(),
+            Self::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => formatter
+                .debug_struct("Error::InvalidLimit")
+                .field("kind", kind)
+                .field("value", value)
+                .field("maximum", maximum)
+                .finish(),
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => formatter
+                .debug_struct("Error::Limit")
+                .field("kind", kind)
+                .field("observed", observed)
+                .field("maximum", maximum)
+                .finish(),
+            Self::PasswordRequired => formatter.write_str("Error::PasswordRequired"),
+            Self::InvalidPassword => formatter.write_str("Error::InvalidPassword"),
+            Self::UnsupportedEncryption(kind) => formatter
+                .debug_tuple("Error::UnsupportedEncryption")
+                .field(kind)
+                .finish(),
+            Self::MalformedEncryptionHeader(value) => formatter
+                .debug_tuple("Error::MalformedEncryptionHeader")
+                .field(value)
+                .finish(),
+            Self::UnsupportedVersion { nfib, name } => formatter
+                .debug_struct("Error::UnsupportedVersion")
+                .field("nfib", nfib)
+                .field("name", name)
+                .finish(),
+        }
+    }
+}
+
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
         Error::Io(err)
@@ -390,6 +472,10 @@ impl std::fmt::Display for Error {
             Error::Io(e) => write!(f, "IO error: {e}"),
             Error::Ole(e) => write!(f, "OLE error: {e}"),
             Error::Object(e) => write!(f, "OLE object error: {e}"),
+            Error::CustomXml(_) => f.write_str("DOC Custom XML operation failed"),
+            Error::Vba(_) => f.write_str("DOC VBA operation failed"),
+            Error::Signature(_) => f.write_str("DOC signature operation failed"),
+            Error::Crypto(_) => f.write_str("DOC DataSpaces operation failed"),
             Error::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
             Error::StreamNotFound(s) => write!(f, "Stream not found: {s}"),
             Error::Corrupted(s) => write!(f, "Corrupted file: {s}"),
@@ -442,6 +528,10 @@ impl std::error::Error for Error {
             Self::Io(error) => Some(error),
             Self::Ole(error) => Some(error),
             Self::Object(error) => Some(error),
+            Self::CustomXml(error) => Some(error),
+            Self::Vba(error) => Some(error),
+            Self::Signature(error) => Some(error),
+            Self::Crypto(error) => Some(error),
             Self::Allocation { source, .. } => Some(source),
             Self::InvalidFormat(_)
             | Self::StreamNotFound(_)
@@ -619,12 +709,75 @@ impl std::fmt::Debug for Package {
     }
 }
 
+// The generic core projection predates the format-owned typed errors and has
+// no foreign-source carrier. Keep this projection fixed and content-free;
+// litchi-ops classifies the original DOC error before this conversion.
+fn core_custom_xml_error(error: litchi_ole_common::custom_xml::Error) -> litchi_core::Error {
+    match error {
+        litchi_ole_common::custom_xml::Error::Ole(error) => {
+            litchi_core::Error::from(litchi_ole_common::Error::from(error))
+        },
+        litchi_ole_common::custom_xml::Error::Invalid(_)
+        | litchi_ole_common::custom_xml::Error::ResourceLimit(_)
+        | litchi_ole_common::custom_xml::Error::Xml(_) => {
+            litchi_core::Error::CorruptedFile("DOC Custom XML operation failed".to_string())
+        },
+        _ => litchi_core::Error::CorruptedFile("DOC Custom XML operation failed".to_string()),
+    }
+}
+
+fn core_vba_error(error: litchi_vba::Error) -> litchi_core::Error {
+    match error {
+        litchi_vba::Error::Cfb(error) => litchi_core::Error::from(error),
+        litchi_vba::Error::InvalidData(_)
+        | litchi_vba::Error::Limit { .. }
+        | litchi_vba::Error::UnsupportedCodePage(_) => {
+            litchi_core::Error::CorruptedFile("DOC VBA operation failed".to_string())
+        },
+    }
+}
+
+fn core_signature_error(error: litchi_sign::Error) -> litchi_core::Error {
+    match error {
+        litchi_sign::Error::Cfb(error) => litchi_core::Error::from(error),
+        litchi_sign::Error::Encrypted
+        | litchi_sign::Error::Legacy
+        | litchi_sign::Error::Unsupported(_) => {
+            litchi_core::Error::Unsupported("DOC signature policy is unsupported".to_string())
+        },
+        litchi_sign::Error::Xml(_)
+        | litchi_sign::Error::Limit(_)
+        | litchi_sign::Error::Sha1
+        | litchi_sign::Error::Key(_)
+        | litchi_sign::Error::Sign(_)
+        | litchi_sign::Error::Container(_) => {
+            litchi_core::Error::CorruptedFile("DOC signature operation failed".to_string())
+        },
+        _ => litchi_core::Error::CorruptedFile("DOC signature operation failed".to_string()),
+    }
+}
+
+fn core_crypto_error(error: litchi_crypto::spaces::Error) -> litchi_core::Error {
+    match error {
+        litchi_crypto::spaces::Error::Ole(error) => litchi_core::Error::from(error),
+        litchi_crypto::spaces::Error::Invalid(_) => {
+            litchi_core::Error::CorruptedFile("DOC DataSpaces operation failed".to_string())
+        },
+        litchi_crypto::spaces::Error::PatchConflict => litchi_core::Error::PatchConflict,
+        _ => litchi_core::Error::CorruptedFile("DOC DataSpaces operation failed".to_string()),
+    }
+}
+
 impl From<Error> for litchi_core::Error {
     fn from(err: Error) -> Self {
         match err {
             Error::Io(e) => litchi_core::Error::Io(e),
             Error::Ole(ole_err) => litchi_core::Error::from(ole_err),
             Error::Object(error) => litchi_core::Error::from(error),
+            Error::CustomXml(error) => core_custom_xml_error(error),
+            Error::Vba(error) => core_vba_error(error),
+            Error::Signature(error) => core_signature_error(error),
+            Error::Crypto(error) => core_crypto_error(error),
             Error::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             Error::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
             Error::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
@@ -675,5 +828,74 @@ impl From<litchi_ole_common::Error> for Error {
             litchi_ole_common::Error::PatchConflict => Self::PatchConflict,
             error => Self::Object(error),
         }
+    }
+}
+
+impl From<litchi_ole_common::custom_xml::Error> for Error {
+    fn from(error: litchi_ole_common::custom_xml::Error) -> Self {
+        Self::CustomXml(error)
+    }
+}
+
+impl From<litchi_vba::Error> for Error {
+    fn from(error: litchi_vba::Error) -> Self {
+        Self::Vba(error)
+    }
+}
+
+impl From<litchi_sign::Error> for Error {
+    fn from(error: litchi_sign::Error) -> Self {
+        Self::Signature(error)
+    }
+}
+
+impl From<litchi_crypto::spaces::Error> for Error {
+    fn from(error: litchi_crypto::spaces::Error) -> Self {
+        match error {
+            litchi_crypto::spaces::Error::PatchConflict => Self::PatchConflict,
+            error => Self::Crypto(error),
+        }
+    }
+}
+
+#[cfg(test)]
+mod error_tests {
+    use super::Error;
+    use std::error::Error as _;
+
+    #[test]
+    fn new_foreign_boundaries_redact_display_and_debug_but_keep_source() {
+        let payload = "doc-secret-foreign-payload";
+        let errors = [
+            Error::CustomXml(litchi_ole_common::custom_xml::Error::Invalid(
+                payload.to_string(),
+            )),
+            Error::Vba(litchi_vba::Error::InvalidData(payload.to_string())),
+            Error::Signature(litchi_sign::Error::Xml(payload.to_string())),
+            Error::Crypto(litchi_crypto::spaces::Error::Invalid(payload.to_string())),
+        ];
+        for error in errors {
+            assert!(error.source().is_some());
+            assert!(!error.to_string().contains(payload));
+            assert!(!format!("{error:?}").contains(payload));
+        }
+    }
+
+    #[test]
+    fn core_projection_uses_typed_or_fixed_categories_without_foreign_text() {
+        let payload = "doc-secret-signature-limit";
+        let core: litchi_core::Error =
+            Error::Signature(litchi_sign::Error::Limit(payload.to_string())).into();
+        assert!(matches!(core, litchi_core::Error::CorruptedFile(_)));
+        assert!(!core.to_string().contains(payload));
+
+        let core: litchi_core::Error =
+            Error::Signature(litchi_sign::Error::Unsupported(payload.to_string())).into();
+        assert!(matches!(core, litchi_core::Error::Unsupported(_)));
+        assert!(!core.to_string().contains(payload));
+
+        let core: litchi_core::Error =
+            Error::Crypto(litchi_crypto::spaces::Error::PatchConflict).into();
+        assert!(matches!(core, litchi_core::Error::PatchConflict));
     }
 }

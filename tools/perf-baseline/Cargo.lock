@@ -1276,6 +1276,7 @@ dependencies = [
  "litchi-pptx",
  "litchi-rtf",
  "litchi-sign",
+ "litchi-vba",
  "litchi-xls",
  "litchi-xlsb",
  "litchi-xlsx",

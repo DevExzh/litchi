@@ -69,7 +69,11 @@ fn doc_facade_discovers_unsigned_signature_state() {
     let mut doc =
         litchi_doc::raw::Reader::open(root.join("test-data/ole/doc/documentProperties.doc"))
             .unwrap();
-    assert!(doc.signatures().unwrap().is_empty());
+    assert!(
+        doc.signatures(&litchi_sign::Policy::strict())
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[test]
@@ -101,7 +105,10 @@ fn public_property_set_facade_reads_and_edits_vba_signature_payloads() {
         stream,
     );
     let mut package = litchi_doc::raw::Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
-    let package_signature = package.vba_signature().unwrap().unwrap();
+    let package_signature = package
+        .vba_signature(litchi_ole_common::vba_signature::Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(package_signature.info().signature(), [1, 2, 3]);
 
     let package = litchi_doc::Package::from_bytes(&bytes).unwrap();

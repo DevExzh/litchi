@@ -27,14 +27,15 @@ pub struct PackageOptions<'a> {
 }
 
 impl<R: Read + Seek> Reader<R> {
-    /// Read font semantics from the exact live persisted document.
+    /// Read font semantics from the exact live persisted document under the
+    /// caller-selected record and font limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the package cannot be opened or its font records
     /// are malformed.
-    pub fn fonts(&mut self) -> Result<FontCollections> {
-        self.presentation()?.fonts()
+    pub fn fonts(&mut self, limits: Limits) -> Result<FontCollections> {
+        self.presentation()?.fonts_with_limits(limits)
     }
 }
 

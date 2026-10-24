@@ -377,6 +377,7 @@ fn validate_limit(kind: SourceLimitKind, value: usize, maximum: usize) -> Result
 )]
 mod limit_tests {
     use super::{Error, OpenOptions, SourceLimitKind, SourceLimits};
+    use std::error::Error as _;
 
     #[test]
     fn constrained_limits_take_the_component_wise_minimum() {
@@ -487,6 +488,33 @@ mod limit_tests {
             litchi_core::Error::Unsupported(message)
                 if message.contains("password-to-open encryption")
         ));
+    }
+
+    #[test]
+    fn new_custom_xml_boundary_redacts_foreign_payload_but_keeps_source() {
+        let payload = "ppt-secret-custom-xml-payload";
+        let error = Error::CustomXml(litchi_ole_common::custom_xml::Error::Invalid(
+            payload.to_string(),
+        ));
+        assert!(error.source().is_some());
+        assert!(!error.to_string().contains(payload));
+        assert!(!format!("{error:?}").contains(payload));
+        let core: litchi_core::Error = error.into();
+        assert!(matches!(core, litchi_core::Error::CorruptedFile(_)));
+        assert!(!core.to_string().contains(payload));
+    }
+
+    #[cfg(feature = "sign")]
+    #[test]
+    fn new_signature_boundary_keeps_typed_core_categories_without_payloads() {
+        let payload = "ppt-secret-signature-payload";
+        let error = Error::Signature(litchi_sign::Error::Unsupported(payload.to_string()));
+        assert!(error.source().is_some());
+        assert!(!error.to_string().contains(payload));
+        assert!(!format!("{error:?}").contains(payload));
+        let core: litchi_core::Error = error.into();
+        assert!(matches!(core, litchi_core::Error::Unsupported(_)));
+        assert!(!core.to_string().contains(payload));
     }
 }
 
@@ -607,6 +635,11 @@ pub enum Error {
     Ole(OleError),
     /// Shared OLE object or Property Set error with typed classification.
     Object(litchi_ole_common::Error),
+    /// Legacy Custom XML data-store parsing failure.
+    CustomXml(litchi_ole_common::custom_xml::Error),
+    /// XML signature verification failure.
+    #[cfg(feature = "sign")]
+    Signature(litchi_sign::Error),
     /// Checked `OfficeArt` parsing or validation error.
     OfficeArt(litchi_odraw::Error),
     /// Host-neutral Office Graph parsing or validation error.
@@ -661,6 +694,9 @@ impl std::fmt::Debug for Error {
             Self::Io(error) => formatter.debug_tuple("Error::Io").field(error).finish(),
             Self::Ole(error) => formatter.debug_tuple("Error::Ole").field(error).finish(),
             Self::Object(error) => formatter.debug_tuple("Error::Object").field(error).finish(),
+            Self::CustomXml(_) => formatter.write_str("Error::CustomXml(..)"),
+            #[cfg(feature = "sign")]
+            Self::Signature(_) => formatter.write_str("Error::Signature(..)"),
             Self::OfficeArt(error) => formatter
                 .debug_tuple("Error::OfficeArt")
                 .field(error)
@@ -745,6 +781,19 @@ impl From<litchi_ole_common::Error> for Error {
     }
 }
 
+impl From<litchi_ole_common::custom_xml::Error> for Error {
+    fn from(error: litchi_ole_common::custom_xml::Error) -> Self {
+        Self::CustomXml(error)
+    }
+}
+
+#[cfg(feature = "sign")]
+impl From<litchi_sign::Error> for Error {
+    fn from(error: litchi_sign::Error) -> Self {
+        Self::Signature(error)
+    }
+}
+
 impl From<litchi_odraw::Error> for Error {
     fn from(err: litchi_odraw::Error) -> Self {
         Error::OfficeArt(err)
@@ -764,6 +813,9 @@ impl std::fmt::Display for Error {
             Error::Io(e) => write!(f, "IO error: {e}"),
             Error::Ole(e) => write!(f, "OLE error: {e}"),
             Error::Object(e) => write!(f, "OLE object error: {e}"),
+            Error::CustomXml(_) => f.write_str("PPT Custom XML operation failed"),
+            #[cfg(feature = "sign")]
+            Error::Signature(_) => f.write_str("PPT signature operation failed"),
             Error::OfficeArt(e) => write!(f, "OfficeArt error: {e}"),
             Error::Graph(e) => write!(f, "Office Graph error: {e}"),
             Error::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
@@ -812,6 +864,9 @@ impl std::error::Error for Error {
             Self::Io(error) => Some(error),
             Self::Ole(error) => Some(error),
             Self::Object(error) => Some(error),
+            Self::CustomXml(error) => Some(error),
+            #[cfg(feature = "sign")]
+            Self::Signature(error) => Some(error),
             Self::OfficeArt(error) => Some(error),
             Self::Graph(error) => Some(error),
             Self::InvalidFormat(_)
@@ -868,12 +923,53 @@ pub struct Reader<R: Read + Seek = File> {
 // `From<Error> for litchi_core::Error` lives here (not in the umbrella) so
 // the orphan rule is satisfied — both source and target crates are external
 // to the umbrella.
+// The generic core projection has no foreign-source carrier. Keep this
+// projection fixed and content-free; litchi-ops classifies the original PPT
+// error before this conversion.
+fn core_custom_xml_error(error: litchi_ole_common::custom_xml::Error) -> litchi_core::Error {
+    match error {
+        litchi_ole_common::custom_xml::Error::Ole(error) => {
+            litchi_core::Error::from(litchi_ole_common::Error::from(error))
+        },
+        litchi_ole_common::custom_xml::Error::Invalid(_)
+        | litchi_ole_common::custom_xml::Error::ResourceLimit(_)
+        | litchi_ole_common::custom_xml::Error::Xml(_) => {
+            litchi_core::Error::CorruptedFile("PPT Custom XML operation failed".to_string())
+        },
+        _ => litchi_core::Error::CorruptedFile("PPT Custom XML operation failed".to_string()),
+    }
+}
+
+#[cfg(feature = "sign")]
+fn core_signature_error(error: litchi_sign::Error) -> litchi_core::Error {
+    match error {
+        litchi_sign::Error::Cfb(error) => litchi_core::Error::from(error),
+        litchi_sign::Error::Encrypted
+        | litchi_sign::Error::Legacy
+        | litchi_sign::Error::Unsupported(_) => {
+            litchi_core::Error::Unsupported("PPT signature policy is unsupported".to_string())
+        },
+        litchi_sign::Error::Xml(_)
+        | litchi_sign::Error::Limit(_)
+        | litchi_sign::Error::Sha1
+        | litchi_sign::Error::Key(_)
+        | litchi_sign::Error::Sign(_)
+        | litchi_sign::Error::Container(_) => {
+            litchi_core::Error::CorruptedFile("PPT signature operation failed".to_string())
+        },
+        _ => litchi_core::Error::CorruptedFile("PPT signature operation failed".to_string()),
+    }
+}
+
 impl From<Error> for litchi_core::Error {
     fn from(err: Error) -> Self {
         match err {
             Error::Io(e) => litchi_core::Error::Io(e),
             Error::Ole(ole_err) => litchi_core::Error::from(ole_err),
             Error::Object(error) => litchi_core::Error::from(error),
+            Error::CustomXml(error) => core_custom_xml_error(error),
+            #[cfg(feature = "sign")]
+            Error::Signature(error) => core_signature_error(error),
             Error::OfficeArt(error) => {
                 litchi_core::Error::CorruptedFile(format!("Invalid OfficeArt data: {error}"))
             },

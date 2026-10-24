@@ -33,11 +33,28 @@ default = []
 # compound file an encrypted OOXML package arrives in.
 # The legacy binary formats remove a compound-file signature after
 # `Signed::unsign` through `litchi-sign` (step S6b, record 0013).
-doc     = ["dep:litchi-cfb", "dep:litchi-doc", "dep:litchi-ole-common", "dep:litchi-sign"]
+doc     = [
+    "dep:litchi-cfb",
+    "dep:litchi-crypto",
+    "dep:litchi-doc",
+    "dep:litchi-ole-common",
+    "dep:litchi-sign",
+    "dep:litchi-vba",
+]
+sign    = ["dep:litchi-sign", "litchi-ppt?/sign"]
 docx    = ["dep:base64", "dep:litchi-docx", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "opc"]
 ppt     = ["dep:litchi-biff", "dep:litchi-cfb", "dep:litchi-ograph", "dep:litchi-ole-common", "dep:litchi-ppt", "dep:litchi-sign"]
 pptx    = ["dep:base64", "dep:chrono", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "dep:litchi-pptx", "opc"]
-xls     = ["dep:base64", "dep:litchi-biff", "dep:litchi-cfb", "dep:litchi-ograph", "dep:litchi-ole-common", "dep:litchi-sign", "dep:litchi-xls"]
+xls     = [
+    "dep:base64",
+    "dep:litchi-biff",
+    "dep:litchi-cfb",
+    "dep:litchi-ograph",
+    "dep:litchi-ole-common",
+    "dep:litchi-sign",
+    "dep:litchi-vba",
+    "dep:litchi-xls",
+]
 xlsx    = ["dep:base64", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "dep:litchi-xlsx", "opc"]
 xlsb    = ["dep:base64", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "dep:litchi-xlsb", "opc"]
 rtf     = ["dep:litchi-rtf", "dep:chrono"]
@@ -141,6 +158,7 @@ litchi-pptx         = { workspace = true, optional = true }
 litchi-rtf          = { workspace = true, optional = true }
 litchi-sheet-text   = { workspace = true } # Delimited tokenizer and decoding for `File::import` (record 0354)
 litchi-sign         = { workspace = true, optional = true }
+litchi-vba          = { workspace = true, optional = true }
 litchi-xls          = { workspace = true, optional = true }
 litchi-xlsb         = { workspace = true, optional = true }
 litchi-xlsx         = { workspace = true, optional = true }

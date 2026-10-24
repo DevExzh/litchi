@@ -241,11 +241,8 @@ impl<R: Read + Seek> Reader<R> {
     /// never decrypts content, evaluates a license, contacts a rights server,
     /// or activates protected content. `None` means the package has no
     /// `DataSpaces` graph.
-    pub fn data_spaces(
-        &mut self,
-    ) -> std::result::Result<Option<litchi_crypto::spaces::Graph>, litchi_crypto::spaces::Error>
-    {
-        litchi_crypto::spaces::inspect(&mut self.ole)
+    pub fn data_spaces(&mut self) -> Result<Option<litchi_crypto::spaces::Graph>> {
+        litchi_crypto::spaces::inspect(&mut self.ole).map_err(Error::from)
     }
 
     /// Capture a source-preserving, validated `DataSpaces` edit owner.
@@ -254,11 +251,8 @@ impl<R: Read + Seek> Reader<R> {
     /// can later be written to a fresh destination with
     /// [`Self::write_data_spaces_patch`]; the current package is never
     /// mutated in place and no protected payload is decrypted or evaluated.
-    pub fn data_spaces_snapshot(
-        &mut self,
-    ) -> std::result::Result<Option<litchi_crypto::spaces::Snapshot>, litchi_crypto::spaces::Error>
-    {
-        litchi_crypto::spaces::Snapshot::from_ole(&mut self.ole)
+    pub fn data_spaces_snapshot(&mut self) -> Result<Option<litchi_crypto::spaces::Snapshot>> {
+        litchi_crypto::spaces::Snapshot::from_ole(&mut self.ole).map_err(Error::from)
     }
 
     /// Rebuild the package after source-checking a `DataSpaces` patch.
@@ -271,8 +265,8 @@ impl<R: Read + Seek> Reader<R> {
         &mut self,
         patch: &litchi_crypto::spaces::Patch,
         output: &mut W,
-    ) -> std::result::Result<(), litchi_crypto::spaces::Error> {
-        patch.write_to(&mut self.ole, output)
+    ) -> Result<()> {
+        patch.write_to(&mut self.ole, output).map_err(Error::from)
     }
 
     /// Get the underlying OLE file.
@@ -308,21 +302,14 @@ impl<R: Read + Seek> Reader<R> {
         self.vba_project_storages().into_iter().next()
     }
 
-    /// Parse the optional MS-DOC VBA project with safe default limits.
+    /// Parse the optional MS-DOC VBA project with explicit resource limits.
     ///
     /// Source is decompressed and decoded according to the project code page,
     /// but is never compiled, interpreted, or executed.
     pub fn vba(
         &mut self,
-    ) -> std::result::Result<Option<litchi_vba::project::Project>, litchi_vba::Error> {
-        self.vba_with(&litchi_vba::Limits::default())
-    }
-
-    /// Parse the optional MS-DOC VBA project with explicit resource limits.
-    pub fn vba_with(
-        &mut self,
         limits: &litchi_vba::Limits,
-    ) -> std::result::Result<Option<litchi_vba::project::Project>, litchi_vba::Error> {
+    ) -> Result<Option<litchi_vba::project::Project>> {
         let Some(storage) = self.vba_project_storage() else {
             return Ok(None);
         };
@@ -334,17 +321,17 @@ impl<R: Read + Seek> Reader<R> {
             .iter()
             .map(String::as_str)
             .collect();
-        litchi_vba::project::Project::open(&mut self.ole, &path, limits).map(Some)
+        litchi_vba::project::Project::open(&mut self.ole, &path, limits)
+            .map(Some)
+            .map_err(Error::from)
     }
 
     /// Read the legacy Custom XML Data Storage without resolving schema URIs.
     pub fn custom_xml_data_store(
         &mut self,
-    ) -> litchi_ole_common::custom_xml::Result<Option<litchi_ole_common::custom_xml::Store>> {
-        litchi_ole_common::custom_xml::inspect(
-            &mut self.ole,
-            litchi_ole_common::custom_xml::Limits::default(),
-        )
+        limits: litchi_ole_common::custom_xml::Limits,
+    ) -> Result<Option<litchi_ole_common::custom_xml::Store>> {
+        litchi_ole_common::custom_xml::inspect(&mut self.ole, limits).map_err(Error::from)
     }
 
     pub fn summary_information(&mut self) -> Result<Option<Stream>> {
@@ -358,22 +345,18 @@ impl<R: Read + Seek> Reader<R> {
         }
     }
 
-    /// Verify document XML signatures with the safe strict policy, without
-    /// evaluating certificate trust or opening any VBA project stream.
-    pub fn signatures(&mut self) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
-        self.signatures_with(&litchi_sign::Policy::strict())
-    }
-
     /// Verify document XML signatures with an explicit trust-neutral policy.
-    pub fn signatures_with(
+    pub fn signatures(
         &mut self,
         policy: &litchi_sign::Policy,
-    ) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
+    ) -> Result<Vec<litchi_sign::cfb::Report>> {
         litchi_sign::cfb::verify(&mut self.ole, litchi_sign::cfb::Format::Doc, policy)
+            .map_err(Error::from)
     }
 
     /// Read the inert VBA `DigSigBlob` stored in PIDDSI
-    /// `DocumentSummaryInformation`.
+    /// `DocumentSummaryInformation` with explicit finite blob and payload
+    /// limits.
     ///
     /// This accessor validates only the `[MS-OSHARED]` container serialization.
     /// The PKCS#7 `SignedData` payload and its
@@ -382,13 +365,7 @@ impl<R: Read + Seek> Reader<R> {
     /// and never verifies certificate trust, opens a VBA project, or executes
     /// code. `None` means the property stream or its `DigitalSignature`
     /// property is absent.
-    pub fn vba_signature(&mut self) -> Result<Option<litchi_ole_common::vba_signature::Snapshot>> {
-        self.vba_signature_with(litchi_ole_common::vba_signature::Limits::default())
-    }
-
-    /// Read the inert VBA signature with explicit finite blob and payload
-    /// limits.
-    pub fn vba_signature_with(
+    pub fn vba_signature(
         &mut self,
         limits: litchi_ole_common::vba_signature::Limits,
     ) -> Result<Option<litchi_ole_common::vba_signature::Snapshot>> {

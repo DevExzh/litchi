@@ -55,7 +55,7 @@ fn empty_project_metadata_round_trips_as_non_executable() {
     let storage = workbook.vba_project_storage().unwrap();
     assert!(storage.is_structurally_complete());
     assert!(storage.candidate_module_stream_names().is_empty());
-    let project = workbook.vba().unwrap().unwrap();
+    let project = workbook.vba(&Limits::default()).unwrap().unwrap();
     assert_eq!(project.name(), "VBAProject");
     assert!(project.modules().is_empty());
 }
@@ -95,7 +95,7 @@ fn complete_project_with_modules_round_trips_as_inert_source() {
         storage.candidate_module_stream_names(),
         ["Module1", "ThisWorkbook"]
     );
-    let project = workbook.vba().unwrap().unwrap();
+    let project = workbook.vba(&Limits::default()).unwrap().unwrap();
     assert_eq!(project.name(), "Analytics");
     assert_eq!(project.modules().len(), 2);
     assert_eq!(project.modules()[0].name(), "Module1");

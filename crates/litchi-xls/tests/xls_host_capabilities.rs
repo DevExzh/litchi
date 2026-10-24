@@ -14,7 +14,7 @@ fn facade_exposes_signatures_and_standard_property_sets() {
     .expect("valid XLS fixture");
     assert!(
         signed
-            .signatures()
+            .signatures(&litchi_sign::Policy::strict())
             .expect("inspect inert signatures")
             .is_empty()
     );

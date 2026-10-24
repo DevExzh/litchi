@@ -30,9 +30,10 @@ use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;
 
 impl<R: Read + Seek> Reader<R> {
-    pub(super) fn empty(ole_file: OleFile<R>) -> Self {
+    pub(super) fn empty(ole_file: OleFile<R>, source_limits: SourceLimits) -> Self {
         Self {
             ole_file,
+            source_limits,
             encryption: None,
             worksheets: Vec::new(),
             worksheet_names: Vec::new(),
@@ -126,7 +127,7 @@ impl<R: Read + Seek> Reader<R> {
         ole_file: OleFile<R>,
         options: OpenOptions<'_>,
     ) -> Result<Self> {
-        let mut workbook = Self::empty(ole_file);
+        let mut workbook = Self::empty(ole_file, options.source_limits_value());
         workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
         workbook.parse_workbook(&options, CellDecoding::Every)?;
         Ok(workbook)
@@ -151,7 +152,7 @@ impl<R: Read + Seek> Reader<R> {
     ) -> Result<std::result::Result<Self, OleFile<R>>> {
         let source_limits = options.source_limits_value();
         Self::validate_ole_file(&ole_file, source_limits)?;
-        let mut workbook = Self::empty(ole_file);
+        let mut workbook = Self::empty(ole_file, source_limits);
 
         workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
         match workbook.parse_workbook(&options, CellDecoding::Every) {
@@ -365,11 +366,15 @@ impl<R: Read + Seek> Reader<R> {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn custom_xml_data_store(
         &mut self,
-    ) -> litchi_ole_common::custom_xml::Result<Option<litchi_ole_common::custom_xml::Store>> {
-        litchi_ole_common::custom_xml::inspect(
-            &mut self.ole_file,
-            litchi_ole_common::custom_xml::Limits::default(),
-        )
+        limits: litchi_ole_common::custom_xml::Limits,
+    ) -> Result<Option<litchi_ole_common::custom_xml::Store>> {
+        litchi_ole_common::custom_xml::inspect(&mut self.ole_file, limits).map_err(Error::from)
+    }
+
+    /// Source limits inherited by package-stream readers.
+    #[must_use]
+    pub const fn source_limits(&self) -> SourceLimits {
+        self.source_limits
     }
 
     /// # Errors
@@ -386,24 +391,16 @@ impl<R: Read + Seek> Reader<R> {
         }
     }
 
-    /// Verify workbook XML signatures with the safe strict policy, without
-    /// evaluating certificate trust or executing any macro content.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn signatures(&mut self) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
-        self.signatures_with(&litchi_sign::Policy::strict())
-    }
-
     /// Verify workbook XML signatures with an explicit trust-neutral policy.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn signatures_with(
+    pub fn signatures(
         &mut self,
         policy: &litchi_sign::Policy,
-    ) -> litchi_sign::Result<Vec<litchi_sign::cfb::Report>> {
+    ) -> Result<Vec<litchi_sign::cfb::Report>> {
         litchi_sign::cfb::verify(&mut self.ole_file, litchi_sign::cfb::Format::Xls, policy)
+            .map_err(Error::from)
     }
 
     /// # Errors
@@ -462,7 +459,7 @@ impl<R: Read + Seek> Reader<R> {
         crate::vba::discover_vba_project_storage(&self.ole_file.list_streams())
     }
 
-    /// Parse the `_VBA_PROJECT_CUR` MS-OVBA project with safe default limits.
+    /// Parse the `_VBA_PROJECT_CUR` MS-OVBA project with explicit limits.
     ///
     /// The method returns `None` when no structurally complete VBA project is
     /// present. Source is only decompressed and decoded; it is never compiled,
@@ -472,18 +469,8 @@ impl<R: Read + Seek> Reader<R> {
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn vba(
         &mut self,
-    ) -> std::result::Result<Option<litchi_vba::project::Project>, litchi_vba::Error> {
-        self.vba_with(&litchi_vba::Limits::default())
-    }
-
-    /// Parse the `_VBA_PROJECT_CUR` project with explicit resource limits.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn vba_with(
-        &mut self,
         limits: &litchi_vba::Limits,
-    ) -> std::result::Result<Option<litchi_vba::project::Project>, litchi_vba::Error> {
+    ) -> Result<Option<litchi_vba::project::Project>> {
         let Some(storage) = self.vba_project_storage() else {
             return Ok(None);
         };
@@ -495,7 +482,9 @@ impl<R: Read + Seek> Reader<R> {
             .iter()
             .map(String::as_str)
             .collect();
-        litchi_vba::project::Project::open(&mut self.ole_file, &path, limits).map(Some)
+        litchi_vba::project::Project::open(&mut self.ole_file, &path, limits)
+            .map(Some)
+            .map_err(Error::from)
     }
 
     /// Whether the CFB container holds a shared-workbook `Revision Log` stream
@@ -508,16 +497,33 @@ impl<R: Read + Seek> Reader<R> {
     ///
     /// The result is a typed, inert model of the RRD revision records.
     /// Parsing never applies, rejects, or replays any recorded revision.
+    /// `limits` is required at this raw boundary. It is constrained by the
+    /// source profile retained when this reader was admitted, so a caller can
+    /// narrow the operation but cannot widen the ingress policy.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn revision_log(&mut self) -> Result<Option<crate::revision_log::RevisionLog>> {
+    pub fn revision_log(
+        &mut self,
+        limits: &SourceLimits,
+    ) -> Result<Option<crate::revision_log::RevisionLog>> {
         let Some(name) =
             crate::revision_log::find_revision_log_stream(&self.ole_file.list_streams())
                 .map(str::to_owned)
         else {
             return Ok(None);
         };
+        let effective_limits = self.source_limits.constrained_by(*limits);
+        let maximum = effective_limits.max_entry_bytes();
+        let observed = self.ole_file.stream_len(&[name.as_str()])?;
+        let maximum_u64 = u64::try_from(maximum).unwrap_or(u64::MAX);
+        if observed > maximum_u64 {
+            return Err(Error::Limit {
+                kind: LimitKind::EntryBytes,
+                observed,
+                maximum: maximum_u64,
+            });
+        }
         let data = self.ole_file.open_stream(&[name.as_str()])?;
         crate::revision_log::parse_revision_log_stream_with_sheet_count(&data, self.sheets.len())
             .map(Some)

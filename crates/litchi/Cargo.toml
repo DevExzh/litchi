@@ -121,6 +121,7 @@ sheet = ["dep:litchi-sheet"]
 sheet-text = ["sheet", "dep:litchi-sheet-text"]
 sign = [
     "dep:litchi-sign",
+    "litchi-ops?/sign",
     "litchi-opc?/sign",
     "litchi-docx?/sign",
     "litchi-ppt?/sign",
