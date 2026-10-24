@@ -454,6 +454,7 @@ impl Edit<'_> {
     fn resolve(&mut self) -> Result<(), Error> {
         if self.resolved.is_none() {
             let mut budget = TransactionBudget::new(self.source)?;
+            budget.charge(LimitKind::Allocations, self.selector.retained_allocations())?;
             let selector = self.selector.public();
             let section_index =
                 resolve_section_index(self.source, selector.section(), &mut budget)?;
@@ -737,14 +738,7 @@ impl DeferredSelector {
             SectionSelector::Position(position) => (Some(position), None),
             SectionSelector::Name(name) => {
                 let mut budget = TransactionBudget::new(source)?;
-                budget.charge(LimitKind::TextBytes, name.len())?;
-                budget.charge(LimitKind::RetainedBytes, name.len())?;
-                let mut owned = String::new();
-                owned
-                    .try_reserve_exact(name.len())
-                    .map_err(|_| Error::Allocation { amount: name.len() })?;
-                owned.push_str(name);
-                (None, Some(owned.into_boxed_str()))
+                (None, Some(own_section_name(&mut budget, name)?))
             },
         };
         Ok(Self {
@@ -762,6 +756,54 @@ impl DeferredSelector {
             SectionSelector::Position,
         );
         HeaderFooterSelector::new(section, self.template, self.kind, self.slot)
+    }
+
+    fn retained_allocations(&self) -> usize {
+        self.section_name.is_some() as usize
+    }
+}
+
+fn own_section_name(budget: &mut TransactionBudget, name: &str) -> Result<Box<str>, Error> {
+    budget.charge(LimitKind::TextBytes, name.len())?;
+    budget.charge(LimitKind::RetainedBytes, name.len())?;
+    budget.charge(LimitKind::Allocations, 1)?;
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(name.len())
+        .map_err(|_| Error::Allocation { amount: name.len() })?;
+    owned.push_str(name);
+    Ok(owned.into_boxed_str())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn budget_with_allocations(maximum: u64) -> TransactionBudget {
+        let mut maximums = [u64::MAX; 17];
+        maximums[LimitKind::Allocations as usize] = maximum;
+        TransactionBudget {
+            maximum: maximums,
+            observed: [0; 17],
+        }
+    }
+
+    #[test]
+    fn named_selector_allocation_admission_is_typed_at_exact_and_one_under() {
+        let mut exact = budget_with_allocations(1);
+        let owned = own_section_name(&mut exact, "section").unwrap();
+        assert_eq!(&*owned, "section");
+        assert_eq!(exact.observed[LimitKind::Allocations as usize], 1,);
+
+        let mut one_under = budget_with_allocations(0);
+        assert_eq!(
+            own_section_name(&mut one_under, "section"),
+            Err(Error::Limit {
+                kind: LimitKind::Allocations,
+                observed: 1,
+                maximum: 0,
+            })
+        );
     }
 }
 
@@ -1050,6 +1092,7 @@ fn source_preview_count(source: &Package) -> usize {
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let mut budget = TransactionBudget::new(edit.source)?;
+    budget.charge(LimitKind::Allocations, edit.selector.retained_allocations())?;
     edit.source.validate().map_err(map_package_error)?;
     let records = discover_slots_with_budget(edit.source, &mut budget)?;
     budget.charge(LimitKind::WireWork, records.len())?;
