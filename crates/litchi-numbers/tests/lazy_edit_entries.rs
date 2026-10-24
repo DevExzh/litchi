@@ -146,7 +146,7 @@ fn deferred_failures_preserve_budget_and_error_class_across_retries() -> TestRes
         Err(MergeError::Refused(MergeRefusal::SheetNotFound))
     ));
     assert!(matches!(
-        merges.merge(Region::new(0, 0, 1, 1)?),
+        merges.merge(Region::new(0, 0, 1, 2)?),
         Err(MergeError::Refused(MergeRefusal::SheetNotFound))
     ));
     assert!(matches!(
