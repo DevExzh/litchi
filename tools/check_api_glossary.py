@@ -15,7 +15,8 @@ the nominal litchi_core::edit::Commit or Diagnostics item; generic arguments
 and richer format-owned diagnostics remain outside that rule. Direct shared
 core Commit types use their canonical dependency path. "required_signatures"
 pins caller-visible input names and a required typed limits argument for
-raw/record/codec entry points; it deliberately checks only registered methods.
+raw/record/codec entry points; it deliberately checks only registered entry
+points.
 Each profile builds its own feature-specific rustdoc JSON; --json/--profile
 checks an existing document instead. Names are matched exactly under a public
 path prefix, never by substring. A ban with recursive=false matches direct
@@ -209,7 +210,12 @@ def checked_policy(value: Any) -> list[dict[str, Any]]:
                     "required signature requires method, inputs, limits_argument and limits_type"
                 )
             check_path(signature["method"])
-            check_path(signature["limits_type"])
+            # A raw function may borrow the limits type from its defining
+            # dependency (for example DOCX's MCE limits).  The method itself
+            # is local to this profile, but its limits type need not be.  The
+            # identity check below remains fail-closed for missing, aliased,
+            # or ambiguous external paths.
+            check_path(signature["limits_type"], local=False)
             inputs = signature["inputs"]
             if (not isinstance(inputs, list) or not inputs
                     or any(not isinstance(name, str) or not IDENTIFIER.fullmatch(name)
@@ -626,11 +632,13 @@ def violations(document: Any, profile: dict[str, Any]) -> list[str]:
         while isinstance(normalized, tuple) and normalized and normalized[0] == "ref":
             normalized = normalized[2]
         expected_path = tuple(rule["limits_type"].split("::"))
-        expected_id = surface.item_ids.get(expected_path)
-        expected_identity = (
-            return_types._resolve_nominal_identity(expected_id)
-            if expected_id is not None else None
-        )
+        # Prefer the caller-visible export, preserving local aliases and
+        # re-exports.  For a defining dependency path there is no local
+        # export, so canonical resolution requires exactly one external
+        # rustdoc identity and rejects same-spelled/ambiguous alternatives.
+        expected_identity = return_types.nominal_identity(expected_path)
+        if expected_identity is None:
+            expected_identity = return_types.nominal_identity(expected_path, canonical=True)
         actual_identity = (
             return_types._resolve_nominal_identity(normalized[1])
             if isinstance(normalized, tuple) and len(normalized) == 3
