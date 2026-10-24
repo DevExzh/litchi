@@ -23,6 +23,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 import tomllib
 
 ROOT_DEFAULT = Path("/home/zhuhe/code/litchi-worktrees/unified-ops-api")
@@ -39,6 +40,8 @@ POST_EXIT_STABLE_SAMPLES = 2
 POST_EXIT_TIMEOUT_SECONDS = 2.0
 PRE_EXIT_POLL_SECONDS = 0.01
 PROCESS_KILL_GRACE_SECONDS = 1.0
+TARGET_MEASURE_RETRIES = 5
+TARGET_MEASURE_DELAY_SECONDS = 0.02
 PR_SET_CHILD_SUBREAPER = 36
 _SUBREAPER_ENABLED = False
 _SUBREAPER_ERROR: str | None = None
@@ -490,7 +493,25 @@ def post_exit_guard(process_pid: int, root: Path, target: Path, ownership: dict 
 def target_bytes(target: Path) -> int:
     if not target.exists():
         return 0
-    return int(subprocess.check_output(["du", "-sb", str(target)], text=True).split()[0])
+    last_error: str | None = None
+    for attempt in range(TARGET_MEASURE_RETRIES):
+        result = subprocess.run(
+            ["du", "-sb", str(target)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+        fields = result.stdout.split()
+        if result.returncode == 0 and fields:
+            try:
+                return int(fields[0])
+            except ValueError:
+                pass
+        last_error = f"du exit={result.returncode}: {result.stderr.strip()[-500:]}"
+        if attempt + 1 < TARGET_MEASURE_RETRIES:
+            time.sleep(TARGET_MEASURE_DELAY_SECONDS)
+    raise RuntimeError(f"target measurement failed after {TARGET_MEASURE_RETRIES} attempts: {last_error}")
 
 
 def _terminate_process_group(process: subprocess.Popen, ownership: dict | None = None) -> dict | None:
@@ -520,7 +541,20 @@ def _watch_target(
     ownership: dict | None = None,
 ) -> dict:
     """Enforce the live cap for every gate command, not just Cargo chunks."""
-    maximum = target_bytes(target)
+    try:
+        maximum = target_bytes(target)
+    except Exception as error:
+        detail = {
+            "reason": "target measurement failed",
+            "error": repr(error),
+            "samples": 0,
+            "last_sampled_bytes": None,
+        }
+        overflow.append(detail)
+        cleanup = _terminate_process_group(process, ownership)
+        if cleanup is not None:
+            detail["cleanup"] = cleanup
+        return {"max_sampled_bytes": None, "samples": 0, "live_target": LIVE_TARGET, "measurement_error": repr(error)}
     samples = 0
     exited_at: float | None = None
     while not stop.wait(PRE_EXIT_POLL_SECONDS):
@@ -535,7 +569,20 @@ def _watch_target(
                     break
             else:
                 exited_at = None
-        size = target_bytes(target)
+        try:
+            size = target_bytes(target)
+        except Exception as error:
+            detail = {
+                "reason": "target measurement failed",
+                "error": repr(error),
+                "samples": samples,
+                "last_sampled_bytes": maximum,
+            }
+            overflow.append(detail)
+            cleanup = _terminate_process_group(process, ownership)
+            if cleanup is not None:
+                detail["cleanup"] = cleanup
+            break
         maximum = max(maximum, size)
         samples += 1
         if size >= LIVE_TARGET:
@@ -543,6 +590,7 @@ def _watch_target(
                 "target_bytes": size,
                 "live_target": LIVE_TARGET,
                 "max_sampled_bytes": maximum,
+                "last_sampled_bytes": size,
                 "samples": samples,
             }
             overflow.append(detail)
@@ -551,6 +599,37 @@ def _watch_target(
                 detail["cleanup"] = cleanup
             break
     return {"max_sampled_bytes": maximum, "samples": samples, "live_target": LIVE_TARGET}
+
+
+def _run_target_guard(
+    process: subprocess.Popen,
+    target: Path,
+    stop: threading.Event,
+    overflow: list[dict],
+    errors: list[dict],
+    ownership: dict,
+    stats: dict,
+) -> None:
+    """Convert any watcher exception into a recorded, fail-closed cleanup."""
+    try:
+        stats.update(_watch_target(process, target, stop, overflow, ownership))
+    except BaseException as error:
+        detail = {
+            "reason": "target guard exception",
+            "error": repr(error),
+            "traceback": traceback.format_exc(),
+        }
+        try:
+            cleanup = _terminate_process_group(process, ownership)
+            if cleanup is not None:
+                detail["cleanup"] = cleanup
+        except BaseException as cleanup_error:
+            detail["cleanup_error"] = repr(cleanup_error)
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+        errors.append(detail)
 
 
 def preflight(root: Path, target: Path, source: dict, isolated: bool = False) -> dict:
@@ -712,9 +791,10 @@ def run_step(step: dict, root: Path, target: Path, state_dir: Path, source: dict
     monitor.start()
     live_stop = threading.Event()
     live_overflow: list[dict] = []
+    live_errors: list[dict] = []
     live_guard_stats: dict = {}
     live_guard = threading.Thread(
-        target=lambda: live_guard_stats.update(_watch_target(process, target, live_stop, live_overflow, ownership)),
+        target=lambda: _run_target_guard(process, target, live_stop, live_overflow, live_errors, ownership, live_guard_stats),
         name=f"gate-target-guard-{process.pid}",
         daemon=True,
     )
@@ -772,12 +852,18 @@ def run_step(step: dict, root: Path, target: Path, state_dir: Path, source: dict
         "cargo_target_trace_sha256": sha256(trace),
         "preflight": pre,
         "target_live_guard": live_guard_stats,
+        "target_live_guard_errors": live_errors,
     }
-    if live_overflow:
+    if live_errors:
         row["resource_failure"] = {
-            "reason": "target live guard stopped command before hard cap",
-            **live_overflow[0],
+            "reason": "target live guard raised an unexpected exception",
+            "errors": live_errors,
         }
+        status = 1
+    if live_overflow:
+        row["resource_failure"] = {"reason": "target live guard stopped command before hard cap", **live_overflow[0]}
+        if live_errors:
+            row["resource_failure"]["guard_errors"] = live_errors
         status = 1
     if size > MAX_TARGET:
         row["resource_failure"] = f"target exceeded 20 GiB: {size}"
