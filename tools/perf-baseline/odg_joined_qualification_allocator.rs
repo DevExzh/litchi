@@ -19,6 +19,8 @@ static ALLOCATED_BYTES: AtomicU64 = AtomicU64::new(0);
 static DEALLOCATED_BYTES: AtomicU64 = AtomicU64::new(0);
 static LIVE_BYTES: AtomicU64 = AtomicU64::new(0);
 static PEAK_LIVE_BYTES: AtomicU64 = AtomicU64::new(0);
+static REGION_ACTIVE: AtomicBool = AtomicBool::new(false);
+static REGION_PEAK_LIVE_BYTES: AtomicU64 = AtomicU64::new(0);
 
 struct CountingSystemAllocator;
 
@@ -123,6 +125,20 @@ fn record_live_delta(delta: u64) {
             Err(observed) => peak = observed,
         }
     }
+    if REGION_ACTIVE.load(Ordering::Acquire) {
+        let mut region_peak = REGION_PEAK_LIVE_BYTES.load(Ordering::Acquire);
+        while live > region_peak {
+            match REGION_PEAK_LIVE_BYTES.compare_exchange_weak(
+                region_peak,
+                live,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => break,
+                Err(observed) => region_peak = observed,
+            }
+        }
+    }
 }
 
 fn decrement_live(delta: u64) -> u64 {
@@ -151,12 +167,17 @@ pub struct Region {
 }
 
 pub fn begin() -> Region {
-    Region { before: snapshot() }
+    REGION_ACTIVE.store(true, Ordering::Release);
+    let before = snapshot();
+    REGION_PEAK_LIVE_BYTES.store(before.live_bytes, Ordering::Release);
+    Region { before }
 }
 
 impl Region {
     pub fn finish(self) -> serde_json::Value {
         let after = snapshot();
+        let region_peak_live_bytes = REGION_PEAK_LIVE_BYTES.load(Ordering::Acquire);
+        REGION_ACTIVE.store(false, Ordering::Release);
         let measured = |before: u64, after: u64| after.checked_sub(before);
         let status = if measured(self.before.allocation_calls, after.allocation_calls).is_some()
             && measured(self.before.deallocation_calls, after.deallocation_calls).is_some()
@@ -169,6 +190,8 @@ impl Region {
             && measured(self.before.allocated_bytes, after.allocated_bytes).is_some()
             && measured(self.before.deallocated_bytes, after.deallocated_bytes).is_some()
             && after.peak_live_bytes >= self.before.peak_live_bytes
+            && region_peak_live_bytes >= self.before.live_bytes
+            && region_peak_live_bytes >= after.live_bytes
         {
             "measured"
         } else {
@@ -190,7 +213,7 @@ impl Region {
             "live_bytes_after": after.live_bytes,
             "peak_live_bytes_before": self.before.peak_live_bytes,
             "peak_live_bytes_after": after.peak_live_bytes,
-            "region_peak_live_bytes": after.peak_live_bytes.max(self.before.live_bytes),
+            "region_peak_live_bytes": region_peak_live_bytes,
         });
         serde_json::json!({
             "tool": {
