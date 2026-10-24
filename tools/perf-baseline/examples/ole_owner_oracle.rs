@@ -27,6 +27,7 @@ use litchi_xls::Package as XlsPackage;
 use litchi_xls::cell_values::{
     Reference as XlsReference, Selector as XlsSelector, Value as XlsValue,
 };
+use sha2::{Digest, Sha256};
 
 #[cfg(feature = "current-owner-api")]
 use litchi_ole_common::object::{OpenOptions, Package as ObjectPackage};
@@ -46,6 +47,26 @@ const XLS_EDIT_VALUE: f64 = 4242.0;
 const LINK_BASE_TEXT: &str = "https://example.invalid/base/";
 const HYPERLINK_TARGET: &str = "https://example.invalid/target";
 const HYPERLINK_LOCATION: &str = "bookmark";
+const ORACLE_ARTIFACTS: &[&str] = &[
+    "ole-source.bin",
+    "ole-noop.bin",
+    "ole-replacement.bin",
+    "properties.tsv",
+    "doc-source.bin",
+    "doc-edit.bin",
+    "doc-proof.tsv",
+    "xls-source.bin",
+    "xls-edit.bin",
+    "xls-proof.tsv",
+    "xls-opaque-source.bin",
+    "xls-opaque-edit.bin",
+    "doc-history-final.bin",
+    "xls-history-final.bin",
+    "history-proof.tsv",
+    "ole-inventory.tsv",
+    "oracle.tsv",
+    "allocator.tsv",
+];
 
 struct Corpus {
     archive: Vec<u8>,
@@ -71,6 +92,12 @@ struct StreamRecord {
     modified_time: u64,
     size: u64,
     payload: Vec<u8>,
+}
+
+#[cfg(feature = "w5-counting-allocator")]
+enum RetainedHistory {
+    Doc(Vec<DocPackage>, Vec<litchi_doc::tracked_revision::Patch>),
+    Xls(Vec<XlsPackage>, Vec<litchi_xls::Patch>),
 }
 
 #[cfg(feature = "w5-counting-allocator")]
@@ -215,14 +242,30 @@ fn main() -> Result<(), Box<dyn StdError>> {
     write(&output.join("properties.tsv"), properties.as_bytes())?;
 
     let doc_source = DocPackage::from_bytes(corpus.doc_archive.clone())?;
-    let doc_output = check_doc(&doc_source)?;
+    let (doc_output, doc_proof) = check_doc(&doc_source)?;
     write(&output.join("doc-source.bin"), &corpus.doc_archive)?;
     write(&output.join("doc-edit.bin"), &doc_output)?;
+    write(&output.join("doc-proof.tsv"), doc_proof.as_bytes())?;
 
     let xls_source = XlsPackage::from_bytes(corpus.xls_archive.clone())?;
-    let xls_output = check_xls(&xls_source)?;
+    let (xls_output, xls_proof, opaque_source, opaque_output) =
+        check_xls(&xls_source, &corpus.xls_archive)?;
     write(&output.join("xls-source.bin"), &corpus.xls_archive)?;
     write(&output.join("xls-edit.bin"), &xls_output)?;
+    write(&output.join("xls-proof.tsv"), xls_proof.as_bytes())?;
+    write(&output.join("xls-opaque-source.bin"), &opaque_source)?;
+    write(&output.join("xls-opaque-edit.bin"), &opaque_output)?;
+
+    let (history_proof, doc_history, xls_history) = check_history(&corpus)?;
+    write(&output.join("history-proof.tsv"), history_proof.as_bytes())?;
+    write(&output.join("doc-history-final.bin"), &doc_history)?;
+    write(&output.join("xls-history-final.bin"), &xls_history)?;
+
+    let inventory_proof = inventory_proof(&source, &replacement)?;
+    write(
+        &output.join("ole-inventory.tsv"),
+        inventory_proof.as_bytes(),
+    )?;
 
     let record = format!(
         "schema\t1\nowner_streams\t{}\nowner_target\t{}\nowner_original_bytes\t{}\nowner_replacement_bytes\t{}\nproperties\tvalidated\ndoc\trevision\tInsertion\t0\t{}\t{}\nxls\tCells\t0\t0\t4242\n",
@@ -244,6 +287,18 @@ fn main() -> Result<(), Box<dyn StdError>> {
     )?;
 
     println!("ole_owner_oracle,{}", output.display());
+    for name in ORACLE_ARTIFACTS {
+        let bytes = fs::read(output.join(name))?;
+        let digest = Sha256::digest(&bytes);
+        println!(
+            "oracle_output\t{name}\t{}\t{}",
+            bytes.len(),
+            digest
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
+        );
+    }
     Ok(())
 }
 
@@ -420,14 +475,32 @@ fn owner_replace(corpus: &Corpus) -> Result<Vec<u8>, Box<dyn StdError>> {
 fn inventory(bytes: &[u8]) -> Result<Vec<StreamRecord>, Box<dyn StdError>> {
     let mut file = open_cfb(bytes.to_vec())?;
     let mut records = Vec::new();
+    if let Some(entry) = file.directory_entry_by_sid(0).cloned() {
+        records.push(StreamRecord {
+            name: entry.name,
+            entry_type: entry.entry_type,
+            sid: entry.sid,
+            sid_left: entry.sid_left,
+            sid_right: entry.sid_right,
+            sid_child: entry.sid_child,
+            clsid: entry.clsid,
+            state_bits: entry.state_bits,
+            creation_time: entry.creation_time,
+            modified_time: entry.modified_time,
+            size: entry.size,
+            payload: Vec::new(),
+        });
+    }
     file.visit_directory_entries(&[], SIBLINGS + 4, |file, sid| {
         let entry = file
             .directory_entry_by_sid(sid)
             .ok_or_else(|| "directory visitor returned an unknown SID".to_string())?;
-        if entry.entry_type != 2 {
-            return Ok::<(), Box<dyn StdError>>(());
-        }
         let name = entry.name.clone();
+        let payload = if entry.entry_type == 2 {
+            file.open_stream(&[name.as_str()])?
+        } else {
+            Vec::new()
+        };
         let record = StreamRecord {
             name: name.clone(),
             entry_type: entry.entry_type,
@@ -440,7 +513,7 @@ fn inventory(bytes: &[u8]) -> Result<Vec<StreamRecord>, Box<dyn StdError>> {
             creation_time: entry.creation_time,
             modified_time: entry.modified_time,
             size: entry.size,
-            payload: file.open_stream(&[name.as_str()])?,
+            payload,
         };
         records.push(record);
         Ok::<(), Box<dyn StdError>>(())
@@ -473,7 +546,7 @@ fn check_ole_outputs(
     }
     let source_records = inventory(source)?;
     let replacement_records = inventory(replacement)?;
-    if source_records.len() != SIBLINGS + 1 || replacement_records.len() != source_records.len() {
+    if source_records.len() != SIBLINGS + 2 || replacement_records.len() != source_records.len() {
         return Err("owner output stream inventory is incomplete".into());
     }
     for (before, after) in source_records.iter().zip(replacement_records.iter()) {
@@ -488,6 +561,39 @@ fn check_ole_outputs(
         }
     }
     Ok(())
+}
+
+fn inventory_proof(source: &[u8], replacement: &[u8]) -> Result<String, Box<dyn StdError>> {
+    let mut output = String::from(
+        "kind\tname\tentry_type\tsid\tsid_left\tsid_right\tsid_child\tclsid\tstate_bits\tcreation_time\tmodified_time\tsize\tpayload_hex\n",
+    );
+    for (kind, records) in [
+        ("source", inventory(source)?),
+        ("replacement", inventory(replacement)?),
+    ] {
+        for record in records {
+            output.push_str(&format!(
+                "{kind}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                record.name,
+                record.entry_type,
+                record.sid,
+                record.sid_left,
+                record.sid_right,
+                record.sid_child,
+                record.clsid,
+                record.state_bits,
+                record.creation_time,
+                record.modified_time,
+                record.size,
+                record
+                    .payload
+                    .iter()
+                    .map(|byte| format!("{byte:02x}"))
+                    .collect::<String>(),
+            ));
+        }
+    }
+    Ok(output)
 }
 
 fn user_properties<'a>(
@@ -564,7 +670,7 @@ fn check_properties(corpus: &Corpus) -> Result<String, Box<dyn StdError>> {
     ))
 }
 
-fn check_doc(source: &DocPackage) -> Result<Vec<u8>, Box<dyn StdError>> {
+fn check_doc(source: &DocPackage) -> Result<(Vec<u8>, String), Box<dyn StdError>> {
     if !source.tracked_revisions()?.is_empty() {
         return Err("DOC source unexpectedly contains tracked revisions".into());
     }
@@ -590,10 +696,47 @@ fn check_doc(source: &DocPackage) -> Result<Vec<u8>, Box<dyn StdError>> {
     if bytes == source.to_bytes()? {
         return Err("DOC edit produced a source-identical output".into());
     }
-    Ok(bytes)
+    let source_paragraphs = source
+        .document()
+        .body_paragraphs()
+        .map(|paragraph| paragraph.map(str::to_owned))
+        .collect::<Result<Vec<_>, _>>()?;
+    let output_paragraphs = output
+        .document()
+        .body_paragraphs()
+        .map(|paragraph| paragraph.map(str::to_owned))
+        .collect::<Result<Vec<_>, _>>()?;
+    if source_paragraphs.len() != 256 || output_paragraphs.len() != 256 {
+        return Err("DOC paragraph oracle did not retain all 256 paragraphs".into());
+    }
+    for index in 0..256 {
+        let expected_source = format!("ole-w5 tracked paragraph {index:03}");
+        let expected_output = if index == 0 {
+            format!("{DOC_REVISION_TEXT}{expected_source}")
+        } else {
+            expected_source.clone()
+        };
+        if source_paragraphs[index] != expected_source
+            || output_paragraphs[index] != expected_output
+        {
+            return Err(
+                format!("DOC paragraph {index} differs from its explicit expected value").into(),
+            );
+        }
+    }
+    let mut proof = String::from("kind\tindex\ttext\n");
+    for (kind, paragraphs) in [("source", source_paragraphs), ("edit", output_paragraphs)] {
+        for (index, paragraph) in paragraphs.into_iter().enumerate() {
+            proof.push_str(&format!("{kind}\t{index}\t{paragraph}\n"));
+        }
+    }
+    Ok((bytes, proof))
 }
 
-fn check_xls(source: &XlsPackage) -> Result<Vec<u8>, Box<dyn StdError>> {
+fn check_xls(
+    source: &XlsPackage,
+    source_bytes: &[u8],
+) -> Result<(Vec<u8>, String, Vec<u8>, Vec<u8>), Box<dyn StdError>> {
     let before = source
         .cell_values()?
         .worksheet(XlsSelector::Name("Cells"))?
@@ -623,7 +766,91 @@ fn check_xls(source: &XlsPackage) -> Result<Vec<u8>, Box<dyn StdError>> {
     if bytes == source.to_bytes()? {
         return Err("XLS edit produced a source-identical output".into());
     }
-    Ok(bytes)
+    let source_sheet = source
+        .cell_values()?
+        .worksheet(XlsSelector::Name("Cells"))?
+        .ok_or("XLS source worksheet was omitted")?;
+    let output_sheet = output
+        .cell_values()?
+        .worksheet(XlsSelector::Name("Cells"))?
+        .ok_or("XLS output worksheet was omitted")?;
+    let mut proof = String::from("kind\trow\tvalue_bits\n");
+    for row in 0..256u32 {
+        let source_number = source_sheet
+            .number(XlsReference::new(row, 0)?)?
+            .ok_or("XLS source cell inventory is incomplete")?;
+        let output_number = output_sheet
+            .number(XlsReference::new(row, 0)?)?
+            .ok_or("XLS output cell inventory is incomplete")?;
+        let expected_source = f64::from(row);
+        let expected_output = if row == 0 {
+            XLS_EDIT_VALUE
+        } else {
+            expected_source
+        };
+        if source_number.value() != expected_source || output_number.value() != expected_output {
+            return Err(format!("XLS row {row} differs from its explicit expected value").into());
+        }
+        proof.push_str(&format!(
+            "source\t{row}\t{}\n",
+            source_number.value().to_bits()
+        ));
+        proof.push_str(&format!(
+            "edit\t{row}\t{}\n",
+            output_number.value().to_bits()
+        ));
+    }
+    let mut source_cfb = open_cfb(source_bytes.to_vec())?;
+    let mut output_cfb = open_cfb(bytes.clone())?;
+    let opaque_source = source_cfb.open_stream(&["ole_w5_opaque_payload.bin"])?;
+    let opaque_output = output_cfb.open_stream(&["ole_w5_opaque_payload.bin"])?;
+    if opaque_source.len() != 96 * 1024 || opaque_output != opaque_source {
+        return Err("XLS opaque 96 KiB stream was not retained exactly".into());
+    }
+    proof.push_str(&format!("opaque\tbytes\t{}\n", opaque_source.len()));
+    Ok((bytes, proof, opaque_source, opaque_output))
+}
+
+fn check_history(corpus: &Corpus) -> Result<(String, Vec<u8>, Vec<u8>), Box<dyn StdError>> {
+    let doc_source = DocPackage::from_bytes(corpus.doc_archive.clone())?;
+    let (doc_packages, doc_patches) = retain_doc_history(&doc_source)?;
+    let mut doc_forward = doc_source.clone();
+    for patch in &doc_patches {
+        doc_forward = doc_forward.apply_tracked_revisions(patch)?.into_package();
+    }
+    let doc_final = doc_forward.to_bytes()?;
+    for patch in doc_patches.iter().rev() {
+        doc_forward = doc_forward
+            .apply_tracked_revisions(&patch.inverse())?
+            .into_package();
+    }
+    if doc_forward.to_bytes()? != doc_source.to_bytes()? {
+        return Err("DOC retained history inverse did not restore source bytes".into());
+    }
+
+    let xls_source = XlsPackage::from_bytes(corpus.xls_archive.clone())?;
+    let (xls_packages, xls_patches) = retain_xls_history(&xls_source)?;
+    let mut xls_forward = xls_source.clone();
+    for patch in &xls_patches {
+        xls_forward = xls_forward.apply(patch)?.into_package();
+    }
+    let xls_final = xls_forward.to_bytes()?;
+    for patch in xls_patches.iter().rev() {
+        xls_forward = xls_forward.apply(&patch.inverse())?.into_package();
+    }
+    if xls_forward.to_bytes()? != xls_source.to_bytes()? {
+        return Err("XLS retained history inverse did not restore source bytes".into());
+    }
+    let proof = format!(
+        "kind\tpackages\tpatches\tforward\tinverse\n\
+doc\t{}\t{}\tvalidated\tvalidated\n\
+xls\t{}\t{}\tvalidated\tvalidated\n",
+        doc_packages.len(),
+        doc_patches.len(),
+        xls_packages.len(),
+        xls_patches.len(),
+    );
+    Ok((proof, doc_final, xls_final))
 }
 
 #[cfg(feature = "w5-counting-allocator")]
@@ -639,12 +866,15 @@ fn allocator_evidence(output: &Path, corpus: &Corpus) -> Result<(), Box<dyn StdE
     let mut rows = Vec::new();
     for route in routes {
         let before = counting::begin();
-        let mut retained_packages = 0usize;
-        let mut retained_patches = 0usize;
-        match route {
+        let (retained_packages, retained_patches, retained): (
+            usize,
+            usize,
+            Option<RetainedHistory>,
+        ) = match route {
             "read" => {
                 let properties = user_properties(&corpus.user_section, corpus.user_limits)?;
                 black_box((properties.link_base()?, properties.hyperlinks()?));
+                (0, 0, None)
             },
             "edit" => {
                 let mut section = corpus.user_section.clone();
@@ -658,6 +888,7 @@ fn allocator_evidence(output: &Path, corpus: &Corpus) -> Result<(), Box<dyn StdE
                     HYPERLINK_LOCATION,
                 )?]))?;
                 black_box(section);
+                (0, 0, None)
             },
             "xls_cells" | "xls_cells_stage" => {
                 let package = XlsPackage::from_bytes(corpus.xls_archive.clone())?;
@@ -673,36 +904,45 @@ fn allocator_evidence(output: &Path, corpus: &Corpus) -> Result<(), Box<dyn StdE
                 } else {
                     black_box(commit);
                 }
+                (0, 0, None)
             },
             "doc_history" | "xls_history" => {
                 // The retained-state routes intentionally keep the published
                 // package bytes alive through the snapshot boundary, so the
                 // resulting live/retained counters are observable rather than
                 // a synthetic assertion.
-                let retained = if route == "doc_history" {
+                if route == "doc_history" {
                     let package = DocPackage::from_bytes(corpus.doc_archive.clone())?;
                     let (packages, patches) = retain_doc_history(&package)?;
-                    retained_packages = packages.len();
-                    retained_patches = patches.len();
-                    Some((packages, patches))
+                    let counts = (packages.len(), patches.len());
+                    (
+                        counts.0,
+                        counts.1,
+                        Some(RetainedHistory::Doc(packages, patches)),
+                    )
                 } else {
                     let package = XlsPackage::from_bytes(corpus.xls_archive.clone())?;
                     let (packages, patches) = retain_xls_history(&package)?;
-                    retained_packages = packages.len();
-                    retained_patches = patches.len();
-                    Some((packages, patches))
-                };
-                black_box(retained);
+                    let counts = (packages.len(), patches.len());
+                    (
+                        counts.0,
+                        counts.1,
+                        Some(RetainedHistory::Xls(packages, patches)),
+                    )
+                }
             },
             _ => unreachable!(),
-        }
+        };
         let after = counting::snapshot();
-        rows.push((route, before, after));
+        // Borrow the retained values after the snapshot so they remain live
+        // through the counter capture instead of being consumed and dropped.
+        black_box(&retained);
+        rows.push((route, before, after, retained_packages, retained_patches));
     }
     let mut text = String::from(
         "route\talloc_calls\talloc_bytes\tdealloc_calls\tdealloc_bytes\trealloc_calls\trealloc_old_bytes\trealloc_new_bytes\tbase_live_calls\tbase_live_bytes\tlive_calls\tlive_bytes\tpeak_calls\tpeak_bytes\tretained_packages\tretained_patches\n",
     );
-    for (route, before, after) in rows {
+    for (route, before, after, retained_packages, retained_patches) in rows {
         text.push_str(&format!(
             "{route}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{retained_packages}\t{retained_patches}\n",
             after.alloc_calls.saturating_sub(before.alloc_calls),
@@ -724,7 +964,6 @@ fn allocator_evidence(output: &Path, corpus: &Corpus) -> Result<(), Box<dyn StdE
     Ok(())
 }
 
-#[cfg(feature = "w5-counting-allocator")]
 fn retain_doc_history(
     source: &DocPackage,
 ) -> Result<(Vec<DocPackage>, Vec<litchi_doc::tracked_revision::Patch>), Box<dyn StdError>> {
@@ -759,7 +998,6 @@ fn retain_doc_history(
     Ok((packages, patches))
 }
 
-#[cfg(feature = "w5-counting-allocator")]
 fn retain_xls_history(
     source: &XlsPackage,
 ) -> Result<(Vec<XlsPackage>, Vec<litchi_xls::Patch>), Box<dyn StdError>> {

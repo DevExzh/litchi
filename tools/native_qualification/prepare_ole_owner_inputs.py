@@ -30,7 +30,7 @@ REVIEWED_PROBE_SHA256 = "ad4c52c01333fbc13c7b3cca18e2c0a0d2ccf89d5c07972e2e453fa
 CANDIDATE_ADAPTER_SHA256 = "dc11e6533c43434c314bd359ad68e458555291f4c134b44b13c1f3ce29fb4508"
 CLONE_PROBE_SHA256 = "0a23c99ed8958e0df1aa51e5f37e7a949328149074b2096613c972d2b8cf6e98"
 LOCK_SHA256 = "bc5a133f0668142d18d637b2b196097e855c8890697cb3bbf43aeb937145f04a"
-ORACLE_SOURCE_SHA256 = "e1f57ab1112badb2fc6c4160fecc359dc9e261eeb6cf603701d6133d6d148bf8"
+ORACLE_SOURCE_SHA256 = "49df705ccd92e498efc51388cb3d00310de453a12e84d1919128c52ffeddee95"
 PROBE_PATH = Path("tools/perf-baseline/examples/ole_w5_probe.rs")
 CLONE_PATH = Path("tools/perf-baseline/examples/ole_package_clone_probe.rs")
 ORACLE_PATH = Path("tools/perf-baseline/examples/ole_owner_oracle.rs")
@@ -93,6 +93,7 @@ litchi-cfb = { path = \"@SOURCE_ROOT@/crates/litchi-cfb\", features = [\"write\"
 litchi-doc = { path = \"@SOURCE_ROOT@/crates/litchi-doc\", features = [\"performance-diagnostics\"] }
 litchi-ole-common = { path = \"@SOURCE_ROOT@/crates/litchi-ole-common\" }
 litchi-xls = { path = \"@SOURCE_ROOT@/crates/litchi-xls\" }
+sha2 = \"0.11\"
 
 [workspace]
 """

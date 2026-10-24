@@ -27,6 +27,7 @@ from pathlib import Path
 import resource
 import shutil
 import signal
+import struct
 import subprocess
 import sys
 import time
@@ -124,11 +125,20 @@ ORACLE_FILES = (
     "properties.tsv",
     "doc-source.bin",
     "doc-edit.bin",
+    "doc-proof.tsv",
     "xls-source.bin",
     "xls-edit.bin",
+    "xls-proof.tsv",
+    "xls-opaque-source.bin",
+    "xls-opaque-edit.bin",
+    "doc-history-final.bin",
+    "xls-history-final.bin",
+    "history-proof.tsv",
+    "ole-inventory.tsv",
     "oracle.tsv",
     "allocator.tsv",
 )
+TARGET_NAME = "ole-w5_edit_target.bin"
 
 
 class RunnerError(RuntimeError):
@@ -1131,6 +1141,26 @@ class PairedRunner:
             path.name: {"path": str(path), "bytes": _sha256_file(path)[1], "sha256": _sha256_file(path)[0]}
             for path in expected_outputs
         }
+        try:
+            stdout_lines = Path(event["stdout"]["path"]).read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError) as error:
+            raise RunnerError(f"cannot read oracle invocation manifest: {directory}") from error
+        if not stdout_lines or stdout_lines[0] != f"ole_owner_oracle,{directory}":
+            raise RunnerError(f"oracle invocation did not identify its selected output: {directory}")
+        invocation: dict[str, tuple[int, str]] = {}
+        for line in stdout_lines[1:]:
+            fields = line.split("\t")
+            if len(fields) != 4 or fields[0] != "oracle_output" or fields[1] in invocation:
+                raise RunnerError(f"oracle invocation output manifest is malformed: {directory}")
+            try:
+                invocation[fields[1]] = (int(fields[2]), fields[3])
+            except ValueError as error:
+                raise RunnerError(f"oracle invocation output size is not numeric: {directory}") from error
+        if set(invocation) != set(ORACLE_FILES):
+            raise RunnerError(f"oracle invocation output manifest set differs: {directory}")
+        for name in ORACLE_FILES:
+            if invocation[name] != (actual[name]["bytes"], actual[name]["sha256"]):
+                raise RunnerError(f"oracle invocation output hash differs: {directory}/{name}")
         if {
             path.name
             for path in directory.iterdir()
@@ -1149,7 +1179,7 @@ class PairedRunner:
         if lines != [
             "schema\t1",
             "owner_streams\t65",
-            "owner_target\tole_w5_edit_target.bin",
+            f"owner_target\t{TARGET_NAME}",
             "owner_original_bytes\t15",
             "owner_replacement_bytes\t19",
             "properties\tvalidated",
@@ -1165,6 +1195,75 @@ class PairedRunner:
             "opaque_property\t42\t128",
         ]:
             raise RunnerError(f"oracle property values are not the explicit expected record: {directory}")
+        inventory = (directory / "ole-inventory.tsv").read_text(encoding="utf-8").splitlines()
+        if not inventory or inventory[0].split("\t") != [
+            "kind", "name", "entry_type", "sid", "sid_left", "sid_right", "sid_child",
+            "clsid", "state_bits", "creation_time", "modified_time", "size", "payload_hex",
+        ]:
+            raise RunnerError(f"oracle OLE inventory header differs: {directory}")
+        if len(inventory) != 1 + 2 * (64 + 2):
+            raise RunnerError(f"oracle OLE inventory cardinality differs: {directory}")
+        rows: dict[str, dict[str, tuple[str, ...]]] = {"source": {}, "replacement": {}}
+        for line in inventory[1:]:
+            fields = line.split("\t")
+            if len(fields) != 13 or fields[0] not in rows or fields[1] in rows[fields[0]]:
+                raise RunnerError(f"oracle OLE inventory row differs: {line!r}")
+            rows[fields[0]][fields[1]] = tuple(fields[2:])
+        if len(rows["source"]) != 66 or len(rows["replacement"]) != 66:
+            raise RunnerError(f"oracle OLE inventory does not include root/storage and all streams: {directory}")
+        if not any(fields[0] != "2" for fields in rows["source"].values()):
+            raise RunnerError(f"oracle OLE inventory omitted non-stream metadata: {directory}")
+        expected_streams = {f"ole_w5_sibling_{index:03}" for index in range(64)} | {TARGET_NAME}
+        if not expected_streams.issubset(rows["source"]) or not expected_streams.issubset(rows["replacement"]):
+            raise RunnerError(f"oracle OLE inventory omitted an expected stream: {directory}")
+        for name in expected_streams:
+            before = rows["source"][name]
+            after = rows["replacement"][name]
+            if name == TARGET_NAME:
+                if bytes.fromhex(before[-1]) != b"ole-w5-original" or bytes.fromhex(after[-1]) != b"ole-w5-replacement":
+                    raise RunnerError(f"oracle replacement target proof differs: {directory}")
+            elif before != after or bytes.fromhex(before[-1]) != f"opaque sibling payload {name[-3:]}".encode():
+                raise RunnerError(f"oracle untouched sibling proof differs: {name}")
+        doc_proof = (directory / "doc-proof.tsv").read_text(encoding="utf-8").splitlines()
+        if len(doc_proof) != 1 + 2 * 256 or doc_proof[0] != "kind\tindex\ttext":
+            raise RunnerError(f"oracle DOC paragraph proof cardinality differs: {directory}")
+        for line in doc_proof[1:]:
+            fields = line.split("\t")
+            if len(fields) != 3 or fields[0] not in {"source", "edit"} or not fields[1].isdigit():
+                raise RunnerError(f"oracle DOC paragraph proof row differs: {line!r}")
+            index = int(fields[1])
+            expected = f"ole-w5 tracked paragraph {index:03}"
+            if fields[0] == "edit" and index == 0:
+                expected = f"ole-w5-tracked-revision {expected}"
+            if index >= 256 or fields[2] != expected:
+                raise RunnerError(f"oracle DOC paragraph proof value differs: {line!r}")
+        xls_proof = (directory / "xls-proof.tsv").read_text(encoding="utf-8").splitlines()
+        if len(xls_proof) != 1 + 2 * 256 + 1 or xls_proof[0] != "kind\trow\tvalue_bits":
+            raise RunnerError(f"oracle XLS cell proof cardinality differs: {directory}")
+        for line in xls_proof[1:-1]:
+            fields = line.split("\t")
+            if len(fields) != 3 or fields[0] not in {"source", "edit"} or not fields[1].isdigit() or not fields[2].isdigit():
+                raise RunnerError(f"oracle XLS cell proof row differs: {line!r}")
+            row, bits = int(fields[1]), int(fields[2])
+            # Compare the serialized IEEE bits without trusting a decimal
+            # rendering.  The explicit values have stable bit patterns.
+            expected_value = float(row) if fields[0] == "source" or row != 0 else 4242.0
+            expected_bits = struct.unpack("<Q", struct.pack("<d", expected_value))[0]
+            if row >= 256 or bits != expected_bits:
+                raise RunnerError(f"oracle XLS cell proof value differs: {line!r}")
+        if xls_proof[-1] != "opaque\tbytes\t98304":
+            raise RunnerError(f"oracle XLS opaque proof differs: {directory}")
+        opaque_source = directory / "xls-opaque-source.bin"
+        opaque_output = directory / "xls-opaque-edit.bin"
+        if opaque_source.stat().st_size != 98304 or opaque_output.read_bytes() != opaque_source.read_bytes():
+            raise RunnerError(f"oracle XLS opaque stream proof differs: {directory}")
+        history = (directory / "history-proof.tsv").read_text(encoding="utf-8").splitlines()
+        if history != [
+            "kind\tpackages\tpatches\tforward\tinverse",
+            "doc\t129\t128\tvalidated\tvalidated",
+            "xls\t129\t128\tvalidated\tvalidated",
+        ]:
+            raise RunnerError(f"oracle retained-history proof differs: {directory}")
         return {line.split("\t", 1)[0]: line for line in lines}
 
     @staticmethod
