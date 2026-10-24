@@ -3995,3 +3995,29 @@ See [0063](0063-source-pptx-modern-comments.md).
   and absence checks pass. Record 0362ul17 binds the receipts. The removed
   checkouts contained 12.51 GB of regular files; native endpoints, targets and
   the protected trunk probe remain untouched. The staging hold is released.
+
+- Coordinator capture update (2026-10-24, fresh API evidence and glossary return):
+  The a3 all-68 capture completes with no reused artifacts. All 84 inventory
+  rows retain valid reviewed dispositions after independent source-role
+  revalidation, including three IWA wire-request rows affected by alias
+  removal. The coordinator verifies every artifact, manifest and log hash;
+  production API equivalence binds this capture to c796. Record 0362ul18
+  preserves the fresh evidence and distinguishes the blank scaffold from
+  reviewed decisions.
+
+  Supplemental glossary checks pass 55 of 59 profiles. Two DOCX failures
+  identify the same public ArtifactStreamPublication exposure; return 0362ul19
+  renames that raw receipt and migrates every consumer without losing streaming
+  capability. Six stale soapberry policy scopes also need their actual office
+  namespace. The Keynote-minimal finding is an all-feature mismatch, with no
+  source or policy change required. The complete feature-specific gate remains
+  active on a separate c796 checkout; formatting passes. Native builds and
+  correctness checks continue, with performance acceptance still pending.
+
+  Final native source preparations for durable Ink and W4b/W5 are reviewed and
+  merged in records 0362ld and 0362ul16c. Their seven and forty-one tooling
+  tests pass respectively; they make no native-performance claim. OLE owner,
+  RTF, sheet and property preparations are also ready for their assigned
+  build slots. The iWork allocator protocol and DOC body-toggle fidelity
+  preparation have separate pending reviews. No previous binary or result is
+  relabeled as current evidence.

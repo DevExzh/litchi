@@ -1,0 +1,27 @@
+{
+  "schema": "litchi.api-capture-source-equivalence.v1",
+  "capture_source": "a3ec9799939071d535925133c483bc998aa9667c",
+  "assembled_candidate": "c796d0acc24c7c6e6fd08980b9e31af6bb86b18b",
+  "changed_paths": [
+    "crates/litchi-xls/src/cell_values/tests.rs",
+    "docs/unified-ops/0362dvih-composed-native-proof-checks.md",
+    "docs/unified-ops/0362ul16b-cfb-report-output-accessor.md",
+    "docs/unified-ops/results/0362dvih/assembled-clippy.json",
+    "docs/unified-ops/results/0362dvih/composed-tooling.json",
+    "docs/unified-ops/results/0362ul16b/validation-receipt.json",
+    "tools/native_qualification/prepare_drawingml_raw_inputs.py",
+    "tools/perf-baseline/src/filesystem.rs",
+    "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline/src/xls_numeric.rs"
+  ],
+  "only_crate_change": {
+    "path": "crates/litchi-xls/src/cell_values/tests.rs",
+    "classification": "test-only exact rustfmt expansion",
+    "before_sha256": "b8595a0dcc5b3f466fc8315dbf9731af6b74ed251271700d328a46d20a912962",
+    "after_sha256": "330be88a95284469ee8d71f7c8022795ab0cb2369496492dd24c7de924134bcd"
+  },
+  "all_other_crate_sources_and_manifests": "identical git blobs",
+  "root_Cargo_toml": "identical git blob",
+  "root_lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+  "claim": "source equivalence only; fresh capture and disposition verification still required"
+}
