@@ -189,6 +189,29 @@ and `check=0` in the review run.  The receipt is compile evidence only: it is
 not a fidelity, capability, or performance acceptance result, and a final
 candidate must be checked separately after source freeze.
 
+The final baseline receipt batch is retained outside the repository at
+`/tmp/dml-compile-baselines-final.6f9KpN`.  Its source-bound command identity is
+driver commit `bc6239982771f4489306cf12d076492920daacd9`, driver SHA-256
+`94642d465d4fa46b709281fd42d3b6c2e6784281b1a9e60e3322d888b6012856`, probe
+SHA-256 `b690cd5b34aa73e145b8ec2ac36a9c9d583c922eca3edbb7ae56c7b60dbab16f`,
+allocator SHA-256
+`3db5f3a49cf1c3e5ef496f6f3a787f94e74fa3d995879af578a60cb910d13117`, and
+standalone generated-lock SHA-256
+`93878f7a5925cb0484a770bdfb7132cb124dd43c7d37a31ad08fe19b0d8dd741` (29,747
+bytes).  A first compile-only check of frozen source
+`04058bc7e13bf227d6adaf2165fb67c64ca40a40`, retained at
+`/tmp/dml-compile-candidate.7mP4sQ`, returned Cargo `check=101` before the
+raw-adapter merge: the current probe still used the historical unbounded raw
+arities, and the candidate requires typed limits for chart, diagram, text,
+SVG, model3d, blip, theme, Ink, geometry, color, formatcode2, and transform.
+That negative receipt is not a candidate acceptance result.  It also exposed
+two owner-adapter calls that must pass the candidate's typed policy:
+`theme::family::Package::from_xml(..., family::Limits::DEFAULT)` and
+`transform::Package::from_xml(..., &transform::Limits::DEFAULT)` in prepare,
+commit, and replay paths.  Re-run the candidate after the raw adapter and
+these owner call sites are composed; do not treat the pre-assembly failure as
+a capability or performance result.
+
 After all raw, route, and owner receipts and external targets are ready, the coordinator may
 run the guarded phases with the corresponding `DRAWINGML_*` environment
 bindings:
