@@ -7,6 +7,11 @@ publish = false
 [features]
 default = ["current-api", "current-xlsx-raw-opc"]
 current-api = ["current-owner-api", "current-property-api"]
+# The RTF refusal contract is compiled against two native API eras through
+# this consumer-only probe.  These package features select only the adapter;
+# they do not alter litchi-rtf or overlay its implementation.
+rtf-current-api = []
+rtf-legacy-api = []
 # The paired W5 driver can compare the owner and property-set migrations
 # independently.  `current-api` keeps the normal candidate invocation terse;
 # the baseline uses the two legacy flags and the intermediate pair selects

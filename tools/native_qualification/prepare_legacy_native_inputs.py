@@ -85,19 +85,72 @@ OLE_ADAPTER_RECORD: dict[str, Any] = {
     "candidate": OLE_ADAPTER_RECIPE,
 }
 
+RTF_PROBE_SHA256 = "0613f279db17121711b140c273137465c23670033a4dda5392444703b01b1f81"
+RTF_BASELINE_LOCK_SHA256 = "57c2a19ffeff395fdea95c33f295c85b08400b00e2fd9cec94d66cff56d1583f"
+RTF_CANDIDATE_LOCK_SHA256 = "6dbfc0bcc64cdf8e625a6562f2d5d11c1e98ad7cb6edda299b9adf2a36a70e39"
+RTF_BASELINE_MANIFEST_SHA256 = "af876fbf715edb643d2c7abb8643efb252413c640824890e90b1849207889676"
+RTF_CANDIDATE_MANIFEST_SHA256 = "60cde3ec148b08d81806d0b15740808c37ecbc9eed8ecf3f4d32e20ce8631a49"
+RTF_LIVE_PROBE_RELATIVE = "crates/litchi-rtf/examples/refusal_contract_bench.rs"
+RTF_LIVE_PROBE_SHA256 = "1726acb58953ae3f57d9b74207f75678a3bcc7ac4c993443aac5583d3943f791"
+
+RTF_ADAPTER_RECORD: dict[str, Any] = {
+    "relative_path": "tools/perf-baseline/examples/refusal_contract_bench.rs",
+    "probe_sha256": RTF_PROBE_SHA256,
+    "manifest_relative_path": "tools/perf-baseline/Cargo.toml",
+    "manifest_sha256": {
+        "before": RTF_BASELINE_MANIFEST_SHA256,
+        "after": RTF_CANDIDATE_MANIFEST_SHA256,
+    },
+    "features": {
+        "before": "rtf-legacy-api",
+        "after": "rtf-current-api",
+    },
+    "native_error_api": {
+        "before": "litchi_rtf::edit::Error::{UnsupportedSource,ProtectedDocument}",
+        "after": "litchi_rtf::edit::Error::Refused(Refusal)",
+    },
+    "apply_result_api": {
+        "before": "litchi_rtf::Package::apply -> litchi_rtf::Package",
+        "after": "litchi_rtf::Package::apply -> litchi_rtf::edit::Commit",
+    },
+    "live_current_probe": {
+        "relative_path": RTF_LIVE_PROBE_RELATIVE,
+        "sha256": RTF_LIVE_PROBE_SHA256,
+        "lock_sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        "lock_source": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/locks/4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1.Cargo.lock",
+        "api": "current litchi-rtf workspace example; not part of the baseline adapter source",
+    },
+    "historical_failed_compile": {
+        "source_sha256": "70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585",
+        "source_relative_path": RTF_LIVE_PROBE_RELATIVE,
+        "api_context": "current litchi-rtf consumer at candidate fence 35e37dbede6657dd023b114a1536862c18541946",
+        "receipt": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-probe-compile/check-before.json",
+        "receipt_sha256": "f3af926353fc3db4f74221f62ed4f4743cc6b31c359ab42415c8f1500e33bda4",
+        "log": "/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-probe-compile/check-before.log",
+        "log_sha256": "119d4216675ee79a7e89e17579f019dd4fe3a6d43c08a8bd22d87c37622fd103",
+        "exit": 101,
+    },
+}
+
 LANES: dict[str, dict[str, Any]] = {
     "legacy-rtf": {
         "baseline": "86d708878fa537eab42fd4bd5ffbc0f79c606191",
-        "probe": "crates/litchi-rtf/examples/refusal_contract_bench.rs",
+        "probe": "tools/perf-baseline/examples/refusal_contract_bench.rs",
         "probe_sha256": {
-            "before": "70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585",
-            "after": "70077fcec439fda2fdf9e9635f5db2f1f7c86ed31f3f972a95c5e5e3a607a585",
+            "before": RTF_PROBE_SHA256,
+            "after": RTF_PROBE_SHA256,
         },
-        "lock": "Cargo.lock",
+        "lock": "tools/perf-baseline/Cargo.lock",
         "fixtures": [],
+        "lock_sha256": {
+            "before": RTF_BASELINE_LOCK_SHA256,
+            "after": RTF_CANDIDATE_LOCK_SHA256,
+        },
+        "adapter": RTF_ADAPTER_RECORD,
         "allowed_dirty": [
-            "Cargo.lock",
-            "crates/litchi-rtf/examples/refusal_contract_bench.rs",
+            "tools/perf-baseline/Cargo.lock",
+            "tools/perf-baseline/Cargo.toml",
+            "tools/perf-baseline/examples/refusal_contract_bench.rs",
         ],
     },
     "legacy-ole-properties": {
@@ -303,6 +356,28 @@ def _source_identity(root: Path, lane: str, leg: str, spec: dict[str, Any]) -> d
         _expect(value in allowed, f"unreviewed dirty path in {root}: {value}")
     relative_files = [spec["lock"], spec["probe"], *spec["fixtures"]]
     files = [_identity_file(root, relative) for relative in relative_files]
+    lock_record = next(record for record in files if record["relative"] == spec["lock"])
+    if "lock_sha256" in spec:
+        _expect(
+            lock_record["sha256"] == spec["lock_sha256"][leg],
+            f"{lane}/{leg} lock is not the reviewed provenance lock",
+        )
+    if lane == "legacy-rtf" and "adapter" in spec:
+        adapter = spec["adapter"]
+        manifest_path = root / adapter["manifest_relative_path"]
+        manifest_sha256, _ = _sha256(manifest_path)
+        _expect(
+            manifest_sha256 == adapter["manifest_sha256"][leg],
+            f"{lane}/{leg} adapter manifest is not the reviewed consumer overlay",
+        )
+        live = adapter.get("live_current_probe")
+        if leg == "after" and live is not None:
+            live_path = root / str(live["relative_path"])
+            live_sha256, _ = _sha256(live_path)
+            _expect(live_sha256 == live["sha256"], f"{lane}/{leg} live workspace probe is not reviewed")
+            lock_source = Path(str(live["lock_source"]))
+            lock_sha256, _ = _sha256(lock_source)
+            _expect(lock_sha256 == live["lock_sha256"], f"{lane}/{leg} live workspace lock is not reviewed")
     probe_record = next(record for record in files if record["relative"] == spec["probe"])
     _expect(probe_record["sha256"] == spec["probe_sha256"][leg], f"{lane}/{leg} probe is not the reviewed generator")
     if lane == "legacy-ole-properties":
