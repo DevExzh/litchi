@@ -204,7 +204,12 @@ pub(crate) fn core_error(error: litchi_core::Error, format: FileFormat) -> Error
 /// the common-core error.  The older object adapters still return a core
 /// error for some staging paths, so those retain the caller-argument
 /// classification supplied by the shared helper.
-#[cfg(any(test, feature = "odc", feature = "odi", feature = "odf-formula"))]
+#[cfg(any(
+    all(test, feature = "odb"),
+    feature = "odc",
+    feature = "odi",
+    feature = "odf-formula"
+))]
 pub(crate) fn odf_staging_error(error: litchi_odf_common::Error, format: FileFormat) -> Error {
     match error {
         litchi_odf_common::Error::Core(error) => write::staging_error(error, format),
