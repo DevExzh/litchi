@@ -1206,7 +1206,7 @@ fn pptx_reports_selection_and_structural_writes() {
         assert_eq!(
             gap.code(),
             if context == "final-slide" {
-                Code::InvalidArgument
+                Code::InvalidValue
             } else {
                 Code::UnsupportedCapability
             }

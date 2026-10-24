@@ -5129,7 +5129,7 @@
       "verb": "remove",
       "element": "slide",
       "context": "final-slide",
-      "code": "invalid_argument",
+      "code": "invalid_value",
       "followUp": "M2 PPTX final-slide removal policy",
       "reason": "native PPTX slide removal currently preserves the final slide and cannot remove the last slide from a presentation"
     },
