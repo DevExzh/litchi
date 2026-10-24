@@ -1449,6 +1449,60 @@ fn docx_owning_policy_refusal_is_an_unsupported_capability() {
     assert!(matches!(error.leaf(), Source::Docx(_)));
 }
 
+#[cfg(any(feature = "docx", feature = "pptx"))]
+#[test]
+fn drawingml_typed_errors_keep_host_classification() {
+    #[cfg(feature = "docx")]
+    {
+        let limit = assert_code(
+            litchi_docx::Error::Drawing(litchi_drawingml::Error::Limit {
+                kind: litchi_drawingml::LimitKind::ChartTextBytes,
+                observed: 9,
+                maximum: 8,
+            }),
+            Code::LimitExceeded,
+        );
+        assert!(matches!(limit.leaf(), Source::Docx(_)));
+        assert_code(
+            litchi_docx::Error::Drawing(litchi_drawingml::Error::InvalidLimit {
+                kind: litchi_drawingml::LimitKind::ChartTextBytes,
+                value: 0,
+                maximum: 8,
+            }),
+            Code::InvalidArgument,
+        );
+        assert_code(
+            litchi_docx::Error::Drawing(litchi_drawingml::Error::PatchConflict),
+            Code::InvalidInput,
+        );
+    }
+
+    #[cfg(feature = "pptx")]
+    {
+        let limit = assert_code(
+            litchi_pptx::Error::Drawing(litchi_drawingml::Error::Limit {
+                kind: litchi_drawingml::LimitKind::ChartTextBytes,
+                observed: 9,
+                maximum: 8,
+            }),
+            Code::LimitExceeded,
+        );
+        assert!(matches!(limit.leaf(), Source::Pptx(_)));
+        assert_code(
+            litchi_pptx::Error::Drawing(litchi_drawingml::Error::InvalidLimit {
+                kind: litchi_drawingml::LimitKind::ChartTextBytes,
+                value: 0,
+                maximum: 8,
+            }),
+            Code::InvalidArgument,
+        );
+        assert_code(
+            litchi_pptx::Error::Drawing(litchi_drawingml::Error::PatchConflict),
+            Code::InvalidInput,
+        );
+    }
+}
+
 #[cfg(all(feature = "docx", feature = "encryption"))]
 #[test]
 fn docx_encryption_policy_refusal_retains_typed_source() {

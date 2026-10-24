@@ -26,6 +26,15 @@ const DGM_STRICT: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/diagram";
 const R: &[u8] = b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const R_STRICT: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
 
+fn drawing_error(error: litchi_drawingml::Error, context: &str) -> crate::Error {
+    match error {
+        litchi_drawingml::Error::Invalid(_) | litchi_drawingml::Error::Xml(_) => {
+            invalid(format!("{context} is invalid"))
+        },
+        error => crate::Error::Drawing(error),
+    }
+}
+
 /// The parts of one SmartArt graphic.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SmartArtParts {
@@ -124,8 +133,7 @@ impl Edit {
                     .relate_to(&reference, relationship),
             );
         }
-        let authored =
-            |error: litchi_drawingml::Error| invalid(format!("authored SmartArt: {error}"));
+        let authored = |error: litchi_drawingml::Error| drawing_error(error, "authored SmartArt");
         let blobs = [
             spec.data_xml(Some(&ids[4])).map_err(authored)?.into_bytes(),
             spec.layout_xml().into_bytes(),
@@ -214,7 +222,7 @@ impl Edit {
         let selected = self.resolve_slide(slide.into())?;
         let targets = targets(&self.working, &selected.part_name, shape.into())?;
         let read_error =
-            |error: litchi_drawingml::Error| invalid(format!("SmartArt data model: {error}"));
+            |error: litchi_drawingml::Error| drawing_error(error, "SmartArt data model");
         diagram_edit::Outline::read(&parts.data).map_err(read_error)?;
         let mut candidate = self.working.clone();
         let SmartArtParts {
@@ -478,7 +486,7 @@ fn targets(package: &OpcPackage, slide: &PackURI, shape: crate::shape::Key<'_>) 
         ct::DML_DIAGRAM_COLORS,
     )?;
     let outline = diagram_edit::Outline::read(package.get_part(&data)?.blob())
-        .map_err(|error| invalid(format!("SmartArt data model: {error}")))?;
+        .map_err(|error| drawing_error(error, "SmartArt data model"))?;
     let drawing = match outline.drawing_relationship {
         Some(id) => match owner.rels().get(&id) {
             Some(found) if !found.is_external() && found.reltype() == MS_DIAGRAM_DRAWING_REL => {

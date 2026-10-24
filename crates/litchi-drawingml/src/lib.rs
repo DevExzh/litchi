@@ -173,6 +173,8 @@ pub enum LimitKind {
     ChartexPartBytes,
     /// Extended-chart XML nodes.
     ChartexXmlNodes,
+    /// Extended-chart XML nesting depth.
+    ChartexXmlDepth,
     /// Color transform count.
     ColorTransforms,
     /// Diagram data-model bytes.
@@ -284,6 +286,7 @@ impl LimitKind {
             Self::ChartStyleStrings => "chart-style strings",
             Self::ChartexPartBytes => "chartex part bytes",
             Self::ChartexXmlNodes => "chartex XML nodes",
+            Self::ChartexXmlDepth => "chartex XML depth",
             Self::ColorTransforms => "DrawingML color transforms",
             Self::DiagramDataModelBytes => "diagram data-model bytes",
             Self::DiagramDrawingBytes => "diagram drawing bytes",

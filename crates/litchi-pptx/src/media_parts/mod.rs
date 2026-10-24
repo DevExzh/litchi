@@ -81,7 +81,18 @@ pub(crate) fn output_limit(maximum: usize) -> Error {
 }
 
 pub(crate) fn coordinate_error(error: CoordinateParseError, name: &str) -> Error {
-    invalid(format!("invalid media transform {name}: {error}"))
+    match error {
+        CoordinateParseError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Drawing(litchi_drawingml::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        }),
+        _ => invalid(format!("invalid media transform {name}")),
+    }
 }
 
 mod edit;

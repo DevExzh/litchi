@@ -119,6 +119,20 @@ fn resource_limits_and_fragment_shape_are_checked() {
 }
 
 #[test]
+fn overlong_coordinate_lexicals_keep_the_typed_budget_dimension() {
+    let lexical = "1".repeat(crate::coordinate::MAX_BYTES + 1);
+    let xml = format!(r#"<a:xfrm><a:off x="{lexical}" y="0"/></a:xfrm>"#);
+    assert!(matches!(
+        codec::read(xml.as_bytes()),
+        Err(Error::Limit {
+            kind: crate::LimitKind::LexicalValueBytes,
+            observed,
+            maximum,
+        }) if observed == crate::coordinate::MAX_BYTES + 1 && maximum == crate::coordinate::MAX_BYTES
+    ));
+}
+
+#[test]
 fn transform_errors_do_not_echo_authored_xml() {
     for xml in [
         r#"<a:xfrm rot="private-value"/>"#,

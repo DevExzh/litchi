@@ -584,10 +584,17 @@ fn checked_inherited_bindings<'a>(
     for (prefix, namespace) in bindings {
         let prefix = prefix.as_bytes();
         let namespace = namespace.as_bytes();
-        if prefix.len() > MAX_NAMESPACE_BYTES || namespace.len() > MAX_NAMESPACE_BYTES {
+        if prefix.len() > MAX_NAMESPACE_BYTES {
+            return Err(limit(
+                LimitKind::NamespacePrefixBytes,
+                prefix.len(),
+                MAX_NAMESPACE_BYTES,
+            ));
+        }
+        if namespace.len() > MAX_NAMESPACE_BYTES {
             return Err(limit(
                 LimitKind::NamespaceBytes,
-                prefix.len().max(namespace.len()),
+                namespace.len(),
                 MAX_NAMESPACE_BYTES,
             ));
         }

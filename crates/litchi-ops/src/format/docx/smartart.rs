@@ -59,6 +59,15 @@ fn error(code: Code, message: &'static str) -> Error {
     Error::new(code, message).with_format(FileFormat::Docx)
 }
 
+fn drawing_code(error: &litchi_drawingml::Error, fallback: Code) -> Code {
+    match error {
+        litchi_drawingml::Error::Limit { .. } => Code::LimitExceeded,
+        litchi_drawingml::Error::InvalidLimit { .. } => Code::InvalidArgument,
+        litchi_drawingml::Error::PatchConflict => Code::InvalidInput,
+        _ => fallback,
+    }
+}
+
 const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
     let mut spec = PropSpec::new(name, ty);
     spec.access.get = false;
@@ -174,8 +183,11 @@ impl SmartArtValue {
         }
         let xml = data_xml(docx, &self.diagram)?;
         let outline = Arc::new(Outline::read(&xml).map_err(|source| {
-            error(Code::CorruptFile, "the SmartArt data model does not read")
-                .with_suggestion(source.to_string())
+            error(
+                drawing_code(&source, Code::CorruptFile),
+                "the SmartArt data model does not read",
+            )
+            .with_suggestion(source.to_string())
         })?);
         Ok(Arc::clone(self.outline.get_or_init(|| outline)))
     }
@@ -615,8 +627,12 @@ fn foreign_structure() -> Error {
 
 /// The parts after `change`, for a drawing of `extent` (record 0284 §3).
 fn apply(parts: &SmartArtParts, change: Change, extent: (i64, i64)) -> Result<SmartArtParts> {
-    let corrupt = |source: litchi_drawingml::Error| leaf_error(Code::CorruptFile, source);
-    let invalid = |source: litchi_drawingml::Error| leaf_error(Code::InvalidValue, source);
+    let corrupt = |source: litchi_drawingml::Error| {
+        leaf_error(drawing_code(&source, Code::CorruptFile), source)
+    };
+    let invalid = |source: litchi_drawingml::Error| {
+        leaf_error(drawing_code(&source, Code::InvalidValue), source)
+    };
     let outline = Outline::read(&parts.data).map_err(corrupt)?;
     let authored = Spec::recognize(&outline, &parts.data, &parts.layout).map_err(corrupt)?;
     let regenerate = |spec: &Spec, all: bool| -> Result<SmartArtParts> {

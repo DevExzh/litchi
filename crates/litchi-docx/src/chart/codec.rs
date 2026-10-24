@@ -297,7 +297,7 @@ pub(crate) fn scan_chart_xml_with_limits(
         });
     }
     litchi_drawingml::chart::reader::read(Cursor::new(xml))
-        .map_err(|error| invalid(format!("DrawingML chart schema: {error}")))?;
+        .map_err(|error| drawing_error(error, "DrawingML chart schema"))?;
     let processed = process_markup(xml, policy, policy.chart_xml_bytes())?;
     if processed.len() > policy.chart_xml_bytes() {
         return Err(Error::ChartLimit {
@@ -435,7 +435,16 @@ pub(crate) fn validate_companion_xml_with_limits(
         "colorStyle" => litchi_drawingml::chart::style::parse_color(processed.as_ref()).map(|_| ()),
         _ => return Err(invalid(format!("unsupported {label} root"))),
     };
-    result.map_err(|error| Error::Invalid(format!("{label}: {error}")))
+    result.map_err(|error| drawing_error(error, label))
+}
+
+fn drawing_error(error: litchi_drawingml::Error, context: &str) -> Error {
+    match error {
+        litchi_drawingml::Error::Invalid(_) | litchi_drawingml::Error::Xml(_) => {
+            invalid(format!("{context} is invalid"))
+        },
+        error => Error::Drawing(error),
+    }
 }
 
 fn element_info(

@@ -2214,9 +2214,11 @@ fn validate_result(xml: &[u8]) -> Result<Scanned> {
 
 fn validate_output_limit(max_xml_bytes: usize) -> Result<()> {
     if max_xml_bytes == 0 || max_xml_bytes > MAX_XML_BYTES {
-        return Err(invalid(format!(
-            "Theme XML output limit must be between 1 and {MAX_XML_BYTES}"
-        )));
+        return Err(Error::InvalidLimit {
+            kind: LimitKind::XmlBytes,
+            value: max_xml_bytes,
+            maximum: MAX_XML_BYTES,
+        });
     }
     Ok(())
 }

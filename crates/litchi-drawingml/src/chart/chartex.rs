@@ -735,12 +735,24 @@ fn parse_tree(xml: &[u8]) -> Result<Node> {
     loop {
         match reader.read_event()? {
             Event::Start(element) => {
-                nodes += 1;
-                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    Error::limit(crate::LimitKind::ChartexXmlNodes, usize::MAX, MAX_NODES)
+                })?;
+                if nodes > MAX_NODES {
                     return Err(Error::limit(
                         crate::LimitKind::ChartexXmlNodes,
                         nodes,
                         MAX_NODES,
+                    ));
+                }
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    Error::limit(crate::LimitKind::ChartexXmlDepth, usize::MAX, MAX_DEPTH)
+                })?;
+                if depth > MAX_DEPTH {
+                    return Err(Error::limit(
+                        crate::LimitKind::ChartexXmlDepth,
+                        depth,
+                        MAX_DEPTH,
                     ));
                 }
                 let node = open(&reader, &element)?;

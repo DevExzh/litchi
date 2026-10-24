@@ -375,7 +375,18 @@ fn required_coordinate(
 ) -> Result<Coordinate> {
     let value = unqualified_attribute_value(element, name, decoder)?
         .ok_or_else(|| invalid(format!("DrawingML transform {description} is missing")))?;
-    Coordinate::parse(&value).map_err(|_error| invalid(format!("invalid transform {description}")))
+    Coordinate::parse(&value).map_err(|error| match error {
+        crate::coordinate::ParseError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind,
+            observed,
+            maximum,
+        },
+        _ => invalid(format!("invalid transform {description}")),
+    })
 }
 
 fn required_extent(
@@ -386,7 +397,18 @@ fn required_extent(
 ) -> Result<Extent> {
     let value = unqualified_attribute_value(element, name, decoder)?
         .ok_or_else(|| invalid(format!("DrawingML transform {description} is missing")))?;
-    Extent::parse(&value).map_err(|_error| invalid(format!("invalid transform {description}")))
+    Extent::parse(&value).map_err(|error| match error {
+        crate::coordinate::ParseError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind,
+            observed,
+            maximum,
+        },
+        _ => invalid(format!("invalid transform {description}")),
+    })
 }
 
 fn child_order(local: &[u8]) -> Option<u8> {

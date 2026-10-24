@@ -49,6 +49,13 @@ fn invalid() -> Error {
     }
 }
 
+fn drawing_error(error: litchi_drawingml::Error) -> Error {
+    match error {
+        litchi_drawingml::Error::Invalid(_) | litchi_drawingml::Error::Xml(_) => invalid(),
+        error => Error::Document(crate::Error::Drawing(error)),
+    }
+}
+
 /// A SmartArt graphic to insert: its authored spec, an extent in EMUs, and
 /// its frame name and description (alternative text).
 ///
@@ -229,7 +236,7 @@ impl Edit<Package> {
         let located = self
             .locate_smartart(data_relationship_id)?
             .ok_or_else(not_found)?;
-        diagram_edit::Outline::read(&parts.data).map_err(|_| invalid())?;
+        diagram_edit::Outline::read(&parts.data).map_err(drawing_error)?;
         let SmartArtParts {
             data,
             layout,
@@ -297,7 +304,7 @@ impl Edit<Package> {
             (None, None) => None,
         };
         let data = diagram_edit::set_drawing_reference(&data, relationship.as_deref())
-            .map_err(|_| invalid())?;
+            .map_err(drawing_error)?;
         replace(&located.data.1, data, self)?;
         replace(&located.layout.1, layout, self)?;
         replace(&located.quick_style.1, quick_style, self)?;

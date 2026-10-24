@@ -198,7 +198,7 @@ pub(crate) fn validated_fragment(xml: &[u8]) -> Result<&[u8]> {
                 if stack.len() >= MAX_DEPTH {
                     return Err(Error::limit(
                         crate::LimitKind::XmlDepth,
-                        stack.len(),
+                        stack.len().saturating_add(1),
                         MAX_DEPTH,
                     ));
                 }
