@@ -273,56 +273,25 @@ pub struct Diagnostics {
 impl Diagnostics {
     /// Whether the exact source changed.
     #[must_use]
-    pub const fn changed(self) -> bool {
+    pub const fn changed(&self) -> bool {
         self.changed
     }
 
     /// Whether the changed candidate required full parsing.
     #[must_use]
-    pub const fn full_reparse_performed(self) -> bool {
+    pub const fn full_reparse_performed(&self) -> bool {
         self.full_reparse_performed
     }
 
     /// Number of semantic blocks directly targeted by the operation.
     #[must_use]
-    pub const fn touched_blocks(self) -> usize {
+    pub const fn touched_blocks(&self) -> usize {
         self.touched_blocks
     }
 }
 
-/// A validated Markdown snapshot, reversible patch, and diagnostics.
-#[derive(Debug)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    diagnostics: Diagnostics,
-}
-
-impl Commit {
-    /// Publication diagnostics.
-    #[must_use]
-    pub const fn diagnostics(&self) -> Diagnostics {
-        self.diagnostics
-    }
-
-    /// Reversible exact-source patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Newly validated immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Consume this commit into its snapshot, patch, and diagnostics.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch, Diagnostics) {
-        (self.snapshot, self.patch, self.diagnostics)
-    }
-}
+/// A validated Markdown package, reversible patch, and diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch, Diagnostics>;
 
 /// An in-memory reversible patch guarded by an exact complete before-image.
 #[derive(Clone, PartialEq, Eq)]
@@ -557,7 +526,7 @@ impl Patch {
             }
             let base = Snapshot::read_with(&envelope.before, dialect, read_limits)?;
             let replayed = replay_semantic_operations(&base, operations)?;
-            if replayed.snapshot().source() != envelope.after {
+            if replayed.package().source() != envelope.after {
                 return Err(Error::InvalidPatchEnvelope {
                     reason: "semantic operations do not reproduce the after-image".to_owned(),
                 });
@@ -782,14 +751,14 @@ impl History {
     ///
     /// Returns a stale-source or history-limit error without changing history.
     pub fn apply(&mut self, commit: Commit) -> Result<(), Error> {
-        if commit.patch.before != self.current.state.source {
+        if commit.patch().before != self.current.state.source {
             return Err(Error::PatchConflict);
         }
-        if commit.patch.is_empty() {
-            self.current = commit.snapshot;
+        if commit.patch().is_empty() {
+            self.current = commit.into_package();
             return Ok(());
         }
-        let new_patch_bytes = patch_bytes(&commit.patch);
+        let new_patch_bytes = patch_bytes(commit.patch());
         let next_entries = self.undo.len().saturating_add(1);
         if next_entries > self.limits.max_entries {
             return Err(Error::HistoryLimitExceeded {
@@ -816,8 +785,9 @@ impl History {
             })?;
         self.redo.clear();
         self.retained_patch_bytes = next_bytes;
-        self.undo.push(commit.patch);
-        self.current = commit.snapshot;
+        let (snapshot, patch) = commit.into_parts();
+        self.undo.push(patch);
+        self.current = snapshot;
         Ok(())
     }
 
@@ -845,7 +815,7 @@ impl History {
             })?;
         self.redo.pop();
         self.undo.push(patch);
-        self.current = commit.snapshot;
+        self.current = commit.into_package();
         Ok(true)
     }
 
@@ -867,7 +837,7 @@ impl History {
             })?;
         self.undo.pop();
         self.redo.push(patch);
-        self.current = commit.snapshot;
+        self.current = commit.into_package();
         Ok(true)
     }
 }
@@ -1086,26 +1056,26 @@ pub(crate) fn apply(source: &Snapshot, patch: &Patch) -> Result<Commit, Error> {
         return Err(Error::PatchConflict);
     }
     if patch.is_empty() {
-        return Ok(Commit {
-            snapshot: source.clone(),
-            patch: patch.clone(),
-            diagnostics: Diagnostics {
+        return Ok(Commit::new(
+            source.clone(),
+            patch.clone(),
+            Diagnostics {
                 changed: false,
                 touched_blocks: 0,
                 full_reparse_performed: false,
             },
-        });
+        ));
     }
     let snapshot = Snapshot::read_with(&patch.after, patch.dialect, patch.limits)?;
-    Ok(Commit {
+    Ok(Commit::new(
         snapshot,
-        patch: patch.clone(),
-        diagnostics: Diagnostics {
+        patch.clone(),
+        Diagnostics {
             changed: true,
             touched_blocks: patch.operation_count,
             full_reparse_performed: true,
         },
-    })
+    ))
 }
 
 fn fingerprint(source: &str) -> u64 {
@@ -1259,9 +1229,9 @@ fn publish(source: &Snapshot, target: &str, intents: &[Intent]) -> Result<Commit
     if target == source.source() {
         let exact = Arc::clone(&source.state.source);
         let fingerprint = fingerprint(&exact);
-        return Ok(Commit {
-            snapshot: source.clone(),
-            patch: Patch {
+        return Ok(Commit::new(
+            source.clone(),
+            Patch {
                 before: Arc::clone(&exact),
                 after: exact,
                 dialect: source.dialect(),
@@ -1271,21 +1241,21 @@ fn publish(source: &Snapshot, target: &str, intents: &[Intent]) -> Result<Commit
                 operation_count,
                 operations: Some(operations.clone().into_boxed_slice()),
             },
-            diagnostics: Diagnostics {
+            Diagnostics {
                 changed: false,
                 touched_blocks: 0,
                 full_reparse_performed: false,
             },
-        });
+        ));
     }
     let snapshot = Snapshot::read_with(target, source.dialect(), source.limits())?;
     let before = Arc::clone(&source.state.source);
     let after = Arc::clone(&snapshot.state.source);
     let source_fingerprint = fingerprint(&before);
     let target_fingerprint = fingerprint(&after);
-    Ok(Commit {
+    Ok(Commit::new(
         snapshot,
-        patch: Patch {
+        Patch {
             before,
             after,
             dialect: source.dialect(),
@@ -1295,12 +1265,12 @@ fn publish(source: &Snapshot, target: &str, intents: &[Intent]) -> Result<Commit
             operation_count,
             operations: Some(operations.into_boxed_slice()),
         },
-        diagnostics: Diagnostics {
+        Diagnostics {
             changed: true,
             touched_blocks: operation_count,
             full_reparse_performed: true,
         },
-    })
+    ))
 }
 
 fn render(source: &Snapshot, intents: &[Intent]) -> Result<String, Error> {

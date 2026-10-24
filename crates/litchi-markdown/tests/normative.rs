@@ -78,8 +78,8 @@ fn real_document_fixtures_roundtrip_through_durable_patches() -> Result<(), Erro
             litchi_markdown::reader::PatchEnvelopeLimits::DEFAULT,
         )?;
         let applied = snapshot.apply(&durable)?;
-        let restored = applied.snapshot().apply(&durable.inverse())?;
-        assert_eq!(restored.snapshot().source().as_bytes(), source.as_bytes());
+        let restored = applied.package().apply(&durable.inverse())?;
+        assert_eq!(restored.package().source().as_bytes(), source.as_bytes());
     }
     Ok(())
 }
@@ -111,8 +111,8 @@ fn assert_exact_model_and_reversible_edit(
     let mut edit = snapshot.edit();
     edit.append_block("release-gate-sentinel")?;
     let committed = edit.commit()?;
-    let restored = committed.snapshot().apply(&committed.patch().inverse())?;
-    assert_eq!(restored.snapshot().source(), snapshot.source());
+    let restored = committed.package().apply(&committed.patch().inverse())?;
+    assert_eq!(restored.package().source(), snapshot.source());
     Ok(())
 }
 
