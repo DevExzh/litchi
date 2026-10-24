@@ -1586,7 +1586,7 @@ fn validate_replacement_namespace(
         ResolveResult::Bound(Namespace(_)) if known => Err(invalid(
             "theme replacement modeled child has a cross-family namespace",
         )),
-        ResolveResult::Bound(_) if !root => Ok(()),
+        ResolveResult::Bound(_) => Ok(()),
         ResolveResult::Unknown(prefix) if prefix.as_slice() == b"a" => Ok(()),
         ResolveResult::Unbound if !root && element.name().prefix().is_none() => Ok(()),
         ResolveResult::Unbound if root && element.name().prefix().is_none() => {
