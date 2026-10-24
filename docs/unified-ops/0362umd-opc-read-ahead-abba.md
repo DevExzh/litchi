@@ -251,9 +251,9 @@ selector invocation receives a new output basename because the harness uses
 exclusive creation.
 
 The lock alone is not the quiet-host proof. The capture wrapper records a
-process census and `/proc/loadavg` before the first leg, once per second while
-the ABBA child is alive, and after the last leg. The coordinator marks the
-run quiet only when all three views contain no unrelated Cargo/rustc/rustdoc,
+process census and `/proc/loadavg` before the first leg, every 100 ms while the
+ABBA child is alive, and after the last leg. The coordinator marks the run
+quiet only when all three views contain no unrelated Cargo/rustc/rustdoc,
 perf/valgrind/heaptrack, or second benchmark process; the selected CPU has no
 other CPU-bound process in the census; and the maximum one-minute load in the
 throughout samples is no more than one above the before sample. Otherwise the
@@ -332,7 +332,7 @@ RUN_PID=$!
       ps -eo pid=,ppid=,psr=,pcpu=,stat=,comm=,args=
       printf '\n'
     } >> "$EVIDENCE/host/throughout.log"
-    sleep 1
+    sleep 0.1
   done
 ) &
 MONITOR_PID=$!
@@ -409,6 +409,7 @@ reports. Its schema is `docx-managed-read-ahead-abba-v1`:
       "before": "host/before.txt",
       "throughout": "host/throughout.log",
       "after": "host/after.txt",
+      "sample_interval_ms": 100,
       "quiet": true,
       "load_1m_max_delta": 0
     },
@@ -485,8 +486,9 @@ oracle, not just elapsed time. In particular:
    perf/valgrind/heaptrack or second benchmark process, any other CPU-bound
    process on the selected CPU, or a throughout one-minute load maximum more
    than one above the before sample. The lock path, selected CPU and allowed
-   process ancestry must agree with the manifest. A host receipt failure
-   rejects the lane and requires a quiet rerun.
+   process ancestry must agree with the manifest, and the throughout log must
+   prove the 100 ms sample interval (allowing only scheduler timestamp jitter).
+   A host receipt failure rejects the lane and requires a quiet rerun.
 
 The summary reports p50, p95 and p99 elapsed nanoseconds for each leg, then
 compares `median(b1,b2)` with `median(a1,a2)` separately for forward-start and
