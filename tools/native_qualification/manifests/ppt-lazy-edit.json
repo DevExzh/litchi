@@ -46,6 +46,7 @@
     }
   ],
   "baseline_adapter": {
+    "status": "M tools/perf-baseline/src/lib.rs\n?? test-data/unified-ops/ppt-lazy-native-fixture.ppt\n?? tools/perf-baseline/src/bin/ppt_lazy_native.rs\n?? tools/perf-baseline/src/bin/ppt_lazy_native_alloc.rs\n?? tools/perf-baseline/src/ppt_lazy_native.rs",
     "overlay_paths": [
       "tools/perf-baseline/src/ppt_lazy_native.rs",
       "tools/perf-baseline/src/bin/ppt_lazy_native.rs",

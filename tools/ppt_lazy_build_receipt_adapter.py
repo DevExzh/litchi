@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
-"""Bind the frozen PPT build receipt through its canonical input projection.
+"""Bind the PPT build receipt through its canonical input projection.
 
-The frozen PPT runner requires a receipt to hash the complete qualification
-manifest while the manifest requires the receipt hash.  This adapter removes
-only ``build.receipt.bytes`` and ``build.receipt.sha256`` from a canonical
-projection, keeps the receipt path and every other input, and asks the frozen
-runner's own build-receipt validator to validate that projection.  It also
-checks the reviewed baseline overlay status/content and the accepted 472b
-preflight/build-log identities.  It never builds or invokes a probe.
+The runner requires a receipt to hash the complete qualification manifest
+while the manifest requires the receipt hash.  This adapter removes only
+``build.receipt.bytes`` and ``build.receipt.sha256`` from a canonical
+projection, keeps the receipt path and every other input, and asks the public
+runner lifecycle to validate that projection.  It independently pins the
+historical runner, checks the reviewed baseline overlay status/content and the
+accepted 472b preflight/build-log identities.  It never builds or invokes a
+probe.
 """
 
 from __future__ import annotations
@@ -26,8 +27,12 @@ from typing import Any, Mapping, Sequence
 
 SCHEMA = "litchi.ppt.lazy-native.build-adapter.v1"
 RUNNER_RELATIVE = Path("tools/ppt_lazy_native_qualification.py")
-RUNNER_BYTES = 73_596
-RUNNER_SHA256 = "19d80d7f6e9450b60862929c4d864c0caae213aaa9e0682fca1c5fcc67d28c4f"
+FROZEN_RUNNER_BYTES = 73_596
+FROZEN_RUNNER_SHA256 = "19d80d7f6e9450b60862929c4d864c0caae213aaa9e0682fca1c5fcc67d28c4f"
+# Updated after the public lifecycle integration is committed.  Keeping this
+# identity fixed prevents an adapter from silently loading a different runner.
+PUBLIC_RUNNER_BYTES = 85_764
+PUBLIC_RUNNER_SHA256 = "56be0399ba88ba01bbec6ea0f42ef46823515d6eaeba735d4bab6e282e39752a"
 PREFLIGHT_BYTES = 7_646
 PREFLIGHT_SHA256 = "fbe59be89acb3a588b659c217f05ddf3c6ac49cdbeee2dce03c821e469714db8"
 NORMAL_LOG = (39_797, "ca7297042ecfc6cd212126ba8fe92eff78cd023cd4d4f5d658ebb0cc72fdd223")
@@ -120,37 +125,27 @@ def _git(root: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def _runner(candidate_root: Path):
-    tools = candidate_root / "tools"
+def _runner() -> tuple[Any, dict[str, Any]]:
+    path = Path(__file__).with_name("ppt_lazy_native_qualification.py").resolve()
+    tools = path.parent
     sys.path.insert(0, str(tools))
-    path = candidate_root / RUNNER_RELATIVE
     actual = identity(path)
-    if actual["bytes"] != RUNNER_BYTES or actual["sha256"] != RUNNER_SHA256:
-        raise AdapterError("frozen PPT qualification runner identity differs")
+    if actual["bytes"] != PUBLIC_RUNNER_BYTES or actual["sha256"] != PUBLIC_RUNNER_SHA256:
+        raise AdapterError("public PPT qualification runner identity differs")
     spec = importlib.util.spec_from_file_location("ppt_lazy_native_qualification_adapter", path)
     if spec is None or spec.loader is None:
-        raise AdapterError("cannot load frozen PPT qualification runner")
+        raise AdapterError("cannot load public PPT qualification runner")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module, actual
 
 
-def _endpoint(runner: Any, name: str, raw: Mapping[str, Any]) -> dict[str, Any]:
-    root = Path(raw["root"]).resolve()
-    normal = Path(raw["normal_binary"]["path"]).resolve()
-    allocator = Path(raw["allocator_binary"]["path"]).resolve()
-    return {
-        "name": name,
-        "raw": raw,
-        "root": root,
-        "head": raw["ref"],
-        "tree": raw["tree"],
-        "lock": runner._identity(root / "tools/perf-baseline/Cargo.lock"),
-        "normal_binary": runner._identity(normal),
-        "allocator_binary": runner._identity(allocator),
-        "target_dir": Path(raw["target_dir"]).resolve(),
-        "allocator_target_dir": Path(raw["allocator_target_dir"]).resolve(),
-    }
+def _frozen_runner(candidate_root: Path) -> dict[str, Any]:
+    path = (candidate_root / RUNNER_RELATIVE).resolve()
+    actual = identity(path)
+    if actual["bytes"] != FROZEN_RUNNER_BYTES or actual["sha256"] != FROZEN_RUNNER_SHA256:
+        raise AdapterError("frozen PPT qualification runner identity differs")
+    return actual
 
 
 def _check_expected(actual: Mapping[str, Any], expected: tuple[int, str], label: str) -> dict[str, Any]:
@@ -226,15 +221,14 @@ def validate(manifest_path: Path, projection_path: Path, preflight_path: Path, l
         raise AdapterError("build-input projection differs outside receipt identity fields")
     projection_identity = identity(projection_path)
     candidate_root = Path(manifest["candidate"]["root"]).resolve()
-    runner, runner_identity = _runner(candidate_root)
-    loaded = runner._load_manifest(manifest_path, plan=False)
-    probe_sources = runner._check_probe_sources(loaded["probe_sources"], {"root": candidate_root, "name": "candidate"})
-    baseline = _endpoint(runner, "baseline", loaded["baseline"])
-    candidate = _endpoint(runner, "candidate", loaded["candidate"])
+    runner, public_runner_identity = _runner()
+    frozen_runner_identity = _frozen_runner(candidate_root)
+    lifecycle = runner.validate_inputs(manifest_path, projection_path)
+    if lifecycle["build_input_projection"] != projection_identity:
+        raise AdapterError("public runner returned a different canonical projection identity")
+    loaded = strict_json(manifest_path, "final PPT manifest")
     receipt = strict_json(Path(loaded["build"]["receipt"]["path"]), "PPT build receipt")
-    if receipt.get("manifest") != str(projection_path) or receipt.get("manifest_sha256") != projection_identity["sha256"]:
-        raise AdapterError("build receipt is not bound to the canonical build-input projection")
-    build_result = runner._validate_build_receipt(loaded, projection_path, baseline, candidate, probe_sources)
+    build_result = lifecycle["build_receipt"]
     prep_path = Path(build_result["preparation"]["path"])
     overlay = _check_baseline_overlay(runner, loaded, receipt, prep_path)
     preflight_identity = _check_expected(identity(preflight_path), (PREFLIGHT_BYTES, PREFLIGHT_SHA256), "corrected qualification receipt")
@@ -249,13 +243,14 @@ def validate(manifest_path: Path, projection_path: Path, preflight_path: Path, l
         "build_input_projection": projection_identity,
         "build_receipt": {"path": build_result["path"], "bytes": build_result["bytes"], "sha256": build_result["sha256"]},
         "qualification_receipt": preflight_identity,
-        "runner": runner_identity,
+        "public_runner": public_runner_identity,
+        "frozen_runner": frozen_runner_identity,
         "preparation": build_result["preparation"],
         "overlay": overlay,
         "build_logs": logs,
-        "source_and_binary_validation": "frozen runner _validate_build_receipt plus exact baseline overlay path/content checks",
+        "source_and_binary_validation": "public runner validate_inputs lifecycle plus exact baseline overlay path/content checks",
         "claim_scope": "source-only structural binding of existing builds and correctness/allocation preflight; no rebuild or native timing claim",
-        "known_frozen_runner_boundary": "the frozen runner hashes a complete manifest; this adapter intentionally supplies its canonical build-input projection to avoid the receipt/manifest hash cycle",
+        "known_frozen_runner_boundary": "the public runner receives the full manifest and its explicit canonical build-input projection; the frozen historical runner identity is independently pinned",
     }
 
 

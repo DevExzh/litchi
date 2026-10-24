@@ -54,6 +54,12 @@ ARGS = (
     "--max-iterations",
     "1",
 )
+ABBA_ORDER = ("a1", "b1", "b2", "a2")
+ROLE_ENDPOINT = {"a1": "baseline", "a2": "baseline", "b1": "candidate", "b2": "candidate"}
+DEFAULT_ROUNDS = 2
+MAX_ROUNDS = 2
+PUBLIC_RUNNER_BYTES = 85_764
+PUBLIC_RUNNER_SHA256 = "56be0399ba88ba01bbec6ea0f42ef46823515d6eaeba735d4bab6e282e39752a"
 HEX64 = set("0123456789abcdef")
 class ColdRouteError(ValueError):
     """The fixed cold-route contract was not satisfied."""
@@ -199,24 +205,242 @@ def run(binary: Path, fixture: Path, role: str, *, execute: bool) -> dict[str, A
             raise ColdRouteError("cold probe output must be an object")
         result["report"] = validate_report(report, FIXTURE, allocator=role.endswith("allocator"))
     return result
+
+
+def _public_runner() -> Any:
+    path = Path(__file__).with_name("ppt_lazy_native_qualification.py").resolve()
+    actual = _digest(path)
+    if actual["bytes"] != PUBLIC_RUNNER_BYTES or actual["sha256"] != PUBLIC_RUNNER_SHA256:
+        raise ColdRouteError("public PPT qualification runner identity differs")
+    tools = str(path.parent)
+    if tools not in sys.path:
+        sys.path.insert(0, tools)
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("ppt_lazy_native_qualification_cold_pair", path)
+    if spec is None or spec.loader is None:
+        raise ColdRouteError("cannot load public PPT qualification runner")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def _aggregate(samples: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+    if not samples:
+        raise ColdRouteError("cold pair has no measured operation samples")
+    elapsed = []
+    for sample in samples:
+        if type(sample.get("elapsed_ns")) is not int or sample["elapsed_ns"] <= 0:
+            raise ColdRouteError("cold pair sample elapsed_ns is invalid")
+        if sample.get("iterations") != 1:
+            raise ColdRouteError("cold pair sample is not one operation")
+        elapsed.append(sample["elapsed_ns"])
+    total = sum(elapsed)
+    count = len(elapsed)
+    return {"operation_total_ns": total, "operation_count": count, "operation_mean_ns": total // count}
+
+
+def validate_pair_report(value: Mapping[str, Any], *, rounds: int) -> dict[str, Any]:
+    """Validate the fixed ABBA aggregate without setup time or a median."""
+
+    required = {"schema", "route", "abba_order", "rounds", "samples", "aggregate"}
+    allowed = required | {
+        "underlying_route",
+        "warmups",
+        "iterations",
+        "commands",
+        "manifest",
+        "build_input_projection",
+        "claim_scope",
+        "execution",
+    }
+    if not required.issubset(value) or set(value) - allowed:
+        raise ColdRouteError("cold pair report fields or route differ from the fixed contract")
+    if value.get("schema") != SCHEMA or value.get("route") != ROUTE:
+        raise ColdRouteError("cold pair report fields or route differ from the fixed contract")
+    if value.get("abba_order") != list(ABBA_ORDER) or value.get("rounds") != rounds:
+        raise ColdRouteError("cold pair report is not the bounded symmetric ABBA workload")
+    rows = value.get("samples")
+    if not isinstance(rows, list) or len(rows) != rounds * len(ABBA_ORDER) * 2:
+        raise ColdRouteError("cold pair report does not contain both binary roles for every ABBA position")
+    expected_positions = tuple(
+        (round_number, expected_role, expected_kind)
+        for round_number in range(rounds)
+        for expected_role in ABBA_ORDER
+        for expected_kind in ("normal", "allocator")
+    )
+    grouped: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
+    for index, row_value in enumerate(rows):
+        row = row_value if isinstance(row_value, dict) else None
+        if row is None or set(row) != {"round", "role", "endpoint", "kind", "sample"}:
+            raise ColdRouteError(f"cold pair sample {index} fields differ")
+        round_index = row["round"]
+        role = row["role"]
+        endpoint = row["endpoint"]
+        kind = row["kind"]
+        if type(round_index) is not int or not 0 <= round_index < rounds:
+            raise ColdRouteError("cold pair sample round is invalid")
+        if role not in ABBA_ORDER or ROLE_ENDPOINT[role] != endpoint or kind not in {"normal", "allocator"}:
+            raise ColdRouteError("cold pair sample role/endpoint/kind is invalid")
+        if (round_index, role, kind) != expected_positions[index]:
+            raise ColdRouteError("cold pair samples are not in the fixed ABBA order")
+        sample = row["sample"]
+        if not isinstance(sample, dict) or set(sample) != {"elapsed_ns", "iterations", "allocation"}:
+            raise ColdRouteError("cold pair sample must be the operation timing observation")
+        grouped.setdefault((endpoint, kind), []).append(sample)
+    aggregate = value.get("aggregate")
+    if not isinstance(aggregate, dict) or set(aggregate) != {"baseline", "candidate"}:
+        raise ColdRouteError("cold pair aggregate endpoints differ")
+    for endpoint in ("baseline", "candidate"):
+        endpoint_aggregate = aggregate[endpoint]
+        if not isinstance(endpoint_aggregate, dict) or set(endpoint_aggregate) != {"normal", "allocator"}:
+            raise ColdRouteError("cold pair aggregate roles differ")
+        for kind in ("normal", "allocator"):
+            expected_aggregate = _aggregate(grouped.get((endpoint, kind), []))
+            if endpoint_aggregate[kind] != expected_aggregate:
+                raise ColdRouteError("cold pair aggregate is not the sum/count of operation timings")
+    return dict(value)
+
+
+def run_pair(
+    manifest: Path,
+    projection: Path,
+    output: Path,
+    *,
+    rounds: int = DEFAULT_ROUNDS,
+    execute: bool = False,
+) -> dict[str, Any]:
+    if type(rounds) is not int or not 1 <= rounds <= MAX_ROUNDS:
+        raise ColdRouteError(f"cold pair rounds must be between 1 and {MAX_ROUNDS}")
+    runner = _public_runner()
+    manifest_path = manifest.resolve()
+    projection_path = projection.resolve()
+    manifest_value = runner._load_manifest(manifest_path, plan=False)
+    if manifest_value["build"]["fixtures"]["default"]["bytes"] != FIXTURE["bytes"] or manifest_value["build"]["fixtures"]["default"]["sha256"] != FIXTURE["sha256"]:
+        raise ColdRouteError("cold pair default fixture differs from the reviewed fixture")
+    lifecycle = runner.validate_inputs(manifest_path, projection_path)
+    endpoints = {name: lifecycle[name] for name in ("baseline", "candidate")}
+    roots = [endpoints[endpoint]["root"] for endpoint in ("baseline", "candidate")]
+    resources = [
+        output.resolve(),
+        *[
+            endpoints[endpoint][target]
+            for endpoint in endpoints
+            for target in ("target_dir", "allocator_target_dir")
+        ],
+    ]
+    if any(runner._overlap(resource, root) for resource in resources for root in roots):
+        raise ColdRouteError("cold pair output or target directory overlaps a source worktree")
+    for index, first in enumerate(resources):
+        for second in resources[index + 1 :]:
+            if runner._overlap(first, second):
+                raise ColdRouteError("cold pair output and target directories overlap")
+    commands = {
+        endpoint: {
+            kind: [str(endpoints[endpoint][f"{kind}_binary"]["path"]), *ARGS]
+            for kind in ("normal", "allocator")
+        }
+        for endpoint in endpoints
+    }
+    result: dict[str, Any] = {
+        "schema": SCHEMA,
+        "route": ROUTE,
+        "underlying_route": UNDERLYING_ROUTE,
+        "abba_order": list(ABBA_ORDER),
+        "rounds": rounds,
+        "warmups": 0,
+        "iterations": 1,
+        "samples": [],
+        "commands": commands,
+        "manifest": lifecycle["manifest"],
+        "build_input_projection": lifecycle["build_input_projection"],
+        "claim_scope": "symmetric bounded cold operation observations; timing is the probe's operation elapsed_ns only",
+        "execution": "not_run",
+    }
+    if not execute:
+        return result
+    out_dir = runner._prepare_output(output.resolve(), roots)
+    manifest_identity = lifecycle["manifest"]
+    protocol = dict(manifest_value["protocol"])
+    protocol["cpu"] = CPU
+    for round_index in range(rounds):
+        for role in ABBA_ORDER:
+            endpoint_name = ROLE_ENDPOINT[role]
+            endpoint = endpoints[endpoint_name]
+            runner._recheck(
+                endpoint,
+                lifecycle["probe_sources"],
+                manifest_path,
+                manifest_identity,
+                f"cold-before-{round_index}-{role}",
+                projection_path,
+                lifecycle["build_input_projection"],
+            )
+            for kind in ("normal", "allocator"):
+                binary = Path(endpoint[f"{kind}_binary"]["path"])
+                target = endpoint["target_dir"] if kind == "normal" else endpoint["allocator_target_dir"]
+                report, event = runner._run_child(
+                    endpoint,
+                    protocol,
+                    out_dir,
+                    f"cold-{kind}-round-{round_index}-{role}",
+                    binary,
+                    target,
+                    ARGS,
+                )
+                checked = validate_report(report, FIXTURE, allocator=kind == "allocator")
+                result["samples"].append({
+                    "round": round_index,
+                    "role": role,
+                    "endpoint": endpoint_name,
+                    "kind": kind,
+                    "sample": checked["samples"][0],
+                    "event": event,
+                })
+            runner._recheck(
+                endpoint,
+                lifecycle["probe_sources"],
+                manifest_path,
+                manifest_identity,
+                f"cold-after-{round_index}-{role}",
+                projection_path,
+                lifecycle["build_input_projection"],
+            )
+    result["aggregate"] = {
+        endpoint: {
+            kind: _aggregate([
+                row["sample"] for row in result["samples"]
+                if row["endpoint"] == endpoint and row["kind"] == kind
+            ])
+            for kind in ("normal", "allocator")
+        }
+        for endpoint in ("baseline", "candidate")
+    }
+    result["execution"] = "native_executed"
+    validate_pair_report(result, rounds=rounds)
+    return result
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, required=True)
-    parser.add_argument("--fixture", type=Path, required=True)
-    parser.add_argument("--role", choices=sorted(BINARY_IDENTITIES), required=True)
-    parser.add_argument("--execute", action="store_true", help="run the fixed cold route; omitted for source-only planning")
-    parser.add_argument("--output", type=Path)
+    parser.add_argument("--manifest", type=Path, required=True)
+    parser.add_argument("--projection", type=Path, required=True)
+    parser.add_argument("--out-dir", type=Path, required=True)
+    parser.add_argument("--rounds", type=int, default=DEFAULT_ROUNDS)
+    parser.add_argument("--execute", action="store_true", help="run the fixed pair; omitted for source-only planning")
     args = parser.parse_args(argv)
     try:
-        result = run(args.binary.resolve(), args.fixture.resolve(), args.role, execute=args.execute)
-        encoded = json.dumps(result, indent=2, sort_keys=True) + "\n"
-        if args.output:
-            if args.output.exists() or args.output.is_symlink():
-                raise ColdRouteError(f"refusing to overwrite output: {args.output}")
-            args.output.parent.mkdir(parents=True, exist_ok=True)
-            args.output.write_text(encoded, encoding="utf-8")
-        else:
-            print(encoded, end="")
+        result = run_pair(
+            args.manifest.resolve(),
+            args.projection.resolve(),
+            args.out_dir.resolve(),
+            rounds=args.rounds,
+            execute=args.execute,
+        )
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        output = args.out_dir / ("report.json" if args.execute else "plan.json")
+        if output.exists() or output.is_symlink():
+            raise ColdRouteError(f"refusing to overwrite output: {output}")
+        output.write_bytes((json.dumps(result, indent=2, sort_keys=True) + "\n").encode())
+        print(json.dumps(result, indent=2, sort_keys=True))
         return 0
     except (OSError, ColdRouteError, subprocess.TimeoutExpired) as error:
         print(f"PPT cold first-commit route failed: {error}", file=sys.stderr)

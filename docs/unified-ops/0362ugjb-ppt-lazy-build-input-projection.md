@@ -46,9 +46,11 @@ python3 tools/ppt_lazy_build_receipt_adapter.py \
   --output /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-20261024/ppt-lazy-build-adapter-472b.json
 ```
 
-The adapter reuses the frozen runner's manifest, probe-source, and build
-receipt validators with the projection path, then rehashes the baseline
-endpoint and every reviewed overlay file.  Baseline admission is exact: HEAD,
+The historical adapter used the frozen runner's manifest, probe-source, and
+build receipt validators with the projection path.  The repaired adapter uses
+the public runner lifecycle described below and retains the frozen identity as
+an independent input.  Both rehash the baseline endpoint and every reviewed
+overlay file.  Baseline admission is exact: HEAD,
 tree, and the following status are required (no blanket dirty-root waiver):
 
 ```text
@@ -77,3 +79,53 @@ The supplemental cold first-commit route is documented separately in
 `0362ugja-ppt-lazy-cold-first-commit.md`.  It uses CPU 29, `warmups=0`, and
 one no-op iteration, but is not part of the frozen 28-route acceptance
 manifest.  CPU 29 is reserved for a future quiet execution only.
+
+## Repaired public-lifecycle packet
+
+The initial 472b packet above is retained as historical evidence.  The
+reviewable source-only handoff uses the separately materialized repaired
+packet at
+`/home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024`:
+
+| artifact | bytes | SHA-256 |
+| --- | ---: | --- |
+| `ppt-lazy-edit-472b-repaired.json` | 9829 | `8cdcc3644bf072664d37651923245df0ff1c5425a3f73e695db3a3b77ec5dc15` |
+| `ppt-lazy-build-input-projection-472b-repaired.json` | 9724 | `762ba94ec10b83cb574d9d2b01a1992316a3a1592b31d42b8f6ca89d152250f6` |
+| `ppt-lazy-build-receipt-472b-repaired.json` | 9976 | `bc44f06bf77959edf0a67a43ea0be15701d547dc5b490395a59601ab27641d45` |
+| `ppt-lazy-build-adapter-472b-repaired-public-v2.json` | 3885 | `aa69930eba70750fb6436fed47ec4c6bd4b98bd4c5ab0702c3f5673aaefb1bfe` |
+
+The repaired manifest binds normal and allocator targets to their actual
+binary parents (`baseline-082-normal-target`, `baseline-082-allocator-target`,
+`candidate-472b-normal-target`, and `candidate-472b-allocator-target`), rather
+than to their shared parent.  Its baseline adapter includes the exact five
+status lines and the ten-file content closure.  The public runner now accepts
+the full manifest plus `--build-input-projection`, validates the canonical
+projection digest, resolves both endpoints, rechecks locks/executables/target
+directories/worktree state, and then validates the build receipt.  The adapter
+uses that public `validate_inputs` lifecycle; it does not construct endpoint
+objects or invoke frozen-runner internals.  It also rechecks the projection
+identity at every later endpoint lifecycle boundary.  The public runner identity is
+85764 bytes, SHA
+`56be0399ba88ba01bbec6ea0f42ef46823515d6eaeba735d4bab6e282e39752a`; the
+historical candidate runner remains independently pinned at 73596 bytes, SHA
+`19d80d7f6e9450b60862929c4d864c0caae213aaa9e0682fca1c5fcc67d28c4f`.
+
+The repaired adapter completed `status=structural_pass` after rehashing the
+source archive and all endpoint/overlay identities; no Cargo, native probe,
+calibration, allocator measurement, or ABBA run was performed.  The earlier
+`ppt-lazy-build-adapter-472b-repaired.json` is retained as the pre-allowlist
+receipt, and `ppt-lazy-build-adapter-472b-repaired-public.json` is retained as
+the first public-lifecycle receipt.  The `-public-v2` artifact is the final
+receipt bound to the public runner, exact four-path probe allowlist, and
+projection rechecks at use.
+
+Its exact source-only invocation was:
+
+```sh
+python3 tools/ppt_lazy_build_receipt_adapter.py \
+  --manifest /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-edit-472b-repaired.json \
+  --projection /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-build-input-projection-472b-repaired.json \
+  --preflight-receipt /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/qualification-receipt-472b670547-corrected.json \
+  --logs-root /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs \
+  --output /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-build-adapter-472b-repaired-public-v2.json
+```

@@ -5,6 +5,8 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 import unittest
 ROOT = Path(__file__).resolve().parents[1]
@@ -82,5 +84,72 @@ class ColdFirstCommitTests(unittest.TestCase):
             MODULE._strict_json(b'{"x": 1, "x": 2}', "test")
         with self.assertRaises(MODULE.ColdRouteError):
             MODULE._strict_json(b'{"x": 1e999}', "test")
+
+    def test_public_cli_exposes_symmetric_pair_contract(self) -> None:
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "ppt_lazy_cold_first_commit.py"), "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(completed.returncode, 0)
+        self.assertIn("--manifest", completed.stdout)
+        self.assertIn("--projection", completed.stdout)
+        self.assertIn("--out-dir", completed.stdout)
+        self.assertIn("--rounds", completed.stdout)
+
+    def test_pair_report_aggregates_operation_elapsed_ns_in_abba_order(self) -> None:
+        rows = []
+        for round_index in range(1):
+            for role in MODULE.ABBA_ORDER:
+                for kind in ("normal", "allocator"):
+                    rows.append({
+                        "round": round_index,
+                        "role": role,
+                        "endpoint": MODULE.ROLE_ENDPOINT[role],
+                        "kind": kind,
+                        "sample": {
+                            "elapsed_ns": 10 if kind == "normal" else 20,
+                            "iterations": 1,
+                            "allocation": {"status": "unavailable"},
+                        },
+                    })
+        report = {
+            "schema": MODULE.SCHEMA,
+            "route": MODULE.ROUTE,
+            "abba_order": list(MODULE.ABBA_ORDER),
+            "rounds": 1,
+            "samples": rows,
+            "aggregate": {
+                "baseline": {
+                    "normal": {"operation_total_ns": 20, "operation_count": 2, "operation_mean_ns": 10},
+                    "allocator": {"operation_total_ns": 40, "operation_count": 2, "operation_mean_ns": 20},
+                },
+                "candidate": {
+                    "normal": {"operation_total_ns": 20, "operation_count": 2, "operation_mean_ns": 10},
+                    "allocator": {"operation_total_ns": 40, "operation_count": 2, "operation_mean_ns": 20},
+                },
+            },
+        }
+        self.assertNotIn("median", MODULE.validate_pair_report(report, rounds=1))
+        full = dict(
+            report,
+            underlying_route=MODULE.UNDERLYING_ROUTE,
+            warmups=0,
+            iterations=1,
+            commands={},
+            manifest={"path": "manifest"},
+            build_input_projection={"path": "projection"},
+            claim_scope="operation only",
+            execution="native_executed",
+        )
+        self.assertEqual(MODULE.validate_pair_report(full, rounds=1)["execution"], "native_executed")
+        reordered = dict(report, samples=list(report["samples"]))
+        reordered["samples"][0], reordered["samples"][2] = reordered["samples"][2], reordered["samples"][0]
+        with self.assertRaises(MODULE.ColdRouteError):
+            MODULE.validate_pair_report(reordered, rounds=1)
+        report["aggregate"]["candidate"]["normal"]["operation_total_ns"] = 1
+        with self.assertRaises(MODULE.ColdRouteError):
+            MODULE.validate_pair_report(report, rounds=1)
 if __name__ == "__main__":
     unittest.main()
