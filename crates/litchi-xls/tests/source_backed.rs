@@ -2601,20 +2601,6 @@ fn deferred_package_handoff_promotes_original_source_changes_for_primary_edit_an
     ));
 }
 
-#[test]
-fn deferred_package_edit_admission_promotes_inflight_original_source_change() {
-    let (source, deferred, _sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
-    let handoff = Package::from_source(deferred).unwrap();
-    source.clear_version_calls();
-    source.bump_after_observation(3);
-    assert!(matches!(
-        handoff.edit(),
-        Err(litchi_xls::EditError::Package(PackageError::Source(
-            SourceBackedError::SourceChanged { .. }
-        )))
-    ));
-}
-
 fn assert_handoff_package_source_change(
     operation: impl FnOnce(&Package) -> Result<(), PackageError>,
 ) {

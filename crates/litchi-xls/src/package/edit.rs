@@ -1287,3 +1287,131 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
         }),
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_cfb::{SameLengthStreamSplice, SharedOleFile, StreamSpliceLimits};
+    use litchi_core::{ReadAt, SourceVersion};
+    use std::io;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    struct AdmissionSource {
+        bytes: Arc<Vec<u8>>,
+        revision: AtomicU64,
+        observations: AtomicU64,
+        bump_after: AtomicU64,
+    }
+
+    impl AdmissionSource {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                bytes: Arc::new(bytes),
+                revision: AtomicU64::new(0),
+                observations: AtomicU64::new(0),
+                bump_after: AtomicU64::new(0),
+            }
+        }
+
+        fn bump_after_observation(&self, ordinal: u64) {
+            self.observations.store(0, Ordering::Relaxed);
+            self.bump_after.store(ordinal, Ordering::Relaxed);
+        }
+    }
+
+    impl ReadAt for AdmissionSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let start = usize::try_from(offset)
+                .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
+            if start >= self.bytes.len() || output.is_empty() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - start);
+            output[..count].copy_from_slice(&self.bytes[start..start + count]);
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            let ordinal = self.observations.fetch_add(1, Ordering::Relaxed) + 1;
+            let observed = SourceVersion::new(
+                0x584c_535f_4144_4d49,
+                self.revision.load(Ordering::Relaxed),
+            );
+            if self.bump_after.load(Ordering::Relaxed) == ordinal {
+                self.revision.fetch_add(1, Ordering::Relaxed);
+            }
+            Ok(observed)
+        }
+    }
+
+    #[test]
+    fn capture_source_guard_promotes_target_error_to_original_source_changed() {
+        let mut builder = crate::Builder::new();
+        let sheet = builder.add_worksheet("Admission").unwrap();
+        builder.write_number(sheet, 0, 0, 42.0).unwrap();
+        let bytes = builder.build().unwrap().to_bytes().unwrap();
+        let source = Arc::new(AdmissionSource::new(bytes));
+        let source_cfb = Arc::new(SharedOleFile::open(source.clone()).unwrap());
+        let original = crate::SourceBackedWorkbook::from_shared_ole_file_with_options(
+            Arc::clone(&source_cfb),
+            crate::SourceBackedOptions::default(),
+        )
+        .unwrap();
+
+        let workbook_stream = source_cfb.open_stream(&["Workbook"]).unwrap();
+        let expected = 42.0_f64.to_le_bytes();
+        let offset = workbook_stream
+            .windows(expected.len())
+            .position(|window| window == expected)
+            .expect("writer must retain the Number value in the Workbook stream");
+        let replacement = 43.0_f64.to_le_bytes();
+        let plan = source_cfb
+            .plan_same_length_stream_splices(
+                vec![SameLengthStreamSplice::new(
+                    vec!["Workbook".to_string()],
+                    offset as u64,
+                    Arc::from(expected),
+                    Arc::from(replacement),
+                )],
+                StreamSpliceLimits::default(),
+            )
+            .unwrap();
+        let composed = Arc::new(plan.composed_source().unwrap());
+        let target_cfb = Arc::new(SharedOleFile::open(composed).unwrap());
+        let deferred = original.committed_deferred(plan).unwrap();
+        let limits = deferred.retained_limits();
+        let leniency = deferred.retained_leniency();
+        let package = Package {
+            inner: Arc::new(super::super::PackageInner {
+                state: PackageState::Source {
+                    cfb: target_cfb,
+                    workbook: deferred,
+                    encryption: None,
+                    materialized: OnceLock::new(),
+                    catalog: OnceLock::new(),
+                },
+                policy: super::super::RetainedPolicy::Source { limits, leniency },
+                signed: false,
+                metadata: OnceLock::new(),
+                edit_snapshot: None,
+                workbook_stream: OnceLock::new(),
+            }),
+        };
+
+        // The first observation is the retained original-owner fence. The
+        // target CFB's composed-source version check then observes twice; the
+        // mutation after its first observation must be reported as the typed
+        // original SourceChanged error, before a SourceGuard exists.
+        source.bump_after_observation(2);
+        assert!(matches!(
+            package.edit(),
+            Err(Error::Package(PackageError::Source(
+                SourceBackedError::SourceChanged { .. }
+            )))
+        ));
+    }
+}
