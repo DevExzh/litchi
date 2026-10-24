@@ -1,7 +1,10 @@
 #![allow(clippy::expect_used, reason = "regression fixture assertions")]
 
 //! Exercise complete-part grammar independently of the family fragment codec.
-use litchi_drawingml::theme::family::{Family, part};
+use litchi_drawingml::{
+    Error, LimitKind,
+    theme::family::{Family, part},
+};
 
 fn theme(body: &str) -> String {
     format!(
@@ -16,21 +19,24 @@ fn assert_rejected(source: &[u8]) {
         "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}",
     )
     .expect("valid family");
-    assert!(part::read(source).is_err(), "read accepted {source:?}");
     assert!(
-        part::read_family(source).is_err(),
+        part::read(source, part::Limits::DEFAULT).is_err(),
+        "read accepted {source:?}"
+    );
+    assert!(
+        part::read_family(source, part::Limits::DEFAULT).is_err(),
         "projection accepted {source:?}"
     );
     assert!(
-        part::add_family(source, &family).is_err(),
+        part::add_family(source, &family, part::Limits::DEFAULT).is_err(),
         "add accepted {source:?}"
     );
     assert!(
-        part::replace_family(source, &family).is_err(),
+        part::replace_family(source, &family, part::Limits::DEFAULT).is_err(),
         "replace accepted {source:?}"
     );
     assert!(
-        part::remove_family(source).is_err(),
+        part::remove_family(source, part::Limits::DEFAULT).is_err(),
         "remove accepted {source:?}"
     );
 }
@@ -101,7 +107,10 @@ fn declarations_require_xml_10_utf8_and_correct_placement() {
         "<?xml version='1.0' encoding='utf-8' standalone='no'?>",
     ] {
         let source = format!("{declaration}{}", theme(""));
-        assert!(part::read(source.as_bytes()).is_ok(), "rejected {source}");
+        assert!(
+            part::read(source.as_bytes(), part::Limits::DEFAULT).is_ok(),
+            "rejected {source}"
+        );
     }
 }
 
@@ -113,10 +122,13 @@ fn valid_opaque_text_and_xml_whitespace_remain_lexically_intact() {
         "<a:extLst> \t\r\n&#32;<![CDATA[\t]]></a:extLst>",
     ] {
         let source = format!("\u{feff}{}\n", theme(body));
-        let snapshot = part::read(source.as_bytes()).expect("valid opaque XML");
+        let snapshot =
+            part::read(source.as_bytes(), part::Limits::DEFAULT).expect("valid opaque XML");
         assert_eq!(snapshot.xml_bytes(), source.as_bytes());
         assert_eq!(
-            snapshot.remove_family().expect("absent no-op"),
+            snapshot
+                .remove_family(part::Limits::DEFAULT)
+                .expect("absent no-op"),
             source.as_bytes()
         );
     }
@@ -139,7 +151,7 @@ fn namespace_prefix_byte_limit_covers_declarations_elements_and_attributes() {
             let source = theme(&body);
             if length == MAX_NAMESPACE_BYTES {
                 assert!(
-                    part::read(source.as_bytes()).is_ok(),
+                    part::read(source.as_bytes(), part::Limits::DEFAULT).is_ok(),
                     "exact bound rejected"
                 );
             } else {
@@ -154,7 +166,8 @@ fn namespace_prefix_byte_limit_covers_declarations_elements_and_attributes() {
         format!("<opaque {prefix}:attr='v'/>"),
     ] {
         let source = theme(&body);
-        let error = part::read(source.as_bytes()).expect_err("oversized undeclared prefix");
+        let error = part::read(source.as_bytes(), part::Limits::DEFAULT)
+            .expect_err("oversized undeclared prefix");
         assert!(
             error.to_string().contains("namespace prefix bytes"),
             "{error}"
@@ -180,17 +193,20 @@ fn inherited_namespace_decoration_respects_fragment_output_limit() {
         ));
         if extra == 0 {
             assert!(
-                part::read(source.as_bytes()).is_ok(),
+                part::read(source.as_bytes(), part::Limits::DEFAULT).is_ok(),
                 "exact decorated bound"
             );
         } else {
-            let error = part::read(source.as_bytes()).expect_err("decoration exceeds bound");
-            assert!(
-                error
-                    .to_string()
-                    .contains("decorated Theme Family XML bytes"),
-                "{error}"
-            );
+            let error = part::read(source.as_bytes(), part::Limits::DEFAULT)
+                .expect_err("decoration exceeds bound");
+            assert!(matches!(
+                error,
+                Error::Limit {
+                    kind: LimitKind::XmlBytes,
+                    maximum: MAX_XML_BYTES,
+                    ..
+                }
+            ));
         }
     }
 }
@@ -212,11 +228,19 @@ fn insertion_wrappers_obey_exact_complete_part_output_limit() {
         ),
     ] {
         let source = theme(&body);
-        let output = part::add_family(source.as_bytes(), &family).expect("unbounded insertion");
-        let exact = part::add_family_with_limit(source.as_bytes(), &family, output.len())
+        let output = part::add_family(source.as_bytes(), &family, part::Limits::DEFAULT)
+            .expect("default-profile insertion");
+        let exact = part::add_family(source.as_bytes(), &family, part::Limits::new(output.len()))
             .expect("exact output limit");
         assert_eq!(output, exact);
-        assert!(part::add_family_with_limit(source.as_bytes(), &family, output.len() - 1).is_err());
+        assert!(
+            part::add_family(
+                source.as_bytes(),
+                &family,
+                part::Limits::new(output.len() - 1),
+            )
+            .is_err()
+        );
     }
 }
 
@@ -231,13 +255,14 @@ fn native_family_name_edit_preserves_exact_future_cdata_payload() {
         &native[..end],
         &native[end + 2..]
     );
-    let snapshot = part::read(source.as_bytes()).expect("native family with CDATA");
+    let snapshot =
+        part::read(source.as_bytes(), part::Limits::DEFAULT).expect("native family with CDATA");
     let mut replacement = snapshot.family().expect("family projection").clone();
     replacement
         .set_name("Updated CDATA Theme")
         .expect("valid name");
     let changed = snapshot
-        .replace_family(&replacement)
+        .replace_family(&replacement, part::Limits::DEFAULT)
         .expect("CDATA is not a PI");
     let expected = format!(
         "{}{}",
@@ -246,7 +271,9 @@ fn native_family_name_edit_preserves_exact_future_cdata_payload() {
     );
     assert_eq!(changed, expected.as_bytes());
     assert_eq!(
-        part::read(&changed).expect("readback").family(),
+        part::read(&changed, part::Limits::DEFAULT)
+            .expect("readback")
+            .family(),
         Some(&replacement)
     );
 }
@@ -255,21 +282,30 @@ fn native_family_name_edit_preserves_exact_future_cdata_payload() {
 fn caller_limit_preflight_handles_source_fragments_and_escaped_replacement_names() {
     use litchi_drawingml::theme::family;
     let native = include_str!("fixtures/theme-part-native.xml");
-    let snapshot = part::read(native.as_bytes()).expect("native family");
+    let snapshot = part::read(native.as_bytes(), part::Limits::DEFAULT).expect("native family");
     let mut replacement = snapshot.family().expect("family").clone();
     replacement
         .set_name("Expanded & <quoted> \"name\"\r\n\t")
         .expect("escaped name");
-    let changed = part::replace_family(native.as_bytes(), &replacement).expect("replace");
+    let changed = part::replace_family(native.as_bytes(), &replacement, part::Limits::DEFAULT)
+        .expect("replace");
     assert!(changed.len() > native.len());
     assert_eq!(
-        part::replace_family_with_limit(native.as_bytes(), &replacement, changed.len())
-            .expect("exact limit"),
+        part::replace_family(
+            native.as_bytes(),
+            &replacement,
+            part::Limits::new(changed.len()),
+        )
+        .expect("exact limit"),
         changed
     );
     assert!(
-        part::replace_family_with_limit(native.as_bytes(), &replacement, changed.len() - 1)
-            .is_err()
+        part::replace_family(
+            native.as_bytes(),
+            &replacement,
+            part::Limits::new(changed.len() - 1),
+        )
+        .is_err()
     );
 
     let fragment = format!(
@@ -277,12 +313,14 @@ fn caller_limit_preflight_handles_source_fragments_and_escaped_replacement_names
         family::NAMESPACE,
         "x".repeat(64 * 1024)
     );
-    let incoming = family::read(fragment.as_bytes()).expect("source-backed incoming family");
+    let incoming = family::read(fragment.as_bytes(), family::Limits::DEFAULT)
+        .expect("source-backed incoming family");
     let source = theme("");
-    assert!(part::add_family_with_limit(source.as_bytes(), &incoming, 1024).is_err());
-    let added = part::add_family(source.as_bytes(), &incoming).expect("large add");
+    assert!(part::add_family(source.as_bytes(), &incoming, part::Limits::new(1024)).is_err());
+    let added =
+        part::add_family(source.as_bytes(), &incoming, part::Limits::DEFAULT).expect("large add");
     assert_eq!(
-        part::add_family_with_limit(source.as_bytes(), &incoming, added.len())
+        part::add_family(source.as_bytes(), &incoming, part::Limits::new(added.len()),)
             .expect("exact add limit"),
         added
     );
@@ -302,7 +340,7 @@ fn empty_prefixed_bindings_are_rejected_before_attribute_projection() {
     let valid =
         theme(r#"<opaque xmlns="urn:vendor"><child xmlns="" y="z" xml:lang="en"/></opaque>"#);
     assert!(
-        part::read(valid.as_bytes()).is_ok(),
+        part::read(valid.as_bytes(), part::Limits::DEFAULT).is_ok(),
         "default namespace reset is legal"
     );
 }
@@ -316,7 +354,9 @@ fn standalone_document_markup_cannot_be_embedded_as_a_family_child() {
         "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}",
     )
     .expect("family");
-    let fragment = String::from_utf8(family::write(&value).expect("write family")).expect("UTF-8");
+    let fragment =
+        String::from_utf8(family::write(&value, family::Limits::DEFAULT).expect("write family"))
+            .expect("UTF-8");
     let source = theme("");
     for prefix in [
         "<?xml version='1.0'?>",
@@ -324,22 +364,27 @@ fn standalone_document_markup_cannot_be_embedded_as_a_family_child() {
         "<?xml version='1.0'?><!-- prolog -->",
     ] {
         let standalone = format!("{prefix}{fragment}");
-        let parsed = family::read(standalone.as_bytes()).expect("valid standalone declaration");
-        assert!(part::add_family(source.as_bytes(), &parsed).is_err());
-        assert!(part::replace_family(source.as_bytes(), &parsed).is_err());
+        let parsed = family::read(standalone.as_bytes(), family::Limits::DEFAULT)
+            .expect("valid standalone declaration");
+        assert!(part::add_family(source.as_bytes(), &parsed, part::Limits::DEFAULT).is_err());
+        assert!(part::replace_family(source.as_bytes(), &parsed, part::Limits::DEFAULT).is_err());
     }
     for standalone in [
         format!("<?future data?>{fragment}"),
         fragment.replace("/>", "><?future data?></thm15:themeFamily>"),
     ] {
         assert!(
-            family::read(standalone.as_bytes()).is_err(),
+            family::read(standalone.as_bytes(), family::Limits::DEFAULT).is_err(),
             "actual PI must be rejected"
         );
     }
-    let commented = family::read(format!("<!-- <?x is comment text -->{fragment}").as_bytes())
-        .expect("legal comment");
-    let added = part::add_family(source.as_bytes(), &commented).expect("comment can be embedded");
+    let commented = family::read(
+        format!("<!-- <?x is comment text -->{fragment}").as_bytes(),
+        family::Limits::DEFAULT,
+    )
+    .expect("legal comment");
+    let added = part::add_family(source.as_bytes(), &commented, part::Limits::DEFAULT)
+        .expect("comment can be embedded");
     assert!(
         std::str::from_utf8(&added)
             .expect("UTF-8")
@@ -364,7 +409,7 @@ fn namespace_heavy_foreign_families_stay_opaque_and_duplicate_owners_fail_early(
     let source = format!("{root}{foreign}</a:extLst></a:theme>");
     assert!(source.len() < family::MAX_XML_BYTES);
     assert!(
-        part::read_family(source.as_bytes())
+        part::read_family(source.as_bytes(), part::Limits::DEFAULT)
             .expect("opaque foreign families")
             .is_none()
     );
@@ -377,7 +422,8 @@ fn namespace_heavy_foreign_families_stay_opaque_and_duplicate_owners_fail_early(
             part::EXTENSION_URI,
             part::NATIVE_EXTENSION_URI
         );
-        let error = part::read_family(source.as_bytes()).expect_err("duplicate supported owner");
+        let error = part::read_family(source.as_bytes(), part::Limits::DEFAULT)
+            .expect_err("duplicate supported owner");
         assert!(
             error
                 .to_string()
@@ -409,15 +455,20 @@ fn active_namespace_cap_counts_nested_declarations_and_restores_on_scope_exit() 
         );
         if extra == 0 {
             assert!(
-                part::read(source.as_bytes()).is_ok(),
+                part::read(source.as_bytes(), part::Limits::DEFAULT).is_ok(),
                 "exact active declaration cap"
             );
         } else {
-            let error = part::read(source.as_bytes()).expect_err("one over active declaration cap");
-            assert!(
-                error.to_string().contains("active namespace bindings"),
-                "{error}"
-            );
+            let error = part::read(source.as_bytes(), part::Limits::DEFAULT)
+                .expect_err("one over active declaration cap");
+            assert!(matches!(
+                error,
+                Error::Limit {
+                    kind: LimitKind::NamespaceDeclarations,
+                    maximum,
+                    ..
+                } if maximum == part::MAX_ACTIVE_NAMESPACE_DECLARATIONS + 1,
+            ));
         }
     }
 }
@@ -437,7 +488,8 @@ fn direct_extension_list_rejects_foreign_children_but_extensions_keep_opaque_pay
         let source = theme(&format!(
             r#"<a:extLst><!--keep--><a:ext uri="{uri}"><x:foreign xmlns:x="urn:vendor"><x:child/></x:foreign></a:ext></a:extLst>"#
         ));
-        let snapshot = part::read(source.as_bytes()).expect("foreign payload inside extension");
+        let snapshot = part::read(source.as_bytes(), part::Limits::DEFAULT)
+            .expect("foreign payload inside extension");
         assert_eq!(snapshot.xml_bytes(), source.as_bytes());
     }
 }

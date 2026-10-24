@@ -9,7 +9,7 @@
 
 use litchi_drawingml::diagram::authoring::{Spec, colors_xml, quick_style_xml};
 use litchi_drawingml::diagram::{
-    DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
+    DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL, Limits,
     MS_DIAGRAM_DRAWING_REL, edit as diagram_edit,
 };
 use litchi_opc::constants::content_type as ct;
@@ -25,6 +25,15 @@ const DGM: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/diagram";
 const DGM_STRICT: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/diagram";
 const R: &[u8] = b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const R_STRICT: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+fn drawing_error(error: litchi_drawingml::Error, context: &str) -> crate::Error {
+    match error {
+        litchi_drawingml::Error::Invalid(_) | litchi_drawingml::Error::Xml(_) => {
+            invalid(format!("{context} is invalid"))
+        },
+        error => crate::Error::Drawing(error),
+    }
+}
 
 /// The parts of one SmartArt graphic.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -124,14 +133,16 @@ impl Edit {
                     .relate_to(&reference, relationship),
             );
         }
-        let authored =
-            |error: litchi_drawingml::Error| invalid(format!("authored SmartArt: {error}"));
+        let authored = |error: litchi_drawingml::Error| drawing_error(error, "authored SmartArt");
+        let limits = Limits::default();
         let blobs = [
-            spec.data_xml(Some(&ids[4])).map_err(authored)?.into_bytes(),
-            spec.layout_xml().into_bytes(),
-            quick_style_xml().into_bytes(),
-            colors_xml().into_bytes(),
-            spec.drawing_xml(bounds.2, bounds.3)
+            spec.data_xml(Some(&ids[4]), &limits)
+                .map_err(authored)?
+                .into_bytes(),
+            spec.layout_xml(&limits).map_err(authored)?.into_bytes(),
+            quick_style_xml(&limits).map_err(authored)?.into_bytes(),
+            colors_xml(&limits).map_err(authored)?.into_bytes(),
+            spec.drawing_xml(bounds.2, bounds.3, &limits)
                 .map_err(authored)?
                 .into_bytes(),
         ];
@@ -214,8 +225,8 @@ impl Edit {
         let selected = self.resolve_slide(slide.into())?;
         let targets = targets(&self.working, &selected.part_name, shape.into())?;
         let read_error =
-            |error: litchi_drawingml::Error| invalid(format!("SmartArt data model: {error}"));
-        diagram_edit::Outline::read(&parts.data).map_err(read_error)?;
+            |error: litchi_drawingml::Error| drawing_error(error, "SmartArt data model");
+        diagram_edit::Outline::read(&parts.data, &Limits::default()).map_err(read_error)?;
         let mut candidate = self.working.clone();
         let SmartArtParts {
             data,
@@ -257,8 +268,9 @@ impl Edit {
             },
             (None, None) => None,
         };
-        let data = diagram_edit::set_drawing_reference(&data, relationship.as_deref())
-            .map_err(read_error)?;
+        let data =
+            diagram_edit::set_drawing_reference(&data, relationship.as_deref(), &Limits::default())
+                .map_err(read_error)?;
         for (name, bytes) in [
             (&targets.data, data),
             (&targets.layout, layout),
@@ -477,8 +489,8 @@ fn targets(package: &OpcPackage, slide: &PackURI, shape: crate::shape::Key<'_>) 
         "diagramColors",
         ct::DML_DIAGRAM_COLORS,
     )?;
-    let outline = diagram_edit::Outline::read(package.get_part(&data)?.blob())
-        .map_err(|error| invalid(format!("SmartArt data model: {error}")))?;
+    let outline = diagram_edit::Outline::read(package.get_part(&data)?.blob(), &Limits::default())
+        .map_err(|error| drawing_error(error, "SmartArt data model"))?;
     let drawing = match outline.drawing_relationship {
         Some(id) => match owner.rels().get(&id) {
             Some(found) if !found.is_external() && found.reltype() == MS_DIAGRAM_DRAWING_REL => {
@@ -511,7 +523,9 @@ pub(crate) fn drawing_relationship(
         return None;
     }
     let name = found.target_partname().ok()?;
-    let outline = diagram_edit::Outline::read(package.get_part(&name).ok()?.blob()).ok()?;
+    let outline =
+        diagram_edit::Outline::read(package.get_part(&name).ok()?.blob(), &Limits::default())
+            .ok()?;
     let id = outline.drawing_relationship?;
     let drawing = owner.rels().get(&id)?;
     (drawing.reltype() == MS_DIAGRAM_DRAWING_REL).then_some(id)

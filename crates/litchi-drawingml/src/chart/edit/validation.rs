@@ -9,10 +9,11 @@ pub(crate) const MAX_TEXT_BYTES: usize = 1 << 20;
 
 pub(crate) fn validate_text(value: &str, description: &'static str) -> Result<()> {
     if value.len() > MAX_TEXT_BYTES {
-        return Err(Error::Limit {
-            resource: description,
-            limit: MAX_TEXT_BYTES,
-        });
+        return Err(Error::limit(
+            crate::LimitKind::ChartTextBytes,
+            value.len(),
+            MAX_TEXT_BYTES,
+        ));
     }
     if value.chars().any(|character| character == '\0') {
         return Err(Error::Invalid(format!(
@@ -43,6 +44,6 @@ pub(crate) fn validate_axis_range(min: Option<f64>, max: Option<f64>) -> Result<
     Ok(())
 }
 
-pub(crate) fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+pub(crate) fn limit(kind: crate::LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::limit(kind, observed, maximum)
 }

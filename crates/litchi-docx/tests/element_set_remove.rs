@@ -7,6 +7,7 @@ use litchi_docx::document::{
     CommentChange, ElementPath, ElementStep, NewComment, NewPicture, NewSmartArt, PictureChange,
 };
 use litchi_docx::{Builder, Package};
+use litchi_drawingml::diagram::Limits;
 use litchi_drawingml::diagram::authoring::{Layout, Spec};
 
 fn source() -> Package {
@@ -259,7 +260,7 @@ fn comments_take_new_authors_initials_dates_and_text() {
 
 fn with_smartart() -> (Package, String) {
     let mut edit = source().edit().unwrap();
-    let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild").unwrap();
+    let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild", &Limits::default()).unwrap();
     let id = edit
         .insert_smartart_at(&paragraph(1), None, &NewSmartArt::new(spec))
         .unwrap();
@@ -280,10 +281,15 @@ fn smartart_parts_are_replaced_and_their_drawing_kept_consistent() {
     // Identical parts are a no-op.
     assert!(!edit.set_smartart(&id, parts.clone()).unwrap());
     // A new outline with its regenerated drawing.
-    let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\nShip").unwrap();
+    let limits = Limits::default();
+    let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\nShip", &limits).unwrap();
     let mut next = parts.clone();
-    next.data = spec.data_xml(Some("rId0")).unwrap().into_bytes();
-    next.drawing = Some(spec.drawing_xml(5_760_000, 3_240_000).unwrap().into_bytes());
+    next.data = spec.data_xml(Some("rId0"), &limits).unwrap().into_bytes();
+    next.drawing = Some(
+        spec.drawing_xml(5_760_000, 3_240_000, &limits)
+            .unwrap()
+            .into_bytes(),
+    );
     assert!(edit.set_smartart(&id, next).unwrap());
     let (changed, patch) = edit.commit().unwrap().into_parts();
     let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();

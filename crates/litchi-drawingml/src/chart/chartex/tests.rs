@@ -33,13 +33,16 @@ fn every_family_round_trips_through_its_spec() {
             assert_eq!(xml, spec.to_xml(external).unwrap(), "deterministic");
             let text = String::from_utf8(xml.clone()).unwrap();
             assert!(text.contains(r#"<cx:chartSpace "#), "{kind:?}");
-            let chart = read(&xml).unwrap();
+            let chart = read(&xml, &Limits::DEFAULT).unwrap();
             assert_eq!(chart.spec.variant().kind, kind);
             assert_eq!(chart.external_data.as_deref(), external);
             assert_eq!(chart.spec.title(), Some("Title & <more>"));
             assert_eq!(chart.spec.series().len(), spec.series().len());
             assert_eq!(chart.spec.series()[0].values, spec.series()[0].values);
-            assert!(chart.is_authored(&xml), "{kind:?} {binding:?}\n{text}");
+            assert!(
+                chart.is_authored(&xml, &Limits::DEFAULT),
+                "{kind:?} {binding:?}\n{text}"
+            );
             assert_eq!(chart.spec.binding(), &binding, "{kind:?}");
         }
     }
@@ -70,8 +73,8 @@ fn formatting_survives_the_round_trip() {
         .with_value_axis_title("Cash")
         .with_appearance(appearance.clone());
     let xml = spec.to_xml(None).unwrap();
-    let chart = read(&xml).unwrap();
-    assert!(chart.is_authored(&xml));
+    let chart = read(&xml, &Limits::DEFAULT).unwrap();
+    assert!(chart.is_authored(&xml, &Limits::DEFAULT));
     let got = chart.spec.appearance();
     assert_eq!(got.increase_color.as_deref(), Some("00AA00"));
     assert_eq!(got.decrease_color.as_deref(), Some("C00000"));
@@ -95,8 +98,8 @@ fn formatting_survives_the_round_trip() {
     };
     let spec = sample(Kind::Histogram).with_appearance(appearance);
     let xml = spec.to_xml(None).unwrap();
-    let chart = read(&xml).unwrap();
-    assert!(chart.is_authored(&xml));
+    let chart = read(&xml, &Limits::DEFAULT).unwrap();
+    assert!(chart.is_authored(&xml, &Limits::DEFAULT));
     assert_eq!(chart.spec.appearance().bins.unwrap().count, Some(4));
 
     let spec = sample(Kind::Treemap).with_appearance(Appearance {
@@ -105,8 +108,8 @@ fn formatting_survives_the_round_trip() {
         ..Appearance::default()
     });
     let xml = spec.to_xml(None).unwrap();
-    let chart = read(&xml).unwrap();
-    assert!(chart.is_authored(&xml));
+    let chart = read(&xml, &Limits::DEFAULT).unwrap();
+    assert!(chart.is_authored(&xml, &Limits::DEFAULT));
     assert_eq!(chart.spec.appearance().colors.len(), 3);
 
     let spec = sample(Kind::BoxWhisker).with_appearance(Appearance {
@@ -114,7 +117,11 @@ fn formatting_survives_the_round_trip() {
         ..Appearance::default()
     });
     let xml = spec.to_xml(None).unwrap();
-    assert!(read(&xml).unwrap().is_authored(&xml));
+    assert!(
+        read(&xml, &Limits::DEFAULT)
+            .unwrap()
+            .is_authored(&xml, &Limits::DEFAULT)
+    );
 }
 
 #[test]
@@ -146,19 +153,100 @@ fn invalid_extended_specs_are_refused() {
 
 #[test]
 fn foreign_parts_read_but_are_not_authored() {
-    let xml = br#"<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><cx:chartData><cx:data id="0"><cx:numDim type="val"><cx:lvl ptCount="2"><cx:pt idx="0">1</cx:pt><cx:pt idx="1">2</cx:pt></cx:lvl></cx:numDim></cx:data></cx:chartData><cx:chart><cx:title><cx:tx><cx:rich><a:p><a:r><a:t>Rich</a:t></a:r></a:p></cx:rich></cx:tx></cx:title><cx:plotArea><cx:plotAreaRegion><cx:series layoutId="funnel"><cx:dataId val="0"/></cx:series></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>"#;
-    let chart = read(xml).unwrap();
+    let xml = br#"<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:foo="urn:foreign"><cx:chartData><cx:data unknown:id="opaque" foo:id="wrong" id="0"><cx:numDim type="val"><cx:lvl ptCount="2"><cx:pt foo:idx="99" idx="0">1</cx:pt><cx:pt foo:idx="99" idx="1">2</cx:pt></cx:lvl></cx:numDim></cx:data></cx:chartData><cx:chart><cx:title><cx:tx><cx:rich><a:p><a:r><a:t>Rich</a:t></a:r></a:p></cx:rich></cx:tx></cx:title><cx:plotArea><cx:plotAreaRegion><cx:series layoutId="funnel"><cx:dataId foo:val="wrong" val="0"/></cx:series></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>"#;
+    let chart = read(xml, &Limits::DEFAULT).unwrap();
     assert_eq!(chart.spec.variant().kind, Kind::Funnel);
     assert_eq!(chart.spec.title(), Some("Rich"));
     assert_eq!(chart.spec.series()[0].values, [1.0, 2.0]);
-    assert!(!chart.is_authored(xml));
-    assert!(read(b"<c:chartSpace xmlns:c=\"urn:x\"/>").is_err());
-    assert!(read(b"<cx:chartSpace xmlns:cx=\"http://schemas.microsoft.com/office/drawing/2014/chartex\"><cx:chartData/><cx:chart><cx:plotArea><cx:plotAreaRegion><cx:series layoutId=\"regionMap\"/></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>").is_err());
+    assert!(!chart.is_authored(xml, &Limits::DEFAULT));
+    assert!(read(b"<c:chartSpace xmlns:c=\"urn:x\"/>", &Limits::DEFAULT,).is_err());
+    assert!(read(
+        b"<cx:chartSpace xmlns:cx=\"http://schemas.microsoft.com/office/drawing/2014/chartex\"><cx:chartData/><cx:chart><cx:plotArea><cx:plotAreaRegion><cx:series layoutId=\"regionMap\"/></cx:plotAreaRegion></cx:plotArea></cx:chart></cx:chartSpace>",
+        &Limits::DEFAULT,
+    )
+    .is_err());
 }
 
 #[test]
 fn companion_parts_are_valid_chart_styles() {
-    let style = crate::chart::style::parse(&style_xml()).unwrap();
+    let style = crate::chart::style::parse(&style_xml(), &Limits::DEFAULT).unwrap();
     assert_eq!(style.info().entries.len(), 30);
-    crate::chart::style::parse_color(&colors_xml()).unwrap();
+    crate::chart::style::parse_color(&colors_xml(), &Limits::DEFAULT).unwrap();
+}
+
+#[test]
+fn chartex_writer_checks_external_relationship_limit_before_output() {
+    let spec = Spec::new(Variant::new(Kind::Funnel)).with_series(Series::new("Only", vec![1.0]));
+    let mut limits = Limits::DEFAULT;
+    limits.max_attribute_value_bytes = 2;
+    assert!(matches!(
+        write_with_limits(&spec, Some("rId3"), &limits),
+        Err(Error::Limit {
+            kind: crate::LimitKind::AttributeValueBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn chartex_text_limit_counts_decoded_general_references() {
+    let spec = Spec::new(Variant::new(Kind::Funnel))
+        .with_title("A&")
+        .with_series(Series::new("S", vec![1.0]));
+    let xml = spec.to_xml(None).unwrap();
+
+    let mut exact = Limits::DEFAULT;
+    exact.max_text_bytes = 2;
+    assert!(read(&xml, &exact).is_ok());
+
+    let mut narrow = Limits::DEFAULT;
+    narrow.max_text_bytes = 1;
+    assert!(matches!(
+        read(&xml, &narrow),
+        Err(Error::Limit {
+            kind: crate::LimitKind::ChartTextBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn waterfall_subtotals_are_admitted_before_their_vector_grows() {
+    let spec = Spec::new(Variant::new(Kind::Waterfall)).with_series(Series::new("Only", vec![1.0]));
+    let xml = String::from_utf8(spec.to_xml(None).unwrap())
+        .unwrap()
+        .replace(
+            "</cx:subtotals>",
+            r#"<cx:idx val="0"/><cx:idx val="0"/></cx:subtotals>"#,
+        );
+    let mut limits = Limits::DEFAULT;
+    limits.max_points = 2;
+    assert!(matches!(
+        read(xml.as_bytes(), &limits),
+        Err(Error::Limit {
+            kind: crate::LimitKind::ChartPoints,
+            observed: 3,
+            maximum: 2,
+        })
+    ));
+}
+
+#[test]
+fn chartex_requires_one_complete_root_and_a_restricted_prolog() {
+    let source = sample(Kind::Funnel).to_xml(None).unwrap();
+    let mut second_root = source.clone();
+    second_root.extend_from_slice(b"<cx:other/>");
+    assert!(read(&second_root, &Limits::DEFAULT).is_err());
+
+    let mut text_before_root = b"text".to_vec();
+    text_before_root.extend_from_slice(&source);
+    assert!(read(&text_before_root, &Limits::DEFAULT).is_err());
+
+    let mut doctype = b"<!DOCTYPE cx:chartSpace>".to_vec();
+    doctype.extend_from_slice(&source);
+    assert!(read(&doctype, &Limits::DEFAULT).is_err());
+
+    let mut processing_instruction = source;
+    processing_instruction.extend_from_slice(b"<?chart extension?>");
+    assert!(read(&processing_instruction, &Limits::DEFAULT).is_err());
 }

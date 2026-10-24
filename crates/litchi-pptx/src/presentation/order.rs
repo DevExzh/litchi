@@ -926,7 +926,7 @@ fn validate_modeled_presentation_properties(
 }
 
 fn unsupported_color(color: &crate::presentation_properties::Color) -> bool {
-    match litchi_drawingml::color::read(&color.xml) {
+    match litchi_drawingml::color::read(&color.xml, &litchi_drawingml::color::Limits::DEFAULT) {
         Ok(value) => value.is_unknown(),
         Err(_) => true,
     }

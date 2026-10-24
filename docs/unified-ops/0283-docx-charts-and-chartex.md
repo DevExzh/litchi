@@ -44,7 +44,7 @@ coverage) and record 0271 (dotted series keys).
   retouched still counts).
 - `Spec::workbook_members` (moved out of PPTX) lists the members of the
   embedded chart workbook; PPTX and DOCX zip them.
-- `chart::edit::Transaction::set_series_color` sets or clears a series
+- `chart::edit::Edit::set_series_color` sets or clears a series
   fill (the line color of line, scatter, stock and unfilled radar series),
   keeping the rest of its shape properties.
 

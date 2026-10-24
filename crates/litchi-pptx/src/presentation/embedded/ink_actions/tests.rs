@@ -6,7 +6,7 @@
 
 use super::{Limits, apply_patch, load_snapshot};
 use crate::Error;
-use litchi_drawingml::ink::actions::ActionSelector;
+use litchi_drawingml::ink::actions::builder::ActionSelector;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 

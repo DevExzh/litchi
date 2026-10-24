@@ -1499,8 +1499,11 @@ fn durable_semantic_intent_tampering_is_rejected_after_recomputing_blob_and_targ
     let tampered_wire =
         replace_wire_blob(&wire, "forward_blobs", "intent_sha256", &tampered_intent);
 
-    let altered_payload =
-        Prepared::from_bytes(&replace_once(replacement.as_bytes(), b"0 0", b"9 9")).unwrap();
+    let altered_payload = Prepared::from_bytes(
+        &replace_once(replacement.as_bytes(), b"0 0", b"9 9"),
+        litchi_drawingml::ink::builder::AuthoringLimits::default(),
+    )
+    .unwrap();
     let mut altered = Package::from_reader(Cursor::new(&original)).unwrap();
     let mut altered_edit = altered.edit_ink().unwrap();
     altered_edit
@@ -1540,8 +1543,11 @@ fn durable_coherent_alternate_intent_replays_to_its_matching_target() {
     let tampered_wire =
         replace_wire_blob(&wire, "forward_blobs", "intent_sha256", &tampered_intent);
 
-    let altered_payload =
-        Prepared::from_bytes(&replace_once(replacement.as_bytes(), b"0 0", b"9 9")).unwrap();
+    let altered_payload = Prepared::from_bytes(
+        &replace_once(replacement.as_bytes(), b"0 0", b"9 9"),
+        litchi_drawingml::ink::builder::AuthoringLimits::default(),
+    )
+    .unwrap();
     let mut expected = Package::from_reader(Cursor::new(&original)).unwrap();
     let mut expected_edit = expected.edit_ink().unwrap();
     expected_edit

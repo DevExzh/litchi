@@ -493,7 +493,7 @@ fn body_text(
         reply_list_declarations,
         reply_declarations,
     )?;
-    let body = body_reader::read_with_options(xml, scope, body_limits()).map_err(body_error)?;
+    let body = body_reader::read(xml, scope, body_limits()).map_err(body_error)?;
     Ok(Some(body.text()))
 }
 
@@ -546,8 +546,51 @@ fn body_limits() -> body_reader::Limits {
 
 fn body_error(error: litchi_drawingml::Error) -> Error {
     match error {
-        litchi_drawingml::Error::Limit { resource, limit } => Error::Limit { resource, limit },
+        typed @ litchi_drawingml::Error::Limit { .. }
+        | typed @ litchi_drawingml::Error::InvalidLimit { .. }
+        | typed @ litchi_drawingml::Error::PatchConflict => Error::Drawing(typed),
         _ => Error::Invalid("modern comment DrawingML body is invalid".into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::body_error;
+
+    #[test]
+    fn drawingml_body_errors_keep_typed_budget_and_conflict_meanings() {
+        let limit = body_error(litchi_drawingml::Error::Limit {
+            kind: litchi_drawingml::LimitKind::TextBodyElements,
+            observed: 9,
+            maximum: 8,
+        });
+        assert!(matches!(
+            limit,
+            crate::Error::Drawing(litchi_drawingml::Error::Limit {
+                kind: litchi_drawingml::LimitKind::TextBodyElements,
+                observed: 9,
+                maximum: 8,
+            })
+        ));
+
+        let invalid = body_error(litchi_drawingml::Error::InvalidLimit {
+            kind: litchi_drawingml::LimitKind::TextBodyElements,
+            value: 0,
+            maximum: 8,
+        });
+        assert!(matches!(
+            invalid,
+            crate::Error::Drawing(litchi_drawingml::Error::InvalidLimit {
+                kind: litchi_drawingml::LimitKind::TextBodyElements,
+                value: 0,
+                maximum: 8,
+            })
+        ));
+
+        assert!(matches!(
+            body_error(litchi_drawingml::Error::PatchConflict),
+            crate::Error::Drawing(litchi_drawingml::Error::PatchConflict)
+        ));
     }
 }
 

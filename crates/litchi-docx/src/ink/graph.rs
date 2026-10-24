@@ -718,6 +718,7 @@ fn validate_target_payload(content_type: &str, payload: &[u8]) -> Result<()> {
             projection.traces(),
             projection.brush_properties(),
             projection.links(),
+            shared::Limits::DEFAULT,
         )?;
     }
     Ok(())

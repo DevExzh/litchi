@@ -1262,16 +1262,35 @@ fn series_color(series: &litchi_drawingml::chart::Series) -> Option<String> {
         .map(str::to_ascii_uppercase)
 }
 
+fn drawing_code(error: &litchi_drawingml::Error, invalid: Code, fallback: Code) -> Code {
+    match error {
+        litchi_drawingml::Error::Limit { .. } => Code::LimitExceeded,
+        litchi_drawingml::Error::InvalidLimit { .. } => Code::InvalidArgument,
+        litchi_drawingml::Error::PatchConflict => Code::InvalidInput,
+        litchi_drawingml::Error::Invalid(_) => invalid,
+        _ => fallback,
+    }
+}
+
+fn parsed(error: litchi_drawingml::Error, context: &'static str) -> Error {
+    let code = drawing_code(&error, Code::CorruptFile, Code::CorruptFile);
+    Error::new(code, format!("{context}: {error}"))
+}
+
 impl Summary {
     /// Read a chart part: a `c:chartSpace`, or an extended `cx:chartSpace`.
     pub(crate) fn read(xml: &[u8]) -> Result<Self> {
         if litchi_drawingml::chart::chartex::is_chartex(xml) {
-            let parsed = litchi_drawingml::chart::chartex::read(xml)
-                .map_err(|error| Error::new(Code::CorruptFile, format!("chart part: {error}")))?;
+            let parsed = litchi_drawingml::chart::chartex::read(
+                xml,
+                &litchi_drawingml::chart::Limits::DEFAULT,
+            )
+            .map_err(|error| parsed(error, "chart part"))?;
             return Ok(Self::of_extended(parsed.spec));
         }
-        let chart = litchi_drawingml::chart::reader::read(xml)
-            .map_err(|error| Error::new(Code::CorruptFile, format!("chart part: {error}")))?;
+        let chart =
+            litchi_drawingml::chart::reader::read(xml, &litchi_drawingml::chart::Limits::DEFAULT)
+                .map_err(|error| parsed(error, "chart part"))?;
         Ok(Self::of(chart))
     }
 
@@ -1707,11 +1726,7 @@ pub(crate) struct Edited {
 }
 
 fn native(error: litchi_drawingml::Error, property: &'static str) -> Error {
-    let code = match error {
-        litchi_drawingml::Error::Limit { .. } => Code::InvalidValue,
-        litchi_drawingml::Error::Invalid(_) => Code::InvalidValue,
-        _ => Code::CorruptFile,
-    };
+    let code = drawing_code(&error, Code::InvalidValue, Code::CorruptFile);
     Error::new(code, error.to_string()).with_property(property)
 }
 
@@ -1883,7 +1898,7 @@ impl ChartEdit {
         if self.rebuild.is_some() {
             return self.apply_rebuild(&xml, embedded);
         }
-        let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)
+        let snapshot = litchi_drawingml::chart::edit::Package::from_xml(xml)
             .map_err(|error| native(error, "chart"))?;
         let mut edit = snapshot.edit();
         if let Some(title) = self.title {
@@ -1920,13 +1935,11 @@ impl ChartEdit {
             edit.set_axis_range(id, min, max)
                 .map_err(|error| native(error, "min"))?;
         }
-        if !edit.is_changed() {
+        let commit = edit.commit().map_err(|error| native(error, "chart"))?;
+        if !commit.diagnostics().changed() {
             return Ok(None);
         }
-        let snapshot = edit
-            .commit()
-            .map_err(|error| native(error, "chart"))?
-            .into_snapshot();
+        let snapshot = commit.into_package();
         Ok(Some(Edited {
             xml: snapshot.xml_bytes().to_vec(),
             data_changed,
@@ -1950,9 +1963,12 @@ impl ChartEdit {
     /// Rebuild the part from the edited spec, after checking that the part
     /// is exactly what its spec writes (so the rebuild loses nothing).
     fn apply_rebuild(self, xml: &[u8], embedded: bool) -> Result<Option<Edited>> {
-        let parsed = litchi_drawingml::chart::authoring::read(xml)
-            .map_err(|error| Error::new(Code::CorruptFile, format!("chart part: {error}")))?;
-        if !parsed.is_authored(xml) {
+        let parsed = litchi_drawingml::chart::authoring::read(
+            xml,
+            &litchi_drawingml::chart::Limits::DEFAULT,
+        )
+        .map_err(|error| parsed(error, "chart part"))?;
+        if !parsed.is_authored(xml, &litchi_drawingml::chart::Limits::DEFAULT) {
             return Err(not_authored("chart"));
         }
         let mut spec = self.rebuild.unwrap_or_else(|| parsed.spec.clone());
@@ -2058,7 +2074,9 @@ fn missing_series(property: &'static str) -> Error {
 /// from it so the workbook keeps matching the chart's caches.
 pub(crate) fn embedded_spec(xml: &[u8]) -> Option<Spec> {
     use litchi_drawingml::chart::authoring::Binding;
-    let chart = litchi_drawingml::chart::reader::read(xml).ok()?;
+    let chart =
+        litchi_drawingml::chart::reader::read(xml, &litchi_drawingml::chart::Limits::DEFAULT)
+            .ok()?;
     let summary = Summary::of(chart.clone());
     let variant = summary.variant?;
     let mut spec = Spec::new(variant).with_binding(Binding::sheet("Sheet1"));
@@ -2123,6 +2141,55 @@ fn same_references(left: &Chart, right: &Chart) -> bool {
 )]
 mod tests {
     use super::*;
+
+    #[test]
+    fn drawingml_native_errors_keep_typed_budget_and_replay_codes() {
+        let limit = native(
+            litchi_drawingml::Error::Limit {
+                kind: litchi_drawingml::LimitKind::ChartTextBytes,
+                observed: 9,
+                maximum: 8,
+            },
+            "chart",
+        );
+        assert_eq!(limit.code(), Code::LimitExceeded);
+
+        let invalid = native(
+            litchi_drawingml::Error::InvalidLimit {
+                kind: litchi_drawingml::LimitKind::ChartTextBytes,
+                value: 0,
+                maximum: 8,
+            },
+            "chart",
+        );
+        assert_eq!(invalid.code(), Code::InvalidArgument);
+
+        let conflict = native(litchi_drawingml::Error::PatchConflict, "chart");
+        assert_eq!(conflict.code(), Code::InvalidInput);
+
+        let parsed_limit = parsed(
+            litchi_drawingml::Error::Limit {
+                kind: litchi_drawingml::LimitKind::ChartexXmlNodes,
+                observed: 9,
+                maximum: 8,
+            },
+            "chart part",
+        );
+        assert_eq!(parsed_limit.code(), Code::LimitExceeded);
+
+        let parsed_invalid = parsed(
+            litchi_drawingml::Error::InvalidLimit {
+                kind: litchi_drawingml::LimitKind::XmlBytes,
+                value: 0,
+                maximum: 8,
+            },
+            "chart part",
+        );
+        assert_eq!(parsed_invalid.code(), Code::InvalidArgument);
+
+        let parsed_conflict = parsed(litchi_drawingml::Error::PatchConflict, "chart part");
+        assert_eq!(parsed_conflict.code(), Code::InvalidInput);
+    }
 
     #[test]
     fn chart_type_names_round_trip() {

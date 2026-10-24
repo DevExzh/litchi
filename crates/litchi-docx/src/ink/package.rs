@@ -1435,6 +1435,7 @@ fn load_stories<'story>(
                                 projection.traces(),
                                 projection.brush_properties(),
                                 projection.links(),
+                                shared::Limits::DEFAULT,
                             )?;
                             Payload::Owned(document)
                         },
@@ -1446,6 +1447,7 @@ fn load_stories<'story>(
                                 projection.traces(),
                                 projection.brush_properties(),
                                 projection.links(),
+                                shared::Limits::DEFAULT,
                             )?;
                             Payload::Pinned {
                                 metadata,
@@ -1914,6 +1916,7 @@ mod tests {
             projection.traces(),
             projection.brush_properties(),
             projection.links(),
+            shared::Limits::DEFAULT,
         )
         .expect("recognized brush property");
         assert_eq!(document.brush_property_count(), 1);
@@ -1936,6 +1939,7 @@ mod tests {
             projection.traces(),
             projection.brush_properties(),
             projection.links(),
+            shared::Limits::DEFAULT,
         )
         .expect("recognized brush properties");
         let effective: Vec<_> = document
@@ -1967,6 +1971,7 @@ mod tests {
             projection.traces(),
             projection.brush_properties(),
             projection.links(),
+            shared::Limits::DEFAULT,
         )
         .unwrap();
         assert_eq!(filtered.source(), source);
@@ -1997,6 +2002,7 @@ mod tests {
             projection.traces(),
             projection.brush_properties(),
             projection.links(),
+            shared::Limits::DEFAULT,
         )
         .expect("ignored typed values must remain opaque");
         assert_eq!(document.context_count(), 1);
@@ -2025,6 +2031,7 @@ mod tests {
                     projection.traces(),
                     projection.brush_properties(),
                     projection.links(),
+                    shared::Limits::DEFAULT,
                 )
                 .is_err(),
                 "recognized context must be typed and rejected: {context}"
@@ -2040,6 +2047,7 @@ mod tests {
                 projection.traces(),
                 projection.brush_properties(),
                 projection.links(),
+                shared::Limits::DEFAULT,
             )
             .is_err()
         );

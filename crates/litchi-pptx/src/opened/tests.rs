@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
+use litchi_drawingml::diagram::Limits as DiagramLimits;
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 use sha2::{Digest, Sha256};
@@ -5713,12 +5714,14 @@ fn authored_charts_carry_a_deterministic_embedded_workbook_and_edit_in_place() -
     let (xml, workbook) = edit.chart(0_usize, position)?;
     let workbook = workbook.expect("embedded workbook");
     assert!(workbook.starts_with(b"PK"));
-    let parsed = litchi_drawingml::chart::reader::read(&xml[..]).expect("chart");
+    let parsed =
+        litchi_drawingml::chart::reader::read(&xml[..], &litchi_drawingml::chart::Limits::DEFAULT)
+            .expect("chart");
     assert_eq!(Variant::of(&parsed), Some(Variant::new(Kind::Column)));
     assert!(parsed.external_data.is_some());
     // Identical bytes are an exact no-op; a new title changes only the chart part.
     assert!(!edit.set_chart(0_usize, position, xml.clone(), None)?);
-    let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)
+    let snapshot = litchi_drawingml::chart::edit::Package::from_xml(xml)
         .map_err(|error| Error::Invalid(error.to_string()))?;
     let mut chart_edit = snapshot.edit();
     chart_edit
@@ -5729,7 +5732,7 @@ fn authored_charts_carry_a_deterministic_embedded_workbook_and_edit_in_place() -
     let retitled = chart_edit
         .commit()
         .map_err(|error| Error::Invalid(error.to_string()))?
-        .into_snapshot();
+        .into_package();
     assert!(edit.set_chart(0_usize, position, retitled.xml_bytes().to_vec(), None)?);
     assert!(
         edit.set_chart(0_usize, position, b"<x/>".to_vec(), None)
@@ -5759,8 +5762,12 @@ fn smartart_add_replace_and_remove_keep_the_part_graph_consistent() -> Result<()
 
     let package = opened_two_slide_package()?;
     let before = part_states(&package);
-    let spec = Spec::parse_outline(Layout::Process, "Plan\n\tScope\nBuild\nShip")
-        .map_err(|error| Error::Invalid(error.to_string()))?;
+    let spec = Spec::parse_outline(
+        Layout::Process,
+        "Plan\n\tScope\nBuild\nShip",
+        &DiagramLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(error.to_string()))?;
     let mut edit = package.opened_presentation()?.edit();
     let id = edit.add_smartart(
         0_usize,
@@ -5806,7 +5813,8 @@ fn smartart_add_replace_and_remove_keep_the_part_graph_consistent() -> Result<()
     // The parts read back, and the data names the slide's drawing relationship.
     let mut edit = added.opened_presentation()?.edit();
     let parts = edit.smartart(0_usize, "Diagram 1")?;
-    let outline = Outline::read(&parts.data).map_err(|error| Error::Invalid(error.to_string()))?;
+    let outline = Outline::read(&parts.data, &DiagramLimits::default())
+        .map_err(|error| Error::Invalid(error.to_string()))?;
     assert_eq!(outline.entries.len(), 4);
     assert!(parts.drawing.is_some());
     assert!(!edit.set_smartart(0_usize, "Diagram 1", parts.clone())?);
@@ -5823,7 +5831,7 @@ fn smartart_add_replace_and_remove_keep_the_part_graph_consistent() -> Result<()
         .smartart(0_usize, "Diagram 1")?;
     assert!(read.drawing.is_none());
     assert_eq!(
-        Outline::read(&read.data)
+        Outline::read(&read.data, &DiagramLimits::default())
             .map_err(|error| Error::Invalid(error.to_string()))?
             .drawing_relationship,
         None
@@ -5899,9 +5907,10 @@ fn extended_charts_are_chartex_parts_with_their_companions() -> Result<()> {
     let mut edit = root.edit();
     let (xml, workbook) = edit.chart(0_usize, position)?;
     assert!(workbook.expect("embedded workbook").starts_with(b"PK"));
-    let parsed = authoring::read(&xml).map_err(|error| Error::Invalid(error.to_string()))?;
+    let parsed = authoring::read(&xml, &litchi_drawingml::chart::Limits::DEFAULT)
+        .map_err(|error| Error::Invalid(error.to_string()))?;
     assert_eq!(parsed.spec.variant().kind, Kind::Waterfall);
-    assert!(parsed.is_authored(&xml));
+    assert!(parsed.is_authored(&xml, &litchi_drawingml::chart::Limits::DEFAULT,));
     // A rebuilt part replaces the old one; a classic part does not.
     let retitled = parsed
         .spec

@@ -107,7 +107,7 @@ pub(crate) fn put(
         previous.origin.preview_embedded.as_ref(),
         previous.origin.preview_linked.as_ref(),
     )?;
-    let fragment = codec::write(&Scene::from_wire(scene))?;
+    let fragment = codec::write(&Scene::from_wire(scene), codec::Limits::DEFAULT)?;
     let updated = codec::replace(old_xml.as_slice(), location.range.clone(), &fragment)?;
     package.get_part_mut(slide_name)?.set_blob(updated.clone());
 
@@ -186,7 +186,7 @@ fn load_location(
         .blob()
         .get(location.range.clone())
         .ok_or_else(|| invalid("model3d location is outside its slide snapshot"))?;
-    let scene = codec::read(xml)?;
+    let scene = codec::read(xml, codec::Limits::DEFAULT)?;
     let mut asset = Asset::default();
     let mut origin = Origin::default();
 

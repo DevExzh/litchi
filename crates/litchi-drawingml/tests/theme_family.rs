@@ -5,10 +5,11 @@
 //! exercise the fragment owner only.  Package placement remains the
 //! responsibility of a host format.
 
+use litchi_drawingml::Error;
 use litchi_drawingml::theme::family::{
-    self, DRAWINGML_NAMESPACE, Family, Guid, MAX_ATTRIBUTES, MAX_DEPTH, MAX_NAME_BYTES,
-    MAX_NAMESPACE_BYTES, MAX_NAMESPACE_DECLARATIONS, MAX_XML_BYTES, NAMESPACE, Snapshot,
-    XML_NAMESPACE,
+    self, DRAWINGML_NAMESPACE, Family, Guid, MAX_ATTRIBUTE_VALUE_BYTES, MAX_ATTRIBUTES, MAX_DEPTH,
+    MAX_GUID_BYTES, MAX_NAME_BYTES, MAX_NAMESPACE_BYTES, MAX_NAMESPACE_DECLARATIONS, MAX_XML_BYTES,
+    NAMESPACE, Package, XML_NAMESPACE,
 };
 
 const NATIVE: &[u8] = include_bytes!("fixtures/theme-family-native.xml");
@@ -21,6 +22,55 @@ const FAMILY_WITH_OPAQUE_EXTENSION: &[u8] = br#"<thm15:themeFamily xmlns:thm15="
 
 fn family_value(name: &str) -> Family {
     Family::new(name, OFFICE_ID, OFFICE_VID).expect("valid theme-family value")
+}
+
+#[test]
+fn detached_family_writer_enforces_selected_structure_before_output() {
+    let value = family_value("Office");
+    let mut attribute_limits = family::Limits::DEFAULT;
+    attribute_limits.max_attributes = 3;
+    assert!(matches!(
+        family::write(&value, attribute_limits),
+        Err(Error::Limit {
+            kind: litchi_drawingml::LimitKind::XmlAttributes,
+            observed: 4,
+            maximum: 3,
+        })
+    ));
+
+    let mut value_limits = family::Limits::DEFAULT;
+    value_limits.max_attribute_value_bytes = 5;
+    assert!(matches!(
+        family::write(&value, value_limits),
+        Err(Error::Limit {
+            kind: litchi_drawingml::LimitKind::AttributeValueBytes,
+            observed,
+            maximum: 5,
+        }) if observed > 5
+    ));
+}
+
+#[test]
+fn guid_bounds_keep_typed_limit_dimensions() {
+    let oversized_input = "x".repeat(MAX_ATTRIBUTE_VALUE_BYTES + 1);
+    assert!(matches!(
+        Guid::new(&oversized_input),
+        Err(family::ValueError::Limit {
+            kind: litchi_drawingml::LimitKind::AttributeValueBytes,
+            observed,
+            maximum: MAX_ATTRIBUTE_VALUE_BYTES,
+        }) if observed == oversized_input.len()
+    ));
+
+    let oversized_guid = "x".repeat(MAX_GUID_BYTES + 1);
+    assert!(matches!(
+        Guid::new(&oversized_guid),
+        Err(family::ValueError::Limit {
+            kind: litchi_drawingml::LimitKind::ScalarBytes,
+            observed,
+            maximum: MAX_GUID_BYTES,
+        }) if observed == oversized_guid.len()
+    ));
 }
 
 fn assert_send_sync<T: Send + Sync>() {}
@@ -95,46 +145,56 @@ fn source_with_size(size: usize) -> Vec<u8> {
 
 #[test]
 fn native_fragment_reads_the_schema_fields_and_replays_exactly() {
-    let parsed = family::read(NATIVE).expect("native theme-family fragment must parse");
+    let parsed = family::read(NATIVE, family::Limits::DEFAULT)
+        .expect("native theme-family fragment must parse");
 
     assert_eq!(parsed.name(), "Office Theme");
     assert_eq!(parsed.id().as_str(), OFFICE_ID);
     assert_eq!(parsed.variant_id().as_str(), OFFICE_VID);
     assert_eq!(parsed.source(), Some(NATIVE));
-    assert_eq!(family::write(&parsed).expect("source-backed write"), NATIVE);
+    assert_eq!(
+        family::write(&parsed, family::Limits::DEFAULT).expect("source-backed write"),
+        NATIVE
+    );
 }
 
 #[test]
 fn detached_authoring_escapes_name_and_round_trips() {
     let authored = family_value("\t  Office & <Theme>\r\n");
-    let xml = family::write(&authored).expect("detached value must write");
+    let xml = family::write(&authored, family::Limits::DEFAULT).expect("detached value must write");
     let text = std::str::from_utf8(&xml).expect("theme-family XML is UTF-8");
 
     assert!(text.contains("name=\"&#9;  Office &amp; &lt;Theme&gt;&#13;&#10;\""));
     assert!(text.contains(NAMESPACE));
     assert_eq!(
-        family::read(&xml).expect("authored value must parse"),
+        family::read(&xml, family::Limits::DEFAULT).expect("authored value must parse"),
         authored
     );
 
     let empty = family_value("");
-    let empty_xml = family::write(&empty).expect("empty xsd:string name must write");
+    let empty_xml =
+        family::write(&empty, family::Limits::DEFAULT).expect("empty xsd:string name must write");
     assert!(
         std::str::from_utf8(&empty_xml)
             .unwrap()
             .contains("name=\"\"")
     );
-    assert_eq!(family::read(&empty_xml).unwrap(), empty);
+    assert_eq!(
+        family::read(&empty_xml, family::Limits::DEFAULT).unwrap(),
+        empty
+    );
 }
 
 #[test]
 fn source_attribute_whitespace_normalizes_but_character_references_survive() {
     let literal = source_with_raw_name(b"a\tb\r\nc\rd\ne");
-    let parsed = family::read(&literal).expect("literal XML attribute whitespace is valid");
+    let parsed = family::read(&literal, family::Limits::DEFAULT)
+        .expect("literal XML attribute whitespace is valid");
     assert_eq!(parsed.name(), "a b c d e");
 
     let references = source_with_raw_name(br"a&#9;b&#13;c&#10;d");
-    let parsed = family::read(&references).expect("XML character references are valid");
+    let parsed = family::read(&references, family::Limits::DEFAULT)
+        .expect("XML character references are valid");
     assert_eq!(parsed.name(), "a\tb\rc\nd");
 }
 
@@ -171,7 +231,7 @@ fn guid_domain_is_braced_hyphenated_uppercase_hex() {
             "<thm15:themeFamily xmlns:thm15=\"{NAMESPACE}\" name=\"Office\" id=\"{OFFICE_ID}{whitespace}\" vid=\"{OFFICE_VID}\"/>"
         );
         assert!(
-            family::read(source.as_bytes()).is_err(),
+            family::read(source.as_bytes(), family::Limits::DEFAULT).is_err(),
             "accepted non-XML-token GUID whitespace U+{:04X}",
             u32::from(whitespace)
         );
@@ -183,7 +243,7 @@ fn namespace_and_required_attribute_grammar_is_strict() {
     let default_namespace = format!(
         "<themeFamily xmlns=\"{NAMESPACE}\" name=\"Office\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\"/>"
     );
-    assert!(family::read(default_namespace.as_bytes()).is_ok());
+    assert!(family::read(default_namespace.as_bytes(), family::Limits::DEFAULT).is_ok());
 
     let cases = [
         format!(
@@ -210,7 +270,7 @@ fn namespace_and_required_attribute_grammar_is_strict() {
     ];
     for source in cases {
         assert!(
-            family::read(source.as_bytes()).is_err(),
+            family::read(source.as_bytes(), family::Limits::DEFAULT).is_err(),
             "accepted invalid source: {source}"
         );
     }
@@ -218,7 +278,7 @@ fn namespace_and_required_attribute_grammar_is_strict() {
     let qualified_lookalike = format!(
         "<thm15:themeFamily xmlns:thm15=\"{NAMESPACE}\" name=\"Office\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\" thm15:name=\"opaque\"/>"
     );
-    let qualified = family::read(qualified_lookalike.as_bytes()).unwrap_or_else(|error| {
+    let qualified = family::read(qualified_lookalike.as_bytes(), family::Limits::DEFAULT).unwrap_or_else(|error| {
         panic!(
             "qualified lookalike should remain opaque beside the required unqualified name: {error:?}"
         )
@@ -228,14 +288,18 @@ fn namespace_and_required_attribute_grammar_is_strict() {
     let foreign_ext_list = format!(
         "<thm15:themeFamily xmlns:thm15=\"{NAMESPACE}\" xmlns:a=\"{DRAWINGML_NAMESPACE}\" name=\"Office\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\"><a:extLst/></thm15:themeFamily>"
     );
-    let _ = family::read(foreign_ext_list.as_bytes()).unwrap_or_else(|error| {
-        panic!("foreign direct root children remain opaque: {error:?}; source={foreign_ext_list}")
-    });
+    let _ = family::read(foreign_ext_list.as_bytes(), family::Limits::DEFAULT).unwrap_or_else(
+        |error| {
+            panic!(
+                "foreign direct root children remain opaque: {error:?}; source={foreign_ext_list}"
+            )
+        },
+    );
 
     let duplicate_name = format!(
         "<thm15:themeFamily xmlns:thm15=\"{NAMESPACE}\" name=\"Office\" name=\"Other\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\"/>"
     );
-    assert!(family::read(duplicate_name.as_bytes()).is_err());
+    assert!(family::read(duplicate_name.as_bytes(), family::Limits::DEFAULT).is_err());
 }
 
 #[test]
@@ -252,7 +316,7 @@ fn malformed_nested_qnames_comments_declarations_and_references_fail_closed() {
         source_with_body("<!-- bad -- comment -->"),
     ] {
         assert!(
-            family::read(&source).is_err(),
+            family::read(&source, family::Limits::DEFAULT).is_err(),
             "accepted malformed nested source: {}",
             String::from_utf8_lossy(&source)
         );
@@ -260,44 +324,51 @@ fn malformed_nested_qnames_comments_declarations_and_references_fail_closed() {
 
     let mut declaration = b"<?xml version=\"1.0\"?>".to_vec();
     declaration.extend(source_with_body(""));
-    assert!(family::read(&declaration).is_ok());
+    assert!(family::read(&declaration, family::Limits::DEFAULT).is_ok());
 
     let mut late_declaration = source_with_body("");
     late_declaration.extend_from_slice(b"<?xml version=\"1.0\"?>");
-    assert!(family::read(&late_declaration).is_err());
+    assert!(family::read(&late_declaration, family::Limits::DEFAULT).is_err());
 
     for forbidden in ["<?future?>", "<!DOCTYPE themeFamily>"] {
         let source = source_with_body(forbidden);
-        assert!(family::read(&source).is_err(), "accepted {forbidden}");
+        assert!(
+            family::read(&source, family::Limits::DEFAULT).is_err(),
+            "accepted {forbidden}"
+        );
     }
 
     let commented = source_with_body("<!-- preserved --><x:child/><!-- tail -->");
-    let parsed = family::read(&commented).expect("well-formed comments are opaque markup");
-    assert_eq!(family::write(&parsed).unwrap(), commented);
+    let parsed = family::read(&commented, family::Limits::DEFAULT)
+        .expect("well-formed comments are opaque markup");
+    assert_eq!(
+        family::write(&parsed, family::Limits::DEFAULT).unwrap(),
+        commented
+    );
 }
 
 #[test]
 fn raw_text_delimiter_is_rejected_but_comments_and_attributes_allow_it() {
     let raw_text = source_with_body("<x:child>]]></x:child>");
-    assert!(family::read(&raw_text).is_err());
+    assert!(family::read(&raw_text, family::Limits::DEFAULT).is_err());
 
     let comment = source_with_body("<!-- ]]> -->");
-    assert!(family::read(&comment).is_ok());
+    assert!(family::read(&comment, family::Limits::DEFAULT).is_ok());
 
     let raw_attribute = source_with_body(r#"<x:child marker="]]>"></x:child>"#);
-    assert!(family::read(&raw_attribute).is_ok());
+    assert!(family::read(&raw_attribute, family::Limits::DEFAULT).is_ok());
 
     let escaped_attribute = source_with_body(r#"<x:child marker="]]&gt;"></x:child>"#);
-    assert!(family::read(&escaped_attribute).is_ok());
+    assert!(family::read(&escaped_attribute, family::Limits::DEFAULT).is_ok());
 }
 
 #[test]
 fn xml_prolog_is_single_utf8_version_10_and_first() {
     let valid = source_with_prolog("", "<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
-    assert!(family::read(&valid).is_ok());
+    assert!(family::read(&valid, family::Limits::DEFAULT).is_ok());
     let mut bom_valid = b"\xEF\xBB\xBF".to_vec();
     bom_valid.extend(valid);
-    assert!(family::read(&bom_valid).is_ok());
+    assert!(family::read(&bom_valid, family::Limits::DEFAULT).is_ok());
 
     let cases = [
         (
@@ -324,7 +395,11 @@ fn xml_prolog_is_single_utf8_version_10_and_first() {
     ];
     let accepted = cases
         .iter()
-        .filter_map(|(label, source)| family::read(source).is_ok().then_some(*label))
+        .filter_map(|(label, source)| {
+            family::read(source, family::Limits::DEFAULT)
+                .is_ok()
+                .then_some(*label)
+        })
         .collect::<Vec<_>>();
     assert!(
         accepted.is_empty(),
@@ -338,7 +413,7 @@ fn comments_reject_xml_forbidden_controls() {
     for control in ['\0', '\u{1}', '\u{0B}'] {
         let body = format!("<!-- before{control}after -->");
         let source = source_with_body(&body);
-        if family::read(&source).is_ok() {
+        if family::read(&source, family::Limits::DEFAULT).is_ok() {
             accepted.push(u32::from(control));
         }
     }
@@ -354,10 +429,10 @@ fn extension_list_shape_and_text_are_checked_while_foreign_children_stay_opaque(
         "{}<thm15:extLst><a:ext uri=\"urn:future\"><x:future x:flag=\"keep\"/></a:ext></thm15:extLst></thm15:themeFamily>",
         root_open(" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"")
     );
-    assert!(family::read(valid.as_bytes()).is_ok());
+    assert!(family::read(valid.as_bytes(), family::Limits::DEFAULT).is_ok());
 
     let standard_entities = source_with_body("<x:child>&amp;&#10;</x:child>");
-    assert!(family::read(&standard_entities).is_ok());
+    assert!(family::read(&standard_entities, family::Limits::DEFAULT).is_ok());
 
     for source in [
         format!(
@@ -382,22 +457,22 @@ fn extension_list_shape_and_text_are_checked_while_foreign_children_stay_opaque(
         ),
     ] {
         assert!(
-            family::read(source.as_bytes()).is_err(),
+            family::read(source.as_bytes(), family::Limits::DEFAULT).is_err(),
             "accepted malformed extension list: {source}"
         );
     }
 
-    assert!(family::read(source_with_body("text").as_slice()).is_err());
+    assert!(family::read(source_with_body("text").as_slice(), family::Limits::DEFAULT).is_err());
 }
 
 #[test]
 fn opaque_extensions_and_unknown_attributes_survive_known_edits() {
-    let snapshot = Snapshot::from_xml(FAMILY_WITH_OPAQUE_EXTENSION)
+    let snapshot = Package::from_xml(FAMILY_WITH_OPAQUE_EXTENSION, family::Limits::DEFAULT)
         .expect("theme-family extension fixture must parse");
     assert_eq!(snapshot.value().name(), "Office Theme");
     assert_eq!(snapshot.xml_bytes(), FAMILY_WITH_OPAQUE_EXTENSION);
     assert_eq!(
-        family::write(snapshot.value()).unwrap(),
+        family::write(snapshot.value(), family::Limits::DEFAULT).unwrap(),
         FAMILY_WITH_OPAQUE_EXTENSION
     );
 
@@ -405,21 +480,21 @@ fn opaque_extensions_and_unknown_attributes_survive_known_edits() {
     edit.set_name("Edited Theme")
         .expect("name edit must validate");
     let commit = edit.commit().expect("known edit must commit");
-    let changed = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+    let changed = std::str::from_utf8(commit.package().xml_bytes()).unwrap();
     assert!(changed.contains("name=\"Edited Theme\""));
     assert!(changed.contains("x:opaque=\"keep\""));
     assert!(changed.contains("<x:future x:flag=\"keep\">opaque</x:future>"));
-    assert_eq!(commit.snapshot().value().name(), "Edited Theme");
+    assert_eq!(commit.package().value().name(), "Edited Theme");
 }
 
 #[test]
 fn exact_no_op_inverse_and_stale_source_guards_are_enforced() {
-    let snapshot = Snapshot::from_xml(FAMILY_WITH_OPAQUE_EXTENSION)
+    let snapshot = Package::from_xml(FAMILY_WITH_OPAQUE_EXTENSION, family::Limits::DEFAULT)
         .expect("theme-family extension fixture must parse");
 
     let unchanged = snapshot.edit().commit().expect("no-op must commit");
     assert_eq!(
-        unchanged.snapshot().xml_bytes(),
+        unchanged.package().xml_bytes(),
         FAMILY_WITH_OPAQUE_EXTENSION
     );
     assert_eq!(unchanged.patch().before_xml(), FAMILY_WITH_OPAQUE_EXTENSION);
@@ -432,48 +507,66 @@ fn exact_no_op_inverse_and_stale_source_guards_are_enforced() {
     edit.set_variant_id("{00000000-0000-0000-0000-000000000001}")
         .unwrap();
     let changed = edit.commit().expect("changed edit must commit");
-    let reopened = Snapshot::from_xml(snapshot.xml_bytes())
+    let replayed = snapshot
+        .apply(changed.patch())
+        .expect("package replay must publish a commit");
+    assert!(replayed.diagnostics().changed());
+    assert_eq!(
+        replayed.package().xml_bytes(),
+        changed.package().xml_bytes()
+    );
+    let reopened = Package::from_xml(snapshot.xml_bytes(), family::Limits::DEFAULT)
         .expect("equal bytes must reopen as a separate source allocation");
-    let reopened_changed = changed
-        .patch()
-        .apply(&reopened)
+    let reopened_changed = reopened
+        .apply(changed.patch())
         .expect("forward patch must apply to equal reopened bytes");
-    assert_eq!(reopened_changed.xml_bytes(), changed.snapshot().xml_bytes());
-    let reopened_restored = changed
-        .patch()
-        .clone()
-        .inverse()
-        .apply(&reopened_changed)
+    assert_eq!(
+        reopened_changed.package().xml_bytes(),
+        changed.package().xml_bytes()
+    );
+    let inverse = changed.patch().clone().inverse();
+    let reopened_restored = reopened_changed
+        .package()
+        .apply(&inverse)
         .expect("inverse patch must apply to equal reopened changed bytes");
-    assert_eq!(reopened_restored.xml_bytes(), FAMILY_WITH_OPAQUE_EXTENSION);
+    assert_eq!(
+        reopened_restored.package().xml_bytes(),
+        FAMILY_WITH_OPAQUE_EXTENSION
+    );
 
     let restored = changed
-        .patch()
-        .clone()
-        .inverse()
-        .apply(changed.snapshot())
+        .package()
+        .apply(&inverse)
         .expect("inverse patch must apply to its commit");
-    assert_eq!(restored.xml_bytes(), FAMILY_WITH_OPAQUE_EXTENSION);
+    assert_eq!(restored.package().xml_bytes(), FAMILY_WITH_OPAQUE_EXTENSION);
 
-    let stale = Snapshot::from_xml(
+    let stale = Package::from_xml(
         std::str::from_utf8(FAMILY_WITH_OPAQUE_EXTENSION)
             .unwrap()
             .replace("Office Theme", "Other Theme")
             .into_bytes(),
+        family::Limits::DEFAULT,
     )
     .unwrap();
-    assert!(changed.patch().apply(&stale).is_err());
+    assert!(matches!(
+        stale.apply(changed.patch()),
+        Err(Error::PatchConflict)
+    ));
 }
 
 #[test]
 fn depth_bound_accepts_empty_leaf_at_the_limit_and_rejects_one_more() {
     let exact = nested_source(MAX_DEPTH - 2);
-    let parsed = family::read(&exact).expect("depth with an empty leaf at the limit");
-    assert_eq!(family::write(&parsed).unwrap(), exact);
+    let parsed = family::read(&exact, family::Limits::DEFAULT)
+        .expect("depth with an empty leaf at the limit");
+    assert_eq!(
+        family::write(&parsed, family::Limits::DEFAULT).unwrap(),
+        exact
+    );
 
     let over = nested_source(MAX_DEPTH - 1);
     assert!(
-        family::read(&over).is_err(),
+        family::read(&over, family::Limits::DEFAULT).is_err(),
         "accepted one level over depth"
     );
 }
@@ -482,11 +575,11 @@ fn depth_bound_accepts_empty_leaf_at_the_limit_and_rejects_one_more() {
 fn attribute_bound_accepts_exact_count_and_rejects_one_more() {
     const ROOT_ATTRIBUTE_COUNT: usize = 5; // two xmlns declarations + three required attrs
     let exact = source_with_root_attributes(MAX_ATTRIBUTES - ROOT_ATTRIBUTE_COUNT);
-    assert!(family::read(&exact).is_ok());
+    assert!(family::read(&exact, family::Limits::DEFAULT).is_ok());
 
     let over = source_with_root_attributes(MAX_ATTRIBUTES - ROOT_ATTRIBUTE_COUNT + 1);
     assert!(
-        family::read(&over).is_err(),
+        family::read(&over, family::Limits::DEFAULT).is_err(),
         "accepted one attribute over limit"
     );
 }
@@ -494,11 +587,11 @@ fn attribute_bound_accepts_exact_count_and_rejects_one_more() {
 #[test]
 fn namespace_declaration_bound_accepts_exact_count_and_rejects_one_more() {
     let exact = source_with_namespace_declarations(MAX_NAMESPACE_DECLARATIONS);
-    assert!(family::read(&exact).is_ok());
+    assert!(family::read(&exact, family::Limits::DEFAULT).is_ok());
 
     let over = source_with_namespace_declarations(MAX_NAMESPACE_DECLARATIONS + 1);
     assert!(
-        family::read(&over).is_err(),
+        family::read(&over, family::Limits::DEFAULT).is_err(),
         "accepted one namespace declaration over limit"
     );
 }
@@ -509,14 +602,14 @@ fn namespace_uri_bound_accepts_exact_bytes_and_rejects_one_more() {
     let exact = format!(
         "<thm15:themeFamily xmlns:thm15=\"{NAMESPACE}\" xmlns:x=\"{exact_uri}\" name=\"Office\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\"><x:child/></thm15:themeFamily>"
     );
-    assert!(family::read(exact.as_bytes()).is_ok());
+    assert!(family::read(exact.as_bytes(), family::Limits::DEFAULT).is_ok());
 
     let over_uri = "u".repeat(MAX_NAMESPACE_BYTES + 1);
     let over = format!(
         "<thm15:themeFamily xmlns:thm15=\"{NAMESPACE}\" xmlns:x=\"{over_uri}\" name=\"Office\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\"><x:child/></thm15:themeFamily>"
     );
     assert!(
-        family::read(over.as_bytes()).is_err(),
+        family::read(over.as_bytes(), family::Limits::DEFAULT).is_err(),
         "accepted oversized URI"
     );
 }
@@ -533,16 +626,17 @@ fn namespace_prefix_bound_accepts_exact_bytes_and_rejects_one_more() {
             let xml = format!(
                 "<thm15:themeFamily xmlns:thm15=\"{NAMESPACE}\" xmlns:x=\"urn:child\" xmlns:{prefix}=\"urn:prefix\" name=\"Office\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\">{body}</thm15:themeFamily>"
             );
-            let result = family::read(xml.as_bytes());
+            let result = family::read(xml.as_bytes(), family::Limits::DEFAULT);
             if length == MAX_NAMESPACE_BYTES {
                 assert!(result.is_ok(), "exact prefix boundary: {result:?}");
             } else {
                 assert!(
                     matches!(
                         result,
-                        Err(litchi_drawingml::Error::Limit {
-                            resource: "theme family namespace prefix bytes",
-                            limit: MAX_NAMESPACE_BYTES,
+                        Err(Error::Limit {
+                            kind: litchi_drawingml::LimitKind::NamespacePrefixBytes,
+                            maximum: MAX_NAMESPACE_BYTES,
+                            ..
                         })
                     ),
                     "oversized declared prefix: {result:?}"
@@ -556,46 +650,58 @@ fn namespace_prefix_bound_accepts_exact_bytes_and_rejects_one_more() {
 fn name_and_source_output_bounds_accept_exact_and_reject_over() {
     let exact_name = "N".repeat(MAX_NAME_BYTES);
     let exact_value = Family::new(&exact_name, OFFICE_ID, OFFICE_VID).unwrap();
-    let exact_xml = family::write(&exact_value).unwrap();
-    assert_eq!(family::read(&exact_xml).unwrap().name(), exact_name);
+    let exact_xml = family::write(&exact_value, family::Limits::DEFAULT).unwrap();
+    assert_eq!(
+        family::read(&exact_xml, family::Limits::DEFAULT)
+            .unwrap()
+            .name(),
+        exact_name
+    );
 
     let over_name = "N".repeat(MAX_NAME_BYTES + 1);
     assert!(Family::new(&over_name, OFFICE_ID, OFFICE_VID).is_err());
 
     let exact_source = source_with_size(MAX_XML_BYTES);
-    let mut parsed = family::read(&exact_source).expect("exact source bound must parse");
-    assert_eq!(family::write(&parsed).unwrap(), exact_source);
+    let mut parsed = family::read(&exact_source, family::Limits::DEFAULT)
+        .expect("exact source bound must parse");
+    assert_eq!(
+        family::write(&parsed, family::Limits::DEFAULT).unwrap(),
+        exact_source
+    );
 
     parsed.set_name("Office+").unwrap();
     assert!(
-        family::write(&parsed).is_err(),
+        family::write(&parsed, family::Limits::DEFAULT).is_err(),
         "accepted oversized patched output"
     );
     let over_source = source_with_size(MAX_XML_BYTES + 1);
     assert!(
-        family::read(&over_source).is_err(),
+        family::read(&over_source, family::Limits::DEFAULT).is_err(),
         "accepted oversized source"
     );
 }
 
 #[test]
 fn invalid_edits_do_not_leak_into_a_transaction() {
-    let snapshot = Snapshot::from_xml(NATIVE).unwrap();
+    let snapshot = Package::from_xml(NATIVE, family::Limits::DEFAULT).unwrap();
     let mut edit = snapshot.edit();
     assert!(edit.set_id("not-a-guid").is_err());
     assert!(edit.set_variant_id("{bad}").is_err());
     assert!(edit.set_name("bad\u{1}").is_err());
-    assert!(!edit.is_changed());
     assert_eq!(edit.value(), snapshot.value());
+    assert!(!edit.commit().unwrap().diagnostics().changed());
 }
 
 #[test]
 fn bounded_malformed_inputs_fail_closed() {
     let oversized = vec![b'x'; MAX_XML_BYTES + 1];
-    assert!(family::read(&oversized).is_err());
-    assert!(Snapshot::from_xml(oversized).is_err());
-    assert!(family::read(br#"<thm15:themeFamily"#).is_err());
-    assert!(family::read(br#"<thm15:themeFamily xmlns:thm15="http://schemas.microsoft.com/office/thememl/2012/main" name="Office" id="{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}" vid="{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"><a:extLst/>"#).is_err());
+    assert!(family::read(&oversized, family::Limits::DEFAULT).is_err());
+    assert!(Package::from_xml(oversized, family::Limits::DEFAULT).is_err());
+    assert!(family::read(br#"<thm15:themeFamily"#, family::Limits::DEFAULT).is_err());
+    assert!(family::read(
+        br#"<thm15:themeFamily xmlns:thm15="http://schemas.microsoft.com/office/thememl/2012/main" name="Office" id="{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}" vid="{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"><a:extLst/>"#,
+        family::Limits::DEFAULT,
+    ).is_err());
 
     let mut deep = format!(
         "<thm15:themeFamily xmlns:thm15=\"{NAMESPACE}\" xmlns:a=\"{DRAWINGML_NAMESPACE}\" xmlns:x=\"urn:future\" name=\"Office\" id=\"{OFFICE_ID}\" vid=\"{OFFICE_VID}\"><thm15:extLst><a:ext uri=\"future\">"
@@ -607,12 +713,12 @@ fn bounded_malformed_inputs_fail_closed() {
         deep.push_str(&format!("</x:n{index}>"));
     }
     deep.push_str("</a:ext></thm15:extLst></thm15:themeFamily>");
-    assert!(family::read(deep.as_bytes()).is_err());
+    assert!(family::read(deep.as_bytes(), family::Limits::DEFAULT).is_err());
 }
 
 #[test]
 fn immutable_snapshots_are_send_sync() {
-    assert_send_sync::<Snapshot>();
+    assert_send_sync::<Package>();
     assert_send_sync::<Family>();
     assert_send_sync::<Guid>();
 }

@@ -192,7 +192,7 @@ PPTX 1.011 / 1.011 / 1.003, XLSX 1.055 / 1.021 / 1.007 at N = 0 / 10 / 100
 | Gap | Follow-up |
 |---|---|
 | Cell-range series (`series{N}.values=Sheet1!B2:B13`, `series{N}=<range>`, `series{N}.categories=<range>`), 3 corpus lines | per-series `Binding` references in `chart::authoring` (today one layout per chart); XLSX can read the cells as `dataRange` does |
-| `series{N}.color` on `set`, and `color` on `/chart[N]/series[K]` (19 warned lines) | a series-fill verb on `chart::edit::Transaction` |
+| `series{N}.color` on `set`, and `color` on `/chart[N]/series[K]` (19 warned lines) | a series-fill verb on `chart::edit::Edit` |
 | OfficeCLI's flat alias `series{N}Name` (undocumented, 0 corpus lines) | add as 20 registry aliases if a script needs it |
 | `.marker`, `.trendline*`, `.bubbleSize` per series | extend `Series` alongside the record 0270 formatting gaps |
 | A dotted name without values is refused; OfficeCLI writes an empty series | kept strict: an empty series is not a chart Litchi authors |

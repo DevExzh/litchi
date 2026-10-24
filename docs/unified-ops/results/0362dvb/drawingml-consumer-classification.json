@@ -1,0 +1,174 @@
+{
+  "schema": "litchi.drawingml.consumer-classification-validation.v1",
+  "record": "0362dvb",
+  "scope": "Typed DrawingML budget, invalid-policy, and stale-patch classification through DOCX, PPTX, and OPS consumers; coordinate and Chartex dimension preservation.",
+  "source": {
+    "precommit_base": "3b0ee480b798f3a65c1296fb03e13eaf2f1c3a34",
+    "precommit_base_tree": "8b1256822883faa73271df18f210f2479762a7ac",
+    "validated_worktree_content": "9566398bf35fb54c5d4eb9b354e62c60a544743b",
+    "postcommit_source": "9566398bf35fb54c5d4eb9b354e62c60a544743b",
+    "postcommit_tree": "8a62a50154f00d7a7504accb90cf9b3aa02d1a28",
+    "changed_files": 21,
+    "insertions": 386,
+    "deletions": 47,
+    "execution_phase": "The final focused check ran before the source commit on the unchanged staged-equivalent working tree. Source content was unchanged when 9566398bf3 was committed; this receipt was added afterward. The receipt commit is intentionally separate so the validated source tree remains exact."
+  },
+  "repairs": {
+    "host_classification": [
+      "litchi-ops Classify now delegates DOCX/PPTX Drawing errors to the typed DrawingML classifier",
+      "DOCX/PPTX chart and SmartArt transactions preserve typed DrawingML causes",
+      "modern-comment body conversion preserves Limit, InvalidLimit, and PatchConflict"
+    ],
+    "ops_classification": [
+      "chart native and parsed paths map Limit to LimitExceeded, InvalidLimit to InvalidArgument, and PatchConflict to InvalidInput",
+      "DOCX/PPTX SmartArt read and edit adapters retain those typed codes while preserving parse versus authoring fallbacks"
+    ],
+    "producer_dimensions": [
+      "NamespacePrefixBytes is separated from NamespaceBytes",
+      "XML depth reports attempted depth",
+      "Chartex XML nodes and depth are separate typed dimensions",
+      "theme output policy returns typed XmlBytes InvalidLimit",
+      "transform, DOCX section, PPTX media, and PPTX laser lexical coordinate limits remain typed"
+    ]
+  },
+  "locks": {
+    "workspace": {
+      "path": "/home/zhuhe/code/litchi-worktrees/uo2-drawingml-limits/Cargo.lock",
+      "sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+      "bytes": 139591,
+      "mode": "pinned copy observed by the commands; no lock mutation or registry upgrade"
+    },
+    "standalone_chart_reference": {
+      "manifest": "tools/perf-baseline/unified-chart-add/Cargo.toml",
+      "tracked_before_repair": {
+        "path": "tools/perf-baseline/unified-chart-add/Cargo.lock",
+        "sha256": "b0b8b8fc4bcd6dceb0e6d1de8606878ecd7191c8403de836cfebf35761f7f847",
+        "bytes": 31748
+      },
+      "manual_two_edge_attempt": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-lock-manual.patch.lock",
+        "sha256": "b1d25ab8d54c6e779f928c93363035b263e4c78c58d7b97997640ac66dc0f72e",
+        "bytes": 31780
+      },
+      "offline_resolved_final": {
+        "path": "tools/perf-baseline/unified-chart-add/Cargo.lock",
+        "sha256": "811dc166f6aaec285dfea8276aa1a153e4d992c00f603f5e5f0113a4f71a7f3e",
+        "bytes": 31939
+      },
+      "registry_changes": "none: only local package graph edges changed"
+    }
+  },
+  "environment": {
+    "path_prefix": "/home/zhuhe/code/litchi-worktrees/.coord/bin",
+    "litchi_mem_max": "20G",
+    "cargo_build_jobs": 1,
+    "cargo_incremental": 0,
+    "dev_test_release_bench_debug": 0,
+    "offline": true,
+    "locked": true,
+    "tmpdir": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/tmp",
+    "target_dir": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-target",
+    "target_bytes_after_final": 2590004731
+  },
+  "focused_command": "set -o pipefail; env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/tmp cargo test -p litchi-ops --all-features --offline --locked --lib drawingml --no-fail-fast --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-target 2>&1 | tee /home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-focused-rerun3.log",
+  "focused_attempts": [
+    {
+      "label": "initial classifier compile failure",
+      "session": "2968",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-focused.log",
+        "bytes": 15956,
+        "sha256": "f66d15358a581bc35e65e0f44828ba783ffc442028ddc7105721cd730c403369"
+      },
+      "cargo_result": "failed during litchi-ops compilation with two E0308 mismatches because root DrawingML Error::Common wraps XmlError rather than litchi_ooxml_common::Error; the initial shell pipeline used tee without pipefail",
+      "repair": "removed common-limit helper calls from the DrawingML Common classifier arm; Common remains CorruptFile"
+    },
+    {
+      "label": "authoritative consumer rerun",
+      "session": "21325",
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-focused-rerun.log",
+        "bytes": 1290,
+        "sha256": "d731ab9c699b599ad98d0c35c3020a586f529cb2a1435a20e74cf5e9007ff9bd"
+      },
+      "tests": {
+        "passed": 2,
+        "failed": 0,
+        "filtered": 1005
+      }
+    },
+    {
+      "label": "OPS adapter follow-up",
+      "session": "2692",
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-focused-rerun2.log",
+        "bytes": 602,
+        "sha256": "b470721317fb8cc73f0dbfc57eb393484059ff7dac2392d7778cdd7e1920fbac"
+      },
+      "tests": {
+        "passed": 2,
+        "failed": 0,
+        "filtered": 1005
+      }
+    },
+    {
+      "label": "final source validation",
+      "session": "66810",
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-consumer/consumer-focused-rerun3.log",
+        "bytes": 602,
+        "sha256": "aa82bb559c44f212dead0a3175b5ac877c371bfde3d0f655994ef7367ea5f7a7"
+      },
+      "tests": {
+        "names": [
+          "format::chart::tests::drawingml_native_errors_keep_typed_budget_and_replay_codes",
+          "error::tests::drawingml_typed_errors_keep_host_classification"
+        ],
+        "passed": 2,
+        "failed": 0,
+        "filtered": 1005
+      }
+    }
+  ],
+  "standalone_checks": [
+    {
+      "label": "locked-before-local-lock-repair",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "exit_code": 101,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-check.log",
+        "bytes": 298,
+        "sha256": "408841b16b557ec63fabc2b00f3c191ca9af807b53abcfb63f326adcc7ef4d5a"
+      }
+    },
+    {
+      "label": "offline-local-lock-resolution",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-unlocked-resolution.log",
+        "bytes": 5560,
+        "sha256": "fa33065a9258be4500d5d142c7636f52080d566daf9b0a05f73fb67a2aeb5723"
+      }
+    },
+    {
+      "label": "locked-final",
+      "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target",
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-check-locked.log",
+        "bytes": 590,
+        "sha256": "a0d88f49ca29aed02c60152559c08380cbd6247aafbaf89699781e59f814856d"
+      }
+    }
+  ],
+  "guards": {
+    "cargo_fmt_and_diff_check_exit": 0,
+    "artifact_guard_output": "empty: no staged evidence object >= 1048576 bytes and no staged binaries",
+    "forbidden_fixture_reference_search": "empty for the changed DrawingML, DOCX, PPTX, and OPS source trees",
+    "no_committed_target_or_binary": true
+  }
+}

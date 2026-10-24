@@ -8678,9 +8678,9 @@
           "replacement": "the shared reader is strict by default"
         },
         {
-          "name": "read_with",
+          "name": "read_with_options",
           "scope": "litchi_drawingml::text::body::reader",
-          "replacement": "use read_with_options"
+          "replacement": "use read(xml, scope, limits)"
         },
         {
           "name": "id",
@@ -8696,9 +8696,241 @@
           "name": "relationship_id",
           "scope": "litchi_drawingml::text::body::Picture",
           "replacement": "use explicit body::raw access"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_drawingml",
+          "replacement": "use the focused module's Edit",
+          "recursive": true
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_drawingml",
+          "replacement": "use the focused module's Edit; no prefixed or suffixed transaction names",
+          "match": "suffix",
+          "recursive": true
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_drawingml",
+          "replacement": "use commit.diagnostics().changed() or Patch::is_noop()",
+          "recursive": true
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_drawingml",
+          "replacement": "use Commit::into_package()",
+          "recursive": true
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_drawingml",
+          "replacement": "use Commit::package()",
+          "recursive": true
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_drawingml",
+          "replacement": "configure owner edits with EditOptions; raw readers take required limits",
+          "match": "suffix",
+          "recursive": true
+        },
+        {
+          "name": "replace_family_with_limit",
+          "scope": "litchi_drawingml::theme::family::part",
+          "replacement": "use part::replace_family(..., part::Limits)",
+          "recursive": true
+        },
+        {
+          "name": "add_family_with_limit",
+          "scope": "litchi_drawingml::theme::family::part",
+          "replacement": "use part::add_family(..., part::Limits)",
+          "recursive": true
+        },
+        {
+          "name": "add_family_with_uri_limit",
+          "scope": "litchi_drawingml::theme::family::part",
+          "replacement": "use part::add_family_with_uri(..., part::Limits)",
+          "recursive": true
+        },
+        {
+          "name": "remove_family_with_limit",
+          "scope": "litchi_drawingml::theme::family::part",
+          "replacement": "use part::remove_family(..., part::Limits)",
+          "recursive": true
+        },
+        {
+          "name": "AuthoringLimits",
+          "scope": "litchi_drawingml::ink",
+          "replacement": "use ink::builder::AuthoringLimits",
+          "recursive": false
+        },
+        {
+          "name": "BrushDraft",
+          "scope": "litchi_drawingml::ink",
+          "replacement": "use ink::builder::BrushDraft",
+          "recursive": false
+        },
+        {
+          "name": "BrushPropertyDraft",
+          "scope": "litchi_drawingml::ink",
+          "replacement": "use ink::builder::BrushPropertyDraft",
+          "recursive": false
+        },
+        {
+          "name": "ContextDraft",
+          "scope": "litchi_drawingml::ink",
+          "replacement": "use ink::builder::ContextDraft",
+          "recursive": false
+        },
+        {
+          "name": "Draft",
+          "scope": "litchi_drawingml::ink",
+          "replacement": "use ink::builder::Draft",
+          "recursive": false
+        },
+        {
+          "name": "TraceDraft",
+          "scope": "litchi_drawingml::ink",
+          "replacement": "use ink::builder::TraceDraft",
+          "recursive": false
+        },
+        {
+          "name": "finish",
+          "scope": "litchi_drawingml::ink::actions::Edit",
+          "replacement": "publish only with Edit::commit"
+        },
+        {
+          "name": "prepare",
+          "scope": "litchi_drawingml::ink::actions::Edit",
+          "replacement": "publish only with Edit::commit, which retains the commit triad"
+        },
+        {
+          "name": "set_group_type",
+          "scope": "litchi_drawingml::ink::actions::Edit",
+          "replacement": "use Edit::set_action_group_type"
+        },
+        {
+          "name": "set_group_start_time",
+          "scope": "litchi_drawingml::ink::actions::Edit",
+          "replacement": "use Edit::set_action_group_start_time"
+        },
+        {
+          "name": "add_group",
+          "scope": "litchi_drawingml::ink::actions::Edit",
+          "replacement": "use Edit::add_action_group"
+        },
+        {
+          "name": "move_child",
+          "scope": "litchi_drawingml::ink::actions::Edit",
+          "replacement": "use Edit::move_child_before"
+        },
+        {
+          "name": "move_group_data",
+          "scope": "litchi_drawingml::ink::actions::Edit",
+          "replacement": "use Edit::move_group_data_before"
+        },
+        {
+          "name": "remove_group",
+          "scope": "litchi_drawingml::ink::actions::Edit",
+          "replacement": "use Edit::remove_action_group"
+        },
+        {
+          "name": "source",
+          "scope": "litchi_drawingml::ink::actions::Prepared",
+          "replacement": "use Prepared::as_bytes"
+        },
+        {
+          "name": "readback",
+          "scope": "litchi_drawingml::ink::actions::Prepared",
+          "replacement": "use Prepared::profile"
+        },
+        {
+          "name": "apply",
+          "scope": "litchi_drawingml::ink::actions::Patch",
+          "replacement": "replay with Prepared::apply"
+        },
+        {
+          "name": "from_bytes",
+          "scope": "litchi_drawingml::ink::actions::builder::OpaquePayload",
+          "replacement": "use OpaquePayload::new"
+        },
+        {
+          "name": "with_value",
+          "scope": "litchi_drawingml::ink::actions::builder::PropertyDraft",
+          "replacement": "use PropertyDraft::new"
+        },
+        {
+          "name": "add_data",
+          "scope": "litchi_drawingml::ink::actions::builder::DataGroupDraft",
+          "replacement": "use DataGroupDraft::data"
+        },
+        {
+          "name": "add_property",
+          "scope": "litchi_drawingml::ink::actions::builder::ActionDraft",
+          "replacement": "use ActionDraft::property"
+        },
+        {
+          "name": "add_data",
+          "scope": "litchi_drawingml::ink::actions::builder::ActionDraft",
+          "replacement": "use ActionDraft::data"
+        },
+        {
+          "name": "add_data_group",
+          "scope": "litchi_drawingml::ink::actions::builder::ActionDraft",
+          "replacement": "use ActionDraft::data_group"
+        },
+        {
+          "name": "add_action",
+          "scope": "litchi_drawingml::ink::actions::builder::ActionGroupDraft",
+          "replacement": "use ActionGroupDraft::action"
+        },
+        {
+          "name": "add_action",
+          "scope": "litchi_drawingml::ink::actions::builder::Draft",
+          "replacement": "use Draft::action"
+        },
+        {
+          "name": "add_action_group",
+          "scope": "litchi_drawingml::ink::actions::builder::Draft",
+          "replacement": "use Draft::action_group"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_drawingml::chart",
+        "litchi_drawingml::chart::edit",
+        "litchi_drawingml::transform",
+        "litchi_drawingml::theme::family",
+        "litchi_drawingml::ink::actions"
+      ],
+      "immutable_owners": [
+        "litchi_drawingml::chart::Package",
+        "litchi_drawingml::chart::edit::Package",
+        "litchi_drawingml::transform::Package",
+        "litchi_drawingml::theme::family::Package",
+        "litchi_drawingml::ink::Prepared",
+        "litchi_drawingml::ink::actions::Prepared"
+      ],
+      "shared_types": [
+        {"path": "litchi_drawingml::chart::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_drawingml::chart::Diagnostics", "target": "litchi_core::edit::Diagnostics"},
+        {"path": "litchi_drawingml::chart::edit::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_drawingml::chart::edit::Diagnostics", "target": "litchi_core::edit::Diagnostics"},
+        {"path": "litchi_drawingml::transform::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_drawingml::transform::Diagnostics", "target": "litchi_core::edit::Diagnostics"},
+        {"path": "litchi_drawingml::theme::family::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_drawingml::theme::family::Diagnostics", "target": "litchi_core::edit::Diagnostics"},
+        {"path": "litchi_drawingml::ink::actions::Commit", "target": "litchi_core::edit::Commit"},
+        {"path": "litchi_drawingml::ink::actions::Diagnostics", "target": "litchi_core::edit::Diagnostics"}
+      ],
+      "result_methods": [
+        {"method": "litchi_drawingml::chart::Package::apply", "ok": "litchi_drawingml::chart::Commit"},
+        {"method": "litchi_drawingml::chart::edit::Package::apply", "ok": "litchi_drawingml::chart::edit::Commit"},
+        {"method": "litchi_drawingml::transform::Package::apply", "ok": "litchi_drawingml::transform::Commit"},
+        {"method": "litchi_drawingml::theme::family::Package::apply", "ok": "litchi_drawingml::theme::family::Commit"},
+        {"method": "litchi_drawingml::ink::actions::Prepared::apply", "ok": "litchi_drawingml::ink::actions::Commit"}
+      ],
+      "family_methods": true
     },
     {
       "id": "doc-minimal",

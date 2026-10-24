@@ -1,6 +1,7 @@
 //! Chart-space and package-level `DrawingML` chart records.
 
 use super::super::validation::{invalid_chart_input, validate_chart_style};
+use super::super::xml::write_escaped_xml;
 use super::super::xml::{write_bool_element, write_fragment, write_text_element};
 use super::{
     legend::write_legend,
@@ -12,7 +13,6 @@ use crate::chart::model::{
     Chart, ColorMapOverride, ColorMapping, ExternalData, HeaderFooter, PageMargins, PageSetup,
     PivotFormat, PivotSource, PrintSettings, Protection, UserShapes,
 };
-use litchi_core::xml::escape_xml;
 use std::io::Write;
 
 pub(in crate::chart::writer) fn write_chart_space<W: Write>(
@@ -44,7 +44,9 @@ pub(in crate::chart::writer) fn write_chart_space<W: Write>(
         if chart.date_1904 { "1" } else { "0" }
     )?;
     if let Some(language) = chart.language.as_ref() {
-        write!(writer, r#"<c:lang val="{}"/>"#, escape_xml(language))?;
+        write!(writer, r#"<c:lang val=""#)?;
+        write_escaped_xml(writer, language)?;
+        write!(writer, r#""/>"#)?;
     }
     write!(
         writer,
@@ -182,11 +184,9 @@ fn write_user_shapes<W: Write>(
         .or(user_shapes.relationship_id.as_deref())
         .filter(|value| !value.is_empty())
         .ok_or_else(|| invalid_chart_input("chart user shapes have no relationship ID"))?;
-    write!(
-        writer,
-        r#"<c:userShapes r:id="{}"/>"#,
-        escape_xml(relationship_id)
-    )?;
+    write!(writer, r#"<c:userShapes r:id=""#)?;
+    write_escaped_xml(writer, relationship_id)?;
+    write!(writer, r#""/>"#)?;
     Ok(())
 }
 
@@ -199,11 +199,9 @@ fn write_external_data<W: Write>(
         .or(external_data.relationship_id.as_deref())
         .filter(|value| !value.is_empty())
         .ok_or_else(|| invalid_chart_input("chart external data has no relationship ID"))?;
-    write!(
-        writer,
-        r#"<c:externalData r:id="{}">"#,
-        escape_xml(relationship_id)
-    )?;
+    write!(writer, r#"<c:externalData r:id=""#)?;
+    write_escaped_xml(writer, relationship_id)?;
+    write!(writer, r#"">"#)?;
     if let Some(auto_update) = external_data.auto_update {
         write!(
             writer,
@@ -216,10 +214,11 @@ fn write_external_data<W: Write>(
 }
 
 fn write_pivot_source<W: Write>(writer: &mut W, source: &PivotSource) -> std::io::Result<()> {
+    write!(writer, r#"<c:pivotSource><c:name>"#)?;
+    write_escaped_xml(writer, &source.name)?;
     write!(
         writer,
-        r#"<c:pivotSource><c:name>{}</c:name><c:fmtId val="{}"/></c:pivotSource>"#,
-        escape_xml(&source.name),
+        r#"</c:name><c:fmtId val="{}"/></c:pivotSource>"#,
         source.format_id
     )?;
     Ok(())
@@ -286,7 +285,7 @@ fn write_chart_protection<W: Write>(
 }
 
 fn write_pivot_formats<W: Write>(writer: &mut W, formats: &[PivotFormat]) -> std::io::Result<()> {
-    let mut indexes = std::collections::HashSet::with_capacity(formats.len());
+    let mut indexes = std::collections::HashSet::new();
     write!(writer, "<c:pivotFmts>")?;
     for format in formats {
         if !indexes.insert(format.index) {

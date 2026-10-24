@@ -627,12 +627,12 @@ fn is_image_relationship(value: &str) -> bool {
 
 fn parse_theme(xml: &[u8], limits: Limits) -> Result<Theme> {
     bounded_xml_preflight(xml, limits)?;
-    Ok(codec::read(xml)?)
+    Ok(codec::read(xml, codec::Limits::new(limits.max_xml_bytes))?)
 }
 
 pub(crate) fn parse_theme_content(xml: &[u8], limits: Limits) -> Result<(Theme, Option<Family>)> {
     let theme = parse_theme(xml, limits)?;
-    let family = family::part::read_family(xml)?;
+    let family = family::part::read_family(xml, family::part::Limits::new(limits.max_xml_bytes))?;
     Ok((theme, family))
 }
 
@@ -646,7 +646,12 @@ fn validate_model(theme: &Theme, limits: Limits) -> Result<()> {
     } else {
         theme.name.as_str()
     };
-    let xml = codec::encode_part(name, &theme.colors, &theme.fonts)?;
+    let xml = codec::encode_part(
+        name,
+        &theme.colors,
+        &theme.fonts,
+        codec::Limits::new(limits.max_xml_bytes),
+    )?;
     if xml.len() > limits.max_xml_bytes {
         return Err(Error::limit(
             LimitKind::XmlBytes,
@@ -761,16 +766,33 @@ fn rewrite_base_source(
         replacements.push(root_name_replacement(source, &after.name)?);
     }
     if before.colors != after.colors {
-        let range = codec::scheme_replacement_range(source, b"clrScheme")?;
-        let fragment = strict_fragment(codec::encode_palette_fragment(&after.colors)?, strict)?;
+        let range = codec::scheme_replacement_range(
+            source,
+            b"clrScheme",
+            codec::Limits::new(limits.max_xml_bytes),
+        )?;
+        let fragment = strict_fragment(
+            codec::encode_palette_fragment(
+                &after.colors,
+                codec::Limits::new(limits.max_xml_bytes),
+            )?,
+            strict,
+        )?;
         replacements.push(Replacement {
             range,
             bytes: fragment,
         });
     }
     if before.fonts != after.fonts {
-        let range = codec::scheme_replacement_range(source, b"fontScheme")?;
-        let fragment = strict_fragment(codec::encode_fonts_fragment(&after.fonts)?, strict)?;
+        let range = codec::scheme_replacement_range(
+            source,
+            b"fontScheme",
+            codec::Limits::new(limits.max_xml_bytes),
+        )?;
+        let fragment = strict_fragment(
+            codec::encode_fonts_fragment(&after.fonts, codec::Limits::new(limits.max_xml_bytes))?,
+            strict,
+        )?;
         replacements.push(Replacement {
             range,
             bytes: fragment,
@@ -827,15 +849,19 @@ fn rewrite_family_source(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     let output = match (before, after) {
-        (Some(_), Some(family)) => {
-            family::part::replace_family_with_limit(source, family, limits.max_xml_bytes)
+        (Some(_), Some(family)) => family::part::replace_family(
+            source,
+            family,
+            family::part::Limits::new(limits.max_xml_bytes),
+        ),
+        (Some(_), None) => {
+            family::part::remove_family(source, family::part::Limits::new(limits.max_xml_bytes))
         },
-        (Some(_), None) => family::part::remove_family_with_limit(source, limits.max_xml_bytes),
-        (None, Some(family)) => family::part::add_family_with_uri_limit(
+        (None, Some(family)) => family::part::add_family_with_uri(
             source,
             family,
             family::part::NATIVE_EXTENSION_URI,
-            limits.max_xml_bytes,
+            family::part::Limits::new(limits.max_xml_bytes),
         ),
         (None, None) => Ok(source.to_vec()),
     }?;
@@ -1164,7 +1190,13 @@ mod tests {
     #[test]
     fn generated_theme_reads_and_noop_is_exact() {
         let value = theme();
-        let xml = codec::encode_part(&value.name, &value.colors, &value.fonts).expect("encode");
+        let xml = codec::encode_part(
+            &value.name,
+            &value.colors,
+            &value.fonts,
+            codec::Limits::DEFAULT,
+        )
+        .expect("encode");
         let parsed = parse_theme(&xml, Limits::DEFAULT).expect("read");
         assert_eq!(parsed, value);
         let rewritten =
@@ -1176,7 +1208,13 @@ mod tests {
     #[test]
     fn palette_edit_preserves_root_and_font_source() {
         let value = theme();
-        let xml = codec::encode_part(&value.name, &value.colors, &value.fonts).expect("encode");
+        let xml = codec::encode_part(
+            &value.name,
+            &value.colors,
+            &value.fonts,
+            codec::Limits::DEFAULT,
+        )
+        .expect("encode");
         let mut replacement = value.clone();
         replacement.colors = palette().with(Slot::Accent1, Color::rgb("FF0000").expect("color"));
         let edited =

@@ -395,7 +395,7 @@ fn fixture(action_count: usize) -> Result<Fixture> {
     }
     xml.push_str("</iact:actions><!--trailing-->");
     let source = xml.into_bytes();
-    let profile = actions::read_profile(&source)?;
+    let profile = actions::read_profile(&source, actions::Limits::DEFAULT)?;
     Ok(Fixture {
         action_count,
         profile,
@@ -648,7 +648,7 @@ fn operation(inputs: &Inputs, lane: &str, rejection: Option<RejectionContext>) -
         LaneKind::Draft { opaque } => Ok(Work::Prepared(draft_operation(inputs, count, opaque)?)),
         LaneKind::Scalar => {
             let fixture = source_fixture(inputs, lane)?;
-            let mut edit = Edit::from_profile(&fixture.profile)?;
+            let mut edit = Edit::from_profile(&fixture.profile, Limits::default())?;
             edit.set_action_type(
                 ActionSelector::ordinal(count - 1),
                 ActionType::Custom("edited".into()),
@@ -657,7 +657,7 @@ fn operation(inputs: &Inputs, lane: &str, rejection: Option<RejectionContext>) -
         },
         LaneKind::ScalarBatch => {
             let fixture = source_fixture(inputs, lane)?;
-            let mut edit = Edit::from_profile(&fixture.profile)?;
+            let mut edit = Edit::from_profile(&fixture.profile, Limits::default())?;
             for index in 0..count {
                 edit.set_property_value(
                     ChildSelector::Property {
@@ -671,7 +671,7 @@ fn operation(inputs: &Inputs, lane: &str, rejection: Option<RejectionContext>) -
         },
         LaneKind::ScalarCoalesce => {
             let fixture = source_fixture(inputs, lane)?;
-            let mut edit = Edit::from_profile(&fixture.profile)?;
+            let mut edit = Edit::from_profile(&fixture.profile, Limits::default())?;
             let target = ChildSelector::Property {
                 action: ActionSelector::direct(count - 1),
                 index: 0,
@@ -683,18 +683,18 @@ fn operation(inputs: &Inputs, lane: &str, rejection: Option<RejectionContext>) -
         },
         LaneKind::Noop => {
             let fixture = source_fixture(inputs, lane)?;
-            let edit = Edit::from_profile(&fixture.profile)?;
+            let edit = Edit::from_profile(&fixture.profile, Limits::default())?;
             Ok(Work::Commit(edit.finish()?))
         },
         LaneKind::Add => {
             let fixture = source_fixture(inputs, lane)?;
-            let mut edit = Edit::from_profile(&fixture.profile)?;
+            let mut edit = Edit::from_profile(&fixture.profile, Limits::default())?;
             edit.add_action(ActionParent::Root, added_action(count)?)?;
             Ok(Work::Commit(edit.finish()?))
         },
         LaneKind::InsertBatch => {
             let fixture = source_fixture(inputs, lane)?;
-            let mut edit = Edit::from_profile(&fixture.profile)?;
+            let mut edit = Edit::from_profile(&fixture.profile, Limits::default())?;
             for index in 0..count {
                 edit.add_action(ActionParent::Root, added_action(index)?)?;
             }
@@ -702,13 +702,13 @@ fn operation(inputs: &Inputs, lane: &str, rejection: Option<RejectionContext>) -
         },
         LaneKind::Remove => {
             let fixture = source_fixture(inputs, lane)?;
-            let mut edit = Edit::from_profile(&fixture.profile)?;
+            let mut edit = Edit::from_profile(&fixture.profile, Limits::default())?;
             edit.remove_action(ActionSelector::ordinal(count - 1))?;
             Ok(Work::Commit(edit.finish()?))
         },
         LaneKind::RemoveBatch => {
             let fixture = source_fixture(inputs, lane)?;
-            let mut edit = Edit::from_profile(&fixture.profile)?;
+            let mut edit = Edit::from_profile(&fixture.profile, Limits::default())?;
             for index in (1..count).step_by(2) {
                 edit.remove_action(ActionSelector::direct(index))?;
             }
@@ -716,7 +716,7 @@ fn operation(inputs: &Inputs, lane: &str, rejection: Option<RejectionContext>) -
         },
         LaneKind::ClearBatch => {
             let fixture = source_fixture(inputs, lane)?;
-            let mut edit = Edit::from_profile(&fixture.profile)?;
+            let mut edit = Edit::from_profile(&fixture.profile, Limits::default())?;
             for index in (1..count).step_by(2) {
                 edit.clear(ActionSelector::direct(index))?;
             }
@@ -724,7 +724,7 @@ fn operation(inputs: &Inputs, lane: &str, rejection: Option<RejectionContext>) -
         },
         LaneKind::Move => {
             let fixture = source_fixture(inputs, lane)?;
-            let mut edit = Edit::from_profile(&fixture.profile)?;
+            let mut edit = Edit::from_profile(&fixture.profile, Limits::default())?;
             edit.move_before(
                 ActionSelector::ordinal(count - 1),
                 ActionSelector::ordinal(0),
@@ -733,7 +733,7 @@ fn operation(inputs: &Inputs, lane: &str, rejection: Option<RejectionContext>) -
         },
         LaneKind::MoveBatch => {
             let fixture = source_fixture(inputs, lane)?;
-            let mut edit = Edit::from_profile(&fixture.profile)?;
+            let mut edit = Edit::from_profile(&fixture.profile, Limits::default())?;
             for index in (1..count).step_by(2) {
                 edit.move_before(
                     ActionSelector::direct(index),
@@ -753,7 +753,7 @@ fn operation(inputs: &Inputs, lane: &str, rejection: Option<RejectionContext>) -
                 edit_profile,
                 retained_profile,
             } = context;
-            let mut edit = Edit::with_limits(edit_profile, limits)?;
+            let mut edit = Edit::new(edit_profile, limits)?;
             edit.set_property_value(
                 ChildSelector::Property {
                     action: ActionSelector::ordinal(0),
@@ -882,13 +882,13 @@ fn validate_work(inputs: &Inputs, lane: &str, work: &Work) -> Result<Validation>
     {
         let post_source = retained_profile.source();
         let post_source_hash = source_hash(post_source);
-        let post_profile = actions::read_profile(post_source)?;
+        let post_profile = actions::read_profile(post_source, actions::Limits::DEFAULT)?;
         let post_state = profile_state(&post_profile);
-        let no_op = Edit::from_profile(&post_profile)?.finish()?;
-        let no_op_state = profile_state(no_op.profile());
+        let no_op = Edit::from_profile(&post_profile, Limits::default())?.finish()?;
+        let no_op_state = profile_state(no_op.package().profile());
         let source_unchanged = post_source == pre_source.as_slice()
             && post_source_hash == *pre_source_hash
-            && no_op.as_bytes() == pre_source.as_slice();
+            && no_op.package().as_bytes() == pre_source.as_slice();
         let state_unchanged = profile_state(retained_profile) == *pre_state
             && post_state == *pre_state
             && no_op_state == *pre_state;
@@ -919,8 +919,8 @@ fn validate_work(inputs: &Inputs, lane: &str, work: &Work) -> Result<Validation>
     let Work::Commit(commit) = work else {
         return Err(format!("lane {lane} returned an unexpected result").into());
     };
-    let after = commit.as_bytes();
-    let profile = commit.profile();
+    let after = commit.package().as_bytes();
+    let profile = commit.package().profile();
     let patch = commit.patch();
     let source_exact = patch.before() == source;
     let output_exact = patch.after() == after && profile.source() == after;

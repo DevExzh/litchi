@@ -6,7 +6,7 @@
 //! body properties, paragraphs with their local paragraph properties, and
 //! runs, line breaks and fields with their local character properties. A host
 //! that streams a larger part forwards the element's descendants to a
-//! builder; [`read`] and [`read_with_options`] drive one over a single element span.
+//! builder; [`read`] drives one over a single element span.
 //!
 //! Property values are *local*: an attribute that is absent stays `None`.
 //! Markup the model does not cover (list styles, effects, outlines,
@@ -27,7 +27,7 @@
 //!     <a:bodyPr/>
 //!     <a:p><a:pPr algn="ctr" lvl="1"/><a:r><a:rPr sz="2400" b="1"/><a:t>Hello</a:t></a:r></a:p>
 //! </p:txBody>"#;
-//! let body = reader::read(xml)?;
+//! let body = reader::read(xml, quick_xml::name::NamespaceResolver::default(), reader::Limits::DEFAULT)?;
 //! let paragraph = &body.paragraphs[0];
 //! assert_eq!(paragraph.properties.alignment, Some(Alignment::Center));
 //! assert_eq!(paragraph.properties.level, Some(1));
@@ -89,7 +89,7 @@ impl Limits {
 
     /// Construct a finite, nonzero limit set.
     ///
-    /// `input_bytes` bounds the element span [`read_with_options`] accepts, `depth`
+    /// `input_bytes` bounds the element span [`read`] accepts, `depth`
     /// the nesting below the text-body element, `nodes` its descendant
     /// elements and `text_bytes` the run and field text the body keeps.
     #[must_use]
@@ -111,7 +111,7 @@ impl Limits {
         }
     }
 
-    /// Largest element span [`read_with_options`] accepts.
+    /// Largest element span [`read`] accepts.
     #[inline]
     #[must_use]
     pub const fn input_bytes(self) -> usize {
@@ -146,8 +146,8 @@ impl Default for Limits {
     }
 }
 
-/// Read one text-body element whose namespace prefixes are all declared
-/// inside it, with [`Limits::DEFAULT`].
+/// Read one text-body element span under an explicit namespace scope and
+/// resource policy.
 ///
 /// `xml` is the complete element, for example `<p:txBody>...</p:txBody>`;
 /// its own name is not interpreted. Markup-compatibility processing is the
@@ -158,10 +158,6 @@ impl Default for Limits {
 /// Returns [`Error::Xml`] or [`Error::Common`] for malformed XML,
 /// [`Error::Invalid`] for an invalid modeled value or a fragment that is not
 /// one element, and [`Error::Limit`] when a bound is exceeded.
-pub fn read(xml: &[u8]) -> Result<Body> {
-    read_with_options(xml, NamespaceResolver::default(), Limits::DEFAULT)
-}
-
 /// Read one text-body element span.
 ///
 /// `scope` holds the namespace bindings the element inherits from the
@@ -173,12 +169,13 @@ pub fn read(xml: &[u8]) -> Result<Body> {
 /// # Errors
 ///
 /// The errors of [`read`], under `limits`.
-pub fn read_with_options(xml: &[u8], scope: NamespaceResolver, limits: Limits) -> Result<Body> {
+pub fn read(xml: &[u8], scope: NamespaceResolver, limits: Limits) -> Result<Body> {
     if xml.len() > limits.input_bytes {
-        return Err(Error::Limit {
-            resource: "text body input bytes",
-            limit: limits.input_bytes,
-        });
+        return Err(Error::limit(
+            crate::LimitKind::InputBytes,
+            xml.len(),
+            limits.input_bytes,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -240,12 +237,10 @@ pub fn read_with_options(xml: &[u8], scope: NamespaceResolver, limits: Limits) -
                 }
             },
             Event::Text(text) if depth > 0 => {
-                let decoded = text
+                let encoded = text
                     .xml_content(XmlVersion::Explicit1_0)
                     .map_err(|_error| Error::Xml("malformed text body XML".into()))?;
-                let decoded = quick_xml::escape::unescape(&decoded)
-                    .map_err(|_error| Error::Xml("malformed text body XML".into()))?;
-                builder.text(&decoded)?;
+                builder.text_xml(&encoded)?;
             },
             Event::CData(text) if depth > 0 => {
                 let decoded = text
@@ -436,10 +431,11 @@ impl<'x> Builder<'x> {
     /// Refuses input larger than the configured physical byte bound.
     pub fn new(document: &'x [u8], limits: Limits) -> Result<Self> {
         if document.len() > limits.input_bytes {
-            return Err(Error::Limit {
-                resource: "text body input bytes",
-                limit: limits.input_bytes,
-            });
+            return Err(Error::limit(
+                crate::LimitKind::InputBytes,
+                document.len(),
+                limits.input_bytes,
+            ));
         }
         Ok(Self {
             document,
@@ -555,20 +551,54 @@ impl<'x> Builder<'x> {
     /// Returns [`Error::Limit`] when the kept text exceeds
     /// [`Limits::text_bytes`].
     pub fn text(&mut self, text: &str) -> Result<()> {
-        if self.skipped > 0 || self.frames.last() != Some(&Frame::Text) {
-            if !text
-                .trim_matches(|c| matches!(c, ' ' | '\n' | '\r' | '\t'))
-                .is_empty()
-            {
-                self.body.properties.has_unmodeled_content = true;
-            }
+        if !self.keeps_text() {
+            self.note_text_content(text);
             return Ok(());
         }
         self.charge_text(text.len())?;
+        self.append_text(text);
+        Ok(())
+    }
+
+    /// Read XML character data after checking its decoded size.
+    ///
+    /// XML entity expansion is intentionally accounted for in decoded UTF-8
+    /// bytes.  The budget check runs before `unescape` can allocate an
+    /// expanded `String`, while valid escaped text keeps its historical
+    /// semantic value.
+    fn text_xml(&mut self, encoded: &str) -> Result<()> {
+        let decoded_bytes = unescaped_text_len(encoded)?;
+        let keeps_text = self.keeps_text();
+        if keeps_text {
+            self.charge_text(decoded_bytes)?;
+        }
+        let decoded = quick_xml::escape::unescape(encoded)
+            .map_err(|_error| Error::Xml("malformed text body XML".into()))?;
+        if keeps_text {
+            self.append_text(&decoded);
+        } else {
+            self.note_text_content(&decoded);
+        }
+        Ok(())
+    }
+
+    fn keeps_text(&self) -> bool {
+        self.skipped == 0 && self.frames.last() == Some(&Frame::Text)
+    }
+
+    fn append_text(&mut self, text: &str) {
         if let Some(run) = self.run.as_mut() {
             run.text.push_str(text);
         }
-        Ok(())
+    }
+
+    fn note_text_content(&mut self, text: &str) {
+        if !text
+            .trim_matches(|c| matches!(c, ' ' | '\n' | '\r' | '\t'))
+            .is_empty()
+        {
+            self.body.properties.has_unmodeled_content = true;
+        }
     }
 
     /// Finish the body.
@@ -588,9 +618,12 @@ impl<'x> Builder<'x> {
             .text_bytes
             .checked_add(bytes)
             .filter(|next| *next <= self.limits.text_bytes)
-            .ok_or(Error::Limit {
-                resource: "text body text bytes",
-                limit: self.limits.text_bytes,
+            .ok_or_else(|| {
+                Error::limit(
+                    crate::LimitKind::TextBytes,
+                    self.text_bytes.saturating_add(bytes),
+                    self.limits.text_bytes,
+                )
             })?;
         Ok(())
     }
@@ -732,19 +765,23 @@ impl<'x> Builder<'x> {
             .nodes
             .checked_add(1)
             .filter(|nodes| *nodes <= self.limits.nodes)
-            .ok_or(Error::Limit {
-                resource: "text body elements",
-                limit: self.limits.nodes,
+            .ok_or_else(|| {
+                Error::limit(
+                    crate::LimitKind::TextBodyElements,
+                    self.nodes.saturating_add(1),
+                    self.limits.nodes,
+                )
             })?;
         Ok(())
     }
 
     fn check_depth(&self, frames: usize) -> Result<()> {
         if frames.saturating_add(self.skipped) > self.limits.depth {
-            return Err(Error::Limit {
-                resource: "text body nesting depth",
-                limit: self.limits.depth,
-            });
+            return Err(Error::limit(
+                crate::LimitKind::TextBodyNestingDepth,
+                frames.saturating_add(self.skipped),
+                self.limits.depth,
+            ));
         }
         Ok(())
     }
@@ -1175,9 +1212,18 @@ impl<'x> Builder<'x> {
                 // 100%, which producers write, is refused), so a fragment
                 // it refuses is kept as written rather than failing the
                 // body.
-                let value = match color::read(fragment) {
+                let color_limits = color::Limits::new(
+                    self.limits.input_bytes().min(color::MAX_XML_BYTES).max(1),
+                    self.limits.depth().min(color::MAX_DEPTH).max(1),
+                    self.limits.nodes().min(color::MAX_NODES).max(1),
+                    self.limits.nodes().min(color::MAX_TRANSFORMS).max(1),
+                );
+                let value = match color::read(fragment, &color_limits) {
                     Ok(value) => Some(value),
-                    Err(_) => self.checked(color::Value::unknown(fragment))?,
+                    Err(error @ (Error::Limit { .. } | Error::InvalidLimit { .. })) => {
+                        return Err(error);
+                    },
+                    Err(_) => self.checked(color::Value::unknown(fragment, &color_limits))?,
                 };
                 if let Some(value) = value {
                     self.set_color(target, value);
@@ -1555,6 +1601,31 @@ fn decode<'v>(attribute: &Attribute<'v>, decoder: Decoder) -> Result<Cow<'v, str
         .map_err(|_error| {
             Error::Common(XmlError::Malformed("malformed text body attribute".into()))
         })
+}
+
+fn unescaped_text_len(encoded: &str) -> Result<usize> {
+    let mut total = 0usize;
+    let mut offset = 0usize;
+    while let Some(relative) = encoded[offset..].find('&') {
+        let ampersand = offset + relative;
+        total = total
+            .checked_add(ampersand.saturating_sub(offset))
+            .ok_or_else(|| Error::Xml("text body decoded text length overflows".into()))?;
+        let end = encoded[ampersand + 1..]
+            .find(';')
+            .map(|relative| ampersand + 1 + relative + 1)
+            .ok_or_else(|| Error::Xml("malformed text body XML".into()))?;
+        let entity = quick_xml::escape::unescape(&encoded[ampersand..end])
+            .map_err(|_error| Error::Xml("malformed text body XML".into()))?;
+        total = total
+            .checked_add(entity.len())
+            .ok_or_else(|| Error::Xml("text body decoded text length overflows".into()))?;
+        offset = end;
+    }
+    total = total
+        .checked_add(encoded.len().saturating_sub(offset))
+        .ok_or_else(|| Error::Xml("text body decoded text length overflows".into()))?;
+    Ok(total)
 }
 
 fn invalid(message: impl Into<String>) -> Error {

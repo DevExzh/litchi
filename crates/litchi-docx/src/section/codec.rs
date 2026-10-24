@@ -45,7 +45,7 @@ use crate::header_footer::Kind;
 use crate::leniency::{SectionDefect, ToleranceReport};
 use crate::namespace::is_wordprocessing_namespace;
 use litchi_core::xml::ReaderOrigin;
-use litchi_drawingml::coordinate::{Coordinate, Unit};
+use litchi_drawingml::coordinate::{Coordinate, ParseError as CoordinateParseError, Unit};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::SeenNames;
 use litchi_ooxml_common::xml_name::{is_ncname, is_qualified_name};
@@ -1314,8 +1314,17 @@ fn parse_measurement(value: &str, description: &str, signed: bool, page_size: bo
 /// section domain check remains at the caller so signed/page-size context is
 /// preserved.
 pub(crate) fn parse_universal_twips(value: &str, description: &str) -> Result<i64> {
-    let measure = Coordinate::parse(value).map_err(|_source_error| {
-        Error::InvalidFormat(format!("invalid {description} universal measure '{value}'"))
+    let measure = Coordinate::parse(value).map_err(|error| match error {
+        CoordinateParseError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Drawing(litchi_drawingml::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        }),
+        _ => Error::InvalidFormat(format!("invalid {description} universal measure")),
     })?;
     let number = measure.number().ok_or_else(|| {
         Error::InvalidFormat(format!("invalid {description} universal measure '{value}'"))

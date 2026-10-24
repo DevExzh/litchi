@@ -1,5 +1,5 @@
 use super::*;
-use crate::chart::edit::Snapshot;
+use crate::chart::edit::Package;
 use crate::chart::reader;
 
 fn sales(variant: Variant) -> Spec {
@@ -51,7 +51,7 @@ fn every_variant_round_trips_through_the_reader() {
                 for binding in [Binding::Literal, Binding::sheet("Sheet1")] {
                     let spec = spec.clone().with_binding(binding.clone());
                     let xml = spec.to_xml(Some("rId1")).unwrap();
-                    let chart = reader::read(&xml[..]).unwrap();
+                    let chart = reader::read(&xml[..], &crate::chart::Limits::DEFAULT).unwrap();
                     assert_eq!(
                         Variant::of(&chart),
                         Some(variant),
@@ -63,7 +63,7 @@ fn every_variant_round_trips_through_the_reader() {
                     // Deterministic: the same spec writes the same bytes.
                     assert_eq!(xml, spec.to_xml(Some("rId1")).unwrap());
                     // The source-preserving editor accepts every authored part.
-                    Snapshot::from_xml(xml).unwrap();
+                    Package::from_xml(xml).unwrap();
                 }
             }
         }
@@ -75,7 +75,11 @@ fn stock_charts_need_three_or_four_series() {
     let spec = sales(Variant::new(Kind::Stock));
     assert!(spec.validate().is_err());
     let spec = spec.with_series(Series::new("Close", vec![1.0, 2.0, 3.0, 4.0]));
-    let chart = reader::read(&spec.to_xml(None).unwrap()[..]).unwrap();
+    let chart = reader::read(
+        &spec.to_xml(None).unwrap()[..],
+        &crate::chart::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(Variant::of(&chart), Some(Variant::new(Kind::Stock)));
 }
 
@@ -124,7 +128,7 @@ fn source_preserving_edits_change_title_legend_axes_and_data() {
     let spec = sales(Variant::new(Kind::Column))
         .with_binding(Binding::sheet("Sheet1"))
         .with_value_axis_title("Units");
-    let snapshot = Snapshot::from_xml(spec.to_xml(Some("rId1")).unwrap()).unwrap();
+    let snapshot = Package::from_xml(spec.to_xml(Some("rId1")).unwrap()).unwrap();
     let mut edit = snapshot.edit();
     edit.set_title(Some(TitleText::from_string("Revenue")))
         .unwrap();
@@ -137,7 +141,7 @@ fn source_preserving_edits_change_title_legend_axes_and_data() {
     edit.set_series_values(0, &[1.0, 2.0, 3.0]).unwrap();
     edit.set_categories(&["A".into(), "B".into(), "C".into()])
         .unwrap();
-    let after = edit.commit().unwrap().into_snapshot();
+    let after = edit.commit().unwrap().into_package();
     let chart = after.value();
     assert_eq!(text(chart.title.as_ref()).as_deref(), Some("Revenue"));
     assert_eq!(
@@ -164,21 +168,21 @@ fn source_preserving_edits_change_title_legend_axes_and_data() {
 
     let mut edit = after.edit();
     edit.set_legend(None).unwrap();
-    let hidden = edit.commit().unwrap().into_snapshot();
+    let hidden = edit.commit().unwrap().into_package();
     assert!(hidden.value().legend.is_none());
     // An exact no-op keeps the bytes.
     let mut edit = hidden.edit();
     edit.set_legend(None).unwrap();
-    assert!(!edit.is_changed());
+    assert!(!edit.commit().unwrap().diagnostics().changed());
 }
 
 #[test]
 fn literal_data_is_rewritten_in_place() {
     let spec = sales(Variant::new(Kind::Line));
-    let snapshot = Snapshot::from_xml(spec.to_xml(None).unwrap()).unwrap();
+    let snapshot = Package::from_xml(spec.to_xml(None).unwrap()).unwrap();
     let mut edit = snapshot.edit();
     edit.set_series_values(1, &[7.0, 8.0]).unwrap();
-    let after = edit.commit().unwrap().into_snapshot();
+    let after = edit.commit().unwrap().into_package();
     let series = &after.value().plot_area.type_groups[0].common().series;
     assert_eq!(series[1].values.as_ref().unwrap().values, vec![7.0, 8.0]);
     assert!(series[1].values.as_ref().unwrap().source_ref.is_none());
@@ -250,7 +254,7 @@ fn appearance_options_reach_the_chart_part() {
     ] {
         assert!(xml.contains(needle), "{needle} in {xml}");
     }
-    let chart = reader::read(xml.as_bytes()).unwrap();
+    let chart = reader::read(xml.as_bytes(), &crate::chart::Limits::DEFAULT).unwrap();
     assert!(chart.legend.unwrap().overlay);
 
     let pie = Spec::new(Variant::new(Kind::Doughnut))
@@ -315,7 +319,11 @@ fn combo_charts_group_series_by_family() {
             view_3d: Some((15, 20, Some(30))),
             ..Appearance::default()
         });
-    let chart = reader::read(&spec.to_xml(None).unwrap()[..]).unwrap();
+    let chart = reader::read(
+        &spec.to_xml(None).unwrap()[..],
+        &crate::chart::Limits::DEFAULT,
+    )
+    .unwrap();
     assert_eq!(Variant::of(&chart), Some(Variant::new(Kind::Combo)));
     assert_eq!(chart.plot_area.type_groups.len(), 2);
     assert_eq!(chart.plot_area.type_groups[0].common().series.len(), 2);
@@ -364,7 +372,7 @@ fn series_colors_override_the_palette_and_tint_whole_pies() {
     assert!(xml.contains(r#"<a:srgbClr val="222222"/>"#));
     assert!(xml.contains(r#"<a:srgbClr val="00FF00"><a:alpha val="50196"/></a:srgbClr>"#));
     assert_eq!(xml, String::from_utf8(spec.to_xml(None).unwrap()).unwrap());
-    let chart = reader::read(xml.as_bytes()).unwrap();
+    let chart = reader::read(xml.as_bytes(), &crate::chart::Limits::DEFAULT).unwrap();
     let series = &chart.plot_area.type_groups[0].common().series;
     assert!(
         series
@@ -383,7 +391,7 @@ fn series_colors_override_the_palette_and_tint_whole_pies() {
     let xml = String::from_utf8(pie.to_xml(None).unwrap()).unwrap();
     assert_eq!(xml.matches("<c:dPt>").count(), 2, "{xml}");
     assert!(xml.contains(r#"<a:srgbClr val="4472C4"/>"#));
-    let chart = reader::read(xml.as_bytes()).unwrap();
+    let chart = reader::read(xml.as_bytes(), &crate::chart::Limits::DEFAULT).unwrap();
     assert!(
         chart.plot_area.type_groups[0].common().series[0]
             .shape_properties
@@ -432,11 +440,14 @@ fn every_variant_reads_back_as_its_authored_spec() {
                 ] {
                     let spec = spec.clone().with_binding(binding.clone());
                     let xml = spec.to_xml(external).unwrap();
-                    let parsed = read(&xml).unwrap();
+                    let parsed = read(&xml, &crate::chart::Limits::DEFAULT).unwrap();
                     assert_eq!(parsed.spec.variant(), variant);
                     assert_eq!(parsed.spec.binding(), &binding, "{variant:?}");
                     assert_eq!(parsed.external_data.as_deref(), external);
-                    assert!(parsed.is_authored(&xml), "{variant:?} {binding:?}");
+                    assert!(
+                        parsed.is_authored(&xml, &crate::chart::Limits::DEFAULT),
+                        "{variant:?} {binding:?}"
+                    );
                 }
             }
         }
@@ -468,8 +479,8 @@ fn formatting_reads_back_into_the_spec() {
     let mut spec = spec;
     spec.series[1].color = Some("ED7D31".into());
     let xml = spec.to_xml(None).unwrap();
-    let parsed = read(&xml).unwrap();
-    assert!(parsed.is_authored(&xml));
+    let parsed = read(&xml, &crate::chart::Limits::DEFAULT).unwrap();
+    assert!(parsed.is_authored(&xml, &crate::chart::Limits::DEFAULT));
     assert_eq!(parsed.spec.appearance(), &appearance);
     assert_eq!(parsed.spec.series()[1].color.as_deref(), Some("ED7D31"));
     assert_eq!(parsed.spec.category_axis_title(), Some("Quarter"));
@@ -481,7 +492,7 @@ fn formatting_reads_back_into_the_spec() {
         .with_variant(Variant::new(Kind::Bar))
         .to_xml(None)
         .unwrap();
-    let rebuilt = read(&bar).unwrap();
+    let rebuilt = read(&bar, &crate::chart::Limits::DEFAULT).unwrap();
     assert_eq!(rebuilt.spec.variant().kind, Kind::Bar);
     assert_eq!(rebuilt.spec.series(), parsed.spec.series());
 
@@ -496,15 +507,15 @@ fn formatting_reads_back_into_the_spec() {
             ..Appearance::default()
         });
     let xml = pie.to_xml(None).unwrap();
-    let parsed = read(&xml).unwrap();
-    assert!(parsed.is_authored(&xml));
+    let parsed = read(&xml, &crate::chart::Limits::DEFAULT).unwrap();
+    assert!(parsed.is_authored(&xml, &crate::chart::Limits::DEFAULT));
     assert_eq!(parsed.spec.appearance().colors.len(), 3);
 
     let combo = sales(Variant::new(Kind::Combo)).with_series_kinds(vec![Kind::Column, Kind::Line]);
     let xml = combo.to_xml(None).unwrap();
-    let parsed = read(&xml).unwrap();
+    let parsed = read(&xml, &crate::chart::Limits::DEFAULT).unwrap();
     assert_eq!(parsed.spec.series_kinds(), [Kind::Column, Kind::Line]);
-    assert!(parsed.is_authored(&xml));
+    assert!(parsed.is_authored(&xml, &crate::chart::Limits::DEFAULT));
 }
 
 #[test]
@@ -517,6 +528,6 @@ fn foreign_formatting_is_not_authored() {
         r#"<c:roundedCorners val="1"/>"#,
     );
     assert_ne!(foreign, xml);
-    let parsed = read(foreign.as_bytes()).unwrap();
-    assert!(!parsed.is_authored(foreign.as_bytes()));
+    let parsed = read(foreign.as_bytes(), &crate::chart::Limits::DEFAULT).unwrap();
+    assert!(!parsed.is_authored(foreign.as_bytes(), &crate::chart::Limits::DEFAULT));
 }

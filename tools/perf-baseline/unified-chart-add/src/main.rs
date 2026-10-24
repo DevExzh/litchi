@@ -204,10 +204,10 @@ fn native_once(owner: &Native, count: usize) -> Result<Native> {
 fn native_set(owner: &Native) -> Result<Native> {
     use litchi_drawingml::chart::TitleText;
     let retitle = |xml: Vec<u8>| -> Result<Vec<u8>> {
-        let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)?;
+        let snapshot = litchi_drawingml::chart::edit::Package::from_xml(xml)?;
         let mut edit = snapshot.edit();
         edit.set_title(Some(TitleText::from_string("Revenue")))?;
-        Ok(edit.commit()?.into_snapshot().xml_bytes().to_vec())
+        Ok(edit.commit()?.into_package().xml_bytes().to_vec())
     };
     Ok(match owner {
         Native::Pptx(base) => {

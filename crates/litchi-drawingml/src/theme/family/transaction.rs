@@ -2,44 +2,55 @@
 
 use std::sync::Arc;
 
-use crate::{Error, Result};
+use crate::Error;
+use crate::Result;
 
 use super::{Family, codec};
 
+pub use crate::LimitKind;
+pub use litchi_core::edit::Diagnostics;
+
 /// An immutable, cheap-to-share Theme Family source snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
+pub struct Package {
     xml: Arc<[u8]>,
     value: Family,
+    limits: codec::Limits,
 }
 
-impl Snapshot {
+impl Package {
     /// Parse and retain a bounded Theme Family fragment.
     ///
     /// Validation precedes the source copy. Already shared callers can use
     /// [`Self::from_shared_xml`] to retain their existing allocation.
-    pub fn from_xml(xml: impl AsRef<[u8]>) -> Result<Self> {
-        let value = codec::read(xml.as_ref())?;
+    pub fn from_xml(xml: impl AsRef<[u8]>, limits: codec::Limits) -> Result<Self> {
+        let value = codec::read(xml.as_ref(), limits)?;
         let source = value.source_state().ok_or_else(|| {
             Error::Invalid("theme family reader did not retain its source".into())
         })?;
         let xml = Arc::clone(&source.xml);
-        Ok(Self { xml, value })
+        Ok(Self { xml, value, limits })
     }
 
     /// Parse and retain an already shared Theme Family fragment allocation.
-    pub fn from_shared_xml(xml: Arc<[u8]>) -> Result<Self> {
-        let value = codec::read_shared(Arc::clone(&xml))?;
-        Ok(Self { xml, value })
+    pub fn from_shared_xml(xml: Arc<[u8]>, limits: codec::Limits) -> Result<Self> {
+        let value = codec::read_shared(Arc::clone(&xml), limits)?;
+        Ok(Self { xml, value, limits })
     }
 
     /// Create a source snapshot from a typed family.
     ///
     /// Detached values use canonical XML. Parsed values retain their source
     /// and apply any staged scalar changes without discarding opaque markup.
-    pub fn new(value: Family) -> Result<Self> {
-        let xml = codec::write(&value)?;
-        Self::from_xml(xml)
+    pub fn new(value: Family, limits: codec::Limits) -> Result<Self> {
+        let xml = codec::write(&value, limits)?;
+        Self::from_shared_xml(Arc::from(xml.into_boxed_slice()), limits)
+    }
+
+    /// Borrow the policy which admitted and will constrain this package.
+    #[must_use]
+    pub const fn limits(&self) -> codec::Limits {
+        self.limits
     }
 
     /// Borrow the exact source bytes retained by this snapshot.
@@ -67,14 +78,14 @@ impl Snapshot {
 /// A detached Theme Family edit that is not visible until commit.
 #[derive(Debug, Clone)]
 pub struct Edit {
-    before: Snapshot,
+    before: Package,
     staged: Family,
 }
 
 impl Edit {
     /// Borrow the immutable source snapshot used for stale and inverse checks.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub const fn before(&self) -> &Package {
         &self.before
     }
 
@@ -111,23 +122,18 @@ impl Edit {
         Ok(self)
     }
 
-    /// Whether staged semantic fields differ from the source snapshot.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.before.value.semantic_eq(&self.staged)
-    }
-
     /// Validate and publish the edit with an exact reversible source patch.
     pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
-            return Ok(Commit {
-                snapshot: self.before.clone(),
-                patch: Patch {
+        let changed = !self.before.value.semantic_eq(&self.staged);
+        if !changed {
+            return Ok(Commit::new(
+                self.before.clone(),
+                Patch {
                     before: self.before.clone(),
                     after: self.before.clone(),
                 },
-                changed: false,
-            });
+                Diagnostics::UNCHANGED,
+            ));
         }
 
         let mut source_value = self.before.value.clone();
@@ -140,64 +146,24 @@ impl Edit {
         if source_value.variant_id() != self.staged.variant_id() {
             source_value.set_variant_id(self.staged.variant_id().as_str())?;
         }
-        let xml = codec::write(&source_value)?;
-        let snapshot = Snapshot::from_xml(xml)?;
-        if snapshot.value() != &self.staged {
+        let xml = codec::write(&source_value, self.before.limits)?;
+        let package =
+            Package::from_shared_xml(Arc::from(xml.into_boxed_slice()), self.before.limits)?;
+        if package.value() != &self.staged {
             return Err(Error::Invalid(
                 "theme family edit read-back did not match staged fields".into(),
             ));
         }
         let patch = Patch {
             before: self.before.clone(),
-            after: snapshot.clone(),
+            after: package.clone(),
         };
-        Ok(Commit {
-            snapshot,
-            patch,
-            changed: true,
-        })
+        Ok(Commit::new(package, patch, Diagnostics::CHANGED))
     }
 }
 
 /// A successful Theme Family publication.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    /// Whether the publication changed any bytes.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Borrow the resulting snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Move the resulting snapshot out of this commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Borrow the exact reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Move the reversible patch out of this commit.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-}
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 /// An exact-source-checked and reversible Theme Family patch.
 ///
@@ -207,8 +173,8 @@ impl Commit {
 /// and three-way merging are not provided by this fragment owner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Patch {
-    before: Snapshot,
-    after: Snapshot,
+    before: Package,
+    after: Package,
 }
 
 impl Patch {
@@ -233,18 +199,44 @@ impl Patch {
         }
     }
 
+    /// Whether this patch preserves the exact source bytes and semantics.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        (Arc::ptr_eq(&self.before.xml, &self.after.xml)
+            || self.before.xml.as_ref() == self.after.xml.as_ref())
+            && self.before.value.semantic_eq(&self.after.value)
+    }
+
     /// Apply this patch only to the exact source snapshot from which it came.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    fn apply(&self, source: &Package) -> Result<Package> {
         if !Arc::ptr_eq(&source.xml, &self.before.xml)
             && source.xml.as_ref() != self.before.xml.as_ref()
         {
-            return Err(Error::Invalid(
-                "theme family patch source does not match its byte precondition".into(),
-            ));
+            return Err(Error::PatchConflict);
         }
         if Arc::ptr_eq(&self.before.xml, &self.after.xml) {
             return Ok(source.clone());
         }
-        Ok(self.after.clone())
+        // Re-read changed bytes under the recipient's retained policy before
+        // publication. A patch created under a wider policy cannot silently
+        // widen the recipient or bypass its structural/value limits.
+        let value = codec::read_shared(Arc::clone(&self.after.xml), source.limits)?;
+        Ok(Package {
+            xml: Arc::clone(&self.after.xml),
+            value,
+            limits: source.limits,
+        })
+    }
+}
+
+impl Package {
+    /// Replay a patch against this exact package and publish a commit triad.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
+        let package = patch.apply(self)?;
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 }

@@ -107,7 +107,9 @@ fn observe_alloc(size: usize) {
 
 fn observe_growth(size: usize) {
     let size = as_u64(size);
-    let live = LIVE_BYTES.fetch_add(size, Ordering::Relaxed).saturating_add(size);
+    let live = LIVE_BYTES
+        .fetch_add(size, Ordering::Relaxed)
+        .saturating_add(size);
     let mut old = PEAK_BYTES.load(Ordering::Relaxed);
     while live > old {
         match PEAK_BYTES.compare_exchange_weak(old, live, Ordering::Relaxed, Ordering::Relaxed) {
@@ -240,19 +242,26 @@ struct Inputs {
 impl Inputs {
     fn load(path: &str) -> Result<Self> {
         let native = fs::read(path)?;
-        let snapshot = part::read(&native)?;
-        let family = snapshot.family().ok_or("native fixture has no family")?.clone();
+        let snapshot = part::read(&native, part::Limits::DEFAULT)?;
+        let family = snapshot
+            .family()
+            .ok_or("native fixture has no family")?
+            .clone();
         let mut updated = family.clone();
         updated.set_name(MAX_NAME)?;
-        let family_free = part::remove_family(&native)?;
+        let family_free = part::remove_family(&native, part::Limits::DEFAULT)?;
         let unknown_32 = unknown_theme(&family_free, 32, 200)?;
         let unknown_1000 = unknown_theme(&family_free, 1000, 200)?;
         let fragment = raw_family_fragment(&native)?;
         let duplicate = duplicate_theme(&native, &fragment)?;
         let checks = [
-            part::read(&unknown_32)?.family().is_none(),
-            part::read(&unknown_1000)?.family().is_none(),
-            part::read(&duplicate).is_err(),
+            part::read(&unknown_32, part::Limits::DEFAULT)?
+                .family()
+                .is_none(),
+            part::read(&unknown_1000, part::Limits::DEFAULT)?
+                .family()
+                .is_none(),
+            part::read(&duplicate, part::Limits::DEFAULT).is_err(),
         ];
         if checks != [true, true, true] {
             return Err("hardening fixture semantic preflight failed".into());
@@ -294,7 +303,10 @@ fn unknown_theme(source: &[u8], count: usize, bindings: usize) -> Result<Vec<u8>
         .ok_or("theme root close missing")?;
     let mut declarations = String::new();
     for index in 0..bindings {
-        write!(&mut declarations, " xmlns:p{index}=\"urn:litchi:scope:{index}\"")?;
+        write!(
+            &mut declarations,
+            " xmlns:p{index}=\"urn:litchi:scope:{index}\""
+        )?;
     }
     let mut body = String::with_capacity(count * 180);
     for index in 0..count {
@@ -303,9 +315,7 @@ fn unknown_theme(source: &[u8], count: usize, bindings: usize) -> Result<Vec<u8>
             "<u:themeFamily xmlns:u=\"urn:litchi:unknown-family:{index}\" name=\"F{index}\" id=\"{NATIVE_ID}\" vid=\"{NATIVE_VID}\"/>"
         )?;
     }
-    let extension = format!(
-        "<a:extLst><a:ext uri=\"{UNKNOWN_URI}\">{body}</a:ext></a:extLst>"
-    );
+    let extension = format!("<a:extLst><a:ext uri=\"{UNKNOWN_URI}\">{body}</a:ext></a:extLst>");
     let mut root = source.to_vec();
     let open = root
         .windows(b"<a:theme".len())
@@ -340,44 +350,56 @@ fn duplicate_theme(source: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
 fn operation(inputs: &Inputs, lane: &str) -> Result<(bool, bool)> {
     match lane {
         "native_read" => {
-            let parsed = part::read(&inputs.native)?;
+            let parsed = part::read(&inputs.native, part::Limits::DEFAULT)?;
             Ok((true, parsed.family().is_some()))
         },
         "native_replace" => {
-            let output = part::replace_family_with_limit(
-                &inputs.native,
-                &inputs.updated,
-                part::MAX_XML_BYTES,
-            )?;
-            let parsed = part::read(&output)?;
+            let output =
+                part::replace_family(&inputs.native, &inputs.updated, part::Limits::DEFAULT)?;
+            let parsed = part::read(&output, part::Limits::DEFAULT)?;
             Ok((true, parsed.family().is_some_and(|f| f.name() == MAX_NAME)))
         },
         "native_remove" => {
-            let output = part::remove_family_with_limit(&inputs.native, part::MAX_XML_BYTES)?;
-            let parsed = part::read(&output)?;
+            let output = part::remove_family(&inputs.native, part::Limits::DEFAULT)?;
+            let parsed = part::read(&output, part::Limits::DEFAULT)?;
             Ok((true, parsed.family().is_none()))
         },
         "native_add" => {
-            let output = part::add_family_with_uri_limit(
+            let output = part::add_family_with_uri(
                 &inputs.family_free,
                 &inputs.family,
                 part::NATIVE_EXTENSION_URI,
-                part::MAX_XML_BYTES,
+                part::Limits::DEFAULT,
             )?;
-            let parsed = part::read(&output)?;
+            let parsed = part::read(&output, part::Limits::DEFAULT)?;
             Ok((true, parsed.family().is_some()))
         },
         "unknown_32" => {
-            let parsed = part::read(&inputs.unknown_32)?;
+            let parsed = part::read(&inputs.unknown_32, part::Limits::DEFAULT)?;
             Ok((true, parsed.family().is_none()))
         },
         "unknown_1000" => {
-            let parsed = part::read(&inputs.unknown_1000)?;
+            let parsed = part::read(&inputs.unknown_1000, part::Limits::DEFAULT)?;
             Ok((true, parsed.family().is_none()))
         },
-        "duplicate" => Ok((false, part::read(&inputs.duplicate).is_ok())),
-        "limit_replace" => Ok((false, part::replace_family_with_limit(&inputs.native, &inputs.updated, 1).is_ok())),
-        "limit_add" => Ok((false, part::add_family_with_uri_limit(&inputs.family_free, &inputs.family, part::NATIVE_EXTENSION_URI, 1).is_ok())),
+        "duplicate" => Ok((
+            false,
+            part::read(&inputs.duplicate, part::Limits::DEFAULT).is_ok(),
+        )),
+        "limit_replace" => Ok((
+            false,
+            part::replace_family(&inputs.native, &inputs.updated, part::Limits::new(1)).is_ok(),
+        )),
+        "limit_add" => Ok((
+            false,
+            part::add_family_with_uri(
+                &inputs.family_free,
+                &inputs.family,
+                part::NATIVE_EXTENSION_URI,
+                part::Limits::new(1),
+            )
+            .is_ok(),
+        )),
         other => Err(format!("unknown lane {other}").into()),
     }
 }
@@ -387,7 +409,9 @@ fn run_lane(inputs: &Inputs, lane: &str, warmup: usize, samples: usize) -> Resul
     for _ in 0..warmup {
         let (expected, actual) = operation(inputs, lane)?;
         if expected != expected_success || actual != expected_success {
-            return Err(format!("warmup expectation failed for {lane}: {expected} {actual}").into());
+            return Err(
+                format!("warmup expectation failed for {lane}: {expected} {actual}").into(),
+            );
         }
     }
     let mut values = Vec::with_capacity(samples);
@@ -405,7 +429,9 @@ fn run_lane(inputs: &Inputs, lane: &str, warmup: usize, samples: usize) -> Resul
         let after = AllocSnapshot::now();
         let alloc = before.delta(after);
         if expected != expected_success || actual != expected_success {
-            return Err(format!("sample expectation failed for {lane}: {expected} {actual}").into());
+            return Err(
+                format!("sample expectation failed for {lane}: {expected} {actual}").into(),
+            );
         }
         if alloc.invalid || alloc.failed != 0 || !alloc.balanced() {
             return Err(format!("allocator accounting failed for {lane}").into());
@@ -421,7 +447,8 @@ fn run_lane(inputs: &Inputs, lane: &str, warmup: usize, samples: usize) -> Resul
     write!(
         &mut json,
         "{{\"schema\":\"theme-family-hardening-profile-v1\",\"lane\":\"{lane}\",\"warmup\":{warmup},\"sample_count\":{},\"expected_success\":{},\"samples\":[",
-        values.len(), expected_success
+        values.len(),
+        expected_success
     )?;
     for (index, sample) in values.iter().enumerate() {
         if index != 0 {
@@ -466,7 +493,9 @@ fn main() -> Result<()> {
             "--warmup" => warmup = args.next().ok_or("missing --warmup value")?.parse()?,
             "--samples" => samples = args.next().ok_or("missing --samples value")?.parse()?,
             "--help" | "-h" => {
-                println!("--fixture PATH --lane <native_read|native_replace|native_remove|native_add|unknown_32|unknown_1000|duplicate|limit_replace|limit_add> [--warmup N] [--samples N]");
+                println!(
+                    "--fixture PATH --lane <native_read|native_replace|native_remove|native_add|unknown_32|unknown_1000|duplicate|limit_replace|limit_add> [--warmup N] [--samples N]"
+                );
                 return Ok(());
             },
             other => return Err(format!("unknown argument {other}").into()),

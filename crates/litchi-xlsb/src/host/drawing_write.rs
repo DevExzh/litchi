@@ -123,7 +123,13 @@ pub(crate) fn serialize_drawing(
         .ok_or(Error::InvalidFormula(
             "worksheet drawing object ID overflow",
         ))?;
-    let mut emitter = Emitter::for_objects(first_shape_id, shapes, groups, connections)?;
+    let mut emitter = Emitter::for_objects(
+        first_shape_id,
+        shapes,
+        groups,
+        connections,
+        litchi_drawingml::geometry::Limits::DEFAULT,
+    )?;
     for shape in shapes {
         emitter.write_anchored_shape(&mut xml, shape)?;
         ensure_drawing_size(xml.len())?;

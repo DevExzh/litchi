@@ -117,15 +117,19 @@ fn main() -> Outcome<()> {
         || {
             let mut edit = package.edit()?;
             let parts = edit.smartart_parts(&diagram)?.ok_or("the graphic")?;
-            let outline = Outline::read(&parts.data)?;
-            let mut spec =
-                Spec::recognize(&outline, &parts.data, &parts.layout)?.ok_or("authored")?;
+            let limits = litchi_drawingml::diagram::Limits::default();
+            let outline = Outline::read(&parts.data, &limits)?;
+            let mut spec = Spec::recognize(&outline, &parts.data, &parts.layout, &limits)?
+                .ok_or("authored")?;
             spec.nodes_mut()[0].text = "Design".to_owned();
             let relationship = outline.drawing_relationship.as_deref().unwrap_or("rId0");
             let mut next = parts.clone();
-            next.data = spec.data_xml(Some(relationship))?.into_bytes();
-            next.layout = spec.layout_xml().into_bytes();
-            next.drawing = Some(spec.drawing_xml(5_760_000, 3_240_000)?.into_bytes());
+            next.data = spec.data_xml(Some(relationship), &limits)?.into_bytes();
+            next.layout = spec.layout_xml(&limits)?.into_bytes();
+            next.drawing = Some(
+                spec.drawing_xml(5_760_000, 3_240_000, &limits)?
+                    .into_bytes(),
+            );
             edit.set_smartart(&diagram, next)?;
             Ok(edit.commit()?.into_package())
         },
@@ -136,10 +140,10 @@ fn main() -> Outcome<()> {
         || {
             let mut edit = package.edit()?;
             let (xml, _) = edit.chart_parts(&chart)?.ok_or("the chart")?;
-            let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)?;
+            let snapshot = litchi_drawingml::chart::edit::Package::from_xml(xml)?;
             let mut chart_edit = snapshot.edit();
             chart_edit.set_series_color(0, Some("70AD47"))?;
-            let xml = chart_edit.commit()?.into_snapshot().xml_bytes().to_vec();
+            let xml = chart_edit.commit()?.into_package().xml_bytes().to_vec();
             edit.set_chart(&chart, xml, None)?;
             Ok(edit.commit()?.into_package())
         },
@@ -155,16 +159,19 @@ fn main() -> Outcome<()> {
         || {
             let mut edit = package.edit()?;
             let (xml, _) = edit.chart_parts(&chart)?.ok_or("the chart")?;
-            let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)?;
-            let axis = litchi_drawingml::chart::reader::read(snapshot.xml_bytes())?
-                .plot_area
-                .axes
-                .iter()
-                .find_map(|axis| match axis {
-                    litchi_drawingml::chart::Axis::Value(axis) => Some(axis.common.axis_id),
-                    _ => None,
-                })
-                .ok_or("a value axis")?;
+            let snapshot = litchi_drawingml::chart::edit::Package::from_xml(xml)?;
+            let axis = litchi_drawingml::chart::reader::read(
+                snapshot.xml_bytes(),
+                &litchi_drawingml::chart::Limits::DEFAULT,
+            )?
+            .plot_area
+            .axes
+            .iter()
+            .find_map(|axis| match axis {
+                litchi_drawingml::chart::Axis::Value(axis) => Some(axis.common.axis_id),
+                _ => None,
+            })
+            .ok_or("a value axis")?;
             let mut chart_edit = snapshot.edit();
             chart_edit.set_axis_title(
                 axis,
@@ -172,7 +179,7 @@ fn main() -> Outcome<()> {
                     "Units".to_owned(),
                 )),
             )?;
-            let xml = chart_edit.commit()?.into_snapshot().xml_bytes().to_vec();
+            let xml = chart_edit.commit()?.into_package().xml_bytes().to_vec();
             edit.set_chart(&chart, xml, None)?;
             Ok(edit.commit()?.into_package())
         },
@@ -202,15 +209,19 @@ fn main() -> Outcome<()> {
             let package = litchi_docx::Package::from_bytes(&bytes)?;
             let mut edit = package.edit()?;
             let parts = edit.smartart_parts(&diagram)?.ok_or("the graphic")?;
-            let outline = Outline::read(&parts.data)?;
-            let mut spec =
-                Spec::recognize(&outline, &parts.data, &parts.layout)?.ok_or("authored")?;
+            let limits = litchi_drawingml::diagram::Limits::default();
+            let outline = Outline::read(&parts.data, &limits)?;
+            let mut spec = Spec::recognize(&outline, &parts.data, &parts.layout, &limits)?
+                .ok_or("authored")?;
             spec.nodes_mut()[0].text = "Design".to_owned();
             let relationship = outline.drawing_relationship.as_deref().unwrap_or("rId0");
             let mut next = parts.clone();
-            next.data = spec.data_xml(Some(relationship))?.into_bytes();
-            next.layout = spec.layout_xml().into_bytes();
-            next.drawing = Some(spec.drawing_xml(5_760_000, 3_240_000)?.into_bytes());
+            next.data = spec.data_xml(Some(relationship), &limits)?.into_bytes();
+            next.layout = spec.layout_xml(&limits)?.into_bytes();
+            next.drawing = Some(
+                spec.drawing_xml(5_760_000, 3_240_000, &limits)?
+                    .into_bytes(),
+            );
             edit.set_smartart(&diagram, next)?;
             Ok(edit.commit()?.into_package())
         },
@@ -228,10 +239,10 @@ fn main() -> Outcome<()> {
             let package = litchi_docx::Package::from_bytes(&bytes)?;
             let mut edit = package.edit()?;
             let (xml, _) = edit.chart_parts(&chart)?.ok_or("the chart")?;
-            let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)?;
+            let snapshot = litchi_drawingml::chart::edit::Package::from_xml(xml)?;
             let mut chart_edit = snapshot.edit();
             chart_edit.set_series_color(0, Some("70AD47"))?;
-            let xml = chart_edit.commit()?.into_snapshot().xml_bytes().to_vec();
+            let xml = chart_edit.commit()?.into_package().xml_bytes().to_vec();
             edit.set_chart(&chart, xml, None)?;
             Ok(edit.commit()?.into_package())
         },

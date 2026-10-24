@@ -1054,12 +1054,12 @@ fn decode_intents(bytes: &[u8], limits: EditOptions) -> Result<Vec<SemanticInten
 }
 
 fn decode_prepared(bytes: &[u8], maximum: usize) -> Result<litchi_drawingml::ink::Prepared> {
-    let authoring_limits = litchi_drawingml::ink::AuthoringLimits {
+    let authoring_limits = litchi_drawingml::ink::builder::AuthoringLimits {
         max_source_bytes: maximum,
         max_output_bytes: maximum,
         ..Default::default()
     };
-    litchi_drawingml::ink::Prepared::from_bytes_with_limits(bytes, authoring_limits)
+    litchi_drawingml::ink::Prepared::from_bytes(bytes, authoring_limits)
         .map_err(|error| invalid_durable(format!("invalid canonical Ink payload: {error}")))
 }
 

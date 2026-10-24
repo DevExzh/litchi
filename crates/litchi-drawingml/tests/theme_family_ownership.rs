@@ -41,15 +41,17 @@ fn spaced_uri_diagnostics_are_normalized_while_read_add_and_edit_keep_source_spe
                 &lexical,
                 &format!("{}<!-- retain spaced URI wrapper -->", fragment()),
             ));
-            let snapshot = part::read(source.as_bytes()).expect("spaced recognized URI");
+            let snapshot = part::read(source.as_bytes(), part::Limits::DEFAULT)
+                .expect("spaced recognized URI");
             assert_eq!(snapshot.family_extension_uri(), Some(uri));
             assert_eq!(snapshot.family_profile(), Some(profile));
             assert_eq!(snapshot.xml_bytes(), source.as_bytes());
 
             let removed = snapshot
-                .remove_family()
+                .remove_family(part::Limits::DEFAULT)
                 .expect("retain spaced extension because its comment is opaque content");
-            let empty = part::read(&removed).expect("read retained empty extension");
+            let empty =
+                part::read(&removed, part::Limits::DEFAULT).expect("read retained empty extension");
             assert_eq!(empty.family_extension_uri(), None);
             assert_eq!(empty.family_profile(), None);
             assert!(
@@ -59,18 +61,20 @@ fn spaced_uri_diagnostics_are_normalized_while_read_add_and_edit_keep_source_spe
             );
             let detached = Family::new("Added", ID, VID).expect("new family");
             let added = empty
-                .add_family(&detached)
+                .add_family(&detached, part::Limits::DEFAULT)
                 .expect("reuse existing spaced URI");
-            let added_snapshot = part::read(&added).expect("read added family");
+            let added_snapshot =
+                part::read(&added, part::Limits::DEFAULT).expect("read added family");
             assert_eq!(added_snapshot.family_extension_uri(), Some(uri));
             assert_eq!(added_snapshot.family_profile(), Some(profile));
             assert_eq!(added_snapshot.family(), Some(&detached));
 
             let replacement = Family::new("Replaced", ID, VID).expect("replacement family");
             let changed = added_snapshot
-                .replace_family(&replacement)
+                .replace_family(&replacement, part::Limits::DEFAULT)
                 .expect("update with spaced URI");
-            let changed_snapshot = part::read(&changed).expect("read replacement");
+            let changed_snapshot =
+                part::read(&changed, part::Limits::DEFAULT).expect("read replacement");
             assert_eq!(changed_snapshot.family_extension_uri(), Some(uri));
             assert_eq!(changed_snapshot.family_profile(), Some(profile));
             assert_eq!(changed_snapshot.family(), Some(&replacement));
@@ -105,12 +109,12 @@ fn duplicate_supported_extensions_and_families_refuse_every_scanner_edit() {
         duplicate_family,
     ] {
         let source = with_extensions(&contents);
-        assert!(part::read(source.as_bytes()).is_err());
-        assert!(part::read_family(source.as_bytes()).is_err());
-        assert!(part::family_range(source.as_bytes()).is_err());
-        assert!(part::add_family(source.as_bytes(), &detached).is_err());
-        assert!(part::replace_family(source.as_bytes(), &detached).is_err());
-        assert!(part::remove_family(source.as_bytes()).is_err());
+        assert!(part::read(source.as_bytes(), part::Limits::DEFAULT).is_err());
+        assert!(part::read_family(source.as_bytes(), part::Limits::DEFAULT).is_err());
+        assert!(part::family_range(source.as_bytes(), part::Limits::DEFAULT).is_err());
+        assert!(part::add_family(source.as_bytes(), &detached, part::Limits::DEFAULT).is_err());
+        assert!(part::replace_family(source.as_bytes(), &detached, part::Limits::DEFAULT).is_err());
+        assert!(part::remove_family(source.as_bytes(), part::Limits::DEFAULT).is_err());
     }
 }
 
@@ -118,20 +122,23 @@ fn duplicate_supported_extensions_and_families_refuse_every_scanner_edit() {
 fn duplicate_family_lookalikes_under_foreign_uris_remain_opaque() {
     let foreign = extension("urn:unrecognized:family", &fragment().repeat(2));
     let source = with_extensions(&foreign.repeat(2));
-    let snapshot = part::read(source.as_bytes()).expect("opaque foreign extensions");
+    let snapshot =
+        part::read(source.as_bytes(), part::Limits::DEFAULT).expect("opaque foreign extensions");
     assert!(snapshot.family().is_none());
     assert_eq!(
-        snapshot.remove_family().expect("absent no-op"),
+        snapshot
+            .remove_family(part::Limits::DEFAULT)
+            .expect("absent no-op"),
         source.as_bytes()
     );
 
     let detached = Family::new("Added", ID, VID).expect("detached family");
     let added = snapshot
-        .add_family(&detached)
+        .add_family(&detached, part::Limits::DEFAULT)
         .expect("add direct normative owner");
     let added_text = std::str::from_utf8(&added).expect("Theme UTF-8");
     assert!(added_text.contains(&foreign.repeat(2)));
-    let reopened = part::read(&added).expect("reopen direct owner");
+    let reopened = part::read(&added, part::Limits::DEFAULT).expect("reopen direct owner");
     assert_eq!(reopened.family(), Some(&detached));
     assert_eq!(
         reopened.family_profile(),
@@ -154,9 +161,11 @@ fn inherited_bindings_used_only_by_opaque_descendants_survive_detached_replaceme
         "<a:theme xmlns:x=\"urn:opaque:element\" xmlns:y=\"urn:opaque:attribute\" xmlns:z=\"urn:opaque:qname\" ",
         1,
     );
-    let snapshot = part::read(source.as_bytes()).expect("inherited descendant bindings");
+    let snapshot = part::read(source.as_bytes(), part::Limits::DEFAULT)
+        .expect("inherited descendant bindings");
     let projected = snapshot.family().expect("family owner");
-    let standalone = family::write(projected).expect("namespace-complete projection");
+    let standalone =
+        family::write(projected, family::Limits::DEFAULT).expect("namespace-complete projection");
     let standalone_text = std::str::from_utf8(&standalone).expect("family UTF-8");
     for declaration in [
         "xmlns:x=\"urn:opaque:element\"",
@@ -166,12 +175,12 @@ fn inherited_bindings_used_only_by_opaque_descendants_survive_detached_replaceme
         assert!(standalone_text.contains(declaration));
     }
     assert_eq!(
-        family::read(&standalone).expect("standalone readback"),
+        family::read(&standalone, family::Limits::DEFAULT).expect("standalone readback"),
         *projected
     );
     let detached = Family::new("Changed", ID, VID).expect("fresh scalar values");
     let changed = snapshot
-        .replace_family(&detached)
+        .replace_family(&detached, part::Limits::DEFAULT)
         .expect("replace detached scalars");
     assert_eq!(
         changed,
@@ -184,7 +193,9 @@ fn inherited_bindings_used_only_by_opaque_descendants_survive_detached_replaceme
             .as_bytes()
     );
     assert_eq!(
-        part::read(&changed).expect("changed readback").family(),
+        part::read(&changed, part::Limits::DEFAULT)
+            .expect("changed readback")
+            .family(),
         Some(&detached)
     );
 }
@@ -198,7 +209,8 @@ fn removal_of_sole_family_closes_empty_wrappers_and_normative_add_recreates_owne
         .expect("native extension list end")
         + "</a:extLst>".len();
     let expected = format!("{}{}", &source[..list_start], &source[list_end..]);
-    let removed = part::remove_family(source.as_bytes()).expect("remove sole native family");
+    let removed = part::remove_family(source.as_bytes(), part::Limits::DEFAULT)
+        .expect("remove sole native family");
     assert_eq!(removed, expected.as_bytes());
     assert!(
         !std::str::from_utf8(&removed)
@@ -206,15 +218,16 @@ fn removal_of_sole_family_closes_empty_wrappers_and_normative_add_recreates_owne
             .contains("<a:extLst>")
     );
     assert!(
-        part::read(&removed)
+        part::read(&removed, part::Limits::DEFAULT)
             .expect("reopen family-free Theme")
             .family()
             .is_none()
     );
 
     let detached = Family::new("Normative", ID, VID).expect("normative family");
-    let added = part::add_family(&removed, &detached).expect("add default normative family");
-    let reopened = part::read(&added).expect("reopen normative family");
+    let added = part::add_family(&removed, &detached, part::Limits::DEFAULT)
+        .expect("add default normative family");
+    let reopened = part::read(&added, part::Limits::DEFAULT).expect("reopen normative family");
     assert_eq!(
         reopened.family_profile(),
         Some(part::ExtensionProfile::Normative)
@@ -262,7 +275,7 @@ fn removal_ignores_xml_whitespace_when_closing_empty_wrappers() {
         let list_end =
             source.find("</a:extLst>").expect("extension list end") + "</a:extLst>".len();
         let expected = format!("{}{}", &source[..list_start], &source[list_end..]);
-        let removed = part::remove_family(source.as_bytes())
+        let removed = part::remove_family(source.as_bytes(), part::Limits::DEFAULT)
             .unwrap_or_else(|error| panic!("remove {label} wrappers: {error:?}"));
         assert_eq!(removed, expected.as_bytes(), "{label}");
         assert!(
@@ -326,9 +339,10 @@ fn removal_retains_comments_payload_siblings_and_foreign_attributes() {
             ["v:marker=\"keep\""].as_slice(),
         ),
     ] {
-        let snapshot = part::read(source.as_bytes()).expect("retention source");
+        let snapshot =
+            part::read(source.as_bytes(), part::Limits::DEFAULT).expect("retention source");
         let removed = snapshot
-            .remove_family()
+            .remove_family(part::Limits::DEFAULT)
             .expect("remove retained-family source");
         let text = std::str::from_utf8(&removed).expect("Theme UTF-8");
         assert!(text.contains("<a:extLst>"), "{label} retains extLst");
@@ -341,7 +355,7 @@ fn removal_retains_comments_payload_siblings_and_foreign_attributes() {
             "{label} removes family element"
         );
         assert!(
-            part::read(&removed)
+            part::read(&removed, part::Limits::DEFAULT)
                 .expect("reopen retained wrappers")
                 .family()
                 .is_none()

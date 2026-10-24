@@ -31,7 +31,10 @@
 //!     .with_series(Series::new("East", vec![120.0, 135.0, 148.0]))
 //!     .with_legend(Some(LegendPosition::Bottom));
 //! let xml = spec.to_xml(None)?;
-//! let chart = litchi_drawingml::chart::reader::read(&xml[..])?;
+//! let chart = litchi_drawingml::chart::reader::read(
+//!     &xml[..],
+//!     &litchi_drawingml::chart::Limits::DEFAULT,
+//! )?;
 //! assert_eq!(Variant::of(&chart), Some(Variant::new(Kind::Column)));
 //! # Ok::<(), litchi_drawingml::Error>(())
 //! ```
@@ -658,6 +661,10 @@ impl Spec {
         &self.series_kinds
     }
 
+    pub(crate) fn series_references(&self) -> &[(usize, String, Option<String>)] {
+        &self.series_references
+    }
+
     /// The same spec as another variant, keeping its data and formatting.
     #[must_use]
     pub const fn with_variant(mut self, variant: Variant) -> Self {
@@ -806,10 +813,11 @@ impl Spec {
             }
         }
         if self.series.len() > MAX_SERIES {
-            return Err(Error::Limit {
-                resource: "authored chart series",
-                limit: MAX_SERIES,
-            });
+            return Err(Error::limit(
+                crate::LimitKind::ChartSeries,
+                self.series.len(),
+                MAX_SERIES,
+            ));
         }
         if self.variant.kind == Kind::Stock && !matches!(self.series.len(), 3 | 4) {
             return Err(Error::Invalid(
@@ -827,10 +835,11 @@ impl Spec {
             ));
         }
         if self.categories.len() > MAX_POINTS {
-            return Err(Error::Limit {
-                resource: "authored chart categories",
-                limit: MAX_POINTS,
-            });
+            return Err(Error::limit(
+                crate::LimitKind::ChartCategories,
+                self.categories.len(),
+                MAX_POINTS,
+            ));
         }
         let texts = self
             .title
@@ -841,10 +850,11 @@ impl Spec {
             .chain(self.series.iter().map(|series| &series.name));
         for text in texts {
             if text.len() > MAX_TEXT_BYTES {
-                return Err(Error::Limit {
-                    resource: "authored chart text bytes",
-                    limit: MAX_TEXT_BYTES,
-                });
+                return Err(Error::limit(
+                    crate::LimitKind::ChartTextBytes,
+                    text.len(),
+                    MAX_TEXT_BYTES,
+                ));
             }
         }
         if let Binding::Sheet { sheet, row, column } = &self.binding {
@@ -898,10 +908,11 @@ impl Spec {
                 )));
             }
             if series.values.len() > MAX_POINTS {
-                return Err(Error::Limit {
-                    resource: "authored chart series points",
-                    limit: MAX_POINTS,
-                });
+                return Err(Error::limit(
+                    crate::LimitKind::ChartPoints,
+                    series.values.len(),
+                    MAX_POINTS,
+                ));
             }
             if series.values.iter().any(|value| !value.is_finite()) {
                 return Err(Error::Invalid(format!(
@@ -912,10 +923,11 @@ impl Spec {
             total = total.saturating_add(series.values.len());
         }
         if total > MAX_TOTAL_POINTS {
-            return Err(Error::Limit {
-                resource: "authored chart points",
-                limit: MAX_TOTAL_POINTS,
-            });
+            return Err(Error::limit(
+                crate::LimitKind::ChartPoints,
+                total,
+                MAX_TOTAL_POINTS,
+            ));
         }
         Ok(())
     }
@@ -1669,16 +1681,26 @@ impl Spec {
     ///
     /// Returns the errors of [`Self::validate`] and of the chart writer.
     pub fn to_xml(&self, external_data: Option<&str>) -> Result<Vec<u8>> {
+        self.to_xml_with_policy(external_data, &crate::chart::Limits::DEFAULT)
+    }
+
+    pub(crate) fn to_xml_with_policy(
+        &self,
+        external_data: Option<&str>,
+        limits: &crate::chart::Limits,
+    ) -> Result<Vec<u8>> {
+        let limits = limits.validate()?;
+        limits.validate_spec_for_chart(self)?;
         if self.variant.kind.is_extended() {
-            return crate::chart::chartex::write(self, external_data);
+            return crate::chart::chartex::write_with_limits(self, external_data, &limits);
         }
         let mut chart = self.to_chart()?;
         if external_data.is_some() {
             chart.external_data = Some(crate::chart::model::ExternalData::pending());
         }
-        let mut xml = Vec::with_capacity(4096);
-        crate::chart::writer::write_with_rels(&mut xml, &chart, external_data, None)
-            .map_err(Error::Io)?;
+        limits.validate_chart(&chart)?;
+        let mut xml = Vec::with_capacity(4096.min(limits.max_output_bytes));
+        crate::chart::writer::write_with_rels(&mut xml, &chart, &limits, external_data, None)?;
         Ok(xml)
     }
 }

@@ -296,8 +296,19 @@ pub(crate) fn scan_chart_xml_with_limits(
             maximum: policy.chart_xml_bytes(),
         });
     }
-    litchi_drawingml::chart::reader::read(Cursor::new(xml))
-        .map_err(|error| invalid(format!("DrawingML chart schema: {error}")))?;
+    let mut drawing_limits = litchi_drawingml::chart::Limits::DEFAULT;
+    drawing_limits.max_input_bytes = policy.chart_xml_bytes().min(drawing_limits.max_input_bytes);
+    drawing_limits.max_output_bytes = policy
+        .chart_xml_bytes()
+        .min(drawing_limits.max_output_bytes);
+    drawing_limits.max_xml_depth = policy.depth().min(drawing_limits.max_xml_depth);
+    drawing_limits.max_xml_nodes = policy.nodes().min(drawing_limits.max_xml_nodes);
+    drawing_limits.max_xml_attributes = policy.attributes().min(drawing_limits.max_xml_attributes);
+    drawing_limits.max_attribute_value_bytes = policy
+        .attribute_bytes()
+        .min(drawing_limits.max_attribute_value_bytes);
+    litchi_drawingml::chart::reader::read(Cursor::new(xml), &drawing_limits)
+        .map_err(|error| drawing_error(error, "DrawingML chart schema"))?;
     let processed = process_markup(xml, policy, policy.chart_xml_bytes())?;
     if processed.len() > policy.chart_xml_bytes() {
         return Err(Error::ChartLimit {
@@ -431,11 +442,47 @@ pub(crate) fn validate_companion_xml_with_limits(
         });
     }
     let result = match root_name {
-        "chartStyle" => litchi_drawingml::chart::style::parse(processed.as_ref()).map(|_| ()),
-        "colorStyle" => litchi_drawingml::chart::style::parse_color(processed.as_ref()).map(|_| ()),
+        "chartStyle" => {
+            let mut drawing_limits = litchi_drawingml::chart::Limits::DEFAULT;
+            drawing_limits.max_input_bytes = max.min(drawing_limits.max_input_bytes);
+            drawing_limits.max_output_bytes = max.min(drawing_limits.max_output_bytes);
+            drawing_limits.max_style_bytes = max.min(drawing_limits.max_style_bytes);
+            drawing_limits.max_style_depth = policy.depth().min(drawing_limits.max_style_depth);
+            drawing_limits.max_style_nodes = policy.nodes().min(drawing_limits.max_style_nodes);
+            drawing_limits.max_style_attributes =
+                policy.attributes().min(drawing_limits.max_style_attributes);
+            drawing_limits.max_style_string_bytes = policy
+                .attribute_bytes()
+                .min(drawing_limits.max_style_string_bytes);
+            litchi_drawingml::chart::style::parse(processed.as_ref(), &drawing_limits).map(|_| ())
+        },
+        "colorStyle" => {
+            let mut drawing_limits = litchi_drawingml::chart::Limits::DEFAULT;
+            drawing_limits.max_input_bytes = max.min(drawing_limits.max_input_bytes);
+            drawing_limits.max_output_bytes = max.min(drawing_limits.max_output_bytes);
+            drawing_limits.max_style_bytes = max.min(drawing_limits.max_style_bytes);
+            drawing_limits.max_style_depth = policy.depth().min(drawing_limits.max_style_depth);
+            drawing_limits.max_style_nodes = policy.nodes().min(drawing_limits.max_style_nodes);
+            drawing_limits.max_style_attributes =
+                policy.attributes().min(drawing_limits.max_style_attributes);
+            drawing_limits.max_style_string_bytes = policy
+                .attribute_bytes()
+                .min(drawing_limits.max_style_string_bytes);
+            litchi_drawingml::chart::style::parse_color(processed.as_ref(), &drawing_limits)
+                .map(|_| ())
+        },
         _ => return Err(invalid(format!("unsupported {label} root"))),
     };
-    result.map_err(|error| Error::Invalid(format!("{label}: {error}")))
+    result.map_err(|error| drawing_error(error, label))
+}
+
+fn drawing_error(error: litchi_drawingml::Error, context: &str) -> Error {
+    match error {
+        litchi_drawingml::Error::Invalid(_) | litchi_drawingml::Error::Xml(_) => {
+            invalid(format!("{context} is invalid"))
+        },
+        error => Error::Drawing(error),
+    }
 }
 
 fn element_info(

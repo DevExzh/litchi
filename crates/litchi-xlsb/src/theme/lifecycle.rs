@@ -816,7 +816,12 @@ fn encode_new_theme(
     } else {
         theme.name.as_str()
     };
-    let mut source = codec::encode_part(name, &theme.colors, &theme.fonts)?;
+    let mut source = codec::encode_part(
+        name,
+        &theme.colors,
+        &theme.fonts,
+        codec::Limits::new(limits.max_xml_bytes),
+    )?;
     if plan.relationship.reltype == STRICT_THEME_RELATIONSHIP {
         let range = super::raw_attribute_value_range(&source, b"xmlns:a")?;
         if &source[range.clone()] != codec::NAMESPACE.as_bytes() {
@@ -825,11 +830,11 @@ fn encode_new_theme(
         source.splice(range, codec::STRICT_NAMESPACE.bytes());
     }
     if let Some(family) = family {
-        source = super::family::part::add_family_with_uri_limit(
+        source = super::family::part::add_family_with_uri(
             &source,
             family,
             super::family::part::NATIVE_EXTENSION_URI,
-            limits.max_xml_bytes,
+            super::family::part::Limits::new(limits.max_xml_bytes),
         )?;
     }
     if source.len() > limits.max_xml_bytes {

@@ -1,9 +1,10 @@
 //! Bounded `PresentationML` graphic-frame and shared model3d wire codecs.
 
-use std::ops::Range;
+use std::{borrow::Cow, ops::Range};
 
 use litchi_core::xml::ReaderOrigin;
 use litchi_drawingml::model3d as drawing;
+use litchi_drawingml::{Error as DrawingError, LimitKind};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
@@ -29,6 +30,159 @@ const SHAPES: &[&[u8]] = &[
     b"contentPart",
 ];
 
+/// Caller-selected bounds for one PPTX model3d XML operation.
+///
+/// The shared DrawingML codec owns the model3d grammar.  This adapter keeps a
+/// distinct PPTX policy type so host callers cannot accidentally pass an
+/// unrelated format's limits, while preserving the same byte and tree
+/// dimensions at the wire boundary.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Limits {
+    max_xml_bytes: usize,
+    max_fragment_bytes: usize,
+    max_output_bytes: usize,
+    max_children: usize,
+    max_raster_children: usize,
+    max_depth: usize,
+    max_nodes: usize,
+}
+
+impl Limits {
+    /// The historical PPTX model3d bounds.
+    pub const DEFAULT: Self = {
+        let shared = drawing::codec::Limits::DEFAULT;
+        Self {
+            max_xml_bytes: shared.max_xml_bytes,
+            max_fragment_bytes: shared.max_fragment_bytes,
+            max_output_bytes: shared.max_output_bytes,
+            max_children: shared.max_children,
+            max_raster_children: shared.max_raster_children,
+            max_depth: shared.max_depth,
+            max_nodes: shared.max_nodes,
+        }
+    };
+
+    /// Construct a policy with the historical tree ceilings and selected byte
+    /// budgets.
+    #[must_use]
+    pub const fn new(
+        max_xml_bytes: usize,
+        max_fragment_bytes: usize,
+        max_output_bytes: usize,
+    ) -> Option<Self> {
+        Self::with_tree(
+            max_xml_bytes,
+            max_fragment_bytes,
+            max_output_bytes,
+            Self::DEFAULT.max_children,
+            Self::DEFAULT.max_raster_children,
+            Self::DEFAULT.max_depth,
+            Self::DEFAULT.max_nodes,
+        )
+    }
+
+    /// Construct a policy with explicit byte and tree ceilings.
+    #[must_use]
+    pub const fn with_tree(
+        max_xml_bytes: usize,
+        max_fragment_bytes: usize,
+        max_output_bytes: usize,
+        max_children: usize,
+        max_raster_children: usize,
+        max_depth: usize,
+        max_nodes: usize,
+    ) -> Option<Self> {
+        let default = Self::DEFAULT;
+        if max_xml_bytes == 0
+            || max_xml_bytes > default.max_xml_bytes
+            || max_fragment_bytes == 0
+            || max_fragment_bytes > default.max_fragment_bytes
+            || max_output_bytes == 0
+            || max_output_bytes > default.max_output_bytes
+            || max_children == 0
+            || max_children > default.max_children
+            || max_raster_children == 0
+            || max_raster_children > default.max_raster_children
+            || max_depth == 0
+            || max_depth > default.max_depth
+            || max_nodes == 0
+            || max_nodes > default.max_nodes
+        {
+            return None;
+        }
+        Some(Self {
+            max_xml_bytes,
+            max_fragment_bytes,
+            max_output_bytes,
+            max_children,
+            max_raster_children,
+            max_depth,
+            max_nodes,
+        })
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_xml_bytes(self) -> usize {
+        self.max_xml_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_fragment_bytes(self) -> usize {
+        self.max_fragment_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_children(self) -> usize {
+        self.max_children
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_raster_children(self) -> usize {
+        self.max_raster_children
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn max_nodes(self) -> usize {
+        self.max_nodes
+    }
+
+    fn drawing(self) -> drawing::codec::Limits {
+        drawing::codec::Limits {
+            max_xml_bytes: self.max_xml_bytes,
+            max_fragment_bytes: self.max_fragment_bytes,
+            max_output_bytes: self.max_output_bytes,
+            max_children: self.max_children,
+            max_raster_children: self.max_raster_children,
+            max_depth: self.max_depth,
+            max_nodes: self.max_nodes,
+        }
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 /// A checked model3d element location and its semantic shape anchor.
 #[derive(Debug, Clone)]
 pub(crate) struct Location {
@@ -50,10 +204,10 @@ pub(crate) struct Inventory {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn read(xml: &[u8]) -> Result<Scene> {
-    let prepared = prepare_fragment(xml)?;
+pub fn read(xml: &[u8], limits: Limits) -> Result<Scene> {
+    let prepared = prepare_fragment(xml, limits)?;
     Ok(Scene::from_wire(
-        drawing::codec::read(&prepared).map_err(super::model::drawing_error)?,
+        drawing::codec::read(&prepared, limits.drawing()).map_err(super::model::drawing_error)?,
     ))
 }
 
@@ -62,19 +216,11 @@ pub fn read(xml: &[u8]) -> Result<Scene> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn write(scene: &Scene) -> Result<Vec<u8>> {
-    let mut wire = scene.wire.clone();
-    if !wire
-        .namespaces
-        .iter()
-        .any(|namespace| namespace.prefix() == Some("m3d"))
-    {
-        wire.namespaces.push(
-            drawing::Namespace::new(Some("m3d"), GRAPHIC_URI)
-                .map_err(|error| invalid(error.to_string()))?,
-        );
-    }
-    drawing::codec::write(&wire).map_err(super::model::drawing_error)
+pub fn write(scene: &Scene, limits: Limits) -> Result<Vec<u8>> {
+    // The shared writer supplies missing model and relationship namespace
+    // declarations itself. Passing the borrowed wire directly keeps its
+    // structural/output preflight ahead of any clone of retained opaque XML.
+    drawing::codec::write(&scene.wire, limits.drawing()).map_err(super::model::drawing_error)
 }
 
 pub(crate) fn locate(xml: &[u8]) -> Result<Inventory> {
@@ -308,11 +454,26 @@ fn limit(resource: &'static str, limit: usize) -> Error {
     Error::Limit { resource, limit }
 }
 
+fn drawing_limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Drawing(DrawingError::Limit {
+        kind,
+        observed,
+        maximum,
+    })
+}
+
 /// A model element is usually namespace-contextualized by its slide root.
 /// The shared codec intentionally accepts one self-contained fragment, so a
 /// package adapter supplies the inherited model and relationship declarations
 /// when the selected element did not repeat them locally.
-fn prepare_fragment(xml: &[u8]) -> Result<Vec<u8>> {
+fn prepare_fragment<'a>(xml: &'a [u8], limits: Limits) -> Result<Cow<'a, [u8]>> {
+    if xml.len() > limits.max_xml_bytes {
+        return Err(drawing_limit(
+            LimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
+    }
     let open_end = opening_tag_end(xml)?;
     let opening = &xml[..open_end];
     let model_prefix =
@@ -339,14 +500,33 @@ fn prepare_fragment(xml: &[u8]) -> Result<Vec<u8>> {
         }
     }
     if declarations.is_empty() {
-        return Ok(xml.to_vec());
+        return Ok(Cow::Borrowed(xml));
     }
-    let mut prepared = Vec::with_capacity(xml.len().saturating_add(declarations.len()));
+    let prepared_len =
+        xml.len()
+            .checked_add(declarations.len())
+            .ok_or(Error::CapacityOverflow {
+                resource: "model3d prepared XML",
+            })?;
+    if prepared_len > limits.max_xml_bytes {
+        return Err(drawing_limit(
+            LimitKind::XmlBytes,
+            prepared_len,
+            limits.max_xml_bytes,
+        ));
+    }
+    let mut prepared = Vec::new();
+    prepared
+        .try_reserve_exact(prepared_len)
+        .map_err(|source| Error::Allocation {
+            resource: "model3d prepared XML",
+            source,
+        })?;
     prepared.extend_from_slice(&xml[..open_end - 1]);
     prepared.extend_from_slice(&declarations);
     prepared.push(b'>');
     prepared.extend_from_slice(&xml[open_end..]);
-    Ok(prepared)
+    Ok(Cow::Owned(prepared))
 }
 
 fn opening_tag_end(xml: &[u8]) -> Result<usize> {

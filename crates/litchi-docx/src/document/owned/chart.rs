@@ -116,6 +116,13 @@ fn invalid() -> Error {
     }
 }
 
+fn drawing_error(error: litchi_drawingml::Error) -> Error {
+    match error {
+        litchi_drawingml::Error::Invalid(_) | litchi_drawingml::Error::Xml(_) => invalid(),
+        error => Error::Document(crate::Error::Drawing(error)),
+    }
+}
+
 impl Edit<Package> {
     /// Insert `chart` as a new run of the paragraph at `paragraph`, before
     /// its direct run `at` (after its last child for `None`), and return its
@@ -362,9 +369,14 @@ impl Edit<Package> {
             return Err(invalid());
         }
         if extended {
-            chartex::read(&xml).map_err(|_| invalid())?;
+            chartex::read(&xml, &litchi_drawingml::chart::Limits::DEFAULT)
+                .map_err(drawing_error)?;
         } else {
-            litchi_drawingml::chart::reader::read(&xml[..]).map_err(|_| invalid())?;
+            litchi_drawingml::chart::reader::read(
+                &xml[..],
+                &litchi_drawingml::chart::Limits::DEFAULT,
+            )
+            .map_err(drawing_error)?;
         }
         let mut replaced = Vec::new();
         if current.as_slice() != xml.as_slice() {
@@ -642,9 +654,9 @@ mod tests {
             .chart_xml(charts[0].relationship_id())
             .unwrap()
             .unwrap();
-        let parsed = authoring::read(&classic).unwrap();
+        let parsed = authoring::read(&classic, &litchi_drawingml::chart::Limits::DEFAULT).unwrap();
         assert_eq!(parsed.spec.variant().kind, Kind::Column);
-        assert!(parsed.is_authored(&classic));
+        assert!(parsed.is_authored(&classic, &litchi_drawingml::chart::Limits::DEFAULT,));
         let source = crate::source_backed::Package::from_bytes(&bytes).unwrap();
         assert_eq!(
             source

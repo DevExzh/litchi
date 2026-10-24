@@ -36,6 +36,7 @@ use litchi_core::FileFormat;
 use litchi_core::selector::{Path, Predicate, Step as PathStep};
 use litchi_docx::document::{NewSmartArt, SmartArtParts};
 use litchi_docx::smartart::Diagram;
+use litchi_drawingml::diagram::Limits;
 use litchi_drawingml::diagram::authoring::{
     Layout, Node as SpecNode, Spec, colors_xml, quick_style_xml,
 };
@@ -57,6 +58,15 @@ use crate::value::{LengthSpec, Scalar, ValueType};
 
 fn error(code: Code, message: &'static str) -> Error {
     Error::new(code, message).with_format(FileFormat::Docx)
+}
+
+fn drawing_code(error: &litchi_drawingml::Error, fallback: Code) -> Code {
+    match error {
+        litchi_drawingml::Error::Limit { .. } => Code::LimitExceeded,
+        litchi_drawingml::Error::InvalidLimit { .. } => Code::InvalidArgument,
+        litchi_drawingml::Error::PatchConflict => Code::InvalidInput,
+        _ => fallback,
+    }
 }
 
 const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
@@ -173,9 +183,12 @@ impl SmartArtValue {
             return Ok(Arc::clone(outline));
         }
         let xml = data_xml(docx, &self.diagram)?;
-        let outline = Arc::new(Outline::read(&xml).map_err(|source| {
-            error(Code::CorruptFile, "the SmartArt data model does not read")
-                .with_suggestion(source.to_string())
+        let outline = Arc::new(Outline::read(&xml, &Limits::default()).map_err(|source| {
+            error(
+                drawing_code(&source, Code::CorruptFile),
+                "the SmartArt data model does not read",
+            )
+            .with_suggestion(source.to_string())
         })?);
         Ok(Arc::clone(self.outline.get_or_init(|| outline)))
     }
@@ -482,7 +495,7 @@ impl Docx {
                 .with_property("text")
                 .with_suggestion("give the outline: one node per line, one tab per level")
         })?;
-        let spec = Spec::parse_outline(layout, &outline).map_err(|source| {
+        let spec = Spec::parse_outline(layout, &outline, &Limits::default()).map_err(|source| {
             error(Code::InvalidValue, "the SmartArt outline is not valid")
                 .with_property("text")
                 .with_suggestion(source.to_string())
@@ -539,7 +552,7 @@ fn parse_layout(value: &str) -> Result<Layout> {
 }
 
 fn parse_outline(layout: Layout, value: &str) -> Result<Spec> {
-    let spec = Spec::parse_outline(layout, value)
+    let spec = Spec::parse_outline(layout, value, &Limits::default())
         .map_err(|source| leaf_error(Code::InvalidValue, source).with_property("text"))?;
     if spec.nodes().is_empty() {
         return Err(
@@ -615,31 +628,37 @@ fn foreign_structure() -> Error {
 
 /// The parts after `change`, for a drawing of `extent` (record 0284 §3).
 fn apply(parts: &SmartArtParts, change: Change, extent: (i64, i64)) -> Result<SmartArtParts> {
-    let corrupt = |source: litchi_drawingml::Error| leaf_error(Code::CorruptFile, source);
-    let invalid = |source: litchi_drawingml::Error| leaf_error(Code::InvalidValue, source);
-    let outline = Outline::read(&parts.data).map_err(corrupt)?;
-    let authored = Spec::recognize(&outline, &parts.data, &parts.layout).map_err(corrupt)?;
+    let limits = Limits::default();
+    let corrupt = |source: litchi_drawingml::Error| {
+        leaf_error(drawing_code(&source, Code::CorruptFile), source)
+    };
+    let invalid = |source: litchi_drawingml::Error| {
+        leaf_error(drawing_code(&source, Code::InvalidValue), source)
+    };
+    let outline = Outline::read(&parts.data, &limits).map_err(corrupt)?;
+    let authored =
+        Spec::recognize(&outline, &parts.data, &parts.layout, &limits).map_err(corrupt)?;
     let regenerate = |spec: &Spec, all: bool| -> Result<SmartArtParts> {
         spec.validate().map_err(invalid)?;
         let relationship = outline.drawing_relationship.as_deref().unwrap_or("rId0");
         Ok(SmartArtParts {
             data: spec
-                .data_xml(Some(relationship))
+                .data_xml(Some(relationship), &limits)
                 .map_err(invalid)?
                 .into_bytes(),
-            layout: spec.layout_xml().into_bytes(),
+            layout: spec.layout_xml(&limits).map_err(invalid)?.into_bytes(),
             quick_style: if all {
-                quick_style_xml().into_bytes()
+                quick_style_xml(&limits).map_err(invalid)?.into_bytes()
             } else {
                 parts.quick_style.clone()
             },
             colors: if all {
-                colors_xml().into_bytes()
+                colors_xml(&limits).map_err(invalid)?.into_bytes()
             } else {
                 parts.colors.clone()
             },
             drawing: Some(
-                spec.drawing_xml(extent.0, extent.1)
+                spec.drawing_xml(extent.0, extent.1, &limits)
                     .map_err(invalid)?
                     .into_bytes(),
             ),
@@ -671,13 +690,14 @@ fn apply(parts: &SmartArtParts, change: Change, extent: (i64, i64)) -> Result<Sm
                 return regenerate(&spec, false);
             }
             let id = &outline.entries.get(index).ok_or_else(missing_node)?.id;
-            let data = diagram_edit::set_text(&parts.data, id, &text).map_err(invalid)?;
+            let data = diagram_edit::set_text(&parts.data, id, &text, &limits).map_err(invalid)?;
             if data == parts.data {
                 return Ok(parts.clone());
             }
             let drawing = match &parts.drawing {
                 Some(drawing) => {
-                    diagram_edit::drawing_text(drawing, &parts.data, id, &text).map_err(invalid)?
+                    diagram_edit::drawing_text(drawing, &parts.data, id, &text, &limits)
+                        .map_err(invalid)?
                 },
                 None => None,
             };

@@ -32,6 +32,15 @@ use super::patch::Patch;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
+fn drawing_error(error: litchi_drawingml::Error, context: &str) -> Error {
+    match error {
+        litchi_drawingml::Error::Invalid(_) | litchi_drawingml::Error::Xml(_) => {
+            invalid(format!("{context} is invalid"))
+        },
+        error => Error::Drawing(error),
+    }
+}
+
 /// One failure-atomic edit rooted in an immutable opened-package snapshot.
 ///
 /// Start with [`Package::edit`](crate::Package::edit) or [`Snapshot::edit`].
@@ -1935,11 +1944,14 @@ impl Edit {
             chart_targets(&self.working, &selected.part_name, shape.into())?;
         let current = self.working.get_part(&chart_name)?.content_type();
         if current == litchi_drawingml::chart::chartex::CONTENT_TYPE {
-            litchi_drawingml::chart::chartex::read(&xml)
-                .map_err(|error| invalid(format!("replacement chart XML: {error}")))?;
+            litchi_drawingml::chart::chartex::read(&xml, &litchi_drawingml::chart::Limits::DEFAULT)
+                .map_err(|error| drawing_error(error, "replacement chart XML"))?;
         } else {
-            litchi_drawingml::chart::reader::read(&xml[..])
-                .map_err(|error| invalid(format!("replacement chart XML: {error}")))?;
+            litchi_drawingml::chart::reader::read(
+                &xml[..],
+                &litchi_drawingml::chart::Limits::DEFAULT,
+            )
+            .map_err(|error| drawing_error(error, "replacement chart XML"))?;
         }
         let chart_changed = self.working.get_part(&chart_name)?.blob() != xml.as_slice();
         let workbook_change = match (workbook, workbook_name) {

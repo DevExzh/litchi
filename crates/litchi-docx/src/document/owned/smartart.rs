@@ -16,7 +16,7 @@ use litchi_core::Position;
 use litchi_drawingml::diagram::authoring::{Spec, colors_xml, quick_style_xml};
 use litchi_drawingml::diagram::edit as diagram_edit;
 use litchi_drawingml::diagram::{
-    DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
+    DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL, Limits,
     MS_DIAGRAM_DRAWING_REL, STRICT_DIAGRAM_COLORS_REL, STRICT_DIAGRAM_DATA_REL,
     STRICT_DIAGRAM_LAYOUT_REL, STRICT_DIAGRAM_QUICK_STYLE_REL,
 };
@@ -49,6 +49,13 @@ fn invalid() -> Error {
     }
 }
 
+fn drawing_error(error: litchi_drawingml::Error) -> Error {
+    match error {
+        litchi_drawingml::Error::Invalid(_) | litchi_drawingml::Error::Xml(_) => invalid(),
+        error => Error::Document(crate::Error::Drawing(error)),
+    }
+}
+
 /// A SmartArt graphic to insert: its authored spec, an extent in EMUs, and
 /// its frame name and description (alternative text).
 ///
@@ -56,7 +63,11 @@ fn invalid() -> Error {
 /// use litchi_docx::document::NewSmartArt;
 /// use litchi_drawingml::diagram::authoring::{Layout, Spec};
 ///
-/// let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\nShip")?;
+/// let spec = Spec::parse_outline(
+///     Layout::Process,
+///     "Plan\nBuild\nShip",
+///     &litchi_drawingml::diagram::Limits::default(),
+/// )?;
 /// let smartart = NewSmartArt::new(spec).with_size(Some(5_400_000), None).with_name("Flow");
 /// assert_eq!(smartart.size(), (5_400_000, 3_240_000));
 /// # Ok::<(), litchi_drawingml::Error>(())
@@ -193,22 +204,31 @@ impl Edit<Package> {
     /// use litchi_core::Position;
     /// use litchi_docx::Package;
     /// use litchi_docx::document::{ElementPath, ElementStep, NewSmartArt};
-    /// use litchi_drawingml::diagram::authoring::{Layout, Spec};
+    /// use litchi_drawingml::diagram::{Limits, authoring::{Layout, Spec}};
     ///
     /// let mut builder = litchi_docx::Builder::new()?;
     /// builder.document()?.add_paragraph_with_text("Steps: ");
     /// let package = builder.build()?;
     /// let mut edit = package.edit()?;
     /// let paragraph = ElementPath::new([ElementStep::Paragraph(Position::new(0))]);
-    /// let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild")?;
+    /// let spec = Spec::parse_outline(
+    ///     Layout::Process,
+    ///     "Plan\nBuild",
+    ///     &Limits::default(),
+    /// )?;
     /// let id = edit.insert_smartart_at(&paragraph, None, &NewSmartArt::new(spec))?;
     /// let package = edit.commit()?.into_package();
     /// let mut edit = package.edit()?;
     /// let mut parts = edit.smartart_parts(&id)?.expect("the graphic");
-    /// let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\nShip")?;
+    /// let spec = Spec::parse_outline(
+    ///     Layout::Process,
+    ///     "Plan\nBuild\nShip",
+    ///     &Limits::default(),
+    /// )?;
     /// let drawing = parts.drawing.take().expect("a cached drawing");
-    /// parts.data = spec.data_xml(Some("rId0"))?.into_bytes();
-    /// parts.drawing = Some(spec.drawing_xml(5_760_000, 3_240_000)?.into_bytes());
+    /// let limits = Limits::default();
+    /// parts.data = spec.data_xml(Some("rId0"), &limits)?.into_bytes();
+    /// parts.drawing = Some(spec.drawing_xml(5_760_000, 3_240_000, &limits)?.into_bytes());
     /// assert_ne!(parts.drawing.as_deref(), Some(drawing.as_slice()));
     /// assert!(edit.set_smartart(&id, parts)?);
     /// let package = edit.commit()?.into_package();
@@ -229,7 +249,7 @@ impl Edit<Package> {
         let located = self
             .locate_smartart(data_relationship_id)?
             .ok_or_else(not_found)?;
-        diagram_edit::Outline::read(&parts.data).map_err(|_| invalid())?;
+        diagram_edit::Outline::read(&parts.data, &Limits::default()).map_err(drawing_error)?;
         let SmartArtParts {
             data,
             layout,
@@ -296,8 +316,9 @@ impl Edit<Package> {
             (None, Some((None, _))) => None,
             (None, None) => None,
         };
-        let data = diagram_edit::set_drawing_reference(&data, relationship.as_deref())
-            .map_err(|_| invalid())?;
+        let data =
+            diagram_edit::set_drawing_reference(&data, relationship.as_deref(), &Limits::default())
+                .map_err(drawing_error)?;
         replace(&located.data.1, data, self)?;
         replace(&located.layout.1, layout, self)?;
         replace(&located.quick_style.1, quick_style, self)?;
@@ -498,7 +519,11 @@ impl Edit<Package> {
     /// let package = builder.build()?;
     /// let mut edit = package.edit()?;
     /// let paragraph = ElementPath::new([ElementStep::Paragraph(Position::new(0))]);
-    /// let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\nShip")?;
+    /// let spec = Spec::parse_outline(
+    ///     Layout::Process,
+    ///     "Plan\nBuild\nShip",
+    ///     &litchi_drawingml::diagram::Limits::default(),
+    /// )?;
     /// let id = edit.insert_smartart_at(&paragraph, None, &NewSmartArt::new(spec))?;
     /// let mut next = edit.commit()?.into_package();
     /// let reopened = Package::from_bytes(&next.to_bytes()?)?;
@@ -575,18 +600,25 @@ impl Edit<Package> {
             ct::DML_DIAGRAM_COLORS,
             ct::DML_DIAGRAM_DRAWING,
         ];
+        let limits = Limits::default();
         let blobs = [
             smartart
                 .spec
-                .data_xml(Some(&ids[4]))
+                .data_xml(Some(&ids[4]), &limits)
                 .map_err(|_| invalid())?
                 .into_bytes(),
-            smartart.spec.layout_xml().into_bytes(),
-            quick_style_xml().into_bytes(),
-            colors_xml().into_bytes(),
             smartart
                 .spec
-                .drawing_xml(width, height)
+                .layout_xml(&limits)
+                .map_err(|_| invalid())?
+                .into_bytes(),
+            quick_style_xml(&limits)
+                .map_err(|_| invalid())?
+                .into_bytes(),
+            colors_xml(&limits).map_err(|_| invalid())?.into_bytes(),
+            smartart
+                .spec
+                .drawing_xml(width, height, &limits)
                 .map_err(|_| invalid())?
                 .into_bytes(),
         ];

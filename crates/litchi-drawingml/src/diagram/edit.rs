@@ -28,11 +28,16 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
+pub use super::Limits;
 use super::{DGM_NAMESPACE, DGM_NAMESPACE_STRICT};
 use crate::{Error, Result};
 
 /// Largest data-model or drawing part these functions accept.
 pub const MAX_PART_BYTES: usize = 16 * 1024 * 1024;
+/// Most XML element nodes a source-preserving diagram operation inspects.
+pub const MAX_XML_NODES: usize = 200_000;
+/// Most connection records a source-preserving operation inspects.
+pub const MAX_CONNECTIONS: usize = 100_000;
 /// Most content nodes an outline holds.
 pub const MAX_NODES: usize = 10_000;
 /// Deepest node an outline holds (zero-based).
@@ -81,8 +86,9 @@ impl Outline {
     ///
     /// Returns an error for malformed XML, a part that is not a diagram data
     /// model, a model without a document point, or exceeded bounds.
-    pub fn read(xml: &[u8]) -> Result<Self> {
-        Ok(Parsed::read(xml)?.outline)
+    pub fn read(xml: &[u8], limits: &Limits) -> Result<Self> {
+        limits.validate()?;
+        Ok(Parsed::read(xml, limits)?.outline)
     }
 
     /// The indexes of the children of `parent` (`None`: the top level).
@@ -247,6 +253,7 @@ struct BodyState {
     paragraph: String,
     in_text: bool,
     first_paragraph_done: bool,
+    text_bytes: usize,
 }
 
 impl BodyState {
@@ -263,6 +270,7 @@ impl BodyState {
             paragraph: String::new(),
             in_text: false,
             first_paragraph_done: false,
+            text_bytes: 0,
         }
     }
 
@@ -353,6 +361,9 @@ fn read_body<R: std::io::BufRead>(
     buffer: &mut Vec<u8>,
     start: usize,
     open_end: usize,
+    base_depth: usize,
+    xml_nodes: &mut usize,
+    limits: &Limits,
 ) -> Result<TextBody> {
     let mut state = BodyState::new(start, open_end);
     let mut pending: Option<Pending> = None;
@@ -365,7 +376,22 @@ fn read_body<R: std::io::BufRead>(
         let event_end = position(reader)?;
         match event {
             Event::Start(element) => {
-                state.depth += 1;
+                account_xml_node(xml_nodes, limits)?;
+                state.depth = state
+                    .depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("diagram text-body depth overflows"))?;
+                let total_depth = base_depth
+                    .checked_add(state.depth)
+                    .ok_or_else(|| invalid("diagram XML depth overflows"))?;
+                let max_depth = limits.xml_depth_value().min(MAX_DEPTH as usize);
+                if total_depth > max_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        total_depth,
+                        max_depth,
+                    ));
+                }
                 let local = element.local_name();
                 if pending.is_none() && is_dml(ns) {
                     let kind = match (state.depth, local.as_ref()) {
@@ -401,7 +427,23 @@ fn read_body<R: std::io::BufRead>(
                 state.element(ns, &element, (event_start, event_end), false);
             },
             Event::Empty(element) => {
-                state.depth += 1;
+                account_xml_node(xml_nodes, limits)?;
+                let child_depth = state
+                    .depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("diagram text-body depth overflows"))?;
+                let total_depth = base_depth
+                    .checked_add(child_depth)
+                    .ok_or_else(|| invalid("diagram XML depth overflows"))?;
+                let max_depth = limits.xml_depth_value().min(MAX_DEPTH as usize);
+                if total_depth > max_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        total_depth,
+                        max_depth,
+                    ));
+                }
+                state.depth = child_depth;
                 state.element(ns, &element, (event_start, event_end), true);
                 state.depth -= 1;
             },
@@ -436,18 +478,47 @@ fn read_body<R: std::io::BufRead>(
             Event::Text(text) if state.in_text => {
                 let text = text.decode().map_err(xml_error)?;
                 let text = quick_xml::escape::unescape(&text).map_err(xml_error)?;
+                let max_text = limits.node_text_bytes_value().min(1024 * 1024);
+                let observed = state.text_bytes.saturating_add(text.len());
+                if observed > max_text {
+                    return Err(Error::limit(
+                        crate::LimitKind::DiagramNodeTextBytes,
+                        observed,
+                        max_text,
+                    ));
+                }
+                state.text_bytes = observed;
                 state.paragraph.push_str(&text);
             },
             Event::GeneralRef(reference) if state.in_text => {
                 let name = reference.decode().map_err(xml_error)?;
                 let entity = format!("&{name};");
                 let text = quick_xml::escape::unescape(&entity).map_err(xml_error)?;
+                let max_text = limits.node_text_bytes_value().min(1024 * 1024);
+                let observed = state.text_bytes.saturating_add(text.len());
+                if observed > max_text {
+                    return Err(Error::limit(
+                        crate::LimitKind::DiagramNodeTextBytes,
+                        observed,
+                        max_text,
+                    ));
+                }
+                state.text_bytes = observed;
                 state.paragraph.push_str(&text);
             },
             Event::CData(data) if state.in_text => {
-                state
-                    .paragraph
-                    .push_str(&String::from_utf8_lossy(data.as_ref()));
+                let max_text = limits.node_text_bytes_value().min(1024 * 1024);
+                let text = String::from_utf8_lossy(data.as_ref());
+                let observed = state.text_bytes.saturating_add(text.len());
+                if observed > max_text {
+                    return Err(Error::limit(
+                        crate::LimitKind::DiagramNodeTextBytes,
+                        observed,
+                        max_text,
+                    ));
+                }
+                state.text_bytes = observed;
+                state.paragraph.push_str(&text);
             },
             Event::Eof => return Err(invalid("unterminated text body")),
             Event::DocType(_) => return Err(invalid("document type in a diagram part")),
@@ -460,18 +531,32 @@ fn position<R>(reader: &NsReader<R>) -> Result<usize> {
     usize::try_from(reader.buffer_position()).map_err(|_| invalid("XML offset exceeds usize"))
 }
 
+fn account_xml_node(nodes: &mut usize, limits: &Limits) -> Result<()> {
+    *nodes = nodes
+        .checked_add(1)
+        .ok_or_else(|| invalid("diagram XML node count overflows"))?;
+    let maximum = limits.xml_nodes_value().min(MAX_XML_NODES);
+    if *nodes > maximum {
+        return Err(Error::limit(crate::LimitKind::XmlNodes, *nodes, maximum));
+    }
+    Ok(())
+}
+
 impl Parsed {
-    fn read(xml: &[u8]) -> Result<Self> {
-        if xml.len() > MAX_PART_BYTES {
-            return Err(Error::Limit {
-                resource: "diagram data-model bytes",
-                limit: MAX_PART_BYTES,
-            });
+    fn read(xml: &[u8], limits: &Limits) -> Result<Self> {
+        let max_input = limits.input_bytes_value().min(MAX_PART_BYTES);
+        if xml.len() > max_input {
+            return Err(Error::limit(
+                crate::LimitKind::DiagramDataModelBytes,
+                xml.len(),
+                max_input,
+            ));
         }
         let mut reader = NsReader::from_reader(xml);
         reader.config_mut().trim_text(false);
         let mut buffer = Vec::new();
         let mut depth = 0_usize;
+        let mut xml_nodes = 0_usize;
         // Names of the open elements, as (dgm local name or empty).
         let mut stack: Vec<Vec<u8>> = Vec::new();
         let mut points = Vec::new();
@@ -485,6 +570,8 @@ impl Parsed {
         let mut root_close = None;
         let mut root_prefix = None;
         let mut strict = false;
+        let mut root_seen = false;
+        let mut root_closed = false;
         let mut pending_rel: Option<(usize, usize)> = None;
         loop {
             buffer.clear();
@@ -497,18 +584,37 @@ impl Parsed {
             match event {
                 Event::Start(ref element) | Event::Empty(ref element) => {
                     let empty = matches!(event, Event::Empty(_));
+                    account_xml_node(&mut xml_nodes, limits)?;
+                    let event_depth = depth.saturating_add(1);
+                    let max_depth = limits.xml_depth_value().min(MAX_DEPTH as usize);
+                    if event_depth > max_depth {
+                        return Err(Error::limit(
+                            crate::LimitKind::XmlDepth,
+                            event_depth,
+                            max_depth,
+                        ));
+                    }
                     let local_name = element.local_name();
                     let local = local_name.as_ref().to_vec();
                     let dgm = is_dgm(ns);
+                    if root_closed {
+                        return Err(invalid("trailing markup follows the diagram data model"));
+                    }
                     if depth == 0 {
+                        if root_seen {
+                            return Err(invalid("the diagram data model has multiple roots"));
+                        }
                         if !dgm || local != b"dataModel" {
                             return Err(invalid("the part is not a diagram data model"));
                         }
+                        root_seen = true;
                         strict = ns == Ns::DgmStrict;
                         root_prefix = prefix_of(element);
                         if empty {
                             return Err(invalid("the diagram data model is empty"));
                         }
+                    } else if dgm && local == b"dataModel" {
+                        return Err(invalid("the diagram data model has a nested root"));
                     }
                     let parent = stack.last().map(Vec::as_slice);
                     if dgm && local == b"pt" && parent == Some(b"ptLst".as_slice()) {
@@ -520,11 +626,13 @@ impl Parsed {
                             open_end: event_end,
                             ..PointRecord::default()
                         };
-                        if points.len() >= MAX_NODES * 16 {
-                            return Err(Error::Limit {
-                                resource: "diagram points",
-                                limit: MAX_NODES * 16,
-                            });
+                        let max_points = limits.points_value().min(MAX_NODES * 16);
+                        if points.len() >= max_points {
+                            return Err(Error::limit(
+                                crate::LimitKind::DiagramPoints,
+                                points.len() + 1,
+                                max_points,
+                            ));
                         }
                         if empty {
                             points.push(record);
@@ -552,13 +660,29 @@ impl Parsed {
                                 ..TextBody::default()
                             }
                         } else {
-                            read_body(&mut reader, &mut buffer, event_start, event_end)?
+                            read_body(
+                                &mut reader,
+                                &mut buffer,
+                                event_start,
+                                event_end,
+                                event_depth,
+                                &mut xml_nodes,
+                                limits,
+                            )?
                         };
                         if let Some(point) = current.as_mut() {
                             point.text = Some(body);
                         }
                         continue;
                     } else if dgm && local == b"cxn" && parent == Some(b"cxnLst".as_slice()) {
+                        let max_connections = limits.connections_value().min(MAX_CONNECTIONS);
+                        if connections.len() >= max_connections {
+                            return Err(Error::limit(
+                                crate::LimitKind::DiagramConnections,
+                                connections.len() + 1,
+                                max_connections,
+                            ));
+                        }
                         let values = attributes(element)?;
                         connections.push(ConnectionRecord {
                             kind: attribute(&values, "type").unwrap_or("parOf").to_owned(),
@@ -586,11 +710,18 @@ impl Parsed {
                     }
                 },
                 Event::End(ref element) => {
+                    if depth == 0 || stack.is_empty() {
+                        return Err(invalid("unexpected diagram data model end"));
+                    }
                     let local_name = element.local_name();
                     let local = local_name.as_ref().to_vec();
+                    if depth == 1 && (!is_dgm(ns) || local != b"dataModel") {
+                        return Err(invalid("the diagram data model root is not closed"));
+                    }
                     stack.pop();
-                    depth = depth.saturating_sub(1);
+                    depth -= 1;
                     if depth == 0 {
+                        root_closed = true;
                         root_close = Some(event_start);
                     }
                     if is_dgm(ns) && local == b"pt" && depth == 2 {
@@ -610,8 +741,28 @@ impl Parsed {
                 },
                 Event::Eof => break,
                 Event::DocType(_) => return Err(invalid("document type in a diagram part")),
+                Event::Text(text) => {
+                    if text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
+                        return Err(invalid(
+                            "non-whitespace text is outside the diagram data model",
+                        ));
+                    }
+                },
+                Event::CData(data) => {
+                    if data.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
+                        return Err(invalid("CDATA is outside the diagram data model"));
+                    }
+                },
+                Event::GeneralRef(_) => {
+                    return Err(invalid(
+                        "entity reference is outside the diagram data model",
+                    ));
+                },
                 _ => {},
             }
+        }
+        if !root_seen || !root_closed || depth != 0 || !stack.is_empty() {
+            return Err(invalid("unterminated diagram data model"));
         }
         let root_close = root_close.ok_or_else(|| invalid("unterminated diagram data model"))?;
         let document = points
@@ -627,7 +778,7 @@ impl Parsed {
                 std::borrow::Cow::into_owned,
             )
         });
-        let entries = tree(&document, &points, &connections)?;
+        let entries = tree(&document, &points, &connections, limits)?;
         Ok(Self {
             outline: Outline {
                 document,
@@ -704,6 +855,7 @@ fn tree(
     document: &str,
     points: &[PointRecord],
     connections: &[ConnectionRecord],
+    limits: &Limits,
 ) -> Result<Vec<Entry>> {
     let content: HashMap<&str, &PointRecord> = points
         .iter()
@@ -725,25 +877,39 @@ fn tree(
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
     // (point id, parent entry, depth)
-    let mut stack: Vec<(&str, Option<usize>, u32)> = children
-        .get(document)
-        .map(|list| list.iter().rev().map(|(_, _, id)| (*id, None, 0)).collect())
-        .unwrap_or_default();
+    let max_nodes = limits.nodes_value().min(MAX_NODES);
+    let root_children = children.get(document).map_or(&[][..], Vec::as_slice);
+    if root_children.len() > max_nodes {
+        return Err(Error::limit(
+            crate::LimitKind::DiagramNodes,
+            max_nodes + 1,
+            max_nodes,
+        ));
+    }
+    let mut stack = Vec::with_capacity(root_children.len());
+    for (_, _, id) in root_children.iter().rev() {
+        stack.push((*id, None, 0));
+    }
     while let Some((id, parent, depth)) = stack.pop() {
         if !seen.insert(id) {
             continue;
         }
-        if depth > MAX_DEPTH {
-            return Err(Error::Limit {
-                resource: "diagram node depth",
-                limit: MAX_DEPTH as usize,
-            });
+        let max_depth = limits.node_depth_value().min(MAX_DEPTH as usize);
+        if usize::try_from(depth).unwrap_or(usize::MAX) > max_depth {
+            let observed =
+                usize::try_from(depth).map_err(|_| invalid("diagram depth exceeds usize"))?;
+            return Err(Error::limit(
+                crate::LimitKind::DiagramNodeDepth,
+                observed,
+                max_depth,
+            ));
         }
-        if entries.len() >= MAX_NODES {
-            return Err(Error::Limit {
-                resource: "diagram nodes",
-                limit: MAX_NODES,
-            });
+        if entries.len() >= max_nodes {
+            return Err(Error::limit(
+                crate::LimitKind::DiagramNodes,
+                entries.len() + 1,
+                max_nodes,
+            ));
         }
         let point = content[id];
         let index = entries.len();
@@ -755,6 +921,13 @@ fn tree(
         });
         if let Some(list) = children.get(id) {
             for (_, _, child) in list.iter().rev() {
+                if stack.len() >= max_nodes {
+                    return Err(Error::limit(
+                        crate::LimitKind::DiagramNodes,
+                        max_nodes + 1,
+                        max_nodes,
+                    ));
+                }
                 stack.push((child, Some(index), depth + 1));
             }
         }
@@ -763,24 +936,150 @@ fn tree(
 }
 
 /// Check that `text` holds only XML characters.
-fn check_text(text: &str) -> Result<()> {
+fn check_text(text: &str, limits: &Limits) -> Result<()> {
     if text.chars().any(|character| {
         !matches!(character, '\t' | '\n' | '\r' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..)
     }) {
         return Err(invalid("diagram text holds a character XML cannot carry"));
     }
-    if text.len() > 1024 * 1024 {
-        return Err(Error::Limit {
-            resource: "diagram node text bytes",
-            limit: 1024 * 1024,
-        });
+    let max_text = limits.node_text_bytes_value().min(1024 * 1024);
+    if text.len() > max_text {
+        return Err(Error::limit(
+            crate::LimitKind::DiagramNodeTextBytes,
+            text.len(),
+            max_text,
+        ));
     }
     Ok(())
 }
 
+fn ensure_output(
+    input_len: usize,
+    additional: usize,
+    limits: &Limits,
+    kind: crate::LimitKind,
+) -> Result<usize> {
+    let total = input_len
+        .checked_add(additional)
+        .ok_or_else(|| invalid("edited diagram output length overflows"))?;
+    ensure_output_total(total, limits, kind)
+}
+
+fn ensure_output_total(total: usize, limits: &Limits, kind: crate::LimitKind) -> Result<usize> {
+    let maximum = limits.output_bytes_value().min(MAX_PART_BYTES);
+    if total > maximum {
+        return Err(Error::limit(kind, total, maximum));
+    }
+    Ok(total)
+}
+
+fn escaped_xml_len(text: &str) -> Result<usize> {
+    text.as_bytes().iter().try_fold(0usize, |length, byte| {
+        let replacement = match byte {
+            b'&' => 5,
+            b'<' | b'>' => 4,
+            b'"' | b'\'' => 6,
+            _ => 1,
+        };
+        length
+            .checked_add(replacement)
+            .ok_or_else(|| invalid("escaped diagram text length overflows"))
+    })
+}
+
+fn span_len(xml: &[u8], span: (usize, usize)) -> Result<usize> {
+    let (start, end) = span;
+    if start > end || end > xml.len() {
+        return Err(invalid("diagram source span is outside the input"));
+    }
+    Ok(end - start)
+}
+
+/// Upper bound for the text body emitted by [`body_content`]. The source
+/// spans are counted before the replacement buffer is allocated, so retained
+/// properties cannot hide output that would exceed the caller's budget.
+fn body_content_bound(xml: &[u8], body: &TextBody, text: &str, a_namespace: &str) -> Result<usize> {
+    let prefix = body.prefix.as_deref().unwrap_or("a");
+    let qualified = |local: &str| {
+        if prefix.is_empty() {
+            local.to_owned()
+        } else {
+            format!("{prefix}:{local}")
+        }
+    };
+    let qualified_len = |local: &str| qualified(local).len();
+    let declaration = if prefix.is_empty() {
+        format!(" xmlns=\"{a_namespace}\"")
+    } else {
+        format!(" xmlns:{prefix}=\"{a_namespace}\"")
+    };
+    let empty_body_properties = 1usize
+        .checked_add(qualified_len("bodyPr"))
+        .and_then(|length| length.checked_add(declaration.len()))
+        .and_then(|length| length.checked_add(2))
+        .and_then(|length| {
+            1usize
+                .checked_add(qualified_len("lstStyle"))
+                .and_then(|value| value.checked_add(declaration.len()))
+                .and_then(|value| value.checked_add(2))
+                .and_then(|value| length.checked_add(value))
+        })
+        .ok_or_else(|| invalid("diagram text-body length overflows"))?;
+    let mut length = if body.preamble.is_empty() {
+        empty_body_properties
+    } else {
+        0
+    };
+    for span in &body.preamble {
+        length = length
+            .checked_add(span_len(xml, *span)?)
+            .ok_or_else(|| invalid("diagram text-body length overflows"))?;
+    }
+    let paragraph_properties = body
+        .paragraph_properties
+        .map(|span| span_len(xml, span))
+        .transpose()?;
+    let run_properties = match body.run_properties {
+        Some(span) => Some(
+            span_len(xml, span)?
+                .checked_add(if body.run_properties_is_end { 0 } else { 7 })
+                .ok_or_else(|| invalid("diagram text-body length overflows"))?,
+        ),
+        None => None,
+    };
+    let default_end_para = format!("<{} lang=\"en-US\"/>", qualified("endParaRPr"));
+    let default_run = format!("<{} lang=\"en-US\"/>", qualified("rPr"));
+    for line in text.split('\n') {
+        let line = line.strip_suffix('\r').unwrap_or(line);
+        length = length
+            .checked_add(1 + qualified_len("p") + declaration.len())
+            .and_then(|value| value.checked_add(paragraph_properties.unwrap_or(0)))
+            .ok_or_else(|| invalid("diagram text-body length overflows"))?;
+        if line.is_empty() {
+            length = length
+                .checked_add(run_properties.unwrap_or(default_end_para.len()))
+                .ok_or_else(|| invalid("diagram text-body length overflows"))?;
+        } else {
+            let run = 5 + 2 * qualified_len("r");
+            let text_element = 1 + qualified_len("t") + 1 + 2 + qualified_len("t") + 1;
+            length = length
+                .checked_add(run)
+                .and_then(|value| value.checked_add(run_properties.unwrap_or(default_run.len())))
+                .and_then(|value| value.checked_add(text_element))
+                .and_then(|value| value.checked_add(escaped_xml_len(line).ok()?))
+                .ok_or_else(|| invalid("diagram text-body length overflows"))?;
+        }
+        length = length
+            .checked_add(3 + qualified_len("p"))
+            .ok_or_else(|| invalid("diagram text-body length overflows"))?;
+    }
+    Ok(length)
+}
+
 /// The new content of a text body: its kept preamble, then one paragraph per
 /// line of `text` with the kept paragraph and run properties.
-fn body_content(xml: &[u8], body: &TextBody, text: &str, a_namespace: &str) -> String {
+fn body_content(xml: &[u8], body: &TextBody, text: &str, a_namespace: &str) -> Result<String> {
+    let capacity = body_content_bound(xml, body, text, a_namespace)?;
     let prefix = body.prefix.clone().unwrap_or_else(|| "a".to_owned());
     let qualified = |local: &str| {
         if prefix.is_empty() {
@@ -795,7 +1094,7 @@ fn body_content(xml: &[u8], body: &TextBody, text: &str, a_namespace: &str) -> S
         format!(" xmlns:{prefix}=\"{a_namespace}\"")
     };
     let raw = |(start, end): (usize, usize)| String::from_utf8_lossy(&xml[start..end]).into_owned();
-    let mut out = String::new();
+    let mut out = String::with_capacity(capacity);
     if body.preamble.is_empty() {
         out.push_str(&format!(
             "<{}{declaration}/><{}{declaration}/>",
@@ -843,7 +1142,7 @@ fn body_content(xml: &[u8], body: &TextBody, text: &str, a_namespace: &str) -> S
         }
         out.push_str(&format!("</{}>", qualified("p")));
     }
-    out
+    Ok(out)
 }
 
 /// Rename the outermost element of `raw` from local name `from` to `to`.
@@ -878,14 +1177,21 @@ fn rename_element(raw: &str, from: &str, to: &str) -> String {
 ///
 /// Returns an error for malformed XML, an unknown or non-content node, or
 /// text XML cannot carry.
-pub fn set_text(xml: &[u8], id: &str, text: &str) -> Result<Vec<u8>> {
-    check_text(text)?;
-    let parsed = Parsed::read(xml)?;
+pub fn set_text(xml: &[u8], id: &str, text: &str, limits: &Limits) -> Result<Vec<u8>> {
+    limits.validate()?;
+    check_text(text, limits)?;
+    let parsed = Parsed::read(xml, limits)?;
     let index = parsed
         .outline
         .position(id)
         .ok_or_else(|| invalid(format!("diagram node {id} was not found")))?;
     if parsed.outline.entries[index].text == text.replace("\r\n", "\n") {
+        ensure_output(
+            xml.len(),
+            0,
+            limits,
+            crate::LimitKind::DiagramDataModelBytes,
+        )?;
         return Ok(xml.to_vec());
     }
     let point = parsed
@@ -893,11 +1199,82 @@ pub fn set_text(xml: &[u8], id: &str, text: &str) -> Result<Vec<u8>> {
         .ok_or_else(|| invalid(format!("diagram node {id} was not found")))?;
     let a_namespace = parsed.a_namespace();
     let dgm_prefix = parsed.root_prefix.clone();
-    let mut out = Vec::with_capacity(xml.len() + text.len() + 256);
+    let output_capacity = match &point.text {
+        Some(body) if body.open_end != body.span.1 => {
+            let base = body
+                .open_end
+                .checked_add(
+                    xml.len()
+                        .checked_sub(body.close_start)
+                        .ok_or_else(|| invalid("diagram text-body span is outside the input"))?,
+                )
+                .ok_or_else(|| invalid("edited diagram output length overflows"))?;
+            ensure_output(
+                base,
+                body_content_bound(xml, body, text, a_namespace)?,
+                limits,
+                crate::LimitKind::DiagramDataModelBytes,
+            )?
+        },
+        Some(body) => {
+            let span = span_len(xml, body.span)?;
+            let content_bound = body_content_bound(xml, &TextBody::default(), text, a_namespace)?;
+            let replacement = span
+                .checked_mul(2)
+                .and_then(|length| length.checked_add(1))
+                .and_then(|length| length.checked_add(content_bound))
+                .ok_or_else(|| invalid("edited diagram output length overflows"))?;
+            ensure_output(
+                xml.len()
+                    .checked_sub(span)
+                    .ok_or_else(|| invalid("diagram text-body span is outside the input"))?,
+                replacement,
+                limits,
+                crate::LimitKind::DiagramDataModelBytes,
+            )?
+        },
+        None => {
+            let text_body = body_content_bound(xml, &TextBody::default(), text, a_namespace)?;
+            let qualified_t_len = dgm_prefix.as_deref().map_or(1, |prefix| prefix.len() + 2);
+            let element = text_body
+                .checked_add(
+                    qualified_t_len
+                        .checked_mul(2)
+                        .ok_or_else(|| invalid("edited diagram output length overflows"))?,
+                )
+                .and_then(|length| length.checked_add(5))
+                .ok_or_else(|| invalid("edited diagram output length overflows"))?;
+            if point.open_end == point.span.1 {
+                let span = span_len(xml, point.span)?;
+                let replacement = span
+                    .checked_mul(2)
+                    .and_then(|length| length.checked_add(1))
+                    .and_then(|length| length.checked_add(element))
+                    .ok_or_else(|| invalid("edited diagram output length overflows"))?;
+                ensure_output(
+                    xml.len()
+                        .checked_sub(span)
+                        .ok_or_else(|| invalid("diagram point span is outside the input"))?,
+                    replacement,
+                    limits,
+                    crate::LimitKind::DiagramDataModelBytes,
+                )?
+            } else {
+                ensure_output(
+                    xml.len(),
+                    element,
+                    limits,
+                    crate::LimitKind::DiagramDataModelBytes,
+                )?
+            }
+        },
+    };
+    let mut out = Vec::with_capacity(output_capacity);
     match &point.text {
         Some(body) if body.open_end != body.span.1 => {
             out.extend_from_slice(&xml[..body.open_end]);
-            out.extend_from_slice(body_content(xml, body, text, a_namespace).as_bytes());
+            let content = body_content(xml, body, text, a_namespace)?;
+            out.extend_from_slice(content.as_bytes());
             out.extend_from_slice(&xml[body.close_start..]);
         },
         Some(body) => {
@@ -917,9 +1294,8 @@ pub fn set_text(xml: &[u8], id: &str, text: &str) -> Result<Vec<u8>> {
             out.extend_from_slice(&xml[..body.span.0]);
             out.extend_from_slice(open.as_bytes());
             out.push(b'>');
-            out.extend_from_slice(
-                body_content(xml, &TextBody::default(), text, a_namespace).as_bytes(),
-            );
+            let content = body_content(xml, &TextBody::default(), text, a_namespace)?;
+            out.extend_from_slice(content.as_bytes());
             out.extend_from_slice(format!("</{name}>").as_bytes());
             out.extend_from_slice(&xml[body.span.1..]);
         },
@@ -928,10 +1304,8 @@ pub fn set_text(xml: &[u8], id: &str, text: &str) -> Result<Vec<u8>> {
                 Some(prefix) => format!("{prefix}:t"),
                 None => "t".to_owned(),
             };
-            let element = format!(
-                "<{t}>{}</{t}>",
-                body_content(xml, &TextBody::default(), text, a_namespace)
-            );
+            let content = body_content(xml, &TextBody::default(), text, a_namespace)?;
+            let element = format!("<{t}>{}</{t}>", content);
             if point.open_end == point.span.1 {
                 // An empty `pt`: expand it.
                 let raw = String::from_utf8_lossy(&xml[point.span.0..point.span.1]).into_owned();
@@ -968,7 +1342,13 @@ pub fn set_text(xml: &[u8], id: &str, text: &str) -> Result<Vec<u8>> {
         },
     }
     // Verify the edit reads back.
-    let check = Outline::read(&out)?;
+    ensure_output(
+        out.len(),
+        0,
+        limits,
+        crate::LimitKind::DiagramDataModelBytes,
+    )?;
+    let check = Outline::read(&out, limits)?;
     let expected = text.replace("\r\n", "\n");
     if check.entries.get(index).map(|entry| entry.text.as_str()) != Some(expected.as_str()) {
         return Err(invalid("the edited diagram text did not read back"));
@@ -988,20 +1368,27 @@ struct DrawnShape {
     body: TextBody,
 }
 
-fn read_drawing(xml: &[u8]) -> Result<(Vec<DrawnShape>, bool)> {
-    if xml.len() > MAX_PART_BYTES {
-        return Err(Error::Limit {
-            resource: "diagram drawing bytes",
-            limit: MAX_PART_BYTES,
-        });
+fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> {
+    let max_input = limits.input_bytes_value().min(MAX_PART_BYTES);
+    if xml.len() > max_input {
+        return Err(Error::limit(
+            crate::LimitKind::DiagramDrawingBytes,
+            xml.len(),
+            max_input,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
     let mut shapes = Vec::new();
     let mut models: Vec<Option<String>> = Vec::new();
+    let mut xml_nodes = 0_usize;
+    let mut depth = 0_usize;
     let mut strict = false;
-    let mut root = true;
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut sp_tree_seen = false;
+    let mut shape_count = 0_usize;
     loop {
         buffer.clear();
         let event_start = position(&reader)?;
@@ -1012,16 +1399,50 @@ fn read_drawing(xml: &[u8]) -> Result<(Vec<DrawnShape>, bool)> {
         let event_end = position(&reader)?;
         match event {
             Event::Start(ref element) => {
+                if root_closed {
+                    return Err(invalid("trailing markup follows the diagram drawing"));
+                }
+                account_xml_node(&mut xml_nodes, limits)?;
+                let event_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("diagram drawing XML depth overflows"))?;
+                let max_depth = limits.xml_depth_value().min(MAX_DEPTH as usize);
+                if event_depth > max_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        event_depth,
+                        max_depth,
+                    ));
+                }
                 let drawing = ns == Ns::Drawing;
                 let local = element.local_name();
-                if root {
-                    root = false;
+                if depth == 0 {
+                    if root_seen {
+                        return Err(invalid("the diagram drawing has multiple roots"));
+                    }
                     if !drawing || local.as_ref() != b"drawing" {
                         return Err(invalid("the part is not a diagram drawing"));
                     }
+                    root_seen = true;
+                } else if drawing && local.as_ref() == b"drawing" {
+                    return Err(invalid("the diagram drawing has a nested root"));
+                }
+                if drawing && local.as_ref() == b"spTree" && depth == 1 {
+                    if sp_tree_seen {
+                        return Err(invalid("the diagram drawing has duplicate shape trees"));
+                    }
+                    sp_tree_seen = true;
                 }
                 if drawing && local.as_ref() == b"txBody" {
-                    let body = read_body(&mut reader, &mut buffer, event_start, event_end)?;
+                    let body = read_body(
+                        &mut reader,
+                        &mut buffer,
+                        event_start,
+                        event_end,
+                        event_depth,
+                        &mut xml_nodes,
+                        limits,
+                    )?;
                     if let Some(Some(model)) = models.last() {
                         shapes.push(DrawnShape {
                             model: model.clone(),
@@ -1031,25 +1452,113 @@ fn read_drawing(xml: &[u8]) -> Result<(Vec<DrawnShape>, bool)> {
                     continue;
                 }
                 if drawing && local.as_ref() == b"sp" {
+                    let max_shapes = limits.nodes_value().min(MAX_NODES);
+                    shape_count = shape_count
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("diagram shape count overflows"))?;
+                    if shape_count > max_shapes {
+                        return Err(Error::limit(
+                            crate::LimitKind::DiagramNodes,
+                            shape_count,
+                            max_shapes,
+                        ));
+                    }
                     let values = attributes(element)?;
                     models.push(attribute(&values, "modelId").map(str::to_owned));
                 } else {
                     models.push(models.last().cloned().flatten());
                 }
+                depth = event_depth;
             },
             Event::Empty(ref element) => {
+                if root_closed {
+                    return Err(invalid("trailing markup follows the diagram drawing"));
+                }
+                account_xml_node(&mut xml_nodes, limits)?;
+                let event_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("diagram drawing XML depth overflows"))?;
+                let max_depth = limits.xml_depth_value().min(MAX_DEPTH as usize);
+                if event_depth > max_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        event_depth,
+                        max_depth,
+                    ));
+                }
+                let drawing = ns == Ns::Drawing;
+                let local = element.local_name();
+                if depth == 0 {
+                    if root_seen {
+                        return Err(invalid("the diagram drawing has multiple roots"));
+                    }
+                    if !drawing || local.as_ref() != b"drawing" {
+                        return Err(invalid("the part is not a diagram drawing"));
+                    }
+                    return Err(invalid("the diagram drawing root is empty"));
+                }
+                if drawing && local.as_ref() == b"drawing" {
+                    return Err(invalid("the diagram drawing has a nested root"));
+                }
+                if drawing && local.as_ref() == b"spTree" && depth == 1 {
+                    if sp_tree_seen {
+                        return Err(invalid("the diagram drawing has duplicate shape trees"));
+                    }
+                    sp_tree_seen = true;
+                }
+                if drawing && local.as_ref() == b"sp" {
+                    let max_shapes = limits.nodes_value().min(MAX_NODES);
+                    shape_count = shape_count
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("diagram shape count overflows"))?;
+                    if shape_count > max_shapes {
+                        return Err(Error::limit(
+                            crate::LimitKind::DiagramNodes,
+                            shape_count,
+                            max_shapes,
+                        ));
+                    }
+                }
                 if is_dml(ns) && !strict {
                     strict = ns == Ns::DmlStrict;
                 }
-                let _ = element;
             },
-            Event::End(_) => {
+            Event::End(ref element) => {
+                if depth == 0 || models.is_empty() {
+                    return Err(invalid("unexpected diagram drawing end"));
+                }
+                if depth == 1 && (ns != Ns::Drawing || element.local_name().as_ref() != b"drawing")
+                {
+                    return Err(invalid("the diagram drawing root is not closed"));
+                }
                 models.pop();
+                depth -= 1;
+                if depth == 0 {
+                    root_closed = true;
+                }
             },
             Event::Eof => break,
             Event::DocType(_) => return Err(invalid("document type in a diagram part")),
+            Event::Text(text) => {
+                if text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
+                    return Err(invalid(
+                        "non-whitespace text is outside the diagram drawing",
+                    ));
+                }
+            },
+            Event::CData(data) => {
+                if data.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
+                    return Err(invalid("CDATA is outside the diagram drawing"));
+                }
+            },
+            Event::GeneralRef(_) => {
+                return Err(invalid("entity reference is outside the diagram drawing"));
+            },
             _ => {},
         }
+    }
+    if !root_seen || !root_closed || !sp_tree_seen || depth != 0 || !models.is_empty() {
+        return Err(invalid("unterminated diagram drawing"));
     }
     Ok((shapes, strict))
 }
@@ -1069,9 +1578,16 @@ fn read_drawing(xml: &[u8]) -> Result<(Vec<DrawnShape>, bool)> {
 /// # Errors
 ///
 /// Returns an error for malformed XML or text XML cannot carry.
-pub fn drawing_text(drawing: &[u8], data: &[u8], id: &str, text: &str) -> Result<Option<Vec<u8>>> {
-    check_text(text)?;
-    let parsed = Parsed::read(data)?;
+pub fn drawing_text(
+    drawing: &[u8],
+    data: &[u8],
+    id: &str,
+    text: &str,
+    limits: &Limits,
+) -> Result<Option<Vec<u8>>> {
+    limits.validate()?;
+    check_text(text, limits)?;
+    let parsed = Parsed::read(data, limits)?;
     let Some(index) = parsed.outline.position(id) else {
         return Ok(None);
     };
@@ -1093,7 +1609,7 @@ pub fn drawing_text(drawing: &[u8], data: &[u8], id: &str, text: &str) -> Result
     if shared {
         return Ok(None);
     }
-    let (shapes, strict) = read_drawing(drawing)?;
+    let (shapes, strict) = read_drawing(drawing, limits)?;
     let mine: Vec<&DrawnShape> = shapes
         .iter()
         .filter(|shape| presented.contains(shape.model.as_str()))
@@ -1106,19 +1622,56 @@ pub fn drawing_text(drawing: &[u8], data: &[u8], id: &str, text: &str) -> Result
     } else {
         "http://schemas.openxmlformats.org/drawingml/2006/main"
     };
-    let mut out = Vec::with_capacity(drawing.len() + text.len() * mine.len());
-    let mut cursor = 0;
-    for shape in mine {
+    let mut output_capacity = drawing.len();
+    for shape in &mine {
         let body = &shape.body;
         if body.open_end == body.span.1 {
             return Ok(None);
         }
+        let retained = body
+            .close_start
+            .checked_sub(body.open_end)
+            .ok_or_else(|| invalid("diagram drawing text span is inverted"))?;
+        let replacement = body_content_bound(drawing, body, text, a_namespace)?;
+        output_capacity = output_capacity
+            .checked_sub(retained)
+            .and_then(|length| length.checked_add(replacement))
+            .ok_or_else(|| invalid("edited drawing output length overflows"))?;
+    }
+    ensure_output_total(
+        output_capacity,
+        limits,
+        crate::LimitKind::DiagramDrawingBytes,
+    )?;
+    let mut out = Vec::with_capacity(output_capacity);
+    let mut cursor = 0;
+    for shape in mine {
+        let body = &shape.body;
         out.extend_from_slice(&drawing[cursor..body.open_end]);
-        out.extend_from_slice(body_content(drawing, body, text, a_namespace).as_bytes());
+        let content = body_content(drawing, body, text, a_namespace)?;
+        out.extend_from_slice(content.as_bytes());
         cursor = body.close_start;
     }
     out.extend_from_slice(&drawing[cursor..]);
+    ensure_output(out.len(), 0, limits, crate::LimitKind::DiagramDrawingBytes)?;
     Ok(Some(out))
+}
+
+fn drawing_extension_len(
+    a_namespace: &str,
+    dgm_namespace: &str,
+    relationship: &str,
+) -> Result<usize> {
+    let relationship = escaped_xml_len(relationship)?;
+    let prefix = format!(
+        "<a:ext xmlns:a=\"{a_namespace}\" uri=\"{DRAWING_NAMESPACE}\"><dsp:dataModelExt xmlns:dsp=\"{DRAWING_NAMESPACE}\" relId=\""
+    );
+    let suffix = format!("\" minVer=\"{dgm_namespace}\"/></a:ext>");
+    prefix
+        .len()
+        .checked_add(relationship)
+        .and_then(|length| length.checked_add(suffix.len()))
+        .ok_or_else(|| invalid("diagram drawing extension length overflows"))
 }
 
 /// Name `relationship` as the data model's cached-drawing relationship, or
@@ -1129,21 +1682,91 @@ pub fn drawing_text(drawing: &[u8], data: &[u8], id: &str, text: &str) -> Result
 /// # Errors
 ///
 /// Returns an error for malformed XML or a relationship ID XML cannot carry.
-pub fn set_drawing_reference(xml: &[u8], relationship: Option<&str>) -> Result<Vec<u8>> {
-    let parsed = Parsed::read(xml)?;
+pub fn set_drawing_reference(
+    xml: &[u8],
+    relationship: Option<&str>,
+    limits: &Limits,
+) -> Result<Vec<u8>> {
+    limits.validate()?;
+    if let Some(relationship) = relationship {
+        check_text(relationship, limits)?;
+    }
+    let parsed = Parsed::read(xml, limits)?;
     if parsed.outline.drawing_relationship.as_deref() == relationship {
+        ensure_output(
+            xml.len(),
+            0,
+            limits,
+            crate::LimitKind::DiagramDataModelBytes,
+        )?;
         return Ok(xml.to_vec());
     }
-    let mut out = Vec::with_capacity(xml.len() + 256);
+    let escaped_relationship = relationship.map(escaped_xml_len).transpose()?;
+    let output_capacity = match (relationship, parsed.drawing_ext) {
+        (Some(_), Some((_, (start, end)))) => xml
+            .len()
+            .checked_sub(
+                end.checked_sub(start)
+                    .ok_or_else(|| invalid("diagram drawing relationship span is inverted"))?,
+            )
+            .and_then(|length| length.checked_add(escaped_relationship.unwrap_or(0)))
+            .ok_or_else(|| invalid("edited diagram output length overflows"))?,
+        (Some(relationship), None) => {
+            let a_namespace = parsed.a_namespace();
+            let dgm_namespace = if parsed.strict {
+                DGM_NAMESPACE_STRICT
+            } else {
+                DGM_NAMESPACE
+            };
+            let ext = drawing_extension_len(a_namespace, dgm_namespace, relationship)?;
+            let list_len = parsed
+                .root_prefix
+                .as_deref()
+                .map_or(6, |prefix| prefix.len() + 1 + 6);
+            let element = ext
+                .checked_add(5 + 2 * list_len)
+                .ok_or_else(|| invalid("edited diagram output length overflows"))?;
+            match parsed.ext_list {
+                Some((_, end, open_end)) if open_end < end => xml
+                    .len()
+                    .checked_add(ext)
+                    .ok_or_else(|| invalid("edited diagram output length overflows"))?,
+                Some((start, end, _)) => xml
+                    .len()
+                    .checked_sub(
+                        end.checked_sub(start)
+                            .ok_or_else(|| invalid("diagram extension-list span is inverted"))?,
+                    )
+                    .and_then(|length| length.checked_add(element))
+                    .ok_or_else(|| invalid("edited diagram output length overflows"))?,
+                None => xml
+                    .len()
+                    .checked_add(element)
+                    .ok_or_else(|| invalid("edited diagram output length overflows"))?,
+            }
+        },
+        (None, Some(((start, end), _))) => xml
+            .len()
+            .checked_sub(
+                end.checked_sub(start)
+                    .ok_or_else(|| invalid("diagram drawing extension span is inverted"))?,
+            )
+            .ok_or_else(|| invalid("edited diagram output length underflows"))?,
+        (None, None) => xml.len(),
+    };
+    ensure_output_total(
+        output_capacity,
+        limits,
+        crate::LimitKind::DiagramDataModelBytes,
+    )?;
+    let mut out = Vec::with_capacity(output_capacity);
     match (relationship, parsed.drawing_ext) {
         (Some(relationship), Some((_, (start, end)))) => {
-            check_text(relationship)?;
             out.extend_from_slice(&xml[..start]);
             out.extend_from_slice(escape_xml(relationship).as_bytes());
             out.extend_from_slice(&xml[end..]);
         },
         (Some(relationship), None) => {
-            check_text(relationship)?;
             let a_namespace = parsed.a_namespace();
             let dgm_namespace = if parsed.strict {
                 DGM_NAMESPACE_STRICT
@@ -1151,7 +1774,7 @@ pub fn set_drawing_reference(xml: &[u8], relationship: Option<&str>) -> Result<V
                 DGM_NAMESPACE
             };
             let ext = format!(
-                "<a:ext xmlns:a=\"{a_namespace}\" uri=\"{DRAWING_NAMESPACE}\"><dsp:dataModelExt xmlns:dsp=\"{DRAWING_NAMESPACE}\" relId=\"{}\" minVer=\"{DGM_NAMESPACE}\"/></a:ext>",
+                "<a:ext xmlns:a=\"{a_namespace}\" uri=\"{DRAWING_NAMESPACE}\"><dsp:dataModelExt xmlns:dsp=\"{DRAWING_NAMESPACE}\" relId=\"{}\" minVer=\"{dgm_namespace}\"/></a:ext>",
                 escape_xml(relationship)
             );
             match parsed.ext_list {
@@ -1168,7 +1791,6 @@ pub fn set_drawing_reference(xml: &[u8], relationship: Option<&str>) -> Result<V
                         None => "extLst".to_owned(),
                     };
                     let element = format!("<{list}>{ext}</{list}>");
-                    let _ = dgm_namespace;
                     let (start, end) = existing
                         .map_or((parsed.root_close, parsed.root_close), |(start, end, _)| {
                             (start, end)
@@ -1183,7 +1805,7 @@ pub fn set_drawing_reference(xml: &[u8], relationship: Option<&str>) -> Result<V
             out.extend_from_slice(&xml[..start]);
             out.extend_from_slice(&xml[end..]);
             // Remove an extension list left without elements.
-            let reparsed = Parsed::read(&out)?;
+            let reparsed = Parsed::read(&out, limits)?;
             if let Some((list_start, list_end, open_end)) = reparsed.ext_list {
                 let inner = &out[open_end..list_end];
                 let close = rfind(inner, b"</").unwrap_or(inner.len());
@@ -1194,9 +1816,66 @@ pub fn set_drawing_reference(xml: &[u8], relationship: Option<&str>) -> Result<V
         },
         (None, None) => return Ok(xml.to_vec()),
     }
-    let check = Outline::read(&out)?;
+    ensure_output(
+        out.len(),
+        0,
+        limits,
+        crate::LimitKind::DiagramDataModelBytes,
+    )?;
+    let check = Outline::read(&out, limits)?;
     if check.drawing_relationship.as_deref() != relationship {
         return Err(invalid("the drawing reference did not read back"));
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn limits_with_nodes(nodes: usize) -> Limits {
+        let defaults = Limits::default();
+        Limits::new(
+            defaults.input_bytes_value(),
+            defaults.output_bytes_value(),
+            defaults.xml_nodes_value(),
+            defaults.xml_depth_value(),
+            defaults.points_value(),
+            defaults.connections_value(),
+            defaults.data_text_bytes_value(),
+            nodes,
+            defaults.node_depth_value(),
+            defaults.node_text_bytes_value(),
+        )
+    }
+
+    #[test]
+    fn drawing_shape_limit_counts_sibling_shapes() {
+        let drawing = br#"<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram"><dsp:spTree><dsp:sp/><dsp:sp/></dsp:spTree></dsp:drawing>"#;
+        assert!(matches!(
+            read_drawing(drawing, &limits_with_nodes(1)),
+            Err(Error::Limit {
+                kind: crate::LimitKind::DiagramNodes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn drawing_rejects_nested_empty_root() {
+        let drawing = br#"<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram"><dsp:drawing/></dsp:drawing>"#;
+        assert!(matches!(
+            read_drawing(drawing, &Limits::default()),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn drawing_requires_a_shape_tree() {
+        let drawing = br#"<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram"></dsp:drawing>"#;
+        assert!(matches!(
+            read_drawing(drawing, &Limits::default()),
+            Err(Error::Invalid(_))
+        ));
+    }
 }

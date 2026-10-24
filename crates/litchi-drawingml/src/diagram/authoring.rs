@@ -18,13 +18,14 @@
 //! layout definitions are Litchi's own and simpler than `PowerPoint`'s.
 //!
 //! ```
-//! use litchi_drawingml::diagram::authoring::{Layout, Spec};
+//! use litchi_drawingml::diagram::{Limits, authoring::{Layout, Spec}};
 //!
-//! let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\n\tTest\nShip").unwrap();
+//! let limits = Limits::default();
+//! let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\n\tTest\nShip", &limits).unwrap();
 //! assert_eq!(spec.nodes().len(), 3);
-//! let data = spec.data_xml(Some("rId9")).unwrap();
+//! let data = spec.data_xml(Some("rId9"), &limits).unwrap();
 //! assert!(data.contains("layout/process1"));
-//! assert_eq!(spec.outline(), "Plan\nBuild\n\tTest\nShip");
+//! assert_eq!(spec.outline(&limits).unwrap(), "Plan\nBuild\n\tTest\nShip");
 //! ```
 
 mod drawing;
@@ -33,8 +34,76 @@ mod tests;
 
 use litchi_core::xml::escape_xml;
 
+use super::Limits;
 use super::edit::{DRAWING_NAMESPACE, Outline};
 use crate::{Error, Result};
+
+const MAX_AUTHORING_OUTPUT: usize = 16 * 1024 * 1024;
+
+fn ensure_input(bytes: usize, limits: &Limits, kind: crate::LimitKind) -> Result<()> {
+    let maximum = limits.input_bytes_value().min(MAX_AUTHORING_OUTPUT);
+    if bytes > maximum {
+        return Err(Error::limit(kind, bytes, maximum));
+    }
+    Ok(())
+}
+
+fn ensure_output(bytes: usize, limits: &Limits, kind: crate::LimitKind) -> Result<()> {
+    let maximum = limits.output_bytes_value().min(MAX_AUTHORING_OUTPUT);
+    if bytes > maximum {
+        return Err(Error::limit(kind, bytes, maximum));
+    }
+    Ok(())
+}
+
+fn estimated_output(
+    base: usize,
+    per_node: usize,
+    nodes: usize,
+    text_bytes: usize,
+    text_multiplier: usize,
+    limits: &Limits,
+    kind: crate::LimitKind,
+) -> Result<usize> {
+    let text = text_bytes
+        .checked_mul(text_multiplier)
+        .ok_or_else(|| Error::Invalid("SmartArt output length overflows".to_owned()))?;
+    let dynamic = per_node
+        .checked_mul(nodes)
+        .and_then(|value| value.checked_add(text))
+        .and_then(|value| value.checked_add(base))
+        .ok_or_else(|| Error::Invalid("SmartArt output length overflows".to_owned()))?;
+    ensure_output(dynamic, limits, kind)?;
+    Ok(dynamic)
+}
+
+fn escaped_xml_len(text: &str) -> Result<usize> {
+    text.as_bytes().iter().try_fold(0_usize, |length, byte| {
+        let replacement = match byte {
+            b'&' => 5,
+            b'<' | b'>' => 4,
+            b'"' | b'\'' => 6,
+            _ => 1,
+        };
+        length
+            .checked_add(replacement)
+            .ok_or_else(|| Error::Invalid("escaped SmartArt text length overflows".to_owned()))
+    })
+}
+
+fn text_stats(flat: &[Flat<'_>]) -> Result<(usize, usize)> {
+    flat.iter()
+        .try_fold((0_usize, 0_usize), |(bytes, lines), item| {
+            let next_bytes = bytes
+                .checked_add(item.node.text.len())
+                .ok_or_else(|| Error::Invalid("SmartArt text length overflows".to_owned()))?;
+            let next_lines = lines
+                .checked_add(item.node.text.bytes().filter(|byte| *byte == b'\n').count())
+                .and_then(|value| value.checked_add(1))
+                .ok_or_else(|| Error::Invalid("SmartArt line count overflows".to_owned()))?;
+            Ok((next_bytes, next_lines))
+        })
+}
 
 /// Most nodes a spec holds.
 pub const MAX_NODES: usize = 1000;
@@ -248,12 +317,38 @@ impl Spec {
     ///
     /// Returns [`Error::Invalid`] for a line indented more than one level
     /// below the previous one, or a graphic [`Self::validate`] refuses.
-    pub fn parse_outline(layout: Layout, text: &str) -> Result<Self> {
-        let text = text.replace("\\n", "\n").replace("\\t", "\t");
+    pub fn parse_outline(layout: Layout, text: &str, limits: &Limits) -> Result<Self> {
+        limits.validate()?;
+        ensure_input(text.len(), limits, crate::LimitKind::InputBytes)?;
+        let mut normalized = String::with_capacity(text.len());
+        let mut chars = text.chars().peekable();
+        while let Some(character) = chars.next() {
+            if character == '\\' {
+                match chars.peek().copied() {
+                    Some('n') => {
+                        chars.next();
+                        normalized.push('\n');
+                        continue;
+                    },
+                    Some('t') => {
+                        chars.next();
+                        normalized.push('\t');
+                        continue;
+                    },
+                    _ => {},
+                }
+            }
+            normalized.push(character);
+        }
         let mut spec = Self::new(layout);
         // The path of child indexes to the last node at each depth.
-        let mut path: Vec<usize> = Vec::new();
-        for line in text.split('\n') {
+        let path_capacity = limits.node_depth_value().min(MAX_DEPTH as usize);
+        let mut path: Vec<usize> = Vec::with_capacity(path_capacity);
+        let max_nodes = limits.nodes_value().min(MAX_NODES);
+        let max_depth = limits.node_depth_value().min(MAX_DEPTH as usize);
+        let max_text = limits.node_text_bytes_value().min(MAX_NODE_TEXT);
+        let mut node_count = 0_usize;
+        for line in normalized.split('\n') {
             let line = line.strip_suffix('\r').unwrap_or(line);
             if line.trim().is_empty() {
                 continue;
@@ -271,10 +366,41 @@ impl Spec {
                 level += 1;
             }
             let rest = rest.trim();
+            if level > max_depth {
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodeDepth,
+                    level,
+                    max_depth,
+                ));
+            }
             if level > path.len() {
                 return Err(Error::Invalid(format!(
                     "outline line \"{rest}\" is indented more than one level below the line before it"
                 )));
+            }
+            node_count = node_count
+                .checked_add(1)
+                .ok_or_else(|| Error::Invalid("SmartArt node count overflows".to_owned()))?;
+            if node_count > max_nodes {
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodes,
+                    node_count,
+                    max_nodes,
+                ));
+            }
+            if rest.len() > max_text {
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodeTextBytes,
+                    rest.len(),
+                    max_text,
+                ));
+            }
+            if rest.chars().any(|character| {
+                !matches!(character, '\t' | '\n' | '\r' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..)
+            }) {
+                return Err(Error::Invalid(
+                    "SmartArt node text holds a character XML cannot carry".to_owned(),
+                ));
             }
             path.truncate(level);
             let mut siblings = &mut spec.nodes;
@@ -284,14 +410,42 @@ impl Spec {
             siblings.push(Node::new(rest));
             path.push(siblings.len() - 1);
         }
-        spec.validate()?;
+        spec.validate_for_limits(limits)?;
         Ok(spec)
     }
 
     /// The text outline of the graphic: one line per node, indented by one
     /// tab per level; a node's own line breaks become spaces.
     #[must_use]
-    pub fn outline(&self) -> String {
+    pub fn outline(&self, limits: &Limits) -> Result<String> {
+        self.validate_for_limits(limits)?;
+        let mut capacity = 0_usize;
+        let mut first = true;
+        fn measure(
+            nodes: &[Node],
+            depth: usize,
+            capacity: &mut usize,
+            first: &mut bool,
+        ) -> Result<()> {
+            for node in nodes {
+                if !*first {
+                    *capacity = capacity.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("SmartArt outline length overflows".to_owned())
+                    })?;
+                }
+                *first = false;
+                *capacity = capacity
+                    .checked_add(node.text.len())
+                    .and_then(|value| value.checked_add(depth))
+                    .ok_or_else(|| {
+                        Error::Invalid("SmartArt outline length overflows".to_owned())
+                    })?;
+                measure(&node.children, depth + 1, capacity, first)?;
+            }
+            Ok(())
+        }
+        measure(&self.nodes, 0, &mut capacity, &mut first)?;
+        ensure_output(capacity, limits, crate::LimitKind::OutputBytes)?;
         fn walk(out: &mut String, nodes: &[Node], depth: usize) {
             for node in nodes {
                 if !out.is_empty() {
@@ -304,9 +458,10 @@ impl Spec {
                 walk(out, &node.children, depth + 1);
             }
         }
-        let mut out = String::new();
+        let mut out = String::with_capacity(capacity);
         walk(&mut out, &self.nodes, 0);
-        out
+        ensure_output(out.len(), limits, crate::LimitKind::OutputBytes)?;
+        Ok(out)
     }
 
     /// Check the node count, depth and text against the module's bounds.
@@ -321,22 +476,29 @@ impl Spec {
         while let Some((node, depth)) = stack.pop() {
             count += 1;
             if count > MAX_NODES {
-                return Err(Error::Limit {
-                    resource: "SmartArt nodes",
-                    limit: MAX_NODES,
-                });
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodes,
+                    count,
+                    MAX_NODES,
+                ));
             }
             if depth > MAX_DEPTH {
-                return Err(Error::Limit {
-                    resource: "SmartArt node depth",
-                    limit: MAX_DEPTH as usize,
-                });
+                let observed = usize::try_from(depth)
+                    .map_err(|_| Error::Invalid("SmartArt depth exceeds usize".into()))?;
+                let maximum = usize::try_from(MAX_DEPTH)
+                    .map_err(|_| Error::Invalid("SmartArt depth limit exceeds usize".into()))?;
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodeDepth,
+                    observed,
+                    maximum,
+                ));
             }
             if node.text.len() > MAX_NODE_TEXT {
-                return Err(Error::Limit {
-                    resource: "SmartArt node text bytes",
-                    limit: MAX_NODE_TEXT,
-                });
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodeTextBytes,
+                    node.text.len(),
+                    MAX_NODE_TEXT,
+                ));
             }
             if node.text.chars().any(|character| {
                 !matches!(character, '\t' | '\n' | '\r' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..)
@@ -346,6 +508,45 @@ impl Spec {
                 ));
             }
             stack.extend(node.children.iter().map(|child| (child, depth + 1)));
+        }
+        Ok(())
+    }
+
+    fn validate_for_limits(&self, limits: &Limits) -> Result<()> {
+        limits.validate()?;
+        self.validate()?;
+        let max_nodes = limits.nodes_value().min(MAX_NODES);
+        let max_depth = limits.node_depth_value().min(MAX_DEPTH as usize);
+        let max_text = limits.node_text_bytes_value().min(MAX_NODE_TEXT);
+        let mut count = 0_usize;
+        let mut stack: Vec<(&Node, usize)> =
+            self.nodes.iter().rev().map(|node| (node, 0)).collect();
+        while let Some((node, depth)) = stack.pop() {
+            count = count
+                .checked_add(1)
+                .ok_or_else(|| Error::Invalid("SmartArt node count overflows".to_owned()))?;
+            if count > max_nodes {
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodes,
+                    count,
+                    max_nodes,
+                ));
+            }
+            if depth > max_depth {
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodeDepth,
+                    depth,
+                    max_depth,
+                ));
+            }
+            if node.text.len() > max_text {
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodeTextBytes,
+                    node.text.len(),
+                    max_text,
+                ));
+            }
+            stack.extend(node.children.iter().rev().map(|child| (child, depth + 1)));
         }
         Ok(())
     }
@@ -377,8 +578,8 @@ impl Spec {
     /// # Errors
     ///
     /// Returns an error when `data` is not a readable diagram data model.
-    pub fn from_parts(data: &[u8], layout: &[u8]) -> Result<Option<Self>> {
-        Self::recognize(&Outline::read(data)?, data, layout)
+    pub fn from_parts(data: &[u8], layout: &[u8], limits: &Limits) -> Result<Option<Self>> {
+        Self::recognize(&Outline::read(data, limits)?, data, layout, limits)
     }
 
     /// [`Self::from_parts`] for a data model already read as `outline`.
@@ -386,7 +587,15 @@ impl Spec {
     /// # Errors
     ///
     /// Returns an error when regenerating the data model fails.
-    pub fn recognize(outline: &Outline, data: &[u8], layout: &[u8]) -> Result<Option<Self>> {
+    pub fn recognize(
+        outline: &Outline,
+        data: &[u8],
+        layout: &[u8],
+        limits: &Limits,
+    ) -> Result<Option<Self>> {
+        limits.validate()?;
+        ensure_input(data.len(), limits, crate::LimitKind::DiagramDataModelBytes)?;
+        ensure_input(layout.len(), limits, crate::LimitKind::XmlBytes)?;
         let Some(kind) = outline
             .layout_type_id
             .as_deref()
@@ -398,8 +607,8 @@ impl Spec {
         if spec.validate().is_err() {
             return Ok(None);
         }
-        let regenerated = spec.data_xml(outline.drawing_relationship.as_deref())?;
-        if regenerated.as_bytes() != data || spec.layout_xml().as_bytes() != layout {
+        let regenerated = spec.data_xml(outline.drawing_relationship.as_deref(), limits)?;
+        if regenerated.as_bytes() != data || spec.layout_xml(limits)?.as_bytes() != layout {
             return Ok(None);
         }
         Ok(Some(spec))
@@ -430,11 +639,32 @@ impl Spec {
     /// # Errors
     ///
     /// Returns an error when the spec fails [`Self::validate`].
-    pub fn data_xml(&self, drawing_relationship: Option<&str>) -> Result<String> {
-        self.validate()?;
+    pub fn data_xml(&self, drawing_relationship: Option<&str>, limits: &Limits) -> Result<String> {
+        self.validate_for_limits(limits)?;
         let flat = self.flatten();
+        let (text_bytes, line_count) = text_stats(&flat)?;
+        let text_bound = text_bytes
+            .checked_add(
+                line_count
+                    .checked_mul(128)
+                    .ok_or_else(|| Error::Invalid("SmartArt line count overflows".to_owned()))?,
+            )
+            .ok_or_else(|| Error::Invalid("SmartArt text length overflows".to_owned()))?;
+        let relationship_bytes = drawing_relationship
+            .map(|relationship| escaped_xml_len(relationship))
+            .transpose()?
+            .unwrap_or(0);
+        let capacity = estimated_output(
+            8 * 1024 + relationship_bytes,
+            5 * 1024,
+            flat.len(),
+            text_bound,
+            6,
+            limits,
+            crate::LimitKind::DiagramDataModelBytes,
+        )?;
         let layout_id = self.layout.unique_id();
-        let mut xml = String::with_capacity(1024 + flat.len() * 1200);
+        let mut xml = String::with_capacity(capacity);
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
         xml.push_str(&format!(
             r#"<dgm:dataModel xmlns:dgm="{DGM}" xmlns:a="{A}"><dgm:ptLst>"#
@@ -587,6 +817,7 @@ impl Spec {
             ));
         }
         xml.push_str("</dgm:dataModel>");
+        ensure_output(xml.len(), limits, crate::LimitKind::DiagramDataModelBytes)?;
         Ok(xml)
     }
 
@@ -613,8 +844,12 @@ impl Spec {
 
     /// The layout-definition part (`dgm:layoutDef`).
     #[must_use]
-    pub fn layout_xml(&self) -> String {
-        layout_definition(self.layout)
+    pub fn layout_xml(&self, limits: &Limits) -> Result<String> {
+        limits.validate()?;
+        estimated_output(16 * 1024, 0, 0, 0, 1, limits, crate::LimitKind::XmlBytes)?;
+        let xml = layout_definition(self.layout);
+        ensure_output(xml.len(), limits, crate::LimitKind::XmlBytes)?;
+        Ok(xml)
     }
 
     /// The cached drawing part (`dsp:drawing`) for a frame of `width` ×
@@ -624,14 +859,34 @@ impl Spec {
     ///
     /// Returns an error for non-positive extents or a spec that fails
     /// [`Self::validate`].
-    pub fn drawing_xml(&self, width: i64, height: i64) -> Result<String> {
-        self.validate()?;
+    pub fn drawing_xml(&self, width: i64, height: i64, limits: &Limits) -> Result<String> {
+        self.validate_for_limits(limits)?;
         if width <= 0 || height <= 0 {
             return Err(Error::Invalid(
                 "SmartArt frame extents must be positive".to_owned(),
             ));
         }
-        Ok(drawing::write(self, width, height))
+        let flat = self.flatten();
+        let (text_bytes, line_count) = text_stats(&flat)?;
+        let text_bound = text_bytes
+            .checked_add(
+                line_count
+                    .checked_mul(128)
+                    .ok_or_else(|| Error::Invalid("SmartArt line count overflows".to_owned()))?,
+            )
+            .ok_or_else(|| Error::Invalid("SmartArt text length overflows".to_owned()))?;
+        let capacity = estimated_output(
+            8 * 1024,
+            6 * 1024,
+            flat.len(),
+            text_bound,
+            12,
+            limits,
+            crate::LimitKind::DiagramDrawingBytes,
+        )?;
+        let xml = drawing::write(self, width, height, capacity);
+        ensure_output(xml.len(), limits, crate::LimitKind::DiagramDrawingBytes)?;
+        Ok(xml)
     }
 }
 
@@ -665,8 +920,9 @@ fn push_paragraphs(xml: &mut String, text: &str) {
 }
 
 /// The quick-style part (`dgm:styleDef`) of authored graphics.
-#[must_use]
-pub fn quick_style_xml() -> String {
+pub fn quick_style_xml(limits: &Limits) -> Result<String> {
+    limits.validate()?;
+    estimated_output(8 * 1024, 0, 0, 0, 1, limits, crate::LimitKind::XmlBytes)?;
     let mut xml = String::with_capacity(2048);
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
     xml.push_str(&format!(
@@ -683,12 +939,14 @@ pub fn quick_style_xml() -> String {
         ));
     }
     xml.push_str("</dgm:styleDef>");
-    xml
+    ensure_output(xml.len(), limits, crate::LimitKind::XmlBytes)?;
+    Ok(xml)
 }
 
 /// The colors part (`dgm:colorsDef`) of authored graphics.
-#[must_use]
-pub fn colors_xml() -> String {
+pub fn colors_xml(limits: &Limits) -> Result<String> {
+    limits.validate()?;
+    estimated_output(8 * 1024, 0, 0, 0, 1, limits, crate::LimitKind::XmlBytes)?;
     let mut xml = String::with_capacity(2048);
     xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
     xml.push_str(&format!(
@@ -731,7 +989,8 @@ pub fn colors_xml() -> String {
         ));
     }
     xml.push_str("</dgm:colorsDef>");
-    xml
+    ensure_output(xml.len(), limits, crate::LimitKind::XmlBytes)?;
+    Ok(xml)
 }
 
 /// Litchi's layout definition for `layout`.

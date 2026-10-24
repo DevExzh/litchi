@@ -2,8 +2,9 @@ use std::path::{Path, PathBuf};
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::phys_pkg::{PhysPkgReader, PhysPkgWriter};
-use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
-use litchi_pptx::{SourceBackedPresentation, SourceBackedPresentationEditor};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, SourceLimits, TargetMode};
+use litchi_pptx::SourceBackedPresentation;
+use litchi_pptx::source::{self, Package as SourcePackage};
 
 const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const DML: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
@@ -73,7 +74,7 @@ fn source() -> Vec<u8> {
     }
     package.relate_to("ppt/presentation.xml", rt::OFFICE_DOCUMENT);
     let generated = PackageWriter::to_bytes(&package).unwrap();
-    let reader = PhysPkgReader::new(&generated).unwrap();
+    let reader = PhysPkgReader::new(&generated, SourceLimits::default()).unwrap();
     let mut writer = PhysPkgWriter::new();
     for name in reader.member_names().unwrap() {
         let uri = PackURI::new(format!("/{name}")).unwrap();
@@ -89,7 +90,7 @@ fn source() -> Vec<u8> {
 
 fn emit(output: &Path, name: &str, bytes: &[u8]) {
     std::fs::write(output.join(format!("{name}.pptx")), bytes).unwrap();
-    let package = OpcPackage::from_bytes(bytes).unwrap();
+    let package = OpcPackage::from_bytes(bytes, SourceLimits::default()).unwrap();
     std::fs::write(
         output.join(format!("{name}.xml")),
         package
@@ -101,8 +102,8 @@ fn emit(output: &Path, name: &str, bytes: &[u8]) {
 }
 
 fn unchanged_parts(before: &[u8], after: &[u8]) {
-    let before = OpcPackage::from_bytes(before).unwrap();
-    let after = OpcPackage::from_bytes(after).unwrap();
+    let before = OpcPackage::from_bytes(before, SourceLimits::default()).unwrap();
+    let after = OpcPackage::from_bytes(after, SourceLimits::default()).unwrap();
     for name in [
         "/ppt/media/raster.png",
         "/ppt/media/opaque.bin",
@@ -126,24 +127,33 @@ fn main() {
     assert!(images[0].svg().is_none());
     emit(&output, "source", &source);
 
-    let editor = SourceBackedPresentationEditor::from_reader(source.as_slice()).unwrap();
-    let noop = editor.edit_svg_attachment(0, 0).unwrap().commit().unwrap();
+    let editor = SourcePackage::from_presentation(&view).unwrap();
+    let noop = editor.edit_svg_images().unwrap().commit().unwrap();
     let mut unchanged = Vec::new();
-    editor
-        .publish_svg_attachment_commit_to_stream(&mut unchanged, &noop)
-        .unwrap();
+    noop.package().write_to(&mut unchanged).unwrap();
     assert_eq!(unchanged, source);
 
-    let editor = SourceBackedPresentationEditor::from_reader(source.as_slice()).unwrap();
-    let mut edit = editor.edit_svg_attachment(0, 0).unwrap();
-    assert!(edit.attach_svg(SVG).unwrap());
+    let editor = SourcePackage::from_presentation(&view).unwrap();
+    let mut edit = editor.edit_svg_images().unwrap();
+    let replacement = source::svg::AttachmentReplacement::new(SVG.to_vec());
+    assert!(edit.attach(0, 0, &replacement).unwrap());
     let commit = edit.commit().unwrap();
-    let inverse = commit.patch().inverse();
-    assert!(inverse.apply(commit.snapshot()).unwrap().svg().is_none());
+    let restored = commit
+        .package()
+        .apply_svg_images(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
+    assert!(
+        restored
+            .edit_svg_images()
+            .unwrap()
+            .attachment(0, 0)
+            .unwrap()
+            .svg()
+            .is_none()
+    );
     let mut attached = Vec::new();
-    editor
-        .publish_svg_attachment_commit_to_stream(&mut attached, &commit)
-        .unwrap();
+    commit.package().write_to(&mut attached).unwrap();
     unchanged_parts(&source, &attached);
     let view = SourceBackedPresentation::from_reader(attached.as_slice()).unwrap();
     assert_eq!(
@@ -152,15 +162,21 @@ fn main() {
     );
     emit(&output, "attached", &attached);
 
-    let editor = SourceBackedPresentationEditor::from_reader(attached.as_slice()).unwrap();
-    let mut edit = editor.edit_svg_attachment(0, 0).unwrap();
-    assert!(edit.detach().unwrap());
+    let attached_view = SourceBackedPresentation::from_reader(attached.as_slice()).unwrap();
+    let editor = SourcePackage::from_presentation(&attached_view).unwrap();
+    let mut edit = editor.edit_svg_images().unwrap();
+    assert!(edit.detach(0, 0).unwrap());
     let commit = edit.commit().unwrap();
+    let restored_attached = commit
+        .package()
+        .apply_svg_images(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
     assert_eq!(
-        commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+        restored_attached
+            .edit_svg_images()
+            .unwrap()
+            .attachment(0, 0)
             .unwrap()
             .svg()
             .unwrap()
@@ -168,9 +184,7 @@ fn main() {
         SVG
     );
     let mut detached = Vec::new();
-    editor
-        .publish_svg_attachment_commit_to_stream(&mut detached, &commit)
-        .unwrap();
+    commit.package().write_to(&mut detached).unwrap();
     unchanged_parts(&source, &detached);
     let view = SourceBackedPresentation::from_reader(detached.as_slice()).unwrap();
     assert!(view.slide(0).unwrap().images().unwrap()[0].svg().is_none());

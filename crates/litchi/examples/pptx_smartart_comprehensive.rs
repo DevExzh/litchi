@@ -6,8 +6,8 @@
 use litchi_pptx::Package;
 use litchi_pptx::shape;
 use litchi_pptx::shape::diagram::{
-    Builder, Graphic, Kind, Node, colors_xml, data_xml, drawing_xml, graphic_frame, layout_xml,
-    quickstyle_xml,
+    Builder, Graphic, Kind, Limits, Node, colors_xml, data_xml, drawing_xml, graphic_frame,
+    layout_xml, quickstyle_xml,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -75,7 +75,7 @@ fn test_list_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&bullet_list);
+    let xml = data_xml(&bullet_list, &Limits::default())?;
     println!(
         "  ✓ Basic Block List: {} nodes, {} bytes XML",
         bullet_list.node_count(),
@@ -94,7 +94,7 @@ fn test_list_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&feature_list);
+    let xml = data_xml(&feature_list, &Limits::default())?;
     println!(
         "  ✓ Feature List: {} items, {} bytes XML",
         feature_list.node_count(),
@@ -112,7 +112,7 @@ fn test_list_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&categories);
+    let xml = data_xml(&categories, &Limits::default())?;
     println!(
         "  ✓ Technology Stack: {} categories, {} bytes XML\n",
         categories.node_count(),
@@ -136,7 +136,7 @@ fn test_process_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&basic_process);
+    let xml = data_xml(&basic_process, &Limits::default())?;
     println!(
         "  ✓ Software Development Process: {} steps, {} bytes XML",
         basic_process.node_count(),
@@ -156,7 +156,7 @@ fn test_process_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&customer_journey);
+    let xml = data_xml(&customer_journey, &Limits::default())?;
     println!(
         "  ✓ Customer Journey: {} stages, {} bytes XML",
         customer_journey.node_count(),
@@ -177,7 +177,7 @@ fn test_process_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&pipeline);
+    let xml = data_xml(&pipeline, &Limits::default())?;
     println!(
         "  ✓ Manufacturing Pipeline: {} steps, {} bytes XML\n",
         pipeline.node_count(),
@@ -204,7 +204,7 @@ fn test_cycle_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&pdca_cycle);
+    let xml = data_xml(&pdca_cycle, &Limits::default())?;
     println!(
         "  ✓ PDCA Cycle: {} phases, {} bytes XML",
         pdca_cycle.node_count(),
@@ -223,7 +223,7 @@ fn test_cycle_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&agile_sprint);
+    let xml = data_xml(&agile_sprint, &Limits::default())?;
     println!(
         "  ✓ Agile Sprint: {} activities, {} bytes XML",
         agile_sprint.node_count(),
@@ -242,7 +242,7 @@ fn test_cycle_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&lifecycle);
+    let xml = data_xml(&lifecycle, &Limits::default())?;
     println!(
         "  ✓ Product Lifecycle: {} stages, {} bytes XML\n",
         lifecycle.node_count(),
@@ -264,7 +264,7 @@ fn test_hierarchy_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         .add_items(vec!["CEO", "CFO", "CTO", "COO"])
         .build();
 
-    let xml = data_xml(&org_chart);
+    let xml = data_xml(&org_chart, &Limits::default())?;
     println!(
         "  ✓ Executive Team: {} positions, {} bytes XML",
         org_chart.node_count(),
@@ -299,7 +299,7 @@ fn test_hierarchy_diagrams() -> Result<(), Box<dyn std::error::Error>> {
     ceo.add_child(coo);
     company_org.add_node(ceo);
 
-    let xml = data_xml(&company_org);
+    let xml = data_xml(&company_org, &Limits::default())?;
     println!(
         "  ✓ Company Organization: {} total nodes, {} bytes XML",
         company_org.node_count(),
@@ -318,7 +318,7 @@ fn test_hierarchy_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&tech_stack);
+    let xml = data_xml(&tech_stack, &Limits::default())?;
     println!(
         "  ✓ Tech Stack Layers: {} layers, {} bytes XML\n",
         tech_stack.node_count(),
@@ -340,7 +340,7 @@ fn test_relationship_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         .add_items(vec!["Skills", "Passion", "Market Need"])
         .build();
 
-    let xml = data_xml(&venn);
+    let xml = data_xml(&venn, &Limits::default())?;
     println!(
         "  ✓ Finding Your Niche: {} circles, {} bytes XML",
         venn.node_count(),
@@ -353,7 +353,7 @@ fn test_relationship_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         .add_items(vec!["Quality", "Speed", "Cost", "Scope"])
         .build();
 
-    let xml = data_xml(&balance);
+    let xml = data_xml(&balance, &Limits::default())?;
     println!(
         "  ✓ Project Balance: {} factors, {} bytes XML",
         balance.node_count(),
@@ -372,7 +372,7 @@ fn test_relationship_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&systems);
+    let xml = data_xml(&systems, &Limits::default())?;
     println!(
         "  ✓ System Architecture: {} components, {} bytes XML\n",
         systems.node_count(),
@@ -399,7 +399,7 @@ fn test_matrix_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&priority_matrix);
+    let xml = data_xml(&priority_matrix, &Limits::default())?;
     println!(
         "  ✓ Priority Matrix: {} quadrants, {} bytes XML",
         priority_matrix.node_count(),
@@ -417,7 +417,7 @@ fn test_matrix_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&market_fit);
+    let xml = data_xml(&market_fit, &Limits::default())?;
     println!(
         "  ✓ Feature Prioritization: {} categories, {} bytes XML\n",
         market_fit.node_count(),
@@ -445,7 +445,7 @@ fn test_pyramid_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&needs_pyramid);
+    let xml = data_xml(&needs_pyramid, &Limits::default())?;
     println!(
         "  ✓ Maslow's Hierarchy: {} levels, {} bytes XML",
         needs_pyramid.node_count(),
@@ -463,7 +463,7 @@ fn test_pyramid_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         ])
         .build();
 
-    let xml = data_xml(&business_pyramid);
+    let xml = data_xml(&business_pyramid, &Limits::default())?;
     println!(
         "  ✓ Strategic Planning: {} tiers, {} bytes XML",
         business_pyramid.node_count(),
@@ -476,7 +476,7 @@ fn test_pyramid_diagrams() -> Result<(), Box<dyn std::error::Error>> {
         .add_items(vec!["Wisdom", "Knowledge", "Information", "Data"])
         .build();
 
-    let xml = data_xml(&knowledge);
+    let xml = data_xml(&knowledge, &Limits::default())?;
     println!(
         "  ✓ Knowledge Pyramid: {} levels, {} bytes XML\n",
         knowledge.node_count(),
@@ -538,11 +538,12 @@ fn test_complex_hierarchies() -> Result<(), Box<dyn std::error::Error>> {
     board.add_child(ceo);
     enterprise_org.add_node(board);
 
-    let data_xml = data_xml(&enterprise_org);
-    let layout_xml = layout_xml(&enterprise_org);
-    let colors_xml = colors_xml();
-    let style_xml = quickstyle_xml();
-    let drawing_xml = drawing_xml(&enterprise_org, 0, 0, 7_315_200, 4_000_000);
+    let limits = Limits::default();
+    let data_xml = data_xml(&enterprise_org, &limits)?;
+    let layout_xml = layout_xml(&enterprise_org, &limits)?;
+    let colors_xml = colors_xml(&limits)?;
+    let style_xml = quickstyle_xml(&limits)?;
+    let drawing_xml = drawing_xml(&enterprise_org, 0, 0, 7_315_200, 4_000_000, &limits)?;
 
     println!("  ✓ Enterprise Organization Chart:");
     println!("     - Data XML: {} bytes", data_xml.len());
@@ -560,7 +561,15 @@ fn test_complex_hierarchies() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn validate_graphic_frame() -> Result<(), Box<dyn std::error::Error>> {
-    let frame = graphic_frame(2, 914_400, 1_600_000, 7_315_200, 3_800_000, "rId10");
+    let frame = graphic_frame(
+        2,
+        914_400,
+        1_600_000,
+        7_315_200,
+        3_800_000,
+        "rId10",
+        &Limits::default(),
+    )?;
     let xml = format!(
         r#"<p:spTree xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">{frame}</p:spTree>"#
     );

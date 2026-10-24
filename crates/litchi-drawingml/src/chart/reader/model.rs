@@ -4,6 +4,8 @@
 //! retaining self-contained `DrawingML` fragments and skipping unknown content
 //! without changing the public chart model.
 
+use crate::chart::Limits;
+use crate::chart::limits::decoded_attribute_value_bytes;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::{SeenNames, first_wins};
@@ -28,21 +30,33 @@ pub(super) const INVALID_COLOR_MAPPING_ELEMENT: &str = "invalidColorMappingEleme
 /// elements by the focused parsers below.
 pub(super) struct ChartXmlReader<R: BufRead> {
     inner: NsReader<R>,
+    limits: Limits,
+    nodes: usize,
     depth: usize,
     skipped_depth: usize,
     saw_root: bool,
     closed_root: bool,
+    series: usize,
+    points_in_series: usize,
+    total_points: usize,
+    categories: usize,
     root_namespace_attributes: Vec<(Vec<u8>, Vec<u8>)>,
 }
 
 impl<R: BufRead> ChartXmlReader<R> {
-    pub(super) fn from_reader(reader: R) -> Self {
+    pub(super) fn from_reader(reader: R, limits: Limits) -> Self {
         Self {
             inner: NsReader::from_reader(reader),
+            limits,
+            nodes: 0,
             depth: 0,
             skipped_depth: 0,
             saw_root: false,
             closed_root: false,
+            series: 0,
+            points_in_series: 0,
+            total_points: 0,
+            categories: 0,
             root_namespace_attributes: Vec::new(),
         }
     }
@@ -53,6 +67,113 @@ impl<R: BufRead> ChartXmlReader<R> {
 
     pub(super) fn decoder(&self) -> Decoder {
         self.inner.decoder()
+    }
+
+    pub(super) fn max_text_bytes(&self) -> usize {
+        self.limits.max_text_bytes
+    }
+
+    pub(super) fn max_points(&self) -> usize {
+        self.limits.max_points
+    }
+
+    /// Append decoded semantic text without allowing a caller-selected text
+    /// field to grow past its bound.  XML text may arrive as several events
+    /// (or as entity references), so checking only the final model would make
+    /// the temporary `String` larger than the active policy first.
+    pub(super) fn append_text(&self, target: &mut String, text: &str) -> Result<()> {
+        let observed = target.len().checked_add(text.len()).ok_or_else(|| {
+            Error::limit(
+                crate::LimitKind::ChartTextBytes,
+                usize::MAX,
+                self.limits.max_text_bytes,
+            )
+        })?;
+        if observed > self.limits.max_text_bytes {
+            return Err(Error::limit(
+                crate::LimitKind::ChartTextBytes,
+                observed,
+                self.limits.max_text_bytes,
+            ));
+        }
+        target.push_str(text);
+        Ok(())
+    }
+
+    /// Admit one semantic series before its parser allocates the projection.
+    pub(super) fn begin_series(&mut self) -> Result<()> {
+        self.series = self.series.checked_add(1).ok_or_else(|| {
+            Error::limit(
+                crate::LimitKind::ChartSeries,
+                usize::MAX,
+                self.limits.max_series,
+            )
+        })?;
+        if self.series > self.limits.max_series {
+            return Err(Error::limit(
+                crate::LimitKind::ChartSeries,
+                self.series,
+                self.limits.max_series,
+            ));
+        }
+        self.points_in_series = 0;
+        // Category caches are retained once per series in the classic chart
+        // model.  A repeated category dimension therefore starts a fresh
+        // per-series budget, just as `validate_chart` does below.
+        self.categories = 0;
+        Ok(())
+    }
+
+    /// Admit one category point before its decoded string is retained.
+    pub(super) fn admit_category_point(&mut self) -> Result<()> {
+        self.categories = self.categories.checked_add(1).ok_or_else(|| {
+            Error::limit(
+                crate::LimitKind::ChartCategories,
+                usize::MAX,
+                self.limits.max_categories,
+            )
+        })?;
+        if self.categories > self.limits.max_categories {
+            return Err(Error::limit(
+                crate::LimitKind::ChartCategories,
+                self.categories,
+                self.limits.max_categories,
+            ));
+        }
+        Ok(())
+    }
+
+    /// Admit one numeric point before its decoded value is retained.
+    pub(super) fn admit_numeric_point(&mut self) -> Result<()> {
+        self.points_in_series = self.points_in_series.checked_add(1).ok_or_else(|| {
+            Error::limit(
+                crate::LimitKind::ChartPoints,
+                usize::MAX,
+                self.limits.max_points,
+            )
+        })?;
+        if self.points_in_series > self.limits.max_points {
+            return Err(Error::limit(
+                crate::LimitKind::ChartPoints,
+                self.points_in_series,
+                self.limits.max_points,
+            ));
+        }
+        self.total_points = self.total_points.checked_add(1).ok_or_else(|| {
+            Error::limit(
+                crate::LimitKind::ChartPoints,
+                usize::MAX,
+                self.limits.max_total_points,
+            )
+        })?;
+        if self.total_points > self.limits.max_total_points {
+            return Err(Error::limit(
+                crate::LimitKind::ChartPoints,
+                self.total_points,
+                self.limits.max_total_points,
+            ));
+        }
+        Ok(())
     }
 
     pub(super) fn relationship_attribute_value(
@@ -144,10 +265,24 @@ impl<R: BufRead> ChartXmlReader<R> {
                 .read_resolved_event_into(&mut buffer)
                 .map_err(|error| Error::Xml(error.to_string()))?;
             match event {
-                Event::Start(_) => {
+                Event::Start(ref element) => {
+                    validate_attributes(element, self.limits, self.decoder())?;
+                    let limits = self.limits;
+                    count_node_values(&mut self.nodes, limits)?;
                     self.depth = self.depth.checked_add(1).ok_or_else(|| {
-                        Error::Invalid(format!("{description} XML nesting is too deep"))
+                        Error::limit(
+                            crate::LimitKind::XmlDepth,
+                            usize::MAX,
+                            self.limits.max_xml_depth,
+                        )
                     })?;
+                    if self.depth > self.limits.max_xml_depth {
+                        return Err(Error::limit(
+                            crate::LimitKind::XmlDepth,
+                            self.depth,
+                            self.limits.max_xml_depth,
+                        ));
+                    }
                 },
                 Event::End(_) => {
                     self.depth = self.depth.checked_sub(1).ok_or_else(|| {
@@ -157,13 +292,31 @@ impl<R: BufRead> ChartXmlReader<R> {
                 Event::Eof => {
                     return Err(Error::Invalid(format!("unterminated {description}")));
                 },
+                Event::Empty(ref element) => {
+                    validate_attributes(element, self.limits, self.decoder())?;
+                    let limits = self.limits;
+                    count_node_values(&mut self.nodes, limits)?;
+                    let depth = self.depth.checked_add(1).ok_or_else(|| {
+                        Error::limit(
+                            crate::LimitKind::XmlDepth,
+                            usize::MAX,
+                            self.limits.max_xml_depth,
+                        )
+                    })?;
+                    if depth > self.limits.max_xml_depth {
+                        return Err(Error::limit(
+                            crate::LimitKind::XmlDepth,
+                            depth,
+                            self.limits.max_xml_depth,
+                        ));
+                    }
+                },
                 Event::DocType(_) => {
                     return Err(Error::Invalid(format!(
                         "{description} cannot contain a document type"
                     )));
                 },
-                Event::Empty(_)
-                | Event::Text(_)
+                Event::Text(_)
                 | Event::CData(_)
                 | Event::Comment(_)
                 | Event::Decl(_)
@@ -186,6 +339,8 @@ impl<R: BufRead> ChartXmlReader<R> {
         &mut self,
         buffer: &'buffer mut Vec<u8>,
     ) -> Result<Event<'buffer>> {
+        let limits = self.limits;
+        let decoder = self.inner.decoder();
         let (namespace, event) = self
             .inner
             .read_resolved_event_into(buffer)
@@ -193,6 +348,8 @@ impl<R: BufRead> ChartXmlReader<R> {
 
         match event {
             Event::Start(mut element) => {
+                validate_attributes(&element, limits, decoder)?;
+                count_node_values(&mut self.nodes, limits)?;
                 let is_chart = is_chart_namespace(&namespace, &element);
                 let is_drawing = is_drawing_namespace(&namespace, &element);
 
@@ -239,10 +396,20 @@ impl<R: BufRead> ChartXmlReader<R> {
                         }
                     }
                 }
-                self.depth = self
-                    .depth
-                    .checked_add(1)
-                    .ok_or_else(|| Error::Invalid("chart XML nesting is too deep".to_string()))?;
+                self.depth = self.depth.checked_add(1).ok_or_else(|| {
+                    Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        usize::MAX,
+                        self.limits.max_xml_depth,
+                    )
+                })?;
+                if self.depth > self.limits.max_xml_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        self.depth,
+                        self.limits.max_xml_depth,
+                    ));
+                }
 
                 if self.skipped_depth > 0 {
                     self.skipped_depth = self.skipped_depth.checked_add(1).ok_or_else(|| {
@@ -263,9 +430,25 @@ impl<R: BufRead> ChartXmlReader<R> {
                 Ok(Event::Start(element))
             },
             Event::Empty(mut element) => {
+                validate_attributes(&element, limits, decoder)?;
+                count_node_values(&mut self.nodes, limits)?;
                 if self.depth == 0 {
                     return Err(Error::Invalid(
                         "chart XML must have one non-empty DrawingML chartSpace root".to_string(),
+                    ));
+                }
+                let depth = self.depth.checked_add(1).ok_or_else(|| {
+                    Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        usize::MAX,
+                        self.limits.max_xml_depth,
+                    )
+                })?;
+                if depth > self.limits.max_xml_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        depth,
+                        self.limits.max_xml_depth,
                     ));
                 }
                 let is_chart = is_chart_namespace(&namespace, &element);
@@ -348,6 +531,54 @@ impl<R: BufRead> ChartXmlReader<R> {
             | Event::GeneralRef(_) => Ok(event),
         }
     }
+}
+
+fn count_node_values(nodes: &mut usize, limits: Limits) -> Result<()> {
+    *nodes = nodes.checked_add(1).ok_or_else(|| {
+        Error::limit(crate::LimitKind::XmlNodes, usize::MAX, limits.max_xml_nodes)
+    })?;
+    if *nodes > limits.max_xml_nodes {
+        return Err(Error::limit(
+            crate::LimitKind::XmlNodes,
+            *nodes,
+            limits.max_xml_nodes,
+        ));
+    }
+    Ok(())
+}
+
+fn validate_attributes(element: &BytesStart<'_>, limits: Limits, decoder: Decoder) -> Result<()> {
+    // The chart reader intentionally keeps the legacy first-wins behavior for
+    // duplicate attributes.  The checked iterator rejects those duplicates,
+    // so use the raw iterator here and only enforce resource budgets.
+    let mut count = 0usize;
+    for attribute in element.unchecked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        count = count.checked_add(1).ok_or_else(|| {
+            Error::limit(
+                crate::LimitKind::XmlAttributes,
+                usize::MAX,
+                limits.max_xml_attributes,
+            )
+        })?;
+        if count > limits.max_xml_attributes {
+            return Err(Error::limit(
+                crate::LimitKind::XmlAttributes,
+                count,
+                limits.max_xml_attributes,
+            ));
+        }
+        let value_length =
+            decoded_attribute_value_bytes(attribute.value.as_ref(), decoder).map_err(Error::Xml)?;
+        if value_length > limits.max_attribute_value_bytes {
+            return Err(Error::limit(
+                crate::LimitKind::AttributeValueBytes,
+                value_length,
+                limits.max_attribute_value_bytes,
+            ));
+        }
+    }
+    Ok(())
 }
 
 pub(super) fn is_chart_namespace(namespace: &ResolveResult<'_>, element: &BytesStart<'_>) -> bool {

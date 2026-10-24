@@ -50,13 +50,13 @@ impl Draft {
         F: FnOnce(&mut ProfileEdit) -> Result<()>,
     {
         let index = self.source.find(selector)?;
-        let mut profile_edit = actions::Edit::with_limits(
+        let mut profile_edit = actions::Edit::new(
             self.source.anchors()[index].profile().clone(),
             profile_limits(self.source.limits()),
         )?;
         edit(&mut profile_edit)?;
-        let committed = profile_edit.finish()?;
-        self.replace_profile(selector, committed.profile().clone())
+        let committed = profile_edit.commit()?;
+        self.replace_profile(selector, committed.package().profile().clone())
     }
 
     /// Replace one existing target with an already validated shared profile.
@@ -98,7 +98,7 @@ impl Draft {
                 limit: self.source.limits().target_bytes,
             });
         }
-        let profile = actions::read_profile(bytes.as_ref())?;
+        let profile = actions::read_profile(bytes.as_ref(), actions::Limits::DEFAULT)?;
         self.replace_profile(selector, profile)
     }
 
@@ -369,12 +369,12 @@ impl Change {
 
 /// Shared action profile limits selected by the owner transaction.
 #[must_use]
-pub fn default_profile_limits() -> actions::Limits {
-    actions::Limits::default()
+pub fn default_profile_limits() -> actions::builder::EditOptions {
+    actions::builder::EditOptions::default()
 }
 
-fn profile_limits(limits: super::model::Limits) -> actions::Limits {
-    let mut profile_limits = actions::Limits::default();
+fn profile_limits(limits: super::model::Limits) -> actions::builder::EditOptions {
+    let mut profile_limits = actions::builder::EditOptions::default();
     profile_limits.max_output_bytes = profile_limits.max_output_bytes.min(limits.target_bytes);
     profile_limits.max_payload_bytes = profile_limits.max_payload_bytes.min(limits.target_bytes);
     profile_limits

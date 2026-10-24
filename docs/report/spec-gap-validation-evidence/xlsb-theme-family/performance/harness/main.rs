@@ -21,7 +21,7 @@ use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_drawingml::theme::family::part as family_part;
 use litchi_drawingml::theme::{Color, Slot, Theme, codec};
 use litchi_xlsb::theme::Family;
-use litchi_xlsb::{SourceBackedWorkbook, Workbook};
+use litchi_xlsb::{Package, SourceBackedWorkbook, Workbook};
 use sha2::{Digest, Sha256};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use std::alloc::{GlobalAlloc, Layout, System};
@@ -833,7 +833,7 @@ fn digest_bytes(mut digest: u64, bytes: &[u8]) -> u64 {
 }
 
 struct HostState {
-    workbook: Workbook,
+    workbook: Package,
     operation: Operation,
     baseline_family: Option<Family>,
     target_family: Option<Family>,
@@ -853,13 +853,14 @@ impl HostState {
         } else {
             &fixture.package_bytes
         };
-        let workbook = Workbook::new(Cursor::new(bytes.clone()))?;
+        let workbook = Workbook::new(Cursor::new(bytes.clone()))?.into_package();
         let snapshot = workbook.theme()?.ok_or("prepared workbook has no Theme")?;
         let baseline_family = snapshot.family().cloned();
         let baseline_family_xml = baseline_family
             .as_ref()
             .and_then(|value| value.source().map(ToOwned::to_owned));
-        let baseline_theme_without_family = family_part::remove_family(snapshot.source_xml())?;
+        let baseline_theme_without_family =
+            family_part::remove_family(snapshot.source_xml(), family_part::Limits::DEFAULT)?;
         let target_family = (operation == Operation::Add).then(|| fixture.family.clone());
         let updated_family =
             (operation == Operation::Update).then(|| fixture.updated_family.clone());
@@ -908,7 +909,7 @@ fn run_codec_read(fixture: &Fixture) -> Result<Sample> {
     reset_alloc();
     let before = AllocSnapshot::now();
     let started = Instant::now();
-    let parsed = codec::read(input)?;
+    let parsed = codec::read(input, codec::Limits::DEFAULT)?;
     black_box(&parsed);
     let elapsed_ns = elapsed_ns(started);
     let allocation = before.delta(AllocSnapshot::now());
@@ -1056,24 +1057,26 @@ fn run_host_transaction(_fixture: &Fixture, state: &mut HostState) -> Result<Sam
                 .ok_or("missing update Family")?,
         )?,
         Operation::Remove => edit.remove_family()?,
-        Operation::BaseEdit => edit.replace(state.changed_theme.clone())?,
+        Operation::BaseEdit => edit.replace(Some(state.changed_theme.clone()))?,
         _ => return Err("invalid host transaction operation".into()),
     };
     let commit = edit.commit()?;
-    let commit_changed = commit.changed();
-    let forward = black_box(state.workbook.apply_theme(&commit)?);
+    let commit_changed = commit.diagnostics().changed();
+    let forward = black_box(commit.package().clone());
     let inverse = commit.patch().inverse();
-    let restored = black_box(state.workbook.apply_theme_patch(&inverse)?);
+    let restored = black_box(forward.apply_theme(&inverse)?.into_package());
     let elapsed_ns = elapsed_ns(started);
     let allocation = before.delta(AllocSnapshot::now());
 
     // Source hashes and pointer comparisons are intentionally after the timed
     // interval.  Large Theme XML is never hashed by the timed closure.
-    let forward_theme_hash = theme_digest(forward.theme());
-    let forward_family_hash = forward.family().map(family_digest).unwrap_or(0);
-    let restored_theme_hash = theme_digest(restored.theme());
-    let restored_family_hash = restored.family().map(family_digest).unwrap_or(0);
-    let restored_xml = restored.source_xml();
+    let forward_snapshot = forward.theme()?.ok_or("forward package has no Theme")?;
+    let restored_snapshot = restored.theme()?.ok_or("restored package has no Theme")?;
+    let forward_theme_hash = theme_digest(forward_snapshot.theme());
+    let forward_family_hash = forward_snapshot.family().map(family_digest).unwrap_or(0);
+    let restored_theme_hash = theme_digest(restored_snapshot.theme());
+    let restored_family_hash = restored_snapshot.family().map(family_digest).unwrap_or(0);
+    let restored_xml = restored_snapshot.source_xml();
     let source_shared = state.operation == Operation::Noop
         && restored_xml.as_ptr() == state.baseline_source_ptr as *const u8;
     // Compare the forward source outside the timed interval. Family edits must
@@ -1082,22 +1085,22 @@ fn run_host_transaction(_fixture: &Fixture, state: &mut HostState) -> Result<Sam
     // foreign children.
     let forward_preservation_ok = match state.operation {
         Operation::BaseEdit => state.baseline_family_xml.as_ref().is_none_or(|expected| {
-            forward
+            forward_snapshot
                 .family()
                 .and_then(Family::source)
                 .is_some_and(|actual| actual == expected.as_slice())
         }),
         _ => {
-            family_part::remove_family(forward.source_xml())?
+            family_part::remove_family(forward_snapshot.source_xml(), family_part::Limits::DEFAULT)?
                 == state.baseline_theme_without_family.as_slice()
         },
     };
     let forward_edit_ok = match state.operation {
-        Operation::Add => forward.family().is_some(),
-        Operation::Update => forward
+        Operation::Add => forward_snapshot.family().is_some(),
+        Operation::Update => forward_snapshot
             .family()
             .is_some_and(|value| value.name() == UPDATED_NAME),
-        Operation::Remove => forward.family().is_none(),
+        Operation::Remove => forward_snapshot.family().is_none(),
         Operation::BaseEdit => forward_theme_hash != theme_digest(&state.base_theme),
         Operation::Noop => true,
         _ => false,
@@ -1112,7 +1115,7 @@ fn run_host_transaction(_fixture: &Fixture, state: &mut HostState) -> Result<Sam
                 .unwrap_or(0);
     let preservation_ok = restored_xml == state.baseline_theme_xml.as_slice()
         && state.baseline_family_xml.as_ref().is_none_or(|expected| {
-            restored
+            restored_snapshot
                 .family()
                 .and_then(Family::source)
                 .is_some_and(|actual| actual == expected.as_slice())

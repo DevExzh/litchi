@@ -28,7 +28,10 @@ pub fn read(chart_xml: &[u8], anchor: Anchor) -> Result<Chart> {
 /// Returns an error when the `DrawingML` chart payload is malformed or violates
 /// a modeled chart invariant.
 pub fn decode(chart_xml: &[u8]) -> Result<ChartModel> {
-    Ok(litchi_drawingml::chart::reader::read(chart_xml)?)
+    Ok(litchi_drawingml::chart::reader::read(
+        chart_xml,
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )?)
 }
 
 /// Generate chart XML for a worksheet chart.
@@ -38,8 +41,12 @@ pub fn decode(chart_xml: &[u8]) -> Result<ChartModel> {
 /// Returns an error when the chart cannot be encoded as XML.
 pub fn write(chart: &ChartModel) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    litchi_drawingml::chart::writer::write(&mut output, chart)
-        .map_err(|error| Error::Encoding(error.to_string()))?;
+    litchi_drawingml::chart::writer::write(
+        &mut output,
+        chart,
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )
+    .map_err(|error| Error::Encoding(error.to_string()))?;
     Ok(output)
 }
 
@@ -57,6 +64,7 @@ pub fn write_with_external_data_id(
     litchi_drawingml::chart::writer::write_with_rels(
         &mut output,
         chart,
+        &litchi_drawingml::chart::Limits::DEFAULT,
         external_data_relationship_id,
         user_shapes_relationship_id,
     )

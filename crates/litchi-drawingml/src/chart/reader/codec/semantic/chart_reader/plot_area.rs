@@ -131,14 +131,17 @@ pub(crate) fn parse_title<R: BufRead>(reader: &mut ChartXmlReader<R>) -> Result<
                 saw_text = true;
                 in_text = true;
             },
-            Ok(Event::Text(e)) if in_text => {
-                text.push_str(&e.decode().map_err(|e| Error::Xml(e.to_string()))?);
-            },
-            Ok(Event::CData(e)) if in_text => {
-                text.push_str(&e.decode().map_err(|e| Error::Xml(e.to_string()))?);
-            },
+            Ok(Event::Text(e)) if in_text => reader.append_text(
+                &mut text,
+                &e.decode().map_err(|e| Error::Xml(e.to_string()))?,
+            )?,
+            Ok(Event::CData(e)) if in_text => reader.append_text(
+                &mut text,
+                &e.decode().map_err(|e| Error::Xml(e.to_string()))?,
+            )?,
             Ok(Event::GeneralRef(reference)) if in_text => {
-                text.push_str(&decode_xml_reference(&reference)?);
+                let value = decode_xml_reference(&reference)?;
+                reader.append_text(&mut text, &value)?;
             },
             Ok(Event::End(ref e)) if e.local_name().as_ref() == b"t" => {
                 in_text = false;
@@ -325,14 +328,24 @@ pub(crate) fn parse_picture_options<R: BufRead>(
             Ok(Event::Start(ref element))
                 if is_picture_option_child(element.local_name().as_ref()) =>
             {
-                parse_picture_option_child(&mut options, element, reader.decoder())?;
+                parse_picture_option_child(
+                    &mut options,
+                    element,
+                    reader.decoder(),
+                    reader.max_text_bytes(),
+                )?;
                 let name = element.local_name().as_ref().to_vec();
                 consume_empty_chart_element(reader, &name, "chart picture option")?;
             },
             Ok(Event::Empty(ref element))
                 if is_picture_option_child(element.local_name().as_ref()) =>
             {
-                parse_picture_option_child(&mut options, element, reader.decoder())?;
+                parse_picture_option_child(
+                    &mut options,
+                    element,
+                    reader.decoder(),
+                    reader.max_text_bytes(),
+                )?;
             },
             Ok(Event::End(ref element)) if element.local_name().as_ref() == b"pictureOptions" => {
                 break;
@@ -359,6 +372,7 @@ pub(crate) fn parse_picture_option_child(
     options: &mut PictureOptions,
     element: &BytesStart<'_>,
     decoder: Decoder,
+    max_text_bytes: usize,
 ) -> Result<()> {
     let target = match element.local_name().as_ref() {
         b"applyToFront" => Some(&mut options.apply_to_front),
@@ -370,7 +384,13 @@ pub(crate) fn parse_picture_option_child(
                     "chart picture options contain duplicate formats".into(),
                 ));
             }
-            let value = required_string_attr(element, b"val", decoder, "chart picture format")?;
+            let value = required_string_attr(
+                element,
+                b"val",
+                decoder,
+                max_text_bytes,
+                "chart picture format",
+            )?;
             options.picture_format = Some(match value.as_str() {
                 "stretch" => PictureFormat::Stretch,
                 "stack" => PictureFormat::Stack,

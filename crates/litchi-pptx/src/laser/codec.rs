@@ -451,9 +451,20 @@ fn parse_coordinate(value: String, name: &str) -> Result<Coordinate> {
 }
 
 fn coordinate_error(error: CoordinateParseError, name: &str) -> Error {
-    invalid(format!(
-        "invalid laser trace point {name} DrawingML coordinate: {error}"
-    ))
+    match error {
+        CoordinateParseError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Drawing(litchi_drawingml::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        }),
+        _ => invalid(format!(
+            "invalid laser trace point {name} DrawingML coordinate"
+        )),
+    }
 }
 
 fn parse_time_offset(value: String) -> Result<Offset> {

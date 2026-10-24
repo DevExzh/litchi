@@ -7,6 +7,7 @@ use super::{
     parse_bool_attr, parse_data_label, parse_series_marker, parse_text_element,
     required_named_f64_attr, required_u32_attr,
 };
+use std::collections::HashSet;
 
 pub(crate) fn parse_pivot_source<R: BufRead>(
     reader: &mut ChartXmlReader<R>,
@@ -323,15 +324,27 @@ pub(crate) fn parse_pivot_formats<R: BufRead>(
     reader: &mut ChartXmlReader<R>,
 ) -> Result<Vec<PivotFormat>> {
     let mut formats = Vec::new();
+    let mut indexes = HashSet::new();
     let mut buf = Vec::new();
     loop {
         match reader.read_event_into(&mut buf) {
             Ok(Event::Start(ref element)) if element.local_name().as_ref() == b"pivotFmt" => {
+                let count = formats.len().checked_add(1).ok_or_else(|| {
+                    Error::limit(
+                        crate::LimitKind::ChartPoints,
+                        usize::MAX,
+                        reader.max_points(),
+                    )
+                })?;
+                if count > reader.max_points() {
+                    return Err(Error::limit(
+                        crate::LimitKind::ChartPoints,
+                        count,
+                        reader.max_points(),
+                    ));
+                }
                 let format = parse_pivot_format(reader)?;
-                if formats
-                    .iter()
-                    .any(|existing: &PivotFormat| existing.index == format.index)
-                {
+                if !indexes.insert(format.index) {
                     return Err(Error::Invalid(format!(
                         "chart contains duplicate pivot-format index {}",
                         format.index

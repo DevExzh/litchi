@@ -4939,7 +4939,16 @@ fn attach_svg_relationship(
         inherited_namespaces,
         max_output_bytes,
     )?;
-    let blip = litchi_drawingml::svg_blip::read(&fragment)?;
+    let input_limit = usize::try_from(max_output_bytes)
+        .unwrap_or(usize::MAX)
+        .min(litchi_drawingml::svg_blip::MAX_XML_BYTES);
+    let blip = litchi_drawingml::svg_blip::read(
+        &fragment,
+        litchi_drawingml::svg_blip::Limits::new(
+            input_limit,
+            litchi_drawingml::svg_blip::MAX_XML_BYTES,
+        ),
+    )?;
     let (id, external) = match (blip.embedded(), blip.linked()) {
         (Some(id), None) => (id.as_str().to_owned(), false),
         (None, Some(id)) => (id.as_str().to_owned(), true),

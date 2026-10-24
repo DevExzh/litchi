@@ -15,7 +15,7 @@
     reason = "the opt-in profile owns a process-local allocator observer and emits JSON"
 )]
 
-use litchi_drawingml::theme::family::{self, Snapshot};
+use litchi_drawingml::theme::family::{self, Package};
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::env;
 use std::error::Error;
@@ -302,7 +302,7 @@ fn allocator_counter_self_test() -> Result<(), BoxError> {
     Ok(())
 }
 
-fn observe_source(snapshot: &Snapshot, fixture: &Fixture) -> Result<Observation, BoxError> {
+fn observe_source(snapshot: &Package, fixture: &Fixture) -> Result<Observation, BoxError> {
     let bytes = snapshot.xml_bytes();
     let value = snapshot.value();
     let source_equal = bytes == fixture.bytes;
@@ -477,7 +477,7 @@ impl Fixture {
             opaque: kind == FixtureKind::Opaque,
             shape_ok: false,
         };
-        let snapshot = Snapshot::from_xml(fixture.bytes.clone())?;
+        let snapshot = Package::from_xml(fixture.bytes.clone(), family::Limits::DEFAULT)?;
         if fixture.opaque {
             validate_opaque_shape(&fixture.bytes)?;
         }
@@ -578,7 +578,7 @@ struct Sample {
 fn run_sample(
     fixture: &Fixture,
     operation: Operation,
-    prepared: Option<&Snapshot>,
+    prepared: Option<&Package>,
 ) -> Result<Sample, BoxError> {
     reset_alloc();
     let allocation_before = AllocSnapshot::now();
@@ -587,7 +587,7 @@ fn run_sample(
     let mut changed_ok = true;
     let mut inverse_ok = true;
     let result = match operation {
-        Operation::Read => Snapshot::from_xml(&fixture.bytes),
+        Operation::Read => Package::from_xml(&fixture.bytes, family::Limits::DEFAULT),
         Operation::Clone => Ok(black_box(
             prepared
                 .ok_or("clone operation lacks prepared snapshot")?
@@ -596,13 +596,13 @@ fn run_sample(
         Operation::Noop => {
             let snapshot = prepared.ok_or("no-op operation lacks prepared snapshot")?;
             let commit = snapshot.edit().commit()?;
-            Ok(black_box(commit.into_snapshot()))
+            Ok(black_box(commit.into_package()))
         },
         Operation::Change => {
             let snapshot = prepared.ok_or("change operation lacks prepared snapshot")?;
             let mut edit = snapshot.edit();
             edit.set_name(CHANGED_NAME)?;
-            Ok(black_box(edit.commit()?.into_snapshot()))
+            Ok(black_box(edit.commit()?.into_package()))
         },
     }?;
     let elapsed_ns = u64::try_from(started.elapsed().as_nanos()).unwrap_or(u64::MAX);
@@ -651,7 +651,9 @@ fn run_sample(
             let mut edit = original.edit();
             edit.set_name(CHANGED_NAME)?;
             let commit = edit.commit()?;
-            let restored = commit.patch().clone().inverse().apply(&result)?;
+            let inverse = commit.patch().clone().inverse();
+            let restored_commit = result.apply(&inverse)?;
+            let restored = restored_commit.package();
             inverse_ok = restored.xml_bytes() == original.xml_bytes();
             if !changed_ok || !inverse_ok {
                 return Err("changed edit failed its source-preservation or inverse gate".into());
@@ -675,7 +677,10 @@ fn main() -> Result<(), BoxError> {
     let prepared = if args.operation == Operation::Read {
         None
     } else {
-        Some(Snapshot::from_xml(fixture.bytes.clone())?)
+        Some(Package::from_xml(
+            fixture.bytes.clone(),
+            family::Limits::DEFAULT,
+        )?)
     };
     for _ in 0..args.warmup {
         let _ = run_sample(&fixture, args.operation, prepared.as_ref())?;

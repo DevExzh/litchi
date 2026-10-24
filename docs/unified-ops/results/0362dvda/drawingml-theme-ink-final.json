@@ -1,0 +1,71 @@
+{
+  "record": "0362dvda-drawingml-theme-ink-final",
+  "date": "2026-10-24",
+  "scope": "final nested Theme replacement namespace and expanded-attribute review return",
+  "source": {
+    "commit": "af6844b2baceb7eb5c8eb9a0ce441001ce45a9ab",
+    "tree": "c488dee3014f6db3606b1f83bd121c50482936ac",
+    "followup_commit": "b14ea9d225ef56887b1526e2035e97eb9345bc52",
+    "followup_tree": "8cd797710eedd6c5a675c9bc63c4bcb72c7b0edb",
+    "parent_source_commit": "f7e3a52bdb44cb256b0933b3cdbc8bf55ba47377",
+    "parent_source_tree": "ce16fd65494ba4c0eccb9cfc302665ac685ae0b7",
+    "changes": [
+      "refuse locally cross-conformance-bound modeled descendants before output",
+      "preserve opaque extension namespace bindings",
+      "cap replacement font scripts at MAX_SCRIPT_COUNT=64",
+      "use a borrowed BTreeSet for expanded attribute duplicate checks",
+      "entity-decode namespace URIs before expanded-name comparison"
+    ]
+  },
+  "lock": {
+    "path": "Cargo.lock",
+    "bytes": 139591,
+    "sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6"
+  },
+  "validation": {
+    "phase": "precommit-equivalent-source",
+    "focused_theme_codec_tests": {
+      "passed": 14,
+      "command": "env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_CAPPED= LITCHI_BLESS= LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp-final-nested cargo test -p litchi-drawingml theme::codec::tests --all-targets --offline --locked"
+    },
+    "drawingml_all_targets": {
+      "exit_code": 0,
+      "command": "env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_CAPPED= LITCHI_BLESS= LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp-final-nested cargo test -p litchi-drawingml --all-targets --offline --locked",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/drawingml-final-nested.log",
+        "bytes": 40252,
+        "sha256": "e8e33f67cbf9b3732acc3c039bb41a690a87ceda4d65485ab8266384b9c5eccf"
+      }
+    },
+    "opaque_nested_followup_theme_tests": {
+      "passed": 14,
+      "command": "env PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_CAPPED= LITCHI_BLESS= LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_TARGET_DIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/target TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp-final-opaque cargo test -p litchi-drawingml theme::codec::tests --all-targets --offline --locked",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/theme-opaque-followup.log",
+        "bytes": 6985,
+        "sha256": "b05d38ec5d07f5d942661e8dc15eeb4be12025515dbfccc4f450a062a875641a"
+      },
+      "regression": "opaque foreign parent permits a locally counterpart-bound modeled-looking child and preserves exact replacement splice/readback"
+    },
+    "fmt": true,
+    "diff_check": true,
+    "large_evidence_guard": true,
+    "binary_guard": true,
+    "target_bytes": 2232611316
+  },
+  "harness_receipt": {
+    "source": "f5631b5260d07e6e59af17ff8181092376352e35",
+    "root_lock_sha256": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
+    "harness_lock_sha256": "f60da4a97f25ca90a2cd2e86d2c668c2760c68cd580e382af853d887f1641144",
+    "target_bytes": 205682117,
+    "log_bytes": 858,
+    "log_sha256": "ccfda9726b0e184c4045d98547c5793e9e37e6832e6b9fb66ddd4ce91dca3980"
+  },
+  "standalone_unified_chart_add_failed_locked": {
+    "exit_code": 101,
+    "log_bytes": 298,
+    "log_sha256": "408841b16b557ec63fabc2b00f3c191ca9af807b53abcfb63f326adcc7ef4d5a",
+    "command": "env -u LITCHI_CAPPED -u LITCHI_BLESS PATH=/home/zhuhe/code/litchi-worktrees/.coord/bin:$PATH LITCHI_MEM_MAX=20G CARGO_BUILD_JOBS=1 CARGO_INCREMENTAL=0 CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_PROFILE_BENCH_DEBUG=0 TMPDIR=/home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/tmp cargo check --manifest-path tools/perf-baseline/unified-chart-add/Cargo.toml --offline --locked --target-dir /home/zhuhe/code/litchi-worktrees/.coord/drawingml-limits/unified-chart-target"
+  },
+  "scope_note": "This return does not claim closure for other raw DrawingML lanes."
+}

@@ -1155,6 +1155,25 @@ impl Classify for litchi_core::Error {
     }
 }
 
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+impl Classify for litchi_drawingml::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
+            // A patch made for a different immutable owner is caller input,
+            // not a malformed document or a transient I/O failure.
+            Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::Io(error) => error.classify(),
+            Self::Mce(error) if mce_invalid_limit(error) => Class::of(Code::InvalidArgument),
+            Self::Mce(error) if mce_limit(error) => Class::of(Code::LimitExceeded),
+            Self::Invalid(_) => Class::of(Code::InvalidValue),
+            Self::Xml(_) | Self::Mce(_) | Self::Common(_) => Class::of(Code::CorruptFile),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
 /// Whether a shared OOXML error is a typed budget of a shared family
 /// (record 0360).
 #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
@@ -1271,6 +1290,7 @@ impl Classify for litchi_docx::Error {
             Self::UnsupportedOpenPolicy { .. } => Class::of(Code::UnsupportedCapability),
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
+            Self::Drawing(error) => error.classify(),
             // A nonempty accepted prefix means the sink observed a partial
             // publication, regardless of whether the producer or OPC layer
             // raised the secondary cause. A zero-prefix stream preserves the
@@ -1395,6 +1415,7 @@ impl Classify for litchi_pptx::Error {
             },
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
+            Self::Drawing(error) => error.classify(),
             // A patch for another base: the caller supplied it (record 0351).
             Self::PatchConflict => Class::of(Code::InvalidInput),
             // Every well-formed refusal is classified by its shared kind;

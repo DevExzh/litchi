@@ -488,7 +488,14 @@ impl<'a> SvgOwner<'a> {
     /// codec retains the raw contextual fragment and performs this completion
     /// lazily, so the host never stores a flattened copy per owner.
     pub fn namespace_complete(&self, max_output_bytes: usize) -> Result<Vec<u8>> {
-        svg_blip::write_contextual(&self.value, max_output_bytes).map_err(Into::into)
+        svg_blip::write_contextual(
+            &self.value,
+            svg_blip::Limits::new(
+                svg_blip::MAX_XML_BYTES,
+                max_output_bytes.min(svg_blip::MAX_XML_BYTES),
+            ),
+        )
+        .map_err(Into::into)
     }
 }
 
@@ -2468,7 +2475,14 @@ fn project_svg_owner<'a>(
     if raw.len() > maximum {
         return Err(limit("DOCX SVG fragment bytes", raw.len(), maximum));
     }
-    let value = match svg_blip::read_contextual(raw, context) {
+    let value = match svg_blip::read_contextual(
+        raw,
+        context,
+        svg_blip::Limits::new(
+            maximum.min(svg_blip::MAX_XML_BYTES),
+            svg_blip::MAX_XML_BYTES,
+        ),
+    ) {
         Ok(value) => value,
         Err(_) => return Ok(SvgOwnerState::Refused),
     };

@@ -20,8 +20,8 @@ use std::fmt::Write as FmtWrite;
 use std::hint::black_box;
 use std::time::Instant;
 
-use litchi_drawingml::svg_blip::{self, NamespaceContext, Reference};
-use litchi_xlsx::drawing::{SourceDrawing, SvgOwnerState};
+use litchi_drawingml::svg_blip::{self, Limits, MAX_XML_BYTES, NamespaceContext, Reference};
+use litchi_xlsx::drawing::{ScanLimits, SourceDrawing, SvgOwnerState};
 
 use support::{AllocDelta, AllocSnapshot};
 
@@ -354,7 +354,7 @@ fn original_source() -> Vec<u8> {
 }
 
 fn execute(spec: LaneSpec, fixture: &Fixture) -> Result<Execution> {
-    let drawing = SourceDrawing::scan(&fixture.source)?;
+    let drawing = SourceDrawing::scan(&fixture.source, 0, ScanLimits::default())?;
     let observation = observe(&drawing, fixture)?;
     let common = Execution {
         actual_success: spec.expected_success(),
@@ -440,7 +440,7 @@ fn execute_export(
         let value = owner.value();
         let output = export_owner(owner, value, &fixture.source, usize::MAX)?;
         export_bytes = export_bytes.saturating_add(u64::try_from(output.len()).unwrap_or(u64::MAX));
-        let readback = svg_blip::read(&output)?;
+        let readback = svg_blip::read(&output, Limits::DEFAULT)?;
         if readback
             .embedded()
             .is_some_and(|id| matches_svg_reference(id.as_str(), index))
@@ -499,12 +499,12 @@ fn execute_edit(
         let mut value = owner.value().clone();
         value.set_reference(Reference::embedded("rIdEdited")?)?;
         let output = if value.namespace_context().is_some() {
-            svg_blip::write_contextual(&value, usize::MAX)?
+            svg_blip::write_contextual(&value, Limits::DEFAULT)?
         } else {
-            svg_blip::write(&value)?
+            svg_blip::write(&value, Limits::DEFAULT)?
         };
         export_bytes = export_bytes.saturating_add(u64::try_from(output.len()).unwrap_or(u64::MAX));
-        let readback = svg_blip::read(&output)?;
+        let readback = svg_blip::read(&output, Limits::DEFAULT)?;
         if readback
             .embedded()
             .is_some_and(|id| id.as_str() == "rIdEdited")
@@ -583,7 +583,10 @@ fn export_owner(
     max_output_bytes: usize,
 ) -> Result<Vec<u8>> {
     if value.namespace_context().is_some() {
-        Ok(svg_blip::write_contextual(value, max_output_bytes)?)
+        Ok(svg_blip::write_contextual(
+            value,
+            Limits::new(MAX_XML_BYTES, max_output_bytes.min(MAX_XML_BYTES)),
+        )?)
     } else {
         Ok(owner.namespace_complete(source, max_output_bytes)?)
     }

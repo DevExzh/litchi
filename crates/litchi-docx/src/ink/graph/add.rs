@@ -510,6 +510,7 @@ fn validate_new_target(input: &NewTarget) -> Result<()> {
                 projection.traces(),
                 projection.brush_properties(),
                 projection.links(),
+                shared::Limits::DEFAULT,
             )?;
         },
         NewTargetKind::Image { content_type } => {

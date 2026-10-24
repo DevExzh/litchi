@@ -64,7 +64,8 @@ impl Document {
     pub(crate) fn parse(xml: &[u8]) -> Result<Self> {
         if xml.len() > validation::MAX_XML_BYTES {
             return Err(validation::limit(
-                "chart editor XML",
+                crate::LimitKind::XmlBytes,
+                xml.len(),
                 validation::MAX_XML_BYTES,
             ));
         }
@@ -89,13 +90,15 @@ impl Document {
                 Event::Start(element) => {
                     if nodes.len() >= validation::MAX_XML_NODES {
                         return Err(validation::limit(
-                            "chart editor XML nodes",
+                            crate::LimitKind::XmlNodes,
+                            nodes.len() + 1,
                             validation::MAX_XML_NODES,
                         ));
                     }
                     if stack.len() >= validation::MAX_XML_DEPTH {
                         return Err(validation::limit(
-                            "chart editor XML nesting",
+                            crate::LimitKind::XmlDepth,
+                            stack.len() + 1,
                             validation::MAX_XML_DEPTH,
                         ));
                     }
@@ -115,7 +118,8 @@ impl Document {
                 Event::Empty(element) => {
                     if nodes.len() >= validation::MAX_XML_NODES {
                         return Err(validation::limit(
-                            "chart editor XML nodes",
+                            crate::LimitKind::XmlNodes,
+                            nodes.len() + 1,
                             validation::MAX_XML_NODES,
                         ));
                     }
@@ -386,7 +390,7 @@ impl Document {
 
 pub(crate) fn read(xml: &[u8]) -> Result<crate::chart::Chart> {
     Document::parse(xml)?;
-    reader::read(Cursor::new(xml))
+    reader::read(Cursor::new(xml), &crate::chart::Limits::DEFAULT)
 }
 
 pub(crate) fn set_style(xml: &[u8], style: Option<u32>) -> Result<Vec<u8>> {
@@ -1618,7 +1622,8 @@ fn insert_at(xml: &[u8], position: usize, bytes: &[u8]) -> Result<Vec<u8>> {
     let output_len = xml.len().saturating_add(bytes.len());
     if output_len > validation::MAX_XML_BYTES {
         return Err(validation::limit(
-            "chart editor XML",
+            crate::LimitKind::XmlBytes,
+            output_len,
             validation::MAX_XML_BYTES,
         ));
     }
@@ -1641,7 +1646,8 @@ fn replace_range(xml: &[u8], range: Range<usize>, replacement: &[u8]) -> Result<
         .saturating_add(replacement.len());
     if output_len > validation::MAX_XML_BYTES {
         return Err(validation::limit(
-            "chart editor XML",
+            crate::LimitKind::XmlBytes,
+            output_len,
             validation::MAX_XML_BYTES,
         ));
     }

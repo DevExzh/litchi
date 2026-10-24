@@ -38,8 +38,8 @@ struct Writer {
 }
 
 impl Writer {
-    fn new() -> Self {
-        let mut xml = String::with_capacity(4096);
+    fn new(capacity: usize) -> Self {
+        let mut xml = String::with_capacity(capacity);
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
         xml.push_str(&format!(
             r#"<dsp:drawing xmlns:dgm="{DGM}" xmlns:dsp="{DSP}" xmlns:a="{A}"><dsp:spTree><dsp:nvGrpSpPr><dsp:cNvPr id="0" name=""/><dsp:cNvGrpSpPr/></dsp:nvGrpSpPr><dsp:grpSpPr/>"#
@@ -202,8 +202,8 @@ fn count(value: usize) -> i64 {
 }
 
 /// Write the drawing of `spec` for a `width` × `height` EMU frame.
-pub(super) fn write(spec: &Spec, width: i64, height: i64) -> String {
-    let mut out = Writer::new();
+pub(super) fn write(spec: &Spec, width: i64, height: i64, capacity: usize) -> String {
+    let mut out = Writer::new(capacity);
     let flat = spec.flatten();
     let top: Vec<&Flat<'_>> = flat.iter().filter(|item| item.depth == 0).collect();
     if top.is_empty() {

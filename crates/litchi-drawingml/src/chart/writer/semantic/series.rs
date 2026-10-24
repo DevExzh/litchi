@@ -2,7 +2,7 @@
 
 use super::super::model::SeriesFeatures;
 use super::super::validation::invalid_chart_input;
-use super::super::xml::write_fragment;
+use super::super::xml::{write_escaped_xml, write_fragment};
 use super::{
     common::write_chart_lines,
     presentation::{write_layout, write_marker_parts, write_picture_options, write_title_text},
@@ -250,7 +250,7 @@ pub(super) fn write_data_labels<W: Write>(
     labels: &DataLabels,
 ) -> std::io::Result<()> {
     write!(writer, "<c:dLbls>")?;
-    let mut point_indexes = std::collections::HashSet::with_capacity(labels.labels.len());
+    let mut point_indexes = std::collections::HashSet::new();
     for label in &labels.labels {
         if !point_indexes.insert(label.index) {
             return Err(invalid_chart_input(format!(
@@ -287,10 +287,11 @@ pub(super) fn write_data_labels<W: Write>(
         return Ok(());
     }
     if let Some(number_format) = labels.number_format.as_ref() {
+        write!(writer, "<c:numFmt formatCode=\"")?;
+        write_escaped_xml(writer, &number_format.format_code)?;
         write!(
             writer,
-            r#"<c:numFmt formatCode="{}" sourceLinked="{}"/>"#,
-            escape_xml(&number_format.format_code),
+            r#"" sourceLinked="{}"/>"#,
             if number_format.source_linked {
                 "1"
             } else {
@@ -322,11 +323,9 @@ pub(super) fn write_data_labels<W: Write>(
         )?;
     }
     if let Some(separator) = &labels.separator {
-        write!(
-            writer,
-            "<c:separator>{}</c:separator>",
-            escape_xml(separator)
-        )?;
+        write!(writer, "<c:separator>")?;
+        write_escaped_xml(writer, separator)?;
+        write!(writer, "</c:separator>")?;
     }
     if labels.show_leader_lines {
         write!(writer, r#"<c:showLeaderLines val="1"/>"#)?;
@@ -376,10 +375,11 @@ pub(super) fn write_data_label<W: Write>(writer: &mut W, label: &DataLabel) -> s
         write_title_text(writer, text)?;
     }
     if let Some(number_format) = label.number_format.as_ref() {
+        write!(writer, "<c:numFmt formatCode=\"")?;
+        write_escaped_xml(writer, &number_format.format_code)?;
         write!(
             writer,
-            r#"<c:numFmt formatCode="{}" sourceLinked="{}"/>"#,
-            escape_xml(&number_format.format_code),
+            r#"" sourceLinked="{}"/>"#,
             if number_format.source_linked {
                 "1"
             } else {
@@ -411,11 +411,9 @@ pub(super) fn write_data_label<W: Write>(writer: &mut W, label: &DataLabel) -> s
         )?;
     }
     if let Some(separator) = label.separator.as_ref() {
-        write!(
-            writer,
-            "<c:separator>{}</c:separator>",
-            escape_xml(separator)
-        )?;
+        write!(writer, "<c:separator>")?;
+        write_escaped_xml(writer, separator)?;
+        write!(writer, "</c:separator>")?;
     }
     if let Some(extension_list) = label.extension_list.as_ref() {
         write_fragment(writer, extension_list.as_xml())?;

@@ -764,6 +764,7 @@ fn malformed_recognized_family_content_fails_closed() {
                 .copied()
                 .chain(Some(b'\0'))
                 .collect::<Vec<_>>(),
+            family::Limits::DEFAULT,
         )
         .is_err()
     );

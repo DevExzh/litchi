@@ -28,6 +28,7 @@ use quick_xml::reader::NsReader;
 use quick_xml::writer::Writer;
 
 use crate::{Error, Result};
+use litchi_drawingml::geometry::Limits as GeometryLimits;
 use litchi_drawingml::geometry::reader::{CustomGeometryBuilder, GeometryElement};
 use litchi_drawingml::text::body::reader::{self as text_reader, Builder as TextBuilder};
 use litchi_drawingml::text::parse_bool;
@@ -1051,7 +1052,7 @@ impl<'x> Parser<'x> {
                 "drawing shape contains competing or duplicate geometries",
             ));
         }
-        builder.geometry_builder = Some(CustomGeometryBuilder::new());
+        builder.geometry_builder = Some(CustomGeometryBuilder::new(GeometryLimits::DEFAULT)?);
         Ok(Context::CustomGeometry(GeometryElement::CustomGeometry))
     }
 

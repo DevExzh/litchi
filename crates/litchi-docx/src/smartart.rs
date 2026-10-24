@@ -20,7 +20,7 @@
 use crate::error::{Error, Result};
 use litchi_drawingml::diagram::{
     DGM_NAMESPACE, DGM_NAMESPACE_STRICT, DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL,
-    DIAGRAM_QUICK_STYLE_REL, DiagramDataModel, DiagramDefinition, DiagramNode, DiagramType,
+    DIAGRAM_QUICK_STYLE_REL, DiagramDataModel, DiagramDefinition, DiagramNode, DiagramType, Limits,
     MS_DIAGRAM_DRAWING_REL, STRICT_DIAGRAM_COLORS_REL, STRICT_DIAGRAM_DATA_REL,
     STRICT_DIAGRAM_LAYOUT_REL, STRICT_DIAGRAM_QUICK_STYLE_REL,
 };
@@ -197,6 +197,7 @@ struct DiagramAnchor {
 ///
 /// Returns an error if the operation cannot be completed.
 pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<Vec<Diagram>> {
+    let limits = Limits::default();
     let document = package.get_part(document_name)?;
     if document.content_type() != DOCUMENT_CT {
         return Err(invalid(
@@ -238,7 +239,7 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
             "diagram data",
         )?;
         add_total(&mut total, data_xml.len(), "aggregate bytes")?;
-        let data = DiagramDataModel::parse(&data_xml)?;
+        let data = DiagramDataModel::parse(&data_xml, &limits)?;
 
         let (layout_relationship_id, layout_part_name, layout) = resolve_definition(
             package,
@@ -248,6 +249,7 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
             ct::DML_DIAGRAM_LAYOUT,
             "diagram layout",
             DiagramDefinition::parse_layout,
+            &limits,
             &mut total,
         )?;
         let (quick_style_relationship_id, quick_style_part_name, quick_style) = resolve_definition(
@@ -258,6 +260,7 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
             ct::DML_DIAGRAM_STYLE,
             "diagram quick style",
             DiagramDefinition::parse_quick_style,
+            &limits,
             &mut total,
         )?;
         let (colors_relationship_id, colors_part_name, colors) = resolve_definition(
@@ -268,6 +271,7 @@ pub fn load_smart_arts(package: &OpcPackage, document_name: &PackURI) -> Result<
             ct::DML_DIAGRAM_COLORS,
             "diagram colors",
             DiagramDefinition::parse_colors,
+            &limits,
             &mut total,
         )?;
 
@@ -341,7 +345,8 @@ fn resolve_definition(
     relationship_type: &str,
     content_type: &str,
     label: &str,
-    parse: fn(&str) -> litchi_drawingml::Result<DiagramDefinition>,
+    parse: fn(&str, &Limits) -> litchi_drawingml::Result<DiagramDefinition>,
+    limits: &Limits,
     total: &mut usize,
 ) -> Result<(Option<String>, Option<String>, Option<DiagramDefinition>)> {
     let Some(relationship_id) = relationship_id else {
@@ -357,7 +362,7 @@ fn resolve_definition(
         label,
     )?;
     add_total(total, xml.len(), "aggregate bytes")?;
-    let definition = parse(&xml)?;
+    let definition = parse(&xml, limits)?;
     Ok((
         Some(relationship_id.to_owned()),
         Some(name.as_str().to_owned()),

@@ -5,6 +5,8 @@ use std::fmt;
 use litchi_ooxml_common::xml::is_ncname;
 use thiserror::Error;
 
+use crate::LimitKind;
+
 use super::{MAX_NAMESPACE_TEXT_BYTES, MAX_RELATIONSHIP_ID_BYTES, MAX_RENDERER_TEXT_BYTES};
 
 /// Failure to construct a bounded model3d scalar.
@@ -15,12 +17,14 @@ pub enum ValueError {
     #[error("invalid model3d relationship ID '{value}'")]
     RelationshipId { value: String },
     /// A text or namespace value exceeds the model3d resource bound.
-    #[error("model3d {field} exceeds the limit of {limit} bytes")]
-    TooLong {
-        /// Semantic field being bounded.
-        field: &'static str,
+    #[error("model3d {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Typed resource dimension.
+        kind: LimitKind,
+        /// First observed value beyond the bound.
+        observed: usize,
         /// Maximum accepted byte length.
-        limit: usize,
+        maximum: usize,
     },
     /// A namespace prefix is not an XML `NCName`.
     #[error("invalid model3d namespace prefix '{value}'")]
@@ -47,7 +51,14 @@ impl Id {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn new(value: impl AsRef<str>) -> Result<Self, ValueError> {
         let value = value.as_ref();
-        if value.is_empty() || value.len() > MAX_RELATIONSHIP_ID_BYTES || !is_ncname(value) {
+        if value.len() > MAX_RELATIONSHIP_ID_BYTES {
+            return Err(ValueError::Limit {
+                kind: LimitKind::AttributeValueBytes,
+                observed: value.len(),
+                maximum: MAX_RELATIONSHIP_ID_BYTES,
+            });
+        }
+        if value.is_empty() || !is_ncname(value) {
             return Err(ValueError::RelationshipId {
                 value: value.to_owned(),
             });
@@ -172,20 +183,29 @@ impl Namespace {
     pub fn new(prefix: Option<&str>, uri: impl AsRef<str>) -> Result<Self, ValueError> {
         if let Some(prefix) = prefix
             && !prefix.is_empty()
-            && (prefix.len() > MAX_NAMESPACE_TEXT_BYTES || !is_ncname(prefix))
         {
-            return Err(ValueError::NamespacePrefix {
-                value: prefix.to_owned(),
-            });
+            if prefix.len() > MAX_NAMESPACE_TEXT_BYTES {
+                return Err(ValueError::Limit {
+                    kind: LimitKind::NamespacePrefixBytes,
+                    observed: prefix.len(),
+                    maximum: MAX_NAMESPACE_TEXT_BYTES,
+                });
+            }
+            if !is_ncname(prefix) {
+                return Err(ValueError::NamespacePrefix {
+                    value: prefix.to_owned(),
+                });
+            }
         }
         let uri = uri.as_ref();
         if uri.is_empty() {
             return Err(ValueError::EmptyNamespace);
         }
         if uri.len() > MAX_NAMESPACE_TEXT_BYTES {
-            return Err(ValueError::TooLong {
-                field: "namespace URI",
-                limit: MAX_NAMESPACE_TEXT_BYTES,
+            return Err(ValueError::Limit {
+                kind: LimitKind::NamespaceBytes,
+                observed: uri.len(),
+                maximum: MAX_NAMESPACE_TEXT_BYTES,
             });
         }
         Ok(Self {
@@ -439,21 +459,23 @@ impl Metadata {
     }
 }
 
-fn bounded_text(value: &str, field: &'static str) -> Result<Box<str>, ValueError> {
+fn bounded_text(value: &str, _field: &'static str) -> Result<Box<str>, ValueError> {
     if value.len() > MAX_RENDERER_TEXT_BYTES {
-        return Err(ValueError::TooLong {
-            field,
-            limit: MAX_RENDERER_TEXT_BYTES,
+        return Err(ValueError::Limit {
+            kind: LimitKind::RendererText,
+            observed: value.len(),
+            maximum: MAX_RENDERER_TEXT_BYTES,
         });
     }
     Ok(value.into())
 }
 
-fn bounded_owned_text(value: String, field: &'static str) -> Result<Box<str>, ValueError> {
+fn bounded_owned_text(value: String, _field: &'static str) -> Result<Box<str>, ValueError> {
     if value.len() > MAX_RENDERER_TEXT_BYTES {
-        return Err(ValueError::TooLong {
-            field,
-            limit: MAX_RENDERER_TEXT_BYTES,
+        return Err(ValueError::Limit {
+            kind: LimitKind::RendererText,
+            observed: value.len(),
+            maximum: MAX_RENDERER_TEXT_BYTES,
         });
     }
     Ok(value.into_boxed_str())
