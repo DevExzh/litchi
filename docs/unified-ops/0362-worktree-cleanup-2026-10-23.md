@@ -1386,3 +1386,36 @@ The 4,849-byte restore helper has SHA-256
 `92737064528012e0d8404846876fbf149f5590f3d2da1e00a86d773b5c1c6fe9`.
 Its CLI is `python3 restore.py [leaf]`, after recreating the selected
 worktree; it has no `--dry-run` option.
+
+## Thirty-seventh cleanup: Markdown, IWA aliases and font/cache limits
+
+At staging `e35cede32ae730d351ce9d29d243c35edd321ddf`, three reviewed
+leaf tips were already merged and their tracked worktrees were clean:
+
+| Removed worktree | Retained branch tip | Retained files | Bytes |
+| --- | --- | ---: | ---: |
+| `uo2-final-markdown-reader` | `533902609a6c974c387975775241c0133f1f0817` | 3 | 205686 |
+| `uo2-iwa-protos-alias-repair` | `122aa7cc33276e3bc039e2ed665948cb3bcd27ac` | 4 | 6332669 |
+| `uo2-font-cache-limits` | `a03d518eca5e0b8bfa7993be614d58aa8c03514b` | 1 | 139591 |
+
+All eight ignored payloads (6,677,946 bytes) were quarantined before
+non-forced removal. The coordinator independently verified each payload's
+size, hash and mode, all branch tips and merge ancestry, and the removed
+paths. The cleanup worker exercised the restore helper in three temporary
+sparse worktrees, verified the restored files, and removed those temporary
+worktrees non-forced. Exact-path holder checks were clear after the owners
+terminated their obsolete audit pipelines; cleanup sent no signals.
+
+Evidence remains outside Git under
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave37/`:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `manifest.json` | 29811 | `d32dfbef509e14dc9180451eb4319507ad4a3a87737cf74f1d956d70c16f0c4a` |
+| `receipt.json` | 44388 | `f23d47af5d6290d46b8e54060624b6304fd1fa142008c0f10b0a78aaa77c1083` |
+| `prepare_cleanup.py` | 22347 | `87f2034ee26e27a50bd052881411a4334327b686ebc848fda7fa58e29e4d97b6` |
+| `restore.py` | 4828 | `31b1c136ceb87ef5f01f5d0042f9b02b65fb216fd5b0bd8e6092aee4649d6b04` |
+
+The restore helper takes an optional leaf name after its worktree has been
+recreated. External targets, receipts, frozen source, active repair leaves
+and the trunk's untracked constructor probe were preserved.
