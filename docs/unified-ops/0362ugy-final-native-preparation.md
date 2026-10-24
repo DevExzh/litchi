@@ -82,3 +82,45 @@ Any required production or protocol correction requires a new source freeze.
 Full gate completion, the all-68 rustdoc inventory and dispositions, actual
 corpus replay, glossary closure and the remaining native qualification lanes
 are still required. Only comprehensive redaction audit 22 is deferred.
+
+The f6fe attempt subsequently returned required repairs; see
+[0362uma](0362uma-final-gate-findings.md). It remains diagnostic source,
+not the final production acceptance pin.
+
+## Durable ODG baseline capture
+
+The immutable `ad52437f5e5e2c71ea476eedd5ddcf61aee2021d` baseline source
+closure completed on 2026-10-24. The earlier orphaned capture produced no
+usable output; this fresh attempt writes the complete result atomically to
+an external file. It performs no Cargo build, probe validation or timing.
+
+[The reduced receipt](results/0362ugy/odg-baseline-source-closure.json) binds
+460,379 source entries and 6,263,042,584 content bytes. The complete artifact
+is `/home/zhuhe/code/litchi-worktrees/.coord/odg-baseline-capture-20261024/baseline-source-closure.json`,
+182,412,099 bytes, SHA-256
+`b1cc42d57d07baa4f02115cb9db82847e8079416f08cdf67e4421df3d906b8a5`.
+The coordinator verified that file, its embedded closure binding, the clean
+source ref, lock and actual builder identities. The capture uses builder
+SHA-256 `4f1f556475107c72fd28846503b1807b0490ae0e11251aed40d6e97179c8b46e`;
+later tooling edits do not relabel that provenance. A future build must
+establish its own current source and protocol bindings.
+
+The adjacent `run_capture.py` has SHA-256
+`9facacd33b30def52eca310d33e25d527fe9e661992d4595bb09ac1072b1ab41`.
+To regenerate with the same source, lock and builder, choose a fresh external
+directory and invoke the preserved wrapper with only its output root changed:
+
+```sh
+python3 - /path/to/fresh-external-directory <<'PY'
+import importlib.util
+from pathlib import Path
+import sys
+script = Path('/home/zhuhe/code/litchi-worktrees/.coord/odg-baseline-capture-20261024/run_capture.py')
+spec = importlib.util.spec_from_file_location('odg_capture', script)
+capture = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(capture)
+capture.OUT = Path(sys.argv[1])
+assert not capture.OUT.exists(), 'preserve the existing evidence'
+raise SystemExit(capture.main())
+PY
+```

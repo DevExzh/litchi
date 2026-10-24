@@ -1104,3 +1104,26 @@ the 1,755-byte restore helper has SHA-256
 Recreate the leaf from its retained branch before running `restore.py`.
 The receipt also retains a read-only target inspection; no build artifacts
 were deleted by this cleanup.
+
+## Build-cache headroom after cleanup twenty-nine
+
+With no active holder of the coordinator target, 126 regenerable ELF
+executables under `budget-validation/target/debug/examples` were removed.
+Each was an exact SHA-256 duplicate of an executable already recorded as
+pruned by a completed safe-chunked check. Before unlinking, the cleanup
+rechecked each file's type, executable mode, size, hash, device, inode and
+link count against its manifest and matching completed receipt. It removed
+3,712,220,600 bytes. All three benchmark/profile executables and 5,610
+non-executable files remained; the immediate and final holder scans were empty.
+
+The external directory is
+`/home/zhuhe/code/litchi-worktrees/.coord/target-cache-cleanup-2026-10-23/wave3-examples/`.
+Its 3,605,760-byte `manifest.json` remains outside Git, SHA-256
+`7a25d4cff6bd9a42f77daa62587e52bf9a7f78d958ecfa7a49219c46c2bb0138`.
+The 45,319-byte `deletion-receipt.json` has SHA-256
+`0088c05ac29ad9aefa361a5a7cc8b04668fecea64bf0faf346042dfe71452c02`.
+The coordinator verified the receipt identities, candidate totals and
+preservation/holder observations. Build commands in the retained gate logs
+regenerate these duplicate outputs. No source, benchmark binary, native
+endpoint or validation evidence was removed. The target's allocated size
+after cleanup was 14,922,784,768 bytes; subsequent checks may grow it again.
