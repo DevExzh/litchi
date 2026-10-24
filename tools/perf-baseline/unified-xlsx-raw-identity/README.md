@@ -1,9 +1,8 @@
 # XLSX raw identity lifecycle probe
 
-This probe records the immediate pre-repair pair
-`0befb112d96d2409e6f40c9abfeb4813665905ad` and
-`5726f03c7db2dd7dd539000b45f109f14ea8c33a`, then carries the matched
-lifecycle into the current assembly. The versioned OPC ingress is deliberate:
+This probe records the original production source
+`0befb112d96d2409e6f40c9abfeb4813665905ad` and a final assembled candidate,
+then carries the matched lifecycle into the current assembly. The versioned OPC ingress is deliberate:
 the historical source uses its one-argument `OpcPackage::from_vec` default,
 while the current source uses the required-limit
 `OpcPackage::from_vec(bytes, SourceLimits::default())`. `--api-variant` labels
@@ -40,20 +39,30 @@ or its unrelated DOCX macro targets.
 The standalone lockfile is committed at
 `0e24ccbe5c` with SHA-256
 `8b61b3c5e17b1c32d89139c97a26145117794afae83dd8fef3c9a7aff8765ee6`.
-Archive that exact lockfile with the manifest and use `--locked` for every
-measured build. No result is qualified until the final candidate revision is
-also recorded.
+Copy that exact lockfile into the reviewed adapter in the detached baseline
+worktree and use `--locked` for every measured build. No result is qualified
+until the final candidate revision is also recorded in the preparation
+receipt.
 
-The coordinator must keep captures outside the checkout and reuse existing
-target directories. The recorded directories for this pair are
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/reader-paths-e63`
-for the pinned historical source and
-`/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/hist-current` for the
-current assembly. At preparation time they are 1.3 GiB and 1.6 GiB,
-respectively. The existing historical `release/xlsx_source_reader_paths_alloc`
-binary is retained; the commands below use the new
-`release/xlsx-raw-identity-alloc` name and abort if that path is already
-occupied. Do not clean either target or overwrite any recorded binary.
+The preparation helper is the executable provenance gate for every consumed
+adapter input; it rejects any hash other than these reviewed values, and the
+runner/validator re-check the resulting receipt:
+
+| consumed input | SHA-256 |
+| --- | --- |
+| `tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml` | `30ff248844c9e21436fc3913baa4c4d363daffdc617e5e7d03404423410d5c70` |
+| `tools/perf-baseline/unified-xlsx-raw-identity/src/lib.rs` | `d65ce0630a50d1b972a0b2f93044091d1a5c50df1e9c8ef06e9c3ba65cf8a36a` |
+| `tools/perf-baseline/unified-xlsx-raw-identity/src/bin/xlsx_raw_identity_alloc.rs` | `c21cc9b947539078885ff099527ed8d291d631b39a27bf8a299c6553add9007c` |
+| `tools/perf-baseline/unified-xlsx-raw-identity/src/bin/xlsx_raw_identity_native.rs` | `71435d535e65996f2c62e9952ab3f595b8e3bd2342afc0f45092e8a407fc9ee9` |
+| `tools/perf-baseline/src/allocation_metrics.rs` | `0fcec3e5c4972031b23542fd359a38401e25f32a133c77ef4c6e75facf0710d5` |
+| `tools/perf-baseline/src/xlsx_raw_identity.rs` | `a251f1199b5ba442dfd9664806b81f29c7832d071df66fc2d2d5f2ada6c97fd4` |
+| `tools/perf-baseline/src/bin/support/counting_allocator.rs` | `80977e55c2213eeee2af9a3133295d70cff38505e663a68e4757bf7939c60068` |
+| `tools/perf-baseline/unified-xlsx-raw-identity/Cargo.lock` | `8b61b3c5e17b1c32d89139c97a26145117794afae83dd8fef3c9a7aff8765ee6` |
+
+The coordinator must keep captures, binaries, and targets outside the
+checkout. Every target used by the guarded runner must be absent or empty at
+the start of the build phase; the runner never reuses, cleans, or overwrites a
+target or recorded binary. Select a fresh target root for every attempt.
 
 The feature selection is part of the reproducibility contract. In the
 standalone manifest, `default = ["current-xlsx-raw-opc"]`, so the ordinary
@@ -64,53 +73,53 @@ required-limit constructor. Only `--no-default-features --features
 allocator-metrics,legacy-xlsx-raw-opc` selects the historical one-argument
 constructor.
 
-The historical checkout is an external source overlay, not a modified
-full-workspace build. The overlay copies the exact standalone manifest and
-the two probe modules from the final candidate into an archive of the pinned
-`0befb112d96d2409e6f40c9abfeb4813665905ad` tree. This keeps the probe source
-identical while avoiding the unrelated DOCX macro failures. Root must replace
-`<FINAL_CANDIDATE_REVISION>` with the post-v9 final assembly hash; no earlier
-raw branch or 5726-only result is an acceptable substitute:
+The historical checkout is an actual detached Git worktree, not a tar archive
+or directory without `.git`: the guarded runner uses Git HEAD/tree/status
+identity. Create it from the original production revision, create a clean
+detached candidate worktree at the selected final revision, and let the
+preparation command copy only the reviewed consumer-side adapter. Its receipt
+pins both trees, the exact allowed adapter diff, fixed reviewed
+lock/probe/allocator hashes, and the
+candidate revision. No earlier raw branch or 5726-only result is an acceptable
+substitute:
 
 ```sh
 HIST_TARGET=/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/reader-paths-e63
-CURRENT_TARGET=/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/hist-current
+CURRENT_DEFAULT_TARGET=/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/current-default
+CURRENT_ALL_FEATURES_TARGET=/home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/targets/current-all-features
 FINAL_CHECKOUT=/path/to/final-assembly-checkout
 FINAL_CANDIDATE_REVISION=<FINAL_CANDIDATE_REVISION>
 BASELINE_REVISION=0befb112d96d2409e6f40c9abfeb4813665905ad
 EVIDENCE=/path/to/coordinator-evidence/raw-identity
+BASELINE_SOURCE=/external/sources/xlsx-original-0bef-worktree
+CANDIDATE_SOURCE=/external/sources/xlsx-final-candidate
+PREPARATION_RECEIPT=/external/xlsx-raw-native/preparation.json
 
-test ! -e "$HIST_TARGET/release/xlsx-raw-identity-alloc"
-test ! -e "$HIST_TARGET/release/xlsx-raw-identity-native"
-test ! -e "$CURRENT_TARGET/release/xlsx-raw-identity-alloc"
-test ! -e "$CURRENT_TARGET/release/xlsx-raw-identity-native"
+test ! -e "$HIST_TARGET"
+test ! -e "$CURRENT_DEFAULT_TARGET"
+test ! -e "$CURRENT_ALL_FEATURES_TARGET"
 mkdir -p "$EVIDENCE"
 
-# Make a disposable baseline source overlay. This does not touch the pinned
-# checkout, the final checkout, or any format source. The final candidate
-# supplies the standalone manifest, allocation module, and identical v2 probe.
-BASELINE_OVERLAY=$(mktemp -d /tmp/litchi-xlsx-raw-baseline.XXXXXX)
-git -C "$FINAL_CHECKOUT" archive --format=tar "$BASELINE_REVISION" \
-  | tar -xf - -C "$BASELINE_OVERLAY"
-git -C "$FINAL_CHECKOUT" archive --format=tar "$FINAL_CANDIDATE_REVISION" \
-  tools/perf-baseline/unified-xlsx-raw-identity \
-  tools/perf-baseline/src/allocation_metrics.rs \
-  tools/perf-baseline/src/xlsx_raw_identity.rs \
-  | tar -xf - -C "$BASELINE_OVERLAY"
+git -C "$FINAL_CHECKOUT" worktree add --detach "$BASELINE_SOURCE" "$BASELINE_REVISION"
+git -C "$FINAL_CHECKOUT" worktree add --detach "$CANDIDATE_SOURCE" "$FINAL_CANDIDATE_REVISION"
+python3 "$FINAL_CHECKOUT/tools/native_qualification/prepare_xlsx_raw_inputs.py" \
+  --baseline-root "$BASELINE_SOURCE" \
+  --candidate-root "$CANDIDATE_SOURCE" \
+  --candidate-revision "$FINAL_CANDIDATE_REVISION" \
+  --output "$PREPARATION_RECEIPT"
 
-# The overlay's manifest has path dependencies into its archived crates. The
-# committed lockfile is archived with the manifest; verify it before using
-# --locked below.
+# Optional evidence echo; the preparation helper above is the executable
+# fixed-hash gate and this manual check is not a substitute for it.
 source /home/zhuhe/code/litchi-worktrees/.coord/w4-xlsx/env.sh
-sha256sum "$BASELINE_OVERLAY/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.lock" \
+sha256sum "$BASELINE_SOURCE/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.lock" \
   > "$EVIDENCE/raw-baseline-lock.sha256"
 test "$(awk '{print $1}' "$EVIDENCE/raw-baseline-lock.sha256")" = \
   8b61b3c5e17b1c32d89139c97a26145117794afae83dd8fef3c9a7aff8765ee6
 
 CARGO_BUILD_JOBS=1 CARGO_NET_OFFLINE=true cargo build --release --locked \
   --no-default-features --features allocator-metrics,legacy-xlsx-raw-opc \
-  --manifest-path "$BASELINE_OVERLAY/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml" \
-  --bin xlsx-raw-identity-alloc --target-dir "$HIST_TARGET"
+  --manifest-path "$BASELINE_SOURCE/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml" \
+  --bin xlsx-raw-identity-alloc --bin xlsx-raw-identity-native --target-dir "$HIST_TARGET"
 
 sha256sum "$HIST_TARGET/release/xlsx-raw-identity-alloc" \
   > "$EVIDENCE/raw-baseline-binary.sha256"
@@ -119,10 +128,6 @@ taskset -c 0 "$HIST_TARGET/release/xlsx-raw-identity-alloc" \
   --source-revision "$BASELINE_REVISION" \
   --iterations 5 --warmups 2 --json "$EVIDENCE/raw-original.json"
 
-CARGO_BUILD_JOBS=1 CARGO_NET_OFFLINE=true cargo build --release --locked \
-  --no-default-features --features legacy-xlsx-raw-opc \
-  --manifest-path "$BASELINE_OVERLAY/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml" \
-  --bin xlsx-raw-identity-native --target-dir "$HIST_TARGET"
 sha256sum "$HIST_TARGET/release/xlsx-raw-identity-native" \
   > "$EVIDENCE/raw-baseline-native-binary.sha256"
 taskset -c 0 "$HIST_TARGET/release/xlsx-raw-identity-native" \
@@ -141,7 +146,8 @@ taskset -c 0 valgrind --tool=callgrind --quiet \
 
 # Build the final assembly through its thin manifest. The default command
 # proves the required-limit adapter; --all-features proves current wins over
-# legacy. Both builds use one job and the same existing target directory.
+# legacy. Each build gets a fresh target directory; no target is reused across
+# feature routes.
 CURRENT_MANIFEST="$FINAL_CHECKOUT/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.toml"
 sha256sum "$FINAL_CHECKOUT/tools/perf-baseline/unified-xlsx-raw-identity/Cargo.lock" \
   > "$EVIDENCE/raw-current-lock.sha256"
@@ -149,17 +155,17 @@ test "$(awk '{print $1}' "$EVIDENCE/raw-current-lock.sha256")" = \
   8b61b3c5e17b1c32d89139c97a26145117794afae83dd8fef3c9a7aff8765ee6
 CARGO_BUILD_JOBS=1 CARGO_NET_OFFLINE=true cargo build --release --locked \
   --features allocator-metrics --manifest-path "$CURRENT_MANIFEST" \
-  --bin xlsx-raw-identity-alloc --target-dir "$CURRENT_TARGET"
-sha256sum "$CURRENT_TARGET/release/xlsx-raw-identity-alloc" \
+  --bin xlsx-raw-identity-alloc --bin xlsx-raw-identity-native --target-dir "$CURRENT_DEFAULT_TARGET"
+sha256sum "$CURRENT_DEFAULT_TARGET/release/xlsx-raw-identity-alloc" \
   > "$EVIDENCE/raw-current-default-binary.sha256"
 
 CARGO_BUILD_JOBS=1 CARGO_NET_OFFLINE=true cargo build --release --locked \
   --all-features --manifest-path "$CURRENT_MANIFEST" \
-  --bin xlsx-raw-identity-alloc --target-dir "$CURRENT_TARGET"
-sha256sum "$CURRENT_TARGET/release/xlsx-raw-identity-alloc" \
+  --bin xlsx-raw-identity-alloc --bin xlsx-raw-identity-native --target-dir "$CURRENT_ALL_FEATURES_TARGET"
+sha256sum "$CURRENT_ALL_FEATURES_TARGET/release/xlsx-raw-identity-alloc" \
   > "$EVIDENCE/raw-current-all-features-binary.sha256"
 
-taskset -c 0 "$CURRENT_TARGET/release/xlsx-raw-identity-alloc" \
+taskset -c 0 "$CURRENT_DEFAULT_TARGET/release/xlsx-raw-identity-alloc" \
   xlsx-raw-identity --api-variant current \
   --source-revision "$FINAL_CANDIDATE_REVISION" \
   --iterations 5 --warmups 2 --json "$EVIDENCE/raw-current.json"
