@@ -1979,42 +1979,6 @@ fn validate_replacement_attributes(
     Ok(())
 }
 
-fn replacement_root_attribute_range(xml: &[u8], wanted: &[u8]) -> Result<Option<Range<usize>>> {
-    let mut reader = Reader::from_reader(xml);
-    let origin = ReaderOrigin::of(xml);
-    loop {
-        let start = origin
-            .offset(reader.buffer_position())
-            .ok_or_else(|| invalid("theme replacement offset exceeds usize"))?;
-        let event = reader
-            .read_event()
-            .map_err(|error| Error::Xml(error.to_string()))?;
-        let end = origin
-            .offset(reader.buffer_position())
-            .ok_or_else(|| invalid("theme replacement offset exceeds usize"))?;
-        match event {
-            Event::Start(_) | Event::Empty(_) => {
-                let raw = xml
-                    .get(start..end)
-                    .ok_or_else(|| invalid("theme replacement root range is invalid"))?;
-                return optional_attribute_value_range(raw, wanted)
-                    .map(|range| range.map(|range| (start + range.start)..(start + range.end)));
-            },
-            Event::DocType(_) | Event::PI(_) | Event::End(_) => {
-                return Err(invalid(
-                    "theme replacement has forbidden markup before its root",
-                ));
-            },
-            Event::Eof => return Ok(None),
-            Event::Text(_)
-            | Event::CData(_)
-            | Event::Comment(_)
-            | Event::Decl(_)
-            | Event::GeneralRef(_) => {},
-        }
-    }
-}
-
 fn optional_attribute_value_range(raw: &[u8], wanted: &[u8]) -> Result<Option<Range<usize>>> {
     let mut cursor = 1usize;
     while cursor < raw.len()
