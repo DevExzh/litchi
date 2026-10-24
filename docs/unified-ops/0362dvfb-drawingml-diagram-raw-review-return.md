@@ -63,3 +63,10 @@ be reordered by `sort_unstable`. `diagram/model.rs` now uses the same
 `(srcOrd, point-index)` key for roots and child vectors. A regression supplies
 three roots whose points and connections are in different orders but whose
 `srcOrd` values are equal, and asserts stable point order.
+
+The immediately following audit found that an unconditional second
+`dataModel` guard accidentally rejected every normal paired root. That guard
+was removed; nested-root rejection remains in the depth-aware root branch. A
+new regression now generates a nonempty SmartArt data part with a paired root,
+parses it successfully and checks its node text. This source correction is
+committed but remains untested by Cargo until the validation slot is granted.

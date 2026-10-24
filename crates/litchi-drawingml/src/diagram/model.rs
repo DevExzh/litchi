@@ -268,11 +268,7 @@ impl SmartArt {
                         ));
                     }
                     let parent = stack.last().map(|(kind, name)| (*kind, name.as_slice()));
-                    if dgm && local == b"dataModel" {
-                        return Err(Error::Invalid(
-                            "the SmartArt data model has a nested root".to_owned(),
-                        ));
-                    } else if dgm && local == b"ptLst" {
+                    if dgm && local == b"ptLst" {
                         if parent != Some((SmartArtNamespace::Diagram, b"dataModel".as_slice()))
                             || point_list_seen
                         {
@@ -1872,6 +1868,20 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn generated_nonempty_paired_data_model_is_accepted() {
+        let limits = Limits::default();
+        let smartart = SmartArtBuilder::new(DiagramType::List)
+            .add_item("generated root")
+            .build();
+        let data = generate_smartart_data_xml(&smartart, &limits).unwrap();
+        assert!(data.contains("<dgm:dataModel "));
+        assert!(data.contains("</dgm:dataModel>"));
+        let nodes = SmartArt::parse_data_xml(&data, &limits).unwrap();
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].text, "generated root");
     }
 
     #[test]
