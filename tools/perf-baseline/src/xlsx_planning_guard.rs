@@ -81,7 +81,9 @@ impl GuardCase {
 
     const fn expected_error(self) -> Option<&'static str> {
         match self {
-            Self::LateValidator => Some("value-only edits refuse attribute 'future' on 'c'"),
+            Self::LateValidator => {
+                Some("value-only edits refuse dependency-bearing or unknown element 'future'")
+            },
             Self::LateRaw => Some("invalid worksheet boolean 'maybe'"),
             Self::Valid => None,
         }
@@ -234,7 +236,7 @@ fn worksheet_xml(shape: Shape, case: GuardCase) -> AnyResult<Vec<u8>> {
             let final_cell = row + 1 == rows && column + 1 == columns;
             match (case, final_cell) {
                 (GuardCase::LateValidator, true) => xml.push_str(&format!(
-                    r#"<c r="{address}" future="1"><v>{ordinal}</v></c>"#
+                    r#"<c r="{address}"><future/><v>{ordinal}</v></c>"#
                 )),
                 (GuardCase::LateRaw, true) => {
                     xml.push_str(&format!(r#"<c r="{address}" t="b"><v>maybe</v></c>"#));
@@ -424,54 +426,35 @@ fn run_iteration(
 
     let logical_error = match planned {
         Ok(transaction) => {
-            if case.expected_error().is_some() {
-                return Err(format!(
-                    "{} unexpectedly accepted invalid planning guard",
-                    case.name()
-                )
-                .into());
-            }
-            validate_valid_transaction(transaction)?;
-            if sha256(&fixture.archive) != fixture.source_sha256 {
-                return Err("valid planning guard changed source bytes".into());
-            }
-            LogicalError {
-                status: "accepted",
-                variant: None,
-                message: None,
+            if let Some(expected) = case.expected_error() {
+                // Source-backed edit entry is intentionally lazy. Resolve its
+                // first-use snapshot only after the measured planning region
+                // has closed, so late validator/raw refusals are observed
+                // without charging source resolution to `edit_sheets`.
+                expected_planning_failure(
+                    &editor,
+                    selectors,
+                    Ok(transaction),
+                    case,
+                    expected,
+                )?
+            } else {
+                validate_valid_transaction(transaction)?;
+                if sha256(&fixture.archive) != fixture.source_sha256 {
+                    return Err("valid planning guard changed source bytes".into());
+                }
+                LogicalError {
+                    status: "accepted",
+                    variant: None,
+                    message: None,
+                }
             }
         },
         Err(error) => {
             let expected = case
                 .expected_error()
                 .ok_or_else(|| format!("{} unexpectedly refused valid source", case.name()))?;
-            let (variant, message) = classify_error(&error);
-            if variant != "Invalid" || message != expected {
-                return Err(format!(
-                    "{} error mismatch: expected Invalid({expected:?}), got {variant}({message:?})",
-                    case.name()
-                )
-                .into());
-            }
-            let retry = editor.edit_sheets(selectors.iter().cloned());
-            let retry_message = match retry {
-                Ok(_) => return Err("invalid planning guard succeeded on retry".into()),
-                Err(retry_error) => {
-                    let (retry_variant, retry_message) = classify_error(&retry_error);
-                    if retry_variant != variant || retry_message != message {
-                        return Err("invalid planning guard changed its error on retry".into());
-                    }
-                    true
-                },
-            };
-            if !retry_message {
-                return Err("invalid planning guard retry was not observed".into());
-            }
-            LogicalError {
-                status: "expected_failure",
-                variant: Some("Invalid"),
-                message: Some(message),
-            }
+            expected_planning_failure(&editor, selectors, Err(error), case, expected)?
         },
     };
 
@@ -490,6 +473,55 @@ fn run_iteration(
         empty_commit_is_noop: case.expected_error().is_none(),
         expected_error_exact: case.expected_error().is_some(),
         commit_outside_timing: case.expected_error().is_none(),
+    })
+}
+
+fn expected_planning_failure(
+    editor: &SourceBackedEditor,
+    selectors: &[Selector<'static>],
+    planned: std::result::Result<litchi_xlsx::cell_values::Edit, XlsxError>,
+    case: GuardCase,
+    expected: &str,
+) -> AnyResult<LogicalError> {
+    let error = match planned {
+        Err(error) => error,
+        Ok(transaction) => match transaction.before() {
+            Ok(_) => {
+                return Err(format!(
+                    "{} first-use resolution accepted an invalid planning guard",
+                    case.name()
+                )
+                .into());
+            },
+            Err(error) => error,
+        },
+    };
+    let (variant, message) = classify_error(&error);
+    if variant != "Invalid" || message != expected {
+        return Err(format!(
+            "{} error mismatch: expected Invalid({expected:?}), got {variant}({message:?})",
+            case.name()
+        )
+        .into());
+    }
+
+    let retry = editor.edit_sheets(selectors.iter().cloned());
+    let retry_error = match retry {
+        Err(error) => error,
+        Ok(transaction) => match transaction.before() {
+            Ok(_) => return Err("invalid planning guard succeeded on retry".into()),
+            Err(error) => error,
+        },
+    };
+    let (retry_variant, retry_message) = classify_error(&retry_error);
+    if retry_variant != variant || retry_message != message {
+        return Err("invalid planning guard changed its error on retry".into());
+    }
+
+    Ok(LogicalError {
+        status: "expected_failure",
+        variant: Some("Invalid"),
+        message: Some(message),
     })
 }
 
@@ -658,7 +690,7 @@ where
         allocator: allocation_metrics::allocator_identity(),
         instrumentation: allocation_metrics::instrumentation_identity(),
         counter_revision: allocation_metrics::counter_revision(),
-        timing_scope: "source_open_and_fixture_and_selector_setup_excluded; edit_sheets_result_retained_until_clock_and_allocation_end; inspection_commit_and_drop_excluded",
+        timing_scope: "source_open_and_fixture_and_selector_setup_excluded; edit_sheets_result_retained_until_clock_and_allocation_end; first_use_inspection_commit_and_drop_excluded",
         performance_claim: "none: correctness and planning diagnostic only; no speedup claim",
     };
     let encoded = serde_json::to_vec_pretty(&report)?;
