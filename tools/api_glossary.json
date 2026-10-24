@@ -13085,6 +13085,16 @@
           "name": "update_stream",
           "scope": "litchi_cfb::writer::OleWriter",
           "replacement": "use create_stream; update_stream was a duplicate alias removed in record 0362zad"
+        },
+        {
+          "name": "bytes",
+          "scope": "litchi_cfb::writer::SequentialWriteReport",
+          "replacement": "use output_bytes(); the duplicate compatibility shorthand was removed in record 0362ul16"
+        },
+        {
+          "name": "bytes",
+          "scope": "litchi_cfb::PublishReport",
+          "replacement": "use output_bytes(); the duplicate compatibility shorthand was removed in record 0362ul16a"
         }
       ],
       "families": []

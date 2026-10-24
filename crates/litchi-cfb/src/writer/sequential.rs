@@ -266,12 +266,6 @@ impl SequentialWriteReport {
     pub const fn publication_buffer_bytes(self) -> u64 {
         self.publication_buffer_bytes
     }
-
-    /// Complete artifact length (compatibility shorthand).
-    #[must_use]
-    pub const fn bytes(self) -> u64 {
-        self.output_bytes
-    }
 }
 
 /// Reopens a complete staged artifact through the ordinary CFB reader before

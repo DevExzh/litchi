@@ -1466,7 +1466,7 @@ fn source_backed_numeric_owned_plan_preserves_direct_atomic_and_sink_contracts()
     let mut direct = Vec::new();
     let report = commit.write_to(&mut direct).unwrap();
     assert_eq!(direct, expected);
-    assert_eq!(report.bytes(), u64::try_from(expected.len()).unwrap());
+    assert_eq!(report.output_bytes(), u64::try_from(expected.len()).unwrap());
     assert_eq!(
         report.source_fingerprint(),
         commit.diagnostics().source_fingerprint()
@@ -1502,7 +1502,7 @@ fn source_backed_numeric_owned_plan_preserves_direct_atomic_and_sink_contracts()
     let destination = directory.join("workbook.xls");
     std::fs::write(&destination, b"old destination").unwrap();
     let saved = commit.save(&destination).unwrap();
-    assert_eq!(saved.bytes(), u64::try_from(expected.len()).unwrap());
+    assert_eq!(saved.output_bytes(), u64::try_from(expected.len()).unwrap());
     assert_eq!(std::fs::read(&destination).unwrap(), expected);
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
     std::fs::remove_file(destination).unwrap();

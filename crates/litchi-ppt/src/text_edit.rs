@@ -6015,7 +6015,7 @@ mod tests {
 
         let mut output = Vec::new();
         let report = commit.write_to(&mut output).unwrap();
-        assert_eq!(report.bytes(), u64::try_from(bytes.len()).unwrap());
+        assert_eq!(report.output_bytes(), u64::try_from(bytes.len()).unwrap());
 
         let mut original =
             OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();

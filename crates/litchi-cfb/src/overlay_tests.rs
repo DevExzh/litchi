@@ -400,7 +400,7 @@ fn overlays_minifat_and_fat_cutover_and_preserves_unselected_bytes() {
     assert!(plan.changed_spans() >= 3);
     let mut output = Vec::new();
     let report = plan.write_to(&mut output).unwrap();
-    assert_eq!(report.bytes(), source.len() as u64);
+    assert_eq!(report.output_bytes(), source.len() as u64);
     assert_eq!(output.len(), source.len());
 
     let mut reopened = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
@@ -541,7 +541,7 @@ fn short_and_interrupted_sink_writes_complete_exactly() {
         interrupt: true,
     };
     let report = plan.write_to(&mut sink).unwrap();
-    assert_eq!(report.bytes(), source.len() as u64);
+    assert_eq!(report.output_bytes(), source.len() as u64);
     let mut reopened = OleFile::open(Cursor::new(sink.bytes), OleFileLimits::default()).unwrap();
     assert_eq!(
         reopened.open_stream(&["Fat4097"]).unwrap(),
@@ -833,7 +833,7 @@ fn owned_composed_view_and_direct_write_take_no_recheck_scan() {
         reads.load(Ordering::SeqCst),
         publication_chunks(file.file_size())
     );
-    assert_eq!(report.bytes(), file.file_size());
+    assert_eq!(report.output_bytes(), file.file_size());
     assert_eq!(output, viewed);
     assert_eq!(report.source_fingerprint().as_bytes(), &sha256_of(&source));
     assert_eq!(report.target_fingerprint().as_bytes(), &sha256_of(&output));
@@ -860,7 +860,7 @@ fn public_owned_arc_source_publishes_exactly() {
         .unwrap();
     let mut output = Vec::new();
     let report = plan.write_to(&mut output).unwrap();
-    assert_eq!(report.bytes(), source.len() as u64);
+    assert_eq!(report.output_bytes(), source.len() as u64);
     let mut reopened = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     assert_eq!(
         reopened.open_stream(&["Fat4097"]).unwrap(),
@@ -964,7 +964,7 @@ fn atomic_save_skips_only_the_duplicate_post_emission_source_scan() {
         source.reads.load(Ordering::SeqCst),
         fingerprint_chunks(file.file_size()) * 2 + publication_chunks(file.file_size())
     );
-    assert_eq!(report.bytes(), file.file_size());
+    assert_eq!(report.output_bytes(), file.file_size());
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
 
     std::fs::remove_file(destination).unwrap();
@@ -999,7 +999,7 @@ fn owned_atomic_save_reads_only_its_emission() {
         reads.load(Ordering::SeqCst),
         publication_chunks(file.file_size())
     );
-    assert_eq!(report.bytes(), file.file_size());
+    assert_eq!(report.output_bytes(), file.file_size());
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 1);
     let published = std::fs::read(&destination).unwrap();
     assert_eq!(report.source_fingerprint().as_bytes(), &sha256_of(&source));
@@ -1512,7 +1512,7 @@ fn atomic_path_publication_replaces_after_complete_staging() {
         .unwrap();
     let report = plan.save(&destination).unwrap();
     let output = std::fs::read(&destination).unwrap();
-    assert_eq!(report.bytes(), output.len() as u64);
+    assert_eq!(report.output_bytes(), output.len() as u64);
     let mut reopened = OleFile::open(Cursor::new(output), OleFileLimits::default()).unwrap();
     assert_eq!(
         reopened.open_stream(&["Fat4096"]).unwrap(),
