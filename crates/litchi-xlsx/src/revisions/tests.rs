@@ -190,7 +190,7 @@ fn transaction_noop_preserves_package_bytes() {
     store_workbook_revisions(&mut package, &value(), RevisionConformance::Strict).unwrap();
     let before = owner_bytes(&package);
     let mut transaction = Transaction::new(&mut package).unwrap();
-    let staged = transaction.revisions().cloned();
+    let staged = transaction.revisions().unwrap().cloned();
     assert!(!transaction.replace(staged).unwrap());
     let commit = transaction.commit().unwrap();
     assert!(!commit.changed());
@@ -251,7 +251,15 @@ fn invalid_edit_is_staged_and_failure_atomic() {
     let mut invalid_user = revision_user(7, "Alice");
     invalid_user.guid = "not-a-guid".into();
     assert!(transaction.set_user(invalid_user).is_err());
-    assert!(transaction.revisions().unwrap().users.users.is_empty());
+    assert!(
+        transaction
+            .revisions()
+            .unwrap()
+            .unwrap()
+            .users
+            .users
+            .is_empty()
+    );
     drop(transaction);
     assert_eq!(owner_bytes(&package), before);
 }

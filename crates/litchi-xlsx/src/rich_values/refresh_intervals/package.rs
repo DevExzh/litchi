@@ -225,36 +225,64 @@ crate::record::limit_kinds!("rich-value refresh-interval", RichValueRefresh {
 #[derive(Debug, Clone)]
 pub struct Edit {
     target: crate::record::Source,
-    before: Snapshot,
-    draft: Vec<TypeRefreshIntervals>,
+    before: Option<Snapshot>,
+    draft: Option<Vec<TypeRefreshIntervals>>,
 }
 
 impl Edit {
     /// Start a source-bound edit.
     fn start(target: crate::record::Source) -> Result<Self> {
-        let limits = target.read_limits();
-        let before = Snapshot::load(&target, &limits)?;
         Ok(Self {
-            draft: before.types.clone(),
             target,
-            before,
+            before: None,
+            draft: None,
         })
+    }
+
+    /// Read and clone the owner only when the edit first needs its staged
+    /// semantic values. A failed read leaves the edit unprepared and can be
+    /// retried without retaining a partial draft.
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        let limits = self.target.read_limits();
+        let before = Snapshot::load(&self.target, &limits)?;
+        let draft = before.types.clone();
+        self.draft = Some(draft);
+        self.before = Some(before);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.before
+            .as_ref()
+            .ok_or_else(|| invalid("rich-value refresh edit is not prepared"))
+    }
+
+    fn staged(&self) -> Result<&[TypeRefreshIntervals]> {
+        self.draft
+            .as_deref()
+            .ok_or_else(|| invalid("rich-value refresh edit is not prepared"))
     }
 
     /// Exact immutable source captured when the edit started.
     #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()?;
+        self.snapshot()
     }
 
     /// Currently staged type metadata.
     #[must_use]
-    pub fn types(&self) -> &[TypeRefreshIntervals] {
-        &self.draft
+    pub fn types(&mut self) -> Result<&[TypeRefreshIntervals]> {
+        self.ensure_prepared()?;
+        self.staged()
     }
 
     /// Replace one type's optional refresh collection.
     pub fn set(&mut self, type_index: usize, intervals: Option<RefreshIntervals>) -> Result<bool> {
+        self.ensure_prepared()?;
         let value = self
             .draft
             .get_mut(type_index)
@@ -271,8 +299,11 @@ impl Edit {
 
     /// Append one interval, creating the optional collection when necessary.
     pub fn add(&mut self, type_index: usize, interval: RefreshInterval) -> Result<bool> {
+        self.ensure_prepared()?;
         let current = self
             .draft
+            .as_ref()
+            .ok_or_else(|| invalid("rich-value refresh edit is not prepared"))?
             .get(type_index)
             .ok_or_else(|| invalid("rich-value type index is out of range"))?
             .intervals
@@ -301,8 +332,11 @@ impl Edit {
         type_index: usize,
         interval_index: usize,
     ) -> Result<Option<RefreshInterval>> {
+        self.ensure_prepared()?;
         let current = self
             .draft
+            .as_ref()
+            .ok_or_else(|| invalid("rich-value refresh edit is not prepared"))?
             .get(type_index)
             .ok_or_else(|| invalid("rich-value type index is out of range"))?
             .intervals
@@ -330,12 +364,11 @@ impl Edit {
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.draft.clone_from(&self.before.types);
-    }
-
-    fn changed(&self) -> bool {
-        self.before.types != self.draft
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        let draft = self.snapshot()?.types.clone();
+        self.draft = Some(draft);
+        Ok(())
     }
 
     /// Validate and publish the staged owner edit as a new package. An
@@ -353,12 +386,21 @@ impl Edit {
         self.publish().map(|(commit, _)| commit)
     }
 
-    fn publish(self) -> Result<(Commit, Snapshot)> {
-        if !self.changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
+    fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        self.ensure_prepared()?;
+        let before = self
+            .before
+            .take()
+            .ok_or_else(|| invalid("rich-value refresh edit is not prepared"))?;
+        let draft = self
+            .draft
+            .take()
+            .ok_or_else(|| invalid("rich-value refresh edit is not prepared"))?;
+        if before.types == draft {
+            let patch = Patch::new(before.clone(), before.clone());
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
-                self.before,
+                before,
             ));
         }
         if self.target.is_signed() {
@@ -366,30 +408,29 @@ impl Edit {
         }
         let limits = self.target.read_limits();
         let current = Snapshot::load(&self.target, &limits)?;
-        if !current.same_source(&self.before) {
+        if !current.same_source(&before) {
             return Err(Error::PatchConflict {
                 part: "rich-value refreshIntervals source closure".to_owned(),
             });
         }
-        let source = self
-            .before
+        let source = before
             .source
             .part
             .as_ref()
             .ok_or_else(|| invalid("rich-value types part is required for a changed edit"))?;
         let inspection = codec::inspect(source.bytes.as_slice(), &limits)?;
-        let output = codec::rewrite(source.bytes.as_slice(), &inspection, &self.draft, &limits)?;
+        let output = codec::rewrite(source.bytes.as_slice(), &inspection, &draft, &limits)?;
         let mut candidate = OpcPackage::clone(&self.target);
         candidate
             .get_part_mut(&source.name)?
             .set_blob_shared(Arc::new(output));
         let snapshot = Snapshot::load(&candidate, &limits)?;
-        if snapshot.types != self.draft || !snapshot.same_closure(&self.before) {
+        if snapshot.types != draft || !snapshot.same_closure(&before) {
             return Err(invalid(
                 "rich-value refresh publication changed staged metadata or its relationship closure",
             ));
         }
-        let patch = Patch::new(self.before, snapshot.clone());
+        let patch = Patch::new(before, snapshot.clone());
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),
@@ -510,4 +551,37 @@ impl crate::Package {
 /// Load rich-value refresh metadata from an OPC package.
 pub fn load(package: &OpcPackage, limits: &SourceLimits) -> Result<Snapshot> {
     Snapshot::load(package, limits)
+}
+
+#[cfg(test)]
+mod lazy_tests {
+    use super::*;
+    use litchi_opc::BlobPart;
+
+    #[test]
+    fn edit_entry_defers_rich_value_type_decode() {
+        let package = crate::Package::new().expect("minimal XLSX");
+        let mut edit = package.edit_rich_value_refresh().expect("rich-value edit");
+        assert!(edit.before.is_none());
+        assert!(edit.draft.is_none());
+        assert!(edit.types().expect("first type read").is_empty());
+        assert!(edit.before.is_some());
+    }
+
+    #[test]
+    fn failed_rich_value_decode_is_retryable_without_partial_state() {
+        let source = crate::Package::new().expect("minimal XLSX");
+        let mut package = source.opc().clone();
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/richValueTypes.xml").expect("types URI"),
+            TYPES_CONTENT_TYPE.into(),
+            b"<rv:types".to_vec(),
+        )));
+        let package = crate::Package::from_opc(package).expect("defer rich-value XML");
+        let mut edit = package.edit_rich_value_refresh().expect("rich-value edit");
+        assert!(edit.types().is_err());
+        assert!(edit.before.is_none());
+        assert!(edit.types().is_err());
+        assert!(edit.before.is_none());
+    }
 }

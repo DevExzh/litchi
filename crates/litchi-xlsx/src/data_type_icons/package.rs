@@ -291,35 +291,63 @@ crate::record::limit_kinds!("data-type-icon", DataTypeIcons {
 #[derive(Debug, Clone)]
 pub struct Edit {
     target: crate::record::Source,
-    before: Snapshot,
-    worksheet_views: Vec<Option<ShowDataTypeIcons>>,
-    custom_sheet_views: Vec<Option<ShowDataTypeIcons>>,
+    worksheet: PackURI,
+    before: Option<Snapshot>,
+    worksheet_views: Option<Vec<Option<ShowDataTypeIcons>>>,
+    custom_sheet_views: Option<Vec<Option<ShowDataTypeIcons>>>,
 }
 
 impl Edit {
     fn start(target: crate::record::Source, worksheet: &PackURI) -> Result<Self> {
-        let before = Snapshot::load(&target, worksheet)?;
         Ok(Self {
-            worksheet_views: before.worksheet_views.clone(),
-            custom_sheet_views: before.custom_sheet_views.clone(),
             target,
-            before,
+            worksheet: worksheet.clone(),
+            before: None,
+            worksheet_views: None,
+            custom_sheet_views: None,
         })
     }
 
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    /// Materialize the selected worksheet and its optional named-view part on
+    /// first use. A failed load leaves no partial draft, so callers may retry
+    /// without retaining source-sized state.
+    fn ensure_prepared(&mut self) -> Result<()> {
+        if self.before.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::load(&self.target, &self.worksheet)?;
+        self.worksheet_views = Some(before.worksheet_views.clone());
+        self.custom_sheet_views = Some(before.custom_sheet_views.clone());
+        self.before = Some(before);
+        Ok(())
+    }
+
+    fn snapshot(&self) -> Result<&Snapshot> {
+        self.before
+            .as_ref()
+            .ok_or_else(|| invalid("data-type-icon edit is not prepared"))
     }
 
     #[must_use]
-    pub fn worksheet_views(&self) -> &[Option<ShowDataTypeIcons>] {
-        &self.worksheet_views
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        self.ensure_prepared()?;
+        self.snapshot()
     }
 
     #[must_use]
-    pub fn custom_sheet_views(&self) -> &[Option<ShowDataTypeIcons>] {
-        &self.custom_sheet_views
+    pub fn worksheet_views(&mut self) -> Result<&[Option<ShowDataTypeIcons>]> {
+        self.ensure_prepared()?;
+        self.worksheet_views
+            .as_deref()
+            .ok_or_else(|| invalid("data-type-icon edit is not prepared"))
+    }
+
+    #[must_use]
+    pub fn custom_sheet_views(&mut self) -> Result<&[Option<ShowDataTypeIcons>]> {
+        self.ensure_prepared()?;
+        self.custom_sheet_views
+            .as_deref()
+            .ok_or_else(|| invalid("data-type-icon edit is not prepared"))
     }
 
     pub fn set_worksheet_view(
@@ -327,8 +355,11 @@ impl Edit {
         index: usize,
         value: Option<ShowDataTypeIcons>,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let slot = self
             .worksheet_views
+            .as_mut()
+            .ok_or_else(|| invalid("data-type-icon edit is not prepared"))?
             .get_mut(index)
             .ok_or_else(|| invalid("worksheet sheetView index is out of range"))?;
         if *slot == value {
@@ -343,8 +374,11 @@ impl Edit {
         index: usize,
         value: Option<ShowDataTypeIcons>,
     ) -> Result<bool> {
+        self.ensure_prepared()?;
         let slot = self
             .custom_sheet_views
+            .as_mut()
+            .ok_or_else(|| invalid("data-type-icon edit is not prepared"))?
             .get_mut(index)
             .ok_or_else(|| invalid("Named Sheet View index is out of range"))?;
         if *slot == value {
@@ -355,16 +389,13 @@ impl Edit {
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.worksheet_views
-            .clone_from(&self.before.worksheet_views);
-        self.custom_sheet_views
-            .clone_from(&self.before.custom_sheet_views);
-    }
-
-    fn changed(&self) -> bool {
-        self.before.worksheet_views != self.worksheet_views
-            || self.before.custom_sheet_views != self.custom_sheet_views
+    pub fn reset(&mut self) -> Result<()> {
+        self.ensure_prepared()?;
+        let worksheet_views = self.snapshot()?.worksheet_views.clone();
+        let custom_sheet_views = self.snapshot()?.custom_sheet_views.clone();
+        self.worksheet_views = Some(worksheet_views);
+        self.custom_sheet_views = Some(custom_sheet_views);
+        Ok(())
     }
 
     /// Validate and publish the staged metadata as a new package. An
@@ -374,59 +405,74 @@ impl Edit {
     ///
     /// Returns [`Error::Signed`], [`Error::PatchConflict`] and the
     /// publication's validation errors.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
         self.publish().map(|(commit, _)| commit)
     }
 
     /// [`Self::commit`], keeping the published snapshot.
-    fn publish(self) -> Result<(Commit, Snapshot)> {
-        if !self.changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
+    fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        self.ensure_prepared()?;
+        let before = self
+            .before
+            .take()
+            .ok_or_else(|| invalid("data-type-icon edit is not prepared"))?;
+        let worksheet_views = self
+            .worksheet_views
+            .take()
+            .ok_or_else(|| invalid("data-type-icon edit is not prepared"))?;
+        let custom_sheet_views = self
+            .custom_sheet_views
+            .take()
+            .ok_or_else(|| invalid("data-type-icon edit is not prepared"))?;
+        if before.worksheet_views == worksheet_views
+            && before.custom_sheet_views == custom_sheet_views
+        {
+            let patch = Patch::new(before.clone(), before.clone());
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
-                self.before,
+                before,
             ));
         }
         if self.target.is_signed() {
             return Err(Error::Signed);
         }
-        let current = Snapshot::load(&self.target, &self.before.worksheet)?;
-        if !current.same_source(&self.before) {
+        let current = Snapshot::load(&self.target, &before.worksheet)?;
+        if !current.same_source(&before) {
             return Err(Error::PatchConflict {
                 part: "data-type-icon source closure".to_owned(),
             });
         }
         let mut candidate = OpcPackage::clone(&self.target);
-        if self.before.worksheet_views != self.worksheet_views {
-            let output = rewrite_worksheet(&self.before, &self.worksheet_views)?;
+        if before.worksheet_views != worksheet_views {
+            let output = rewrite_worksheet(&before, &worksheet_views)?;
             candidate
-                .get_part_mut(&self.before.worksheet)?
+                .get_part_mut(&before.worksheet)?
                 .set_blob_shared(Arc::new(output));
         }
-        if self.before.custom_sheet_views != self.custom_sheet_views {
-            let source =
-                self.before.named_source.as_ref().ok_or_else(|| {
-                    invalid("Named Sheet Views part is required for a changed edit")
-                })?;
+        if before.custom_sheet_views != custom_sheet_views {
+            let source = before
+                .named_source
+                .as_ref()
+                .ok_or_else(|| invalid("Named Sheet Views part is required for a changed edit"))?;
             let output = rewrite_named(
                 source.bytes.as_slice(),
-                &self.before.custom_sheet_views,
-                &self.custom_sheet_views,
+                &before.custom_sheet_views,
+                &custom_sheet_views,
             )?;
             candidate
                 .get_part_mut(&source.name)?
                 .set_blob_shared(Arc::new(output));
         }
-        let after = Snapshot::load(&candidate, &self.before.worksheet)?;
-        if after.worksheet_views != self.worksheet_views
-            || after.custom_sheet_views != self.custom_sheet_views
-            || !after.same_closure(&self.before)
+        let after = Snapshot::load(&candidate, &before.worksheet)?;
+        if after.worksheet_views != worksheet_views
+            || after.custom_sheet_views != custom_sheet_views
+            || !after.same_closure(&before)
         {
             return Err(invalid(
                 "data-type-icon publication changed staged metadata or source closure",
             ));
         }
-        let patch = Patch::new(self.before, after.clone());
+        let patch = Patch::new(before, after.clone());
         let package = self.target.publish(candidate)?;
         Ok((Commit::new(package, patch, Diagnostics::new(true)), after))
     }
@@ -593,5 +639,44 @@ impl crate::record::Record for Patch {
 
     fn apply_to(&self, package: &mut OpcPackage) -> Result<()> {
         self.apply(package)
+    }
+}
+
+#[cfg(test)]
+mod lazy_tests {
+    use super::*;
+
+    #[test]
+    fn edit_entry_stays_cold_until_first_projection() {
+        let package = crate::Package::new().expect("minimal XLSX");
+        let mut edit = package
+            .edit_data_type_icons(0usize)
+            .expect("worksheet selector");
+        assert!(edit.before.is_none());
+        assert!(edit.worksheet_views.is_none());
+        assert!(edit.custom_sheet_views.is_none());
+
+        let _ = edit.worksheet_views().expect("first projection");
+        assert!(edit.before.is_some());
+        assert!(edit.worksheet_views.is_some());
+    }
+
+    #[test]
+    fn failed_projection_is_retryable_without_partial_state() {
+        let source = crate::Package::new().expect("minimal XLSX");
+        let worksheet = PackURI::new("/xl/worksheets/sheet1.xml").expect("worksheet URI");
+        let mut package = source.opc().clone();
+        package
+            .get_part_mut(&worksheet)
+            .expect("worksheet")
+            .set_blob(b"<worksheet".to_vec());
+        let package = crate::Package::from_opc(package).expect("defer worksheet XML");
+        let mut edit = package
+            .edit_data_type_icons(0usize)
+            .expect("worksheet selector");
+        assert!(edit.worksheet_views().is_err());
+        assert!(edit.before.is_none());
+        assert!(edit.worksheet_views().is_err());
+        assert!(edit.before.is_none());
     }
 }

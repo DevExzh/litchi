@@ -238,7 +238,7 @@ fn source_bound_anchor_edits_preserve_unknown_markup_and_payload_bytes() {
         .blob()
         .to_vec();
     let mut transaction = Transaction::new(&mut package, &uri).unwrap();
-    let mut anchor = transaction.objects().unwrap().objects[0]
+    let mut anchor = transaction.objects().unwrap().unwrap().objects[0]
         .properties
         .as_ref()
         .unwrap()
@@ -330,7 +330,7 @@ fn no_op_is_byte_exact_and_invalid_edits_are_staged_atomically() {
     let source = package.get_part(&uri).unwrap().blob().to_vec();
     let mut transaction = Transaction::new(&mut package, &uri).unwrap();
     assert!(!transaction.edit_object(1025, |_object| Ok(())).unwrap());
-    let staged = transaction.objects().cloned();
+    let staged = transaction.objects().unwrap().cloned();
     assert!(
         transaction
             .edit_object(1025, |object| {
@@ -339,7 +339,7 @@ fn no_op_is_byte_exact_and_invalid_edits_are_staged_atomically() {
             })
             .is_err()
     );
-    assert_eq!(transaction.objects().cloned(), staged);
+    assert_eq!(transaction.objects().unwrap().cloned(), staged);
     let commit = transaction.commit().unwrap();
     assert!(!commit.changed());
     assert!(commit.patch().is_noop());
@@ -387,7 +387,7 @@ fn mce_choice_and_fallback_sources_remain_editable_without_activation() {
     let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
     let source_before = package.get_part(&uri).unwrap().blob().to_vec();
     let mut transaction = Transaction::new(&mut package, &uri).unwrap();
-    let mut anchor = transaction.objects().unwrap().objects[1]
+    let mut anchor = transaction.objects().unwrap().unwrap().objects[1]
         .properties
         .as_ref()
         .unwrap()
