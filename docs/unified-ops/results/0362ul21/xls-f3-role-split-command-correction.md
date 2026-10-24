@@ -5,7 +5,7 @@ The paired packet is preserved at
 published at
 `/home/zhuhe/code/litchi-worktrees/.coord/sheet-preparation-691941/sheet-native-readiness-472b-f3-role-split-corrected.json`
 with SHA-256
-`e329ba6f93abf8a82a76511c8e6eed3b2df48534be6009272764bd77d66fab80`.
+`2a2b61ef7a5d0a13489bd4285ffe4b600afbd7ebed2223581229c625ea477e03`.
 
 All three command strings were normalized so JSON decoding contains actual
 shell quotes around `$CPU`, never a literal backslash-quote. A source-only
