@@ -194,7 +194,6 @@ impl Archive {
         self.inner.package()
     }
 
-    #[must_use]
     pub(crate) fn resource_count(&self) -> Result<usize> {
         if let Some(count) = self.resource_count.get() {
             return Ok(*count);
