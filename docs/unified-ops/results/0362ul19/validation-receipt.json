@@ -1,0 +1,163 @@
+{
+  "schema": "litchi.docx-artifact-stream-report.validation.v1",
+  "source": {
+    "base_commit": "c796d0acc24c7c6e6fd08980b9e31af6bb86b18b",
+    "tested_commit": "b4fc4ea3700f74964fa63d2feb6cd84ca0e87276",
+    "branch": "uo2/docx-artifact-stream-report",
+    "files": {
+      "crates/litchi-docx/src/source_backed.rs": {
+        "bytes": 163401,
+        "sha256": "d8960c6c4d4ba77249288b880f336617f8dbac9dfd22d1470d46f351faaf69b7"
+      },
+      "crates/litchi-docx/src/source_backed/deferred.rs": {
+        "bytes": 38738,
+        "sha256": "6a2bdb21fddf1aa1457fabd80b75ba9775e8e36994551b6889a1d224aca9b92d"
+      },
+      "crates/litchi-docx/src/source_backed/svg_lifecycle.rs": {
+        "bytes": 131921,
+        "sha256": "5c96fdc08a94f8db67fb80287cf254884f449b6c91eeb3900917a32a483e4fec"
+      },
+      "crates/litchi-docx/src/source_backed/tail_append.rs": {
+        "bytes": 148195,
+        "sha256": "9004633404fd7c722fc6cbdceab4fc549f7677beab4f813fe8f2d4fb268d2d00"
+      },
+      "crates/litchi-docx/src/source_backed/tail_append_stream.rs": {
+        "bytes": 91738,
+        "sha256": "595b9fd85b498d67eac5a5a5d832eadd6c0959425d552cd6734e983257f1d96b"
+      },
+      "crates/litchi-opc/src/lib.rs": {
+        "bytes": 4817,
+        "sha256": "3d13cd2121306aff0fa5b832d9c77e1c3e91201c55dcd8d708474d606736cf1a"
+      },
+      "crates/litchi-opc/src/source_backed.rs": {
+        "bytes": 1143194,
+        "sha256": "e93aea3e745f3f5e683f30150ccea34c9f96f9e9b50c8e74d08396dcf25d8445"
+      },
+      "crates/litchi-opc/src/source_backed/artifact_restore.rs": {
+        "bytes": 148701,
+        "sha256": "8b4114bc0803c2e416964e8979978f9faa7615143ec82997bb32fdd5ea925376"
+      },
+      "tools/api_glossary.json": {
+        "bytes": 940424,
+        "sha256": "ccd0b4abe58d2d6eb46a54269bfaccd5cf24e27128166c3605c9e6016dd79887"
+      },
+      "docs/unified-ops/0362ul19-docx-artifact-stream-report.md": {
+        "bytes": 1915,
+        "sha256": "68f1f1767443ed97b9391642e02176ef9412114ab68c4b1c77caa203c672460d"
+      }
+    }
+  },
+  "locks": {
+    "Cargo.lock": {
+      "bytes": 139606,
+      "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
+    }
+  },
+  "environment": {
+    "cargo": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+    "offline": true,
+    "locked": true,
+    "cargo_build_jobs": 1,
+    "rust_test_threads": 1,
+    "memory_cap": "20G",
+    "target": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/target",
+    "target_bytes_after": 1629962979,
+    "rustdoc_target": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/rustdoc-target",
+    "rustdoc_target_bytes_after": 745221476
+  },
+  "successful_commands": [
+    {
+      "name": "opc_artifact_stream_unit_tests",
+      "argv": ["cargo", "test", "--offline", "--locked", "-p", "litchi-opc", "--lib", "source_backed::artifact_restore::tests"],
+      "exit_code": 0,
+      "tests": "9 passed",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/opc-stream-tests.log",
+        "bytes": 5313,
+        "sha256": "3d3f8502a8f57722353b5886683d55a6339ce4761a464c8e13033672d5a4d99f"
+      }
+    },
+    {
+      "name": "docx_stream_consumer_integration_test",
+      "argv": ["cargo", "test", "--offline", "--locked", "-p", "litchi-docx", "--test", "source_backed_tail_append_stream", "package_stream_edit_uses_the_focused_public_type"],
+      "exit_code": 0,
+      "tests": "1 passed",
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/docx-stream-test.log",
+        "bytes": 3822,
+        "sha256": "f9ecba04c7a933ae3ba628f1bf6600bca409240b2c18faedfc33f083e0eea0b7"
+      }
+    },
+    {
+      "name": "opc_docx_all_targets_all_features_check",
+      "argv": ["cargo", "check", "--offline", "--locked", "-p", "litchi-opc", "-p", "litchi-docx", "--all-targets", "--all-features"],
+      "exit_code": 0,
+      "log": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/opc-docx-all-targets-all-features.log",
+        "bytes": 8492,
+        "sha256": "29b3bf7344ef60fd183b160cbdac98b6ae89ce8485a90f38157bb943e1ce4ac8"
+      }
+    },
+    {
+      "name": "opc_minimal_rustdoc_and_glossary",
+      "argv": ["cargo", "rustdoc", "--offline", "--locked", "--package", "litchi-opc", "--lib", "--no-default-features", "--target-dir", "<rustdoc-target>", "--", "-Zunstable-options", "--output-format", "json", "--document-hidden-items"],
+      "exit_code": 0,
+      "glossary_profile": "opc-minimal",
+      "glossary_result": "pass",
+      "log": {
+        "rustdoc": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/rustdoc-opc-minimal.log", "bytes": 3620, "sha256": "51ebcc6067cf8a697c5efa27b92008b8627a2d47f30938fee8f287fc307a038e"},
+        "glossary": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/glossary-opc-minimal.log", "bytes": 153, "sha256": "96b744382bb550218367e83ca4b12c15811e30bb53b1d86e35186acbe70103ef"}
+      }
+    },
+    {
+      "name": "opc_full_rustdoc_and_glossary",
+      "argv": ["cargo", "rustdoc", "--offline", "--locked", "--package", "litchi-opc", "--lib", "--no-default-features", "--features", "sign,performance-diagnostics", "--target-dir", "<rustdoc-target>", "--", "-Zunstable-options", "--output-format", "json", "--document-hidden-items"],
+      "exit_code": 0,
+      "glossary_profile": "opc-full",
+      "glossary_result": "pass",
+      "log": {
+        "rustdoc": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/rustdoc-opc-full.log", "bytes": 3437, "sha256": "47ff6a5c71e609143a3a0aed8ddc5b902ea69125c20e127e955ddaa308a93f73"},
+        "glossary": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/glossary-opc-full.log", "bytes": 153, "sha256": "96b744382bb550218367e83ca4b12c15811e30bb53b1d86e35186acbe70103ef"}
+      }
+    },
+    {
+      "name": "docx_minimal_rustdoc_and_glossary",
+      "argv": ["cargo", "rustdoc", "--offline", "--locked", "--package", "litchi-docx", "--lib", "--no-default-features", "--target-dir", "<rustdoc-target>", "--", "-Zunstable-options", "--output-format", "json", "--document-hidden-items"],
+      "exit_code": 0,
+      "glossary_profile": "docx-minimal",
+      "glossary_result": "pass",
+      "log": {
+        "rustdoc": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/rustdoc-docx-minimal.log", "bytes": 3283, "sha256": "c2c1bd7d51cac7e1d8640ec3c91bd0e2277eed05a86c1b4ee4be6e205c046c4c"},
+        "glossary": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/glossary-docx-minimal.log", "bytes": 155, "sha256": "4ecfcc59908545887631e4a92941e59aaa6d37d681ac336654162c775ba5e9eb"}
+      }
+    },
+    {
+      "name": "docx_full_rustdoc_and_glossary",
+      "argv": ["cargo", "rustdoc", "--offline", "--locked", "--package", "litchi-docx", "--lib", "--no-default-features", "--features", "automatic-fonts,encryption,sign,vba-inspection", "--target-dir", "<rustdoc-target>", "--", "-Zunstable-options", "--output-format", "json", "--document-hidden-items"],
+      "exit_code": 0,
+      "glossary_profile": "docx-full",
+      "glossary_result": "pass",
+      "log": {
+        "rustdoc": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/rustdoc-docx-full.log", "bytes": 6329, "sha256": "4397151afd507421e483b1804ebdf4ec24f6256713fecf8fdde9849504ca8434"},
+        "glossary": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/glossary-docx-full.log", "bytes": 155, "sha256": "8bcb4f67b3bb9c2cee69c0220fbfa73a253a9abd768ade275fa6fad95dee11e4"}
+      }
+    },
+    {
+      "name": "soapberry_corrected_scope_rustdoc_and_glossary",
+      "argv": ["cargo", "rustdoc", "--offline", "--locked", "--package", "soapberry-zip", "--lib", "--no-default-features", "--target-dir", "<rustdoc-target>", "--", "-Zunstable-options", "--output-format", "json", "--document-hidden-items"],
+      "exit_code": 0,
+      "glossary_profile": "soapberry-zip",
+      "glossary_result": "pass; 6 corrected office scopes resolved",
+      "log": {
+        "rustdoc": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/rustdoc-soapberry.log", "bytes": 1375, "sha256": "4e91b4356a2cdfae133f78048424d0b31e93afaeeff722be25eb7e905c064633"},
+        "glossary": {"path": "/home/zhuhe/code/litchi-worktrees/.coord/docx-artifact-stream-report-validation/logs/glossary-soapberry.log", "bytes": 152, "sha256": "917beb818de828b8301f64db2c6a0ecd3637a2048edca996f08153eeb3dd39e0"}
+      }
+    }
+  ],
+  "claims": {
+    "abba": false,
+    "performance_acceptance": false,
+    "source_fidelity": "unchanged by type-only rename",
+    "independent_finite_review_notification": "receipt supplied to coordinator for gate_upstream_guard review"
+  }
+}

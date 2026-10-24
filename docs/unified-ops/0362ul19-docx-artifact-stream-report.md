@@ -22,7 +22,11 @@ are also scoped to their actual `soapberry_zip::office::LazyArchiveReader` and
 replacement guidance are unchanged.
 
 Source receipt: the leaf was cut from `c796d0acc24c7c6e6fd08980b9e31af6bb86b18b`.
-Build-free validation is limited to glossary-policy/unit checks, source
-searches, formatting and `git diff --check`; Cargo package validation and
-performance measurements require the coordinator's next available slot. No
-ABBA or native acceptance claim is made here.
+The [validation receipt](results/0362ul19/validation-receipt.json) binds the
+tested source tip, lock SHA-256, command and log hashes, and fresh external
+targets. Under the 20 GiB cap with one build job and offline locked Cargo,
+the OPC artifact-stream tests pass 9/9, the focused DOCX stream consumer test
+passes, OPC and DOCX all-target/all-feature checking passes, and the OPC and
+DOCX minimal/full rustdoc glossary profiles pass. The corrected soapberry
+scope profile also passes against fresh rustdoc JSON. No ABBA or performance
+acceptance claim is made here.
