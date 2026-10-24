@@ -4431,3 +4431,25 @@ See [0063](0063-source-pptx-modern-comments.md).
   leaf is registering the newly accepted suites for the current source;
   the runner used by active documentation remains unchanged. The owner
   signed-batch contract choice and actual native qualification remain open.
+
+- Coordinator DOC execution-protocol review (2026-10-24):
+  Reviewed leaf `29c7879b3f` merges at `d91dd56c08`. Its final schedule
+  records 31 actual samples per invocation and two ABBA blocks. The 250 ms
+  aggregate floor now uses the certified lower bound
+  `16 * median_us + 15 * min_us` for each 31-sample invocation, with finite,
+  nonnegative and ordered timing validation. It does not claim that a
+  median multiplied by the sample count is measured accumulated work.
+  Independent fake-command review and the composed protocol checks pass,
+  including short-work, source-identity and missing-profile failures. The
+  accepted release binaries remain unchanged; native timing and profiles
+  have not run.
+
+  The signed original-f2 handoff now records nine exact prepared files and
+  the retained archive path. Root independently verifies those files and
+  the pinned Cargo shim; the corrected build preflight succeeds on the
+  integration ancestry without invoking Cargo. Candidate preparation and
+  all dependent policy changes still await the owner's signed-batch
+  contract choice. Isolated workspace documentation remains active; the
+  core/ops/facade documentation row and actual CLI corpus are authorized
+  only sequentially after their preceding row passes and all its owned
+  processes terminate. No full gate or performance acceptance is claimed.
