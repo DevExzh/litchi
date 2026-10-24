@@ -408,6 +408,17 @@ class ODGJoinedQualificationTests(unittest.TestCase):
             builder._write_fresh_json(receipt, {"ok": True}, "receipt")
             with self.assertRaises(RUNNER.RunFailure):
                 builder._write_fresh_json(receipt, {"ok": False}, "receipt")
+            logs = root / "logs"
+            logs.mkdir()
+            empty = logs / "stderr"
+            empty.write_bytes(b"")
+            self.assertEqual(
+                builder._validate_log_identity(
+                    {"path": str(empty), "bytes": 0, "sha256": hashlib.sha256(b"").hexdigest()},
+                    "empty.stderr", logs,
+                )["bytes"],
+                0,
+            )
 
     def test_builder_requires_pristine_baseline_and_final_candidate_binding(self) -> None:
         from tools import odg_joined_qualification_builder as builder

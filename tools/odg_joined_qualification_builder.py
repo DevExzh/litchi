@@ -816,7 +816,7 @@ def _validate_log_identity(value: Any, label: str, expected_dir: Path) -> dict[s
     if path.parent != expected_dir:
         raise RunFailure(f"{label} is outside the fresh build log directory")
     actual = _identity(path)
-    expected = {"path": str(path), "bytes": _positive_int(item["bytes"], f"{label}.bytes"), "sha256": _digest(item["sha256"], f"{label}.sha256")}
+    expected = {"path": str(path), "bytes": _nonnegative_int(item["bytes"], f"{label}.bytes"), "sha256": _digest(item["sha256"], f"{label}.sha256")}
     if actual != expected:
         raise RunFailure(f"{label} was changed after the build")
     return actual
