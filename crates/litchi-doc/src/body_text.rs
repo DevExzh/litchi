@@ -5983,6 +5983,7 @@ mod tests {
     };
     use crate::parts::dofr::{DofrFrameKind, DofrPayload};
     use crate::parts::fib::FileInformationBlock;
+    #[cfg(feature = "performance-diagnostics")]
     use crate::parts::protection::ProtectionPolicy;
     use crate::tracked_revision::{Limits, RevisionEditor};
     use crate::writer::{
