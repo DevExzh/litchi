@@ -968,6 +968,45 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             self.assertEqual(safe._event_execution_class("measurement"), "exclusive")
             self.assertEqual(safe._event_execution_class("build"), "compile_only")
 
+    def test_expired_compile_lease_reaps_child_and_writes_failed_receipt(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-expiry-child-") as directory:
+            root = Path(directory)
+            manifest, manifest_path, permit, _lease_dir = self._overlap_fixture(
+                root,
+                expires=(runner._dt.datetime.now(runner._dt.timezone.utc) + runner._dt.timedelta(seconds=1)).isoformat(),
+            )
+            fake_cargo = root / "cargo"
+            fake_cargo.write_text("#!/bin/sh\ntrap 'exit 143' TERM\nsleep 5\n", encoding="utf-8")
+            fake_cargo.chmod(0o755)
+            for leg in manifest["legs"].values():
+                leg["build"][0]["argv"] = [str(fake_cargo), "build"]
+                leg["allow_dirty"] = True
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            permit_value = json.loads(permit.read_text(encoding="utf-8"))
+            permit_value["allowed_manifest_sha256"] = [hashlib.sha256(manifest_path.read_bytes()).hexdigest()]
+            permit.write_text(json.dumps(permit_value), encoding="utf-8")
+            # The permit is intentionally made short-lived only after the
+            # manifest/lease identity is complete, avoiding a startup race.
+            permit_value["expires_utc"] = (
+                runner._dt.datetime.now(runner._dt.timezone.utc) + runner._dt.timedelta(seconds=2)
+            ).isoformat()
+            permit.write_text(json.dumps(permit_value), encoding="utf-8")
+            safe = runner.SafeRunner(manifest, manifest_path, "build", None)
+            own = runner._read_proc(os.getpid())
+            assert own is not None
+            with self.assertRaisesRegex(runner.RunnerError, "expired"):
+                with mock.patch.object(runner, "_proc_snapshot", return_value={os.getpid(): own}):
+                    safe.build()
+            receipt = json.loads((root / "output" / "build-receipt.json").read_text(encoding="utf-8"))
+            self.assertEqual(receipt["status"], "failed")
+            self.assertEqual(receipt["build_execution"]["class"], "compile_only")
+            self.assertEqual(receipt["build_execution"]["lease_status"], "released")
+            events = (root / "output" / "events-build.jsonl").read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(events), 1)
+            event = json.loads(events[0])
+            self.assertIn("expired", event["runner_error"])
+            self.assertEqual(event["post_exit_descendants"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

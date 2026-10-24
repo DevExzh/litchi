@@ -48,13 +48,13 @@ No Cargo or native qualification command was run. The exact reduced receipt is
 | Check | Result |
 | --- | --- |
 | `python3 -m py_compile tools/native_qualification_runner.py tools/test_native_qualification_runner.py` | exit 0 |
-| `python3 -m unittest tools.test_native_qualification_runner -v` | 30 tests passed, exit 0 |
+| `python3 -m unittest tools.test_native_qualification_runner -v` | 31 tests passed, exit 0 |
 | `python3 -m unittest tools.test_drawingml_raw_qualification tools.test_legacy_native_qualification -v` | 31 tests passed, exit 0 |
 
 External logs are under
 `/home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-overlap-protocol-20261024/`.
-The runner source is 152,560 bytes (SHA-256
+The runner source is 152,389 bytes (SHA-256
 `597c2e46027b11c7f882d7ae28bc3c8b3a8abff9d92e015fbb25e6be32a8752c`) and its
-focused test source is 47,681 bytes (SHA-256
-`12f31923c4de6abcd4ec433fee73610c350cf53e3b33136b5a9137e35d53622a`). This
+focused test source is 50,216 bytes (SHA-256
+`e767c6943d50a70417a68aef27b01371ab03fb5a0b35882f940ecc53fbd5d947`). This
 leaf makes no performance, ABBA, RSS, or native correctness acceptance claim.
