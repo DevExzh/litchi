@@ -35,14 +35,31 @@ test-data/rtf/watermark.rtf
 
 The first three are copied byte-for-byte; `lib.rs` receives only the guarded
 `pub mod ppt_lazy_native;` insertion; and all six fixtures are copied
-byte-for-byte from the candidate's ordinary tracked files. The two
+byte-for-byte from the candidate's ordinary tracked files, except for the
+five compile fixtures that are already in the pinned baseline Git tree: a
+sparse checkout may omit their worktree files, so the preparer verifies their
+HEAD blob identities and restores them with `checkout-index
+--ignore-skip-worktree-bits`. It rejects an existing untracked or ignored file
+at any reviewed fixture path. The two
 `include_str!("lib.rs")` uses remain self-contained source reads and require
 no external fixture. The receipt records the candidate and baseline ref/tree,
-lock, every source and destination identity, registration before/after
-hashes, the complete path allowlist, and the baseline production-tree digest.
-It claims preparation identity only. The runtime runner's build-receipt
-validator now requires this preparation receipt and the complete fixture
-binding before accepting a correctness report.
+lock, every source and destination identity, the sparse pre-state,
+registration before/after hashes, the complete path allowlist, and the
+baseline production-tree digest. The pinned baseline ref/tree and permitted
+sparse omission state are checked before any materialization. It claims
+preparation identity only. The runtime runner's build-receipt validator now
+requires this preparation receipt and the complete fixture binding before
+accepting a correctness report.
+
+The fixed compile-fixture identities are:
+
+| path | bytes | SHA-256 |
+| --- | ---: | --- |
+| `test-data/poi/test-data/slideshow/ppt_with_embeded.ppt` | 180,736 | `afa1dd5adc36765e6e40725a133b0330e5ad1febd1506ca93ceae8c5c5400b53` |
+| `test-data/unified-ops/0294/video.ppt` | 43,520 | `f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a` |
+| `test-data/poi/test-data/slideshow/bug61881.ppt` | 74,752 | `ba2bf551e87f5fd7667dec52ac19005396bdf9af00f0006f9a247a9fede2e8ee` |
+| `test-data/poi/test-data/spreadsheet/54016.xls` | 984,576 | `2e050f1fbb31868b097aa6d4d0fe0a16af8e39c252af82d01cd8f93c4f9a911a` |
+| `test-data/rtf/watermark.rtf` | 69,471 | `48d62dcd959e737b06ebb8255780bcaaf1e88056ff9c3d5a21d3ff5cd3ddf9cb` |
 
 The regression is covered by:
 
@@ -56,6 +73,21 @@ PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=tools \
 Both preparation tests and all 13 existing PPT protocol tests passed. The
 reviewed fixture is 14,848 bytes with SHA-256
 `02fa44ca76903943e80a3a2da1f9dbd326c7a4a047540c3aa9cf211e34ef617c`.
+The focused suite now has 18 tests, including a temporary sparse worktree,
+wrong-baseline no-mutation, and pre-existing-untracked-fixture rejection.
+
+The actual CLI was rerun against a fresh sparse checkout after these guards:
+
+```text
+receipt: /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/preparation-sparse-cli.json
+receipt SHA-256: 64051f07b614270cfb1769ecbc9752be6a16c7e6efb63daf79c0a77fa264c3fe
+baseline: 8779d059add6c90c74552801372c44f770db9f0f / 27e0b56e2f8e3ab11b00c119604b5636f358dfe2
+candidate: fb262b0bbf5160534ca5e87c63727df823a794bc / cb0965bc806b3f7c7a38f3bc340499039bf7e726
+candidate lock: 6dbfc0bcc64cdf8e625a6562f2d5d11c1e98ad7cb6edda299b9adf2a36a70e39
+```
+
+The receipt binds ten reviewed materialization paths and all five compile
+fixtures; no build or probe was run by the preparer.
 
 ## Preserved failed attempts
 
