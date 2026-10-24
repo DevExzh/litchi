@@ -16,16 +16,34 @@ pub use crate::comments::source_diagnostics::Diagnostics;
 #[derive(Clone)]
 pub struct Edit {
     source: SourceBackedWorkbook,
-    inner: crate::comments::Edit,
+    inner: Option<crate::comments::Edit>,
 }
 
 impl std::fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_struct("Edit").finish_non_exhaustive()
+        formatter
+            .debug_struct("Edit")
+            .field("materialized", &self.inner.is_some())
+            .finish_non_exhaustive()
     }
 }
 
 impl Edit {
+    fn inner_mut(&mut self) -> Result<&mut crate::comments::Edit> {
+        if self.inner.is_none() {
+            let package = self.source.staging_package().map_err(|error| {
+                crate::source_backed::protected_edit_error(error, "edit comments")
+            })?;
+            let inner = package.edit_comments().map_err(|error| {
+                crate::source_backed::protected_edit_error(error, "edit comments")
+            })?;
+            self.inner = Some(inner);
+        }
+        self.inner.as_mut().ok_or(Error::Internal(
+            "source-backed comment edit engine was not retained",
+        ))
+    }
+
     /// Replace the complete text and author of one existing comment.
     ///
     /// # Errors
@@ -37,7 +55,7 @@ impl Edit {
         reference: Reference,
         value: Value,
     ) -> Result<()> {
-        self.inner.replace(selector, reference, value)
+        self.inner_mut()?.replace(selector, reference, value)
     }
 
     /// Atomically stage up to 256 distinct replacements on one worksheet.
@@ -50,7 +68,7 @@ impl Edit {
         selector: Selector<'_>,
         updates: impl IntoIterator<Item = Update>,
     ) -> Result<()> {
-        self.inner.replace_many(selector, updates)
+        self.inner_mut()?.replace_many(selector, updates)
     }
 
     /// Stage an existing comment's visibility.
@@ -64,7 +82,8 @@ impl Edit {
         reference: Reference,
         visibility: Visibility,
     ) -> Result<()> {
-        self.inner.set_visibility(selector, reference, visibility)
+        self.inner_mut()?
+            .set_visibility(selector, reference, visibility)
     }
 
     /// Validate the staged edits and commit them as a workbook that writes
@@ -75,8 +94,24 @@ impl Edit {
     /// Returns a refusal for a protected, signed, encrypted, stale or
     /// length-changing edit, or a failed readback.
     pub fn commit(self) -> Result<Commit> {
-        let (plan, diagnostics) = self.inner.commit_source_backed()?.into_plan();
-        published(&self.source, plan, diagnostics)
+        let source = self.source.clone();
+        source.ensure_original_source_current()?;
+        let inner = match self.inner {
+            Some(inner) => inner,
+            None => {
+                let package = source.staging_package().map_err(|error| {
+                    crate::source_backed::protected_edit_error(error, "edit comments")
+                })?;
+                package.edit_comments().map_err(|error| {
+                    crate::source_backed::protected_edit_error(error, "edit comments")
+                })?
+            },
+        };
+        let (plan, diagnostics) = inner.commit_source_backed()?.into_plan();
+        source.ensure_original_source_current()?;
+        let commit = published(&source, plan, diagnostics)?;
+        source.ensure_original_source_current()?;
+        Ok(commit)
     }
 }
 
@@ -87,15 +122,10 @@ impl SourceBackedWorkbook {
     ///
     /// Returns an error when the workbook's comments cannot be read.
     pub fn edit_comments(&self) -> Result<Edit> {
-        let package = self
-            .staging_package()
-            .map_err(|error| crate::source_backed::protected_edit_error(error, "edit comments"))?;
-        let inner = package
-            .edit_comments()
-            .map_err(|error| crate::source_backed::protected_edit_error(error, "edit comments"))?;
+        self.ensure_original_source_current()?;
         Ok(Edit {
             source: self.clone(),
-            inner,
+            inner: None,
         })
     }
 

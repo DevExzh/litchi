@@ -302,7 +302,7 @@ fn atomic_source_change_after_staging_leaves_destination_untouched() {
 }
 
 #[test]
-fn retained_narrow_profile_allows_noop_but_refuses_entry_and_input_growth() {
+fn retained_narrow_profile_allows_noop_but_defers_entry_and_refuses_input_growth() {
     let bytes = authored_package();
     let source_limits = exact_source_limits(&bytes);
     let package =
@@ -323,11 +323,10 @@ fn retained_narrow_profile_allows_noop_but_refuses_entry_and_input_growth() {
     assert!(growing.commit().is_err());
 
     let too_small = OleFileLimits::new(u64::try_from(bytes.len() - 1).unwrap()).unwrap();
-    assert!(
-        package
-            .edit_with_options(litchi_xls::package::edit::EditOptions::new().cfb_limits(too_small))
-            .is_err()
-    );
+    let too_small_edit = package
+        .edit_with_options(litchi_xls::package::edit::EditOptions::new().cfb_limits(too_small))
+        .unwrap();
+    assert!(too_small_edit.commit().is_err());
 }
 
 #[test]
@@ -936,13 +935,23 @@ fn primary_source_cell_uses_the_admitted_inventory_and_original_state() {
         } else {
             Package::from_bytes(&bytes).unwrap()
         };
+        let reads_before_edit = source.read_count();
         let mut edit = package.edit().unwrap();
+        assert_eq!(
+            source.read_count(),
+            reads_before_edit,
+            "primary edit entry must not materialize the source"
+        );
         let original = Reference::new(3, 2).unwrap();
         let missing = Reference::new(10, 2).unwrap();
-        let reads = source.read_count();
         assert_eq!(
             edit.source_cell(0usize, original).unwrap().unwrap().value(),
             &Value::Number(4.5)
+        );
+        let reads_after_first_lookup = source.read_count();
+        assert!(
+            reads_after_first_lookup >= reads_before_edit,
+            "the first actual operation may materialize the deferred source"
         );
         assert!(edit.source_cell("Sheet1", missing).unwrap().is_none());
         edit.set_value(0usize, original, Value::Number(9.0))
@@ -960,7 +969,7 @@ fn primary_source_cell_uses_the_admitted_inventory_and_original_state() {
         assert!(edit.source_cell("missing sheet", original).is_err());
         assert_eq!(
             source.read_count(),
-            reads,
+            reads_after_first_lookup,
             "source cell lookup must reuse the admitted inventory"
         );
         let commit = edit.commit().unwrap();

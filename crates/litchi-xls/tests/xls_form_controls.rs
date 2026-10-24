@@ -542,7 +542,7 @@ fn editor_enumerates_form_controls_and_preserves_them_on_rewrite() {
     let ole = ole_object(1, 42).to_record_bytes().unwrap();
     let bytes = xls(&[ole, checkbox.clone(), radio], &[42]);
 
-    let editor = litchi_xls::Package::from_bytes(&bytes)
+    let mut editor = litchi_xls::Package::from_bytes(&bytes)
         .unwrap()
         .edit_ole_objects()
         .unwrap();
@@ -574,7 +574,7 @@ fn editor_enumerates_form_controls_and_preserves_them_on_rewrite() {
             .any(|window| window == checkbox)
     );
 
-    let editor = litchi_xls::Package::from_bytes(&bytes)
+    let mut editor = litchi_xls::Package::from_bytes(&bytes)
         .unwrap()
         .edit_ole_objects()
         .unwrap();
