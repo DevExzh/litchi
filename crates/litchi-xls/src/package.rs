@@ -719,6 +719,12 @@ impl Package {
         self.encryption().is_some()
     }
 
+    /// Whether the retained input carries a compound-file signature stream.
+    #[must_use]
+    pub(crate) fn is_signed(&self) -> bool {
+        self.inner.signed
+    }
+
     /// Return the password-to-open profile retained from source admission.
     ///
     /// A CryptoAPI RC4 profile includes its exact key length. Source-backed

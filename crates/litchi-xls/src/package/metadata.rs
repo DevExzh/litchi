@@ -12,7 +12,8 @@
 //! property-set transaction, so an exact no-op commits the source package
 //! unchanged and a changed commit keeps every other stream and the root
 //! class identifier. A missing stream is created with the Windows-1252 code
-//! page. Encrypted and signed workbooks are refused.
+//! page. A signed workbook admits reads and exact no-op commits, while a
+//! changed commit is refused before publication.
 //!
 //! ```
 //! let package = litchi_xls::Package::new()?;
@@ -231,8 +232,21 @@ impl Edit {
             return Ok(());
         }
         let initial = {
-            let editor = self.transaction.editor().map_err(transaction_error)?;
-            SummaryProperties::from_editor(editor)?
+            if self.base.is_signed() {
+                let source = self.transaction.snapshot().map_err(transaction_error)?;
+                SummaryProperties::from_sections(
+                    source
+                        .summary_information()
+                        .map(|snapshot| snapshot.section()),
+                    source
+                        .document_summary_information()
+                        .map(|snapshot| snapshot.section()),
+                    source.user_defined_properties(),
+                )?
+            } else {
+                let editor = self.transaction.editor().map_err(transaction_error)?;
+                SummaryProperties::from_editor(editor)?
+            }
         };
         self.initial = Some(initial.clone());
         self.properties = Some(initial);
@@ -313,6 +327,12 @@ impl Edit {
                     "metadata edit lost its staged properties",
                 )))?;
         if properties != initial {
+            // Preserve the established source-conflict precedence before the
+            // signed-write policy rejects publication.
+            transaction.check_source().map_err(transaction_error)?;
+            if base.is_signed() {
+                return Err(Error::Protected);
+            }
             properties.stage_changes(
                 &initial,
                 transaction.editor_mut().map_err(transaction_error)?,
@@ -358,6 +378,9 @@ impl Package {
             return Err(Error::PatchConflict);
         }
         let changed = !patch.is_noop();
+        if changed && self.is_signed() {
+            return Err(Error::Protected);
+        }
         let package = if changed {
             republish(self, patch.after_bytes().to_vec())?
         } else {
@@ -373,7 +396,7 @@ impl Package {
 
 fn protected(error: crate::Error) -> Error {
     match error {
-        crate::Error::Cfb(OleError::InvalidFormat(_)) => Error::Protected,
+        crate::Error::Cfb(OleError::InvalidFormat(_)) | crate::Error::Signed => Error::Protected,
         other => Error::from(other),
     }
 }
@@ -387,6 +410,9 @@ fn transaction_error(error: crate::package::Error) -> Error {
 
 /// Admit edited bytes under the source package's retained policy.
 fn republish(source: &Package, bytes: Vec<u8>) -> Result<Package> {
+    if source.is_signed() {
+        return Err(Error::Protected);
+    }
     match source.inner.policy {
         RetainedPolicy::Eager {
             source_limits,

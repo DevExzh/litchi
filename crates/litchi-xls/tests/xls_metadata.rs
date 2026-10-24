@@ -10,11 +10,12 @@
 
 use std::io::Cursor;
 
-use litchi_cfb::OleFile;
+use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::Metadata;
 use litchi_ole_common::property_set::{
     Binding, CodePage, PropertySetReader, Value, document_summary,
 };
+use litchi_xls::package::Error as PackageError;
 use litchi_xls::package::metadata::Error;
 use litchi_xls::{Builder, EncryptionEntropy, EncryptionProfile, OpenOptions, Package};
 
@@ -33,6 +34,20 @@ fn fresh() -> Builder {
     let sheet = builder.add_worksheet("Sheet1").unwrap();
     builder.write_number(sheet, 0, 0, 42.0).unwrap();
     builder
+}
+
+fn signed_package() -> Package {
+    let source = fresh().build().unwrap().to_bytes().unwrap();
+    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &workbook).unwrap();
+    writer
+        .create_stream(&["DigitalSignature"], b"opaque signature")
+        .unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    Package::from_bytes(&output.into_inner()).unwrap()
 }
 
 fn stream_names(bytes: &[u8]) -> Vec<String> {
@@ -206,6 +221,48 @@ fn metadata_transaction_round_trip() {
             .unwrap(),
         source
     );
+}
+
+#[test]
+fn signed_metadata_and_property_set_noops_preserve_bytes_and_changes_refuse() {
+    let package = signed_package();
+    let source = package.to_bytes().unwrap();
+
+    let mut metadata = package.edit_metadata().unwrap();
+    assert!(metadata.properties().unwrap().is_empty());
+    let noop = metadata.commit().unwrap();
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.package().to_bytes().unwrap(), source);
+    assert_eq!(
+        Package::from_bytes(&source)
+            .unwrap()
+            .apply_metadata(noop.patch())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap(),
+        source
+    );
+
+    let mut changed = package.edit_metadata().unwrap();
+    changed
+        .properties_mut()
+        .unwrap()
+        .set("title", "changed")
+        .unwrap();
+    assert!(matches!(changed.commit(), Err(Error::Protected)));
+
+    let mut property_sets = package.edit_property_sets().unwrap();
+    assert_eq!(property_sets.before().unwrap().bytes(), source.as_slice());
+    let noop = property_sets.commit().unwrap();
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.package().to_bytes().unwrap(), source);
+
+    let mut changed = package.edit_property_sets().unwrap();
+    assert!(matches!(
+        changed.edit_summary_information(|edit| edit.set_title("changed")),
+        Err(PackageError::Reader(litchi_xls::Error::Signed))
+    ));
 }
 
 #[test]

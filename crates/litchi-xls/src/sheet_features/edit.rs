@@ -64,6 +64,8 @@ pub enum Error {
     },
     /// A patch's source does not match the package receiving it.
     PatchConflict,
+    /// A changed write of a signed workbook; remove the signature explicitly.
+    Signed,
 }
 
 impl fmt::Display for Error {
@@ -83,6 +85,9 @@ impl fmt::Display for Error {
             Self::PatchConflict => formatter.write_str(
                 "the worksheet-feature patch source does not match the package receiving it",
             ),
+            Self::Signed => {
+                formatter.write_str("changed worksheet features require explicit signature removal")
+            },
         }
     }
 }
@@ -92,7 +97,8 @@ impl std::error::Error for Error {
         match self {
             Self::Package(error) => Some(error),
             Self::Records(error) => Some(error),
-            _ => None,
+            Self::Refused(_) | Self::Limit { .. } => None,
+            Self::Signed | Self::PatchConflict => None,
         }
     }
 }
@@ -108,6 +114,7 @@ impl From<crate::Error> for Error {
         match error {
             crate::Error::Refused(refusal) => Self::Refused(refusal),
             crate::Error::PatchConflict { .. } => Self::PatchConflict,
+            crate::Error::Signed => Self::Signed,
             other => Self::Records(other),
         }
     }
@@ -1079,6 +1086,9 @@ impl Edit {
                 },
             });
         }
+        if this.base.is_signed() {
+            return Err(Error::Signed);
+        }
         let before: Arc<[u8]> = Arc::from(this.base.to_bytes()?);
         let name = workbook_stream_name(&before)?;
         let package = ObjectPackage::open_with_options(
@@ -1187,6 +1197,9 @@ pub(super) fn apply(package: &Package, patch: &Patch) -> Result<Commit> {
                 operations: 0,
             },
         });
+    }
+    if package.is_signed() {
+        return Err(Error::Signed);
     }
     Ok(Commit {
         package: crate::package::republish(package, patch.after().to_vec())?,

@@ -137,6 +137,7 @@ impl Snapshot {
 pub struct Edit {
     /// The package a commit republishes; `None` only for codec-level tests.
     base: Option<Package>,
+    signed: bool,
     source: Option<Snapshot>,
     editor: Option<PropertySetEdit>,
 }
@@ -154,6 +155,7 @@ impl Edit {
         }
         Ok(Self {
             base: Some(base.clone()),
+            signed: base.is_signed(),
             source: None,
             editor: None,
         })
@@ -162,12 +164,30 @@ impl Edit {
     /// A codec-level edit of a bare property-set snapshot (tests only).
     #[cfg(test)]
     fn detached(source: Snapshot) -> Result<Self> {
-        let editor = PropertySetEdit::new(source.bytes.to_vec(), OleFileLimits::default())
-            .map_err(crate::Error::from)?;
+        let signed = {
+            let ole = OleFile::open(Cursor::new(source.bytes.to_vec()))?;
+            [
+                "_xmlsignatures",
+                "_signatures",
+                "DigitalSignature",
+                "\u{0005}DigitalSignature",
+            ]
+            .iter()
+            .any(|name| ole.exists(&[*name]))
+        };
+        let editor = if signed {
+            None
+        } else {
+            Some(
+                PropertySetEdit::new(source.bytes.to_vec(), OleFileLimits::default())
+                    .map_err(crate::Error::from)?,
+            )
+        };
         Ok(Self {
             base: None,
+            signed,
             source: Some(source),
-            editor: Some(editor),
+            editor,
         })
     }
 
@@ -176,7 +196,7 @@ impl Edit {
     /// The locals are installed only after both parses succeed, so a failed
     /// admission can be retried without leaving half-built staging state.
     fn ensure_ready(&mut self) -> Result<()> {
-        if self.source.is_some() && self.editor.is_some() {
+        if self.source.is_some() {
             return Ok(());
         }
         let base = self.base.as_ref().ok_or(Error::InvalidData(
@@ -185,6 +205,10 @@ impl Edit {
         let (_, cfb_limits) =
             base.edit_profile(ObjectLimits::default(), OleFileLimits::default())?;
         let source = Snapshot::from_bytes_with_cfb_limits(base.to_bytes()?, cfb_limits)?;
+        if self.signed {
+            self.source = Some(source);
+            return Ok(());
+        }
         let editor =
             PropertySetEdit::new(source.bytes.to_vec(), cfb_limits).map_err(crate::Error::from)?;
         self.source = Some(source);
@@ -196,14 +220,14 @@ impl Edit {
         self.ensure_ready()?;
         self.editor
             .as_ref()
-            .ok_or(Error::InvalidData("a property-set edit lost its editor"))
+            .ok_or(Error::Reader(crate::Error::Signed))
     }
 
     fn editor_mut_ready(&mut self) -> Result<&mut PropertySetEdit> {
         self.ensure_ready()?;
         self.editor
             .as_mut()
-            .ok_or(Error::InvalidData("a property-set edit lost its editor"))
+            .ok_or(Error::Reader(crate::Error::Signed))
     }
 
     /// The shared property-set editor, for the package metadata transaction.
@@ -227,6 +251,12 @@ impl Edit {
         self.source
             .as_ref()
             .ok_or(Error::InvalidData("a property-set edit lost its source"))
+    }
+
+    /// The materialized read snapshot, retained for signed no-op admission
+    /// and package metadata projection.
+    pub(crate) fn snapshot(&mut self) -> Result<&Snapshot> {
+        self.before()
     }
 
     /// Refuse to publish a transaction whose package source changed after
@@ -363,6 +393,9 @@ impl Edit {
             "a detached property-set edit has no package",
         ))?;
         let (patch, changed) = self.finish()?;
+        if changed && base.is_signed() {
+            return Err(Error::Reader(crate::Error::Signed));
+        }
         let package = if changed {
             crate::package::republish(&base, patch.after.to_vec())?
         } else {
@@ -381,10 +414,13 @@ impl Edit {
             .source
             .take()
             .ok_or(Error::InvalidData("a property-set edit lost its source"))?;
-        let editor = this
-            .editor
-            .take()
-            .ok_or(Error::InvalidData("a property-set edit lost its editor"))?;
+        let editor = match this.editor.take() {
+            Some(editor) => editor,
+            None => {
+                let before = source.bytes().to_vec();
+                return Ok((Patch::new(before.clone(), before), false));
+            },
+        };
         let before = source.bytes().to_vec();
         let bytes = editor.finish().map_err(crate::Error::from)?;
         let changed = bytes != before;
@@ -485,6 +521,9 @@ impl Package {
             }));
         }
         let changed = !patch.is_noop();
+        if changed && self.is_signed() {
+            return Err(Error::Reader(crate::Error::Signed));
+        }
         let package = if changed {
             crate::package::republish(self, patch.after.to_vec())?
         } else {
@@ -659,13 +698,21 @@ mod tests {
     }
 
     #[test]
-    fn signed_and_encrypted_sources_are_refused_before_mutation() {
-        assert!(
-            Snapshot::from_bytes(package_bytes(Some("DigitalSignature")))
-                .map(Edit::detached)
-                .unwrap()
-                .is_err()
-        );
+    fn signed_sources_allow_exact_noops_but_refuse_changes() {
+        let source = package_bytes(Some("DigitalSignature"));
+        let mut transaction =
+            Edit::detached(Snapshot::from_bytes(source.clone()).unwrap()).unwrap();
+        let (patch, changed) = transaction.finish().unwrap();
+        assert!(!changed);
+        assert_eq!(patch.before(), source.as_slice());
+        assert_eq!(patch.after(), source.as_slice());
+
+        let mut transaction = Edit::detached(Snapshot::from_bytes(source).unwrap()).unwrap();
+        assert!(matches!(
+            transaction.edit_summary_information(|edit| edit.set_title("changed")),
+            Err(Error::Reader(crate::Error::Signed))
+        ));
+
         assert!(
             Snapshot::from_bytes(package_bytes(Some("EncryptedPackage")))
                 .map(Edit::detached)
