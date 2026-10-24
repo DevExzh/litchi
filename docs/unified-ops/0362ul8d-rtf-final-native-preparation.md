@@ -95,10 +95,21 @@ preparer rejects relative manifest paths:
 python3 source-candidate/tools/native_qualification/prepare_legacy_native_inputs.py --lane legacy-rtf --manifest driver/legacy-rtf-final.json --before source-baseline --after source-candidate --output driver/source-preparation.json
 ```
 
-For a current re-preparation, pass absolute paths to the repaired preparer:
+For a future re-preparation, first materialize the source endpoints and final
+manifest under a new packet root.  Use the repaired qualification checkout
+(the checkout containing `03eec6dbc651ec2d84d87b86c0f69245c38a58b4`) and a new
+external root; do not point a new execution at the historical 691 packet:
 
-```text
-python3 /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/source-candidate/tools/native_qualification/prepare_legacy_native_inputs.py --lane legacy-rtf --manifest /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/driver/legacy-rtf-final.json --before /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/source-baseline --after /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/source-candidate --output /home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-691/driver/source-preparation.json
+```sh
+QUALIFICATION_SOURCE=/home/zhuhe/code/litchi-worktrees/uo2-legacy-manifest-identity
+RTF_PREPARATION_ROOT=/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/rtf-final-native-repaired
+test ! -e "$RTF_PREPARATION_ROOT/driver/source-preparation.json"
+python3 "$QUALIFICATION_SOURCE/tools/native_qualification/prepare_legacy_native_inputs.py" \
+  --lane legacy-rtf \
+  --manifest "$RTF_PREPARATION_ROOT/driver/legacy-rtf-final.json" \
+  --before "$RTF_PREPARATION_ROOT/source-baseline" \
+  --after "$RTF_PREPARATION_ROOT/source-candidate" \
+  --output "$RTF_PREPARATION_ROOT/driver/source-preparation.json"
 ```
 
 The explicit manifest binds candidate revision
