@@ -749,6 +749,21 @@ def make_steps(root: Path, state_dir: Path, target: Path) -> list[dict]:
     all_features, format_features = feature_names(root)
     leaf = ["litchi-docx", "litchi-pptx", "litchi-xlsx", "litchi-xlsb", "litchi-doc", "litchi-xls", "litchi-ppt", "litchi-rtf", "litchi-odt", "litchi-odp", "litchi-opc", "xml-minifier", "litchi-drawingml", "litchi-spreadsheet-drawing", "litchi-keynote", "litchi-pages", "litchi-numbers", "litchi-numbers-wire", "litchi-iwa-text-wire"]
     leaf_args = [item for package in leaf for item in ("-p", package)]
+    ppt_fixture = root / "test-data/unified-ops/0294/video.ppt"
+    ppt_host_guard = root / "docs/unified-ops/results/0362g/ppt_host_process_guard.py"
+    ppt_correctness_validator = root / "docs/unified-ops/results/0362g/validate_ppt_correctness_receipt.py"
+    ppt_correctness_binary = target / "release/examples/scoped_patch_correctness"
+    ppt_correctness_receipt = state_dir / "ppt-scoped-correctness.json"
+    ppt_correctness_commands = (
+        "set -eu; "
+        "cargo test --offline --locked -p litchi-ppt --all-features --lib scoped::tests -- --test-threads=1; "
+        "cargo test --offline --locked -p litchi-ppt --all-features --lib -- --test-threads=1; "
+        "cargo test --offline --locked -p litchi-cfb --all-features --lib -- --test-threads=1; "
+        "cargo test --offline --locked -p litchi-ppt --all-features --tests -- --test-threads=1; "
+        "cargo test --offline --locked -p litchi-cfb --all-features --tests -- --test-threads=1; "
+        "cargo clippy --offline --locked -p litchi-ppt --all-features --all-targets -- -D warnings; "
+        "cargo clippy --offline --locked -p litchi-cfb --all-features --all-targets -- -D warnings"
+    )
     steps: list[dict] = [
         direct("fmt", ["cargo", "fmt", "--all", "--check"]),
         direct("clippy-all-features", ["cargo", "clippy", "-q", "-p", "litchi-cli", "-p", "litchi-ops", "-p", "litchi", "-p", "litchi-py", "--all-targets", "--all-features", "--", "-D", "warnings"]),
@@ -775,6 +790,54 @@ def make_steps(root: Path, state_dir: Path, target: Path) -> list[dict]:
         direct("tests-workspace-excluding-ods-ops", [*safe, "--workspace", "--exclude", "litchi-ods", "--exclude", "litchi-ops", "--all-features", "--log-dir", str(state_dir / "workspace-tests")]),
         direct("wsdoc", ["cargo", "doc", "-q", "--workspace", "--no-deps", "--all-features"], isolated=True, env={"RUSTDOCFLAGS": "-Dwarnings"}),
         direct("ppt-alone", ["cargo", "test", "-q", "-p", "litchi-ppt", "--all-features", "--lib"]),
+        direct(
+            "ppt-scoped-build",
+            [
+                "python3",
+                str(ppt_host_guard),
+                "--",
+                "cargo",
+                "build",
+                "--offline",
+                "--locked",
+                "--release",
+                "-p",
+                "litchi-ppt",
+                "--example",
+                "scoped_patch_probe",
+                "--example",
+                "scoped_patch_correctness",
+            ],
+            isolated=True,
+        ),
+        direct(
+            "ppt-scoped-correctness-suite",
+            ["python3", str(ppt_host_guard), "--", "sh", "-c", ppt_correctness_commands],
+            isolated=True,
+            env={"RUST_TEST_THREADS": "1"},
+        ),
+        direct(
+            "ppt-scoped-correctness",
+            [
+                "python3",
+                str(ppt_host_guard),
+                "--",
+                str(ppt_correctness_binary),
+                str(ppt_fixture),
+                str(ppt_correctness_receipt),
+            ],
+            isolated=True,
+        ),
+        direct(
+            "ppt-scoped-correctness-validate",
+            [
+                "python3",
+                str(ppt_correctness_validator),
+                str(ppt_correctness_receipt),
+                str(ppt_fixture),
+            ],
+            isolated=True,
+        ),
         direct("rustdoc-core-ops-facade", ["cargo", "doc", "-q", "--no-deps", "--all-features", "-p", "litchi-core", "-p", "litchi-ops", "-p", "litchi"], isolated=True, env={"RUSTDOCFLAGS": "-Dwarnings"}),
         direct("cli-tests", [*safe, "-p", "litchi-cli", "--all-features", "--log-dir", str(state_dir / "cli-tests")]),
         shell("python-bindings", "bash crates/pyo3-litchi/tests/run_tests.sh"),
@@ -787,7 +850,7 @@ def make_steps(root: Path, state_dir: Path, target: Path) -> list[dict]:
         shell("native-resave-check", "cd tools/native-resave && cargo check --locked --all-targets"),
         direct("api-glossary", ["python3", "tools/check_api_glossary.py", "--target-dir", str(target)], env={"RUSTC_BOOTSTRAP": "1"}),
         direct("iwork-leaf-api", ["python3", "-m", "unittest", "tools.test_check_iwork_leaf_public_api"]),
-        direct("tooling-unit", ["python3", "-m", "unittest", "tools.test_check_api_glossary", "tools.test_api_debt_inventory", "tools.test_validate_api_disposition", "tools.test_final_api_inventory", "tools.test_w8_file_provenance", "tools.test_w8_original_baseline", "tools.test_w8_projection_policy", "tools.test_officecli_corpus", "tools.test_officecli_capability_delta", "tools.test_no_3rdparty_references", "tools.test_check_crate_boundaries", "tools.test_non_iwork_gate", "tools.test_unified_bench_matrix", "tools.test_check_iwork_leaf_public_api", "tools.test_native_qualification_runner", "tools.test_legacy_native_qualification", "tools.test_prepare_xlsx_raw_inputs", "tools.test_xlsx_raw_native_qualification", "tools.test_prepare_ole_owner_inputs", "tools.test_ole_owner_paired_runner", "tools.test_validate_ole_owner_run", "tools.test_ppt_lazy_native_qualification", "tools.test_prepare_ppt_lazy_native_inputs", "tools.test_drawingml_compile_driver", "tools.test_drawingml_raw_qualification", "docs/unified-ops/results/0362ul29/tooling/test_safe_chunked_tests.py", "tools.test_ink_safe_runner", "docs/unified-ops/results/0362ul24/test_prepare_signed_native_consumer.py", "tools.test_opc_read_ahead_timing_guard", "tools.test_xls_f3_qualification_abba", "docs/unified-ops/results/0362ul24/test_validate_signed_native.py"]),
+        direct("tooling-unit", ["python3", "-m", "unittest", "tools.test_check_api_glossary", "tools.test_api_debt_inventory", "tools.test_validate_api_disposition", "tools.test_final_api_inventory", "tools.test_w8_file_provenance", "tools.test_w8_original_baseline", "tools.test_w8_projection_policy", "tools.test_officecli_corpus", "tools.test_officecli_capability_delta", "tools.test_no_3rdparty_references", "tools.test_check_crate_boundaries", "tools.test_non_iwork_gate", "tools.test_unified_bench_matrix", "tools.test_check_iwork_leaf_public_api", "tools.test_native_qualification_runner", "tools.test_legacy_native_qualification", "tools.test_prepare_xlsx_raw_inputs", "tools.test_xlsx_raw_native_qualification", "tools.test_prepare_ole_owner_inputs", "tools.test_ole_owner_paired_runner", "tools.test_validate_ole_owner_run", "tools.test_ppt_lazy_native_qualification", "tools.test_prepare_ppt_lazy_native_inputs", "tools.test_drawingml_compile_driver", "tools.test_drawingml_raw_qualification", "docs/unified-ops/results/0362ul29/tooling/test_safe_chunked_tests.py", "docs/unified-ops/results/0362ul29/tooling/test_run_safe_gate_ppt.py", "tools.test_ink_safe_runner", "docs/unified-ops/results/0362ul24/test_prepare_signed_native_consumer.py", "tools.test_opc_read_ahead_timing_guard", "tools.test_xls_f3_qualification_abba", "docs/unified-ops/results/0362ul24/test_validate_signed_native.py"]),
         direct("crate-boundaries", ["python3", "tools/check_crate_boundaries.py"]),
         direct("non-iwork-gate", ["python3", "tools/non_iwork_gate.py", "verify"]),
         direct("bench-matrix", ["python3", "tools/unified_bench_matrix.py", "--check"]),

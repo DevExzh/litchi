@@ -18,6 +18,8 @@ HEAD:   472b6705475b073e7fe08f6e11ee17fb1e29f838
 tree:   ebc1cee05f124c0c63977aff07a23288c19e7d00
 probe:  crates/litchi-ppt/examples/scoped_patch_probe.rs
 probe SHA-256: 0bd4d9c1bcad6319968024ff603ae77195810174e496d5394fbae1838021e549
+correctness companion: crates/litchi-ppt/examples/scoped_patch_correctness.rs
+correctness companion SHA-256: 032e74e081d2b442df49ce5bd7fb2edc66b89a4a1d5368872dd7bfeb94c8ee7a
 fixture: test-data/unified-ops/0294/video.ppt
 fixture bytes/SHA-256: 43520 / f32f0614958a177a5195cd7537cdfd2efef52c57de4decc13cf65eadc66cdb8a
 ~~~
@@ -34,7 +36,7 @@ wrapper SHA-256: 495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256
 inner memory-capped shim: /home/zhuhe/code/litchi-worktrees/.coord/bin/cargo
 inner shim SHA-256: 1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8
 target/process supervisor: docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py
-supervisor SHA-256: f5aed3b04da2ce0463caebb42a2fed4976edd3170ea8a7e9a6c6cd74d0d51e54
+supervisor SHA-256: 89e674e9313eb3c3b7d25a95d31e9b6cbf304f3cc994b5e64ac08d80f46581c0
 reference compile command: /home/zhuhe/code/litchi-worktrees/.coord/rtf-fuzz-39a417-20261024/compile-command.txt
 reference compile command SHA-256: 81ab917ba0447718932a08dcb5e0ef1062fc0bda41d2aa4df48a5127019807b1
 reference compile receipt: /home/zhuhe/code/litchi-worktrees/.coord/rtf-fuzz-39a417-20261024/receipt.json
@@ -49,6 +51,8 @@ boundary: /home/zhuhe/code/litchi-worktrees/uo2-docx-ink-final-handoff/tools/ink
 bytes/SHA-256: 17630 / 1bc982f4495a16c30ac4ca2779351aec1e420781a6d6cb7c2b1f33ccff88fede
 host-process adapter: docs/unified-ops/results/0362g/ppt_host_process_guard.py
 adapter SHA-256: 08c73174304061beeaf778df763be3507befd8200db72a8617a5d8ddc42e12b8
+correctness receipt validator: docs/unified-ops/results/0362g/validate_ppt_correctness_receipt.py
+validator SHA-256: cb635bc911998915da71c0dc69c97e6d31a2a7a8e68f0c52c94ec4596cf3aed7
 final-source supervisor/wrapper hashes: must be freshly rebound after
 0362ul39/source freeze
 ~~~
@@ -176,11 +180,12 @@ checks, the hard target limit, post-exit stabilization, one Cargo job, 20-GB
 memory and process guards. No `env.sh` or direct Cargo invocation may replace
 that supervisor.
 
-The source repair 0362ul39 must register a PPT step in the existing
-`run_safe_gate.py` plan before execution. The current plan has no PPT
-selection, so this is an explicit blocker rather than an invented direct
-command. The future command shape (with the final-source supervisor and step
-hashes filled by the rebind receipt) is:
+This leaf registers four source-bound PPT steps in the existing
+`run_safe_gate.py` plan: `ppt-scoped-build`,
+`ppt-scoped-correctness-suite`, `ppt-scoped-correctness`, and
+`ppt-scoped-correctness-validate`. The final assembled source must retain and
+rebind them. The future command shape (with final-source hashes filled by the
+rebind receipt) is:
 
 ~~~sh
 set -eu
@@ -189,13 +194,13 @@ SUPERVISOR="$SOURCE/docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py"
 RUN_ROOT=/external/ppt-final-source-472b670547
 STATE="$RUN_ROOT/ppt-state"
 TARGET="$RUN_ROOT/target"
-PPT_STEP=ppt-final-source-472b670547
+PPT_STEPS=ppt-scoped-build,ppt-scoped-correctness-suite,ppt-scoped-correctness,ppt-scoped-correctness-validate
 test ! -e "$RUN_ROOT"
 mkdir -p "$RUN_ROOT"
 test -f "$SUPERVISOR"; test -d "$(dirname "$STATE")"; test ! -e "$TARGET"
 test "$(sha256sum "$SOURCE/crates/litchi-ppt/examples/scoped_patch_probe.rs" | cut -d' ' -f1)" = 0bd4d9c1bcad6319968024ff603ae77195810174e496d5394fbae1838021e549
 unset LITCHI_CAPPED LITCHI_BLESS
-python3 "$SUPERVISOR" --root "$SOURCE" --target "$TARGET" --state "$STATE" --only "$PPT_STEP"
+python3 "$SUPERVISOR" --root "$SOURCE" --target "$TARGET" --state "$STATE" --only "$PPT_STEPS"
 ~~~
 
 The coordinator-selected step/state must bind the final source HEAD/tree,
@@ -215,59 +220,32 @@ cargo clippy --offline --locked -p litchi-ppt --all-features --all-targets -- -D
 cargo clippy --offline --locked -p litchi-cfb --all-features --all-targets -- -D warnings
 ~~~
 
-The probe does not emit an `inverse_verified` JSON field. Its actual oracle is
-the source check in `scoped_patch_probe.rs`: each replayed patch is inverted,
-the restored package is serialized, and the process returns nonzero if those
-bytes differ from the source. The current historical probe does not expose
-the changed target bytes or the parsed external-media path in its JSON, so a
-positive `target_len` alone is not a correctness preflight. Before execution,
-0362ul39 must add a source-bound outside-clock receipt (or an equivalent
-reviewed production adapter) with `source_sha256`, `target_sha256` and
-`external_media_path`; the expected steady operation is exactly
-`edit_external_media().set_path(1, Some("clip-0000.avi"))`. The preflight
-must reject equal source/target hashes and any path other than
-`clip-0000.avi`, while the process zero exit remains the inverse oracle.
-Until that source/probe binding is present, this packet is not executable:
+The historical probe does not emit an `inverse_verified` JSON field and remains
+unchanged for timing comparability. The separate
+`scoped_patch_correctness` companion uses the same source fixture and public
+`edit_external_media().set_path(1, Some("clip-0000.avi"))` operation outside
+the timed workload. It parses the committed target through
+`slide_order::Snapshot`, rejects unchanged target bytes or an unexpected path,
+replays the patch and inverse, and writes source/target/inverse hashes to an
+outside-clock receipt. The validator binds that receipt to the selected
+fixture, rejects equal source/target hashes and any path other than
+`clip-0000.avi`, and requires the inverse hash to equal the source hash.
+The companion and validator are separate gate steps, so no checksum or extra
+serialization is added to the historical timed loop:
 
 ~~~sh
 set -eu
-ROOT=/home/zhuhe/code/litchi-worktrees/.coord/ppt-final-source-3431ba566c
 SOURCE=/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source
-BUILD="$ROOT/candidate-build"
-PROTECTED="$BUILD/protected/scoped_patch_probe-472b670547"
+RUN_ROOT=/external/ppt-final-source-472b670547
+TARGET="$RUN_ROOT/target"
 FIXTURE="$SOURCE/test-data/unified-ops/0294/video.ppt"
-test -x "$PROTECTED"
-test ! -e "$BUILD/preflight-1-1-1.json"; test ! -e "$BUILD/preflight-1-1-1.stderr"
-"$PROTECTED" "$FIXTURE" 1 1 1 \
-  >"$BUILD/preflight-1-1-1.json" 2>"$BUILD/preflight-1-1-1.stderr"
-test ! -s "$BUILD/preflight-1-1-1.stderr"
-python3 - "$BUILD/preflight-1-1-1.json" "$FIXTURE" <<'PY'
-import json
-from pathlib import Path
-import sys
-
-row = json.loads(Path(sys.argv[1]).read_text())
-fixture_size = Path(sys.argv[2]).stat().st_size
-for key in ("patches", "first_count", "replay_count", "source_len", "target_len",
-            "retained_patch_bytes", "retained_payload_bytes", "retained_block_span_bytes",
-            "retained_block_span_count", "first_total_ns", "commit_total_ns",
-            "apply_total_ns", "inverse_apply_total_ns", "source_sha256", "target_sha256",
-            "external_media_path"):
-    if key not in row:
-        raise SystemExit(f"missing probe field: {key}")
-if row["patches"] != 1 or row["first_count"] != 1 or row["replay_count"] != 1:
-    raise SystemExit("preflight counts differ")
-if row["source_len"] != fixture_size or row["target_len"] <= 0:
-    raise SystemExit("preflight extents are invalid")
-if row["source_sha256"] == row["target_sha256"]:
-    raise SystemExit("preflight target bytes did not change")
-if row["external_media_path"] != "clip-0000.avi":
-    raise SystemExit("preflight external-media path is not the expected changed path")
-if row["inverse_apply_total_ns"] <= 0:
-    raise SystemExit("preflight inverse phase was not measured")
-if "inverse_verified" in row:
-    raise SystemExit("probe output fabricated the absent inverse_verified field")
-PY
+CORRECTNESS="$TARGET/release/examples/scoped_patch_correctness"
+RECEIPT="$RUN_ROOT/ppt-state/ppt-scoped-correctness.json"
+VALIDATOR="$SOURCE/docs/unified-ops/results/0362g/validate_ppt_correctness_receipt.py"
+test -x "$CORRECTNESS"; test -f "$VALIDATOR"; test -f "$FIXTURE"
+test -f "$RECEIPT"
+"$CORRECTNESS" "$FIXTURE" "$RECEIPT"
+python3 "$VALIDATOR" "$RECEIPT" "$FIXTURE"
 ~~~
 
 The historical 0362j calibration counts are distinct and remain historical
@@ -395,13 +373,14 @@ protected references and their 0362j allocation facts remain unchanged.
 
 ## Remaining blockers
 
-1. Source repair 0362ul39 must materialize the PPT adapter in the final source,
-   add the outside-clock changed-target/path receipt, and rebind the source,
-   supervisor, step/state, probe, fixture and adapter hashes. The current
-   472b checkout does not yet satisfy those bindings.
+1. The final assembled source must retain the companion, validator, host
+   adapter and four `run_safe_gate.py` steps, then rebind the source,
+   supervisor, step/state, probe, fixture and tool hashes. The current 472b
+   checkout does not yet satisfy final-source bindings.
 2. The candidate build, current-source correctness/preflight, bounded native
    ABBA and bounded allocation receipts do not yet exist. The registered PPT
-   registered PPT step must exercise the seven correctness selectors with
+   steps must exercise the companion and seven correctness
+   selectors with
    `RUST_TEST_THREADS=1`, `--test-threads=1`, target pre/live/post checks and
    fresh output/TMP paths.
 3. The lock policy check must pass with candidate `4100…` and references
