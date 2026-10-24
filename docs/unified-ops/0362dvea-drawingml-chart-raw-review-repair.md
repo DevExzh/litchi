@@ -2,6 +2,7 @@
 
 - Date: 2026-10-24.
 - Returned source: `96ea764602` (`feat(drawingml): bound chart raw codecs`).
+- Repair source: `2b5c0906e5` (`fix(drawingml): repair chart raw admissions`).
 - Status: source repair complete; coordinator-capped Cargo rerun remains
   pending because the focused build slot was released to the diagram lane.
 
