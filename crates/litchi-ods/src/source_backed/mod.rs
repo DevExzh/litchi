@@ -171,3 +171,34 @@ macro_rules! content_patch {
 }
 
 pub(crate) use content_patch;
+
+#[cfg(test)]
+mod test_support {
+    use super::SourceBackedSpreadsheet;
+    use litchi_core::OwnedSource;
+    use std::sync::Arc;
+
+    const MIME: &str = "application/vnd.oasis.opendocument.spreadsheet";
+    const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+    const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+    const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
+
+    pub(super) fn owner() -> SourceBackedSpreadsheet {
+        SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(bytes())))
+            .expect("source-backed ODS fixture")
+    }
+
+    fn bytes() -> Vec<u8> {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:table table:name="Sheet1"><table:table-row><table:table-cell office:value-type="string"><text:p>value</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#
+        );
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
+        writer.set_mimetype(MIME).expect("ODS MIME");
+        writer
+            .add_file("content.xml", content.as_bytes())
+            .expect("ODS content");
+        writer.finish_to_bytes().expect("ODS package")
+    }
+}

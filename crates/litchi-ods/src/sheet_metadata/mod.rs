@@ -3529,7 +3529,7 @@ fn validate_detective_limits(value: &Detective, limits: Limits) -> Result<()> {
     Ok(())
 }
 
-fn map_execution(error: litchi_core::ExecutionError) -> Error {
+pub(crate) fn map_execution(error: litchi_core::ExecutionError) -> Error {
     match error {
         litchi_core::ExecutionError::ResourceLimit(value) => Error::ResourceLimit(value),
         litchi_core::ExecutionError::Cancelled => {

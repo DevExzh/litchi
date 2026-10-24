@@ -192,8 +192,16 @@ fn lenient_read_owner_does_not_bypass_strict_transaction_validation() {
         litchi_doc::Leniency::TolerateStylesheetDefects
     );
     assert!(!package.document().tolerance_report().defects().is_empty());
+    let dropped = package
+        .edit()
+        .expect("malformed body is not read during edit construction");
+    assert_eq!(dropped.retained_render_bytes(), None);
+    drop(dropped);
+    let mut edit = package
+        .edit()
+        .expect("edit construction is deferred until the first body operation");
     assert!(
-        package.edit().is_err(),
+        edit.changes().is_err(),
         "the body engine still requires strict validation"
     );
     assert_eq!(package.to_bytes().unwrap(), bytes);

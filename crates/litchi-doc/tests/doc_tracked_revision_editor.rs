@@ -99,7 +99,12 @@ fn root_stream_start(bytes: &[u8], name: &str) -> (u32, u64) {
 #[test]
 fn lists_authors_and_mutates_insertions_and_deletions_transactionally() {
     let mut editor = open_revisions(base_doc(), Limits::default()).unwrap();
-    assert!(editor.authors().contains(&"Existing".to_string()));
+    assert!(
+        editor
+            .authors()
+            .expect("revision authors")
+            .contains(&"Existing".to_string())
+    );
     let deletion = editor
         .revisions()
         .unwrap()
@@ -241,7 +246,7 @@ fn bundled_word_and_libreoffice_redline_fixtures_are_strictly_gated() {
     for path in fixtures {
         let original = std::fs::read(&path).unwrap();
         match open_revisions(original.clone(), Limits::default()) {
-            Ok(editor) => {
+            Ok(mut editor) => {
                 let _ = editor.revisions().unwrap();
                 assert_eq!(std::fs::read(&path).unwrap(), original);
             },
@@ -354,7 +359,7 @@ fn every_readable_fixture_accepts_a_tracked_insertion_at_cp_zero() {
             .unwrap_or_else(|error| panic!("{name} should publish: {error}"));
         assert_ne!(output, source, "{name}");
 
-        let reopened = open_revisions(output.clone(), Limits::default())
+        let mut reopened = open_revisions(output.clone(), Limits::default())
             .unwrap_or_else(|error| panic!("{name} output should reopen: {error}"));
         assert!(
             reopened.revisions().unwrap().iter().any(|revision| {
@@ -471,7 +476,7 @@ fn tracked_insertions_keep_rebuilt_chpx_pages_readable() {
             )
             .unwrap_or_else(|error| panic!("{path} should accept the insertion: {error}"));
         let output = editor.finish().unwrap();
-        let reopened = open_revisions(output.clone(), Limits::default())
+        let mut reopened = open_revisions(output.clone(), Limits::default())
             .unwrap_or_else(|error| panic!("{path} output should reopen: {error}"));
         assert!(
             reopened.revisions().unwrap().iter().any(|revision| (

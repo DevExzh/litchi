@@ -8,7 +8,7 @@
 
 use litchi_core::{Error as CoreError, Metadata, Result};
 use litchi_odf_common::core::{MetaXmlPatch, metadata::Metadata as OdfMetadata, patch_meta_xml};
-use std::sync::Arc;
+use std::{borrow::Cow, sync::Arc};
 
 use crate::Package;
 
@@ -30,18 +30,17 @@ const MAX_TITLE_BYTES: usize = 16 * 1024;
 /// An isolated title edit derived from one immutable master-document snapshot.
 pub struct Edit<'source> {
     source: &'source Package,
-    source_meta_xml: Option<String>,
-    before: Option<String>,
-    after: Option<String>,
+    before: Option<&'source str>,
+    after: Option<Cow<'source, str>>,
 }
 
 impl<'source> Edit<'source> {
     pub(crate) fn new(source: &'source Package) -> Result<Self> {
+        let before = source.title();
         Ok(Self {
             source,
-            source_meta_xml: source.meta_xml()?,
-            before: source.title().map(str::to_owned),
-            after: source.title().map(str::to_owned),
+            after: before.map(Cow::Borrowed),
+            before,
         })
     }
 
@@ -60,7 +59,7 @@ impl<'source> Edit<'source> {
     pub fn set(&mut self, value: impl Into<String>) -> FamilyResult<()> {
         let title = value.into();
         validate_title(&title)?;
-        self.after = Some(title);
+        self.after = Some(Cow::Owned(title));
         Ok(())
     }
 
@@ -84,17 +83,18 @@ impl<'source> Edit<'source> {
     }
 
     fn commit_core(self) -> Result<Commit> {
-        if self.before == self.after {
+        if self.before == self.after.as_deref() {
             let snapshot = self.source.clone();
             return Ok(commit(self.source, snapshot));
         }
         let source_meta_xml = self
-            .source_meta_xml
+            .source
+            .meta_xml()?
             .ok_or_else(|| invalid("ODM title editing requires an existing UTF-8 meta.xml part"))?;
         let source_metadata =
             OdfMetadata::from_xml(&source_meta_xml, self.source.xml_limits_value())?;
         let mut current = Metadata::from(source_metadata.clone());
-        current.title.clone_from(&self.after);
+        current.title = self.after.as_deref().map(str::to_owned);
         let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&source_metadata, &current);
         let meta_xml = patch_meta_xml(&source_meta_xml, &patch, self.source.xml_limits_value())?
             .ok_or_else(|| invalid("ODM title editing requires an office:meta container"))?;

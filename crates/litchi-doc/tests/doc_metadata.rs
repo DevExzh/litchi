@@ -197,8 +197,12 @@ fn cryptoapi_encryption_with_metadata_is_refused() {
         Some("Quarterly report")
     );
 
-    // An encrypted package refuses opened metadata edits.
-    assert!(matches!(reopened.edit_metadata(), Err(Error::Encrypted)));
+    // Construction is O(1); the encrypted source is refused when the
+    // deferred property snapshot is first requested.
+    let mut edit = reopened
+        .edit_metadata()
+        .expect("metadata edit construction is deferred");
+    assert!(matches!(edit.properties(), Err(Error::Encrypted)));
 }
 
 #[test]
@@ -215,7 +219,10 @@ fn metadata_transaction_creates_missing_streams_and_keeps_the_clsid() {
 
     let mut edit = package.edit_metadata().unwrap();
     assert!(edit.merge_metadata(&metadata()).unwrap());
-    edit.properties_mut().set("Department", "Research").unwrap();
+    edit.properties_mut()
+        .expect("metadata properties")
+        .set("Department", "Research")
+        .unwrap();
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     let (edited, patch) = commit.into_parts();
@@ -257,7 +264,12 @@ fn metadata_transaction_creates_missing_streams_and_keeps_the_clsid() {
 
     // A second edit removes a property and leaves the others.
     let mut edit = edited.edit_metadata().unwrap();
-    assert!(edit.properties_mut().remove("title").unwrap());
+    assert!(
+        edit.properties_mut()
+            .expect("metadata properties")
+            .remove("title")
+            .unwrap()
+    );
     let removed = edit.commit().unwrap().into_package();
     assert!(removed.metadata().title.is_none());
     assert_eq!(removed.metadata().author.as_deref(), Some("Ada Lovelace"));
@@ -272,7 +284,7 @@ fn refused_metadata_edits_leave_the_edit_unchanged() {
         ..Metadata::default()
     })
     .unwrap();
-    let staged = edit.properties().clone();
+    let staged = edit.properties().expect("metadata properties").clone();
     for refused in [
         Metadata {
             hyperlink_base: Some("https://example.invalid/".to_owned()),
@@ -287,9 +299,14 @@ fn refused_metadata_edits_leave_the_edit_unchanged() {
             edit.merge_metadata(&refused),
             Err(Error::Metadata(_))
         ));
-        assert_eq!(edit.properties(), &staged);
+        assert_eq!(edit.properties().expect("metadata properties"), &staged);
     }
-    assert!(edit.properties_mut().set("_PID_LINKBASE", "x").is_err());
+    assert!(
+        edit.properties_mut()
+            .expect("metadata properties")
+            .set("_PID_LINKBASE", "x")
+            .is_err()
+    );
 }
 
 #[test]

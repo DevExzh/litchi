@@ -82,18 +82,18 @@ fn package_edit_publishes_caption_crud_without_rewriting_unrelated_table_bytes()
     let original_table = table_stream(&original);
     let package = Package::from_bytes(&original).expect("template package opens");
     let mut edit = package.edit_captions().expect("template edit opens");
-    assert!(!edit.captions().is_present());
+    assert!(!edit.captions().expect("caption snapshot").is_present());
 
     let tables = sample_tables();
     edit.set(tables.clone()).expect("caption tables stage");
     let committed = edit.commit().expect("caption tables publish");
     assert!(committed.diagnostics().changed());
     let bytes = committed.patch().after_bytes().to_vec();
-    let reopened = committed
+    let mut reopened = committed
         .package()
         .edit_captions()
         .expect("published package reopens");
-    assert_eq!(reopened.tables(), &tables);
+    assert_eq!(reopened.tables().expect("caption tables"), &tables);
 
     let table = table_stream(&bytes);
     assert!(table.starts_with(&original_table));
@@ -138,7 +138,7 @@ fn package_edit_rejects_stale_record_edits_and_keeps_noop_bytes_exact() {
         .package()
         .edit_captions()
         .expect("published package reopens");
-    let tables = noop.tables().clone();
+    let tables = noop.tables().expect("caption tables").clone();
     noop.set(tables).expect("semantic no-op stages");
     let noop_commit = noop.commit().expect("semantic no-op publishes");
     assert!(!noop_commit.diagnostics().changed());
@@ -148,7 +148,7 @@ fn package_edit_rejects_stale_record_edits_and_keeps_noop_bytes_exact() {
         .package()
         .edit_captions()
         .expect("published package reopens");
-    let stale = editor.captions().edit();
+    let stale = editor.captions().expect("caption snapshot").edit();
     editor
         .replace_auto(
             AutoTable::try_new(vec![
@@ -161,9 +161,12 @@ fn package_edit_rejects_stale_record_edits_and_keeps_noop_bytes_exact() {
 }
 
 #[test]
-fn package_edit_rejects_caption_ranges_on_ordinary_documents() {
+fn package_edit_defers_caption_range_rejection_on_ordinary_documents() {
     let package = Package::from_bytes(&common::authored_document("table")).expect("document opens");
-    assert!(package.edit_captions().is_err());
+    let mut edit = package
+        .edit_captions()
+        .expect("caption edit construction is deferred");
+    assert!(edit.captions().is_err());
 }
 
 fn table_stream(bytes: &[u8]) -> Vec<u8> {

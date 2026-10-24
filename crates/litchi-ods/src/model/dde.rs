@@ -224,7 +224,7 @@ impl Limits {
         self.depth
     }
 
-    fn validate(self) -> Result<Self> {
+    pub(crate) fn validate(self) -> Result<Self> {
         for (name, value, ceiling) in [
             ("input bytes", self.input_bytes, MAX_INPUT_BYTES),
             ("links", self.links, MAX_LINKS),

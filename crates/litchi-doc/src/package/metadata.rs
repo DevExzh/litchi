@@ -7,9 +7,9 @@
 //! was made from. The source package is never mutated; dropping an [`Edit`]
 //! discards it.
 //!
-//! The edit reads the three sections into the shared
-//! [`SummaryProperties`] model and stages back only the sections that
-//! changed, through the DOC property-set transaction
+//! The edit defers reading the three sections until the first property
+//! operation or commit, then stages back only the sections that changed,
+//! through the DOC property-set transaction
 //! ([`super::property_set`]), so an exact no-op commits the source package
 //! unchanged and a changed commit keeps every other stream and the root
 //! class identifier. A missing stream is created with the Windows-1252 code
@@ -196,55 +196,81 @@ pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 /// A staged metadata transaction over one immutable [`Package`].
 pub struct Edit {
     base: Package,
-    before: Arc<[u8]>,
     options: super::EditOptions,
-    transaction: property_set::Staging,
-    initial: SummaryProperties,
-    properties: SummaryProperties,
+    before: Option<Arc<[u8]>>,
+    transaction: Option<property_set::Staging>,
+    initial: Option<SummaryProperties>,
+    properties: Option<SummaryProperties>,
 }
 
 impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
-            .field("changed", &(self.initial != self.properties))
+            .field(
+                "changed",
+                &self
+                    .initial
+                    .as_ref()
+                    .zip(self.properties.as_ref())
+                    .is_some_and(|(initial, properties)| initial != properties),
+            )
             .finish_non_exhaustive()
     }
 }
 
 impl Edit {
     fn new(base: &Package, options: super::EditOptions) -> Result<Self> {
-        let bytes = base.to_bytes()?;
-        if is_encrypted(&bytes)? {
-            return Err(Error::Encrypted);
-        }
-        let before: Arc<[u8]> = Arc::from(bytes.as_slice());
-        let transaction = property_set::Staging::new(
-            property_set::Snapshot::from_bytes(bytes)?,
-            options.protection_policy_value(),
-        )?;
-        let initial = SummaryProperties::from_editor(transaction.editor())?;
         Ok(Self {
             base: base.clone(),
-            before,
             options,
-            transaction,
-            properties: initial.clone(),
-            initial,
+            before: None,
+            transaction: None,
+            properties: None,
+            initial: None,
         })
     }
 
+    fn ensure_loaded(&mut self) -> Result<()> {
+        if self.transaction.is_some() {
+            return Ok(());
+        }
+        let bytes = self.base.to_bytes()?;
+        if is_encrypted(&bytes)? {
+            return Err(Error::Encrypted);
+        }
+        let source = property_set::Snapshot::from_bytes(bytes)?;
+        let before = source.bytes_shared();
+        let transaction =
+            property_set::Staging::new(source, self.options.protection_policy_value())?;
+        let initial = SummaryProperties::from_editor(transaction.editor())?;
+        self.before = Some(before);
+        self.properties = Some(initial.clone());
+        self.initial = Some(initial);
+        self.transaction = Some(transaction);
+        Ok(())
+    }
+
     /// The staged document properties.
-    #[must_use]
-    pub const fn properties(&self) -> &SummaryProperties {
-        &self.properties
+    pub fn properties(&mut self) -> Result<&SummaryProperties> {
+        self.ensure_loaded()?;
+        self.properties.as_ref().ok_or_else(|| {
+            Error::Package(PackageError::InvalidFormat(
+                "metadata properties were not initialized".into(),
+            ))
+        })
     }
 
     /// Mutable access to the staged properties: set or remove one property
     /// by name ([`SummaryProperties::set`], [`SummaryProperties::remove`]),
     /// custom properties, and typed section edits.
-    pub fn properties_mut(&mut self) -> &mut SummaryProperties {
-        &mut self.properties
+    pub fn properties_mut(&mut self) -> Result<&mut SummaryProperties> {
+        self.ensure_loaded()?;
+        self.properties.as_mut().ok_or_else(|| {
+            Error::Package(PackageError::InvalidFormat(
+                "metadata properties were not initialized".into(),
+            ))
+        })
     }
 
     /// Set every field `metadata` carries, keeping the others.
@@ -256,7 +282,7 @@ impl Edit {
     /// Returns [`Error::Metadata`], leaving the staged properties unchanged,
     /// for a field the property sets cannot store or a refused value.
     pub fn merge_metadata(&mut self, metadata: &litchi_core::Metadata) -> Result<bool> {
-        Ok(self.properties.merge_metadata(metadata)?)
+        Ok(self.properties_mut()?.merge_metadata(metadata)?)
     }
 
     /// Publish the staged properties as a new package.
@@ -266,15 +292,21 @@ impl Edit {
     /// Returns [`Error::Property`] when a changed source stream cannot be
     /// rewritten without loss, and [`Error::Package`] when the edited bytes
     /// cannot be republished (for example under the protection policy).
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        self.ensure_loaded()?;
         let Self {
             base,
-            before,
+            before: Some(before),
             options,
-            mut transaction,
-            initial,
-            properties,
-        } = self;
+            transaction: Some(mut transaction),
+            initial: Some(initial),
+            properties: Some(properties),
+        } = self
+        else {
+            return Err(Error::Package(PackageError::InvalidFormat(
+                "metadata edit was not initialized".into(),
+            )));
+        };
         if properties == initial {
             return Ok(unchanged(base, before));
         }

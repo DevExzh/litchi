@@ -447,15 +447,12 @@ fn active_content_is_inventoried_preserved_or_explicitly_refused() {
     joined
         .join(commit.patch().prepare("active", limits).unwrap())
         .unwrap();
-    assert!(
-        source
-            .apply_joined_with_policies(
-                joined,
-                edit::SecurityWritePolicy::Refuse,
-                edit::ActiveContentWritePolicy::Refuse,
-            )
-            .is_err()
+    let mut joined_edit = source.edit_with_policies(
+        edit::SecurityWritePolicy::Refuse,
+        edit::ActiveContentWritePolicy::Refuse,
     );
+    joined_edit.join(joined).unwrap();
+    assert!(joined_edit.commit().is_err());
 
     let safe = Package::from_bytes(&package(CONTENT)).unwrap();
     let external_fill = StyleResource::new(StyleResourceKind::FillImage, "external-fill")
@@ -677,6 +674,33 @@ fn durable_structural_patch_reopens_full_package_and_inverts_exactly() {
     assert_eq!(applied.pages().len(), 2);
     assert_eq!(
         reopened.inverse().apply(&applied).unwrap().as_bytes(),
+        source.as_bytes()
+    );
+
+    let limits = CompositionLimits::new(4, 4, 8, 8);
+    let mut joined = source.joined_edits(limits);
+    joined
+        .join(commit.patch().prepare("structural", limits).unwrap())
+        .unwrap();
+    let mut joined_edit = source.edit();
+    joined_edit.join(joined).unwrap();
+    let joined_commit = joined_edit.commit().unwrap();
+    assert_eq!(joined_commit.package().as_bytes(), applied.as_bytes());
+    assert_eq!(
+        source
+            .apply(joined_commit.patch())
+            .unwrap()
+            .package()
+            .as_bytes(),
+        applied.as_bytes()
+    );
+    assert_eq!(
+        joined_commit
+            .package()
+            .apply(&joined_commit.patch().inverse())
+            .unwrap()
+            .package()
+            .as_bytes(),
         source.as_bytes()
     );
 }
@@ -930,9 +954,28 @@ fn joined_edits_are_deterministic_disjoint_and_conflict_aware() {
             .collect::<Vec<_>>(),
         ["a-name", "z-text"]
     );
-    let applied = source.apply_joined(joined).unwrap();
+    let mut joined_edit = source.edit();
+    joined_edit.join(joined).unwrap();
+    let joined_commit = joined_edit.commit().unwrap();
+    let applied = joined_commit.package().clone();
     assert_eq!(applied.pages()[0].shapes()[0].text(), "joined");
     assert_eq!(applied.pages()[0].shapes()[1].name(), Some("Joined photo"));
+    assert_eq!(
+        source
+            .apply(joined_commit.patch())
+            .unwrap()
+            .package()
+            .as_bytes(),
+        applied.as_bytes()
+    );
+    assert_eq!(
+        applied
+            .apply(&joined_commit.patch().inverse())
+            .unwrap()
+            .package()
+            .as_bytes(),
+        source.as_bytes()
+    );
 
     let mut conflicting_edit = source.edit();
     conflicting_edit.set_shape_text(0, 0, "other").unwrap();
@@ -951,14 +994,105 @@ fn joined_edits_are_deterministic_disjoint_and_conflict_aware() {
     stale_joined
         .join(text_commit.patch().prepare("stale", limits).unwrap())
         .unwrap();
-    assert!(matches!(
-        foreign.apply_joined(stale_joined),
-        Err(Error::PatchConflict)
-    ));
+    let mut foreign_edit = foreign.edit();
+    let stale_error = match foreign_edit.join(stale_joined) {
+        Ok(_) => panic!("stale joined work was accepted"),
+        Err(error) => error,
+    };
+    assert!(matches!(stale_error.error(), Error::PatchConflict));
     assert!(matches!(
         text_commit.patch().then(name_commit.patch()),
         Err(Error::PatchConflict)
     ));
+}
+
+#[test]
+fn joined_staging_preserves_order_and_rejects_without_mutating_the_edit() {
+    let source = Package::from_bytes(&package(CONTENT)).unwrap();
+    let limits = CompositionLimits::new(8, 8, 32, 16);
+
+    let mut text_edit = source.edit();
+    text_edit.set_shape_text(0, 0, "joined text").unwrap();
+    let text_commit = text_edit.commit().unwrap();
+
+    let mut ordinary = source.edit();
+    ordinary.set_shape_name(0, 1, "ordinary name").unwrap();
+    let mut joined = source.joined_edits(limits);
+    joined
+        .join(text_commit.patch().prepare("joined-text", limits).unwrap())
+        .unwrap();
+    ordinary.join(joined).unwrap();
+    let commit = ordinary.commit().unwrap();
+    assert_eq!(commit.diagnostics().change_count(), 2);
+    assert_eq!(
+        commit.package().pages()[0].shapes()[0].text(),
+        "joined text"
+    );
+    assert_eq!(
+        commit.package().pages()[0].shapes()[1].name(),
+        Some("ordinary name")
+    );
+
+    let mut conflicting = source.edit();
+    conflicting.set_shape_text(0, 0, "ordinary text").unwrap();
+    let mut rejected_plan = source.joined_edits(limits);
+    rejected_plan
+        .join(text_commit.patch().prepare("conflict", limits).unwrap())
+        .unwrap();
+    let error = match conflicting.join(rejected_plan) {
+        Ok(_) => panic!("overlapping joined work was accepted"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error.error(),
+        Error::Refused(refusal)
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedOperation
+    ));
+    let recovered = error.into_rejected();
+    let ordinary_commit = conflicting.commit().unwrap();
+    assert_eq!(
+        ordinary_commit.package().pages()[0].shapes()[0].text(),
+        "ordinary text"
+    );
+    let mut retry = source.edit();
+    retry.join(recovered).unwrap();
+    assert_eq!(
+        retry.commit().unwrap().package().pages()[0].shapes()[0].text(),
+        "joined text"
+    );
+}
+
+#[test]
+fn joined_staging_checks_payload_source_preconditions() {
+    let source = Package::from_bytes(&package(CONTENT)).unwrap();
+    let foreign = Package::from_bytes(&package(&CONTENT.replace("Photo", "Changed"))).unwrap();
+    let limits = CompositionLimits::new(4, 4, 8, 8);
+    let mut foreign_edit = foreign.edit();
+    foreign_edit.set_shape_text(0, 0, "foreign text").unwrap();
+    let foreign_commit = foreign_edit.commit().unwrap();
+
+    let plan = source.joined_edits(limits);
+    let mismatched = edit::SubEdit::new(
+        plan.lineage().clone(),
+        limits,
+        "mismatched-source",
+        Vec::<String>::new(),
+        vec!["page/0/shape/0#shape.text.set".to_owned()],
+        foreign_commit.patch().durable().unwrap(),
+    )
+    .unwrap();
+    let mut plan = plan;
+    plan.join(mismatched).unwrap();
+    let mut edit = source.edit();
+    let error = match edit.join(plan) {
+        Ok(_) => panic!("mismatched durable payload was accepted"),
+        Err(error) => error,
+    };
+    assert!(matches!(error.error(), Error::PatchConflict));
+    assert_eq!(
+        edit.commit().unwrap().package().as_bytes(),
+        source.as_bytes()
+    );
 }
 
 #[test]
@@ -986,7 +1120,9 @@ fn three_way_plan_does_not_mutate_until_conflicts_are_resolved() {
     let mut unresolved = plan.finish().unwrap_err();
     unresolved.resolve(MergeChoice::Right);
     let staged = unresolved.finish().unwrap();
-    let applied = source.apply_joined(staged).unwrap();
+    let mut staged_edit = source.edit();
+    staged_edit.join(staged).unwrap();
+    let applied = staged_edit.commit().unwrap().into_package();
     assert_eq!(applied.pages()[0].shapes()[0].name(), Some("Right"));
 }
 

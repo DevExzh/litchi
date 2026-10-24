@@ -29,7 +29,7 @@ crate::scoped::family!("subdocument");
 #[derive(Clone)]
 pub struct Edit {
     base: crate::scoped::Base,
-    inner: Editor,
+    inner: Option<Editor>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -43,27 +43,44 @@ impl std::fmt::Debug for Edit {
 
 impl Edit {
     fn open(base: crate::scoped::Base) -> Result<Self> {
-        let bytes = base.to_vec();
-        let options = base.options();
-        let inner = Editor::open_with_options(bytes, options)?;
-        Ok(Self { base, inner })
+        Ok(Self { base, inner: None })
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut Editor> {
+        if self.inner.is_none() {
+            let bytes = self.base.to_vec()?;
+            let options = self.base.options();
+            self.inner = Some(Editor::open_with_options(bytes, options)?);
+        }
+        self.inner.as_mut().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "subdocument edit was not initialized".into(),
+            ))
+        })
+    }
+
+    fn take_inner(&mut self) -> Result<Editor> {
+        self.inner_mut()?;
+        self.inner.take().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "subdocument edit was not initialized".into(),
+            ))
+        })
     }
 
     /// The current contextual subdocument snapshot.
-    #[must_use]
-    pub fn subdocuments(&self) -> &TransactionSnapshot {
-        self.inner.subdocuments()
+    pub fn subdocuments(&mut self) -> Result<&TransactionSnapshot> {
+        Ok(self.inner_mut()?.subdocuments())
     }
 
     /// The decoded master-document subdocument metadata.
-    #[must_use]
-    pub fn value(&self) -> &Collection {
-        self.inner.value()
+    pub fn value(&mut self) -> Result<&Collection> {
+        Ok(self.inner_mut()?.value())
     }
 
     /// Apply and publish a validated semantic transaction atomically.
     pub fn apply(&mut self, transaction: RecordEdit) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .apply(transaction)
             .map(|_| ())
             .map_err(Error::from)
@@ -76,8 +93,8 @@ impl Edit {
     /// Returns an error when the edited part fails validation, the package
     /// cannot be republished, or [`Error::Signed`] for a changed signed
     /// package.
-    pub fn commit(self) -> Result<Commit> {
-        let after = self.inner.finish()?;
+    pub fn commit(mut self) -> Result<Commit> {
+        let after = self.take_inner()?.finish()?;
         Ok(published(self.base.publish(after)?))
     }
 }

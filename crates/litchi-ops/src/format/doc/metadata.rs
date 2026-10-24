@@ -51,7 +51,7 @@ impl Doc {
             .with_suggestion("reopen the document without `OpenOptions::retain_source(false)`"));
         };
         let mut edit = package.edit_metadata()?;
-        let operations = ole_metadata::apply(edit.properties_mut(), props, FileFormat::Doc)?;
+        let operations = ole_metadata::apply(edit.properties_mut()?, props, FileFormat::Doc)?;
         let commit = edit.commit()?;
         let changed = commit.diagnostics().changed();
         let (package, patch) = commit.into_parts();

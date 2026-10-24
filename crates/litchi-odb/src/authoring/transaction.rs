@@ -16,7 +16,7 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
     reader::NsReader,
 };
-use std::{collections::BTreeSet, ops::Range};
+use std::{borrow::Cow, collections::BTreeSet, ops::Range};
 
 use crate::{
     ApplicationConnectionSettings, AutoIncrementSettings, CharacterSetSettings, Column, Component,
@@ -102,7 +102,7 @@ impl Change {
 pub struct Edit<'source> {
     source: &'source crate::Package,
     policy: crate::EditPolicy,
-    content: String,
+    content: Cow<'source, str>,
     changes: Vec<Change>,
     legacy_query: Option<QueryChange>,
     /// Whether scalar setters touched more than one query: the patch then
@@ -117,7 +117,7 @@ impl<'source> Edit<'source> {
         Self {
             source,
             policy,
-            content: source.database.content_xml().to_owned(),
+            content: Cow::Borrowed(source.database.content_xml()),
             changes: Vec::new(),
             legacy_query: None,
             several_queries: false,
@@ -755,7 +755,7 @@ impl<'source> Edit<'source> {
         let nodes = scan(&self.content)?;
         match table.kind() {
             TableKind::Representation => insert_into_or_create_collection(
-                &mut self.content,
+                self.content.to_mut(),
                 &nodes,
                 "table-representations",
                 "database",
@@ -764,20 +764,20 @@ impl<'source> Edit<'source> {
             )?,
             TableKind::Definition => {
                 if let Some(collection) = unique_node(&nodes, "table-definitions")? {
-                    insert_child(&mut self.content, collection, &fragment)?;
+                    insert_child(self.content.to_mut(), collection, &fragment)?;
                 } else if let Some(schema) = unique_node(&nodes, "schema-definition")? {
                     let wrapped = format!(
                         "<{0}:table-definitions>{fragment}</{0}:table-definitions>",
                         prefixes.database
                     );
-                    insert_child(&mut self.content, schema, &wrapped)?;
+                    insert_child(self.content.to_mut(), schema, &wrapped)?;
                 } else {
                     let database = unique_required_node(&nodes, "database")?;
                     let wrapped = format!(
                         "<{0}:schema-definition><{0}:table-definitions>{fragment}</{0}:table-definitions></{0}:schema-definition>",
                         prefixes.database
                     );
-                    insert_child(&mut self.content, database, &wrapped)?;
+                    insert_child(self.content.to_mut(), database, &wrapped)?;
                 }
             },
         }
@@ -802,7 +802,7 @@ impl<'source> Edit<'source> {
         }
         let prefix = prefixes(&self.content)?.database;
         replace_span(
-            &mut self.content,
+            self.content.to_mut(),
             site.full.clone(),
             &serialize_table(&table, &prefix),
         )?;
@@ -851,7 +851,7 @@ impl<'source> Edit<'source> {
                 range: site.full.clone(),
                 value: String::new(),
             });
-            apply_edits(&mut self.content, edits)?;
+            apply_edits(self.content.to_mut(), edits)?;
             for key in incoming {
                 let owner = ancestors(&nodes, key)
                     .find(|node| node.local == "table-definition")
@@ -866,7 +866,7 @@ impl<'source> Edit<'source> {
                 }
             }
         } else {
-            replace_span(&mut self.content, site.full.clone(), "")?;
+            replace_span(self.content.to_mut(), site.full.clone(), "")?;
         }
         self.record(ChangeAction::Remove, ChangeKind::Table, name)
     }
@@ -903,7 +903,7 @@ impl<'source> Edit<'source> {
                 )?);
             }
         }
-        apply_edits(&mut self.content, edits)?;
+        apply_edits(self.content.to_mut(), edits)?;
         self.record(ChangeAction::Update, ChangeKind::Table, name)
     }
 
@@ -926,7 +926,7 @@ impl<'source> Edit<'source> {
         let prefix = prefixes(&self.content)?.database;
         let fragment = serialize_column(&column, table_site.local == "table-definition", &prefix);
         insert_table_collection(
-            &mut self.content,
+            self.content.to_mut(),
             &nodes,
             table_site,
             column_collection(table_site),
@@ -957,7 +957,7 @@ impl<'source> Edit<'source> {
         }
         let prefix = prefixes(&self.content)?.database;
         let fragment = serialize_column(&column, table_site.local == "table-definition", &prefix);
-        replace_span(&mut self.content, site.full.clone(), &fragment)?;
+        replace_span(self.content.to_mut(), site.full.clone(), &fragment)?;
         self.record(
             ChangeAction::Update,
             ChangeKind::Column,
@@ -1002,7 +1002,7 @@ impl<'source> Edit<'source> {
                 range: site.full.clone(),
                 value: String::new(),
             });
-            apply_edits(&mut self.content, edits)?;
+            apply_edits(self.content.to_mut(), edits)?;
             for dependent in dependents {
                 self.record(
                     ChangeAction::Remove,
@@ -1011,7 +1011,7 @@ impl<'source> Edit<'source> {
                 )?;
             }
         } else {
-            replace_span(&mut self.content, site.full.clone(), "")?;
+            replace_span(self.content.to_mut(), site.full.clone(), "")?;
         }
         self.record(
             ChangeAction::Remove,
@@ -1074,7 +1074,7 @@ impl<'source> Edit<'source> {
                 )?);
             }
         }
-        apply_edits(&mut self.content, edits)?;
+        apply_edits(self.content.to_mut(), edits)?;
         self.record(
             ChangeAction::Update,
             ChangeKind::Column,
@@ -1168,7 +1168,7 @@ impl<'source> Edit<'source> {
         let prefix = prefixes(&self.content)?.database;
         let fragment = serialize_query(&query, &prefix);
         insert_into_or_create_collection(
-            &mut self.content,
+            self.content.to_mut(),
             &nodes,
             "queries",
             "database",
@@ -1189,7 +1189,7 @@ impl<'source> Edit<'source> {
         }
         let prefix = prefixes(&self.content)?.database;
         replace_span(
-            &mut self.content,
+            self.content.to_mut(),
             site.full.clone(),
             &serialize_query(&query, &prefix),
         )?;
@@ -1201,7 +1201,7 @@ impl<'source> Edit<'source> {
         let nodes = scan(&self.content)?;
         let site = find_named_node(&nodes, "query", name)?
             .ok_or_else(|| Error::InvalidFormat("ODB query does not exist".to_string()))?;
-        replace_span(&mut self.content, site.full.clone(), "")?;
+        replace_span(self.content.to_mut(), site.full.clone(), "")?;
         self.record(ChangeAction::Remove, ChangeKind::Query, name)
     }
 
@@ -1218,7 +1218,7 @@ impl<'source> Edit<'source> {
         let nodes = scan(&self.content)?;
         let site = find_named_node(&nodes, "query", name)?
             .ok_or_else(|| Error::InvalidFormat("ODB query does not exist".to_string()))?;
-        if relocate_sibling(&mut self.content, &nodes, site, to)? {
+        if relocate_sibling(self.content.to_mut(), &nodes, site, to)? {
             self.record(ChangeAction::Update, ChangeKind::Query, name)?;
         }
         Ok(())
@@ -1237,7 +1237,7 @@ impl<'source> Edit<'source> {
         let nodes = scan(&self.content)?;
         let site = find_named_table(&nodes, name)?
             .ok_or_else(|| Error::InvalidFormat("ODB table does not exist".to_string()))?;
-        if relocate_sibling(&mut self.content, &nodes, site, to)? {
+        if relocate_sibling(self.content.to_mut(), &nodes, site, to)? {
             self.record(ChangeAction::Update, ChangeKind::Table, name)?;
         }
         Ok(())
@@ -1256,7 +1256,7 @@ impl<'source> Edit<'source> {
             .ok_or_else(|| Error::InvalidFormat("ODB table does not exist".to_string()))?;
         let site = find_named_child(&nodes, table_site, column_element(table_site), name)?
             .ok_or_else(|| Error::InvalidFormat("ODB column does not exist".to_string()))?;
-        if relocate_sibling(&mut self.content, &nodes, site, to)? {
+        if relocate_sibling(self.content.to_mut(), &nodes, site, to)? {
             self.record(
                 ChangeAction::Update,
                 ChangeKind::Column,
@@ -1353,7 +1353,7 @@ impl<'source> Edit<'source> {
                         site,
                         site,
                     )?;
-                    replace_span(&mut self.content, site.full.clone(), &replacement)?;
+                    replace_span(self.content.to_mut(), site.full.clone(), &replacement)?;
                 } else {
                     let replacement = serialize_connection_owner_for_site(
                         value,
@@ -1363,7 +1363,7 @@ impl<'source> Edit<'source> {
                         site,
                         (owner.id != site.id).then_some(owner),
                     )?;
-                    replace_span(&mut self.content, owner.full.clone(), &replacement)?;
+                    replace_span(self.content.to_mut(), owner.full.clone(), &replacement)?;
                 }
             },
             (Some(site), None) => {
@@ -1381,7 +1381,7 @@ impl<'source> Edit<'source> {
                         "ODB connection removal would discard opaque database-description content",
                     );
                 }
-                replace_span(&mut self.content, owner.full.clone(), "")?;
+                replace_span(self.content.to_mut(), owner.full.clone(), "")?;
             },
             (None, Some(value)) => {
                 if let Some(description) = unique_node(&nodes, "database-description")? {
@@ -1403,14 +1403,14 @@ impl<'source> Edit<'source> {
                             description,
                             description,
                         )?;
-                        replace_span(&mut self.content, description.full.clone(), &fragment)?;
+                        replace_span(self.content.to_mut(), description.full.clone(), &fragment)?;
                     } else {
                         let fragment = serialize_connection(value, &prefixes)?;
-                        insert_child(&mut self.content, description, &fragment)?;
+                        insert_child(self.content.to_mut(), description, &fragment)?;
                     }
                 } else if let Some(data) = unique_node(&nodes, "connection-data")? {
                     insert_child(
-                        &mut self.content,
+                        self.content.to_mut(),
                         data,
                         &serialize_connection_owner(value, &prefixes)?,
                     )?;
@@ -1418,7 +1418,7 @@ impl<'source> Edit<'source> {
                     let source = unique_required_node(&nodes, "data-source")?;
                     let owner = serialize_connection_owner(value, &prefixes)?;
                     let wrapped = wrap_connection_data(&owner, &prefixes)?;
-                    insert_child(&mut self.content, source, &wrapped)?;
+                    insert_child(self.content.to_mut(), source, &wrapped)?;
                 }
             },
             (None, None) => return invalid("ODB connection staging state is inconsistent"),
@@ -1498,7 +1498,7 @@ impl<'source> Edit<'source> {
         let prefixes = prefixes(&self.content)?;
         if current.login() != settings.login() {
             set_login_node(
-                &mut self.content,
+                self.content.to_mut(),
                 &nodes,
                 connection_data,
                 settings.login(),
@@ -1509,7 +1509,7 @@ impl<'source> Edit<'source> {
             let nodes = scan(&self.content)?;
             let source = unique_required_node(&nodes, "data-source")?;
             set_driver_node(
-                &mut self.content,
+                self.content.to_mut(),
                 &nodes,
                 source,
                 settings.driver(),
@@ -1520,7 +1520,7 @@ impl<'source> Edit<'source> {
             let nodes = scan(&self.content)?;
             let source = unique_required_node(&nodes, "data-source")?;
             set_application_node(
-                &mut self.content,
+                self.content.to_mut(),
                 &nodes,
                 source,
                 settings.application_connection(),
@@ -1553,7 +1553,7 @@ impl<'source> Edit<'source> {
         let prefixes = prefixes(&self.content)?;
         let fragment = serialize_component(&component, &prefixes);
         insert_into_or_create_collection(
-            &mut self.content,
+            self.content.to_mut(),
             &nodes,
             collection,
             "database",
@@ -1589,7 +1589,7 @@ impl<'source> Edit<'source> {
         }
         let prefixes = prefixes(&self.content)?;
         replace_span(
-            &mut self.content,
+            self.content.to_mut(),
             site.full.clone(),
             &serialize_component(&component, &prefixes),
         )?;
@@ -1605,7 +1605,7 @@ impl<'source> Edit<'source> {
         let nodes = scan(&self.content)?;
         let site = find_component(&nodes, kind, name)?
             .ok_or_else(|| Error::InvalidFormat("ODB component does not exist".to_string()))?;
-        replace_span(&mut self.content, site.full.clone(), "")?;
+        replace_span(self.content.to_mut(), site.full.clone(), "")?;
         self.record(
             ChangeAction::Remove,
             ChangeKind::Component,
@@ -1644,7 +1644,7 @@ impl<'source> Edit<'source> {
         }) {
             return invalid("ODB producer extension already exists");
         }
-        insert_child(&mut self.content, database, xml)?;
+        insert_child(self.content.to_mut(), database, xml)?;
         self.record(
             ChangeAction::Create,
             ChangeKind::ProducerExtension,
@@ -1691,7 +1691,7 @@ impl<'source> Edit<'source> {
             .ok_or_else(|| {
                 Error::InvalidFormat("ODB producer extension does not exist".to_string())
             })?;
-        replace_span(&mut self.content, site.full.clone(), xml)?;
+        replace_span(self.content.to_mut(), site.full.clone(), xml)?;
         self.record(
             ChangeAction::Update,
             ChangeKind::ProducerExtension,
@@ -1717,7 +1717,7 @@ impl<'source> Edit<'source> {
             .ok_or_else(|| {
                 Error::InvalidFormat("ODB producer extension does not exist".to_string())
             })?;
-        replace_span(&mut self.content, site.full.clone(), "")?;
+        replace_span(self.content.to_mut(), site.full.clone(), "")?;
         self.record(
             ChangeAction::Remove,
             ChangeKind::ProducerExtension,
@@ -1741,7 +1741,7 @@ impl<'source> Edit<'source> {
         }
         let prefix = prefixes(&self.content)?.database;
         insert_table_collection(
-            &mut self.content,
+            self.content.to_mut(),
             &nodes,
             table_site,
             collection,
@@ -1769,7 +1769,7 @@ impl<'source> Edit<'source> {
         {
             return invalid("ODB replacement table child name already exists");
         }
-        replace_span(&mut self.content, site.full.clone(), fragment)?;
+        replace_span(self.content.to_mut(), site.full.clone(), fragment)?;
         self.record(ChangeAction::Update, kind, &child_target(table, name))
     }
 
@@ -1778,7 +1778,7 @@ impl<'source> Edit<'source> {
         let table_site = definition_table(&nodes, table)?;
         let site = find_named_child(&nodes, table_site, local, name)?
             .ok_or_else(|| Error::InvalidFormat("ODB table child does not exist".to_string()))?;
-        replace_span(&mut self.content, site.full.clone(), "")?;
+        replace_span(self.content.to_mut(), site.full.clone(), "")?;
         let kind = if local == "key" {
             ChangeKind::Key
         } else {
@@ -1806,7 +1806,7 @@ impl<'source> Edit<'source> {
             value,
             &prefix,
         )?;
-        apply_edits(&mut self.content, vec![edit])
+        apply_edits(self.content.to_mut(), vec![edit])
     }
 
     fn prepare_legacy_query(&mut self, name: &str) -> Result<()> {
@@ -2353,7 +2353,7 @@ fn decode_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Resu
                 Error::InvalidFormat(format!("invalid ODB attribute value: {error}"))
             })?;
         let value = quick_xml::escape::unescape(decoded.as_ref())
-            .map(std::borrow::Cow::into_owned)
+            .map(Cow::into_owned)
             .map_err(|error| {
                 Error::InvalidFormat(format!("invalid ODB attribute value: {error}"))
             })?;

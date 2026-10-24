@@ -6,12 +6,13 @@
 //! dependency closures.  The package boundary adds the canonical
 //! package-owned publication shape without introducing a second edit engine.
 //!
-//! The current bridge copies and revalidates the retained source when an edit
-//! is opened. Changed candidates transfer the body engine's already validated
-//! CFB and document projection into the package owner; exact no-ops retain the
-//! original package. The body engine's exact-source, protection, and
-//! full-candidate validation gates remain authoritative at every publication
-//! boundary.
+//! Opening an edit retains only the immutable package and its effective
+//! options. The first body operation then copies and revalidates the retained
+//! source through the body owner. Changed candidates transfer that owner's
+//! already validated CFB and document projection into the package owner; exact
+//! no-ops retain the original package. The body engine's exact-source,
+//! protection, and full-candidate validation gates remain authoritative at
+//! every publication boundary.
 
 use super::{Error as PackageError, OpenOptions, Package, model::EditProfile};
 use crate::body_text;
@@ -233,6 +234,53 @@ impl Error {
 /// Result type for the canonical package transaction.
 pub type Result<T> = std::result::Result<T, Error>;
 
+/// Deferred-open state for an ordinary package edit.
+///
+/// This is public only as the default parameter of [`Edit`]. Keeping the
+/// observer state out of this value preserves the ordinary edit's `Send` and
+/// `Sync` auto traits when diagnostics are enabled.
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Default)]
+pub struct OrdinaryEditState;
+
+trait DeferredOpenState {
+    fn open(&mut self, package: &Package, options: &EditOptions) -> Result<body_text::Edit>;
+}
+
+impl DeferredOpenState for OrdinaryEditState {
+    fn open(&mut self, package: &Package, options: &EditOptions) -> Result<body_text::Edit> {
+        let source = package.body_snapshot(options)?;
+        source.edit().map_err(Error::from)
+    }
+}
+
+#[cfg(feature = "performance-diagnostics")]
+/// Deferred observer state for a profiled package edit.
+#[doc(hidden)]
+pub struct ProfiledOpen<'a> {
+    observer: Box<dyn FnMut(body_text::DiagnosticEvent) + 'a>,
+    cfb_observer: Box<dyn FnMut(body_text::CfbParseEvent) + 'a>,
+}
+
+#[cfg(feature = "performance-diagnostics")]
+impl<'a> DeferredOpenState for ProfiledOpen<'a> {
+    fn open(&mut self, package: &Package, options: &EditOptions) -> Result<body_text::Edit> {
+        let snapshot = body_text::Snapshot::open_bounded_profiled_with_cfb_observer(
+            package.to_bytes().map_err(Error::Package)?,
+            options.revision_limits,
+            options.transaction_limits,
+            package.source_limits(),
+            options.protection_policy.clone(),
+            &mut *self.observer,
+            &mut *self.cfb_observer,
+        )
+        .map_err(Error::from)?;
+        snapshot
+            .edit_with_options(options.clone())
+            .map_err(Error::from)
+    }
+}
+
 /// Content-free facts about one published package transaction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Diagnostics {
@@ -392,22 +440,31 @@ fn commit_from_body(source: Package, body_commit: body_text::PackageCommit) -> R
     ))
 }
 /// Primary immutable DOC package transaction.
-pub struct Edit {
+pub struct Edit<'a, S = OrdinaryEditState> {
     package: Package,
-    inner: body_text::Edit,
+    options: EditOptions,
+    inner: Option<body_text::Edit>,
+    state: S,
+    _profile: std::marker::PhantomData<&'a ()>,
 }
 
-impl fmt::Debug for Edit {
+impl<'a, S> fmt::Debug for Edit<'a, S> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
             .field("package", &self.package)
-            .field("retained_render_bytes", &self.retained_render_bytes())
+            .field(
+                "retained_render_bytes",
+                &self
+                    .inner
+                    .as_ref()
+                    .and_then(body_text::Edit::retained_render_bytes),
+            )
             .finish_non_exhaustive()
     }
 }
 
-impl Edit {
+impl Edit<'static, OrdinaryEditState> {
     pub(crate) fn from_package_with_options(
         package: Package,
         options: EditOptions,
@@ -417,15 +474,90 @@ impl Edit {
                 body_text::Refusal::Encrypted,
             )));
         }
-        let source = package.body_snapshot(&options)?;
-        let inner = source.edit().map_err(Error::from)?;
-        Ok(Self { package, inner })
+        Ok(Self {
+            package,
+            options,
+            inner: None,
+            state: OrdinaryEditState,
+            _profile: std::marker::PhantomData,
+        })
     }
 
     /// A primary edit of `package` over a body edit already staged from its
     /// body snapshot (a composition, a merge plan or a durable replay).
     pub(crate) fn from_body(package: Package, inner: body_text::Edit) -> Self {
-        Self { package, inner }
+        Self {
+            options: package.retained_edit_options(),
+            package,
+            inner: Some(inner),
+            state: OrdinaryEditState,
+            _profile: std::marker::PhantomData,
+        }
+    }
+}
+
+#[cfg(feature = "performance-diagnostics")]
+impl<'a> Edit<'a, ProfiledOpen<'a>> {
+    pub(crate) fn from_profiled(
+        package: Package,
+        options: EditOptions,
+        observer: impl FnMut(body_text::DiagnosticEvent) + 'a,
+        cfb_observer: impl FnMut(body_text::CfbParseEvent) + 'a,
+    ) -> Self {
+        Self {
+            package,
+            options,
+            inner: None,
+            state: ProfiledOpen {
+                observer: Box::new(observer),
+                cfb_observer: Box::new(cfb_observer),
+            },
+            _profile: std::marker::PhantomData,
+        }
+    }
+
+    /// Finish the deferred profiled open and return the ordinary transferable
+    /// edit after its observers have been consumed.
+    #[must_use = "the profiled edit must be retained or converted"]
+    pub fn into_unprofiled(mut self) -> Result<Edit<'static>> {
+        self.inner_mut()?;
+        let Edit {
+            package,
+            options,
+            inner,
+            state: _,
+            _profile: _,
+        } = self;
+        Ok(Edit {
+            package,
+            options,
+            inner,
+            state: OrdinaryEditState,
+            _profile: std::marker::PhantomData,
+        })
+    }
+}
+
+#[allow(private_bounds)]
+impl<'a, S: DeferredOpenState> Edit<'a, S> {
+    fn inner_mut(&mut self) -> Result<&mut body_text::Edit> {
+        if self.inner.is_none() {
+            self.inner = Some(self.state.open(&self.package, &self.options)?);
+        }
+        self.inner.as_mut().ok_or_else(|| {
+            Error::Package(PackageError::InvalidFormat(
+                "DOC edit was not initialized".into(),
+            ))
+        })
+    }
+
+    fn take_inner(&mut self) -> Result<body_text::Edit> {
+        self.inner_mut()?;
+        self.inner.take().ok_or_else(|| {
+            Error::Package(PackageError::InvalidFormat(
+                "DOC edit was not initialized".into(),
+            ))
+        })
     }
 
     /// Immutable package snapshot that authorizes this transaction.
@@ -435,31 +567,32 @@ impl Edit {
     }
 
     /// Exact source bytes retained by this staged edit.
-    #[must_use]
-    pub fn source_bytes(&self) -> &[u8] {
-        self.inner.source_bytes()
+    pub fn source_bytes(&mut self) -> Result<&[u8]> {
+        Ok(self.inner_mut()?.source_bytes())
     }
 
     /// Borrowed semantic changes staged so far, including authored text.
-    #[must_use]
-    pub fn changes(&self) -> impl ExactSizeIterator<Item = body_text::ChangeRef<'_>> {
-        self.inner.changes()
+    pub fn changes(&mut self) -> Result<impl ExactSizeIterator<Item = body_text::ChangeRef<'_>>> {
+        Ok(self.inner_mut()?.changes())
     }
 
     /// Allocation capacity held by the validated candidate, if retained.
     #[must_use]
     pub fn retained_render_bytes(&self) -> Option<usize> {
-        self.inner.retained_render_bytes()
+        self.inner
+            .as_ref()
+            .and_then(body_text::Edit::retained_render_bytes)
     }
 
     /// Release the retained candidate without changing staged semantics.
-    pub fn release_retained_render(&mut self) {
-        self.inner.release_retained_render();
+    pub fn release_retained_render(&mut self) -> Result<()> {
+        self.inner_mut()?.release_retained_render();
+        Ok(())
     }
 
     /// Apply a checked `Selsf` patch to this transaction.
     pub fn apply_saved_selection_patch(&mut self, patch: &SavedSelectionPatch) -> Result<bool> {
-        self.inner
+        self.inner_mut()?
             .apply_saved_selection_patch(patch)
             .map_err(Error::from)
     }
@@ -469,38 +602,42 @@ impl Edit {
         &mut self,
         edit: impl FnOnce(&mut SavedSelectionEdit) -> crate::package::Result<()>,
     ) -> Result<bool> {
-        self.inner.edit_saved_selection(edit).map_err(Error::from)
+        self.inner_mut()?
+            .edit_saved_selection(edit)
+            .map_err(Error::from)
     }
 
     /// Apply a checked `RgDofr` patch to this transaction.
     pub fn apply_dofr_patch(&mut self, patch: &DofrPatch) -> Result<bool> {
-        self.inner.apply_dofr_patch(patch).map_err(Error::from)
+        self.inner_mut()?
+            .apply_dofr_patch(patch)
+            .map_err(Error::from)
     }
 
     /// Replace one complete checked `RgDofr` record.
     pub fn replace_dofr_record(&mut self, index: usize, replacement: &[u8]) -> Result<bool> {
-        self.inner
+        self.inner_mut()?
             .replace_dofr_record(index, replacement)
             .map_err(Error::from)
     }
 
     /// Replace one ordinary main-story paragraph.
     pub fn replace_paragraph(&mut self, position: Position, replacement: &str) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .replace_paragraph(position, replacement)
             .map_err(Error::from)
     }
 
     /// Replace one checked body, table-cell, or field target.
     pub fn replace_text(&mut self, target: body_text::TextTarget, replacement: &str) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .replace_text(target, replacement)
             .map_err(Error::from)
     }
 
     /// Set direct bold on one ordinary paragraph.
     pub fn set_paragraph_bold(&mut self, position: Position, enabled: bool) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_paragraph_bold(position, enabled)
             .map_err(Error::from)
     }
@@ -512,7 +649,7 @@ impl Edit {
         property: body_text::CharacterProperty,
         enabled: bool,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_character_property(target, property, enabled)
             .map_err(Error::from)
     }
@@ -523,7 +660,7 @@ impl Edit {
         target: body_text::TextTarget,
         value: body_text::CharacterValue<'_>,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_character_value(target, value)
             .map_err(Error::from)
     }
@@ -531,14 +668,19 @@ impl Edit {
     /// Apply paragraph style `istd` to one ordinary main-story paragraph
     /// (record 0324).
     pub fn set_paragraph_style(&mut self, position: Position, istd: u16) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_paragraph_style(position, istd)
             .map_err(Error::from)
     }
 
     /// The effective tab stops of one ordinary main-story paragraph.
-    pub fn paragraph_tabs(&self, position: Position) -> Result<Vec<crate::parts::pap::TabStop>> {
-        self.inner.paragraph_tabs(position).map_err(Error::from)
+    pub fn paragraph_tabs(
+        &mut self,
+        position: Position,
+    ) -> Result<Vec<crate::parts::pap::TabStop>> {
+        self.inner_mut()?
+            .paragraph_tabs(position)
+            .map_err(Error::from)
     }
 
     /// Set the tab stops of one ordinary main-story paragraph.
@@ -547,7 +689,7 @@ impl Edit {
         position: Position,
         stops: &[crate::parts::pap::TabStop],
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_paragraph_tabs(position, stops)
             .map_err(Error::from)
     }
@@ -560,19 +702,21 @@ impl Edit {
         offset: u32,
         link: &body_text::HyperlinkInsert,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_hyperlink(position, offset, link)
             .map_err(Error::from)
     }
 
     /// Remove the whole main-story field that begins at `start_cp`.
     pub fn remove_field(&mut self, start_cp: u32) -> Result<()> {
-        self.inner.remove_field(start_cp).map_err(Error::from)
+        self.inner_mut()?
+            .remove_field(start_cp)
+            .map_err(Error::from)
     }
 
     /// The standard bookmarks, as (name, start CP, end CP) in start order.
-    pub fn bookmarks(&self) -> Result<Vec<(String, u32, u32)>> {
-        self.inner.bookmarks().map_err(Error::from)
+    pub fn bookmarks(&mut self) -> Result<Vec<(String, u32, u32)>> {
+        self.inner_mut()?.bookmarks().map_err(Error::from)
     }
 
     /// Add a standard bookmark over a UTF-16 range of one ordinary
@@ -584,19 +728,21 @@ impl Edit {
         start: u32,
         end: u32,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .add_bookmark(name, position, start, end)
             .map_err(Error::from)
     }
 
     /// Rename the standard bookmark named exactly `from` to `to`.
     pub fn rename_bookmark(&mut self, from: &str, to: &str) -> Result<()> {
-        self.inner.rename_bookmark(from, to).map_err(Error::from)
+        self.inner_mut()?
+            .rename_bookmark(from, to)
+            .map_err(Error::from)
     }
 
     /// Remove the standard bookmark named exactly `name`.
     pub fn remove_bookmark(&mut self, name: &str) -> Result<()> {
-        self.inner.remove_bookmark(name).map_err(Error::from)
+        self.inner_mut()?.remove_bookmark(name).map_err(Error::from)
     }
 
     /// Set page-setup values on one section.
@@ -605,7 +751,7 @@ impl Edit {
         section: Position,
         values: &[body_text::SectionValue],
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_section_values(section, values)
             .map_err(Error::from)
     }
@@ -613,25 +759,29 @@ impl Edit {
     /// Insert one ordinary main-story paragraph before `position`, or after
     /// the last one when `position` is the paragraph count.
     pub fn insert_paragraph(&mut self, position: Position, text: &str) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert_paragraph(position, text)
             .map_err(Error::from)
     }
 
     /// Remove one ordinary main-story paragraph.
     pub fn remove_paragraph(&mut self, position: Position) -> Result<()> {
-        self.inner.remove_paragraph(position).map_err(Error::from)
+        self.inner_mut()?
+            .remove_paragraph(position)
+            .map_err(Error::from)
     }
 
     /// Move one ordinary main-story paragraph so that it ends at `to`,
     /// counted after it is detached.
     pub fn move_paragraph(&mut self, from: Position, to: Position) -> Result<()> {
-        self.inner.move_paragraph(from, to).map_err(Error::from)
+        self.inner_mut()?
+            .move_paragraph(from, to)
+            .map_err(Error::from)
     }
 
     /// Apply a dependency-checked text transfer.
     pub fn apply_transfer(&mut self, plan: &body_text::TransferPlan) -> Result<()> {
-        self.inner.apply_transfer(plan).map_err(Error::from)
+        self.inner_mut()?.apply_transfer(plan).map_err(Error::from)
     }
 
     /// Apply a dependency-closed embedded-object transfer.
@@ -639,14 +789,16 @@ impl Edit {
         &mut self,
         plan: &body_text::EmbeddedTransferPlan,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .apply_embedded_transfer(plan)
             .map_err(Error::from)
     }
 
     /// Apply a checked inline or floating picture transfer.
     pub fn apply_picture_transfer(&mut self, plan: &body_text::PictureTransferPlan) -> Result<()> {
-        self.inner.apply_picture_transfer(plan).map_err(Error::from)
+        self.inner_mut()?
+            .apply_picture_transfer(plan)
+            .map_err(Error::from)
     }
 
     /// Add one inert embedded object through its dependency owner.
@@ -654,12 +806,14 @@ impl Edit {
         &mut self,
         options: crate::embedded_object::WriteOptions,
     ) -> Result<()> {
-        self.inner.add_embedded_object(options).map_err(Error::from)
+        self.inner_mut()?
+            .add_embedded_object(options)
+            .map_err(Error::from)
     }
 
     /// Remove one managed embedded object and its dependency closure.
     pub fn remove_embedded_object(&mut self, storage_id: u32) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .remove_embedded_object(storage_id)
             .map_err(Error::from)
     }
@@ -670,22 +824,25 @@ impl Edit {
         position: Position,
         disposition: body_text::RevisionDisposition,
     ) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .dispose_revision(position, disposition)
             .map_err(Error::from)
     }
 
     /// Change the passive display-as-icon bit of one managed object.
     pub fn set_embedded_display_as_icon(&mut self, storage_id: u32, enabled: bool) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set_embedded_display_as_icon(storage_id, enabled)
             .map_err(Error::from)
     }
 
     /// Publish the checked package commit and canonical triad.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        let body_commit = self
+            .take_inner()?
+            .commit_with_package()
+            .map_err(Error::from)?;
         let package = self.package;
-        let body_commit = self.inner.commit_with_package().map_err(Error::from)?;
         commit_from_body(package, body_commit)
     }
 
@@ -711,16 +868,16 @@ impl Edit {
     /// Returns the same errors as [`Self::commit`].
     #[cfg(feature = "performance-diagnostics")]
     pub fn commit_profiled_with_cfb_observer(
-        self,
+        mut self,
         observer: impl FnMut(body_text::DiagnosticEvent),
         cfb_observer: impl FnMut(body_text::CfbParseEvent),
     ) -> Result<Commit> {
-        let source = self.package;
         let (snapshot, body_patch) = self
-            .inner
+            .take_inner()?
             .commit_profiled_with_cfb_observer(observer, cfb_observer)
             .map_err(Error::from)?
             .into_parts();
+        let source = self.package;
         let patch = Patch::from_body(body_patch);
         let diagnostics = Diagnostics::from_patch(&patch.inner);
         let profile = EditProfile::from_snapshot(&snapshot);
@@ -744,14 +901,12 @@ impl Edit {
 }
 
 impl Package {
-    /// The body-text snapshot of this package's exact bytes under `options`.
-    ///
-    /// Opening one copies and parses the whole file, so the last one opened
-    /// is kept (record 0311): an immutable snapshot of the same bytes under
-    /// the same options is the value a fresh open returns, and every edit
-    /// starts from its own transaction over it. A memo hit still checks that
-    /// the retained source has its captured version, as the copy does.
-    /// The body-text snapshot of this package under the edit `options`.
+    /// Materializes the body-text snapshot of this package under `options`.
+    /// The snapshot is memoized after the first body operation: an immutable
+    /// snapshot of the same bytes under the same options is the value a fresh
+    /// open returns, and every edit starts from its own transaction over it. A
+    /// memo hit still checks that the retained source has its captured
+    /// version, as the copy does.
     pub(crate) fn body_snapshot(&self, options: &EditOptions) -> Result<body_text::Snapshot> {
         self.body_source(
             body_text::OpenOptions::default()
@@ -790,10 +945,11 @@ impl Package {
 
     /// Start the canonical primary DOC package transaction.
     ///
-    /// The package remains immutable.  Staging copies and revalidates its
-    /// exact bytes through the existing body-text owner; dropping the returned
-    /// edit is the rollback operation.
-    pub fn edit(&self) -> Result<Edit> {
+    /// The package remains immutable. Construction retains only the package
+    /// and options; the first body operation copies and revalidates its exact
+    /// bytes through the existing body-text owner. Dropping the returned edit
+    /// discards those deferred or staged changes.
+    pub fn edit(&self) -> Result<Edit<'static>> {
         Edit::from_package_with_options(self.clone(), self.retained_edit_options())
     }
 
@@ -825,7 +981,7 @@ impl Package {
     }
 
     /// Start a primary transaction under one explicit edit profile.
-    pub fn edit_with_options(&self, options: EditOptions) -> Result<Edit> {
+    pub fn edit_with_options(&self, options: EditOptions) -> Result<Edit<'static>> {
         Edit::from_package_with_options(self.clone(), self.constrained_edit_options(options))
     }
 
@@ -874,6 +1030,8 @@ impl Package {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "performance-diagnostics")]
+    use super::Edit;
     use super::{Diagnostics, EditOptions, Error, LimitKind};
     use crate::Builder;
     use crate::body_text::{self, TextTarget, TransactionLimits};
@@ -885,6 +1043,27 @@ mod tests {
         OpenOptions as ObjectOpenOptions, Package as ObjectPackage, Targets,
     };
     use std::io::Cursor;
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn ordinary_edit_keeps_send_and_sync_auto_traits() {
+        fn assert_send_sync<T: Send + Sync>() {}
+
+        assert_send_sync::<Edit<'static>>();
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[allow(dead_code)]
+    fn accepts_borrowed_non_send_profiled_observer<'a>(
+        package: &'a crate::Package,
+        marker: &'a std::rc::Rc<std::cell::Cell<usize>>,
+    ) -> super::Result<Edit<'a, super::ProfiledOpen<'a>>> {
+        package.edit_profiled(
+            EditOptions::default(),
+            move |_| marker.set(marker.get().saturating_add(1)),
+            |_| {},
+        )
+    }
 
     fn package() -> crate::Package {
         package_with_paragraphs(1)

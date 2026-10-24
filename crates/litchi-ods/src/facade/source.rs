@@ -1435,6 +1435,20 @@ mod tests {
         writer.finish_to_bytes().expect("ODS package")
     }
 
+    fn non_repeated_package() -> Vec<u8> {
+        let content = format!(
+            r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}" xmlns:text="{TEXT}"><office:body><office:spreadsheet><table:table table:name="Sheet1"><table:table-row><table:table-cell office:value-type="string"><text:p>hello</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>world</text:p></table:table-cell></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#
+        );
+        let mut writer = litchi_odf_common::core::PackageWriter::new(
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
+        writer.set_mimetype(MIME).expect("ODS MIME");
+        writer
+            .add_file("content.xml", content.as_bytes())
+            .expect("ODS content");
+        writer.finish_to_bytes().expect("ODS package")
+    }
+
     #[test]
     fn source_projection_matches_owned_semantics_and_materializes_explicitly() {
         let bytes = package();
@@ -1576,22 +1590,19 @@ mod tests {
 
     #[test]
     fn source_edit_protection_is_lazy_and_shared_across_sequential_edits() {
-        let source = Arc::new(CountingSource::new(package()));
+        let source = Arc::new(CountingSource::new(non_repeated_package()));
         let spreadsheet =
             SourceBackedSpreadsheet::from_read_at(source.clone()).expect("source ODS");
         let after_open = source.reads();
 
         assert!(spreadsheet.edit_protection.get().is_none());
         let mut first = spreadsheet.edit_cells().expect("first edit");
-        let cached = spreadsheet
-            .edit_protection
-            .get()
-            .expect("protection cached after first edit");
-        assert_eq!(*cached, (false, Vec::new()));
+        assert!(spreadsheet.edit_protection.get().is_none());
         assert_eq!(source.reads(), after_open);
 
-        // The repeated physical row refusal is identical on the cached path.
-        assert!(
+        // A mutation initializes protection only when the first mutation
+        // needs it; construction itself remains read-free.
+        assert_eq!(
             first
                 .set_cell(
                     "Sheet1",
@@ -1599,8 +1610,14 @@ mod tests {
                     0,
                     Cell::new(CellValue::Text("changed".to_string()), "changed"),
                 )
-                .is_err()
+                .expect("cell mutation"),
+            Some(true)
         );
+        let cached = spreadsheet
+            .edit_protection
+            .get()
+            .expect("protection cached after first mutation");
+        assert_eq!(*cached, (false, Vec::new()));
         drop(first);
 
         let mut second = spreadsheet.edit_cells().expect("second edit");
@@ -1610,7 +1627,7 @@ mod tests {
             .expect("protection remains cached");
         assert!(ptr::eq(cached, reused));
         assert_eq!(source.reads(), after_open);
-        assert!(
+        assert_eq!(
             second
                 .set_cell(
                     "Sheet1",
@@ -1618,9 +1635,10 @@ mod tests {
                     0,
                     Cell::new(CellValue::Text("changed".to_string()), "changed"),
                 )
-                .is_err()
+                .expect("second cell mutation"),
+            Some(true)
         );
-        assert_eq!(second.changed_cells(), 0);
+        assert_eq!(second.changed_cells(), 1);
     }
 
     fn editable_package() -> Vec<u8> {

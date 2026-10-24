@@ -79,7 +79,7 @@ fn texts(package: &Package) -> Vec<String> {
     texts
 }
 
-fn commit(package: &Package, edit: impl FnOnce(&mut litchi_doc::Edit)) -> (Package, bool) {
+fn commit(package: &Package, edit: impl FnOnce(&mut litchi_doc::Edit<'static>)) -> (Package, bool) {
     let mut transaction = package.edit().unwrap();
     edit(&mut transaction);
     let commit = transaction.commit().unwrap();
@@ -347,7 +347,7 @@ fn structural_patches_invert_exactly() {
     );
 }
 
-type Operation = dyn Fn(&mut litchi_doc::Edit) -> litchi_doc::package::edit::Result<()>;
+type Operation = dyn Fn(&mut litchi_doc::Edit<'static>) -> litchi_doc::package::edit::Result<()>;
 
 /// Over the DOC corpus: every admitted structural edit publishes a document
 /// whose body reads back as expected, and every refusal is typed.
