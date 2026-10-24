@@ -66,8 +66,9 @@ use litchi_docx::{ToleranceReport, source_backed};
 use litchi_opc::{OpcPackage, SourceLimits};
 
 use super::signature::{self, Opened, Signature};
-use crate::error::{Code, Error, Result};
+use crate::error::{Code, Error, Result, Source};
 use crate::options::{OpenOptions, SourceMode};
+use crate::transaction::{Error as TransactionError, LimitKind};
 
 // The unified read adapter (M1 step R4a): element kinds and spec table,
 // typed nodes, path resolution and query access, the node view's members,
@@ -212,10 +213,10 @@ impl DocxOwner {
     /// before or during the read, and its error wins (records 0262, 0315).
     pub(crate) fn finish<T>(&self, result: Result<T>) -> Result<T> {
         if crate::path::fence::is_active(self.fence_key()) {
-            return result;
+            return normalize_transaction_limit(result);
         }
         self.ensure_current()?;
-        result
+        normalize_transaction_limit(result)
     }
 
     /// Validate every retained source before or after a public read; inside
@@ -241,6 +242,25 @@ impl DocxOwner {
     pub(crate) fn fence_key(&self) -> usize {
         std::ptr::from_ref(self).addr()
     }
+}
+
+/// The DOCX leaf calls its retained before/after pair
+/// `ProjectedXmlBytes`.  The unified transaction exposes that same charge as
+/// `SnapshotBytes`, so the facade keeps one error vocabulary even when lazy
+/// leaf admission rejects the source before a native step is published.
+fn normalize_transaction_limit<T>(result: Result<T>) -> Result<T> {
+    result.map_err(|error| match error.leaf() {
+        Source::DocxTransaction(litchi_docx::document::Error::Limit {
+            kind: litchi_docx::document::LimitKind::ProjectedXmlBytes,
+            observed,
+            maximum,
+        }) => Error::from(TransactionError::Limit {
+            kind: LimitKind::SnapshotBytes,
+            observed: *observed,
+            maximum: *maximum,
+        }),
+        _ => error,
+    })
 }
 
 impl Docx {

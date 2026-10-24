@@ -228,8 +228,8 @@ impl Run {
     }
     fn projected(&self) -> Result<litchi_docx::document::Snapshot> {
         match &self.edit {
-            WorkEdit::Eager(edit) => edit.projected(),
-            WorkEdit::Source(edit) => edit.projected(),
+            WorkEdit::Eager(edit) => Ok(edit.projected()?),
+            WorkEdit::Source(edit) => Ok(edit.projected()?),
         }
     }
     pub(crate) fn snapshot_bytes(&self) -> Result<usize> {

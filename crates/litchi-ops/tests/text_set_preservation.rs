@@ -271,8 +271,19 @@ mod docx {
 
     #[test]
     fn paragraph_anchors_and_fields_are_refused() {
-        for paragraph in [
+        // Direct paragraph bookmark markers have no visible text and are
+        // retained byte-for-byte by the paragraph writer.
+        let bookmarked = document(
             r#"<w:p><w:bookmarkStart w:id="1" w:name="b"/><w:r><w:t>Marked</w:t></w:r><w:bookmarkEnd w:id="1"/></w:p>"#,
+        );
+        let changed = bookmarked
+            .set("/body/p[1]", props! { "text" => "Replaced" })
+            .unwrap();
+        assert_eq!(text(&changed, "/body/p[1]"), "Replaced");
+        assert!(body(&changed).contains(r#"<w:bookmarkStart w:id="1" w:name="b"/>"#));
+        assert!(body(&changed).contains(r#"<w:bookmarkEnd w:id="1"/>"#));
+
+        for paragraph in [
             r#"<w:p><w:commentRangeStart w:id="0"/><w:r><w:t>Commented</w:t></w:r><w:commentRangeEnd w:id="0"/><w:r><w:commentReference w:id="0"/></w:r></w:p>"#,
             r#"<w:p><w:r><w:t>Page </w:t></w:r><w:fldSimple w:instr="PAGE"><w:r><w:t>1</w:t></w:r></w:fldSimple></w:p>"#,
             r#"<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText>PAGE</w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,

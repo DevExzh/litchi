@@ -8,7 +8,7 @@ use super::{
 use crate::Package;
 use litchi_core::Position;
 use litchi_core::patch::CompositionLimits;
-use std::cell::RefCell;
+use std::sync::{Mutex, TryLockError};
 
 mod chart;
 mod comments;
@@ -45,7 +45,7 @@ pub struct Edit<P = Package> {
     /// The native transaction is populated on the first operation (or
     /// projection/output query).  Keeping the source materializer here makes
     /// `Package::edit*` O(1) without introducing a fake empty snapshot.
-    inner: RefCell<Option<transaction::Edit>>,
+    inner: Mutex<Option<transaction::Edit>>,
     materializer: fn(&P, super::EditOptions) -> Result<transaction::Edit>,
     options: super::EditOptions,
     compaction: CompactionPolicy,
@@ -77,7 +77,7 @@ impl<P: Clone> Edit<P> {
         let compaction = inner.compaction_policy();
         Self {
             package,
-            inner: RefCell::new(Some(inner)),
+            inner: Mutex::new(Some(inner)),
             materializer: unavailable_materializer,
             options,
             compaction,
@@ -91,7 +91,7 @@ impl<P: Clone> Edit<P> {
     ) -> Self {
         Self {
             package,
-            inner: RefCell::new(None),
+            inner: Mutex::new(None),
             materializer,
             options,
             compaction: CompactionPolicy::default(),
@@ -105,32 +105,41 @@ impl<P: Clone> Edit<P> {
             .with_compaction_policy(self.compaction))
     }
 
-    pub(crate) fn inner_mut(&mut self) -> Result<&mut transaction::Edit> {
-        if self.inner.get_mut().is_none() {
-            let inner = self.build_inner()?;
-            *self.inner.get_mut() = Some(inner);
+    fn inner_slot_mut(&mut self) -> &mut Option<transaction::Edit> {
+        match self.inner.get_mut() {
+            Ok(slot) => slot,
+            Err(poisoned) => poisoned.into_inner(),
         }
-        self.inner
-            .get_mut()
+    }
+
+    pub(crate) fn inner_mut(&mut self) -> Result<&mut transaction::Edit> {
+        if self.inner_slot_mut().is_none() {
+            let inner = self.build_inner()?;
+            *self.inner_slot_mut() = Some(inner);
+        }
+        self.inner_slot_mut()
             .as_mut()
             .ok_or_else(|| deferred_error("document.edit"))
     }
 
     fn into_inner(mut self) -> Result<transaction::Edit> {
-        if self.inner.get_mut().is_none() {
+        if self.inner_slot_mut().is_none() {
             let inner = self.build_inner()?;
-            *self.inner.get_mut() = Some(inner);
+            *self.inner_slot_mut() = Some(inner);
         }
-        self.inner
-            .into_inner()
-            .ok_or_else(|| deferred_error("document.edit"))
+        let state = match self.inner.into_inner() {
+            Ok(state) => state,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        state.ok_or_else(|| deferred_error("document.edit"))
     }
 
     fn inner_ref<R>(&self, read: impl FnOnce(&transaction::Edit) -> R) -> Result<R> {
-        let mut state = self
-            .inner
-            .try_borrow_mut()
-            .map_err(|_| deferred_error("document.edit.borrow"))?;
+        let mut state = match self.inner.try_lock() {
+            Ok(state) => state,
+            Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+            Err(TryLockError::WouldBlock) => return Err(deferred_error("document.edit.borrow")),
+        };
         if state.is_none() {
             *state = Some(self.build_inner()?);
         }
@@ -150,8 +159,8 @@ impl<P: Clone> Edit<P> {
     /// native projection is retained.
     pub fn with_options(mut self, options: super::EditOptions) -> Self {
         self.options = options;
-        if let Some(inner) = self.inner.get_mut().take() {
-            *self.inner.get_mut() = Some(inner.with_options(options));
+        if let Some(inner) = self.inner_slot_mut().take() {
+            *self.inner_slot_mut() = Some(inner.with_options(options));
         }
         self
     }
@@ -734,7 +743,7 @@ impl<P: Clone> Edit<P> {
     #[must_use]
     pub fn remaining_operations(&self) -> usize {
         self.inner
-            .try_borrow()
+            .try_lock()
             .ok()
             .and_then(|state| state.as_ref().map(transaction::Edit::remaining_operations))
             .unwrap_or(transaction::MAX_OPERATIONS)
@@ -744,8 +753,8 @@ impl<P: Clone> Edit<P> {
     #[must_use]
     pub fn with_compaction_policy(mut self, policy: CompactionPolicy) -> Self {
         self.compaction = policy;
-        if let Some(inner) = self.inner.get_mut().take() {
-            *self.inner.get_mut() = Some(inner.with_compaction_policy(policy));
+        if let Some(inner) = self.inner_slot_mut().take() {
+            *self.inner_slot_mut() = Some(inner.with_compaction_policy(policy));
         }
         self
     }
@@ -762,10 +771,13 @@ impl<P: Clone> Edit<P> {
     /// Returns an allocation or operation admission error.
     pub fn try_clone(&self) -> Result<Self> {
         let inner = {
-            let state = self
-                .inner
-                .try_borrow()
-                .map_err(|_| deferred_error("document.edit.clone"))?;
+            let state = match self.inner.try_lock() {
+                Ok(state) => state,
+                Err(TryLockError::Poisoned(poisoned)) => poisoned.into_inner(),
+                Err(TryLockError::WouldBlock) => {
+                    return Err(deferred_error("document.edit.clone"));
+                },
+            };
             match state.as_ref() {
                 Some(inner) => Some(inner.try_clone()?),
                 None => None,
@@ -773,7 +785,7 @@ impl<P: Clone> Edit<P> {
         };
         Ok(Self {
             package: self.package.clone(),
-            inner: RefCell::new(inner),
+            inner: Mutex::new(inner),
             materializer: self.materializer,
             options: self.options,
             compaction: self.compaction,

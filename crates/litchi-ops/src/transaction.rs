@@ -381,6 +381,19 @@ impl fmt::Debug for Edit {
 }
 
 impl File {
+    /// Batch inputs are an externally supplied stream.  A signed file is a
+    /// protected write target, so reject it before asking the caller for even
+    /// one item.  Ordinary `edit` retains its exact no-op exception because a
+    /// closure can prove that it made no change; a batch cannot do that before
+    /// consuming its stream.
+    pub(crate) fn preflight_batch(&self) -> Result<()> {
+        if !self.is_signed() {
+            return Ok(());
+        }
+        check_source_for_replay(self)?;
+        Err(crate::Error::signed(self.format().ok_or_else(pending)?))
+    }
+
     /// Edit atomically through a closure, retaining a reversible patch and
     /// diagnostics. Integrates DOCX main-document writes, supported XLSX/XLSB
     /// cell and worksheet writes, immutable XLS cell writes, plus PPTX shape text,
@@ -1923,7 +1936,7 @@ impl Edit {
                 .as_mut()
                 .ok_or_else(|| crate::Error::new(Code::InternalError, "formatting run missing"))?;
             let changed = run.stage(plan, _index, _spelling)?;
-            let bytes = self.snapshot_bytes.saturating_add(run.snapshot_bytes());
+            let bytes = self.snapshot_bytes.saturating_add(run.snapshot_bytes()?);
             if bytes > self.limits.max_snapshot_bytes() {
                 return Err(Error::Limit {
                     kind: LimitKind::SnapshotBytes,

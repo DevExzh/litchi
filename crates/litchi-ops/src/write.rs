@@ -534,6 +534,9 @@ impl File {
             // the signature implicitly.
             let target = _target.into_target()?;
             let props = crate::Props::from_props(_props)?;
+            if props.is_empty() {
+                return Err(protected(self));
+            }
             let updated = signed.file().set(target, props)?;
             if !crate::transaction::same_content_for_replay(&updated, signed.file(), true)? {
                 return Err(protected(self));
