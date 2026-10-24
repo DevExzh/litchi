@@ -265,7 +265,11 @@ pub fn is_legacy_operation_storage(name: &str, data: &[u8]) -> bool {
 }
 
 fn new_archive_cache(archive_limits: ArchiveLimits) -> WeightedCache<String, Archive> {
-    WeightedCache::new(archive_limits.max_archive_bytes()).unwrap_or_else(|error| {
+    WeightedCache::new(
+        archive_limits.max_archive_bytes(),
+        WeightedCache::<String, Archive>::DEFAULT_MAX_FLIGHTS,
+    )
+    .unwrap_or_else(|error| {
         unreachable!("validated IWA archive limits cannot create a zero-weight cache: {error}")
     })
 }

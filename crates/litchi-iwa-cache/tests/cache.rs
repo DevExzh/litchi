@@ -24,11 +24,11 @@ fn boxed_error(message: &'static str) -> ParseError {
 #[test]
 fn rejects_invalid_capacity_and_weights() {
     assert!(matches!(
-        WeightedCache::<&str, usize>::new(0),
+        WeightedCache::<&str, usize>::new(0, WeightedCache::<&str, usize>::DEFAULT_MAX_FLIGHTS,),
         Err(WeightError::ZeroCapacity)
     ));
     assert!(matches!(
-        WeightedCache::<&str, usize>::new_with_limits(1, 0),
+        WeightedCache::<&str, usize>::new(1, 0),
         Err(WeightError::ZeroFlightCapacity)
     ));
 
@@ -150,7 +150,7 @@ fn failed_parse_is_not_cached_and_allows_retry() {
 #[test]
 fn active_parser_flights_are_bounded() {
     let cache = Arc::new(
-        WeightedCache::<&'static str, usize>::new_with_limits(4, 1)
+        WeightedCache::<&'static str, usize>::new(4, 1)
             .unwrap_or_else(|error| panic!("test cache construction failed: {error}")),
     );
     let parser_started = Arc::new(Barrier::new(2));
@@ -181,7 +181,7 @@ fn active_parser_flights_are_bounded() {
 #[test]
 fn invalidated_flight_still_counts_against_active_parser_limit() {
     let cache = Arc::new(
-        WeightedCache::<&'static str, usize>::new_with_limits(4, 1)
+        WeightedCache::<&'static str, usize>::new(4, 1)
             .unwrap_or_else(|error| panic!("test cache construction failed: {error}")),
     );
     let parser_started = Arc::new(Barrier::new(2));
@@ -238,8 +238,9 @@ fn reported_weights_are_validated_after_parsing() {
 
 #[test]
 fn borrowed_weighted_lookup_defers_owned_key_until_a_miss() {
-    let cache = WeightedCache::<String, usize>::new(4)
-        .unwrap_or_else(|error| panic!("test cache construction failed: {error}"));
+    let cache =
+        WeightedCache::<String, usize>::new(4, WeightedCache::<String, usize>::DEFAULT_MAX_FLIGHTS)
+            .unwrap_or_else(|error| panic!("test cache construction failed: {error}"));
     let key_constructions = AtomicUsize::new(0);
 
     let first = cache
@@ -302,8 +303,11 @@ fn invalidation_detaches_old_parser_generation() {
 }
 
 fn cache(max_weight: usize) -> WeightedCache<&'static str, usize> {
-    WeightedCache::new(max_weight)
-        .unwrap_or_else(|error| panic!("test cache construction failed: {error}"))
+    WeightedCache::new(
+        max_weight,
+        WeightedCache::<&'static str, usize>::DEFAULT_MAX_FLIGHTS,
+    )
+    .unwrap_or_else(|error| panic!("test cache construction failed: {error}"))
 }
 
 fn insert(

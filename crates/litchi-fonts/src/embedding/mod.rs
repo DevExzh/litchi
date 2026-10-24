@@ -60,16 +60,8 @@ pub struct Prepared {
 /// types, relationship IDs, and part names belong to the document adapters.
 /// Requests are processed in key order, making resolver calls and results
 /// deterministic regardless of `GlyphMap`'s hash iteration order.
+/// The caller supplies request and program-size bounds explicitly.
 pub fn prepare_with(
-    resolver: &impl Resolver,
-    used_glyphs: GlyphMap,
-    mode: Mode,
-) -> Result<Vec<Prepared>, FontError> {
-    prepare_with_limits(resolver, used_glyphs, mode, PreparationLimits::default())
-}
-
-/// Resolve and prepare fonts with explicit request and program-size bounds.
-pub fn prepare_with_limits(
     resolver: &impl Resolver,
     used_glyphs: GlyphMap,
     mode: Mode,
@@ -194,7 +186,12 @@ fn enforce_limit(resource: &'static str, actual: usize, limit: usize) -> Result<
 /// Discover and prepare fonts using the host's configured system font source.
 #[cfg(feature = "automatic")]
 pub fn prepare(used_glyphs: GlyphMap, mode: Mode) -> Result<Vec<Prepared>, FontError> {
-    prepare_with(&crate::discovery::Loader::new(), used_glyphs, mode)
+    prepare_with(
+        &crate::discovery::Loader::new(),
+        used_glyphs,
+        mode,
+        PreparationLimits::default(),
+    )
 }
 
 fn standalone(font: &mut FontData) -> Result<Vec<u8>, FontError> {
@@ -260,7 +257,13 @@ mod tests {
         glyphs.insert(Request::regular("Zulu"), crate::Glyphs::new());
         glyphs.insert(Request::regular("Alpha"), crate::Glyphs::new());
 
-        let prepared = prepare_with(&StaticResolver, glyphs, Mode::Full).expect("prepared fonts");
+        let prepared = prepare_with(
+            &StaticResolver,
+            glyphs,
+            Mode::Full,
+            PreparationLimits::default(),
+        )
+        .expect("prepared fonts");
         assert_eq!(
             prepared
                 .iter()
@@ -274,7 +277,12 @@ mod tests {
     #[test]
     fn subset_mode_requires_the_subset_capability() {
         assert!(matches!(
-            prepare_with(&StaticResolver, HashMap::new(), Mode::Subset),
+            prepare_with(
+                &StaticResolver,
+                HashMap::new(),
+                Mode::Subset,
+                PreparationLimits::default(),
+            ),
             Err(FontError::SubsettingUnavailable)
         ));
     }
@@ -288,7 +296,7 @@ mod tests {
             ..PreparationLimits::default()
         };
         assert!(matches!(
-            prepare_with_limits(&StaticResolver, glyphs, Mode::Full, limits),
+            prepare_with(&StaticResolver, glyphs, Mode::Full, limits),
             Err(FontError::LimitExceeded {
                 resource: "embedded-font requests",
                 ..
@@ -309,12 +317,11 @@ mod tests {
             ..PreparationLimits::default()
         };
         assert!(
-            prepare_with_limits(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,)
-                .is_ok()
+            prepare_with(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,).is_ok()
         );
         limits.max_family_name_bytes = 4;
         assert!(matches!(
-            prepare_with_limits(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,),
+            prepare_with(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,),
             Err(FontError::LimitExceeded {
                 resource: "font-family name",
                 limit: 4,
@@ -325,7 +332,7 @@ mod tests {
         limits = PreparationLimits::default();
         limits.max_glyphs_per_request = 2;
         assert!(
-            prepare_with_limits(
+            prepare_with(
                 &StaticResolver,
                 glyph_map("Alpha", "AB"),
                 Mode::Full,
@@ -335,7 +342,7 @@ mod tests {
         );
         limits.max_glyphs_per_request = 1;
         assert!(matches!(
-            prepare_with_limits(
+            prepare_with(
                 &StaticResolver,
                 glyph_map("Alpha", "AB"),
                 Mode::Full,
@@ -351,12 +358,11 @@ mod tests {
         limits = PreparationLimits::default();
         limits.max_program_bytes = 12;
         assert!(
-            prepare_with_limits(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,)
-                .is_ok()
+            prepare_with(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,).is_ok()
         );
         limits.max_program_bytes = 11;
         assert!(matches!(
-            prepare_with_limits(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,),
+            prepare_with(&StaticResolver, glyph_map("Alpha", "A"), Mode::Full, limits,),
             Err(FontError::LimitExceeded {
                 resource: "resolved font program",
                 limit: 11,
@@ -369,10 +375,10 @@ mod tests {
         two.insert(Request::regular("Zulu"), crate::Glyphs::new());
         limits = PreparationLimits::default();
         limits.max_total_program_bytes = 24;
-        assert!(prepare_with_limits(&StaticResolver, two.clone(), Mode::Full, limits).is_ok());
+        assert!(prepare_with(&StaticResolver, two.clone(), Mode::Full, limits).is_ok());
         limits.max_total_program_bytes = 23;
         assert!(matches!(
-            prepare_with_limits(&StaticResolver, two, Mode::Full, limits),
+            prepare_with(&StaticResolver, two, Mode::Full, limits),
             Err(FontError::LimitExceeded {
                 resource: "prepared font programs",
                 limit: 23,
