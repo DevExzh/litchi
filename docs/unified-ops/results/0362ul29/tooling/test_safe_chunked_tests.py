@@ -320,6 +320,24 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["status"], "failed")
 
+    def test_helper_unexpected_guard_exception_blocks_and_retains_artifact(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-chunked-guard-exception-") as raw:
+            directory = Path(raw)
+            command, target, artifact, marker, quarantine, log = self._command(
+                directory,
+                "import time; time.sleep(5)\n",
+            )
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            artifact.write_bytes(b"\x7fELFretained after guard failure")
+            artifact.chmod(0o751)
+            safe.MIN_FREE = 0
+            with mock.patch.object(safe, "_watch_target", side_effect=RuntimeError("injected helper guard failure")):
+                with self.assertRaisesRegex(RuntimeError, "target guard failed"):
+                    safe.execute(command, target, log, quarantine, 0)
+            self.assertTrue(artifact.exists())
+            self.assertFalse((quarantine / "manifest.jsonl").exists())
+            self.assertIn("safe_chunked_guard_failure", log.read_text(encoding="utf-8"))
+
     def test_gate_runner_live_guard_stops_a_non_chunk_command(self) -> None:
         with tempfile.TemporaryDirectory(prefix="safe-gate-live-guard-") as raw:
             directory = Path(raw)
@@ -370,6 +388,116 @@ class SafeChunkedLifecycleTests(unittest.TestCase):
                 process.wait()
                 guard.join(timeout=2)
                 runner.LIVE_TARGET = previous_live
+
+    def test_target_measurement_retries_a_transient_du_race(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-gate-du-retry-") as raw:
+            target = Path(raw) / "target"
+            target.mkdir()
+            results = [
+                subprocess.CompletedProcess(["du"], 1, "", "du: disappearing file\n"),
+                subprocess.CompletedProcess(["du"], 0, "123\t%s\n" % target, ""),
+            ]
+            with mock.patch.object(runner.subprocess, "run", side_effect=results) as run:
+                self.assertEqual(runner.target_bytes(target), 123)
+            self.assertEqual(run.call_count, 2)
+
+    def test_target_measurement_tolerates_concurrent_create_delete_rename(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-gate-du-concurrent-") as raw:
+            target = Path(raw) / "target"
+            target.mkdir()
+            work = target / "debug" / "race"
+            work.mkdir(parents=True)
+            stop = threading.Event()
+
+            def mutate() -> None:
+                for index in range(500):
+                    left = work / f"left-{index}"
+                    right = work / f"right-{index}"
+                    left.write_bytes(b"x" * 128)
+                    left.replace(right)
+                    right.unlink()
+                stop.set()
+
+            worker = threading.Thread(target=mutate)
+            worker.start()
+            samples = []
+            while not stop.is_set():
+                samples.append(runner.target_bytes(target))
+            worker.join(timeout=2)
+            samples.append(runner.target_bytes(target))
+            self.assertTrue(samples)
+            self.assertTrue(all(value >= 0 for value in samples))
+
+    def test_unexpected_guard_exception_kills_fake_command_and_records_failure(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-gate-guard-exception-") as raw:
+            directory = Path(raw)
+            target = directory / "target"
+            target.mkdir()
+            runner.enable_child_subreaper()
+            prelaunch = runner.process_table()
+            process = subprocess.Popen(
+                [sys.executable, "-c", "import time; time.sleep(5)"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            ownership = runner.new_ownership(process.pid, directory, target, prelaunch, runner.process_table())
+            stop = threading.Event()
+            overflow: list[dict] = []
+            errors: list[dict] = []
+            stats: dict = {}
+            guard = threading.Thread(
+                target=lambda: runner._run_target_guard(
+                    process, target, stop, overflow, errors, ownership, stats
+                )
+            )
+            try:
+                with mock.patch.object(runner, "_watch_target", side_effect=RuntimeError("injected monitor failure")):
+                    guard.start()
+                    guard.join(timeout=3)
+                self.assertFalse(guard.is_alive())
+                self.assertEqual(errors[0]["reason"], "target guard exception")
+                self.assertIn("injected monitor failure", errors[0]["error"])
+                process.wait(timeout=2)
+                self.assertIsNotNone(process.returncode)
+            finally:
+                stop.set()
+                if process.poll() is None:
+                    runner._terminate_owned_tree(process.pid, ownership, "test-cleanup")
+                process.wait()
+                guard.join(timeout=2)
+
+    def test_gate_runner_guard_records_persistent_measurement_failure(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="safe-gate-du-failure-") as raw:
+            directory = Path(raw)
+            target = directory / "target"
+            target.mkdir()
+            process = subprocess.Popen(
+                [sys.executable, "-c", "import time; time.sleep(5)"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            stop = threading.Event()
+            overflow: list[dict] = []
+            stats: dict = {}
+            guard = threading.Thread(
+                target=lambda: stats.update(runner._watch_target(process, target, stop, overflow))
+            )
+            try:
+                with mock.patch.object(runner, "target_bytes", side_effect=[0, RuntimeError("du race")]):
+                    guard.start()
+                    guard.join(timeout=3)
+                self.assertFalse(guard.is_alive())
+                self.assertEqual(overflow[0]["reason"], "target measurement failed")
+                self.assertIn("du race", overflow[0]["error"])
+                process.wait(timeout=2)
+            finally:
+                stop.set()
+                if process.poll() is None:
+                    runner._terminate_process_group(process)
+                process.wait()
+                guard.join(timeout=2)
 
     def test_gate_runner_live_guard_reaps_setsid_child(self) -> None:
         with tempfile.TemporaryDirectory(prefix="safe-gate-live-escaped-") as raw:

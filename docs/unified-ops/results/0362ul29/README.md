@@ -41,6 +41,10 @@ command starts only below `18,000,000,000` bytes, with at least 12 GB free
 disk. The helper uses chunk size 2; planning tests
 assert that all test and example targets occur exactly once, so shrinking the
 chunks cannot drop work. No historical target cleanup is used.
+Target-size sampling retries transient `du` races caused by Cargo renames; a
+persistent measurement error or any unexpected watcher exception is recorded
+with its last sample and process cleanup, then fails the command and prevents
+artifact retirement.
 
 ## Preserved command-count receipt
 

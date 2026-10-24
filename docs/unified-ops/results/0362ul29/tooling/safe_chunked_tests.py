@@ -23,12 +23,15 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 
 MAX_TARGET = 20_000_000_000
 LIVE_TARGET = 19_000_000_000
 START_TARGET = 18_000_000_000
 MIN_FREE = 12_000_000_000
 TARGET_POLL_SECONDS = 0.1
+TARGET_MEASURE_RETRIES = 5
+TARGET_MEASURE_DELAY_SECONDS = 0.02
 PROCESS_KILL_GRACE_SECONDS = 1.0
 DESCENDANT_WAIT_SECONDS = 2.0
 PR_SET_CHILD_SUBREAPER = 36
@@ -93,7 +96,25 @@ def digest(path: Path) -> str:
 def target_bytes(target: Path) -> int:
     if not target.exists():
         return 0
-    return int(subprocess.check_output(["du", "-sb", str(target)], text=True).split()[0])
+    last_error: str | None = None
+    for attempt in range(TARGET_MEASURE_RETRIES):
+        result = subprocess.run(
+            ["du", "-sb", str(target)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=False,
+        )
+        fields = result.stdout.split()
+        if result.returncode == 0 and fields:
+            try:
+                return int(fields[0])
+            except ValueError:
+                pass
+        last_error = f"du exit={result.returncode}: {result.stderr.strip()[-500:]}"
+        if attempt + 1 < TARGET_MEASURE_RETRIES:
+            time.sleep(TARGET_MEASURE_DELAY_SECONDS)
+    raise RuntimeError(f"target measurement failed after {TARGET_MEASURE_RETRIES} attempts: {last_error}")
 
 
 def _terminate_process_group(process: subprocess.Popen) -> None:
@@ -241,12 +262,46 @@ def _watch_target(
     baseline: set[tuple[int, int]] | None = None,
 ) -> dict:
     """Sample target growth and stop a command before the hard cap."""
-    maximum = target_bytes(target)
+    try:
+        maximum = target_bytes(target)
+    except Exception as error:
+        detail = {
+            "reason": "target measurement failed",
+            "error": repr(error),
+            "samples": 0,
+            "last_sampled_bytes": None,
+        }
+        overflow.append(detail)
+        if baseline is not None:
+            _, owned = _owned_descendants(process, baseline)
+            _signal_owned(process, owned, signal.SIGTERM)
+        _terminate_process_group(process)
+        if baseline is not None:
+            remaining, forced = _wait_for_descendants(process, baseline)
+            detail["cleanup"] = {"remaining_descendants": remaining, "forced_cleanup": forced}
+        return {"max_sampled_bytes": None, "samples": 0, "live_target": LIVE_TARGET, "measurement_error": repr(error)}
     samples = 0
     while not stop.wait(TARGET_POLL_SECONDS):
         if process.poll() is not None:
             break
-        size = target_bytes(target)
+        try:
+            size = target_bytes(target)
+        except Exception as error:
+            detail = {
+                "reason": "target measurement failed",
+                "error": repr(error),
+                "samples": samples,
+                "last_sampled_bytes": maximum,
+            }
+            overflow.append(detail)
+            if baseline is not None:
+                _, owned = _owned_descendants(process, baseline)
+                _signal_owned(process, owned, signal.SIGTERM)
+            _terminate_process_group(process)
+            if baseline is not None:
+                remaining, forced = _wait_for_descendants(process, baseline)
+                detail["cleanup"] = {"remaining_descendants": remaining, "forced_cleanup": forced}
+            break
         maximum = max(maximum, size)
         samples += 1
         if size >= LIVE_TARGET:
@@ -254,6 +309,7 @@ def _watch_target(
                 "target_bytes": size,
                 "live_target": LIVE_TARGET,
                 "max_sampled_bytes": maximum,
+                "last_sampled_bytes": size,
                 "samples": samples,
             }
             overflow.append(detail)
@@ -266,6 +322,35 @@ def _watch_target(
                 detail["cleanup"] = {"remaining_descendants": remaining, "forced_cleanup": forced}
             break
     return {"max_sampled_bytes": maximum, "samples": samples, "live_target": LIVE_TARGET}
+
+
+def _run_target_guard(
+    process: subprocess.Popen,
+    target: Path,
+    stop: threading.Event,
+    overflow: list[dict],
+    errors: list[dict],
+    baseline: set[tuple[int, int]],
+    stats: dict,
+) -> None:
+    """Convert any watcher exception into a recorded, fail-closed cleanup."""
+    try:
+        stats.update(_watch_target(process, target, stop, overflow, baseline))
+    except BaseException as error:
+        detail = {
+            "reason": "target guard exception",
+            "error": repr(error),
+            "traceback": traceback.format_exc(),
+        }
+        try:
+            _, owned = _owned_descendants(process, baseline)
+            _signal_owned(process, owned, signal.SIGTERM)
+            _terminate_process_group(process)
+            remaining, forced = _wait_for_descendants(process, baseline)
+            detail["cleanup"] = {"remaining_descendants": remaining, "forced_cleanup": forced}
+        except BaseException as cleanup_error:
+            detail["cleanup_error"] = repr(cleanup_error)
+        errors.append(detail)
 
 
 def _append_manifest(path: Path, row: dict) -> None:
@@ -422,6 +507,7 @@ def execute(
     }
     guard_stop = threading.Event()
     overflow: list[dict] = []
+    guard_errors: list[dict] = []
     guard_stats: dict = {}
     with log.open("w", encoding="utf-8") as stream:
         process = subprocess.Popen(
@@ -432,7 +518,7 @@ def execute(
             start_new_session=True,
         )
         guard = threading.Thread(
-            target=lambda: guard_stats.update(_watch_target(process, target, guard_stop, overflow, baseline)),
+            target=lambda: _run_target_guard(process, target, guard_stop, overflow, guard_errors, baseline, guard_stats),
             name=f"target-guard-{process.pid}",
             daemon=True,
         )
@@ -463,6 +549,9 @@ def execute(
         guard_stop.set()
         guard.join()
         descendants, forced_cleanup = _wait_for_descendants(process, baseline)
+        if guard_errors:
+            stream.write(json.dumps({"safe_chunked_guard_failure": guard_errors[0]}, sort_keys=True) + "\n")
+            stream.flush()
         if descendants or forced_cleanup:
             detail = {
                 "process_group": process.pid,
@@ -473,6 +562,8 @@ def execute(
             stream.write(json.dumps({"safe_chunked_descendant_guard": detail}, sort_keys=True) + "\n")
             stream.flush()
             raise RuntimeError(f"Cargo descendant lifetime required forced cleanup: {detail}")
+        if guard_errors:
+            raise RuntimeError(f"Cargo target guard failed: {guard_errors[0]}")
         if overflow:
             detail = {**overflow[0], "command_exit": status}
             stream.write(json.dumps({"safe_chunked_live_guard": detail}, sort_keys=True) + "\n")
