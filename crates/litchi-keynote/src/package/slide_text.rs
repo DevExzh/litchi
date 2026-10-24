@@ -23,7 +23,7 @@ use litchi_iwa_text::{TextPosition, TextSpan};
 use litchi_iwa_text_wire::{RewriteBehavior, RewriteLimits};
 use thiserror::Error as ThisError;
 
-use super::edit::OwnedSlideSelector;
+use super::edit::{OwnedSlideSelector, SelectorError};
 use super::{
     NOTE_MESSAGE_TYPE, PLACEHOLDER_MESSAGE_TYPE, Package, PhysicalSource, ReadError,
     SHAPE_INFO_MESSAGE_TYPE, SLIDE_MESSAGE_TYPE, STORAGE_MESSAGE_TYPE, SemanticBudget,
@@ -57,6 +57,8 @@ pub enum LimitKind {
     TextFragments,
     /// Aggregate semantic text bytes.
     TextBytes,
+    /// Caller bytes retained by the deferred selector.
+    SelectorBytes,
     /// UTF-16 code units in one native text storage.
     TextUnits,
     /// Bytes in one protobuf payload.
@@ -82,6 +84,7 @@ impl fmt::Display for LimitKind {
             Self::TextStorages => "text storages",
             Self::TextFragments => "text fragments",
             Self::TextBytes => "text bytes",
+            Self::SelectorBytes => "selector bytes",
             Self::TextUnits => "text UTF-16 units",
             Self::WireBytes => "wire bytes",
             Self::WireFields => "wire fields",
@@ -316,15 +319,22 @@ impl<'a> Edit<'a> {
         source: &'a Package,
         selector: impl Into<SlideSelector<'selector>>,
         role: Kind,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
+            selector.into(),
+            source.semantic_limits().max_text_bytes(),
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
+        Ok(Self {
             source,
-            slide: OwnedSlideSelector::from_selector(selector.into()),
+            slide,
             role,
             position: OnceLock::new(),
             snapshot: OnceLock::new(),
             operation: None,
-        }
+        })
     }
 
     fn resolve(&self) -> Result<&TextSnapshot, Error> {
@@ -861,16 +871,18 @@ impl Package {
     ///
     /// # Costs
     ///
-    /// The edit retains only the source and selector at entry. It resolves the
-    /// selected placeholder and owns one bounded text copy on the first value
-    /// read, staged operation, or commit.
+    /// The edit retains only the source and selector at entry. The selector
+    /// name is admitted against the package's finite selector-byte limit;
+    /// resolution of the selected placeholder and ownership of one bounded
+    /// text copy wait for the first value read, staged operation, or commit.
     ///
     /// # Errors
     ///
     /// Returns [`Refusal::UnsupportedKind`] for
-    /// [`Kind::SlideNumber`] at entry. Selector, missing-placeholder, source,
-    /// limit, allocation, and dependency errors are deferred until the first
-    /// value read, staged operation, or commit.
+    /// [`Kind::SlideNumber`] at entry. Selector-resolution,
+    /// missing-placeholder, source, limit, allocation, and dependency errors
+    /// are deferred until the first value read, staged operation, or commit;
+    /// selector-byte admission is checked at entry.
     pub fn edit_slide_text<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
@@ -879,7 +891,7 @@ impl Package {
         if role == Kind::SlideNumber {
             return Err(Error::Refused(Refusal::UnsupportedKind { kind: role }));
         }
-        Ok(Edit::new(self, selector, role))
+        Edit::new(self, selector, role)
     }
 
     /// Start one selector-first slide-title edit.
@@ -999,6 +1011,17 @@ fn resolve_position(package: &Package, selector: SlideSelector<'_>) -> Result<Po
             .map_err(map_slide_selector_error)?
             .map(|slide| Position::new(slide.index()))
             .ok_or(Error::Refused(Refusal::SlideNameNotFound)),
+    }
+}
+
+fn map_selector_error(error: SelectorError) -> Error {
+    match error {
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 

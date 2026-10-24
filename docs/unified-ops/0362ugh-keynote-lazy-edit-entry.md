@@ -20,6 +20,14 @@ aspect request is recorded as a compact flag and applied to the source
 arrangement at read/commit time. Complete arrangement replacement supersedes
 those flags, matching the prior setter ordering semantics.
 
+The retained selector names are admitted before ownership: each edit uses its
+opened package's finite `semantic_limits().max_text_bytes()` as the selector
+byte ceiling, reserves the exact UTF-8 copy fallibly, and reports the typed
+`SelectorBytes` limit before constructing an `Arc<str>`. Chart edits charge
+their slide and chart names cumulatively; positional selectors consume no
+selector bytes. This check is local and O(1), so it does not restore the
+package-wide show or chart-name scan to `edit_*()` entry.
+
 The deferred paths preserve the existing native ownership checks, typed
 refusals, limits, exact no-op commits, source-bound patches, candidate
 verification, and redacted debug output. Because selector and value accessors

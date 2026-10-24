@@ -41,7 +41,7 @@ use litchi_iwa_protos::chart_arrangement_codec::{
 use thiserror::Error as ThisError;
 
 use super::chart_axis_support::{self, AxisSupportBudget, AxisSupportError};
-use super::edit::{OwnedChartSelector, OwnedSlideSelector};
+use super::edit::{OwnedChartSelector, OwnedSlideSelector, SelectorError};
 use super::slide_chart_title::{
     ChartSelection, Error as ChartTitleError, select_chart, select_chart_with_budget, select_charts,
 };
@@ -86,6 +86,8 @@ pub enum LimitKind {
     RetainedBytes,
     /// Temporary candidate bytes required by the lazy codec.
     ScratchBytes,
+    /// Caller bytes retained by the deferred selectors.
+    SelectorBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -106,6 +108,7 @@ impl fmt::Display for LimitKind {
             Self::ArrangementBytes => "chart arrangement bytes",
             Self::RetainedBytes => "retained bytes",
             Self::ScratchBytes => "scratch bytes",
+            Self::SelectorBytes => "selector bytes",
         })
     }
 }
@@ -240,16 +243,30 @@ impl<'a> Edit<'a> {
         source: &'a Package,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        let maximum_selector_bytes = source.semantic_limits().max_text_bytes();
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
+            slide_selector.into(),
+            maximum_selector_bytes,
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
+        let chart = OwnedChartSelector::from_selector(
+            chart_selector.into(),
+            maximum_selector_bytes,
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
+        Ok(Self {
             source,
-            slide: OwnedSlideSelector::from_selector(slide_selector.into()),
-            chart: OwnedChartSelector::from_selector(chart_selector.into()),
+            slide,
+            chart,
             selection: OnceLock::new(),
             after: None,
             locked: None,
             constrain_proportions: None,
-        }
+        })
     }
 
     fn resolve(&self) -> Result<&(ChartSelection, ChartArrangement), Error> {
@@ -428,6 +445,17 @@ impl<'a> Edit<'a> {
             },
             diagnostics: Diagnostics::published(),
         })
+    }
+}
+
+fn map_selector_error(error: SelectorError) -> Error {
+    match error {
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 
@@ -666,13 +694,14 @@ impl Package {
     ///
     /// Entry retains only the source and the archive-free selectors. Chart
     /// graph selection and arrangement decoding are deferred until a value is
-    /// read, an aspect is staged, or the edit is committed.
+    /// read, an aspect is staged, or the edit is committed. Selector names are
+    /// admitted against the package's finite selector-byte limit at entry.
     pub fn edit_slide_chart_arrangement<'slide, 'chart>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
     ) -> Result<Edit<'_>, Error> {
-        Ok(Edit::new(self, slide_selector, chart_selector))
+        Edit::new(self, slide_selector, chart_selector)
     }
 
     /// Apply an exact-source-checked chart-arrangement patch.
@@ -1832,7 +1861,8 @@ fn axis_support_budget_error(error: Error) -> AxisSupportError {
                     LimitKind::WireWork => chart_axis_support::AxisSupportLimitKind::WireWork,
                     LimitKind::ArrangementBytes
                     | LimitKind::RetainedBytes
-                    | LimitKind::ScratchBytes => {
+                    | LimitKind::ScratchBytes
+                    | LimitKind::SelectorBytes => {
                         chart_axis_support::AxisSupportLimitKind::TotalBytes
                     },
                     LimitKind::Allocations => unreachable!(),
@@ -1919,6 +1949,7 @@ fn map_chart_title_limit(kind: super::slide_chart_title::LimitKind) -> LimitKind
         ChartTitleLimitKind::TotalBytes => LimitKind::TotalBytes,
         ChartTitleLimitKind::Slides => LimitKind::Slides,
         ChartTitleLimitKind::References => LimitKind::References,
+        ChartTitleLimitKind::SelectorBytes => LimitKind::SelectorBytes,
         ChartTitleLimitKind::WireFields => LimitKind::WireFields,
         ChartTitleLimitKind::WireNesting => LimitKind::WireNesting,
         ChartTitleLimitKind::WireWork => LimitKind::WireWork,

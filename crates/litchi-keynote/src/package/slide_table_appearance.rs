@@ -30,7 +30,7 @@ use litchi_iwa_protos::package_metadata_codec::{
 use litchi_iwa_protos::{table_appearance_codec as appearance_codec, table_info_codec};
 use thiserror::Error as ThisError;
 
-use super::edit::OwnedSlideSelector;
+use super::edit::{OwnedSlideSelector, SelectorError};
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::selector::SlideSelector;
 use crate::slide::table::{
@@ -99,10 +99,14 @@ pub enum LimitKind {
     Retained,
     Scratch,
     TransactionWork,
+    SelectorBytes,
 }
 
 impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if matches!(self, Self::SelectorBytes) {
+            return formatter.write_str("selector bytes");
+        }
         write!(formatter, "{self:?}")
     }
 }
@@ -1127,15 +1131,23 @@ impl Package {
     ///
     /// Entry retains only the source and archive-free selectors. Table graph
     /// selection and appearance decoding are deferred until a value is read
-    /// or the edit is committed.
+    /// or the edit is committed. Selector names are admitted against the
+    /// package's finite selector-byte limit at entry.
     pub fn edit_slide_table_appearance<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
     ) -> Result<Edit<'_>, Error> {
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
+            slide.into(),
+            self.semantic_limits().max_text_bytes(),
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
         Ok(Edit {
             source: self,
-            slide: OwnedSlideSelector::from_selector(slide.into()),
+            slide,
             table: table.into(),
             selection: OnceLock::new(),
             after: None,
@@ -1145,6 +1157,17 @@ impl Package {
     /// Apply an exact-source reversible appearance patch.
     pub fn apply_slide_table_appearance(&self, patch: &Patch) -> Result<Commit, Error> {
         apply_patch(self, patch)
+    }
+}
+
+fn map_selector_error(error: SelectorError) -> Error {
+    match error {
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 

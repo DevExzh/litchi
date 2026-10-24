@@ -28,7 +28,7 @@ use litchi_iwa_core::{
 use litchi_iwa_protos::{package_metadata_codec, table_info_codec, table_model_discovery_codec};
 use thiserror::Error as ThisError;
 
-use super::edit::OwnedSlideSelector;
+use super::edit::{OwnedSlideSelector, SelectorError};
 use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
 use crate::SlideSelector;
 use crate::slide::table::TableSelector;
@@ -67,6 +67,7 @@ pub enum LimitKind {
     Retained,
     Scratch,
     Components,
+    SelectorBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -87,6 +88,7 @@ impl fmt::Display for LimitKind {
             Self::Retained => "retained bytes",
             Self::Scratch => "scratch bytes",
             Self::Components => "components",
+            Self::SelectorBytes => "selector bytes",
         })
     }
 }
@@ -844,14 +846,23 @@ impl Package {
     ///
     /// Entry retains only the source and archive-free selectors. Table graph
     /// selection is deferred until a value is read or the edit is committed.
+    /// Selector names are admitted against the package's finite selector-byte
+    /// limit at entry.
     pub fn edit_slide_table_lock_state<'slide>(
         &self,
         slide: impl Into<SlideSelector<'slide>>,
         table: impl Into<TableSelector>,
     ) -> Result<Edit<'_>, Error> {
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
+            slide.into(),
+            self.semantic_limits().max_text_bytes(),
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
         Ok(Edit {
             source: self,
-            slide: OwnedSlideSelector::from_selector(slide.into()),
+            slide,
             table: table.into(),
             after: None,
             selection: OnceLock::new(),
@@ -880,6 +891,17 @@ impl Package {
             });
         }
         reopen_patch(self, patch, current.admission_budget)
+    }
+}
+
+fn map_selector_error(error: SelectorError) -> Error {
+    match error {
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 

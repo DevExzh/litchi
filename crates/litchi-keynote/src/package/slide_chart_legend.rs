@@ -1419,6 +1419,10 @@ fn map_chart_title_limit(kind: super::slide_chart_title::LimitKind) -> LimitKind
         ChartTitleLimitKind::TotalBytes => LimitKind::TotalBytes,
         ChartTitleLimitKind::Slides => LimitKind::Slides,
         ChartTitleLimitKind::References => LimitKind::References,
+        // The shared graph proof does not retain caller selector names for
+        // legend reads; keep this defensive forwarding path in the family's
+        // aggregate byte category.
+        ChartTitleLimitKind::SelectorBytes => LimitKind::LegendBytes,
         ChartTitleLimitKind::WireFields => LimitKind::WireFields,
         ChartTitleLimitKind::WireNesting => LimitKind::WireNesting,
         ChartTitleLimitKind::WireWork => LimitKind::WireWork,

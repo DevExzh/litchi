@@ -29,7 +29,7 @@ use thiserror::Error as ThisError;
 
 use super::Package;
 use super::chart_axis_support::{self, AxisSupportBudget, AxisSupportError};
-use super::edit::{OwnedChartSelector, OwnedSlideSelector};
+use super::edit::{OwnedChartSelector, OwnedSlideSelector, SelectorError};
 use super::slide_chart_title::{
     self, ChartGraphScanBudget, ChartSelection, Error as ChartTitleError,
     LimitKind as ChartTitleLimitKind, select_chart_with_budget,
@@ -86,6 +86,8 @@ pub enum LimitKind {
     Allocations,
     /// Bytes retained by the data view.
     RetainedBytes,
+    /// Caller bytes retained by the deferred selectors.
+    SelectorBytes,
     /// Number of borrowed row/column labels.
     LabelCount,
     /// Candidate output bytes.
@@ -117,6 +119,7 @@ impl fmt::Display for LimitKind {
             Self::TotalBytes => "total bytes",
             Self::Allocations => "allocations",
             Self::RetainedBytes => "retained bytes",
+            Self::SelectorBytes => "selector bytes",
             Self::LabelCount => "label count",
             Self::OutputBytes => "output bytes",
             Self::ScratchBytes => "scratch bytes",
@@ -522,16 +525,31 @@ impl Package {
     ///
     /// Entry retains only the source and the archive-free selectors. Chart
     /// graph selection and data decoding are deferred until a value is read
-    /// or the edit is committed.
+    /// or the edit is committed. Selector names are admitted against the
+    /// package's finite selector-byte limit at entry.
     pub fn edit_slide_chart_data<'slide, 'chart>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
     ) -> Result<Edit<'_>, Error> {
+        let maximum_selector_bytes = self.semantic_limits().max_text_bytes();
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
+            slide_selector.into(),
+            maximum_selector_bytes,
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
+        let chart = OwnedChartSelector::from_selector(
+            chart_selector.into(),
+            maximum_selector_bytes,
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
         Ok(Edit {
             source: self,
-            slide: OwnedSlideSelector::from_selector(slide_selector.into()),
-            chart: OwnedChartSelector::from_selector(chart_selector.into()),
+            slide,
+            chart,
             selection: OnceLock::new(),
             after: None,
         })
@@ -634,6 +652,17 @@ impl Package {
             patch: patch.clone(),
             diagnostics: Diagnostics::published(deleted_previews),
         })
+    }
+}
+
+fn map_selector_error(error: SelectorError) -> Error {
+    match error {
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 
@@ -1693,6 +1722,7 @@ fn map_title_limit_kind(kind: ChartTitleLimitKind) -> LimitKind {
         ChartTitleLimitKind::TextStorages => LimitKind::TextStorages,
         ChartTitleLimitKind::TextFragments => LimitKind::TextFragments,
         ChartTitleLimitKind::TextBytes | ChartTitleLimitKind::TitleBytes => LimitKind::TextBytes,
+        ChartTitleLimitKind::SelectorBytes => LimitKind::SelectorBytes,
         ChartTitleLimitKind::WireFields => LimitKind::WireFields,
         ChartTitleLimitKind::WireNesting => LimitKind::WireNesting,
         ChartTitleLimitKind::WireWork => LimitKind::WireWork,

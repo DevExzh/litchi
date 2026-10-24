@@ -41,7 +41,7 @@ use litchi_iwa_protos::keynote_chart_title_codec::{
 use thiserror::Error as ThisError;
 
 use super::chart_axis_support::{self, AxisSupportBudget, AxisSupportError};
-use super::edit::{OwnedChartSelector, OwnedSlideSelector};
+use super::edit::{OwnedChartSelector, OwnedSlideSelector, SelectorError};
 use super::{
     Package, PhysicalSource, ReadError, SLIDE_MESSAGE_TYPE, SemanticLimitKind, SlideRecord,
     unique_payload,
@@ -98,6 +98,8 @@ pub enum LimitKind {
     WireWork,
     /// UTF-8 bytes in one visible chart title.
     TitleBytes,
+    /// Caller bytes retained by the deferred selectors.
+    SelectorBytes,
 }
 
 impl fmt::Display for LimitKind {
@@ -118,6 +120,7 @@ impl fmt::Display for LimitKind {
             Self::WireNesting => "wire nesting",
             Self::WireWork => "wire work",
             Self::TitleBytes => "chart title bytes",
+            Self::SelectorBytes => "selector bytes",
         })
     }
 }
@@ -243,14 +246,28 @@ impl<'a> Edit<'a> {
         source: &'a Package,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, Error> {
+        let maximum_selector_bytes = source.semantic_limits().max_text_bytes();
+        let mut selector_bytes = 0;
+        let slide = OwnedSlideSelector::from_selector(
+            slide_selector.into(),
+            maximum_selector_bytes,
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
+        let chart = OwnedChartSelector::from_selector(
+            chart_selector.into(),
+            maximum_selector_bytes,
+            &mut selector_bytes,
+        )
+        .map_err(map_selector_error)?;
+        Ok(Self {
             source,
-            slide: OwnedSlideSelector::from_selector(slide_selector.into()),
-            chart: OwnedChartSelector::from_selector(chart_selector.into()),
+            slide,
+            chart,
             selection: OnceLock::new(),
             after: None,
-        }
+        })
     }
 
     fn resolve(&self) -> Result<&ChartSelection, Error> {
@@ -434,6 +451,17 @@ impl<'a> Edit<'a> {
             },
             diagnostics: Diagnostics::published(deleted_previews),
         })
+    }
+}
+
+fn map_selector_error(error: SelectorError) -> Error {
+    match error {
+        SelectorError::Limit { observed, maximum } => Error::Limit {
+            kind: LimitKind::SelectorBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        SelectorError::Allocation { amount } => Error::Allocation { amount },
     }
 }
 
@@ -656,13 +684,14 @@ impl Package {
     ///
     /// Entry retains only the source and the archive-free selectors. Chart
     /// graph selection and title decoding are deferred until a value is read
-    /// or the edit is committed.
+    /// or the edit is committed. Selector names are admitted against the
+    /// package's finite selector-byte limit at entry.
     pub fn edit_slide_chart_title<'slide, 'chart>(
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
     ) -> Result<Edit<'_>, Error> {
-        Ok(Edit::new(self, slide_selector, chart_selector))
+        Edit::new(self, slide_selector, chart_selector)
     }
 
     /// Apply an exact-source-checked chart-title patch.
