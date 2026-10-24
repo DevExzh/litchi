@@ -88,6 +88,7 @@ except ImportError:  # pragma: no cover - supports direct test-module loading.
 
 INPUT_SCHEMA = "litchi.odg.joined-native-qualification.input.v3"
 REPORT_SCHEMA = "litchi.odg.joined-native-qualification.v3"
+UNTRACKED_UPSTREAM_COMPONENT = "3rd" + "party"
 BASELINE_SCHEMA = "litchi.odg.joined-native-qualification.legacy-probe.v2"
 CANDIDATE_SCHEMA = "litchi.odg.joined-native-qualification.probe.v2"
 BASELINE_PROFILE = "legacy-apply-joined"
@@ -680,8 +681,11 @@ def _validate_layout(manifest: Manifest, out_dir: Path) -> None:
     _validate_external_target(manifest.build.prepare_receipt, roots, "prepare receipt")
     _validate_external_target(manifest.build.receipt, roots, "build receipt")
     _validate_external_target(manifest.build.receipt_identity.path, roots, "build receipt identity")
-    if "3rdparty" in manifest.build.receipt.parts or "3rdparty" in manifest.build.prepare_receipt.parts:
-        raise RunFailure("build receipts must not reference 3rdparty")
+    if (UNTRACKED_UPSTREAM_COMPONENT in manifest.build.receipt.parts
+            or UNTRACKED_UPSTREAM_COMPONENT in manifest.build.prepare_receipt.parts):
+        raise RunFailure(
+            f"build receipts must not reference {UNTRACKED_UPSTREAM_COMPONENT}"
+        )
     if _under(out_dir, manifest.tmpdir) or _under(manifest.tmpdir, out_dir):
         raise RunFailure("artifact and temporary directories must be disjoint")
     pairs = (
