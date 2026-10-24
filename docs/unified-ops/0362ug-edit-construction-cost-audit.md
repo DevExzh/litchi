@@ -250,3 +250,99 @@ by 0351 §2.4.2.
 The four owned build slots now cover composed iWork, composed XLSX, XLSB and
 DOCX. PPT runtime validation remains queued. Native endpoints stay unresolved
 until final source freeze; no required engineering work is waived.
+
+## Validation follow-up, 2026-10-24
+
+Pages correction `57b14d3f2a` clears scoped review of all three new persistent
+lazy ledgers (table name, appearance and merge). Failed resolution retains the
+charged ledger and the next attempt reuses it; typed retry tests cover the
+operation-work ceilings. The modified name Edit's Debug now reports presence
+and byte count only. The coordinator verified the final Pages log: 719 tests
+across 61 result blocks, with no failures or ignored tests, and actual root
+configuration matching the source. Strict Pages Clippy also passes. Remaining
+combined iWork consumers and the final receipt are still in progress.
+
+DOCX validation corrections clear review at `d85c59cf91`. Signature admission
+uses the retained physical source before the effective-topology branch, so a
+chained deferred edit does not fail by demanding a materialized package.
+Formatting consumers force their deferred projections; typed errors,
+no-op/signature behavior, retry state and bounded paragraph routes remain.
+Full runtime validation continues. XLSB validation corrections clear independent
+review at `51c8628446`; their runtime/consumer checks continue. XLSX corrections
+through `8c39f97fe1`
+clear review; the later `d486a2490f` only forces the first data-model read in
+three refusal tests. Its combined runtime validation continues.
+
+The PPT validation leaf is composed with integration `d0e1782f9b` at
+`7ae7e9144b`, retaining the reviewed native source-fence correction. It awaits
+the next build slot. The final gate runner's first post-exit successor
+`7f8b1a01e5` passes its verifier but is returned: a detached `setsid()` helper
+can escape the current process-group lookup and write the target after a pass.
+An independent controlled reproduction establishes the gap. Ownership tracking
+and its detached-child regression must be corrected before final gate use.
+
+Gate successor `c196274831` closes that return and is merged at `72d106cfac`.
+The runner captures PID/start-time identities during a step and adopts new
+subreaper children without relying on cwd or command-line paths. The final
+regression covers `setsid`, `chdir("/")` and a delayed write through an
+inherited target descriptor; the predecessor fails that case. The coordinator
+independently verified the regression and byte-exact patch reproduction.
+Attempt-specific logs preserve retry provenance. This clears the runner for
+execution; it does not count as running the 53-step gate.
+
+The composed iWork ops check passes at `5ac9b25891`. That older non-iWork
+source boundary requires direct XLS/PPT metadata property access in its bench
+example. The actual merged XLS getter remains infallible; the queued PPT
+packet must migrate its own getter call when it merges. Standalone fuzz validation found one missed
+fallible Keynote `position()` result; `a0bf134246` now observes the error and
+returns before further work. The rerun passes with only the three pre-existing
+unused media constants. The final iWork harness check and receipt remain open.
+
+
+## Reviewed assembly merges, 2026-10-24
+
+Composed iWork source `a0bf134246` and receipt `4441c86bbe` merge at
+`9ea602e0e1`. The coordinator independently verified all successful and
+reported diagnostic logs, actual root configuration, three lock identities,
+and the minimal harness lock delta. Final package runs total 4,695 passing
+regular tests, with 96 passing doctests and 50 selected facade tests. Strict
+checks, operations targets, standalone fuzz and unified-batch iWork checks
+pass at their documented source boundaries. Existing ignored tests and the
+three unrelated fuzz media constants remain explicitly recorded. This is
+source/correctness integration; native qualification remains open.
+
+XLSB source `51c8628446`, documentation correction `c7aecdb536` and receipt
+`16ba8da04f` merge at `0d35a83a31`. The coordinator verified the five closed
+logs: 1,355 package tests including 42 doctests, strict all-target/all-feature
+Clippy over XLSB/ops/facade/Python, 126 operations tests, 23 facade tests and
+nine standalone CRUD harness tests. All actual root configuration and both
+locks match their recorded identities. The final target was 12,379,273,678
+bytes, below the decimal 20 GB cap. The receipt now distinguishes the r7
+pre-footer hash and the final closed log, and identifies the documentation-only
+slicer/timeline overlay that overlapped the standalone run; exact compiler-read
+timing was not captured. No native performance claim is made.
+
+The combined CLI/ops/facade/Python strict check first found a missing PPTX
+benchmark migration at `0d35a83a31`; the gate monitor also hit a vanished-PID
+race. Correction 0362ugka propagates `slides()` errors, and runner successor
+`f9cf4aa6d5` narrowly handles `ProcessLookupError`. The rerun passes at
+`0f007c4d74` in 27.094 seconds with all targets/features, a clean source,
+no remaining owned processes, and stable target size 4,706,526,684 bytes.
+Its reduced source/command/log/plan/state receipt is in 0362ugka. This is
+one selected check, not the final 53-step gate. The released coordinator slot
+is assigned to the XLS follow-up alongside PPT, XLSX and DOCX. Final source
+freeze, all-68 inventory, full gate, corpus and native qualification remain
+required.
+
+
+A subsequent check of the actual XLS metadata getter exposed an omitted
+constructor path: `metadata::Edit::new` still constructs a property-set editor,
+parses `SummaryProperties` and clones the initial values before returning.
+The earlier XLS receipt establishes its tested source behavior, but does not
+close this entry-cost gap. Required follow-up 0362ugea is assigned in a fresh
+leaf for metadata/property-set lazy state and every consumer. The bounded
+review also found `sheet_features::Edit::new` parsing globals and copying the
+complete Workbook stream. These three families are the finite follow-up scope;
+other public Package edit entries checked are already lazy. This is engineering
+work before source freeze, not an accepted exception. The current XLS getter
+is infallible; its eventual migration must follow the actual corrected API.
