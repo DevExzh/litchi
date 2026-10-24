@@ -18,9 +18,11 @@ and protocol.
 from __future__ import annotations
 
 import argparse
+import errno
 import fcntl
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import resource
@@ -79,9 +81,14 @@ DEFAULT_MAX_OUTPUT_BYTES = 4 * 1024 * 1024
 DEFAULT_MAX_REPORT_BYTES = 4 * 1024 * 1024
 DEFAULT_MAX_RSS_BYTES = 20_000_000_000
 DEFAULT_MAX_TARGET_BYTES = 20_000_000_000
+DEFAULT_MAX_HOST_BYTES = 16 * 1024 * 1024
+DEFAULT_MAX_EVENT_BYTES = 1 * 1024 * 1024
+DEFAULT_MAX_RECEIPT_BYTES = 1 * 1024 * 1024
+DEFAULT_MAX_PRERUN_LOAD = 1.0
 DEFAULT_TIMEOUT_SECONDS = 120.0
 DEFAULT_POLL_SECONDS = 0.1
 ABBA_ORDER = ("a1", "b1", "b2", "a2")
+CPU_TICK_TOLERANCE = 1
 
 
 class TimingError(RuntimeError):
@@ -104,15 +111,18 @@ def sha256_file(path: Path) -> tuple[str, int]:
     return digest.hexdigest(), size
 
 
-def write_json_exclusive(path: Path, value: Mapping[str, Any]) -> None:
+def write_json_exclusive(path: Path, value: Mapping[str, Any], maximum: int | None = None) -> int:
     if path.exists() or path.is_symlink():
         raise TimingError(f"refusing to overwrite output: {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
     data = (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    if maximum is not None and len(data) > maximum:
+        raise TimingError(f"JSON output exceeds cap: {path} ({len(data)} > {maximum})")
     with path.open("xb") as stream:
         stream.write(data)
         stream.flush()
         os.fsync(stream.fileno())
+    return len(data)
 
 
 def reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -153,23 +163,36 @@ def range_dicts(ranges: Iterable[tuple[int, int]]) -> list[dict[str, int]]:
 
 
 def directory_size(path: Path) -> int:
-    if not path.exists():
-        return 0
     if path.is_symlink():
         raise TimingError(f"target is a symlink: {path}")
+    if not path.exists():
+        return 0
     if path.is_file():
         return path.stat().st_size
+    if not path.is_dir():
+        raise TimingError(f"target is not a regular file or directory: {path}")
     total = 0
-    for root, dirs, files in os.walk(path, followlinks=False):
-        dirs[:] = [name for name in dirs if not (Path(root) / name).is_symlink()]
-        for name in files:
-            item = Path(root) / name
-            if item.is_symlink():
-                raise TimingError(f"target contains a symlink: {item}")
+    pending = [path]
+    while pending:
+        current = pending.pop()
+        try:
+            entries = list(os.scandir(current))
+        except OSError as error:
+            raise TimingError(f"cannot inspect target directory {current}: {error}") from error
+        for entry in entries:
             try:
-                total += item.stat().st_size
-            except FileNotFoundError:
-                continue
+                if entry.is_symlink():
+                    raise TimingError(f"target contains a symlink: {entry.path}")
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False):
+                    total += entry.stat(follow_symlinks=False).st_size
+                else:
+                    raise TimingError(f"target contains a non-regular entry: {entry.path}")
+            except FileNotFoundError as error:
+                raise TimingError(f"target entry disappeared during inspection: {entry.path}") from error
+            except OSError as error:
+                raise TimingError(f"cannot inspect target entry {entry.path}: {error}") from error
     return total
 
 
@@ -185,21 +208,76 @@ def read_proc(pid: int) -> dict[str, Any] | None:
     try:
         comm = (proc / "comm").read_text(encoding="utf-8", errors="replace").strip()
         cmdline = [part.decode("utf-8", "replace") for part in (proc / "cmdline").read_bytes().split(b"\0") if part]
-        exe = os.readlink(proc / "exe")
-        cwd = os.readlink(proc / "cwd")
         fields = _proc_stat_fields((proc / "stat").read_text(encoding="utf-8", errors="replace"))
         status = (proc / "status").read_text(encoding="utf-8", errors="replace")
-    except (FileNotFoundError, PermissionError, OSError, ValueError):
+    except FileNotFoundError:
         return None
+    except (PermissionError, OSError, ValueError) as error:
+        raise TimingError(f"cannot inspect /proc/{pid}: {error}") from error
+    command_names = {Path(comm).name}
+    if cmdline:
+        command_names.add(Path(cmdline[0]).name)
+    command_is_heavy = bool(command_names & HEAVY_NAMES)
+    metadata_restricted = False
+
+    # exe/cwd are restricted for some otherwise unrelated host processes
+    # (notably PID 1 in a user namespace).  comm plus readable cmdline proves
+    # those processes are outside the guarded heavy set; retain explicit
+    # restricted markers instead of weakening RSS/stat identity checks.
     try:
-        rss = next(int(line.split()[1]) * os.sysconf("SC_PAGE_SIZE") for line in status.splitlines() if line.startswith("VmRSS:"))
-    except (StopIteration, ValueError):
-        rss = 0
+        exe = os.readlink(proc / "exe")
+    except FileNotFoundError:
+        return None
+    except PermissionError as error:
+        if not command_is_heavy:
+            metadata_restricted = True
+            exe = "<restricted>"
+        else:
+            metadata_restricted = True
+            exe = "<restricted-heavy>"
+    except OSError as error:
+        if error.errno == errno.EACCES:
+            metadata_restricted = True
+            exe = "<restricted-heavy>" if command_is_heavy else "<restricted>"
+        else:
+            raise TimingError(f"cannot inspect /proc/{pid}/exe: {error}") from error
+    try:
+        cwd = os.readlink(proc / "cwd")
+    except FileNotFoundError:
+        return None
+    except PermissionError as error:
+        metadata_restricted = True
+        cwd = "<restricted>"
+    except OSError as error:
+        if error.errno == errno.EACCES:
+            metadata_restricted = True
+            cwd = "<restricted>"
+        else:
+            raise TimingError(f"cannot inspect /proc/{pid}/cwd: {error}") from error
+    rss_lines = [line for line in status.splitlines() if line.startswith("VmRSS:")]
+    if not rss_lines:
+        # Kernel threads have no address space and zombies can disappear
+        # between the stat/status reads; neither has a meaningful VmRSS.
+        # Missing RSS for any other process is an unexpected accounting error.
+        stat_state = fields[0] if fields else ""
+        stat_pgrp = fields[2] if len(fields) > 2 else "-1"
+        stat_session = fields[3] if len(fields) > 3 else "-1"
+        if stat_state == "Z" or (not cmdline and stat_pgrp == "0" and stat_session == "0"):
+            rss = 0
+        else:
+            raise TimingError(f"cannot read RSS for /proc/{pid}: VmRSS is absent")
+    else:
+        try:
+            rss = int(rss_lines[0].split()[1]) * os.sysconf("SC_PAGE_SIZE")
+        except (IndexError, ValueError, OSError) as error:
+            raise TimingError(f"cannot read RSS for /proc/{pid}: {error}") from error
     try:
         return {
             "pid": pid,
             "ppid": int(fields[1]),
             "pgrp": int(fields[2]),
+            "session": int(fields[3]),
+            "starttime": int(fields[19]),
             "state": fields[0],
             "utime": int(fields[11]),
             "stime": int(fields[12]),
@@ -209,26 +287,58 @@ def read_proc(pid: int) -> dict[str, Any] | None:
             "exe": exe,
             "cwd": cwd,
             "cmdline": cmdline,
+            "metadata_restricted": metadata_restricted,
         }
-    except (IndexError, ValueError):
-        return None
+    except (IndexError, ValueError) as error:
+        raise TimingError(f"malformed /proc/{pid}/stat: {error}") from error
 
 
 def proc_snapshot() -> dict[int, dict[str, Any]]:
     result: dict[int, dict[str, Any]] = {}
-    for item in Path("/proc").iterdir():
-        if item.name.isdigit():
-            entry = read_proc(int(item.name))
-            if entry is not None:
-                result[entry["pid"]] = entry
+    try:
+        entries = list(Path("/proc").iterdir())
+    except OSError as error:
+        raise TimingError(f"cannot enumerate /proc: {error}") from error
+    for item in entries:
+        if not item.name.isdigit():
+            continue
+        entry = read_proc(int(item.name))
+        if entry is not None:
+            result[entry["pid"]] = entry
     return result
 
 
 def load_average() -> list[float]:
     try:
-        return [float(value) for value in os.getloadavg()]
-    except (AttributeError, OSError):
-        return []
+        values = [float(value) for value in os.getloadavg()]
+    except (AttributeError, OSError, ValueError) as error:
+        raise TimingError(f"cannot read load average: {error}") from error
+    if not values or any(not math.isfinite(value) or value < 0 for value in values):
+        raise TimingError(f"invalid load average: {values!r}")
+    return values
+
+
+def cpu_counters(cpu: int) -> tuple[int, int]:
+    """Return (total_ticks, busy_ticks) for one CPU over an interval."""
+    try:
+        lines = Path("/proc/stat").read_text(encoding="ascii").splitlines()
+    except (OSError, UnicodeError) as error:
+        raise TimingError(f"cannot read /proc/stat: {error}") from error
+    label = f"cpu{cpu}"
+    for line in lines:
+        fields = line.split()
+        if not fields or fields[0] != label:
+            continue
+        try:
+            values = [int(value) for value in fields[1:9]]
+        except ValueError as error:
+            raise TimingError(f"invalid {label} counters: {error}") from error
+        if len(values) < 8 or any(value < 0 for value in values):
+            raise TimingError(f"incomplete or negative {label} counters")
+        total = sum(values)
+        busy = values[0] + values[1] + values[2] + values[5] + values[6] + values[7]
+        return total, busy
+    raise TimingError(f"/proc/stat has no counters for selected CPU {cpu}")
 
 
 def descendants(snapshot: Mapping[int, Mapping[str, Any]], root: int) -> set[int]:
@@ -243,6 +353,41 @@ def descendants(snapshot: Mapping[int, Mapping[str, Any]], root: int) -> set[int
     # A detached descendant can be reparented while retaining the process
     # group.  Keep it owned for cleanup and do not mistake it for host work.
     owned.update(pid for pid, entry in snapshot.items() if int(entry.get("pgrp", -1)) == root)
+    return owned
+
+
+def refresh_owned(
+    snapshot: Mapping[int, Mapping[str, Any]],
+    known: Mapping[int, int],
+    root_pid: int,
+    root_pgrp: int,
+    root_session: int,
+) -> dict[int, int]:
+    """Keep ownership across reparenting while rejecting PID reuse."""
+    owned: dict[int, int] = {}
+    for pid, expected_start in known.items():
+        entry = snapshot.get(pid)
+        if entry is None:
+            continue
+        actual_start = int(entry["starttime"])
+        if actual_start != expected_start:
+            raise TimingError(f"owned child PID {pid} changed identity")
+        owned[pid] = expected_start
+    changed = True
+    while changed:
+        changed = False
+        for pid, entry in snapshot.items():
+            if pid in owned:
+                continue
+            if (
+                int(entry.get("ppid", -1)) in owned
+                or int(entry.get("pgrp", -1)) == root_pgrp
+                or int(entry.get("session", -1)) == root_session
+            ):
+                owned[pid] = int(entry["starttime"])
+                changed = True
+    if root_pid in snapshot and root_pid not in owned:
+        owned[root_pid] = int(snapshot[root_pid]["starttime"])
     return owned
 
 
@@ -266,43 +411,64 @@ def quiet_violations(
     previous: Mapping[int, Mapping[str, Any]],
     current: Mapping[int, Mapping[str, Any]],
     *,
-    allowed_root: int | None,
-    cpu: int,
+    owned: Mapping[int, int],
     load_before: float,
     max_load_delta: float,
+    previous_cpu: tuple[int, int],
+    current_cpu: tuple[int, int],
+    check_load_delta: bool,
+    absolute_load_limit: float | None,
 ) -> list[str]:
-    # The monitor itself is expected to consume a small amount of CPU between
-    # snapshots.  Never classify that work as an unrelated selected-CPU user.
-    owned = {os.getpid()}
-    if allowed_root is not None:
-        owned.update(descendants(current, allowed_root))
+    # Account for the complete selected-CPU interval from /proc/stat and
+    # subtract ticks charged to the monitor and the owned process identities.
+    # This deliberately does not use instantaneous PSR as a migration proxy.
+    owned_ids = set(owned)
+    owned_ids.add(os.getpid())
     violations: list[str] = []
     heavy = [
         entry
         for pid, entry in current.items()
-        if pid not in owned and is_heavy(entry)
+        if pid not in owned_ids and is_heavy(entry)
     ]
     if heavy:
         violations.append("unrelated heavy process: " + repr(heavy))
-    busy: list[dict[str, Any]] = []
-    for pid, entry in current.items():
-        if pid in owned or int(entry.get("psr", -1)) != cpu:
-            continue
-        if str(entry.get("comm", "")).startswith("["):
-            continue
+    previous_total, previous_busy = previous_cpu
+    current_total, current_busy = current_cpu
+    if current_total < previous_total or current_busy < previous_busy:
+        raise TimingError("selected CPU counters moved backwards")
+    selected_busy_delta = current_busy - previous_busy
+    owned_ticks = 0
+    for pid in owned_ids:
         old = previous.get(pid)
-        if old is not None and int(entry.get("utime", 0)) + int(entry.get("stime", 0)) > int(old.get("utime", 0)) + int(old.get("stime", 0)):
-            busy.append({"pid": pid, "comm": entry.get("comm"), "psr": entry.get("psr")})
-    if busy:
-        violations.append("another process used selected CPU: " + repr(busy))
+        new = current.get(pid)
+        old_ticks = 0 if old is None else int(old.get("utime", 0)) + int(old.get("stime", 0))
+        new_ticks = 0 if new is None else int(new.get("utime", 0)) + int(new.get("stime", 0))
+        if new_ticks >= old_ticks:
+            owned_ticks += new_ticks - old_ticks
+    outside_busy = selected_busy_delta - owned_ticks
+    if outside_busy > CPU_TICK_TOLERANCE:
+        violations.append(
+            "selected CPU interval had unowned busy ticks: "
+            f"busy_delta={selected_busy_delta}, owned_ticks={owned_ticks}"
+        )
     load = load_average()
-    if load and load[0] > load_before + max_load_delta:
+    if absolute_load_limit is not None and load[0] > absolute_load_limit:
+        violations.append(f"load1 exceeded absolute quiet bound: {load[0]} > {absolute_load_limit}")
+    if check_load_delta and load[0] > load_before + max_load_delta:
         violations.append(f"load1 increased beyond quiet bound: before={load_before}, now={load[0]}")
     return violations
 
 
-def process_rss(snapshot: Mapping[int, Mapping[str, Any]], root: int) -> int:
-    return sum(int(snapshot[pid].get("rss_bytes", 0)) for pid in descendants(snapshot, root) if pid in snapshot)
+def process_rss(snapshot: Mapping[int, Mapping[str, Any]], owned: Mapping[int, int]) -> int:
+    total = 0
+    for pid, expected_start in owned.items():
+        entry = snapshot.get(pid)
+        if entry is None:
+            continue
+        if int(entry["starttime"]) != expected_start:
+            raise TimingError(f"owned child PID {pid} changed identity while reading RSS")
+        total += int(entry["rss_bytes"])
+    return total
 
 
 def process_group_exists(pgid: int) -> bool:
@@ -311,33 +477,97 @@ def process_group_exists(pgid: int) -> bool:
     except ProcessLookupError:
         return False
     except PermissionError:
-        return True
+        raise TimingError(f"cannot inspect process group {pgid}: permission denied")
+    except OSError as error:
+        raise TimingError(f"cannot inspect process group {pgid}: {error}") from error
     return True
 
 
-def terminate_group(process: subprocess.Popen[bytes], *, grace_seconds: float = 5.0) -> bool:
+def set_child_subreaper(enabled: bool) -> int:
+    """Adopt detached descendants so cleanup remains attributable to this run."""
+    try:
+        import ctypes
+
+        prctl = ctypes.CDLL(None, use_errno=True).prctl
+        prctl.argtypes = [ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong]
+        prctl.restype = ctypes.c_int
+        previous = ctypes.c_int()
+        if prctl(37, ctypes.addressof(previous), 0, 0, 0) != 0:  # PR_GET_CHILD_SUBREAPER
+            raise OSError(ctypes.get_errno(), "PR_GET_CHILD_SUBREAPER failed")
+        if prctl(36, 1 if enabled else 0, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER
+            raise OSError(ctypes.get_errno(), "PR_SET_CHILD_SUBREAPER failed")
+        return previous.value
+    except (AttributeError, OSError) as error:
+        raise TimingError(f"cannot configure child subreaper: {error}") from error
+
+
+def live_owned(owned: Mapping[int, int]) -> dict[int, int]:
+    snapshot = proc_snapshot()
+    result: dict[int, int] = {}
+    for pid, expected_start in owned.items():
+        entry = snapshot.get(pid)
+        if entry is None:
+            continue
+        actual_start = int(entry["starttime"])
+        if actual_start != expected_start:
+            raise TimingError(f"refusing to treat reused owned PID {pid} as a child")
+        result[pid] = expected_start
+    return result
+
+
+def terminate_group(
+    process: subprocess.Popen[bytes],
+    owned: Mapping[int, int],
+    pgid: int,
+    *,
+    grace_seconds: float = 5.0,
+) -> bool:
+    def signal_owned(kind: signal.Signals) -> None:
+        snapshot = proc_snapshot()
+        for pid, expected_start in owned.items():
+            entry = snapshot.get(pid)
+            if entry is None:
+                continue
+            if int(entry["starttime"]) != expected_start:
+                raise TimingError(f"refusing to signal reused owned PID {pid}")
+            try:
+                os.kill(pid, kind)
+            except ProcessLookupError:
+                continue
+            except OSError as error:
+                raise TimingError(f"cannot signal owned PID {pid}: {error}") from error
+
     forced = False
     try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except (ProcessLookupError, PermissionError):
-        process.terminate()
+        os.killpg(pgid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    except OSError as error:
+        raise TimingError(f"cannot terminate process group {pgid}: {error}") from error
+    signal_owned(signal.SIGTERM)
     deadline = time.monotonic() + grace_seconds
-    while time.monotonic() < deadline and process.poll() is None:
+    while time.monotonic() < deadline:
+        if process.poll() is not None and not process_group_exists(pgid) and not live_owned(owned):
+            return forced
         time.sleep(0.05)
-    if process.poll() is None or process_group_exists(process.pid):
-        forced = True
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except (ProcessLookupError, PermissionError):
-            process.kill()
+    forced = True
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    except OSError as error:
+        raise TimingError(f"cannot kill process group {pgid}: {error}") from error
+    signal_owned(signal.SIGKILL)
     try:
         process.wait(timeout=grace_seconds)
     except subprocess.TimeoutExpired as error:
         raise TimingError(f"child did not terminate after process-group cleanup: {process.pid}") from error
     deadline = time.monotonic() + grace_seconds
-    while time.monotonic() < deadline and process_group_exists(process.pid):
+    while time.monotonic() < deadline:
+        if not process_group_exists(pgid) and not live_owned(owned):
+            return forced
         time.sleep(0.05)
-    if process_group_exists(process.pid):
+    if process_group_exists(pgid) or live_owned(owned):
         raise TimingError(f"descendant process group survived cleanup: {process.pid}")
     return forced
 
@@ -369,6 +599,17 @@ class BoundedCapture(threading.Thread):
                 os.fsync(output.fileno())
         except BaseException as error:  # retain the failure for the parent loop
             self.error = f"{type(error).__name__}: {error}"
+
+
+def host_snapshot_descriptor(
+    path: Path,
+    snapshot: Mapping[int, Mapping[str, Any]],
+    load: list[float],
+    maximum: int,
+) -> dict[str, Any]:
+    bytes_written = write_json_exclusive(path, snapshot_json(snapshot, load), maximum)
+    digest, _ = sha256_file(path)
+    return {"path": str(path), "bytes": bytes_written, "sha256": digest}
 
 
 def validate_report(path: Path, endpoint: str, revision: str, policy: str, warmup: int, samples: int, max_bytes: int) -> dict[str, Any]:
@@ -490,6 +731,15 @@ def verify_source(root: Path, revision: str, tree: str) -> dict[str, str]:
     return {"path": str(root), "revision": actual_revision, "tree": actual_tree}
 
 
+def verify_binary(path: Path, expected: Mapping[str, Any], location: str) -> dict[str, Any]:
+    if path.is_symlink() or not path.is_file() or not os.access(path, os.X_OK):
+        raise TimingError(f"{location} is missing, symlinked, or non-executable: {path}")
+    digest, size = sha256_file(path)
+    require_equal(digest, expected.get("sha256"), f"{location}.sha256")
+    require_equal(size, expected.get("bytes"), f"{location}.bytes")
+    return {"path": str(path), "sha256": digest, "bytes": size}
+
+
 def acquire_cpu_lock(path: Path) -> Any:
     """Hold the protocol's external CPU lock for the complete ABBA sequence."""
     if path.is_symlink():
@@ -509,6 +759,7 @@ def run_child(
     output: Path,
     endpoint: str,
     binary: Path,
+    binary_identity: Mapping[str, Any],
     revision: str,
     source_tree: str,
     policy: str,
@@ -525,40 +776,71 @@ def run_child(
     max_target: int,
     max_output: int,
     max_report: int,
+    max_host: int,
+    max_event: int,
     max_load_delta: float,
+    max_prerun_load: float,
 ) -> dict[str, Any]:
     report_path = output / "reports" / policy / f"{label}.json"
     stdout_path = output / "logs" / f"{policy}-{label}.stdout"
     stderr_path = output / "logs" / f"{policy}-{label}.stderr"
     event_path = output / "events" / f"{policy}-{label}.json"
-    for path in (report_path, stdout_path, stderr_path, event_path):
+    host_before_path = output / "host" / f"{policy}-{label}-before.json"
+    host_probe_path = output / "host" / f"{policy}-{label}-probe.json"
+    host_after_path = output / "host" / f"{policy}-{label}-after.json"
+    during_path = output / "host" / f"{policy}-{label}-during.jsonl"
+    for path in (
+        report_path,
+        stdout_path,
+        stderr_path,
+        event_path,
+        host_before_path,
+        host_probe_path,
+        host_after_path,
+        during_path,
+    ):
         if path.exists() or path.is_symlink():
             raise TimingError(f"output path is not fresh: {path}")
-    if not binary.is_file() or not os.access(binary, os.X_OK) or binary.is_symlink():
-        raise TimingError(f"binary is missing, non-executable, or symlinked: {binary}")
     source_before = verify_source(source_cwd, revision, source_tree)
+    binary_before = verify_binary(binary, binary_identity, f"{endpoint} binary before {policy}/{label}")
     if cpu not in os.sched_getaffinity(0):
         raise TimingError(f"selected CPU is not allowed: {cpu}")
+    if tmpdir.is_symlink():
+        raise TimingError(f"temporary directory is symlinked: {tmpdir}")
     tmpdir.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     stdout_path.parent.mkdir(parents=True, exist_ok=True)
     event_path.parent.mkdir(parents=True, exist_ok=True)
+    host_before_path.parent.mkdir(parents=True, exist_ok=True)
     before = proc_snapshot()
+    preexisting_pids = set(before)
     before_load = load_average()
+    before_cpu = cpu_counters(cpu)
+    before_host = host_snapshot_descriptor(host_before_path, before, before_load, max_host)
     time.sleep(poll_seconds)
     quiet_probe = proc_snapshot()
     probe_load = load_average()
+    probe_cpu = cpu_counters(cpu)
+    probe_host = host_snapshot_descriptor(host_probe_path, quiet_probe, probe_load, max_host)
+    if before_load[0] > max_prerun_load or probe_load[0] > max_prerun_load:
+        raise TimingError(
+            f"quiet-host preflight rejected stable load for {endpoint}/{policy}/{label}: "
+            f"before={before_load[0]}, probe={probe_load[0]}, limit={max_prerun_load}"
+        )
     pre_violations = quiet_violations(
         before,
         quiet_probe,
-        allowed_root=None,
-        cpu=cpu,
-        load_before=before_load[0] if before_load else 0.0,
+        owned={},
+        load_before=before_load[0],
         max_load_delta=max_load_delta,
+        previous_cpu=before_cpu,
+        current_cpu=probe_cpu,
+        check_load_delta=True,
+        absolute_load_limit=max_prerun_load,
     )
     if pre_violations:
         raise TimingError(f"quiet-host preflight rejected {endpoint}/{policy}/{label}: {pre_violations}")
-    safe_target_check(target, max_target)
+    target_before = safe_target_check(target, max_target)
     env = os.environ.copy()
     env.pop("LITCHI_CAPPED", None)
     env.pop("LITCHI_BLESS", None)
@@ -589,12 +871,29 @@ def run_child(
         ]
     )
 
+    parent_pid = os.getpid()
+
     def preexec() -> None:
-        os.sched_setaffinity(0, {cpu})
-        resource.setrlimit(resource.RLIMIT_AS, (max_rss, max_rss))
-        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        try:
+            if os.getppid() != parent_pid:
+                os._exit(127)
+            os.setsid()
+            import ctypes
+
+            prctl = ctypes.CDLL(None, use_errno=True).prctl
+            prctl.argtypes = [ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong]
+            prctl.restype = ctypes.c_int
+            if prctl(1, signal.SIGKILL, 0, 0, 0) != 0:  # PR_SET_PDEATHSIG
+                os._exit(127)
+            os.sched_setaffinity(0, {cpu})
+            resource.setrlimit(resource.RLIMIT_AS, (max_rss, max_rss))
+            resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        except BaseException:
+            os._exit(127)
 
     process: subprocess.Popen[bytes] | None = None
+    pgid: int | None = None
+    owned: dict[int, int] = {}
     stdout_capture: BoundedCapture | None = None
     stderr_capture: BoundedCapture | None = None
     violations: list[str] = []
@@ -602,15 +901,14 @@ def run_child(
     forced_cleanup = False
     peak_rss = 0
     started_utc: str | None = None
-    target_before = directory_size(target)
     target_after = target_before
-    during_path = output / "host" / f"{policy}-{label}-during.jsonl"
-    during_path.parent.mkdir(parents=True, exist_ok=True)
-    if during_path.exists() or during_path.is_symlink():
-        raise TimingError(f"host output path is not fresh: {during_path}")
+    during_bytes = 0
+    previous = quiet_probe
+    previous_cpu = probe_cpu
     with during_path.open("x", encoding="utf-8") as during:
         try:
             started_utc = utc_now()
+            binary_before = verify_binary(binary, binary_identity, f"{endpoint} binary before spawn {policy}/{label}")
             process = subprocess.Popen(
                 command,
                 cwd=str(source_cwd),
@@ -618,60 +916,126 @@ def run_child(
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                start_new_session=True,
+                start_new_session=False,
                 preexec_fn=preexec,
             )
             require(process.stdout is not None and process.stderr is not None, "child pipes were not created")
+            try:
+                pgid = os.getpgid(process.pid)
+            except OSError as error:
+                pgid = process.pid
+                raise TimingError(f"cannot inspect child process group: {error}") from error
+            require(pgid == process.pid, f"child did not create an independent process group: {pgid}")
+            root_entry = read_proc(process.pid)
+            require(root_entry is not None, "child disappeared before process-group identity was checked")
+            require_equal(root_entry.get("pgrp"), process.pid, "child process group")
+            require_equal(root_entry.get("session"), process.pid, "child session")
+            owned = {process.pid: int(root_entry["starttime"])}
             stdout_capture = BoundedCapture(process.stdout, stdout_path, max_output)
             stderr_capture = BoundedCapture(process.stderr, stderr_path, max_output)
             stdout_capture.start()
             stderr_capture.start()
-            previous = quiet_probe
             started = time.monotonic()
             while process.poll() is None:
                 time.sleep(poll_seconds)
+                elapsed = time.monotonic() - started
+                if elapsed > timeout_seconds:
+                    timeout = True
+                    violations.append(f"child exceeded timeout: {timeout_seconds}s")
+                    break
                 current = proc_snapshot()
                 current_load = load_average()
-                during.write(json.dumps(snapshot_json(current, current_load), sort_keys=True) + "\n")
+                current_cpu = cpu_counters(cpu)
+                require(pgid is not None, "child process group identity was not retained")
+                owned = refresh_owned(current, owned, process.pid, pgid, process.pid)
+                # A detached descendant adopted by this runner's subreaper
+                # has neither the child's pgrp nor session.  It is still
+                # attributable when it is a newly adopted direct child.
+                for pid, entry in current.items():
+                    if pid not in preexisting_pids and int(entry.get("ppid", -1)) == parent_pid:
+                        owned[pid] = int(entry["starttime"])
+                accounting_current = dict(current)
+                for pid in owned:
+                    if pid not in accounting_current and pid in previous:
+                        accounting_current[pid] = previous[pid]
+                line = (json.dumps(snapshot_json(current, current_load), sort_keys=True) + "\n").encode()
+                if during_bytes + len(line) > max_host:
+                    violations.append(f"during host snapshot exceeded cap: {max_host}")
+                    break
+                during.write(line.decode("utf-8"))
                 during.flush()
+                during_bytes += len(line)
                 violations.extend(
                     quiet_violations(
                         previous,
-                        current,
-                        allowed_root=process.pid,
-                        cpu=cpu,
-                        load_before=before_load[0] if before_load else 0.0,
+                        accounting_current,
+                        owned=owned,
+                        load_before=before_load[0],
                         max_load_delta=max_load_delta,
+                        previous_cpu=previous_cpu,
+                        current_cpu=current_cpu,
+                        check_load_delta=False,
+                        absolute_load_limit=None,
                     )
                 )
-                previous = current
-                peak_rss = max(peak_rss, process_rss(current, process.pid))
+                previous = accounting_current
+                previous_cpu = current_cpu
+                peak_rss = max(peak_rss, process_rss(current, owned))
                 if peak_rss > max_rss:
                     violations.append(f"RSS exceeded cap: {peak_rss} > {max_rss}")
                 target_after = safe_target_check(target, max_target)
+                if target_after > target_before:
+                    violations.append(f"target grew during child: {target_before} -> {target_after}")
                 if report_path.exists() and report_path.stat().st_size > max_report:
                     violations.append(f"report exceeded cap: {report_path}")
                 if stdout_capture.overflow or stderr_capture.overflow:
                     violations.append("stdout/stderr exceeded output cap")
                 if violations:
                     break
-                if time.monotonic() - started > timeout_seconds:
-                    timeout = True
-                    violations.append(f"child exceeded timeout: {timeout_seconds}s")
-                    break
+            if time.monotonic() - started > timeout_seconds and not timeout:
+                timeout = True
+                violations.append(f"child exceeded timeout: {timeout_seconds}s")
             if process.poll() is None or violations or timeout:
-                forced_cleanup = terminate_group(process)
+                require(pgid is not None, "child process group identity was not retained")
+                forced_cleanup = terminate_group(process, owned, pgid)
             else:
                 process.wait(timeout=5)
         finally:
-            if process is not None and process.poll() is None:
-                forced_cleanup = terminate_group(process) or forced_cleanup
+            if process is not None and process.poll() is None and pgid is not None:
+                forced_cleanup = terminate_group(process, owned, pgid) or forced_cleanup
     if stdout_capture is not None:
         stdout_capture.join(timeout=5)
+        if stdout_capture.is_alive():
+            violations.append("stdout capture thread did not join")
     if stderr_capture is not None:
         stderr_capture.join(timeout=5)
+        if stderr_capture.is_alive():
+            violations.append("stderr capture thread did not join")
+    if stdout_capture is not None and stdout_capture.error:
+        violations.append(stdout_capture.error)
+    if stderr_capture is not None and stderr_capture.error:
+        violations.append(stderr_capture.error)
+    require(process is not None, "child was not started")
+    if pgid is None:
+        raise TimingError("child process group identity was not retained")
     after = proc_snapshot()
     after_load = load_average()
+    after_cpu = cpu_counters(cpu)
+    owned = refresh_owned(after, owned, process.pid, pgid, process.pid)
+    for pid, entry in after.items():
+        if pid not in preexisting_pids and int(entry.get("ppid", -1)) == parent_pid:
+            owned[pid] = int(entry["starttime"])
+    live = live_owned(owned)
+    if live or process_group_exists(pgid):
+        forced_cleanup = terminate_group(process, owned, pgid) or forced_cleanup
+        violations.append(f"child ownership survived normal exit: {sorted(live)}")
+        after = proc_snapshot()
+        after_load = load_average()
+        after_cpu = cpu_counters(cpu)
+        owned = refresh_owned(after, owned, process.pid, pgid, process.pid)
+        live = live_owned(owned)
+        if live or process_group_exists(pgid):
+            raise TimingError(f"child ownership survived cleanup: {sorted(live)}")
     source_after: dict[str, str] | None = None
     try:
         source_after = verify_source(source_cwd, revision, source_tree)
@@ -679,30 +1043,42 @@ def run_child(
         violations.append(f"source changed during child: {error}")
     post_violations = quiet_violations(
         quiet_probe,
-        after,
-        allowed_root=None,
-        cpu=cpu,
-        load_before=before_load[0] if before_load else 0.0,
+        {pid: after.get(pid, entry) for pid, entry in previous.items()},
+        owned=owned,
+        load_before=before_load[0],
         max_load_delta=max_load_delta,
+        previous_cpu=previous_cpu,
+        current_cpu=after_cpu,
+        check_load_delta=True,
+        absolute_load_limit=None,
     )
     violations.extend(post_violations)
-    if process is None:
-        raise TimingError("child was not started")
-    descendants_left = sorted(descendants(after, process.pid) - {process.pid})
+    descendants_left = sorted(pid for pid in live if pid != process.pid)
     if descendants_left:
         violations.append(f"descendants survived child exit: {descendants_left}")
     if forced_cleanup:
         violations.append("forced process-group cleanup was required")
-    if stdout_capture is not None and stdout_capture.error:
-        violations.append(stdout_capture.error)
-    if stderr_capture is not None and stderr_capture.error:
-        violations.append(stderr_capture.error)
     target_after = safe_target_check(target, max_target)
+    if target_after > target_before:
+        violations.append(f"target grew during child: {target_before} -> {target_after}")
+    try:
+        binary_after = verify_binary(binary, binary_identity, f"{endpoint} binary after {policy}/{label}")
+    except TimingError as error:
+        binary_after = None
+        violations.append(f"binary changed during child: {error}")
     validation: dict[str, Any] | None = None
     if process.returncode == 0 and not violations and not timeout:
         validation = validate_report(report_path, endpoint, revision, policy, warmup, samples, max_report)
     elif process.returncode != 0:
         violations.append(f"child exited with status {process.returncode}")
+    stdout_identity = {"path": str(stdout_path), "bytes": stdout_capture.bytes if stdout_capture else 0, "sha256": sha256_file(stdout_path)[0]}
+    stderr_identity = {"path": str(stderr_path), "bytes": stderr_capture.bytes if stderr_capture else 0, "sha256": sha256_file(stderr_path)[0]}
+    during_identity = {"path": str(during_path), "bytes": during_path.stat().st_size, "sha256": sha256_file(during_path)[0]}
+    report_identity = {
+        "path": str(report_path),
+        "bytes": report_path.stat().st_size if report_path.exists() else 0,
+        "sha256": sha256_file(report_path)[0] if report_path.exists() else None,
+    }
     event = {
         "schema": SCHEMA,
         "endpoint": endpoint,
@@ -712,6 +1088,7 @@ def run_child(
         "cwd": str(source_cwd),
         "revision": revision,
         "source": {"before": source_before, "after": source_after, "expected_tree": source_tree},
+        "binary": {"expected": dict(binary_identity), "before": binary_before, "after": binary_after},
         "started_utc": started_utc,
         "ended_utc": utc_now(),
         "returncode": process.returncode,
@@ -721,19 +1098,19 @@ def run_child(
         "rss_peak_bytes": peak_rss,
         "rss_cap_bytes": max_rss,
         "target": {"path": str(target), "bytes_before": target_before, "bytes_after": target_after, "cap_bytes": max_target},
-        "stdout": {"path": str(stdout_path), "bytes": stdout_capture.bytes if stdout_capture else 0, "overflow": stdout_capture.overflow if stdout_capture else True},
-        "stderr": {"path": str(stderr_path), "bytes": stderr_capture.bytes if stderr_capture else 0, "overflow": stderr_capture.overflow if stderr_capture else True},
-        "report": {"path": str(report_path), "bytes": report_path.stat().st_size if report_path.exists() else 0},
+        "stdout": {**stdout_identity, "overflow": stdout_capture.overflow if stdout_capture else True},
+        "stderr": {**stderr_identity, "overflow": stderr_capture.overflow if stderr_capture else True},
+        "report": report_identity,
         "host": {
-            "before": snapshot_json(before, before_load),
-            "probe": snapshot_json(quiet_probe, probe_load),
-            "during_jsonl": str(during_path),
-            "after": snapshot_json(after, after_load),
+            "before": before_host,
+            "probe": probe_host,
+            "during_jsonl": during_identity,
+            "after": host_snapshot_descriptor(host_after_path, after, after_load, max_host),
         },
         "violations": violations,
         "validation": validation,
     }
-    write_json_exclusive(event_path, event)
+    write_json_exclusive(event_path, event, max_event)
     if violations:
         raise TimingError(f"{endpoint}/{policy}/{label} rejected: {violations}")
     require(validation is not None, f"{endpoint}/{policy}/{label} has no validation result")
@@ -764,7 +1141,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--max-target-bytes", type=int, default=DEFAULT_MAX_TARGET_BYTES)
     parser.add_argument("--max-output-bytes", type=int, default=DEFAULT_MAX_OUTPUT_BYTES)
     parser.add_argument("--max-report-bytes", type=int, default=DEFAULT_MAX_REPORT_BYTES)
+    parser.add_argument("--max-host-bytes", type=int, default=DEFAULT_MAX_HOST_BYTES)
+    parser.add_argument("--max-event-bytes", type=int, default=DEFAULT_MAX_EVENT_BYTES)
+    parser.add_argument("--max-receipt-bytes", type=int, default=DEFAULT_MAX_RECEIPT_BYTES)
     parser.add_argument("--max-load-delta", type=float, default=1.0)
+    parser.add_argument("--max-prerun-load", type=float, default=DEFAULT_MAX_PRERUN_LOAD)
     return parser.parse_args(argv)
 
 
@@ -781,7 +1162,16 @@ def main(argv: list[str] | None = None) -> int:
         require(args.samples > 0 and args.warmup >= 0, "samples/warmup are invalid")
         require(args.timeout_seconds > 0 and args.poll_seconds > 0, "timeouts are invalid")
         require(args.max_rss_bytes > 0 and args.max_target_bytes > 0, "resource caps are invalid")
-        require(args.max_output_bytes > 0 and args.max_report_bytes > 0, "output caps are invalid")
+        require(
+            args.max_output_bytes > 0
+            and args.max_report_bytes > 0
+            and args.max_host_bytes > 0
+            and args.max_event_bytes > 0
+            and args.max_receipt_bytes > 0,
+            "output caps are invalid",
+        )
+        require(math.isfinite(args.max_load_delta) and args.max_load_delta >= 0, "max-load-delta is invalid")
+        require(math.isfinite(args.max_prerun_load) and args.max_prerun_load > 0, "max-prerun-load is invalid")
         require(args.output_dir.is_absolute() and not args.output_dir.exists() and not args.output_dir.is_symlink(), "output-dir must be a fresh absent absolute path")
         sources = {"baseline": args.baseline_source.resolve(), "candidate": args.candidate_source.resolve()}
         trees = {"baseline": args.baseline_tree, "candidate": args.candidate_tree}
@@ -791,14 +1181,28 @@ def main(argv: list[str] | None = None) -> int:
         for directory in (args.target_baseline, args.target_candidate):
             require(not directory.is_symlink(), f"target is symlinked: {directory}")
             safe_target_check(directory, args.max_target_bytes)
+        require(not args.tmpdir.is_symlink(), f"temporary directory is symlinked: {args.tmpdir}")
         args.tmpdir.mkdir(parents=True, exist_ok=True)
         args.output_dir = args.output_dir.resolve()
         args.tmpdir = args.tmpdir.resolve()
+        for binary in (args.baseline_binary, args.candidate_binary):
+            require(not binary.is_symlink(), f"binary is symlinked: {binary}")
         binaries = {"baseline": args.baseline_binary.resolve(), "candidate": args.candidate_binary.resolve()}
+        binary_identities: dict[str, dict[str, Any]] = {}
+        for endpoint, binary in binaries.items():
+            if binary.is_symlink() or not binary.is_file() or not os.access(binary, os.X_OK):
+                raise TimingError(f"{endpoint} binary is missing, symlinked, or non-executable: {binary}")
+            digest, size = sha256_file(binary)
+            binary_identities[endpoint] = {"path": str(binary), "sha256": digest, "bytes": size}
         targets = {"baseline": args.target_baseline.resolve(), "candidate": args.target_candidate.resolve()}
         events: list[dict[str, Any]] = []
-        cpu_lock = acquire_cpu_lock(args.cpu_lock.resolve())
+        previous_affinity = os.sched_getaffinity(0)
+        require(args.cpu in previous_affinity, f"selected CPU is not allowed: {args.cpu}")
+        previous_subreaper = set_child_subreaper(True)
+        cpu_lock: Any | None = None
         try:
+            os.sched_setaffinity(0, {args.cpu})
+            cpu_lock = acquire_cpu_lock(args.cpu_lock.resolve())
             for policy in ("forward", "exact"):
                 for label in ABBA_ORDER:
                     endpoint = "baseline" if label.startswith("a") else "candidate"
@@ -807,6 +1211,7 @@ def main(argv: list[str] | None = None) -> int:
                             output=args.output_dir,
                             endpoint=endpoint,
                             binary=binaries[endpoint],
+                            binary_identity=binary_identities[endpoint],
                             revision=revisions[endpoint],
                             source_tree=trees[endpoint],
                             policy=policy,
@@ -823,30 +1228,51 @@ def main(argv: list[str] | None = None) -> int:
                             max_target=args.max_target_bytes,
                             max_output=args.max_output_bytes,
                             max_report=args.max_report_bytes,
+                            max_host=args.max_host_bytes,
+                            max_event=args.max_event_bytes,
                             max_load_delta=args.max_load_delta,
+                            max_prerun_load=args.max_prerun_load,
                         )
                     )
         finally:
-            fcntl.flock(cpu_lock.fileno(), fcntl.LOCK_UN)
-            cpu_lock.close()
+            if cpu_lock is not None:
+                fcntl.flock(cpu_lock.fileno(), fcntl.LOCK_UN)
+                cpu_lock.close()
+            os.sched_setaffinity(0, previous_affinity)
+            set_child_subreaper(bool(previous_subreaper))
+        final_binaries = {
+            endpoint: verify_binary(binary, binary_identities[endpoint], f"{endpoint} binary after ABBA")
+            for endpoint, binary in binaries.items()
+        }
         receipt = {
             "schema": SCHEMA,
             "classification": "latency-only capture; allocator is not applicable",
             "sources": source_identities,
             "source_revisions": revisions,
             "source_trees": trees,
-            "binaries": {endpoint: {"path": str(path), "sha256": sha256_file(path)[0], "bytes": sha256_file(path)[1]} for endpoint, path in binaries.items()},
+            "binaries": final_binaries,
             "cpu": args.cpu,
             "cpu_lock": str(args.cpu_lock.resolve()),
             "abba_order": list(ABBA_ORDER),
             "policies": ["forward", "exact"],
             "samples": args.samples,
             "warmup": args.warmup,
-            "resource_caps": {"rss_bytes": args.max_rss_bytes, "target_bytes": args.max_target_bytes, "output_bytes": args.max_output_bytes, "report_bytes": args.max_report_bytes, "timeout_seconds": args.timeout_seconds},
+            "resource_caps": {
+                "rss_bytes": args.max_rss_bytes,
+                "target_bytes": args.max_target_bytes,
+                "output_bytes": args.max_output_bytes,
+                "report_bytes": args.max_report_bytes,
+                "host_bytes": args.max_host_bytes,
+                "event_bytes": args.max_event_bytes,
+                "receipt_bytes": args.max_receipt_bytes,
+                "timeout_seconds": args.timeout_seconds,
+                "max_load_delta": args.max_load_delta,
+                "max_prerun_load": args.max_prerun_load,
+            },
             "events": [event["endpoint"] + "/" + event["policy"] + "/" + event["label"] for event in events],
             "qualification_status": "capture_complete_pending_analysis",
         }
-        write_json_exclusive(args.output_dir / "receipt.json", receipt)
+        write_json_exclusive(args.output_dir / "receipt.json", receipt, args.max_receipt_bytes)
         return 0
     except (OSError, TimingError, ValueError) as error:
         print(f"opc read-ahead timing rejected: {error}", file=sys.stderr)
