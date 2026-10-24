@@ -18,12 +18,16 @@ and correctness, calibration, and timed reports reject a route or fixture
 identity mismatch. Serialization and full fidelity checks remain outside the
 timed operation interval.
 
-The protocol tests also exercise real temporary Git/source, lock, probe, build
-binary, target, and manifest files. They verify that mutating each bound input
-after the initial check is rejected by the corresponding at-use guard. The
-runner remains fail-closed for strict JSON, finite numeric limits, source and
-resource overlap, exact source/lock/probe/binary identities, and the fixed
-ABBA route set.
+The protocol tests also exercise real temporary Git/source roots, lock files,
+probe source, build binaries, target directories, and a manifest. They verify
+that mutating the manifest, lock, probe source, and each normal/allocator
+binary for both baseline and candidate after the initial check is rejected by
+the corresponding at-use guard. Source-root cleanliness and target path/size
+guards are checked on every recheck, but fixture-copy, external build-receipt,
+toolchain, and cargo-configuration mutation are outside this source-only
+packet. The runner remains fail-closed for strict JSON, finite numeric limits,
+source and resource overlap, exact source/lock/probe/binary identities, and
+the fixed ABBA route set.
 
 ## Source-only checks
 
