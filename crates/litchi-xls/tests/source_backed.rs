@@ -2572,7 +2572,7 @@ fn deferred_materialized_package_handoff_keeps_the_original_source_fence() {
 #[test]
 fn deferred_package_handoff_promotes_original_source_changes_for_primary_edit_and_replay() {
     let (source, deferred, sheet_index, reference, _sheet_name) = deferred_numeric_fixture();
-    let handoff = Package::from_source(deferred.source_workbook().unwrap().clone()).unwrap();
+    let handoff = Package::from_source(deferred).unwrap();
 
     let mut edit = handoff.edit().unwrap();
     source.bump();
@@ -2584,7 +2584,7 @@ fn deferred_package_handoff_promotes_original_source_changes_for_primary_edit_an
     ));
 
     let (source, deferred, _sheet_index, _reference, _sheet_name) = deferred_numeric_fixture();
-    let handoff = Package::from_source(deferred.source_workbook().unwrap().clone()).unwrap();
+    let handoff = Package::from_source(deferred).unwrap();
     let patch = handoff.edit().unwrap().commit().unwrap().patch().clone();
     source.bump();
     assert!(matches!(
