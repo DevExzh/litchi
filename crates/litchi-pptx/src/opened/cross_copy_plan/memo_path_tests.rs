@@ -73,8 +73,10 @@ fn with_pictures(bytes: &[u8], slide: usize, pictures: &[(&str, &[u8])]) -> Resu
 }
 
 fn repack_stored(bytes: &[u8], stored: &str) -> Vec<u8> {
-    let reader = ArchiveReader::new(bytes).expect("fixture archive");
-    let mut writer = StreamingArchiveWriter::new();
+    let reader = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("fixture archive");
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in reader.file_names() {
         let payload = reader.read(name).expect("fixture member");
         if name == stored {

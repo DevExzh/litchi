@@ -180,7 +180,8 @@ impl ReadAt for ZeroAfterArmSource {
 }
 
 fn package_bytes(deflated: bool, payload: &[u8]) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("mimetype", MIME).unwrap();
     if deflated {
         writer

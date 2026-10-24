@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
 
     let data = fs::read(&path)?;
-    let archive = ArchiveReader::new(&data)?;
+    let archive = ArchiveReader::new(&data, soapberry_zip::office::ArchiveLimits::default())?;
 
     if !archive.contains(&entry_name) {
         eprintln!("Entry not found. Available entries:");

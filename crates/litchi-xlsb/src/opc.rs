@@ -271,7 +271,11 @@ mod tests {
     /// match.
     fn effective_archive_snapshot(package: &Package) -> Vec<(String, Vec<u8>)> {
         let bytes = package.to_bytes().unwrap();
-        let reader = soapberry_zip::office::ArchiveReader::new(&bytes).unwrap();
+        let reader = soapberry_zip::office::ArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let mut members = reader
             .file_names()
             .map(|name| (name.to_owned(), reader.read(name).unwrap()))

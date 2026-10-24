@@ -77,7 +77,7 @@ fn fixture_bytes(relative: &str) -> FixtureResult<Vec<u8>> {
 }
 
 fn archive_members(bytes: &[u8]) -> FixtureResult<BTreeMap<String, Vec<u8>>> {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| FixtureError(format!("open fixture archive: {error:?}")))?;
     archive
         .file_names()
@@ -100,9 +100,10 @@ fn rewrite_archive<F>(bytes: &[u8], mut rewrite: F) -> FixtureResult<Vec<u8>>
 where
     F: FnMut(&str, Vec<u8>) -> FixtureResult<Option<Vec<u8>>>,
 {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| FixtureError(format!("open fixture archive: {error:?}")))?;
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let content = archive
             .read(name)
@@ -129,9 +130,10 @@ fn replace_member(bytes: &[u8], selected: &str, replacement: Vec<u8>) -> Fixture
 }
 
 fn rename_member(bytes: &[u8], selected: &str, replacement: &str) -> FixtureResult<Vec<u8>> {
-    let archive = ArchiveReader::new(bytes)
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .map_err(|error| FixtureError(format!("open fixture archive: {error:?}")))?;
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let content = archive
             .read(name)
@@ -159,7 +161,8 @@ fn add_member(bytes: &[u8], added: &str, content: Vec<u8>) -> FixtureResult<Vec<
     if members.contains_key(added) {
         return Err(FixtureError(format!("fixture already has member {added}")));
     }
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for (name, member) in members {
         writer
             .write_stored(&name, &member)

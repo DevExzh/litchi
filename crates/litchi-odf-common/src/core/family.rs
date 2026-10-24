@@ -1573,7 +1573,11 @@ mod tests {
                 .ok()
                 .map(|xml| (xml, body_marker, family_name));
         }
-        let reader = soapberry_zip::office::ArchiveReader::new(&bytes).ok()?;
+        let reader = soapberry_zip::office::ArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .ok()?;
         let entry = reader.read("content.xml").ok()?;
         String::from_utf8(entry)
             .ok()

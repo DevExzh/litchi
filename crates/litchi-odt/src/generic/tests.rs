@@ -12,8 +12,10 @@ use std::io::{Cursor, Read};
 use std::num::{NonZeroU64, NonZeroUsize};
 
 fn replace_zip_member_raw(package: &[u8], path: &str, replacement: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(package).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(package, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut replaced = false;
     for name in archive.file_names() {
         let data = if name == path {

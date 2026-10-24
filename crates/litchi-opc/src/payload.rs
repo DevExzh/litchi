@@ -102,12 +102,8 @@ impl DeferredPartSource {
         let bytes = &self.bytes;
         self.index
             .get_or_init(|| {
-                IndexedArchive::from_reader_with_limits(
-                    Arc::clone(bytes),
-                    end_offset,
-                    limits.zip_limits(),
-                )
-                .map_err(OpcError::from)
+                IndexedArchive::from_reader(Arc::clone(bytes), end_offset, limits.zip_limits())
+                    .map_err(OpcError::from)
             })
             .as_ref()
             .map_err(replicate_deferred_error)

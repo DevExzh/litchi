@@ -141,12 +141,16 @@ fn remove_owned_and_invert(
 }
 
 fn member_names(bytes: &[u8]) -> Vec<String> {
-    let archive = ArchiveReader::new(bytes).unwrap();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     archive.file_names().map(|name| name.to_string()).collect()
 }
 
 fn member(bytes: &[u8], name: &str) -> Vec<u8> {
-    ArchiveReader::new(bytes).unwrap().read(name).unwrap()
+    ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .unwrap()
+        .read(name)
+        .unwrap()
 }
 
 const SAMPLE: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/sample.pptx");
@@ -217,8 +221,10 @@ fn a_slide_whose_edge_names_a_missing_part_is_a_typed_refusal() {
 
 /// `shapes.pptx` with slide 3 also showing slide 1's picture.
 fn shapes_with_a_shared_picture() -> &'static [u8] {
-    let archive = ArchiveReader::new(SHAPES).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(SHAPES, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let mut bytes = archive.read(name).unwrap();
         if name == "ppt/slides/_rels/slide3.xml.rels" {

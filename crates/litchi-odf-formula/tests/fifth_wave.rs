@@ -560,7 +560,8 @@ fn raw_formula_package(content: &str, resource: Option<(&str, &[u8])>) -> Vec<u8
     let manifest = format!(
         r#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="{ODF_FORMULA}"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>{resource_entry}</manifest:manifest>"#
     );
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive
         .write_stored("mimetype", ODF_FORMULA.as_bytes())
         .expect("mimetype");

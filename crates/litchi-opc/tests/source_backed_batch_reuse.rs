@@ -86,7 +86,8 @@ fn fixture() -> Fixture {
         expected_by_index.push(payload(u8::try_from(index * 23 + 7).unwrap()));
     }
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();

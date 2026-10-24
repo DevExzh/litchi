@@ -126,8 +126,8 @@ impl<'data> Archive<'data> {
     pub fn new(data: &'data [u8], limits: ArchiveLimits) -> Result<Self> {
         #[cfg(test)]
         super::model::note_index_build();
-        let reader = ArchiveReader::new_with_limits(data, limits.into_zip_limits())
-            .map_err(map_archive_error)?;
+        let reader =
+            ArchiveReader::new(data, limits.into_zip_limits()).map_err(map_archive_error)?;
         Ok(Self {
             reader: ArchiveReaderKind::Borrowed(reader),
         })

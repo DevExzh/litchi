@@ -284,13 +284,13 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn fixture_content_digest(fixture: &[u8]) -> Result<Digest, Box<dyn Error>> {
-    let archive = ArchiveReader::new(fixture)?;
+    let archive = ArchiveReader::new(fixture, soapberry_zip::office::ArchiveLimits::default())?;
     let content = archive.read("content.xml")?;
     Ok(Digest::from_bytes(&content))
 }
 
 fn member_digest(bytes: &[u8], name: &str) -> Result<Digest, Box<dyn Error>> {
-    let archive = ArchiveReader::new(bytes)?;
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let member = archive.read(name)?;
     Ok(Digest::from_bytes(&member))
 }
@@ -298,7 +298,7 @@ fn member_digest(bytes: &[u8], name: &str) -> Result<Digest, Box<dyn Error>> {
 fn scoped_recipient_fixture(
     fixture: &[u8],
 ) -> Result<(Vec<u8>, String, Option<Digest>), Box<dyn Error>> {
-    let reader = ArchiveReader::new(fixture)?;
+    let reader = ArchiveReader::new(fixture, soapberry_zip::office::ArchiveLimits::default())?;
     let mut names: Vec<String> = reader.file_names().map(str::to_owned).collect();
     names.retain(|name| !name.ends_with('/'));
     let target = names
@@ -324,7 +324,8 @@ fn scoped_recipient_fixture(
         ordered.push("mimetype".to_owned());
     }
     ordered.extend(names.into_iter().filter(|name| name != "mimetype"));
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut changed_existing = false;
     for name in ordered {
         let mut bytes = reader.read(&name)?;

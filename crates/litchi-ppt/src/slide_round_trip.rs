@@ -820,8 +820,10 @@ mod tests {
     }
 
     fn replace_zip_member_raw(package: &[u8], path: &str, replacement: &[u8]) -> Vec<u8> {
-        let archive = ArchiveReader::new(package).unwrap();
-        let mut writer = StreamingArchiveWriter::new();
+        let archive =
+            ArchiveReader::new(package, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         let normalized_path = path.trim_start_matches('/');
         let mut replaced = false;
         for name in archive.file_names() {

@@ -76,7 +76,8 @@ fn pack(uri: &str) -> PackURI {
 }
 
 fn archive_bytes(include_empty_owned_relationships: bool, include_large_part: bool) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let content_types = if include_empty_owned_relationships {
         ORIGINAL_CONTENT_TYPES.to_vec()
     } else {
@@ -155,7 +156,8 @@ fn signed_package_bytes() -> Vec<u8> {
         signature_relationship.as_bytes(),
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", &content_types)
         .unwrap();
@@ -219,11 +221,14 @@ fn publish(source: &[u8], plan: SourceTopologyPlan) -> litchi_opc::Result<Vec<u8
 }
 
 fn member(bytes: &[u8], name: &str) -> Vec<u8> {
-    ArchiveReader::new(bytes).unwrap().read(name).unwrap()
+    ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .unwrap()
+        .read(name)
+        .unwrap()
 }
 
 fn optional_member(bytes: &[u8], name: &str) -> Option<Vec<u8>> {
-    ArchiveReader::new(bytes)
+    ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .unwrap()
         .file_names()
         .any(|candidate| candidate == name)
@@ -231,12 +236,13 @@ fn optional_member(bytes: &[u8], name: &str) -> Option<Vec<u8>> {
 }
 
 fn rewrite_member(source: &[u8], name: &str, replacement: &[u8]) -> Vec<u8> {
-    let names = ArchiveReader::new(source)
+    let names = ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())
         .unwrap()
         .file_names()
         .map(str::to_owned)
         .collect::<Vec<_>>();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member_name in names {
         let bytes = if member_name == name {
             replacement.to_vec()

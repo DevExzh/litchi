@@ -1046,8 +1046,8 @@ fn raw_members(
     let limits = archive_limits(compressed_limit, expansion_limit);
     let archive = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new_with_limits(&archive, &mut scratch, limits)?;
-    let reader = ArchiveReader::new_with_limits(bytes, limits)?;
+    let index = PreservationIndex::new(&archive, &mut scratch, limits)?;
+    let reader = ArchiveReader::new(bytes, limits)?;
     let mut members = BTreeMap::new();
     for entry in index.entries() {
         let name = std::str::from_utf8(entry.raw_name_bytes())?.to_owned();

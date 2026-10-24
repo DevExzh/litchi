@@ -40,7 +40,8 @@ fn archive(document: &[u8]) -> Vec<u8> {
     let relationships = format!(
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="word/document.xml"/></Relationships>"#
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -65,7 +66,7 @@ fn proof(bytes: &[u8]) -> VerifiedSource {
 
 fn published_document(package: &OpcPackage) -> Vec<u8> {
     let output = PackageWriter::to_bytes(package).unwrap();
-    ArchiveReader::new(&output)
+    ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
         .unwrap()
         .read("word/document.xml")
         .unwrap()
@@ -332,10 +333,13 @@ fn every_route_audits_the_bytes_it_publishes() {
                 Ok(bytes) => panic!(
                     "{label}, owned {owned}: published {:?} unaudited",
                     String::from_utf8_lossy(
-                        &ArchiveReader::new(&bytes)
-                            .unwrap()
-                            .read("word/document.xml")
-                            .unwrap()
+                        &ArchiveReader::new(
+                            &bytes,
+                            soapberry_zip::office::ArchiveLimits::default()
+                        )
+                        .unwrap()
+                        .read("word/document.xml")
+                        .unwrap()
                     )
                 ),
             }

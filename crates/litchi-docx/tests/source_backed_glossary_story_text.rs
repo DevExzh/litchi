@@ -416,7 +416,9 @@ fn with_unaudited_member(archive: &[u8], member: &str, bytes: &[u8]) -> Vec<u8> 
     let reader =
         litchi_opc::phys_pkg::PhysPkgReader::new(archive, litchi_opc::SourceLimits::default())
             .unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for name in reader.member_names().unwrap() {
         let data = if name == member {
             bytes.to_vec()

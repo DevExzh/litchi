@@ -8,7 +8,8 @@ use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 use super::*;
 
 fn members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).unwrap();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     archive
         .file_names()
         .map(|name| (name.to_owned(), archive.read(name).unwrap()))
@@ -19,8 +20,10 @@ fn rewrite_member<F>(bytes: &[u8], selected: &str, mut rewrite: F) -> Vec<u8>
 where
     F: FnMut(&[u8]) -> Vec<u8>,
 {
-    let archive = ArchiveReader::new(bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let content = archive.read(name).unwrap();
         if name == selected {
@@ -33,8 +36,10 @@ where
 }
 
 fn add_member(bytes: &[u8], name: &str, content: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member in archive.file_names() {
         writer
             .write_stored(member, &archive.read(member).unwrap())

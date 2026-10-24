@@ -1019,7 +1019,8 @@ mod tests {
         let source = PhysPkgReader::new(&archive, litchi_opc::SourceLimits::default())
             .expect("source package");
         let static_payload = source.read_member("ppt/presProps.xml").unwrap();
-        let mut rewritten = StreamingArchiveWriter::new();
+        let mut rewritten =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for name in source.member_names().unwrap() {
             let payload = source.read_member(&name).unwrap();
             rewritten.write_stored(&name, &payload).unwrap();

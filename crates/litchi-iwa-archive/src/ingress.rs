@@ -922,7 +922,8 @@ mod tests {
         };
         let stream =
             SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/Document.iwa", &stream)?;
         writer.write_deflated("Metadata/Properties.plist", b"properties")?;
         writer.finish_to_bytes().map_err(crate::Error::from)

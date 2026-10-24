@@ -831,14 +831,18 @@ mod tests {
     use crate::{BlobPart, OpcPackage, PackageWriter};
 
     fn source(xml: &[u8]) -> OpcPackage {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer.write_stored("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/part.xml" ContentType="application/xml"/></Types>"#).unwrap();
         writer.write_stored("part.xml", xml).unwrap();
         OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap(), SourceLimits::default()).unwrap()
     }
 
     fn source_with_limits(xml: &[u8], limits: SourceLimits) -> OpcPackage {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer.write_stored("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/part.xml" ContentType="application/xml"/></Types>"#).unwrap();
         writer.write_stored("part.xml", xml).unwrap();
         OpcPackage::from_bytes(&writer.finish_to_bytes().unwrap(), limits).unwrap()

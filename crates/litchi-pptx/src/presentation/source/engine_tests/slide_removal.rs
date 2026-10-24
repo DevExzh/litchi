@@ -63,11 +63,14 @@ fn write_removal(bytes: &[u8], position: usize) -> crate::Result<Vec<u8>> {
 }
 
 fn member(bytes: &[u8], name: &str) -> Vec<u8> {
-    ArchiveReader::new(bytes).unwrap().read(name).unwrap()
+    ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .unwrap()
+        .read(name)
+        .unwrap()
 }
 
 fn has_member(bytes: &[u8], name: &str) -> bool {
-    ArchiveReader::new(bytes)
+    ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
         .unwrap()
         .file_names()
         .any(|candidate| candidate == name)
@@ -90,12 +93,13 @@ fn rewrite_archive(
     replacements: &[(&str, &[u8])],
     additions: &[(&str, &[u8])],
 ) -> Vec<u8> {
-    let names = ArchiveReader::new(source)
+    let names = ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())
         .unwrap()
         .file_names()
         .map(str::to_owned)
         .collect::<Vec<_>>();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in names {
         let bytes = replacements
             .iter()

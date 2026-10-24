@@ -73,7 +73,8 @@ fn source_positions(package: &Package) -> Vec<Position> {
 }
 
 fn decoded_members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).unwrap();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let names = archive.file_names().map(str::to_owned).collect::<Vec<_>>();
     names
         .into_iter()
@@ -641,7 +642,9 @@ fn alternate_layout_target_spelling_is_refused_before_noninvertible_removal() {
     let mut members = decoded_members(&fixture());
     let rels = members.get_mut("ppt/slides/_rels/slide2.xml.rels").unwrap();
     *rels = replace_once(rels, b"../slideLayouts/", b"/ppt/slideLayouts/");
-    let mut archive = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut archive = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for (name, bytes) in members {
         archive.write_stored(&name, &bytes).unwrap();
     }

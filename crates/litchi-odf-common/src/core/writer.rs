@@ -726,10 +726,7 @@ impl PackageWriter<io::Cursor<Vec<u8>>> {
     #[must_use]
     pub fn new(limits: StreamingArchiveLimits) -> Self {
         Self {
-            zip_writer: StreamingArchiveWriter::with_writer_and_limits(
-                io::Cursor::new(Vec::new()),
-                limits,
-            ),
+            zip_writer: StreamingArchiveWriter::with_writer(io::Cursor::new(Vec::new()), limits),
             limits,
             mimetype: None,
             manifest_entries: Vec::new(),
@@ -765,7 +762,7 @@ impl<W: Write> PackageWriter<W> {
     /// policy.
     pub fn with_writer(writer: W, limits: StreamingArchiveLimits) -> Self {
         Self {
-            zip_writer: StreamingArchiveWriter::with_writer_and_limits(writer, limits),
+            zip_writer: StreamingArchiveWriter::with_writer(writer, limits),
             limits,
             mimetype: None,
             manifest_entries: Vec::new(),
@@ -2689,7 +2686,8 @@ mod tests {
             )
             .unwrap();
         let bytes = writer.finish().unwrap();
-        let archive = ArchiveReader::new(&bytes).unwrap();
+        let archive =
+            ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         let manifest_xml = archive.read("META-INF/manifest.xml").unwrap();
         let manifest_text = std::str::from_utf8(&manifest_xml).unwrap();
         let manifest = super::super::manifest::Manifest::parse(
@@ -2741,7 +2739,8 @@ mod tests {
             .unwrap();
         writer.copy_auxiliary_files_from(&source).unwrap();
         let output = writer.finish().unwrap();
-        let archive = ArchiveReader::new(&output).unwrap();
+        let archive =
+            ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         assert_eq!(archive.read("manifest.rdf").unwrap(), source_rdf);
     }
 
@@ -2850,7 +2849,8 @@ mod tests {
         writer.add_file("content.xml", b"<content/>").unwrap();
 
         let bytes = writer.finish().unwrap();
-        let archive = ArchiveReader::new(&bytes).unwrap();
+        let archive =
+            ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         let manifest = archive.read("META-INF/manifest.xml").unwrap();
         let manifest = std::str::from_utf8(&manifest).unwrap();
 
@@ -2876,7 +2876,8 @@ mod tests {
             .unwrap();
         destination.copy_auxiliary_files_from(&source).unwrap();
         let bytes = destination.finish().unwrap();
-        let archive = ArchiveReader::new(&bytes).unwrap();
+        let archive =
+            ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         let manifest = archive.read("META-INF/manifest.xml").unwrap();
         let manifest = std::str::from_utf8(&manifest).unwrap();
 

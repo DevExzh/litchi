@@ -50,7 +50,8 @@ fn generated_xml_is_read_back_and_has_one_manifest_record() {
     assert_eq!(report.fragments(), 1);
 
     let bytes = writer.finish_to_bytes().unwrap();
-    let archive = ArchiveReader::new(&bytes).unwrap();
+    let archive =
+        ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert_eq!(
         archive.read("content.xml").unwrap(),
         b"<root><row id=\"1\">x</row></root>"

@@ -951,7 +951,8 @@ mod font_settings_tests {
         } else {
             r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>"#
         };
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for (name, payload) in [
             ("[Content_Types].xml", content_types.as_bytes()),
             (

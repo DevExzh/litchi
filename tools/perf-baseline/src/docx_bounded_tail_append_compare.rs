@@ -769,7 +769,7 @@ fn limits_record(copy: CopyLimits, bounded: TailAppendLimits) -> LimitsRecord {
 
 fn member_identities(bytes: &[u8]) -> BenchResult<Vec<MemberIdentity>> {
     let archive = ZipArchive::from_slice(bytes)?;
-    let reader = ArchiveReader::new(bytes)?;
+    let reader = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let mut records = Vec::new();
     for result in archive.entries() {
         let entry = result?;
@@ -1100,7 +1100,8 @@ fn route_record(
     stale_source_refusal_verified: bool,
 ) -> BenchResult<RouteCorpusRecord> {
     let output_members = member_identities(output)?;
-    let output_reader = ArchiveReader::new(output)?;
+    let output_reader =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let output_xml = output_reader.read(MAIN_PATH)?;
     let output_main_xml_expected_raw_verified = output_xml == expected_main_xml;
     let (output_semantic, output_texts) = semantic_record(output)?;
@@ -1159,7 +1160,10 @@ fn build_corpus(count: usize) -> BenchResult<Corpus> {
     let source_archive_vec = source_archive(&source_xml, 0)?;
     let source_guard = source_archive_vec.clone();
     let source_members = member_identities(&source_archive_vec)?;
-    let source_reader = ArchiveReader::new(&source_archive_vec)?;
+    let source_reader = ArchiveReader::new(
+        &source_archive_vec,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let source_main_xml_archive = source_reader.read(MAIN_PATH)?;
     let source_main_xml_archive_verified = source_main_xml_archive == source_xml;
     let source_opaque = find_member(&source_members, OPAQUE_PATH)?;

@@ -114,7 +114,12 @@ struct RawMember {
 fn raw_members(bytes: &[u8]) -> BTreeMap<String, RawMember> {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let mut records = archive.entries(&mut buffer);
     index
         .entries()
@@ -244,7 +249,9 @@ fn fixture_with_sheet(sheet_xml: String, signed: bool) -> Vec<u8> {
         drawing = rt::DRAWING,
     );
 
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();

@@ -350,8 +350,11 @@ pub fn bytes(value: &[u8], limits: Limits) -> Result<Option<Format>> {
         // extra-field-carrying, or relocated `mimetype` member is a tolerated
         // container deviation (LENIENCY_AUDIT F9.1) recorded by the
         // subsequent open, so it no longer withholds the classification.
-        let archive =
-            soapberry_zip::office::ArchiveReader::new(value).map_err(map_detector_zip_error)?;
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            value,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .map_err(map_detector_zip_error)?;
         // The strict offset-0 sniff reads only the local header. When it
         // matched, the central record must agree that the member is stored:
         // a local/central compression disagreement is structural corruption
@@ -944,7 +947,7 @@ fn tolerant_packaged_mime(value: &[u8]) -> Option<Format> {
         return None;
     }
     let length = u64::try_from(value.len()).ok()?;
-    let archive = soapberry_zip::office::IndexedArchive::from_reader_with_limits(
+    let archive = soapberry_zip::office::IndexedArchive::from_reader(
         value,
         length,
         ArchiveLimits::default().into_zip_limits(),
@@ -984,7 +987,7 @@ fn tolerant_packaged_mime_read_at(
     if !tolerant_lookup_admitted(header, name) {
         return Ok(None);
     }
-    let archive = match soapberry_zip::office::IndexedArchive::from_reader_with_limits(
+    let archive = match soapberry_zip::office::IndexedArchive::from_reader(
         ReadAtZipSource { source },
         length,
         ArchiveLimits::default().into_zip_limits(),

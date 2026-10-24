@@ -970,7 +970,8 @@ fn build_corpus() -> AnyResult<Corpus> {
         .into());
     }
     let ranges = parse_zip_ranges(&archive)?;
-    let archive_reader = ArchiveReader::new(&archive)?;
+    let archive_reader =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?;
     let mut members = BTreeMap::new();
     for name in archive_reader.file_names() {
         let bytes = archive_reader.read(name)?;

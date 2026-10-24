@@ -748,7 +748,7 @@ impl<'package> SourcePartSplicePlan<'package> {
         let index = self
             .package
             .archive
-            .preservation_index_with_limits(&mut scratch, self.package.limits.zip_limits())
+            .preservation_index(&mut scratch, self.package.limits.zip_limits())
             .map_err(map_preservation_error)?;
         self.package.source.ensure_current()?;
         if index.archive_end_offset() != self.package.source.length {

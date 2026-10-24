@@ -55,8 +55,11 @@ fn source_with_worksheet_xml(source_xml: &str) -> Vec<u8> {
     // Build a ZIP source fixture so the public source-backed path owns
     // worksheet validation. Changed publication requires compact element spacing.
     let base = two_sheets();
-    let archive = ArchiveReader::new(&base).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&base, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for member in archive.file_names() {
         let content = if member == "xl/worksheets/sheet1.xml" {
             source_xml.as_bytes().to_vec()

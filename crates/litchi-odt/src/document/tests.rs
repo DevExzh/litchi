@@ -16,7 +16,9 @@ fn document(content: &str) -> Document {
 }
 
 fn raw_package(content: &[u8]) -> Vec<u8> {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored("mimetype", constants::ODF_TEXT.as_bytes())
         .unwrap();

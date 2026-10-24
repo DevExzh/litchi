@@ -54,7 +54,8 @@ fn fixture(name: &str) -> Vec<u8> {
 /// A package written by this crate's own ZIP writer: stored structural
 /// members and deflated parts.
 fn built_package() -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored(
             "[Content_Types].xml",

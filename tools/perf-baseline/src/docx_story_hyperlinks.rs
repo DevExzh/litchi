@@ -285,7 +285,10 @@ fn build_archive() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 pub(super) fn build_corpus() -> Result<Corpus, Box<dyn std::error::Error>> {
     let archive = build_archive()?;
     let opc = OpcPackage::from_bytes(&archive, litchi_opc::SourceLimits::default())?;
-    let archive_member_count = ArchiveReader::new(&archive)?.file_names().count();
+    let archive_member_count =
+        ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?
+            .file_names()
+            .count();
     let uncompressed_payload_bytes = opc
         .try_iter_parts()
         .map(|part| part.expect("part payload decodes"))

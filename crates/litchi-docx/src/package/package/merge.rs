@@ -456,7 +456,8 @@ mod tests {
             ct::WML_DOCUMENT_MAIN,
             ct::WML_SETTINGS
         );
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for (name, payload) in [
             ("[Content_Types].xml", content_types.as_bytes()),
             (

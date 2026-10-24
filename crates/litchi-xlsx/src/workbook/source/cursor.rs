@@ -744,7 +744,8 @@ mod tests {
 
     /// A one-sheet workbook whose worksheet part is `xml`.
     fn workbook(xml: &str) -> SourceBackedWorkbook {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         let content_types = format!(
             r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="{}"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="{}"/><Override PartName="/xl/sharedStrings.xml" ContentType="{}"/><Override PartName="/xl/styles.xml" ContentType="{}"/></Types>"#,
             ct::SML_SHEET_MAIN,

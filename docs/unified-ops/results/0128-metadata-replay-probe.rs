@@ -8,8 +8,10 @@ fn metadata_replay_probe() {
     use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
     let initial = crate::Package::new().unwrap().to_bytes().unwrap();
-    let archive = ArchiveReader::new(&initial).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&initial, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let mut bytes = archive.read(name).unwrap();
         if name == "[Content_Types].xml" {

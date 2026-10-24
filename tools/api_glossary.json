@@ -11815,6 +11815,56 @@
       "families": []
     },
     {
+      "id": "soapberry-zip",
+      "package": "soapberry-zip",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "soapberry_zip",
+          "replacement": "use the canonical raw ZIP method with required ArchiveLimits or StreamingArchiveLimits (record 0362zae)",
+          "match": "suffix"
+        },
+        {
+          "name": "with_limits",
+          "scope": "soapberry_zip",
+          "replacement": "use the canonical raw ZIP method with required ArchiveLimits or StreamingArchiveLimits (record 0362zae)"
+        },
+        {
+          "name": "new_with_cache_limits",
+          "scope": "soapberry_zip::LazyArchiveReader",
+          "replacement": "use LazyArchiveReader::new(data, archive_limits, cache_limits) (record 0362zaea)"
+        },
+        {
+          "name": "new_with_active_flight_limits",
+          "scope": "soapberry_zip::LazyArchiveCacheLimits",
+          "replacement": "use LazyArchiveCacheLimits::new(max_bytes, max_entries, max_active_flights, max_flight_key_bytes) (record 0362zaea)"
+        },
+        {
+          "name": "new_with_flight_limits",
+          "scope": "soapberry_zip::LazyArchiveCacheLimits",
+          "replacement": "use LazyArchiveCacheLimits::new(max_bytes, max_entries, max_active_flights, max_flight_key_bytes) (record 0362zaea)"
+        },
+        {
+          "name": "with_active_flight_limits",
+          "scope": "soapberry_zip::LazyArchiveCacheLimits",
+          "replacement": "use LazyArchiveCacheLimits::active_flight_limits (record 0362zaea)"
+        },
+        {
+          "name": "with_flight_limits",
+          "scope": "soapberry_zip::LazyArchiveCacheLimits",
+          "replacement": "use LazyArchiveCacheLimits::active_flight_limits (record 0362zaea)"
+        },
+        {
+          "name": "max_active_key_bytes",
+          "scope": "soapberry_zip::LazyArchiveCacheLimits",
+          "replacement": "use max_flight_key_bytes_value (record 0362zaea)"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "ograph",
       "package": "litchi-ograph",
       "default_features": false,

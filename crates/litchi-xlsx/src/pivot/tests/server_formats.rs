@@ -415,7 +415,9 @@ fn with_unaudited_table(archive: Vec<u8>, published: &str, table_xml: &str) -> V
     ];
     let reader =
         litchi_opc::phys_pkg::PhysPkgReader::new(&archive, SourceLimits::default()).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for name in reader.member_names().unwrap() {
         let data = if tables.contains(&name.as_str()) {
             table_xml.as_bytes().to_vec()

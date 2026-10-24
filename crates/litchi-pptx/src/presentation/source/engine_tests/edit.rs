@@ -230,7 +230,9 @@ fn svg_transition_fixture() -> Vec<u8> {
 }
 
 fn unchecked_slide_fixture(slide_xml: &[u8]) -> Vec<u8> {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored(
             "[Content_Types].xml",
@@ -447,7 +449,12 @@ fn raw_records(data: &[u8]) -> HashMap<Vec<u8>, RawRecord> {
         .unwrap()
         .into_zip_archive();
     let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = soapberry_zip::PreservationIndex::new(&archive, &mut scratch).unwrap();
+    let index = soapberry_zip::PreservationIndex::new(
+        &archive,
+        &mut scratch,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     index
         .entries()
         .iter()

@@ -56,7 +56,8 @@ fn fixture_bytes(name: &str) -> Vec<u8> {
 }
 
 fn rewrite_member(source: &[u8], member: &str, edit: impl FnOnce(String) -> String) -> Vec<u8> {
-    let archive = ArchiveReader::new(source).expect("fixture archive");
+    let archive = ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())
+        .expect("fixture archive");
     let replacement = edit(
         String::from_utf8(
             archive
@@ -66,7 +67,8 @@ fn rewrite_member(source: &[u8], member: &str, edit: impl FnOnce(String) -> Stri
         .expect("member is UTF-8 in local design fixture"),
     )
     .into_bytes();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let bytes = if name == member {
             replacement.clone()
@@ -79,8 +81,10 @@ fn rewrite_member(source: &[u8], member: &str, edit: impl FnOnce(String) -> Stri
 }
 
 fn add_member(source: &[u8], name: &str, bytes: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(source).expect("fixture archive");
-    let mut writer = StreamingArchiveWriter::new();
+    let archive = ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())
+        .expect("fixture archive");
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member in archive.file_names() {
         writer
             .write_deflated(member, &archive.read(member).expect("copy fixture member"))
@@ -109,14 +113,15 @@ fn signed_fixture(source: &[u8]) -> Vec<u8> {
 }
 
 fn member(source: &[u8], name: &str) -> Vec<u8> {
-    ArchiveReader::new(source)
+    ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())
         .expect("fixture archive")
         .read(name)
         .expect("fixture member")
 }
 
 fn package_members(source: &[u8]) -> Vec<(String, Vec<u8>)> {
-    let archive = ArchiveReader::new(source).expect("fixture archive");
+    let archive = ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())
+        .expect("fixture archive");
     archive
         .file_names()
         .map(|name| {

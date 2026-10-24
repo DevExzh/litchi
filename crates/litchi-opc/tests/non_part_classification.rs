@@ -26,7 +26,8 @@ const RELS_AND_XML_MANIFEST: &[u8] = br#"<Types xmlns="http://schemas.openxmlfor
 
 /// Build a ZIP archive from `(member name, contents)` pairs, in order.
 fn archive(members: &[(&str, &[u8])]) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for (name, blob) in members {
         writer
             .write_stored(name, blob)

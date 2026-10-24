@@ -243,7 +243,8 @@ fn archive_for(worksheet: &[u8]) -> AnyResult<Vec<u8>> {
         r#"<Relationships xmlns="{OPC_REL}"><Relationship Id="rIdSheet" Type="{REL}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("[Content_Types].xml", content_types.as_bytes())?;
     writer.write_stored("_rels/.rels", root_relationships.as_bytes())?;
     writer.write_stored("xl/workbook.xml", workbook.as_bytes())?;

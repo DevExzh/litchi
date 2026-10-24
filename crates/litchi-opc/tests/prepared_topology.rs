@@ -283,10 +283,13 @@ fn mutation_plan() -> SourceTopologyPlan {
 }
 
 fn zip_member(bytes: &[u8], name: &str) -> Vec<u8> {
-    soapberry_zip::office::ArchiveReader::new(bytes)
-        .unwrap()
-        .read(name)
-        .unwrap()
+    soapberry_zip::office::ArchiveReader::new(
+        bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap()
+    .read(name)
+    .unwrap()
 }
 
 fn whitespace_rich_relationship_source() -> Vec<u8> {
@@ -310,7 +313,8 @@ fn whitespace_rich_relationship_source() -> Vec<u8> {
 </r:Relationships>
 <!--preserve-tail-->"#;
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .unwrap();
@@ -897,7 +901,7 @@ fn archive_uncompressed_total(bytes: &[u8]) -> u64 {
         .unwrap()
         .into_zip_archive();
     let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = soapberry_zip::PreservationIndex::new_with_limits(
+    let index = soapberry_zip::PreservationIndex::new(
         &archive,
         &mut scratch,
         soapberry_zip::office::ArchiveLimits::UNBOUNDED,
@@ -1883,7 +1887,8 @@ fn owned_effective_views_are_lazy_and_outlive_an_unchanged_candidate() {
     let (generated, _) = source_bytes_with_large_untouched_part();
     let reader =
         litchi_opc::phys_pkg::PhysPkgReader::new(&generated, SourceLimits::default()).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in reader.member_names().unwrap() {
         writer
             .write_stored(&name, &reader.read_member(&name).unwrap())
@@ -2464,7 +2469,8 @@ fn source_bytes_with_document(document: &[u8]) -> Vec<u8> {
     let generated = source_bytes();
     let reader =
         litchi_opc::phys_pkg::PhysPkgReader::new(&generated, SourceLimits::default()).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in reader.member_names().unwrap() {
         let bytes = if name == "word/document.xml" {
             document.to_vec()

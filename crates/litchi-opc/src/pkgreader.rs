@@ -50,9 +50,7 @@ pub(crate) fn indexed_archive_with_limits<R: soapberry_zip::ReaderAt>(
         located.declared_entries(),
         limits.max_archive_total_entries() as u64,
     )?;
-    let archive = located
-        .index_with_limits(limits.zip_limits())
-        .map_err(OpcError::from)?;
+    let archive = located.index(limits.zip_limits()).map_err(OpcError::from)?;
     // Source-backed ingress performs this bounded fixed-header scan before it
     // reserves catalog objects. IndexedArchive retains a proof under its
     // existing byte-stable ReaderAt contract, so the source catalog's own
@@ -2633,7 +2631,9 @@ mod tests {
     use std::sync::Arc;
 
     fn package_bytes(root_relationships: &[u8], document: &[u8]) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -2692,12 +2692,19 @@ mod tests {
 
     #[test]
     fn structural_member_reuses_lazy_shared_decompression_allocation() {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_deflated("payload.xml", b"shared structural payload")
             .unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
-        let archive = soapberry_zip::office::LazyArchiveReader::new(&bytes).unwrap();
+        let archive = soapberry_zip::office::LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
 
         let member = read_structural_member(&archive, "payload.xml").unwrap();
         let cached = archive.read_shared("payload.xml").unwrap();
@@ -2717,12 +2724,19 @@ mod tests {
 
     #[test]
     fn structural_member_keeps_stored_payload_borrowed() {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored("payload.xml", b"borrowed structural payload")
             .unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
-        let archive = soapberry_zip::office::LazyArchiveReader::new(&bytes).unwrap();
+        let archive = soapberry_zip::office::LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let source = archive
             .read_stored_borrowed("payload.xml")
             .unwrap()
@@ -2747,7 +2761,9 @@ mod tests {
 
     #[test]
     fn structural_member_uses_owned_fallback_for_indexed_archive() {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored("payload.xml", b"indexed structural payload")
             .unwrap();
@@ -2755,6 +2771,7 @@ mod tests {
         let archive = soapberry_zip::office::IndexedArchive::from_reader(
             Cursor::new(bytes.clone()),
             bytes.len() as u64,
+            soapberry_zip::office::ArchiveLimits::default(),
         )
         .unwrap();
 
@@ -2795,10 +2812,17 @@ mod tests {
 
     #[test]
     fn missing_relationship_parts_are_optional_but_malformed_xml_is_not() {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer.write_stored("placeholder", b"x").unwrap();
         let bytes = writer.finish_to_bytes().unwrap();
-        let archive = soapberry_zip::office::LazyArchiveReader::new(&bytes).unwrap();
+        let archive = soapberry_zip::office::LazyArchiveReader::new(
+            &bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let package_uri = PackURI::new(PACKAGE_URI).unwrap();
         assert!(
             PackageReader::load_rels_lazy(
@@ -2815,8 +2839,12 @@ mod tests {
             br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test" Target="document""#,
             b"document",
         );
-        let malformed_archive =
-            soapberry_zip::office::LazyArchiveReader::new(&malformed_bytes).unwrap();
+        let malformed_archive = soapberry_zip::office::LazyArchiveReader::new(
+            &malformed_bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+            soapberry_zip::office::LazyArchiveCacheLimits::default(),
+        )
+        .unwrap();
         let error = PackageReader::load_rels_lazy(
             &malformed_archive,
             &package_uri,
@@ -2865,7 +2893,9 @@ mod tests {
     }
 
     fn package_with_physical_parts(first: &str, second: &str) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -2878,7 +2908,9 @@ mod tests {
     }
 
     fn package_with_mixed_physical_parts() -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -2895,7 +2927,9 @@ mod tests {
     }
 
     fn package_with_corrupt_deflate_and_later_malformed_relationship() -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -3389,7 +3423,9 @@ mod tests {
         parts: &[(&str, &[u8])],
         document_relationships: Option<&[u8]>,
     ) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -3787,7 +3823,9 @@ mod tests {
     /// threshold's counting rule is exercised with a non-relationship member
     /// present that must not be counted.
     fn archive_with_relationship_members(count: usize) -> Vec<u8> {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         writer
             .write_deflated(CONTENT_TYPES_MEMBER, b"<Types/>")
             .unwrap();
@@ -3813,9 +3851,12 @@ mod tests {
         ] {
             let bytes = archive_with_relationship_members(relationship_members);
             let length = bytes.len() as u64;
-            let archive =
-                soapberry_zip::office::IndexedArchive::from_reader(Cursor::new(bytes), length)
-                    .unwrap();
+            let archive = soapberry_zip::office::IndexedArchive::from_reader(
+                Cursor::new(bytes),
+                length,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )
+            .unwrap();
             // The content-types member is present and is not a relationship
             // member, so it must not count towards the threshold.
             assert_eq!(archive.len(), relationship_members + 1);
@@ -3872,9 +3913,11 @@ mod tests {
         for path in fixtures {
             let bytes = std::fs::read(&path).unwrap();
             let length = bytes.len() as u64;
-            let Ok(archive) =
-                soapberry_zip::office::IndexedArchive::from_reader(Cursor::new(bytes), length)
-            else {
+            let Ok(archive) = soapberry_zip::office::IndexedArchive::from_reader(
+                Cursor::new(bytes),
+                length,
+                soapberry_zip::office::ArchiveLimits::default(),
+            ) else {
                 // A fixture that does not index at all refuses identically on
                 // both paths, because neither has been reached yet.
                 continue;

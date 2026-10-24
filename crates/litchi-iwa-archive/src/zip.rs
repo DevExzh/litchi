@@ -144,7 +144,7 @@ impl<'data> ZipArchive<'data> {
         })?;
         validated_limits.check_input_size(input_size, "ZIP input")?;
         let zip_limits = validated_limits.zip_limits();
-        let reader = ArchiveReader::new_with_limits(data, zip_limits)?;
+        let reader = ArchiveReader::new(data, zip_limits)?;
         let raw_archive = RawZipArchive::from_slice(data)?;
         let physical_entries = parse_physical_entries(data, &raw_archive, zip_limits)?;
         let mut central_order = Vec::new();
@@ -1032,7 +1032,8 @@ mod tests {
 
     #[test]
     fn constrained_index_precedes_physical_layout_materialization() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/A.iwa", b"a")?;
         writer.write_stored("Index/B.iwa", b"b")?;
         let mut bytes = writer.finish_to_bytes()?;
@@ -1067,7 +1068,8 @@ mod tests {
 
     #[test]
     fn physical_member_limit_counts_directory_records() -> Result<()> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("Index/", b"")?;
         writer.write_stored("Data/", b"")?;
         let bytes = writer.finish_to_bytes()?;
@@ -1100,7 +1102,8 @@ mod tests {
             b"",
             b"iwa",
         );
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("legacy.pages/Index.zip", &index)?;
         let bytes = writer.finish_to_bytes()?;
         let archive = ZipArchive::new_with_limits(&bytes, Limits::default())?;
@@ -1130,7 +1133,8 @@ mod tests {
             b"",
             b"iwa",
         );
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("legacy.pages/Index.zip", &index)?;
         let bytes = writer.finish_to_bytes()?;
         let archive = ZipArchive::new_with_limits(&bytes, Limits::default())?;

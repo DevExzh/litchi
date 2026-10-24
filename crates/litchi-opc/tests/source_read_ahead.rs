@@ -116,7 +116,8 @@ fn archive_bytes_with_typed_unknown(typed_unknown: bool) -> Vec<u8> {
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rId1" Type="{OFFICE_DOCUMENT_REL}" Target="{DOCUMENT_MEMBER}"/></Relationships>"#
     );
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content types fixture must be writable");
@@ -210,8 +211,12 @@ fn raw_records(data: &[u8]) -> HashMap<Vec<u8>, RawRecord> {
         .expect("published archive must be valid ZIP")
         .into_zip_archive();
     let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut scratch)
-        .expect("published archive must have preservable physical records");
+    let index = PreservationIndex::new(
+        &archive,
+        &mut scratch,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .expect("published archive must have preservable physical records");
 
     index
         .entries()

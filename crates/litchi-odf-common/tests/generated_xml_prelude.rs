@@ -149,7 +149,11 @@ fn prelude_zero_fragments_publishes_exact_fixed_shell_and_full_audit() {
     let expected = expected_bytes(&[]);
     let (archive_bytes, report) = publish(GeneratedXmlLimits::default(), 1, Vec::new())
         .expect("zero-fragment prelude publication");
-    let archive = ArchiveReader::new(&archive_bytes).unwrap();
+    let archive = ArchiveReader::new(
+        &archive_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     assert_eq!(archive.read("content.xml").unwrap(), expected);
     assert_eq!(report.fragments(), 0);
     assert_report_matches_audit(report, &expected);
@@ -165,7 +169,11 @@ fn prelude_two_fragments_preserve_order_and_every_audit_counter() {
         fragments,
     )
     .expect("two-fragment prelude publication");
-    let archive = ArchiveReader::new(&archive_bytes).unwrap();
+    let archive = ArchiveReader::new(
+        &archive_bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     assert_eq!(archive.read("content.xml").unwrap(), expected);
     assert_eq!(report.fragments(), 2);
     assert_report_matches_audit(report, &expected);
@@ -251,10 +259,13 @@ fn fixed_shell_depth_can_dominate_a_shallow_fragment() {
     assert_report_matches_audit(report, &expected);
     let archive = writer.finish_to_writer().unwrap();
     assert_eq!(
-        ArchiveReader::new(archive.get_ref())
-            .unwrap()
-            .read("content.xml")
-            .unwrap(),
+        ArchiveReader::new(
+            archive.get_ref(),
+            soapberry_zip::office::ArchiveLimits::default()
+        )
+        .unwrap()
+        .read("content.xml")
+        .unwrap(),
         expected
     );
 }
@@ -342,7 +353,11 @@ fn assert_shell_limit(resource: Resource, exact: usize) {
     assert!(exact > 0);
     let exact_result = publish(narrowed(resource, exact), 1, Vec::new())
         .expect("inclusive fixed-prelude shell limit");
-    let archive = ArchiveReader::new(&exact_result.0).unwrap();
+    let archive = ArchiveReader::new(
+        &exact_result.0,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     assert_eq!(archive.read("content.xml").unwrap(), expected_bytes(&[]));
     let under = publish(narrowed(resource, exact - 1), 1, Vec::new());
     assert_limit_failure(under, resource, exact, exact - 1, Some(0));
@@ -385,7 +400,9 @@ fn composed_prelude_limits_are_inclusive_and_one_under() {
         )
         .expect("inclusive composed prelude limit");
         assert_eq!(success.1, report);
-        let archive = ArchiveReader::new(&success.0).unwrap();
+        let archive =
+            ArchiveReader::new(&success.0, soapberry_zip::office::ArchiveLimits::default())
+                .unwrap();
         assert_eq!(archive.read("content.xml").unwrap(), expected);
 
         let under = publish(

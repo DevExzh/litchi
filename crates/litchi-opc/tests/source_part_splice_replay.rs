@@ -76,7 +76,8 @@ fn archive_with_source(deflated: bool, source: &[u8]) -> Vec<u8> {
     let relationships = format!(
         r#"<Relationships xmlns="{RELATIONSHIPS_NS}"><Relationship Id="rDoc" Type="{OFFICE_DOCUMENT_REL}" Target="{TARGET_MEMBER}"/></Relationships>"#
     );
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types.as_bytes())
         .expect("content-types fixture must be writable");
@@ -199,6 +200,7 @@ fn publication_memory_envelope(archive_bytes: &[u8], limits: SourcePartSpliceLim
     let indexed = soapberry_zip::office::IndexedArchive::from_reader(
         Cursor::new(archive_bytes.to_vec()),
         archive_bytes.len() as u64,
+        soapberry_zip::office::ArchiveLimits::default(),
     )
     .expect("fixture archive must have an indexed memory envelope");
     let target = indexed

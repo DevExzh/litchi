@@ -857,9 +857,10 @@ fn xlsx_producer_archive(
         return Err("producer XLSX shape has no shared-string references".into());
     }
 
-    let reader = ArchiveReader::new(&skeleton)?;
+    let reader = ArchiveReader::new(&skeleton, soapberry_zip::office::ArchiveLimits::default())?;
     let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut rewritten_sheets = 0;
     for name in &names {
         let bytes = reader.read(name.as_str())?;
@@ -996,7 +997,7 @@ fn finish_xlsx_producer_corpus(
         None => "real-file",
     };
     let options = generated.map(|(_shape, variant)| ArchiveOptions::of(variant));
-    let reader = ArchiveReader::new(&archive)?;
+    let reader = ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?;
     let member_names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
     let archive_member_count = member_names.len();
 
@@ -1478,8 +1479,10 @@ fn verify_producer_xlsx_worksheet_splice(
     address: litchi_xlsx::Address,
     replacement: usize,
 ) -> Result<(), Box<dyn Error>> {
-    let source_archive = ArchiveReader::new(source)?;
-    let output_archive = ArchiveReader::new(output)?;
+    let source_archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?;
+    let output_archive =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let source_xml = String::from_utf8(source_archive.read("xl/worksheets/sheet1.xml")?)?;
     let output_xml = output_archive.read("xl/worksheets/sheet1.xml")?;
     let original = numeric_value(PLANNING_SHEET, spec.row_count / 2, spec.column_count / 2);
@@ -1498,8 +1501,10 @@ fn verify_producer_xlsx_workbook_calculation_closure(
     source: &[u8],
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let source_archive = ArchiveReader::new(source)?;
-    let output_archive = ArchiveReader::new(output)?;
+    let source_archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default())?;
+    let output_archive =
+        ArchiveReader::new(output, soapberry_zip::office::ArchiveLimits::default())?;
     let source_workbook = source_archive.read("xl/workbook.xml")?;
     let output_workbook = output_archive.read("xl/workbook.xml")?;
     let (source_without_calc_pr, source_count) =
@@ -1647,9 +1652,10 @@ fn document_root_attributes() -> String {
 pub(crate) fn build_docx_producer_corpus() -> Result<ProducerCorpus, Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let skeleton = semantic_docx_bytes(shape)?;
-    let reader = ArchiveReader::new(&skeleton)?;
+    let reader = ArchiveReader::new(&skeleton, soapberry_zip::office::ArchiveLimits::default())?;
     let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut rewritten = 0;
     let mut paragraph_edits = 0;
     for name in &names {
@@ -1689,7 +1695,7 @@ pub(crate) fn build_docx_producer_corpus() -> Result<ProducerCorpus, Box<dyn Err
     drop(document);
     drop(package);
 
-    let reader = ArchiveReader::new(&archive)?;
+    let reader = ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?;
     let main = reader.read("word/document.xml")?;
     let parts = vec![census_of(
         "word/document.xml",
@@ -1794,9 +1800,10 @@ fn producer_document_part(xml: &str) -> Result<(String, usize), Box<dyn Error>> 
 pub(crate) fn build_pptx_producer_corpus() -> Result<ProducerCorpus, Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let skeleton = semantic_pptx_bytes(shape)?;
-    let reader = ArchiveReader::new(&skeleton)?;
+    let reader = ArchiveReader::new(&skeleton, soapberry_zip::office::ArchiveLimits::default())?;
     let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut wrapped = 0;
     for name in &names {
         let bytes = reader.read(name.as_str())?;
@@ -1827,7 +1834,7 @@ pub(crate) fn build_pptx_producer_corpus() -> Result<ProducerCorpus, Box<dyn Err
         .text_and_name()?;
     drop(presentation);
 
-    let reader = ArchiveReader::new(&archive)?;
+    let reader = ArchiveReader::new(&archive, soapberry_zip::office::ArchiveLimits::default())?;
     let archive_member_count = reader.file_names().count();
     let member = format!("ppt/slides/slide{}.xml", target_index + 1);
     let slide = reader.read(member.as_str())?;
@@ -2990,8 +2997,10 @@ mod tests {
         target: &str,
         rewrite: impl FnMut(Vec<u8>) -> Vec<u8>,
     ) -> Vec<u8> {
-        let reader = ArchiveReader::new(archive).expect("archive reader");
-        let mut writer = StreamingArchiveWriter::new();
+        let reader = ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default())
+            .expect("archive reader");
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         let mut rewrite = Some(rewrite);
         for name in reader.file_names() {
             let payload = reader.read(name).expect("archive member");
@@ -3424,10 +3433,13 @@ mod tests {
         assert_eq!(part.mc_ignorable.as_deref(), Some("w14 w15 wp14"));
         assert!(!part.source_stream_eligible);
         let xml = String::from_utf8(
-            ArchiveReader::new(&corpus.corpus.archive)
-                .expect("archive reads")
-                .read("word/document.xml")
-                .expect("document part reads"),
+            ArchiveReader::new(
+                &corpus.corpus.archive,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )
+            .expect("archive reads")
+            .read("word/document.xml")
+            .expect("document part reads"),
         )
         .expect("document part is UTF-8");
         assert!(

@@ -185,8 +185,14 @@ fn verify(corpus: &Corpus, output: &[u8], added: &[u8]) -> Result<(), Box<dyn Er
     {
         return Err("Part addition changed source member order or archive comment".into());
     }
-    let source_archive = soapberry_zip::office::ArchiveReader::new(&corpus.archive)?;
-    let output_archive = soapberry_zip::office::ArchiveReader::new(output)?;
+    let source_archive = soapberry_zip::office::ArchiveReader::new(
+        &corpus.archive,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
+    let output_archive = soapberry_zip::office::ArchiveReader::new(
+        output,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )?;
     let mut source_types = Vec::new();
     source_archive.read_to("[Content_Types].xml", &mut source_types)?;
     let expected_types = super::pptx_source_backed_expected_content_types(

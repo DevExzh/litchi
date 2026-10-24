@@ -2181,7 +2181,12 @@ mod tests {
             .unwrap()
             .into_zip_archive();
         let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-        let index = PreservationIndex::new(&archive, &mut scratch).unwrap();
+        let index = PreservationIndex::new(
+            &archive,
+            &mut scratch,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let entry = index
             .entries()
             .iter()
@@ -2219,7 +2224,12 @@ mod tests {
         // The physical archive is valid and admitted; ODF's narrower raw
         // publication contract must refuse before writing to the caller sink.
         let promoted = ZipArchive::from_slice(&bytes).unwrap().into_zip_archive();
-        PreservationIndex::new(&promoted, &mut scratch).unwrap();
+        PreservationIndex::new(
+            &promoted,
+            &mut scratch,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let package = SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes)))
             .expect("open valid local-only ZIP64 source");
         let mut output = Vec::new();

@@ -303,12 +303,14 @@ fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext
 }
 
 fn replace_zip_member_unchecked(source: &[u8], name: &str, replacement: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(source).unwrap();
+    let archive =
+        ArchiveReader::new(source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let names = archive
         .file_names()
         .map(ToOwned::to_owned)
         .collect::<Vec<_>>();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member in names {
         let bytes = if member == name {
             replacement.to_vec()

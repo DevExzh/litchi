@@ -18,7 +18,8 @@ pub(crate) fn compact_xml_fixture(xml: &str) -> String {
 pub(crate) fn package(mimetype: &str, files: &[(&str, &[u8])]) -> Vec<u8> {
     // Parser fixtures deliberately cover producer whitespace and other
     // noncanonical XML. Bypass publication validation only in this test helper.
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("mimetype", mimetype.as_bytes())
         .unwrap();

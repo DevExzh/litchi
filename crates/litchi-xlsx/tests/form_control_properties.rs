@@ -130,7 +130,8 @@ fn native_corpus_parts_read_and_write_as_exact_no_ops() {
             "retained fixture hash {retained_path} (source {package_path})"
         );
         assert_eq!(package.len(), fixture["bytes"].as_u64().unwrap() as usize);
-        let archive = ArchiveReader::new(&package).unwrap();
+        let archive =
+            ArchiveReader::new(&package, soapberry_zip::office::ArchiveLimits::default()).unwrap();
         let parts = fixture["form_control_parts"].as_array().unwrap();
         for part in parts {
             part_count += 1;

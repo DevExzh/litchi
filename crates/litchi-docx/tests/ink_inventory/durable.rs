@@ -134,7 +134,8 @@ fn durable_limits() -> PatchLimits {
 }
 
 fn members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).unwrap();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     archive
         .file_names()
         .map(|name| (name.to_owned(), archive.read(name).unwrap()))
@@ -145,8 +146,10 @@ fn rewrite_member<F>(bytes: &[u8], selected: &str, mut rewrite: F) -> Vec<u8>
 where
     F: FnMut(&[u8]) -> Vec<u8>,
 {
-    let archive = ArchiveReader::new(bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let content = archive.read(name).unwrap();
         if name == selected {
@@ -159,8 +162,10 @@ where
 }
 
 fn add_member(bytes: &[u8], name: &str, content: &[u8]) -> Vec<u8> {
-    let archive = ArchiveReader::new(bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member in archive.file_names() {
         writer
             .write_stored(member, &archive.read(member).unwrap())
@@ -171,8 +176,10 @@ fn add_member(bytes: &[u8], name: &str, content: &[u8]) -> Vec<u8> {
 }
 
 fn remove_member(bytes: &[u8], selected: &str) -> Vec<u8> {
-    let archive = ArchiveReader::new(bytes).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for member in archive.file_names() {
         if member != selected {
             writer
@@ -326,8 +333,10 @@ fn formatted_story_xml(content: &[u8]) -> Vec<u8> {
 
 fn noncanonical_shared_source() -> Vec<u8> {
     let original = PackageWriter::to_bytes(&source(false, true)).unwrap();
-    let archive = ArchiveReader::new(&original).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&original, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let content = archive.read(name).unwrap();
         let content = match name {

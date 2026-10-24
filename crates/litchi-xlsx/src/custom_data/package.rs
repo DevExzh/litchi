@@ -2930,7 +2930,9 @@ mod tests {
         overrides: &[(&str, &[u8])],
         content_types: Option<&[u8]>,
     ) -> OpcPackage {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         let mut parts = package
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))
@@ -3094,7 +3096,11 @@ mod tests {
             transaction.commit().unwrap()
         };
         let removed_bytes = PackageWriter::to_bytes(&package).unwrap();
-        let removed_archive = soapberry_zip::office::ArchiveReader::new(&removed_bytes).unwrap();
+        let removed_archive = soapberry_zip::office::ArchiveReader::new(
+            &removed_bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let removed_content_types = removed_archive.read("[Content_Types].xml").unwrap();
         assert!(
             removed_content_types
@@ -3120,7 +3126,11 @@ mod tests {
         let mut reopened = OpcPackage::from_vec(removed_bytes, SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
         let restored_bytes = PackageWriter::to_bytes(&reopened).unwrap();
-        let restored_archive = soapberry_zip::office::ArchiveReader::new(&restored_bytes).unwrap();
+        let restored_archive = soapberry_zip::office::ArchiveReader::new(
+            &restored_bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             restored_archive.read("[Content_Types].xml").unwrap(),
             content_types
@@ -3451,7 +3461,11 @@ mod tests {
         commit.patch().inverse().apply(&mut reopened).unwrap();
 
         let restored = PackageWriter::to_bytes(&reopened).unwrap();
-        let archive = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &restored,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             archive
                 .read(workbook_uri.rels_uri().unwrap().membername())
@@ -3512,7 +3526,11 @@ mod tests {
         let mut reopened = OpcPackage::from_vec(removed, SourceLimits::default()).unwrap();
         commit.patch().inverse().apply(&mut reopened).unwrap();
         let restored = PackageWriter::to_bytes(&reopened).unwrap();
-        let archive = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &restored,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             archive
                 .read(
@@ -3576,7 +3594,11 @@ mod tests {
             transaction.commit().unwrap()
         };
         let output = PackageWriter::to_bytes(&package).unwrap();
-        let archive = soapberry_zip::office::ArchiveReader::new(&output).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &output,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         let workbook = archive
             .read(
                 PackURI::new("/xl/workbook.xml")

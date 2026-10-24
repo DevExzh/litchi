@@ -162,7 +162,8 @@ fn run_package(child_count: usize, broken: Option<(usize, String)>) -> Vec<u8> {
     let children: Vec<String> = (0..child_count)
         .map(|index| format!("word/child{index}.xml"))
         .collect();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types(&children).as_bytes())
         .unwrap();
@@ -377,7 +378,8 @@ fn a_run_read_never_covers_an_ordinary_part_payload() {
     // The ordinary parts sit after the structural members, and one more
     // ordinary member is written between two relationship parts so a run has
     // to break rather than read across it.
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let children = vec!["word/child0.xml".to_string(), "word/child1.xml".to_string()];
     writer
         .write_stored("[Content_Types].xml", content_types(&children).as_bytes())
@@ -508,7 +510,8 @@ fn a_duplicate_relationship_id_keeps_its_repair_anywhere_in_a_run() {
 fn the_untyped_member_admission_verdict_does_not_move() {
     let build = |referenced: bool| {
         let children = vec!["word/child0.xml".to_string()];
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored("[Content_Types].xml", content_types(&children).as_bytes())
             .unwrap();
@@ -590,7 +593,8 @@ fn a_scattered_package_costs_no_more_reads() {
     let children: Vec<String> = (0..4)
         .map(|index| format!("word/child{index}.xml"))
         .collect();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types(&children).as_bytes())
         .unwrap();

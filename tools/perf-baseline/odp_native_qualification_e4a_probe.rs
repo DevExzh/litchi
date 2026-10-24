@@ -238,7 +238,7 @@ fn owner(source: Arc<dyn ReadAt>) -> Result<SourceBackedPresentation, Box<dyn Er
 }
 
 fn fixture_content_digest(fixture: &[u8]) -> Result<Digest, Box<dyn Error>> {
-    let archive = ArchiveReader::new(fixture)?;
+    let archive = ArchiveReader::new(fixture, soapberry_zip::office::ArchiveLimits::default())?;
     Ok(Digest::from_bytes(&archive.read("content.xml")?))
 }
 

@@ -469,7 +469,7 @@ fn build_archive() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
 }
 
 fn archive_members(bytes: &[u8]) -> Result<BTreeMap<String, Vec<u8>>, Box<dyn std::error::Error>> {
-    let archive = ArchiveReader::new(bytes)?;
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())?;
     let mut members = BTreeMap::new();
     for name in archive.file_names() {
         members.insert(name.to_owned(), archive.read(name)?);

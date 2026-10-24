@@ -6,7 +6,8 @@ use soapberry_zip::office::ArchiveReader;
 use super::*;
 
 fn members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let archive = ArchiveReader::new(bytes).unwrap();
+    let archive =
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     archive
         .file_names()
         .map(|name| (name.to_owned(), archive.read(name).unwrap()))
@@ -213,7 +214,8 @@ fn drawing_removal_deletes_complete_alternative_and_exclusive_fallback_then_rest
 fn removal_and_reopened_inverse_preserve_relationship_and_content_type_lexical_extensions() {
     use soapberry_zip::office::StreamingArchiveWriter;
     let original = PackageWriter::to_bytes(&drawing_source("", "")).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for (name, bytes) in members(&original) {
         let bytes = if name == "[Content_Types].xml" || name.ends_with(".rels") {
             let xml = String::from_utf8(bytes).unwrap();

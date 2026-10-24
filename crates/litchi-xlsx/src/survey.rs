@@ -4204,7 +4204,9 @@ mod tests {
     const XML: &[u8] = br#"<survey xmlns="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main" id="7" guid="{01234567-89ab-cdef-0123-456789abcdef}" title="Survey"><surveyPr cssClass="card" top="-2" width="320" position="relative"/><questions><questionsPr height="20"/><question binding="1" text="Pick one" type="choice" format="standard" required="true" decimalPlaces="15" rowSource="one;&quot;two;three&quot;;"><questionPr left="1"/></question></questions></survey>"#;
 
     fn as_source(package: &OpcPackage) -> OpcPackage {
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         let mut parts = package
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))
@@ -6298,7 +6300,9 @@ mod tests {
         let survey_relationships = br#"<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <!-- explicitly empty survey member -->
 </Relationships>"#;
-        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
         let mut parts = package
             .try_iter_parts()
             .map(|part| part.expect("part payload decodes"))

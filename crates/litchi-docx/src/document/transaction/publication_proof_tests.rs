@@ -91,7 +91,11 @@ fn fixture_documents() -> Vec<Vec<u8>> {
         .into_iter()
         .filter_map(|path| {
             let bytes = std::fs::read(&path).ok()?;
-            let reader = soapberry_zip::office::ArchiveReader::new(&bytes).ok()?;
+            let reader = soapberry_zip::office::ArchiveReader::new(
+                &bytes,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )
+            .ok()?;
             reader.read("word/document.xml").ok()
         })
         .collect()

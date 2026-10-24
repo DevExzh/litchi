@@ -39,7 +39,9 @@ fn package(content: &str) -> Vec<u8> {
 }
 
 fn raw_package(content: &str) -> Vec<u8> {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer
         .write_stored(
             "mimetype",

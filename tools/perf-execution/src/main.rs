@@ -478,7 +478,8 @@ fn build_opc(payloads: &[Vec<u8>], manifests: &[MemberManifest]) -> AnyResult<Ve
     }
     root_relationships.push_str("</Relationships>");
 
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_deflated("[Content_Types].xml", content_types.as_bytes())?;
     writer.write_deflated("_rels/.rels", root_relationships.as_bytes())?;
     for (payload, manifest) in payloads.iter().zip(manifests) {

@@ -564,7 +564,7 @@ impl SourceBackedPackage {
             expected: source_version,
             length: source_length,
         };
-        let archive_result = SourceIndexedArchive::from_reader_with_limits_and_policy(
+        let archive_result = SourceIndexedArchive::from_reader_with_policy(
             reader,
             source_length,
             limits.archive().into_zip_limits(),
@@ -1208,7 +1208,8 @@ impl SourceBackedPackage {
         soapberry_zip::PreservationIndex<'archive, SourceReader>,
         soapberry_zip::Error,
     > {
-        self.archive.preservation_index(scratch)
+        self.archive
+            .preservation_index(scratch, self.limits.archive().into_zip_limits())
     }
 
     fn read_entry(&self, path: &str) -> Result<Vec<u8>> {
@@ -1416,7 +1417,7 @@ fn tolerant_source_archive(
         expected: source_version,
         length: source_length,
     };
-    let archive = match SourceIndexedArchive::from_reader_with_limits_and_policy(
+    let archive = match SourceIndexedArchive::from_reader_with_policy(
         reader,
         source_length,
         limits.archive().into_zip_limits(),
@@ -1879,7 +1880,7 @@ impl OwnedPackage {
         #[cfg(test)]
         package::note_index_build();
         let index = Arc::new(
-            soapberry_zip::office::IndexedArchive::from_reader_with_limits_and_policy(
+            soapberry_zip::office::IndexedArchive::from_reader_with_policy(
                 Arc::clone(&data),
                 data_length,
                 limits.archive().into_zip_limits(),
@@ -2629,6 +2630,32 @@ mod tests {
             b"PNG\x89\x50\x4e\x47\x0d\x0a\x1a\x0a"
         );
         assert!(source.read_count() > after_open);
+    }
+
+    #[test]
+    fn source_backed_preservation_index_uses_retained_zip_limits() {
+        let data = create_test_odf_package("application/vnd.oasis.opendocument.text");
+        let source = CountingSource::new(data);
+        let mut package = SourceBackedPackage::from_read_at(source).unwrap();
+        let original_limits = package.limits;
+        package.limits = SourceLimits::builder()
+            .max_archive_metadata_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+
+        let mut scratch = vec![0; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
+        let error = match package.preservation_index(&mut scratch) {
+            Ok(_) => panic!("preservation index exceeded no retained metadata limit"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            soapberry_zip::ErrorKind::LimitExceeded { .. }
+        ));
+
+        package.limits = original_limits;
+        assert!(package.preservation_index(&mut scratch).is_ok());
     }
 
     #[test]

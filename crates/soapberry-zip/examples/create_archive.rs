@@ -17,7 +17,8 @@ const CONTENT_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?><office:doc
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build the archive in memory.
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
 
     // ODF requires "mimetype" be the first entry, stored uncompressed.
     writer.write_stored("mimetype", MIMETYPE_VALUE)?;
@@ -38,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Re-open from disk and verify contents.
     let on_disk = fs::read(&temp_path)?;
-    let archive = ArchiveReader::new(&on_disk)?;
+    let archive = ArchiveReader::new(&on_disk, soapberry_zip::office::ArchiveLimits::default())?;
     println!("Re-opened archive: {} files", archive.len());
 
     let mut names: Vec<&str> = archive.file_names().collect();

@@ -41,7 +41,8 @@ fn package(content: &str, auxiliary: Option<(&str, &[u8])>) -> TestResult<Vec<u8
             &mut manifest,
             "<manifest:file-entry manifest:full-path=\"{path}\" manifest:media-type=\"application/octet-stream\"/>"
         )?;
-        let mut archive = StreamingArchiveWriter::new();
+        let mut archive =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         archive.write_stored("mimetype", b"application/vnd.oasis.opendocument.chart")?;
         archive.write_deflated("content.xml", content.as_bytes())?;
         archive.write_deflated(path, bytes)?;
@@ -50,7 +51,8 @@ fn package(content: &str, auxiliary: Option<(&str, &[u8])>) -> TestResult<Vec<u8
         return Ok(archive.finish_to_bytes()?);
     }
     manifest.push_str("</manifest:manifest>");
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", b"application/vnd.oasis.opendocument.chart")?;
     archive.write_deflated("content.xml", content.as_bytes())?;
     archive.write_deflated("META-INF/manifest.xml", manifest.as_bytes())?;
@@ -64,14 +66,16 @@ fn encrypted_envelope(content: &str) -> TestResult<Vec<u8>> {
     encrypted_writer.set_encryption("password", Profile::compatible())?;
     encrypted_writer.add_file("content.xml", content.as_bytes())?;
     let encrypted = encrypted_writer.finish_to_bytes()?;
-    let encrypted_archive = ArchiveReader::new(&encrypted)?;
+    let encrypted_archive =
+        ArchiveReader::new(&encrypted, soapberry_zip::office::ArchiveLimits::default())?;
     let ciphertext = encrypted_archive.read("content.xml")?;
     let manifest = String::from_utf8(encrypted_archive.read("META-INF/manifest.xml")?)?.replace(
         "full-path=\"content.xml\"",
         "full-path=\"META-INF/secret.bin\"",
     );
 
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", b"application/vnd.oasis.opendocument.chart")?;
     archive.write_deflated("content.xml", content.as_bytes())?;
     archive.write_deflated("META-INF/secret.bin", &ciphertext)?;
@@ -80,7 +84,8 @@ fn encrypted_envelope(content: &str) -> TestResult<Vec<u8>> {
 }
 
 fn raw_negative_package(content: &str) -> TestResult<Vec<u8>> {
-    let mut archive = StreamingArchiveWriter::new();
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     archive.write_stored("mimetype", b"application/vnd.oasis.opendocument.chart")?;
     archive.write_deflated("content.xml", content.as_bytes())?;
     archive.write_deflated("META-INF/manifest.xml", RAW_MANIFEST)?;

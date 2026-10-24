@@ -6019,7 +6019,8 @@ mod tests {
         let presentation = format!(
             r#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst>{slide_list}</p:sldIdLst><p:sldSz cx="9144000" cy="6858000"/></p:presentation>"#
         );
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -6115,7 +6116,8 @@ mod tests {
     }
 
     fn source_backed_pptx_with_core_properties() -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",
@@ -6229,7 +6231,8 @@ mod tests {
         media_content_type: Option<&str>,
         media_relationships: Option<&[u8]>,
     ) -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         let media_default = media_content_type.map_or_else(String::new, |content_type| {
             format!(r#"<Default Extension="png" ContentType="{content_type}"/>"#)
         });
@@ -6308,7 +6311,8 @@ mod tests {
                     "xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\" xmlns:asvg=\"{SVG_NAMESPACE}\""
                 ),
             );
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",

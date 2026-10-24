@@ -62,7 +62,8 @@ fn record(bytes: usize) {
 }
 
 fn raw_package(content: &str) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer.write_stored("mimetype", MIMETYPE).unwrap();
     writer
         .write_stored("content.xml", content.as_bytes())

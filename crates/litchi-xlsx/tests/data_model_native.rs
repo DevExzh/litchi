@@ -124,7 +124,11 @@ fn native_relationship_token_removal_and_inverse_preserve_exact_xml() {
                 .unwrap()
         );
         let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let archive = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            &restored,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             archive.read("xl/_rels/workbook.xml.rels").unwrap(),
             before.bytes()
@@ -152,8 +156,14 @@ fn native_descriptor_patch_rejects_relationship_lexical_source_changes() {
     })
     .unwrap();
     let (_, patch) = edit.commit().unwrap().into_parts();
-    let original = soapberry_zip::office::ArchiveReader::new(SOURCE).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let original = soapberry_zip::office::ArchiveReader::new(
+        SOURCE,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for member in original.file_names() {
         let mut bytes = original.read(member).unwrap();
         if member == "xl/_rels/workbook.xml.rels" {
@@ -291,7 +301,11 @@ fn native_model_removal_retains_connections_and_restores_exact_source() {
             }
             apply_patch(&patch.inverse(), &mut reopened).unwrap();
             let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-            let archive = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
+            let archive = soapberry_zip::office::ArchiveReader::new(
+                &restored,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )
+            .unwrap();
             for part in raw
                 .try_iter_parts()
                 .map(|part| part.expect("part payload decodes"))
@@ -301,7 +315,11 @@ fn native_model_removal_retains_connections_and_restores_exact_source() {
                     part.blob()
                 );
             }
-            let original = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
+            let original = soapberry_zip::office::ArchiveReader::new(
+                &source,
+                soapberry_zip::office::ArchiveLimits::default(),
+            )
+            .unwrap();
             for member in ["xl/_rels/workbook.xml.rels", "[Content_Types].xml"] {
                 assert_eq!(
                     archive.read(member).unwrap(),
@@ -402,8 +420,16 @@ fn native_model_removal_preserves_connections_processing_instructions_and_tokens
 
     apply_patch(&patch.inverse(), &mut reopened).unwrap();
     let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-    let actual = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
-    let expected = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
+    let actual = soapberry_zip::office::ArchiveReader::new(
+        &restored,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
+    let expected = soapberry_zip::office::ArchiveReader::new(
+        &source,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     for member in expected.file_names() {
         assert_eq!(
             actual.read(member).unwrap(),
@@ -422,9 +448,15 @@ fn source_with_xml_change(
     member: &str,
     change: impl FnOnce(String) -> String,
 ) -> Vec<u8> {
-    let archive = soapberry_zip::office::ArchiveReader::new(source).unwrap();
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        source,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let updated = change(String::from_utf8(archive.read(member).unwrap()).unwrap()).into_bytes();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for name in archive.file_names() {
         let bytes = if name == member {
             updated.clone()
@@ -673,15 +705,21 @@ fn check_native_model_descriptor_round_trip(raw: OpcPackage) {
     let patch = commit.patch().clone();
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();
-    let relationship_xml = soapberry_zip::office::ArchiveReader::new(SOURCE)
+    let relationship_xml = soapberry_zip::office::ArchiveReader::new(
+        SOURCE,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap()
+    .read("xl/_rels/workbook.xml.rels")
+    .unwrap();
+    assert_eq!(
+        soapberry_zip::office::ArchiveReader::new(
+            &output,
+            soapberry_zip::office::ArchiveLimits::default()
+        )
         .unwrap()
         .read("xl/_rels/workbook.xml.rels")
-        .unwrap();
-    assert_eq!(
-        soapberry_zip::office::ArchiveReader::new(&output)
-            .unwrap()
-            .read("xl/_rels/workbook.xml.rels")
-            .unwrap(),
+        .unwrap(),
         relationship_xml
     );
     let reopened = Package::from_bytes(&output).unwrap();
@@ -712,10 +750,13 @@ fn check_native_model_descriptor_round_trip(raw: OpcPackage) {
     apply_patch(&patch.inverse(), &mut after).unwrap();
     let restored = litchi_opc::PackageWriter::to_bytes(&after).unwrap();
     assert_eq!(
-        soapberry_zip::office::ArchiveReader::new(&restored)
-            .unwrap()
-            .read("xl/_rels/workbook.xml.rels")
-            .unwrap(),
+        soapberry_zip::office::ArchiveReader::new(
+            &restored,
+            soapberry_zip::office::ArchiveLimits::default()
+        )
+        .unwrap()
+        .read("xl/_rels/workbook.xml.rels")
+        .unwrap(),
         relationship_xml
     );
     for part in raw
@@ -933,8 +974,14 @@ fn all_auto_delete_connections_source() -> Vec<u8> {
     });
     // This derived source retains the ordinary query outputs as static tables,
     // removing their query owners and declarations along with connections 1/2.
-    let archive = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        &source,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for name in archive.file_names() {
         if name.starts_with("xl/queryTables/")
             || matches!(
@@ -1018,8 +1065,16 @@ fn native_removal_deletes_final_connections_owner_and_restores_exact_inverse() {
         }
         apply_patch(&patch.inverse(), &mut reopened).unwrap();
         let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-        let actual = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
-        let expected = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
+        let actual = soapberry_zip::office::ArchiveReader::new(
+            &restored,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        let expected = soapberry_zip::office::ArchiveReader::new(
+            &source,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
         for member in expected.file_names() {
             assert_eq!(
                 actual.read(member).unwrap(),
@@ -1167,8 +1222,14 @@ fn connections_owner_inverse_rejects_uri_reuse_even_with_unchanged_manifest() {
     let source = source_with_xml_change(&source, "xl/_rels/workbook.xml.rels", |xml| {
         xml.replace("Target=\"connections.xml\"", "Target=\"connections.cnx\"")
     });
-    let archive = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        &source,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for member in archive.file_names() {
         writer
             .write_deflated(
@@ -1304,8 +1365,16 @@ fn final_connections_owner_resolves_case_variant_owning_target() {
     );
     apply_patch(&patch.inverse(), &mut reopened).unwrap();
     let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-    let actual = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
-    let original = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
+    let actual = soapberry_zip::office::ArchiveReader::new(
+        &restored,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
+    let original = soapberry_zip::office::ArchiveReader::new(
+        &source,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     for member in original.file_names() {
         assert_eq!(
             actual.read(member).unwrap(),
@@ -1357,8 +1426,16 @@ fn native_model_workbook_edge_resolves_case_equivalent_target() {
     let mut reopened = OpcPackage::from_vec(output, SourceLimits::default()).unwrap();
     apply_patch(&inverse, &mut reopened).unwrap();
     let restored = litchi_opc::PackageWriter::to_bytes(&reopened).unwrap();
-    let actual = soapberry_zip::office::ArchiveReader::new(&restored).unwrap();
-    let original = soapberry_zip::office::ArchiveReader::new(&source).unwrap();
+    let actual = soapberry_zip::office::ArchiveReader::new(
+        &restored,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
+    let original = soapberry_zip::office::ArchiveReader::new(
+        &source,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     for member in original.file_names() {
         assert_eq!(
             actual.read(member).unwrap(),

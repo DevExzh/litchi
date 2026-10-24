@@ -367,7 +367,7 @@ impl OpcPackage {
         if let Some(state) = cell.get() {
             return Ok(state.as_deref());
         }
-        match IndexedArchive::from_reader_with_limits(
+        match IndexedArchive::from_reader(
             Arc::clone(source_archive),
             source_archive.len() as u64,
             self.source_limits.zip_limits(),

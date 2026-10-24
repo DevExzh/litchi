@@ -169,8 +169,10 @@ fn source_package(signed: bool) -> Vec<u8> {
 
 fn package_with_orphan_relationship_member() -> Vec<u8> {
     let source = source_package(false);
-    let archive = ArchiveReader::new(&source).unwrap();
-    let mut writer = StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     for name in archive.file_names() {
         let data = archive.read(name).unwrap();
         writer.write_stored(name, &data).unwrap();

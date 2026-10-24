@@ -35,7 +35,8 @@ const DOCUMENT_PAYLOAD: &[u8] = br#"<?xml version="1.0"?><document><body>fuzz</b
 const DATA_PAYLOAD: &[u8] = &[0xa5; 37];
 
 fn archive_bytes(content_types: &[u8], root_rels: &[u8], document_rels: &[u8]) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", content_types)
         .expect("deterministic content types member");
@@ -112,7 +113,8 @@ fn valid_fixture() -> ValidFixture {
         "word/document.xml",
         "custom/data.bin",
     ];
-    let archive = ArchiveReader::new(&bytes).expect("deterministic archive index");
+    let archive = ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("deterministic archive index");
     let metadata_bytes = member_names
         .iter()
         .map(|name| name.len() + 46)
@@ -302,7 +304,8 @@ fn archive_total_entries_fixture() -> Vec<u8> {
         6,
         "five OPC members plus one directory must be counted physically"
     );
-    let reader = ArchiveReader::new(&bytes).expect("directory fixture must be readable");
+    let reader = ArchiveReader::new(&bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("directory fixture must be readable");
     assert_eq!(reader.len(), 5, "directory is not an OPC member");
     assert!(
         reader
@@ -505,7 +508,8 @@ fn assert_reopened_xml_payloads() {
         expected.as_slice()
     );
 
-    let archive = ArchiveReader::new(&output).expect("published ZIP must reopen");
+    let archive = ArchiveReader::new(&output, soapberry_zip::office::ArchiveLimits::default())
+        .expect("published ZIP must reopen");
     assert_eq!(
         archive
             .read("word/document.xml")

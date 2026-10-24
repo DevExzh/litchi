@@ -21,8 +21,11 @@ fn source_with_sheet1(sheet1: &str) -> Vec<u8> {
     // must reject.  PackageWriter validates XML eagerly, so use the same
     // lower-level ZIP construction as the existing error-order tests.
     let source = two_sheets();
-    let archive = ArchiveReader::new(&source).unwrap();
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive =
+        ArchiveReader::new(&source, soapberry_zip::office::ArchiveLimits::default()).unwrap();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for member in archive.file_names() {
         let bytes = if member == "xl/worksheets/sheet1.xml" {
             sheet1.as_bytes().to_vec()

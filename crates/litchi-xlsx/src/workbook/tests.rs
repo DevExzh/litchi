@@ -249,7 +249,8 @@ fn workbook_with_opaque_payload(payload: &[u8]) -> Vec<u8> {
     const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     const PACKAGE_REL: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored(
             "[Content_Types].xml",
@@ -308,7 +309,8 @@ fn workbook_with_unmodeled_metadata(
     const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
     const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     const PACKAGE_REL: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored(
             "[Content_Types].xml",

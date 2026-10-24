@@ -24,7 +24,8 @@ fn fixture(name: &str) -> Vec<u8> {
 }
 
 fn member(bytes: &[u8], name: &str) -> String {
-    let archive = ArchiveReader::new(bytes).expect("fixture archive");
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("fixture archive");
     String::from_utf8(archive.read(name).expect("archive member")).expect("UTF-8 member")
 }
 
@@ -38,8 +39,10 @@ fn patch(bytes: &[u8], name: &str, from: &str, to: &str) -> Vec<u8> {
 
 /// Rewrite the text of archive member `name` with `rewrite`.
 fn patch_with(bytes: &[u8], name: &str, rewrite: impl FnOnce(String) -> String) -> Vec<u8> {
-    let archive = ArchiveReader::new(bytes).expect("fixture archive");
-    let mut writer = StreamingArchiveWriter::new();
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("fixture archive");
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut rewrite = Some(rewrite);
     for member in archive.file_names() {
         let mut content = archive.read(member).expect("archive member");

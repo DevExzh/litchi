@@ -1289,7 +1289,10 @@ fn presentation_fixtures() -> Vec<(String, Option<String>, String)> {
                     let Ok(bytes) = std::fs::read(&path) else {
                         continue;
                     };
-                    let Ok(archive) = soapberry_zip::office::ArchiveReader::new(&bytes) else {
+                    let Ok(archive) = soapberry_zip::office::ArchiveReader::new(
+                        &bytes,
+                        soapberry_zip::office::ArchiveLimits::default(),
+                    ) else {
                         continue;
                     };
                     let Ok(content) = archive.read_string("content.xml") else {

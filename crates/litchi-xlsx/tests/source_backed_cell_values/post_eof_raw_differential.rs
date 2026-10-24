@@ -168,7 +168,8 @@ fn assert_shape_contract(shape: Shape) {
         "{} failure polluted publication",
         shape.name()
     );
-    let published_archive = ArchiveReader::new(&published).unwrap();
+    let published_archive =
+        ArchiveReader::new(&published, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     assert_eq!(
         published_archive
             .read(SECOND_SHEET.trim_start_matches('/'))

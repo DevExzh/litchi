@@ -1286,7 +1286,8 @@ mod tests {
     use soapberry_zip::office::StreamingArchiveWriter;
 
     fn archive_bytes() -> Vec<u8> {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer
             .write_stored(
                 "[Content_Types].xml",

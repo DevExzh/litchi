@@ -33,7 +33,8 @@ fn is_xml_member(name: &str) -> bool {
 }
 
 fn members(archive: &[u8]) -> BTreeMap<String, Vec<u8>> {
-    let reader = ArchiveReader::new(archive).unwrap();
+    let reader =
+        ArchiveReader::new(archive, soapberry_zip::office::ArchiveLimits::default()).unwrap();
     let names: Vec<String> = reader.file_names().map(str::to_owned).collect();
     names
         .into_iter()
@@ -70,7 +71,8 @@ fn rebuild(
     mark: &dyn Fn(&str) -> bool,
     indented: bool,
 ) -> (Vec<u8>, BTreeSet<String>) {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     let mut marked = BTreeSet::new();
     for (name, bytes) in members(archive) {
         let body = bytes.strip_prefix(BOM).unwrap_or(&bytes);

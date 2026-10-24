@@ -1633,8 +1633,11 @@ fn part_states(package: &Package) -> BTreeMap<String, (Vec<u8>, Vec<String>)> {
 }
 
 fn zip_member(data: &[u8], name: &str) -> Result<Vec<u8>> {
-    let archive = soapberry_zip::office::ArchiveReader::new(data)
-        .map_err(|error| Error::Invalid(format!("cannot index test ZIP: {error}")))?;
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        data,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot index test ZIP: {error}")))?;
     archive
         .read(name)
         .map_err(|error| Error::Invalid(format!("cannot read test ZIP member {name}: {error}")))
@@ -1658,8 +1661,12 @@ fn raw_zip_archive(data: &[u8]) -> Result<RawZipArchive> {
     let comment = slice.comment().as_bytes().to_vec();
     let archive = slice.into_zip_archive();
     let mut scratch = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = soapberry_zip::PreservationIndex::new(&archive, &mut scratch)
-        .map_err(|error| Error::Invalid(format!("cannot preserve raw test ZIP: {error}")))?;
+    let index = soapberry_zip::PreservationIndex::new(
+        &archive,
+        &mut scratch,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot preserve raw test ZIP: {error}")))?;
     let mut members = BTreeMap::new();
     let mut local_order = Vec::with_capacity(index.entries().len());
     let mut central_order = Vec::with_capacity(index.entries().len());
@@ -1791,9 +1798,14 @@ fn attach_external_link(package: &mut Package) -> Result<()> {
 }
 
 fn add_unknown_member(data: &[u8], name: &str) -> Result<Vec<u8>> {
-    let archive = soapberry_zip::office::ArchiveReader::new(data)
-        .map_err(|error| Error::Invalid(format!("cannot index test ZIP: {error}")))?;
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let archive = soapberry_zip::office::ArchiveReader::new(
+        data,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(format!("cannot index test ZIP: {error}")))?;
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     for member in archive.file_names() {
         let bytes = archive.read(member).map_err(|error| {
             Error::Invalid(format!("cannot read test ZIP member {member}: {error}"))

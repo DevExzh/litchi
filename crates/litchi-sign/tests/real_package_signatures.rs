@@ -223,7 +223,8 @@ fn push_escaped(output: &mut String, value: &str) {
 
 fn verify_fixture(bytes: &[u8]) -> litchi_sign::Report {
     let policy = Policy::compatible();
-    let archive = ArchiveReader::new(bytes).expect("fixture ZIP is readable");
+    let archive = ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
+        .expect("fixture ZIP is readable");
     let signature = archive
         .read("_xmlsignatures/sig1.xml")
         .expect("fixture signature part is readable");
@@ -247,7 +248,8 @@ fn real_microsoft_package_signatures_verify_through_public_xml_api() {
 #[test]
 fn real_microsoft_package_signatures_require_compatible_weak_algorithm_policy() {
     for fixture in [DOCX, XLSX, PPTX] {
-        let archive = ArchiveReader::new(fixture).expect("fixture ZIP is readable");
+        let archive = ArchiveReader::new(fixture, soapberry_zip::office::ArchiveLimits::default())
+            .expect("fixture ZIP is readable");
         let signature = archive
             .read("_xmlsignatures/sig1.xml")
             .expect("fixture signature part is readable");

@@ -355,7 +355,12 @@ fn xml_limits() -> XmlStreamLimits {
 fn raw_members(bytes: &[u8]) -> BTreeMap<Vec<u8>, RawMember> {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     index
         .entries()
         .iter()

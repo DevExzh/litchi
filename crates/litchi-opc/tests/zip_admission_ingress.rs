@@ -44,7 +44,8 @@ const BLOB: &[u8] = b"an unrelated payload that nothing reads at open time";
 /// A small package whose `custom/blob.bin` member is either streamed (bit 3,
 /// zero local CRC and sizes, a data descriptor) or sized.
 fn package(streaming_blob: bool) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_deflated_sized("[Content_Types].xml", CONTENT_TYPES.as_bytes())
         .unwrap();

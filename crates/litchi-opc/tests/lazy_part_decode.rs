@@ -31,7 +31,8 @@ fn uri(value: &str) -> PackURI {
 }
 
 fn archive() -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", MANIFEST)
         .expect("write manifest");

@@ -6,7 +6,9 @@ use std::sync::Arc;
 use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 
 fn source_package() -> OpcPackage {
-    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new();
+    let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+        soapberry_zip::office::StreamingArchiveLimits::default(),
+    );
     writer.write_stored("[Content_Types].xml", br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/></Types>"#).unwrap();
     writer.write_stored("item.xml", b"<root/>").unwrap();
     let limits = SourceLimits::builder()

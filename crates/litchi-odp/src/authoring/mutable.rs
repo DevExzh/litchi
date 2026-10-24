@@ -3430,7 +3430,8 @@ mod tests {
             b"  <m:file-entry m:full-path=\"vendor/foreign.xml\" m:media-type=\"text/xml\"/>\n  <m:file-entry m:full-path=\"vendor/opaque.bin\" m:media-type=\"application/octet-stream\"/>\n</m:manifest>\n",
         );
 
-        let mut archive = StreamingArchiveWriter::new();
+        let mut archive =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         archive
             .write_stored("mimetype", base_package.mimetype()?.as_bytes())
             .unwrap();

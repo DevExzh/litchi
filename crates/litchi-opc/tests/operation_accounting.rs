@@ -19,7 +19,8 @@ const ROOT_RELS: &[u8] = br#"<Relationships xmlns="http://schemas.openxmlformats
 const PART: &[u8] = b"<document><paragraph>accounted</paragraph></document>";
 
 fn source_bytes(deflated: bool) -> Vec<u8> {
-    let mut writer = StreamingArchiveWriter::new();
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
     writer
         .write_stored("[Content_Types].xml", CONTENT_TYPES)
         .unwrap();

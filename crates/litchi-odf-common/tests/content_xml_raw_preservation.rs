@@ -63,7 +63,12 @@ fn source_package(with_signature: bool) -> Vec<u8> {
 fn raw_members(bytes: &[u8]) -> BTreeMap<String, RawMember> {
     let archive = ZipArchive::from_slice(bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let mut records = archive.entries(&mut buffer);
     index
         .entries()
@@ -116,7 +121,12 @@ fn text_replacement_publication(source: &OwnedPackage) -> XmlSplicePublication {
 fn corrupt_stored_payload(mut bytes: Vec<u8>, target: &str) -> Vec<u8> {
     let archive = ZipArchive::from_slice(&bytes).unwrap().into_zip_archive();
     let mut buffer = vec![0_u8; soapberry_zip::RECOMMENDED_BUFFER_SIZE];
-    let index = PreservationIndex::new(&archive, &mut buffer).unwrap();
+    let index = PreservationIndex::new(
+        &archive,
+        &mut buffer,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap();
     let mut records = archive.entries(&mut buffer);
     for preserved in index.entries() {
         let record = records.next_entry().unwrap().unwrap();

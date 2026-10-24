@@ -280,10 +280,13 @@ fn raw_records(bytes: &[u8]) -> BTreeMap<String, RawRecord> {
 }
 
 fn zip_member(bytes: &[u8], wanted: &str) -> Vec<u8> {
-    soapberry_zip::office::ArchiveReader::new(bytes)
-        .unwrap()
-        .read(wanted)
-        .unwrap()
+    soapberry_zip::office::ArchiveReader::new(
+        bytes,
+        soapberry_zip::office::ArchiveLimits::default(),
+    )
+    .unwrap()
+    .read(wanted)
+    .unwrap()
 }
 
 fn mark_entry_encrypted(bytes: Vec<u8>, wanted: &str) -> Vec<u8> {

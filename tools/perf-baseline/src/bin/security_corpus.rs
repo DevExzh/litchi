@@ -888,8 +888,7 @@ fn preserve_fixture(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> 
             let archive = ZipArchive::from_seekable(Cursor::new(bytes), &mut locate_buffer)?;
             admit_zip_archive_entries(fixture.id, &archive)?;
             let mut buffer = vec![0u8; RECOMMENDED_BUFFER_SIZE];
-            let index =
-                PreservationIndex::new_with_limits(&archive, &mut buffer, archive_limits())?;
+            let index = PreservationIndex::new(&archive, &mut buffer, archive_limits())?;
             let output = index.write_to(&PreservationPlan::copy_all(&index), Vec::new())?;
             if output.as_slice() != bytes {
                 return Err(format!("{} no-op ZIP preservation changed bytes", fixture.id).into());
@@ -1238,10 +1237,7 @@ fn bounded_archive<'data>(
 ) -> Result<(ArchiveReader<'data>, usize)> {
     let preflight = ZipArchive::from_slice(bytes)?.into_zip_archive();
     let total_entries = admit_zip_archive_entries(fixture_id, &preflight)?;
-    Ok((
-        ArchiveReader::new_with_limits(bytes, archive_limits())?,
-        total_entries,
-    ))
+    Ok((ArchiveReader::new(bytes, archive_limits())?, total_entries))
 }
 
 fn admit_zip_archive_entries<R: ReaderAt>(
@@ -1998,7 +1994,8 @@ mod tests {
 
     #[test]
     fn declared_zip_member_size_refuses_before_payload_read() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         writer.write_stored("payload.bin", b"small").unwrap();
         let mut bytes = writer.finish_to_bytes().unwrap();
         let central = bytes
@@ -2007,12 +2004,13 @@ mod tests {
             .expect("central directory");
         let oversized = (MAX_INPUT_BYTES + 1) as u32;
         bytes[central + 24..central + 28].copy_from_slice(&oversized.to_le_bytes());
-        assert!(ArchiveReader::new_with_limits(&bytes, archive_limits()).is_err());
+        assert!(ArchiveReader::new(&bytes, archive_limits()).is_err());
     }
 
     #[test]
     fn total_zip_entry_admission_includes_directory_records() {
-        let mut writer = StreamingArchiveWriter::new();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
         for index in 0..=MAX_MEMBERS {
             let name = format!("directory-{index}/");
             writer.write_stored(&name, &[]).unwrap();

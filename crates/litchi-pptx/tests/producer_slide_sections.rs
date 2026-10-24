@@ -30,7 +30,7 @@ fn open(bytes: &[u8]) -> Package {
 
 fn presentation_xml(bytes: &[u8]) -> String {
     String::from_utf8(
-        ArchiveReader::new(bytes)
+        ArchiveReader::new(bytes, soapberry_zip::office::ArchiveLimits::default())
             .unwrap()
             .read("ppt/presentation.xml")
             .unwrap(),
