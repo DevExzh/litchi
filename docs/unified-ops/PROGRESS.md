@@ -4157,3 +4157,38 @@ See [0063](0063-source-pptx-modern-comments.md).
   pass, and independent verification confirms retained source/evidence paths
   and the protected trunk probe (0362ul25). No performance exception is added
   and nothing is pushed.
+
+- Coordinator native preflight update (2026-10-24):
+  Final DOC body-toggle build and correctness evidence merges at `c204999a44`
+  after independent review (0359qg). Both release builds pass. Three corrected
+  module-qualified tests each execute once; the earlier zero-test invocations
+  remain diagnostic. Single-edit outputs are byte-identical, and the CHPX
+  oracle verifies the intentionally smaller batch output. Allocation and
+  quiet-host timing remain open.
+
+  Final PPT normal and allocator builds pass, followed by all 28 correctness
+  routes across four fixtures. Independent review verifies the reused
+  baseline and matching normalized proofs. A truncated probe hash is corrected
+  from the actual source; the original receipt remains preserved. The corrected
+  record merges at `479234623d`, with no timing or ABBA claim.
+
+  The signed-native protocol is returned for concrete adapter, provenance,
+  process-guard, comparison and memory-evidence repairs. Two workers are
+  implementing the executable build adapter and qualification protocol; neither
+  is accepted yet. A separate compile-only scheduling change is under review
+  to permit bounded concurrent builds while preserving exclusive measured,
+  documentation and profiler phases. Frozen packets still use their existing
+  guards.
+
+  The final gate has passed formatting and all 24 Clippy profiles and is
+  running the ops tests. W8's original baseline build finishes and its final
+  candidate builds; sheet builds are active. PPT's released slot is assigned
+  to OPC build/correctness only. The original OPC script would continue into
+  ABBA, so only its reviewed prefix is authorized; its timing guard is returned
+  for repair before any measured run.
+
+  Cleanup wave 51 removes the merged DOC and iWork author leaves while
+  preserving branches, five ignored files and all native evidence (0362ul27).
+  A held glossary leaf is retained. Three obsolete searches are stopped by
+  their owners without changing files. Only audit 22 is deferred; nothing is
+  pushed.
