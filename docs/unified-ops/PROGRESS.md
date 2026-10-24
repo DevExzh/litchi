@@ -3506,8 +3506,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   Source integration remains staging. Strict all-target/all-feature checks
   for the 19 native gate packages and ODS pass on f6fe; ongoing native tests
   found a real OPC read-ahead retention failure plus four OPC and eight ODP
-  stale doctest consumers. These have dedicated repair leaves; assertions
-  and examples remain required. A fresh composed
+  stale doctest consumers. Reviewed ODP repair `21c47647af` now migrates all
+  eight examples without changing production logic or assertions; all 19
+  doctests and the all-target compiler check pass. OPC retention and its
+  doctest migration remain in repair. A fresh composed
   source freeze, full gate, all-68 inventory, actual OfficeCLI corpus replay,
   glossary closure and quiet native qualification remain required. Only
   comprehensive redaction audit 22 is deferred. Nothing is pushed.

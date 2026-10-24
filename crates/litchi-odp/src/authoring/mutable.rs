@@ -315,7 +315,8 @@ impl MutablePresentation {
     /// # fn main() -> litchi_core::Result<()> {
     /// let snapshot = Builder::new().build()?;
     /// let transaction = snapshot.edit()?;
-    /// assert!(transaction.slides().is_empty());
+    /// let slides = transaction.slides()?;
+    /// assert!(slides.is_empty());
     /// # Ok(())
     /// # }
     /// ```
@@ -1294,7 +1295,8 @@ impl MutablePresentation {
     /// transaction.add("First", "Content 1")?;
     /// transaction.add("Third", "Content 3")?;
     /// transaction.add_before(1, "Second", "Content 2")?;
-    /// assert_eq!(transaction.slides()[1].title.as_deref(), Some("Second"));
+    /// let slides = transaction.slides()?;
+    /// assert_eq!(slides[1].title.as_deref(), Some("Second"));
     /// # Ok(())
     /// # }
     /// ```
@@ -1364,7 +1366,8 @@ impl MutablePresentation {
     /// transaction.add("Slide 2", "Content 2")?;
     /// let removed = transaction.remove(0)?; // Remove first slide
     /// assert_eq!(removed.and_then(|slide| slide.title).as_deref(), Some("Slide 1"));
-    /// assert_eq!(transaction.slides().len(), 1);
+    /// let slides = transaction.slides()?;
+    /// assert_eq!(slides.len(), 1);
     /// # Ok(())
     /// # }
     /// ```
@@ -1478,8 +1481,9 @@ impl MutablePresentation {
     /// let mut transaction = source.edit()?;
     /// transaction.add("Old Title", "Old content")?;
     /// transaction.replace(0, "New Title", "New content")?;
-    /// assert_eq!(transaction.slides()[0].title.as_deref(), Some("New Title"));
-    /// assert_eq!(transaction.slides()[0].text, "New content");
+    /// let slides = transaction.slides()?;
+    /// assert_eq!(slides[0].title.as_deref(), Some("New Title"));
+    /// assert_eq!(slides[0].text, "New content");
     /// # Ok(())
     /// # }
     /// ```
@@ -1516,7 +1520,8 @@ impl MutablePresentation {
     /// let mut shape = Shape::new();
     /// shape.text = "Shape text".to_string();
     /// transaction.add_shape(0, shape)?;
-    /// assert_eq!(transaction.slides()[0].shapes.len(), 1);
+    /// let slides = transaction.slides()?;
+    /// assert_eq!(slides[0].shapes.len(), 1);
     /// # Ok(())
     /// # }
     /// ```
@@ -1553,7 +1558,8 @@ impl MutablePresentation {
     /// transaction.add_shape(0, Shape::new())?;
     /// let removed = transaction.remove_shape(0, 0)?;
     /// assert!(removed.is_some());
-    /// assert!(transaction.slides()[0].shapes.is_empty());
+    /// let slides = transaction.slides()?;
+    /// assert!(slides[0].shapes.is_empty());
     /// # Ok(())
     /// # }
     /// ```
@@ -1588,8 +1594,9 @@ impl MutablePresentation {
     /// let mut transaction = source.edit()?;
     /// transaction.add("Slide 1", "Content")?;
     /// transaction.clear(0)?;
-    /// assert!(transaction.slides()[0].title.is_none());
-    /// assert!(transaction.slides()[0].text.is_empty());
+    /// let slides = transaction.slides()?;
+    /// assert!(slides[0].title.is_none());
+    /// assert!(slides[0].text.is_empty());
     /// # Ok(())
     /// # }
     /// ```

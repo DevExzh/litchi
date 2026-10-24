@@ -3062,6 +3062,10 @@
   {
    "record": "0362uva",
    "reason": "Safe-gate tooling registration patch and build-free runner verification only: the 53 steps, process isolation and existing failure receipts remain enforced. No Cargo build or leaf-versus-unified performance measurement is recorded."
+  },
+  {
+   "record": "0362umb",
+   "reason": "Documentation-consumer repair and source-bound doctest/compiler validation only. The 19 ODP examples retain their assertions; command runtime and RSS are validation provenance, not a leaf-versus-unified performance measurement."
   }
  ]
 }
