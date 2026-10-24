@@ -1,11 +1,13 @@
 //! A bounded, archive-owned forward-start read-ahead window.
 //!
 //! The window is deliberately kept below the `SourceReader` adapter.  It is
-//! therefore shared by ZIP metadata and lazy member reads, while source
-//! artifacts and the exact publication helpers continue to use the snapshot
-//! directly.  A small admission gate serializes forward operations and lets
-//! exact-publication transitions drain them without holding a cache lock over
-//! a provider call.
+//! therefore shared by ZIP metadata and lazy member reads while their package
+//! owner is live.  Source artifacts retain the immutable archive index and
+//! catalog; their reader upgrades the package's window when it is available
+//! and falls back to checked exact snapshot reads after the owner drops.  A
+//! small admission gate serializes forward operations and lets exact-
+//! publication transitions drain them without holding a cache lock over a
+//! provider call.
 
 use crate::error::{OpcError, Result};
 use litchi_core::{Reservation, Resource};

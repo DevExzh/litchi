@@ -3508,8 +3508,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   found a real OPC read-ahead retention failure plus four OPC and eight ODP
   stale doctest consumers. Reviewed ODP repair `21c47647af` now migrates all
   eight examples without changing production logic or assertions; all 19
-  doctests and the all-target compiler check pass. OPC retention and its
-  doctest migration remain in repair. A fresh composed
+  doctests and the all-target compiler check pass. Reviewed OPC source
+  `cdbee64a36` and corrected receipt `42e3f2314c` release the retained window
+  through a weak archive link, preserve live clone ownership and source-change
+  precedence, and migrate all four doctests. All 1,207 native tests and 11
+  doctests pass; the existing independent ZIP64 fixture test remains explicitly
+  ignored. Strict all-target Clippy passes. Initial sparse-checkout failures
+  were resolved by restoring tracked fixtures. The configured read-ahead path
+  needs its own matched native ABBA comparison under 0362umc; the exact-policy
+  path performs no weak upgrade. A fresh composed
   source freeze, full gate, all-68 inventory, actual OfficeCLI corpus replay,
   glossary closure and quiet native qualification remain required. Only
   comprehensive redaction audit 22 is deferred. Nothing is pushed.

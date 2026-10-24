@@ -44,7 +44,7 @@ use std::ops::Range;
 #[cfg(any(unix, windows))]
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, OnceLock, Weak};
 use std::time::Duration;
 
 mod artifact_restore;
@@ -3043,10 +3043,13 @@ impl PolicyAppendedEntry {
 /// candidate, so retry and repeated output do not require another preparation.
 ///
 /// ```
-/// use litchi_opc::{OpcPackage, PackageWriter, SourceBackedPackage, SourceTopologyPlan};
+/// use litchi_opc::{
+///     OpcPackage, PackageWriter, SourceBackedPackage, SourceCacheLimits, SourceLimits,
+///     SourceTopologyPlan,
+/// };
 /// # fn main() -> litchi_opc::Result<()> {
 /// let bytes = PackageWriter::to_bytes(&OpcPackage::new())?;
-/// let source = SourceBackedPackage::from_vec(bytes.clone(), SourceLimits::default(), crate::SourceCacheLimits::default(), None)?;
+/// let source = SourceBackedPackage::from_vec(bytes.clone(), SourceLimits::default(), SourceCacheLimits::default(), None)?;
 /// let prepared = source.prepare_topology(SourceTopologyPlan::new())?;
 /// let shared = prepared.clone();
 /// let mut first = Vec::new();
@@ -4157,7 +4160,11 @@ impl CacheCounters {
 #[derive(Clone)]
 struct SourceReader {
     snapshot: SourceSnapshot,
-    read_ahead: Option<Arc<ArchiveReadAhead>>,
+    /// The package owns the strong read-ahead handle. Keeping only a weak link
+    /// here lets an exact [`SourceArtifact`] share the immutable archive index
+    /// without retaining the bounded window after its package owner is
+    /// dropped; reads then fall back to the checked exact source path.
+    read_ahead: Option<Weak<ArchiveReadAhead>>,
     /// Bytes the open already fetched for the structural members it is about
     /// to read. Present only for an ordinary unmanaged, exact-policy open, and
     /// released as soon as the catalog has been read.
@@ -4237,7 +4244,7 @@ impl ZipReaderAt for SourceReader {
                 return Ok(count);
             }
         }
-        let result = match &self.read_ahead {
+        let result = match self.read_ahead.as_ref().and_then(Weak::upgrade) {
             Some(read_ahead) => read_ahead.read_at(&self.snapshot, offset, output),
             None => read_source_at_with_context(
                 &self.snapshot,
@@ -7612,7 +7619,7 @@ impl SourceBackedPackage {
         let archive = match indexed_archive_with_limits(
             SourceReader {
                 snapshot: snapshot.clone(),
-                read_ahead: read_ahead.clone(),
+                read_ahead: read_ahead.as_ref().map(Arc::downgrade),
                 prefetch: prefetch.clone(),
             },
             length,
