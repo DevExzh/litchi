@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as _dt
+import fcntl
 import hashlib
 import json
 import os
@@ -53,6 +54,26 @@ ROUNDS = 31
 TARGET_PREFLIGHT_BYTES = 19_200_000_000
 TARGET_HARD_LIMIT_BYTES = 20_000_000_000
 MEMORY_HARD_LIMIT_BYTES = 20_000_000_000
+BUILD_PERMIT_SCHEMA = "litchi.native-build-permit.v1"
+BUILD_EXECUTION_CLASSES = frozenset({"exclusive", "compile_only"})
+PEER_COMMAND_CLASSES = frozenset(
+    {
+        "cargo-build",
+        "cargo-check",
+        "cargo-clippy",
+        "cargo-test",
+    }
+)
+DISALLOWED_DESCENDANT_NAMES = frozenset(
+    {
+        "cargo-fuzz",
+        "heaptrack",
+        "perf",
+        "rustdoc",
+        "rustfmt",
+        "valgrind",
+    }
+)
 HEAVY_NAMES = frozenset(
     {
         "cargo",
@@ -79,6 +100,29 @@ class RunnerError(RuntimeError):
 
 def _now() -> str:
     return _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="milliseconds")
+
+
+def _parse_utc(value: Any, label: str) -> _dt.datetime:
+    if not isinstance(value, str) or not value:
+        raise RunnerError(f"{label} must be an ISO-8601 timestamp")
+    try:
+        parsed = _dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise RunnerError(f"{label} is not a valid ISO-8601 timestamp") from error
+    if parsed.tzinfo is None:
+        raise RunnerError(f"{label} must carry a timezone")
+    return parsed.astimezone(_dt.timezone.utc)
+
+
+def _sha256_shape(value: Any, label: str) -> str:
+    if (
+        not isinstance(value, str)
+        or len(value) != 64
+        or value != value.lower()
+        or any(character not in "0123456789abcdef" for character in value)
+    ):
+        raise RunnerError(f"{label} must be a lowercase SHA-256")
+    return value
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -415,6 +459,7 @@ def load_manifest(path: Path) -> dict[str, Any]:
     for key in ("probe_paths", "fixture_paths"):
         if not isinstance(shared.get(key, []), list):
             raise RunnerError(f"shared.{key} must be a list")
+    _validate_build_execution(data, output=output, source_roots=source_roots)
     _validate_lane_workload(data)
     return data
 
@@ -439,6 +484,52 @@ def _validate_command(command: Any, location: str) -> None:
         or not all(isinstance(item, str) and item for item in artifacts)
     ):
         raise RunnerError(f"{location}.artifacts must be a non-empty string list")
+
+
+def _cargo_command_class(argv: Sequence[str]) -> str | None:
+    """Classify only the Cargo subcommands that a peer lease may admit."""
+
+    if not argv or Path(argv[0]).name != "cargo":
+        return None
+    index = 1
+    if index < len(argv) and argv[index].startswith("+"):
+        index += 1
+    if index >= len(argv):
+        return None
+    return {
+        "build": "cargo-build",
+        "check": "cargo-check",
+        "clippy": "cargo-clippy",
+        "test": "cargo-test",
+    }.get(argv[index])
+
+
+def _validate_build_execution(
+    data: Mapping[str, Any], *, output: Path, source_roots: Sequence[Path]
+) -> None:
+    execution = data.get("build_execution")
+    if execution is None:
+        return
+    if not isinstance(execution, dict):
+        raise RunnerError("build_execution must be an object")
+    if execution.get("class") == "exclusive":
+        return
+    if execution.get("class") != "compile_only":
+        raise RunnerError("build_execution.class must be exclusive or compile_only")
+    permit_value = execution.get("permit_path")
+    if not isinstance(permit_value, str) or not permit_value:
+        raise RunnerError("compile_only build_execution needs permit_path")
+    permit = _resolve_path(permit_value)
+    if _under(permit, output) or permit == output:
+        raise RunnerError("compile_only permit_path must be outside output_dir")
+    _ensure_external(permit, source_roots, "compile_only permit_path")
+    for leg, spec in data["legs"].items():
+        for command in spec["build"]:
+            command_class = _cargo_command_class(command["argv"])
+            if command_class != "cargo-build":
+                raise RunnerError(
+                    f"compile_only build_execution admits only cargo build commands ({leg}/{command['id']})"
+                )
 
 
 def _validate_validator(command: Any, location: str) -> None:
@@ -1175,6 +1266,62 @@ def _validate_cargo_paths(argv: Sequence[str], *, cwd: Path, source: Path, targe
             raise RunnerError(f"Cargo config redirects target outside the runner target: {config} -> {configured}")
 
 
+def _build_phase_identity(
+    manifest: Mapping[str, Any], manifest_path: Path, phase_id: str
+) -> tuple[list[str], Path, Path, Path]:
+    """Resolve and validate one recorded build phase from its manifest."""
+
+    legs = manifest.get("legs")
+    if not isinstance(legs, Mapping):
+        raise RunnerError("phase manifest legs are malformed")
+    shared = manifest.get("shared", {})
+    if not isinstance(shared, Mapping):
+        raise RunnerError("phase manifest shared section is malformed")
+    output = _resolve_path(str(manifest.get("output_dir", "")))
+    for leg, spec in legs.items():
+        if not isinstance(leg, str) or not isinstance(spec, Mapping):
+            raise RunnerError("phase manifest leg is malformed")
+        commands = spec.get("build")
+        if not isinstance(commands, list):
+            raise RunnerError(f"phase manifest build list is malformed for {leg}")
+        for command in commands:
+            if not isinstance(command, Mapping) or not isinstance(command.get("id"), str):
+                raise RunnerError(f"phase manifest build command is malformed for {leg}")
+            if f"build-{leg}-{command['id']}" != phase_id:
+                continue
+            source = _resolve_path(str(spec.get("source_root", "")))
+            target = _resolve_path(str(spec.get("target_dir", "")))
+            shared_fixtures = shared.get("fixture_paths", [])
+            leg_fixtures = spec.get("fixture_paths", [])
+            if not isinstance(shared_fixtures, list) or not isinstance(leg_fixtures, list):
+                raise RunnerError(f"phase manifest fixture paths are malformed for {leg}")
+            fixture_values = [*shared_fixtures, *leg_fixtures]
+            fixture = ""
+            if len(fixture_values) == 1:
+                fixture = str(_resolve_path(str(fixture_values[0]), base=source))
+            context: dict[str, Any] = {
+                "source_root": source,
+                "target_dir": target,
+                "output_dir": output,
+                "manifest_path": manifest_path,
+                "leg": leg,
+                "index": 0,
+                "rounds": int(manifest.get("rounds", 31)),
+                "block": 1,
+                "fixture": fixture,
+            }
+            argv_value = command.get("argv")
+            if not isinstance(argv_value, list) or not all(isinstance(item, str) for item in argv_value):
+                raise RunnerError(f"phase manifest argv is malformed for {phase_id}")
+            argv = normalize_cargo_argv(_render_argv(argv_value, context))
+            cwd = _resolve_path(_render(str(command.get("cwd", ".")), context), base=source)
+            if not _under(cwd, source):
+                raise RunnerError(f"phase build cwd escapes source root: {cwd}")
+            _validate_cargo_paths(argv, cwd=cwd, source=source, target=target)
+            return argv, cwd, target, source
+    raise RunnerError(f"phase {phase_id!r} is not an admitted manifest build entry")
+
+
 def _read_proc(pid: int) -> dict[str, Any] | None:
     proc = Path("/proc") / str(pid)
     try:
@@ -1193,12 +1340,14 @@ def _read_proc(pid: int) -> dict[str, Any] | None:
     try:
         parent = int(fields[1])
         process_group = int(fields[2])
+        starttime = fields[19]
     except (IndexError, ValueError):
         return None
     return {
         "pid": pid,
         "ppid": parent,
         "pgrp": process_group,
+        "starttime": starttime,
         "comm": comm,
         "exe": exe,
         "cwd": cwd,
@@ -1232,6 +1381,23 @@ def _is_heavy(entry: Mapping[str, Any]) -> bool:
     return Path(str(first)).name in HEAVY_NAMES
 
 
+def _process_command_class(entry: Mapping[str, Any]) -> str | None:
+    command = entry.get("cmdline", [])
+    if not isinstance(command, list) or not command:
+        return None
+    executable = Path(str(command[0])).name
+    if executable == "cargo":
+        return _cargo_command_class([str(value) for value in command])
+    return None
+
+
+def _process_starttime(pid: int) -> str:
+    entry = _read_proc(pid)
+    if entry is None or not isinstance(entry.get("starttime"), str):
+        raise RunnerError(f"cannot read process starttime for pid {pid}")
+    return str(entry["starttime"])
+
+
 def _descendants(snapshot: Mapping[int, Mapping[str, Any]], root: int) -> set[int]:
     allowed = {root}
     changed = True
@@ -1247,9 +1413,57 @@ def _descendants(snapshot: Mapping[int, Mapping[str, Any]], root: int) -> set[in
 class ProcessGuard:
     """Reject unrelated compiler/profiler activity in any Litchi worktree."""
 
-    def offenders(self, allowed_root: int | None = None) -> list[dict[str, Any]]:
+    @staticmethod
+    def _check_child_tree(
+        snapshot: Mapping[int, Mapping[str, Any]],
+        root: int,
+        *,
+        expected_command_class: str | None,
+        label: str,
+    ) -> set[int]:
+        descendants = _descendants(snapshot, root)
+        root_entry = snapshot.get(root)
+        if root_entry is None:
+            return descendants
+        if expected_command_class is not None:
+            actual = _process_command_class(root_entry)
+            if actual != expected_command_class:
+                raise RunnerError(
+                    f"{label} command class changed: expected {expected_command_class}, got {actual}"
+                )
+        for pid in descendants:
+            if pid == root:
+                continue
+            entry = snapshot[pid]
+            names = {Path(str(entry.get("exe", ""))).name, str(entry.get("comm", ""))}
+            if names & DISALLOWED_DESCENDANT_NAMES:
+                raise RunnerError(f"{label} spawned a disallowed compiler/profiler: {entry!r}")
+            if "cargo" in names:
+                raise RunnerError(f"{label} spawned a nested Cargo process: {entry!r}")
+            if "clippy-driver" in names and expected_command_class != "cargo-clippy":
+                raise RunnerError(f"{label} spawned clippy-driver outside cargo clippy: {entry!r}")
+        return descendants
+
+    def offenders(
+        self,
+        allowed_root: int | None = None,
+        *,
+        overlap: "BuildOverlapLease | None" = None,
+        expected_command_class: str | None = None,
+    ) -> list[dict[str, Any]]:
         snapshot = _proc_snapshot()
-        allowed = _descendants(snapshot, allowed_root) if allowed_root is not None else set()
+        allowed = (
+            self._check_child_tree(
+                snapshot,
+                allowed_root,
+                expected_command_class=expected_command_class,
+                label="owned child",
+            )
+            if allowed_root is not None
+            else set()
+        )
+        if overlap is not None:
+            allowed.update(overlap.allowed_peer_processes(snapshot))
         return [
             entry
             for pid, entry in snapshot.items()
@@ -1261,12 +1475,776 @@ class ProcessGuard:
         if offenders:
             raise RunnerError(f"unrelated Litchi builder/profiler is running: {offenders!r}")
 
+    def require_compile_quiet(self, overlap: "BuildOverlapLease") -> None:
+        offenders = self.offenders(overlap=overlap)
+        if offenders:
+            raise RunnerError(f"unregistered Litchi builder/profiler is running: {offenders!r}")
+
     @staticmethod
     def loadavg() -> list[float] | None:
         try:
             return [float(value) for value in os.getloadavg()]
         except (AttributeError, OSError):
             return None
+
+
+class BuildOverlapLease:
+    """A short-lived, externally granted lease for compile-only overlap.
+
+    The permit is immutable and coordinator-owned.  Each participating job
+    creates its own lease file under the permit's external lease directory;
+    the file binds the job group, root PID/starttime, manifest identity and
+    exact Cargo command class.  A missing/reused PID, changed permit, stale
+    active lease, phase change, or expiry is a hard failure.
+    """
+
+    def __init__(self, manifest: Mapping[str, Any], manifest_path: Path):
+        execution = manifest.get("build_execution")
+        if not isinstance(execution, dict) or execution.get("class") != "compile_only":
+            raise RunnerError("compile_only build_execution is required for an overlap lease")
+        permit_value = execution.get("permit_path")
+        if not isinstance(permit_value, str) or not permit_value:
+            raise RunnerError("compile_only build_execution needs permit_path")
+        self.manifest = manifest
+        self.manifest_path = manifest_path.resolve()
+        self.manifest_hash, self.manifest_bytes = _sha256_file(self.manifest_path)
+        self.permit_path = _resolve_path(permit_value)
+        if self.permit_path.is_symlink() or not self.permit_path.is_file():
+            raise RunnerError(f"build permit is missing or symlinked: {self.permit_path}")
+        self.permit_hash, self.permit_bytes = _sha256_file(self.permit_path)
+        try:
+            value = json.loads(self.permit_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise RunnerError(f"cannot read build permit: {error}") from error
+        if not isinstance(value, dict) or value.get("schema") != BUILD_PERMIT_SCHEMA:
+            raise RunnerError(f"build permit schema must be {BUILD_PERMIT_SCHEMA!r}")
+        self.permit = value
+        self.grant_id = self._text("grant_id")
+        self.job_group = self._text("job_group")
+        self.expires = _parse_utc(value.get("expires_utc"), "build permit expires_utc")
+        if self.expires <= _dt.datetime.now(_dt.timezone.utc):
+            raise RunnerError("build permit is expired")
+        max_jobs = value.get("max_jobs")
+        if isinstance(max_jobs, bool) or not isinstance(max_jobs, int) or not 1 <= max_jobs <= 4:
+            raise RunnerError("build permit max_jobs must be between 1 and 4")
+        self.max_jobs = max_jobs
+        self.allowed_lanes = self._text_list("allowed_lanes")
+        self.allowed_manifests = self._text_list("allowed_manifest_sha256")
+        for item in self.allowed_manifests:
+            _sha256_shape(item, "build permit allowed_manifest_sha256 entry")
+        self.allowed_command_classes = self._text_list("allowed_command_classes")
+        if any(item not in PEER_COMMAND_CLASSES for item in self.allowed_command_classes):
+            raise RunnerError("build permit contains an unknown command class")
+        bindings = value.get("manifest_bindings")
+        if not isinstance(bindings, list) or not bindings:
+            raise RunnerError("build permit needs exact manifest_bindings")
+        self.manifest_bindings: dict[tuple[str, str], dict[str, Any]] = {}
+        for binding in bindings:
+            if not isinstance(binding, dict):
+                raise RunnerError("build permit manifest binding must be an object")
+            binding_path_value = binding.get("path")
+            if not isinstance(binding_path_value, str) or not binding_path_value:
+                raise RunnerError("build permit manifest binding path is malformed")
+            binding_path = str(_resolve_path(binding_path_value))
+            binding_hash = _sha256_shape(
+                binding.get("sha256"), "build permit manifest binding sha256"
+            )
+            binding_lane = binding.get("lane")
+            if not isinstance(binding_lane, str) or binding_lane not in self.allowed_lanes:
+                raise RunnerError("build permit manifest binding lane is not admitted")
+            binding_roots = self._binding_paths(binding, "source_roots")
+            binding_targets = self._binding_paths(binding, "target_dirs")
+            if binding_hash not in self.allowed_manifests:
+                raise RunnerError("build permit manifest binding is not in allowed_manifest_sha256")
+            key = (binding_path, binding_hash)
+            if key in self.manifest_bindings:
+                raise RunnerError("build permit repeats a manifest binding")
+            self.manifest_bindings[key] = {
+                "path": binding_path,
+                "sha256": binding_hash,
+                "lane": binding_lane,
+                "source_roots": binding_roots,
+                "target_dirs": binding_targets,
+            }
+        if manifest.get("lane") not in self.allowed_lanes:
+            raise RunnerError("build permit does not admit this lane")
+        if self.manifest_hash not in self.allowed_manifests:
+            raise RunnerError("build permit does not admit this manifest hash")
+        manifest_key = (str(self.manifest_path), self.manifest_hash)
+        manifest_binding = self.manifest_bindings.get(manifest_key)
+        if manifest_binding is None:
+            raise RunnerError("build permit does not bind this manifest path and hash")
+        source_roots = [
+            str(_resolve_path(str(spec["source_root"]))) for spec in manifest.get("legs", {}).values()
+        ]
+        target_dirs = [
+            str(_resolve_path(str(spec["target_dir"]))) for spec in manifest.get("legs", {}).values()
+        ]
+        if (
+            manifest_binding["lane"] != manifest.get("lane")
+            or manifest_binding["source_roots"] != source_roots
+            or manifest_binding["target_dirs"] != target_dirs
+        ):
+            raise RunnerError("build permit manifest binding paths differ from the current manifest")
+        if "cargo-build" not in self.allowed_command_classes:
+            raise RunnerError("build permit does not admit the native cargo-build class")
+        lease_value = value.get("lease_dir")
+        if not isinstance(lease_value, str) or not lease_value:
+            raise RunnerError("build permit needs an external lease_dir")
+        self.lease_dir = _resolve_path(lease_value)
+        source_roots = [Path(path) for path in source_roots]
+        output = _resolve_path(str(manifest.get("output_dir", "")))
+        _ensure_external(self.lease_dir, source_roots, "build permit lease_dir")
+        if _overlap(self.lease_dir, output):
+            raise RunnerError("build permit lease_dir must be disjoint from output_dir")
+        if _overlap(self.permit_path, self.lease_dir):
+            raise RunnerError("build permit path must be disjoint from lease_dir")
+        if self.lease_dir.exists() and not self.lease_dir.is_dir():
+            raise RunnerError(f"build permit lease_dir is not a directory: {self.lease_dir}")
+        self.root_pid = os.getpid()
+        self.root_starttime = _process_starttime(self.root_pid)
+        self.lease_path: Path | None = None
+        self.lease_id: str | None = None
+        self.started_peers: list[dict[str, Any]] = []
+        self.ended_peers: list[dict[str, Any]] = []
+        self.owned_jobs: list[dict[str, Any]] = []
+        self.bound_pid: int | None = None
+        self.bound_starttime: str | None = None
+        self.bound_phase: str | None = None
+        self.phase_argv: list[str] | None = None
+        self.phase_cwd: str | None = None
+        self.phase_target_dir: str | None = None
+
+    @staticmethod
+    def _binding_paths(binding: Mapping[str, Any], key: str) -> list[str]:
+        values = binding.get(key)
+        if not isinstance(values, list) or not values or any(not isinstance(item, str) for item in values):
+            raise RunnerError(f"build permit manifest binding {key} is malformed")
+        return [str(_resolve_path(item)) for item in values]
+
+    def _text(self, key: str) -> str:
+        value = self.permit.get(key)
+        if not isinstance(value, str) or not value or "/" in value:
+            raise RunnerError(f"build permit {key} must be a non-empty identifier")
+        return value
+
+    def _text_list(self, key: str) -> list[str]:
+        value = self.permit.get(key)
+        if not isinstance(value, list) or not value or any(not isinstance(item, str) or not item for item in value):
+            raise RunnerError(f"build permit {key} must be a non-empty string list")
+        return [str(item) for item in value]
+
+    def _lock_path(self) -> Path:
+        return self.lease_dir / ".lock"
+
+    def _lease_record(self, *, status: str = "active") -> dict[str, Any]:
+        if self.lease_id is None:
+            raise RunnerError("build overlap lease has no lease id")
+        bound = self.bound_pid is not None
+        root_pid = self.bound_pid if bound else self.root_pid
+        root_starttime = self.bound_starttime if bound else self.root_starttime
+        command_class = "cargo-build" if bound else "controller-reservation"
+        return {
+            "schema": BUILD_PERMIT_SCHEMA,
+            "status": status,
+            "lease_id": self.lease_id,
+            "grant_id": self.grant_id,
+            "job_group": self.job_group,
+            "permit_sha256": self.permit_hash,
+            "root_pid": root_pid,
+            "root_starttime": root_starttime,
+            "controller_pid": self.root_pid,
+            "controller_starttime": self.root_starttime,
+            "lane": self.manifest["lane"],
+            "manifest_path": str(self.manifest_path),
+            "manifest_sha256": self.manifest_hash,
+            "command_class": command_class,
+            "allowed_command_classes": list(self.allowed_command_classes),
+            "phase": "build",
+            "phase_id": self.bound_phase,
+            "phase_argv": list(self.phase_argv) if self.phase_argv is not None else None,
+            "phase_cwd": self.phase_cwd,
+            "phase_target_dir": self.phase_target_dir,
+            "source_roots": [
+                str(_resolve_path(str(spec["source_root"])))
+                for spec in self.manifest["legs"].values()
+            ],
+            "target_dirs": [
+                str(_resolve_path(str(spec["target_dir"])))
+                for spec in self.manifest["legs"].values()
+            ],
+            "created_utc": _now(),
+            "expires_utc": self.permit["expires_utc"],
+        }
+
+    def _read_records_locked(self) -> list[tuple[Path, dict[str, Any]]]:
+        if self.lease_dir.is_symlink():
+            raise RunnerError(f"build permit lease_dir is symlinked: {self.lease_dir}")
+        self.lease_dir.mkdir(parents=True, exist_ok=True)
+        records: list[tuple[Path, dict[str, Any]]] = []
+        for path in sorted(self.lease_dir.glob("*.json")):
+            if path.is_symlink():
+                raise RunnerError(f"build permit lease is symlinked: {path}")
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+                raise RunnerError(f"cannot read build lease {path}: {error}") from error
+            if not isinstance(value, dict) or value.get("schema") != BUILD_PERMIT_SCHEMA:
+                raise RunnerError(f"build lease schema mismatch: {path}")
+            records.append((path, value))
+        return records
+
+    def _phase_manifest(self, path: Path) -> Mapping[str, Any]:
+        if path == self.manifest_path:
+            return self.manifest
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise RunnerError(f"cannot read phase manifest {path}: {error}") from error
+        if not isinstance(value, dict):
+            raise RunnerError(f"phase manifest is not an object: {path}")
+        return _expand_environment(value)
+
+    def _validate_record(
+        self,
+        path: Path,
+        value: Mapping[str, Any],
+        *,
+        snapshot: Mapping[int, Mapping[str, Any]],
+    ) -> tuple[int, str] | None:
+        if value.get("status") == "released":
+            return None
+        if value.get("status") != "active":
+            raise RunnerError(f"build lease has an unknown status: {path}")
+        is_current = path == self.lease_path and value.get("lease_id") == self.lease_id
+        if value.get("grant_id") != self.grant_id or value.get("job_group") != self.job_group:
+            raise RunnerError(f"build lease belongs to a different grant/group: {path}")
+        if value.get("permit_sha256") != self.permit_hash:
+            raise RunnerError(f"build lease permit hash differs: {path}")
+        pid = value.get("root_pid")
+        starttime = value.get("root_starttime")
+        if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0 or not isinstance(starttime, str) or not starttime:
+            raise RunnerError(f"build lease root identity is malformed: {path}")
+        controller_pid = value.get("controller_pid")
+        controller_starttime = value.get("controller_starttime")
+        if (
+            isinstance(controller_pid, bool)
+            or not isinstance(controller_pid, int)
+            or controller_pid <= 0
+            or not isinstance(controller_starttime, str)
+            or not controller_starttime
+        ):
+            raise RunnerError(f"build lease controller identity is malformed: {path}")
+        if value.get("lane") not in self.allowed_lanes:
+            raise RunnerError(f"build lease lane is not admitted: {path}")
+        manifest_path = value.get("manifest_path")
+        if not isinstance(manifest_path, str) or not manifest_path:
+            raise RunnerError(f"build lease manifest_path is malformed: {path}")
+        resolved_manifest_path = _resolve_path(manifest_path)
+        manifest_hash = _sha256_shape(value.get("manifest_sha256"), "build lease manifest_sha256")
+        if manifest_hash not in self.allowed_manifests:
+            raise RunnerError(f"build lease manifest is not admitted: {path}")
+        binding = self.manifest_bindings.get((str(resolved_manifest_path), manifest_hash))
+        if binding is None:
+            raise RunnerError(f"build lease manifest binding is not admitted: {path}")
+        if not resolved_manifest_path.is_file() or resolved_manifest_path.is_symlink():
+            raise RunnerError(f"build lease manifest is missing or symlinked: {path}")
+        actual_manifest_hash, _ = _sha256_file(resolved_manifest_path)
+        if actual_manifest_hash != manifest_hash:
+            raise RunnerError(f"build lease manifest content changed: {path}")
+        if value.get("lane") != binding["lane"]:
+            raise RunnerError(f"build lease lane differs from its manifest binding: {path}")
+        command_class = value.get("command_class")
+        allowed_classes = value.get("allowed_command_classes")
+        if (
+            not isinstance(allowed_classes, list)
+            or any(item not in self.allowed_command_classes for item in allowed_classes)
+            or "cargo-build" not in allowed_classes
+        ):
+            raise RunnerError(f"build lease allowed command classes are not admitted: {path}")
+        if value.get("phase") != "build":
+            raise RunnerError(f"build lease phase is not build: {path}")
+        phase_id = value.get("phase_id")
+        phase_argv = value.get("phase_argv")
+        phase_cwd = value.get("phase_cwd")
+        phase_target_dir = value.get("phase_target_dir")
+        if phase_id is None:
+            if phase_argv is not None or phase_cwd is not None or phase_target_dir is not None:
+                raise RunnerError(f"idle controller build lease carries a phase binding: {path}")
+        elif (
+            not isinstance(phase_id, str)
+            or not phase_id
+            or not isinstance(phase_argv, list)
+            or not phase_argv
+            or any(not isinstance(item, str) or not item for item in phase_argv)
+            or _cargo_command_class(phase_argv) is None
+            or not isinstance(phase_cwd, str)
+            or not phase_cwd
+            or not isinstance(phase_target_dir, str)
+            or not phase_target_dir
+        ):
+            raise RunnerError(f"build lease phase binding is malformed: {path}")
+        phase_cwd_path = _resolve_path(phase_cwd) if isinstance(phase_cwd, str) else None
+        phase_target_path = _resolve_path(phase_target_dir) if isinstance(phase_target_dir, str) else None
+        if phase_id is not None and (
+            phase_cwd_path is None
+            or not any(_under(phase_cwd_path, Path(root)) for root in binding["source_roots"])
+            or phase_target_path is None
+            or str(phase_target_path) not in binding["target_dirs"]
+        ):
+            raise RunnerError(f"build lease phase paths differ from their manifest binding: {path}")
+        if phase_id is not None:
+            phase_manifest = self._phase_manifest(resolved_manifest_path)
+            expected_argv, expected_cwd, expected_target, expected_source = _build_phase_identity(
+                phase_manifest,
+                resolved_manifest_path,
+                phase_id,
+            )
+            if (
+                phase_argv != expected_argv
+                or phase_cwd != str(expected_cwd)
+                or phase_target_dir != str(expected_target)
+                or str(expected_source) not in binding["source_roots"]
+            ):
+                raise RunnerError(f"build lease phase differs from its admitted manifest entry: {path}")
+        if command_class == "controller-reservation":
+            if phase_id is not None and _cargo_command_class(phase_argv) != "cargo-build":
+                raise RunnerError(f"controller build lease phase is not cargo build: {path}")
+        elif (
+            command_class not in self.allowed_command_classes
+            or not isinstance(phase_id, str)
+            or not phase_id
+            or _cargo_command_class(phase_argv) != command_class
+        ):
+            raise RunnerError(f"build lease command phase is not admitted: {path}")
+        for key in ("source_roots", "target_dirs"):
+            paths = value.get(key)
+            if not isinstance(paths, list) or not paths or any(not isinstance(item, str) for item in paths):
+                raise RunnerError(f"build lease {key} are malformed: {path}")
+            normalized = [str(_resolve_path(item)) for item in paths]
+            if normalized != binding[key]:
+                raise RunnerError(f"build lease {key} differ from their manifest binding: {path}")
+        if value.get("expires_utc") != self.permit.get("expires_utc"):
+            raise RunnerError(f"build lease expiry differs from its permit: {path}")
+        lease_expiry = _parse_utc(value.get("expires_utc"), f"build lease {path} expires_utc")
+        if lease_expiry <= _dt.datetime.now(_dt.timezone.utc):
+            raise RunnerError(f"active build lease is expired: {path}")
+        controller_entry = snapshot.get(controller_pid)
+        if controller_entry is None:
+            raise RunnerError(f"active build lease controller process is gone: {path}")
+        if controller_entry.get("starttime") != controller_starttime:
+            raise RunnerError(f"active build lease controller PID was reused: {path}")
+        entry = snapshot.get(pid)
+        if entry is None:
+            # A Cargo child can exit just before its controller rewrites the
+            # lease back to a controller reservation.  Keep the slot
+            # occupied while that live controller performs the transition;
+            # this record never enters the peer process allow-list.
+            if not is_current and command_class == "cargo-build":
+                return pid, str(value.get("lease_id", ""))
+            raise RunnerError(f"active build lease root process is gone: {path}")
+        if entry.get("starttime") != starttime:
+            raise RunnerError(f"active build lease root PID was reused: {path}")
+        if command_class in PEER_COMMAND_CLASSES and entry.get("ppid") != controller_pid:
+            raise RunnerError(f"active Cargo build parent changed from its controller: {path}")
+        if command_class == "cargo-build" and (
+            entry.get("cmdline") != phase_argv or entry.get("cwd") != phase_cwd
+        ):
+            raise RunnerError(f"active Cargo build phase changed from its published phase: {path}")
+        if is_current:
+            expected_pid = self.bound_pid if self.bound_pid is not None else self.root_pid
+            expected_starttime = self.bound_starttime if self.bound_starttime is not None else self.root_starttime
+            expected_class = "cargo-build" if self.bound_pid is not None else "controller-reservation"
+            if (
+                value.get("manifest_path") != str(self.manifest_path)
+                or value.get("lane") != self.manifest.get("lane")
+                or value.get("manifest_sha256") != self.manifest_hash
+                or pid != expected_pid
+                or starttime != expected_starttime
+                or command_class != expected_class
+                or phase_id != self.bound_phase
+                or phase_argv != self.phase_argv
+                or phase_cwd != self.phase_cwd
+                or phase_target_dir != self.phase_target_dir
+                or controller_pid != self.root_pid
+                or controller_starttime != self.root_starttime
+            ):
+                raise RunnerError(f"current build lease identity changed: {path}")
+            if self.bound_pid is not None and _process_command_class(entry) != "cargo-build":
+                raise RunnerError(f"current Cargo child command phase changed: {path}")
+            return pid, str(value.get("lease_id", ""))
+        if command_class == "controller-reservation":
+            # The controller is a capacity reservation only.  It is never
+            # admitted to the process allow-list; reject a record that
+            # pretends a live Cargo child is still merely a controller.
+            if _process_command_class(entry) is not None:
+                raise RunnerError(f"controller build lease root is already a Cargo phase: {path}")
+            return pid, str(value.get("lease_id", ""))
+        actual = _process_command_class(entry)
+        if actual != command_class:
+            raise RunnerError(
+                f"active build lease command phase changed for {path}: expected {command_class}, got {actual}"
+            )
+        return pid, str(value.get("lease_id", ""))
+
+    def _active_records_locked(
+        self, snapshot: Mapping[int, Mapping[str, Any]]
+    ) -> list[tuple[Path, dict[str, Any], int, str]]:
+        active: list[tuple[Path, dict[str, Any], int, str]] = []
+        for path, value in self._read_records_locked():
+            identity = self._validate_record(path, value, snapshot=snapshot)
+            if identity is not None:
+                active.append((path, value, identity[0], identity[1]))
+        return active
+
+    def _with_lock(self, callback: Any) -> Any:
+        if self.lease_dir.is_symlink():
+            raise RunnerError(f"build permit lease_dir is symlinked: {self.lease_dir}")
+        self.lease_dir.mkdir(parents=True, exist_ok=True)
+        lock_path = self._lock_path()
+        if lock_path.is_symlink():
+            raise RunnerError(f"build permit lock is symlinked: {lock_path}")
+        with lock_path.open("a+", encoding="utf-8") as stream:
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+            try:
+                return callback()
+            finally:
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+
+    def acquire(self) -> None:
+        snapshot = _proc_snapshot()
+        if snapshot.get(self.root_pid, {}).get("starttime") != self.root_starttime:
+            raise RunnerError("build overlap root PID changed before lease acquisition")
+        self.lease_id = f"{self.grant_id}-{self.root_pid}-{self.root_starttime}"
+        self.lease_path = self.lease_dir / f"{self.lease_id}.json"
+
+        def create() -> None:
+            active = self._active_records_locked(snapshot)
+            if len(active) >= self.max_jobs:
+                raise RunnerError(f"build permit has no free slot (max_jobs={self.max_jobs})")
+            if self.lease_path is None:
+                raise RunnerError("build overlap lease path was not prepared")
+            if self.lease_path.exists() or self.lease_path.is_symlink():
+                raise RunnerError(f"build overlap lease path already exists: {self.lease_path}")
+            with self.lease_path.open("x", encoding="utf-8") as stream:
+                json.dump(self._lease_record(), stream, indent=2, sort_keys=True)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+
+        self._with_lock(create)
+        self.ensure_valid()
+        self.started_peers = self.peer_snapshots(_proc_snapshot())
+
+    def _write_current_record(self) -> None:
+        if self.lease_path is None or self.lease_path.is_symlink() or not self.lease_path.is_file():
+            raise RunnerError("build overlap lease file is missing or symlinked")
+        with self.lease_path.open("w", encoding="utf-8") as stream:
+            json.dump(self._lease_record(), stream, indent=2, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+
+    def prepare_phase(
+        self,
+        *,
+        phase_id: str,
+        cwd: Path,
+        argv: Sequence[str],
+        target: Path,
+    ) -> None:
+        """Publish an exact phase before its Cargo child becomes visible."""
+
+        if not phase_id:
+            raise RunnerError("build overlap phase id is empty")
+        if _cargo_command_class(argv) != "cargo-build":
+            raise RunnerError("overlap phase is not an exact cargo build")
+        self.ensure_valid()
+        if self.bound_pid is not None or self.bound_phase is not None:
+            raise RunnerError("build overlap phase is already bound")
+        self.bound_phase = phase_id
+        self.phase_argv = list(argv)
+        self.phase_cwd = str(_resolve_path(cwd))
+        self.phase_target_dir = str(_resolve_path(target))
+        try:
+            self._with_lock(self._write_current_record)
+        except BaseException:
+            self.bound_phase = None
+            self.phase_argv = None
+            self.phase_cwd = None
+            self.phase_target_dir = None
+            raise
+
+    def bind_child(
+        self,
+        process: subprocess.Popen[Any],
+        *,
+        phase_id: str,
+        cwd: Path,
+        argv: Sequence[str],
+        target: Path,
+    ) -> None:
+        self.ensure_valid()
+        entry = _read_proc(process.pid)
+        if entry is None or not isinstance(entry.get("starttime"), str):
+            raise RunnerError("Cargo child disappeared before overlap binding")
+        if _process_command_class(entry) != "cargo-build":
+            raise RunnerError("overlap child is not an exact cargo build process")
+        if (
+            self.bound_phase != phase_id
+            or self.phase_argv != list(argv)
+            or self.phase_cwd != str(_resolve_path(cwd))
+            or self.phase_target_dir != str(_resolve_path(target))
+        ):
+            raise RunnerError("overlap child does not match its prepared phase")
+        if entry.get("cwd") != self.phase_cwd or entry.get("cmdline") != list(argv):
+            raise RunnerError("overlap child process identity differs from its prepared phase")
+        self.bound_pid = process.pid
+        self.bound_starttime = str(entry["starttime"])
+        owned = {
+            "root_pid": process.pid,
+            "root_starttime": self.bound_starttime,
+            "command_class": "cargo-build",
+            "phase": "build",
+            "phase_id": phase_id,
+            "cwd": str(cwd),
+            "argv": list(argv),
+            "target_dir": str(target),
+        }
+        try:
+            self._with_lock(self._write_current_record)
+        except BaseException:
+            self.bound_pid = None
+            self.bound_starttime = None
+            raise
+        self.owned_jobs.append(owned)
+
+    def unbind_child(self) -> None:
+        if self.bound_pid is None and self.bound_phase is None:
+            return
+        old = (
+            self.bound_pid,
+            self.bound_starttime,
+            self.bound_phase,
+            self.phase_argv,
+            self.phase_cwd,
+            self.phase_target_dir,
+        )
+        self.bound_pid = None
+        self.bound_starttime = None
+        self.bound_phase = None
+        self.phase_argv = None
+        self.phase_cwd = None
+        self.phase_target_dir = None
+        try:
+            self._with_lock(self._write_current_record)
+        except BaseException:
+            (
+                self.bound_pid,
+                self.bound_starttime,
+                self.bound_phase,
+                self.phase_argv,
+                self.phase_cwd,
+                self.phase_target_dir,
+            ) = old
+            raise
+
+    def ensure_valid(self) -> None:
+        if self.lease_path is None or self.lease_id is None:
+            raise RunnerError("build overlap lease is not acquired")
+        if _dt.datetime.now(_dt.timezone.utc) >= self.expires:
+            raise RunnerError("build overlap permit expired")
+        current_hash, _ = _sha256_file(self.permit_path)
+        if current_hash != self.permit_hash:
+            raise RunnerError("build overlap permit changed while active")
+        snapshot = _proc_snapshot()
+        expected_pid = self.bound_pid if self.bound_pid is not None else self.root_pid
+        expected_starttime = self.bound_starttime if self.bound_pid is not None else self.root_starttime
+        if snapshot.get(expected_pid, {}).get("starttime") != expected_starttime:
+            raise RunnerError("build overlap root PID was reused")
+
+        def check() -> None:
+            active = self._active_records_locked(snapshot)
+            if len(active) > self.max_jobs:
+                raise RunnerError("build permit active-job count exceeds max_jobs")
+            if not any(path == self.lease_path for path, _, _, _ in active):
+                raise RunnerError("build overlap lease is missing or no longer active")
+
+        self._with_lock(check)
+
+    @staticmethod
+    def _peer_summary(entry: Mapping[str, Any], value: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "lease_id": value.get("lease_id"),
+            "job_group": value.get("job_group"),
+            "root_pid": value.get("root_pid"),
+            "root_starttime": value.get("root_starttime"),
+            "controller_pid": value.get("controller_pid"),
+            "controller_starttime": value.get("controller_starttime"),
+            "lane": value.get("lane"),
+            "manifest_path": value.get("manifest_path"),
+            "manifest_sha256": value.get("manifest_sha256"),
+            "command_class": value.get("command_class"),
+            "phase": value.get("phase"),
+            "phase_id": value.get("phase_id"),
+            "source_roots": value.get("source_roots"),
+            "target_dirs": value.get("target_dirs"),
+            "cwd": entry.get("cwd"),
+            "exe": entry.get("exe"),
+            "cmdline": entry.get("cmdline"),
+        }
+
+    @staticmethod
+    def _pending_peer_processes(
+        snapshot: Mapping[int, Mapping[str, Any]],
+        controller_pid: int,
+        value: Mapping[str, Any],
+        lease_id: str,
+    ) -> set[int]:
+        """Allow only a direct child matching the published pending phase."""
+
+        phase_id = value.get("phase_id")
+        if phase_id is None:
+            return set()
+        phase_argv = value.get("phase_argv")
+        phase_cwd = value.get("phase_cwd")
+        if not isinstance(phase_argv, list) or not isinstance(phase_cwd, str):
+            raise RunnerError(f"peer {lease_id} phase binding is malformed")
+        children = [
+            pid
+            for pid, entry in snapshot.items()
+            if int(entry.get("ppid", -1)) == controller_pid
+            and _process_command_class(entry) == "cargo-build"
+        ]
+        if len(children) > 1:
+            raise RunnerError(f"peer {lease_id} has multiple Cargo phase children")
+        if not children:
+            return set()
+        child_pid = children[0]
+        child = snapshot[child_pid]
+        if child.get("cmdline") != phase_argv or child.get("cwd") != phase_cwd:
+            raise RunnerError(f"peer {lease_id} Cargo child differs from its published phase")
+        return ProcessGuard._check_child_tree(
+            snapshot,
+            child_pid,
+            expected_command_class="cargo-build",
+            label=f"peer {lease_id}",
+        )
+
+    def peer_snapshots(self, snapshot: Mapping[int, Mapping[str, Any]]) -> list[dict[str, Any]]:
+        self.ensure_valid()
+        summaries: list[dict[str, Any]] = []
+
+        def read() -> None:
+            for path, value, pid, lease_id in self._active_records_locked(snapshot):
+                if lease_id == self.lease_id:
+                    continue
+                # A peer may have reserved a slot while its runner is still
+                # between lease acquisition and spawning Cargo.  This record
+                # is intentionally counted for capacity, but its Python
+                # controller is never a permitted process.  Only the exact
+                # Cargo child record written by bind_child becomes a peer
+                # snapshot/allow-list entry.
+                if value.get("command_class") == "controller-reservation":
+                    continue
+                entry = snapshot.get(pid)
+                if entry is None:
+                    # The lease remains a counted, non-allowlisted
+                    # transitional reservation until its live controller
+                    # rewrites it.  A dead controller was already rejected
+                    # by _validate_record.
+                    continue
+                summaries.append(self._peer_summary(entry, value))
+
+        self._with_lock(read)
+        summaries.sort(key=lambda item: str(item.get("lease_id")))
+        return summaries
+
+    def allowed_peer_processes(self, snapshot: Mapping[int, Mapping[str, Any]]) -> set[int]:
+        self.ensure_valid()
+        peers: set[int] = set()
+
+        def read() -> None:
+            for path, value, pid, lease_id in self._active_records_locked(snapshot):
+                if lease_id == self.lease_id:
+                    continue
+                if value.get("command_class") == "controller-reservation":
+                    peers.update(self._pending_peer_processes(snapshot, pid, value, lease_id))
+                    continue
+                entry = snapshot.get(pid)
+                if entry is None:
+                    continue
+                expected = str(value["command_class"])
+                peers.update(
+                    ProcessGuard._check_child_tree(
+                        snapshot,
+                        pid,
+                        expected_command_class=expected,
+                        label=f"peer {lease_id}",
+                    )
+                )
+
+        self._with_lock(read)
+        return peers
+
+    def event_record(self) -> dict[str, Any]:
+        record: dict[str, Any] = {
+            "class": "compile_only",
+            "permit_path": str(self.permit_path),
+            "permit_sha256": self.permit_hash,
+            "permit_bytes": self.permit_bytes,
+            "grant_id": self.grant_id,
+            "job_group": self.job_group,
+            "max_jobs": self.max_jobs,
+            "expires_utc": self.permit["expires_utc"],
+            "lease_path": str(self.lease_path) if self.lease_path is not None else None,
+            "lease_id": self.lease_id,
+            "root_pid": self.root_pid,
+            "root_starttime": self.root_starttime,
+            "owned_jobs": list(self.owned_jobs),
+            "peer_jobs_start": self.started_peers,
+            "peer_jobs_end": self.ended_peers,
+        }
+        if self.lease_path is not None and self.lease_path.is_file() and not self.lease_path.is_symlink():
+            record["lease_sha256"], record["lease_bytes"] = _sha256_file(self.lease_path)
+            try:
+                lease_value = json.loads(self.lease_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                lease_value = None
+            if isinstance(lease_value, dict):
+                record["lease_status"] = lease_value.get("status")
+        return record
+
+    def release(self) -> None:
+        if self.bound_pid is not None or self.bound_phase is not None:
+            try:
+                self.unbind_child()
+            except (OSError, RunnerError):
+                return
+        if self.lease_path is None or not self.lease_path.is_file() or self.lease_path.is_symlink():
+            return
+
+        def write_release() -> None:
+            try:
+                value = json.loads(self.lease_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                return
+            if not isinstance(value, dict):
+                return
+            value["status"] = "released"
+            value["released_utc"] = _now()
+            with self.lease_path.open("w", encoding="utf-8") as stream:
+                json.dump(value, stream, indent=2, sort_keys=True)
+                stream.write("\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+
+        try:
+            self._with_lock(write_release)
+        except (OSError, RunnerError):
+            # The failed build receipt already records the child/guard error;
+            # leaving an active external lease is safer than hiding that error.
+            return
 
 
 def _json_hash(path: Path) -> tuple[str, int]:
@@ -1296,6 +2274,24 @@ class SafeRunner:
         # subprocesses used by this runner's git/config checks.
         self.process_observer = process_observer
         self.guard = ProcessGuard()
+        self.build_execution = manifest.get("build_execution")
+        if self.build_execution is None:
+            self.build_execution = {"class": "exclusive"}
+        if not isinstance(self.build_execution, dict):
+            raise RunnerError("build_execution must be an object")
+        if self.build_execution.get("class") not in BUILD_EXECUTION_CLASSES:
+            raise RunnerError("build_execution.class must be exclusive or compile_only")
+        if self.build_execution.get("class") == "compile_only":
+            _validate_build_execution(
+                manifest,
+                output=_resolve_path(str(manifest["output_dir"])),
+                source_roots=[
+                    _resolve_path(str(spec["source_root"]))
+                    for spec in manifest.get("legs", {}).values()
+                    if isinstance(spec, Mapping) and "source_root" in spec
+                ],
+            )
+        self.overlap_lease: BuildOverlapLease | None = None
         self.target_preflight_limit = TARGET_PREFLIGHT_BYTES
         self.target_limit = TARGET_HARD_LIMIT_BYTES
         self.memory_limit = MEMORY_HARD_LIMIT_BYTES
@@ -1333,6 +2329,39 @@ class SafeRunner:
             self.preparation_path = _resolve_path(str(manifest["preparation_receipt"]))
             self.preparation = self._load_preparation_receipt()
         self.recorded_events: list[dict[str, Any]] = []
+
+    def _event_execution_class(self, event_kind: str) -> str:
+        if event_kind == "build" and self.overlap_lease is not None:
+            return "compile_only"
+        return "exclusive"
+
+    def _build_execution_record(self) -> dict[str, Any]:
+        if self.overlap_lease is not None:
+            return self.overlap_lease.event_record()
+        if self.build_execution.get("class") == "compile_only":
+            permit_value = self.build_execution.get("permit_path")
+            record: dict[str, Any] = {"class": "compile_only", "status": "not_acquired"}
+            if isinstance(permit_value, str) and permit_value:
+                try:
+                    permit_path = _resolve_path(permit_value)
+                    record["permit_path"] = str(permit_path)
+                    if permit_path.is_file() and not permit_path.is_symlink():
+                        record["permit_sha256"], record["permit_bytes"] = _sha256_file(permit_path)
+                except RunnerError as error:
+                    record["permit_error"] = str(error)
+            return record
+        return {"class": "exclusive"}
+
+    def _capture_overlap_end(self) -> None:
+        if self.overlap_lease is None:
+            return
+        self.overlap_lease.ended_peers = self.overlap_lease.peer_snapshots(_proc_snapshot())
+
+    def _acquire_overlap_lease(self) -> None:
+        if self.build_execution.get("class") != "compile_only":
+            return
+        self.overlap_lease = BuildOverlapLease(self.manifest, self.manifest_path)
+        self.overlap_lease.acquire()
 
     def _load_preparation_receipt(self) -> dict[str, Any]:
         if self.preparation_path is None:
@@ -1625,7 +2654,11 @@ class SafeRunner:
         measured: bool = True,
         event_kind: str = "measurement",
     ) -> dict[str, Any]:
-        self.guard.require_quiet()
+        overlap = self.overlap_lease if event_kind == "build" else None
+        if overlap is not None:
+            self.guard.require_compile_quiet(overlap)
+        else:
+            self.guard.require_quiet()
         target = _resolve_path(str(self.manifest["legs"][leg]["target_dir"]))
         target_before = self._check_target(target, preflight=preflight_target)
         stdout_path = self._prepare_log_path(stdout_path or (self.command_dir / f"{event_id}.stdout"))
@@ -1638,6 +2671,17 @@ class SafeRunner:
         process_observation: Any | None = None
         runner_error: str | None = None
         last_target_check = 0.0
+        overlap_start: list[dict[str, Any]] = []
+        overlap_end: list[dict[str, Any]] = []
+        owned_job: dict[str, Any] | None = None
+        if overlap is not None:
+            overlap.prepare_phase(
+                phase_id=event_id,
+                cwd=cwd,
+                argv=argv,
+                target=target,
+            )
+            overlap_start = overlap.peer_snapshots(_proc_snapshot())
         with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
             try:
                 process = subprocess.Popen(
@@ -1650,6 +2694,20 @@ class SafeRunner:
                     start_new_session=True,
                     preexec_fn=self._preexec(),
                 )
+                if overlap is not None:
+                    try:
+                        overlap.bind_child(
+                            process,
+                            phase_id=event_id,
+                            cwd=cwd,
+                            argv=argv,
+                            target=target,
+                        )
+                        owned_job = overlap.owned_jobs[-1]
+                    except BaseException as error:
+                        runner_error = f"overlap child binding failed at {event_id}: {error}"
+                        self._terminate(process)
+                        returncode = process.returncode
                 if self.process_observer is not None:
                     try:
                         process_observation = self.process_observer.process_started(
@@ -1672,7 +2730,14 @@ class SafeRunner:
                         if returncode is not None:
                             break
                         try:
-                            offenders = self.guard.offenders(process.pid)
+                            if overlap is not None:
+                                offenders = self.guard.offenders(
+                                    process.pid,
+                                    overlap=overlap,
+                                    expected_command_class="cargo-build",
+                                )
+                            else:
+                                offenders = self.guard.offenders(process.pid)
                             if offenders:
                                 violation.extend(offenders)
                                 runner_error = "process guard rejected an unrelated Litchi process"
@@ -1684,6 +2749,18 @@ class SafeRunner:
                                 self._check_target(target)
                                 last_target_check = now
                         except RunnerError as error:
+                            # The child can exit between poll() above and
+                            # the lease/guard snapshot.  In that narrow
+                            # window the bound PID is naturally absent, not
+                            # reused; let the normal unbind/post-exit checks
+                            # validate the completed child.
+                            if (
+                                overlap is not None
+                                and process.poll() is not None
+                                and overlap.bound_pid == process.pid
+                            ):
+                                returncode = process.returncode
+                                break
                             runner_error = str(error)
                             self._terminate(process)
                             returncode = process.returncode
@@ -1707,9 +2784,22 @@ class SafeRunner:
                 # journaled without a false observation pointer and the
                 # runner still fails closed below.
                 process_observation = None
+        if overlap is not None:
+            try:
+                overlap.unbind_child()
+            except RunnerError as error:
+                runner_error = runner_error or f"overlap child unbinding failed at {event_id}: {error}"
         ended_at = _now()
         post_descendants = self._wait_descendants_gone(process.pid) if process is not None else []
-        post_offenders = self.guard.offenders()
+        try:
+            if overlap is not None:
+                overlap_end = overlap.peer_snapshots(_proc_snapshot())
+                post_offenders = self.guard.offenders(overlap=overlap)
+            else:
+                post_offenders = self.guard.offenders()
+        except RunnerError as error:
+            post_offenders = []
+            runner_error = runner_error or str(error)
         if post_descendants:
             runner_error = runner_error or f"child descendants survived exit: {post_descendants}"
         if post_offenders:
@@ -1782,7 +2872,14 @@ class SafeRunner:
             "post_exit_descendants": post_descendants,
             "post_exit_offenders": post_offenders,
             "runner_error": runner_error,
+            "execution_class": self._event_execution_class(event_kind),
         }
+        if overlap is not None:
+            event["overlap"] = {
+                "owned_job": owned_job,
+                "peer_jobs_start": overlap_start,
+                "peer_jobs_end": overlap_end,
+            }
         if process_observation is not None:
             event["process_observation"] = process_observation
         self._append_event(event)
@@ -1956,6 +3053,7 @@ class SafeRunner:
             "cpu": self.cpu,
             "abba_order": list(ABBA_ORDER),
             "abba_blocks": int(self.manifest.get("abba_blocks", 1)),
+            "build_execution": self._build_execution_record(),
             "identities": identities,
             "event_count": len(self.recorded_events),
             "measured_event_count": sum(
@@ -1990,6 +3088,7 @@ class SafeRunner:
     def build(self) -> None:
         identities: dict[str, Any] = {}
         try:
+            self._acquire_overlap_lease()
             for leg in ("before", "after"):
                 target = _resolve_path(str(self.manifest["legs"][leg]["target_dir"]))
                 self._require_fresh_target(target)
@@ -2005,6 +3104,8 @@ class SafeRunner:
                 env = self._environment(self.manifest["legs"][leg], context)
                 for command in self.manifest["legs"][leg]["build"]:
                     argv = normalize_cargo_argv(_render_argv(command["argv"], context))
+                    if self.overlap_lease is not None and _cargo_command_class(argv) != "cargo-build":
+                        raise RunnerError("compile_only build_execution encountered a non-build Cargo command")
                     cwd = _resolve_path(_render(str(command.get("cwd", ".")), context), base=source)
                     if not _under(cwd, source):
                         raise RunnerError(f"build cwd escapes source root: {cwd}")
@@ -2033,8 +3134,17 @@ class SafeRunner:
                         artifacts.append({"path": str(path), "bytes": size, "sha256": digest})
                 identities[leg]["artifacts"] = artifacts
                 identities[leg]["target_final_bytes"] = self._check_target(target)
+            self._capture_overlap_end()
+            if self.overlap_lease is not None:
+                self.overlap_lease.release()
             self._write_receipt("passed", identities=identities, events=self.recorded_events)
         except (BaseException,) as error:
+            try:
+                self._capture_overlap_end()
+            except RunnerError:
+                pass
+            if self.overlap_lease is not None:
+                self.overlap_lease.release()
             self._write_receipt("failed", identities=identities, events=self.recorded_events, error=str(error))
             raise
 
@@ -2092,6 +3202,14 @@ class SafeRunner:
         runner_hash, _ = _sha256_file(Path(__file__).resolve())
         if not isinstance(runner, dict) or runner.get("path") != runner_path or runner.get("sha256") != runner_hash:
             raise RunnerError("build receipt was produced by a different runner")
+        build_execution = receipt.get("build_execution")
+        expected_execution = self.build_execution.get("class")
+        if not isinstance(build_execution, dict) or build_execution.get("class") != expected_execution:
+            raise RunnerError("build receipt execution class differs from the current manifest")
+        if expected_execution == "compile_only":
+            permit_value = self.build_execution.get("permit_path")
+            if build_execution.get("permit_path") != str(_resolve_path(str(permit_value))):
+                raise RunnerError("build receipt permit path differs from the current manifest")
         if self.preparation_path is not None:
             preparation = receipt.get("preparation")
             if not isinstance(preparation, dict) or preparation.get("path") != str(self.preparation_path):
@@ -2183,6 +3301,24 @@ class SafeRunner:
                 raise RunnerError(f"output/target identity mismatch for {event_id}")
             if event.get("source_identity_sha256") != recorded.get("identity_sha256"):
                 raise RunnerError(f"source identity hash mismatch for {event_id}")
+            expected_event_class = "compile_only" if expected_execution == "compile_only" else "exclusive"
+            if event.get("execution_class") != expected_event_class:
+                raise RunnerError(f"build event execution class differs for {event_id}")
+            if expected_event_class == "compile_only":
+                overlap = event.get("overlap")
+                owned_job = overlap.get("owned_job") if isinstance(overlap, dict) else None
+                if (
+                    not isinstance(overlap, dict)
+                    or not isinstance(overlap.get("peer_jobs_start"), list)
+                    or not isinstance(overlap.get("peer_jobs_end"), list)
+                    or not isinstance(owned_job, dict)
+                    or owned_job.get("root_pid", 0) <= 0
+                    or not isinstance(owned_job.get("root_starttime"), str)
+                    or owned_job.get("command_class") != "cargo-build"
+                    or owned_job.get("phase") != "build"
+                    or owned_job.get("phase_id") != event_id
+                ):
+                    raise RunnerError(f"build overlap receipt is missing for {event_id}")
             identity_after = event.get("source_identity_after")
             if not isinstance(identity_after, dict) or identity_after.get("identity_sha256") != recorded.get("identity_sha256"):
                 raise RunnerError(f"source identity-after mismatch for {event_id}")
