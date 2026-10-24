@@ -1056,17 +1056,28 @@ impl Edit {
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        let Some(state) = self.materialized.as_mut() else {
-            return;
-        };
-        for (slot, before) in state
-            .staged
-            .iter_mut()
-            .zip(state.before.cached_unique_names().names())
-        {
-            slot.clone_from(&before.name);
+    pub fn reset(&mut self) -> Result<()> {
+        self.materialize()?;
+        let before = self.state()?.before.cached_unique_names().names();
+        let mut staged = Vec::new();
+        staged
+            .try_reserve_exact(before.len())
+            .map_err(|source| Error::Allocation {
+                resource: "Workbook reset cached unique-name values",
+                source,
+            })?;
+        for value in before {
+            let mut copy = String::new();
+            copy.try_reserve_exact(value.name.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "Workbook reset cached unique-name text",
+                    source,
+                })?;
+            copy.push_str(&value.name);
+            staged.push(copy);
         }
+        self.state_mut()?.staged = staged;
+        Ok(())
     }
 
     /// Validate and publish the staged names as a new package. An unchanged

@@ -1155,6 +1155,15 @@ impl Edit {
     /// Set, replace, or clear both optional attributes explicitly.
     pub fn set_server_format(&mut self, index: usize, value: ServerFormat) -> Result<bool> {
         self.materialize()?;
+        if self.state()?.staged.get(index).is_none() {
+            return Err(invalid("server-format index is out of range"));
+        }
+        if self.state()?.staged[index] == value {
+            return Ok(false);
+        }
+        let text_limit = caller_attribute_limit(self.source.pivot_package().read_limits());
+        validate_text(&value.culture, text_limit)?;
+        validate_text(&value.format, text_limit)?;
         let slot = self
             .state_mut()?
             .staged
@@ -1163,9 +1172,6 @@ impl Edit {
         if *slot == value {
             return Ok(false);
         }
-        let text_limit = caller_attribute_limit(self.source.pivot_package().read_limits());
-        validate_text(&value.culture, text_limit)?;
-        validate_text(&value.format, text_limit)?;
         *slot = value;
         Ok(true)
     }
@@ -1333,22 +1339,28 @@ impl Edit {
     /// Discard every staged change.
     pub fn reset(&mut self) -> Result<()> {
         self.materialize()?;
-        let state = self.state_mut()?;
-        state.staged.clear();
-        state
-            .staged
-            .try_reserve_exact(state.before.server_formats().formats().len())
+        let before = self.state()?.before.server_formats().formats();
+        let mut staged = Vec::new();
+        staged
+            .try_reserve_exact(before.len())
             .map_err(|source| Error::Allocation {
                 resource: "Workbook reset pivot server-format values",
                 source,
             })?;
-        for value in state.before.server_formats().formats() {
-            state.staged.push(clone_server_format(value)?);
+        for value in before {
+            staged.push(clone_server_format(value)?);
         }
-        state.staged_sources.clear();
-        state
-            .staged_sources
-            .extend((0..state.before.server_formats().formats().len()).map(Some));
+        let mut staged_sources = Vec::new();
+        staged_sources
+            .try_reserve_exact(before.len())
+            .map_err(|source| Error::Allocation {
+                resource: "Workbook reset pivot server-format source order",
+                source,
+            })?;
+        staged_sources.extend((0..before.len()).map(Some));
+        let state = self.state_mut()?;
+        state.staged = staged;
+        state.staged_sources = staged_sources;
         Ok(())
     }
 
