@@ -383,10 +383,7 @@ fn sparse_header_moves_borrow_records_and_reject_unknown_mutation() {
     .expect("unknown header no-op executes");
     assert_eq!(unknown_identity, unknown_source);
     assert_eq!(unknown_report.changed_records(), 0);
-    let unknown_moves = [
-        codec::RowMove::new(0, 9),
-        codec::RowMove::new(9, 0),
-    ];
+    let unknown_moves = [codec::RowMove::new(0, 9), codec::RowMove::new(9, 0)];
     assert!(
         codec::rewrite_header_storage_bucket_rows(
             &unknown_source,
@@ -400,10 +397,7 @@ fn sparse_header_moves_borrow_records_and_reject_unknown_mutation() {
 
     let source = header_fixture_clean();
     let before = source.clone();
-    let moves = [
-        codec::RowMove::new(0, 9),
-        codec::RowMove::new(9, 0),
-    ];
+    let moves = [codec::RowMove::new(0, 9), codec::RowMove::new(9, 0)];
     let plan = codec::plan_header_storage_bucket_rows(&source, 16, &moves, options(&source))
         .expect("valid sparse header plan");
     let records: Vec<_> = plan.records().collect();

@@ -2050,10 +2050,7 @@ fn rewrite_physical(
                 if moves.len() == moves.capacity() {
                     return Err(Error::Allocation { amount: 1, path });
                 }
-                moves.push(physical_codec::RowMove::new(
-                    source_index,
-                    destination,
-                ));
+                moves.push(physical_codec::RowMove::new(source_index, destination));
             }
         }
         debug_assert_eq!(moves.len(), move_count);
