@@ -667,6 +667,11 @@ fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Pa
 pub fn write(document: &Document, limits: Limits) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
     super::validation::validate(document).map_err(value_error)?;
+    // A document may have been admitted under a wider policy. Re-run the
+    // bounded scanner before reserving the output so every selected source,
+    // structural, decoded-value, and typed-payload dimension applies to this
+    // writer call rather than only the output-byte cap.
+    let _ = read_metadata(document.source(), limits)?;
     if document.source().len() > limits.max_output_bytes {
         return Err(limit(
             crate::LimitKind::InkMlOutputBytes,
@@ -690,6 +695,7 @@ pub fn write(document: &Document, limits: Limits) -> Result<Vec<u8>> {
 pub fn write_to<W: Write>(writer: &mut W, document: &Document, limits: Limits) -> Result<()> {
     let limits = limits.validate()?;
     super::validation::validate(document).map_err(value_error)?;
+    let _ = read_metadata(document.source(), limits)?;
     if document.source().len() > limits.max_output_bytes {
         return Err(limit(
             crate::LimitKind::InkMlOutputBytes,
@@ -1051,7 +1057,7 @@ fn parse_brush_property<R: std::io::BufRead>(
         .ok_or_else(|| value_error(ValueError::MissingAttribute { name: "name" }))?;
     if name.len() > limits.max_identifier_bytes {
         return Err(limit(
-            crate::LimitKind::ScalarBytes,
+            crate::LimitKind::InkMlIdentifierBytes,
             name.len(),
             limits.max_identifier_bytes,
         ));
@@ -1182,6 +1188,15 @@ fn attr<R: std::io::BufRead>(
         }
         let is_namespace_declaration = attribute.key.as_ref() == b"xmlns"
             || attribute.key.as_ref().strip_prefix(b"xmlns:").is_some();
+        crate::preflight_attribute_value_bytes_with_kind(
+            attribute.value.as_ref(),
+            if is_namespace_declaration {
+                MAX_ATTRIBUTE_VALUE_BYTES
+            } else {
+                limits.max_attribute_value_bytes
+            },
+            crate::LimitKind::InkMlAttributeValueBytes,
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
@@ -1326,6 +1341,15 @@ fn validate_element<R: std::io::BufRead>(
         }
         let is_namespace_declaration = attribute.key.as_ref() == b"xmlns"
             || attribute.key.as_ref().strip_prefix(b"xmlns:").is_some();
+        crate::preflight_attribute_value_bytes_with_kind(
+            attribute.value.as_ref(),
+            if is_namespace_declaration {
+                MAX_ATTRIBUTE_VALUE_BYTES
+            } else {
+                limits.max_attribute_value_bytes
+            },
+            crate::LimitKind::InkMlAttributeValueBytes,
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;

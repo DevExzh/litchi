@@ -652,7 +652,8 @@ fn complete_theme_codec_accepts_family_extension_with_inherited_namespace() {
 #[test]
 fn family_edit_preserves_unknown_attributes_children_and_exact_inverse() {
     let source = opaque_family();
-    let package = family::Package::from_xml(source.clone()).expect("opaque family package");
+    let package = family::Package::from_xml(source.clone(), family::Limits::DEFAULT)
+        .expect("opaque family package");
     assert_eq!(package.xml_bytes(), source.as_slice());
 
     let mut edit = package.edit();
@@ -686,7 +687,8 @@ fn family_edit_preserves_unknown_attributes_children_and_exact_inverse() {
 #[test]
 fn scalar_family_update_preserves_processing_tokens_in_opaque_markup() {
     let source = opaque_markup_with_processing_token();
-    let package = family::Package::from_xml(source.clone()).expect("opaque family package");
+    let package = family::Package::from_xml(source.clone(), family::Limits::DEFAULT)
+        .expect("opaque family package");
     let mut edit = package.edit();
     edit.set_name("Edited Office").expect("set family name");
     let commit = edit
@@ -853,7 +855,8 @@ fn legal_default_namespace_reset_and_namespace_heavy_foreign_children_round_trip
 #[test]
 fn family_noop_and_stale_source_are_source_checked() {
     let source = opaque_family();
-    let package = family::Package::from_xml(source.clone()).expect("family package");
+    let package =
+        family::Package::from_xml(source.clone(), family::Limits::DEFAULT).expect("family package");
     let noop = package.edit().commit().expect("family no-op");
     assert!(!noop.diagnostics().changed());
     assert_eq!(noop.package().xml_bytes(), source.as_slice());
@@ -864,9 +867,11 @@ fn family_noop_and_stale_source_are_source_checked() {
         .set_id("{11111111-2222-3333-4444-555555555555}")
         .expect("change family id");
     let changed = changed.commit().expect("changed family");
-    let other =
-        family::Package::from_xml(source.iter().copied().chain(Some(b' ')).collect::<Vec<_>>())
-            .expect("different source package");
+    let other = family::Package::from_xml(
+        source.iter().copied().chain(Some(b' ')).collect::<Vec<_>>(),
+        family::Limits::DEFAULT,
+    )
+    .expect("different source package");
     assert!(matches!(
         other.apply(changed.patch()),
         Err(Error::PatchConflict)

@@ -15,6 +15,7 @@ pub use litchi_core::edit::Diagnostics;
 pub struct Package {
     xml: Arc<[u8]>,
     value: Family,
+    limits: codec::Limits,
 }
 
 impl Package {
@@ -22,28 +23,34 @@ impl Package {
     ///
     /// Validation precedes the source copy. Already shared callers can use
     /// [`Self::from_shared_xml`] to retain their existing allocation.
-    pub fn from_xml(xml: impl AsRef<[u8]>) -> Result<Self> {
-        let value = codec::read(xml.as_ref(), codec::Limits::DEFAULT)?;
+    pub fn from_xml(xml: impl AsRef<[u8]>, limits: codec::Limits) -> Result<Self> {
+        let value = codec::read(xml.as_ref(), limits)?;
         let source = value.source_state().ok_or_else(|| {
             Error::Invalid("theme family reader did not retain its source".into())
         })?;
         let xml = Arc::clone(&source.xml);
-        Ok(Self { xml, value })
+        Ok(Self { xml, value, limits })
     }
 
     /// Parse and retain an already shared Theme Family fragment allocation.
-    pub fn from_shared_xml(xml: Arc<[u8]>) -> Result<Self> {
-        let value = codec::read_shared(Arc::clone(&xml), codec::Limits::DEFAULT)?;
-        Ok(Self { xml, value })
+    pub fn from_shared_xml(xml: Arc<[u8]>, limits: codec::Limits) -> Result<Self> {
+        let value = codec::read_shared(Arc::clone(&xml), limits)?;
+        Ok(Self { xml, value, limits })
     }
 
     /// Create a source snapshot from a typed family.
     ///
     /// Detached values use canonical XML. Parsed values retain their source
     /// and apply any staged scalar changes without discarding opaque markup.
-    pub fn new(value: Family) -> Result<Self> {
-        let xml = codec::write(&value, codec::Limits::DEFAULT)?;
-        Self::from_xml(xml)
+    pub fn new(value: Family, limits: codec::Limits) -> Result<Self> {
+        let xml = codec::write(&value, limits)?;
+        Self::from_shared_xml(Arc::from(xml.into_boxed_slice()), limits)
+    }
+
+    /// Borrow the policy which admitted and will constrain this package.
+    #[must_use]
+    pub const fn limits(&self) -> codec::Limits {
+        self.limits
     }
 
     /// Borrow the exact source bytes retained by this snapshot.
@@ -139,8 +146,9 @@ impl Edit {
         if source_value.variant_id() != self.staged.variant_id() {
             source_value.set_variant_id(self.staged.variant_id().as_str())?;
         }
-        let xml = codec::write(&source_value, codec::Limits::DEFAULT)?;
-        let package = Package::from_xml(xml)?;
+        let xml = codec::write(&source_value, self.before.limits)?;
+        let package =
+            Package::from_shared_xml(Arc::from(xml.into_boxed_slice()), self.before.limits)?;
         if package.value() != &self.staged {
             return Err(Error::Invalid(
                 "theme family edit read-back did not match staged fields".into(),
@@ -209,7 +217,15 @@ impl Patch {
         if Arc::ptr_eq(&self.before.xml, &self.after.xml) {
             return Ok(source.clone());
         }
-        Ok(self.after.clone())
+        // Re-read changed bytes under the recipient's retained policy before
+        // publication. A patch created under a wider policy cannot silently
+        // widen the recipient or bypass its structural/value limits.
+        let value = codec::read_shared(Arc::clone(&self.after.xml), source.limits)?;
+        Ok(Package {
+            xml: Arc::clone(&self.after.xml),
+            value,
+            limits: source.limits,
+        })
     }
 }
 

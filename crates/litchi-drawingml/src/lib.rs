@@ -59,6 +59,103 @@ use std::fmt;
 
 use thiserror::Error;
 
+/// Preflight the decoded XML 1.0 attribute-value length without constructing
+/// quick-xml's owned normalization buffer. Callers still perform their
+/// module-specific raw-byte guard before decoding; this pass accounts for
+/// entity expansion and XML whitespace normalization so escaped values are not
+/// rejected merely because their lexical form is longer.
+pub(crate) fn preflight_attribute_value_bytes(value: &[u8], maximum: usize) -> Result<()> {
+    preflight_attribute_value_bytes_with_kind(value, maximum, LimitKind::AttributeValueBytes)
+}
+
+/// Preflight a decoded XML attribute under a caller-owned typed dimension.
+/// InkML uses a distinct public dimension from the generic DrawingML XML
+/// codecs, while sharing the same entity/whitespace normalization pass.
+pub(crate) fn preflight_attribute_value_bytes_with_kind(
+    value: &[u8],
+    maximum: usize,
+    kind: LimitKind,
+) -> Result<()> {
+    let value = std::str::from_utf8(value)
+        .map_err(|error| Error::Xml(format!("attribute value is not UTF-8: {error}")))?;
+    let mut length = 0usize;
+    let mut cursor = 0usize;
+    while cursor < value.len() {
+        let character = value[cursor..]
+            .chars()
+            .next()
+            .ok_or_else(|| Error::Xml("attribute value has an invalid UTF-8 boundary".into()))?;
+        match character {
+            '&' => {
+                let end = value[cursor + 1..]
+                    .find(';')
+                    .map(|offset| cursor + 1 + offset)
+                    .ok_or_else(|| Error::Xml("attribute entity is unterminated".into()))?;
+                let entity = &value[cursor + 1..end];
+                let decoded = if let Some(number) = entity.strip_prefix("#x") {
+                    u32::from_str_radix(number, 16)
+                        .ok()
+                        .and_then(char::from_u32)
+                        .ok_or_else(|| {
+                            Error::Xml("attribute character reference is invalid".into())
+                        })?
+                        .len_utf8()
+                } else if let Some(number) = entity.strip_prefix("#X") {
+                    u32::from_str_radix(number, 16)
+                        .ok()
+                        .and_then(char::from_u32)
+                        .ok_or_else(|| {
+                            Error::Xml("attribute character reference is invalid".into())
+                        })?
+                        .len_utf8()
+                } else if let Some(number) = entity.strip_prefix('#') {
+                    number
+                        .parse::<u32>()
+                        .ok()
+                        .and_then(char::from_u32)
+                        .ok_or_else(|| {
+                            Error::Xml("attribute character reference is invalid".into())
+                        })?
+                        .len_utf8()
+                } else {
+                    quick_xml::escape::resolve_xml_entity(entity)
+                        .map(str::len)
+                        .ok_or_else(|| Error::Xml("attribute entity is unknown".into()))?
+                };
+                length = length
+                    .checked_add(decoded)
+                    .ok_or_else(|| Error::Xml("attribute value length overflows usize".into()))?;
+                cursor = end + 1;
+            },
+            '\r' => {
+                length = length
+                    .checked_add(1)
+                    .ok_or_else(|| Error::Xml("attribute value length overflows usize".into()))?;
+                cursor += 1;
+                if value.as_bytes().get(cursor) == Some(&b'\n') {
+                    cursor += 1;
+                }
+            },
+            '\n' | '\t' => {
+                length = length
+                    .checked_add(1)
+                    .ok_or_else(|| Error::Xml("attribute value length overflows usize".into()))?;
+                cursor += character.len_utf8();
+            },
+            _ => {
+                length = length
+                    .checked_add(character.len_utf8())
+                    .ok_or_else(|| Error::Xml("attribute value length overflows usize".into()))?;
+                cursor += character.len_utf8();
+            },
+        }
+    }
+    if length > maximum {
+        return Err(Error::limit(kind, length, maximum));
+    }
+    Ok(())
+}
+
 /// Result of a `DrawingML` read operation.
 pub type Result<T> = std::result::Result<T, Error>;
 

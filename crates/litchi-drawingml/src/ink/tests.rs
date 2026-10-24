@@ -165,6 +165,17 @@ fn raw_ink_limits_are_retained_as_typed_dimensions() {
             maximum,
         }) if observed > maximum && maximum == 1
     ));
+
+    let mut writer_node_limits = Limits::DEFAULT;
+    writer_node_limits.max_xml_nodes = 1;
+    assert!(matches!(
+        raw_write(&document, writer_node_limits),
+        Err(Error::Limit {
+            kind: LimitKind::InkMlXmlNodes,
+            observed,
+            maximum,
+        }) if observed > maximum && maximum == 1
+    ));
 }
 
 #[test]
@@ -302,6 +313,16 @@ fn ink_actions_are_typed_and_preserved() {
         actions::write(&actions, actions::Limits::DEFAULT).expect("source-backed action write"),
         source
     );
+    let mut narrow = actions::Limits::DEFAULT;
+    narrow.max_nodes = 1;
+    assert!(matches!(
+        actions::write(&actions, narrow),
+        Err(Error::Limit {
+            kind: LimitKind::Nodes,
+            observed,
+            maximum,
+        }) if observed > maximum && maximum == 1
+    ));
 }
 
 #[test]

@@ -4,7 +4,6 @@ use std::ops::Range;
 
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::process_ooxml;
-use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::{NsReader, Reader};
@@ -13,7 +12,7 @@ use crate::{Error, LimitKind, Result};
 
 use super::model::{
     Color, Face, FontSet, Override, Palette, Slot, System, Theme, validate_fonts, validate_name,
-    validate_palette,
+    validate_palette, validate_xml_text,
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
@@ -142,18 +141,23 @@ pub fn encode_part(
     validate_name("theme", name)?;
     validate_palette(colors)?;
     validate_fonts(fonts)?;
-    let mut xml = String::with_capacity(4096);
+    let output_len = serialized_part_len(name, colors, fonts)?;
+    let mut xml = output_string(output_len, limits)?;
+    write_part(&mut xml, name, colors, fonts);
+    Ok(xml.into_bytes())
+}
+
+fn write_part<T: XmlSink>(xml: &mut T, name: &str, colors: &Palette, fonts: &FontSet) {
     xml.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
     xml.push_str("<a:theme xmlns:a=\"");
     xml.push_str(NAMESPACE);
     xml.push_str("\" name=\"");
-    escape(&mut xml, name);
+    escape(xml, name);
     xml.push_str("\"><a:themeElements>");
-    push_palette(&mut xml, colors, false);
-    push_fonts(&mut xml, fonts, false);
+    push_palette(xml, colors, false);
+    push_fonts(xml, fonts, false);
     xml.push_str(FORMAT_SCHEME);
     xml.push_str("</a:themeElements><a:objectDefaults/><a:extraClrSchemeLst/></a:theme>");
-    bounded(xml.into_bytes(), limits)
 }
 
 /// Encode a theme override part.
@@ -172,19 +176,24 @@ pub fn encode_override(value: &Override, limits: Limits) -> Result<Vec<u8>> {
     if let Some(fonts) = &value.fonts {
         validate_fonts(fonts)?;
     }
-    let mut xml = String::with_capacity(2048);
+    let output_len = serialized_override_len(value)?;
+    let mut xml = output_string(output_len, limits)?;
+    write_override(&mut xml, value);
+    Ok(xml.into_bytes())
+}
+
+fn write_override<T: XmlSink>(xml: &mut T, value: &Override) {
     xml.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>");
     xml.push_str("<a:themeOverride xmlns:a=\"");
     xml.push_str(NAMESPACE);
     xml.push_str("\">");
     if let Some(colors) = &value.colors {
-        push_palette(&mut xml, colors, false);
+        push_palette(xml, colors, false);
     }
     if let Some(fonts) = &value.fonts {
-        push_fonts(&mut xml, fonts, false);
+        push_fonts(xml, fonts, false);
     }
     xml.push_str("</a:themeOverride>");
-    bounded(xml.into_bytes(), limits)
 }
 
 /// Parse a complete theme part.
@@ -239,11 +248,11 @@ pub fn replace_scheme(
     let limits = limits.validate()?;
     let range = scheme_replacement_range(xml, local, limits)?;
     let source_namespace = theme_root_namespace(xml, limits)?;
-    let adjusted_replacement = adjust_replacement_namespace(replacement, source_namespace)?;
-    let replacement = adjusted_replacement.as_deref().unwrap_or(replacement);
+    validate_replacement_fragment(replacement, local, limits)?;
+    let adjusted_len = adjusted_replacement_len(replacement, source_namespace)?;
     let output_len = range
         .start
-        .checked_add(replacement.len())
+        .checked_add(adjusted_len)
         .and_then(|length| {
             xml.len()
                 .checked_sub(range.end)
@@ -253,6 +262,9 @@ pub fn replace_scheme(
     if output_len > limits.max_xml_bytes {
         return Err(limit(LimitKind::XmlBytes, output_len, limits.max_xml_bytes));
     }
+    let adjusted_replacement = adjust_replacement_namespace(replacement, source_namespace)?;
+    let replacement = adjusted_replacement.as_deref().unwrap_or(replacement);
+    debug_assert_eq!(replacement.len(), adjusted_len);
     let mut output = Vec::with_capacity(output_len);
     output.extend_from_slice(&xml[..range.start]);
     output.extend_from_slice(replacement);
@@ -285,9 +297,10 @@ pub fn scheme_replacement_range(xml: &[u8], local: &[u8], limits: Limits) -> Res
 pub fn encode_palette_fragment(value: &Palette, limits: Limits) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
     validate_palette(value)?;
-    let mut output = String::with_capacity(1024);
+    let output_len = serialized_palette_len(value, true)?;
+    let mut output = output_string(output_len, limits)?;
     push_palette(&mut output, value, true);
-    bounded(output.into_bytes(), limits)
+    Ok(output.into_bytes())
 }
 
 /// # Errors
@@ -297,12 +310,13 @@ pub fn encode_palette_fragment(value: &Palette, limits: Limits) -> Result<Vec<u8
 pub fn encode_fonts_fragment(value: &FontSet, limits: Limits) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
     validate_fonts(value)?;
-    let mut output = String::with_capacity(1024);
+    let output_len = serialized_fonts_len(value, true)?;
+    let mut output = output_string(output_len, limits)?;
     push_fonts(&mut output, value, true);
-    bounded(output.into_bytes(), limits)
+    Ok(output.into_bytes())
 }
 
-fn push_palette(xml: &mut String, value: &Palette, declare_namespace: bool) {
+fn push_palette<T: XmlSink>(xml: &mut T, value: &Palette, declare_namespace: bool) {
     xml.push_str("<a:clrScheme");
     if declare_namespace {
         xml.push_str(" xmlns:a=\"");
@@ -342,7 +356,7 @@ fn push_palette(xml: &mut String, value: &Palette, declare_namespace: bool) {
     xml.push_str("</a:clrScheme>");
 }
 
-fn push_fonts(xml: &mut String, value: &FontSet, declare_namespace: bool) {
+fn push_fonts<T: XmlSink>(xml: &mut T, value: &FontSet, declare_namespace: bool) {
     xml.push_str("<a:fontScheme");
     if declare_namespace {
         xml.push_str(" xmlns:a=\"");
@@ -357,7 +371,7 @@ fn push_fonts(xml: &mut String, value: &FontSet, declare_namespace: bool) {
     xml.push_str("</a:fontScheme>");
 }
 
-fn push_face(xml: &mut String, name: &str, face: &Face) {
+fn push_face<T: XmlSink>(xml: &mut T, name: &str, face: &Face) {
     xml.push_str("<a:");
     xml.push_str(name);
     xml.push_str("><a:latin typeface=\"");
@@ -377,6 +391,79 @@ fn push_face(xml: &mut String, name: &str, face: &Face) {
     xml.push_str("</a:");
     xml.push_str(name);
     xml.push('>');
+}
+
+#[derive(Default)]
+struct LengthSink {
+    length: u128,
+}
+
+trait XmlSink {
+    fn push_str(&mut self, value: &str);
+    fn push(&mut self, value: char);
+}
+
+impl XmlSink for String {
+    fn push_str(&mut self, value: &str) {
+        String::push_str(self, value);
+    }
+
+    fn push(&mut self, value: char) {
+        String::push(self, value);
+    }
+}
+
+impl XmlSink for LengthSink {
+    fn push_str(&mut self, value: &str) {
+        self.length += value.len() as u128;
+    }
+
+    fn push(&mut self, value: char) {
+        self.length += value.len_utf8() as u128;
+    }
+}
+
+fn serialized_part_len(name: &str, colors: &Palette, fonts: &FontSet) -> Result<usize> {
+    let mut sink = LengthSink::default();
+    write_part(&mut sink, name, colors, fonts);
+    sink.length
+        .try_into()
+        .map_err(|_| invalid("theme output length overflows usize"))
+}
+
+fn serialized_override_len(value: &Override) -> Result<usize> {
+    let mut sink = LengthSink::default();
+    write_override(&mut sink, value);
+    sink.length
+        .try_into()
+        .map_err(|_| invalid("theme override output length overflows usize"))
+}
+
+fn serialized_palette_len(value: &Palette, declare_namespace: bool) -> Result<usize> {
+    let mut sink = LengthSink::default();
+    push_palette(&mut sink, value, declare_namespace);
+    sink.length
+        .try_into()
+        .map_err(|_| invalid("theme palette output length overflows usize"))
+}
+
+fn serialized_fonts_len(value: &FontSet, declare_namespace: bool) -> Result<usize> {
+    let mut sink = LengthSink::default();
+    push_fonts(&mut sink, value, declare_namespace);
+    sink.length
+        .try_into()
+        .map_err(|_| invalid("theme fonts output length overflows usize"))
+}
+
+fn output_string(length: usize, limits: Limits) -> Result<String> {
+    if length > limits.max_xml_bytes {
+        return Err(limit(LimitKind::XmlBytes, length, limits.max_xml_bytes));
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(length)
+        .map_err(|_| invalid("theme output allocation failed"))?;
+    Ok(output)
 }
 
 #[derive(Default)]
@@ -819,6 +906,7 @@ fn attr(
     limits: Limits,
 ) -> Result<Option<String>> {
     let mut count = 0usize;
+    let mut value = None;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         count = count
@@ -831,21 +919,26 @@ fn attr(
                 limits.max_attributes_per_element,
             ));
         }
-        if attribute.key.as_ref() == name {
-            let value = unqualified_attribute_value(element, name, decoder)?;
-            if let Some(value) = &value
-                && value.len() > limits.max_attribute_value_bytes
-            {
-                return Err(limit(
-                    LimitKind::AttributeValueBytes,
-                    value.len(),
-                    limits.max_attribute_value_bytes,
-                ));
+        if attribute.key.prefix().is_none() && attribute.key.local_name().as_ref() == name {
+            if value.is_some() {
+                return Err(invalid(format!(
+                    "duplicate theme XML attribute '{}'",
+                    String::from_utf8_lossy(name)
+                )));
             }
-            return Ok(value);
+            crate::preflight_attribute_value_bytes(
+                attribute.value.as_ref(),
+                limits.max_attribute_value_bytes,
+            )?;
+            value = Some(
+                attribute
+                    .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                    .into_owned(),
+            );
         }
     }
-    Ok(None)
+    Ok(value)
 }
 
 fn theme_root_namespace(xml: &[u8], limits: Limits) -> Result<&'static [u8]> {
@@ -904,17 +997,221 @@ fn adjust_replacement_namespace(
             "theme replacement has an unsupported DrawingML namespace",
         ));
     }
-    let mut adjusted = Vec::with_capacity(
-        replacement
-            .len()
-            .checked_sub(current.len())
-            .and_then(|length| length.checked_add(source_namespace.len()))
-            .ok_or_else(|| invalid("theme replacement length overflows"))?,
-    );
+    let adjusted_len = adjusted_replacement_len(replacement, source_namespace)?;
+    let mut adjusted = Vec::with_capacity(adjusted_len);
     adjusted.extend_from_slice(&replacement[..range.start]);
     adjusted.extend_from_slice(source_namespace);
     adjusted.extend_from_slice(&replacement[range.end..]);
     Ok(Some(adjusted))
+}
+
+fn adjusted_replacement_len(replacement: &[u8], source_namespace: &[u8]) -> Result<usize> {
+    let Some(range) = replacement_root_attribute_range(replacement, b"xmlns:a")? else {
+        return Ok(replacement.len());
+    };
+    let current = &replacement[range];
+    if current == source_namespace {
+        return Ok(replacement.len());
+    }
+    if current != NAMESPACE.as_bytes() && current != STRICT_NAMESPACE.as_bytes() {
+        return Err(invalid(
+            "theme replacement has an unsupported DrawingML namespace",
+        ));
+    }
+    replacement
+        .len()
+        .checked_sub(current.len())
+        .and_then(|length| length.checked_add(source_namespace.len()))
+        .ok_or_else(|| invalid("theme replacement length overflows"))
+}
+
+/// Validate a replacement fragment before namespace adjustment or patched
+/// output allocation. The source scheme checker validates the existing
+/// modeled scheme; this pass applies the caller's generic XML/resource
+/// policy to arbitrary replacement markup while retaining opaque children.
+fn validate_replacement_fragment(replacement: &[u8], target: &[u8], limits: Limits) -> Result<()> {
+    if replacement.len() > limits.max_xml_bytes {
+        return Err(limit(
+            LimitKind::XmlBytes,
+            replacement.len(),
+            limits.max_xml_bytes,
+        ));
+    }
+    let mut reader = NsReader::from_reader(replacement);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    reader
+        .resolver_mut()
+        .set_max_declarations_per_element(limits.max_namespace_declarations);
+    let mut stack: Vec<Vec<u8>> = Vec::new();
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut nodes = 0usize;
+    let mut buffer = Vec::new();
+    loop {
+        let event = reader
+            .read_event_into(&mut buffer)
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .into_owned();
+        let namespace = match &event {
+            Event::Start(element) | Event::Empty(element) => {
+                reader.resolver().resolve_element(element.name()).0
+            },
+            Event::End(element) => reader.resolver().resolve_element(element.name()).0,
+            _ => ResolveResult::Unbound,
+        };
+        match event {
+            Event::Start(element) => {
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("theme replacement node count overflows"))?;
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
+                }
+                if root_closed || (root_seen && stack.is_empty()) {
+                    return Err(invalid("theme replacement has more than one root"));
+                }
+                validate_replacement_namespace(&namespace, &element, !root_seen)?;
+                validate_replacement_attributes(&element, &reader, limits)?;
+                let local = element.local_name().as_ref().to_vec();
+                if !root_seen && local.as_slice() != target {
+                    return Err(invalid("theme replacement root does not match target"));
+                }
+                if stack.len() >= limits.max_depth {
+                    return Err(limit(
+                        LimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_depth,
+                    ));
+                }
+                root_seen = true;
+                stack.push(local);
+            },
+            Event::Empty(element) => {
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("theme replacement node count overflows"))?;
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
+                }
+                if root_closed || (root_seen && stack.is_empty()) {
+                    return Err(invalid("theme replacement has more than one root"));
+                }
+                validate_replacement_namespace(&namespace, &element, !root_seen)?;
+                validate_replacement_attributes(&element, &reader, limits)?;
+                if !root_seen && element.local_name().as_ref() != target {
+                    return Err(invalid("theme replacement root does not match target"));
+                }
+                if 1 > limits.max_depth {
+                    return Err(limit(LimitKind::XmlDepth, 1, limits.max_depth));
+                }
+                if !root_seen {
+                    root_seen = true;
+                    root_closed = true;
+                }
+            },
+            Event::End(element) => {
+                let Some(local) = stack.pop() else {
+                    return Err(invalid(
+                        "theme replacement has an unexpected closing element",
+                    ));
+                };
+                if local.as_slice() != element.local_name().as_ref() {
+                    return Err(invalid("theme replacement closing element does not match"));
+                }
+                if stack.is_empty() {
+                    root_closed = true;
+                }
+            },
+            Event::Text(text) => {
+                let value = std::str::from_utf8(text.as_ref()).map_err(xml_error)?;
+                validate_xml_text("theme replacement text", value)?;
+                if !value.chars().all(char::is_whitespace) {
+                    return Err(invalid("theme replacement contains unsupported text"));
+                }
+            },
+            Event::CData(_) | Event::GeneralRef(_) => {
+                return Err(invalid("theme replacement contains unsupported content"));
+            },
+            Event::Comment(comment) => {
+                validate_xml_text(
+                    "theme replacement comment",
+                    std::str::from_utf8(comment.as_ref()).map_err(xml_error)?,
+                )?;
+            },
+            Event::Decl(_) | Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("theme replacement contains forbidden markup"));
+            },
+            Event::Eof => break,
+        }
+        buffer.clear();
+    }
+    if !root_seen || !root_closed || !stack.is_empty() {
+        return Err(invalid("theme replacement is unterminated"));
+    }
+    Ok(())
+}
+
+fn validate_replacement_namespace(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    root: bool,
+) -> Result<()> {
+    match namespace {
+        ResolveResult::Bound(_) => Ok(()),
+        ResolveResult::Unknown(prefix) if prefix.as_slice() == b"a" => Ok(()),
+        ResolveResult::Unbound if !root && element.name().prefix().is_none() => Ok(()),
+        ResolveResult::Unbound if root && element.name().prefix().is_none() => {
+            Err(invalid("theme replacement root has no DrawingML namespace"))
+        },
+        ResolveResult::Unknown(_) => Err(invalid(
+            "theme replacement uses an undeclared namespace prefix",
+        )),
+        ResolveResult::Unbound => Err(invalid("theme replacement has an unbound namespace")),
+    }
+}
+
+fn validate_replacement_attributes(
+    element: &BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+    limits: Limits,
+) -> Result<()> {
+    let mut count = 0usize;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| invalid("theme replacement attribute count overflows"))?;
+        if count > limits.max_attributes_per_element {
+            return Err(limit(
+                LimitKind::XmlAttributes,
+                count,
+                limits.max_attributes_per_element,
+            ));
+        }
+        if attribute.value.contains(&b'<') {
+            return Err(invalid("theme replacement attribute contains raw '<'"));
+        }
+        let is_namespace = attribute.key.as_ref() == b"xmlns"
+            || attribute.key.as_ref().strip_prefix(b"xmlns:").is_some();
+        crate::preflight_attribute_value_bytes(
+            attribute.value.as_ref(),
+            limits.max_attribute_value_bytes,
+        )?;
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
+            .map_err(xml_error)?;
+        validate_xml_text("theme replacement attribute", &value)?;
+        if !is_namespace && value.len() > limits.max_attribute_value_bytes {
+            return Err(limit(
+                LimitKind::AttributeValueBytes,
+                value.len(),
+                limits.max_attribute_value_bytes,
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn replacement_root_attribute_range(xml: &[u8], wanted: &[u8]) -> Result<Option<Range<usize>>> {
@@ -1330,6 +1627,10 @@ fn ensure_supported_attributes(
         }
         let key = attribute.key.as_ref();
         if key == b"xmlns" || key.starts_with(b"xmlns:") {
+            crate::preflight_attribute_value_bytes(
+                attribute.value.as_ref(),
+                limits.max_attribute_value_bytes,
+            )?;
             let value = attribute
                 .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
                 .map_err(|error| Error::Xml(error.to_string()))?;
@@ -1350,6 +1651,10 @@ fn ensure_supported_attributes(
         if attribute.key.prefix().is_some() || !allowed.contains(&key) {
             return Err(invalid("theme scheme contains an unsupported attribute"));
         }
+        crate::preflight_attribute_value_bytes(
+            attribute.value.as_ref(),
+            limits.max_attribute_value_bytes,
+        )?;
         let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?;
@@ -1375,7 +1680,7 @@ fn bounded(value: Vec<u8>, limits: Limits) -> Result<Vec<u8>> {
     Ok(value)
 }
 
-fn escape(output: &mut String, value: &str) {
+fn escape<T: XmlSink>(output: &mut T, value: &str) {
     for character in value.chars() {
         match character {
             '&' => output.push_str("&amp;"),
@@ -1393,6 +1698,10 @@ fn escape(output: &mut String, value: &str) {
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
+}
+
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(error.to_string())
 }
 
 fn limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
@@ -1460,6 +1769,61 @@ mod tests {
         assert_eq!(parsed.name, "Office Theme");
         assert_eq!(parsed.colors, palette());
         assert_eq!(parsed.fonts, fonts);
+    }
+
+    #[test]
+    fn authored_outputs_preflight_serialized_size_before_allocation() {
+        let colors = palette();
+        let fonts = FontSet::new("Office", Face::new("Aptos"), Face::new("Aptos"));
+        let complete = super::encode_part("Office Theme", &colors, &fonts, Limits::DEFAULT)
+            .expect("complete theme");
+        assert_eq!(
+            super::encode_part("Office Theme", &colors, &fonts, Limits::new(complete.len()),)
+                .expect("exact complete-theme cap"),
+            complete
+        );
+        assert!(matches!(
+            super::encode_part(
+                "Office Theme",
+                &colors,
+                &fonts,
+                Limits::new(complete.len() - 1),
+            ),
+            Err(Error::Limit {
+                kind: LimitKind::XmlBytes,
+                ..
+            })
+        ));
+
+        let override_value = Override::new().colors(colors.clone()).fonts(fonts.clone());
+        let override_xml =
+            super::encode_override(&override_value, Limits::DEFAULT).expect("theme override");
+        assert!(matches!(
+            super::encode_override(&override_value, Limits::new(override_xml.len() - 1)),
+            Err(Error::Limit {
+                kind: LimitKind::XmlBytes,
+                ..
+            })
+        ));
+
+        let palette_xml =
+            super::encode_palette_fragment(&colors, Limits::DEFAULT).expect("palette fragment");
+        assert!(matches!(
+            super::encode_palette_fragment(&colors, Limits::new(palette_xml.len() - 1)),
+            Err(Error::Limit {
+                kind: LimitKind::XmlBytes,
+                ..
+            })
+        ));
+
+        let fonts_xml = encode_fonts_fragment(&fonts, Limits::DEFAULT).expect("fonts fragment");
+        assert!(matches!(
+            encode_fonts_fragment(&fonts, Limits::new(fonts_xml.len() - 1)),
+            Err(Error::Limit {
+                kind: LimitKind::XmlBytes,
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -1722,5 +2086,60 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn scheme_replacement_preflights_structure_and_decoded_attributes() {
+        let fonts = FontSet::new("Office", Face::new("Aptos"), Face::new("Aptos"));
+        let original = encode_part("Office", &palette(), &fonts).unwrap();
+        let mut node_limits = Limits::DEFAULT;
+        node_limits.max_nodes = 2;
+        assert!(matches!(
+            super::replace_scheme(
+                &original,
+                b"clrScheme",
+                b"<a:clrScheme><a:future/><a:another/></a:clrScheme>",
+                node_limits,
+            ),
+            Err(Error::Limit {
+                kind: LimitKind::XmlNodes,
+                observed,
+                maximum: 2,
+            }) if observed > 2
+        ));
+        assert!(
+            super::replace_scheme(
+                &original,
+                b"clrScheme",
+                b"<a:clrScheme><a:future/></a:wrong>",
+                Limits::DEFAULT,
+            )
+            .is_err()
+        );
+
+        let mut value_limits = Limits::DEFAULT;
+        value_limits.max_attribute_value_bytes = 16;
+        assert!(
+            super::replace_scheme(
+                &original,
+                b"clrScheme",
+                br#"<a:clrScheme name="a&amp;bcde"/>"#,
+                value_limits,
+            )
+            .is_ok()
+        );
+        assert!(matches!(
+            super::replace_scheme(
+                &original,
+                b"clrScheme",
+                br#"<a:clrScheme name="a&amp;bcdefghijklmnopq"/>"#,
+                value_limits,
+            ),
+            Err(Error::Limit {
+                kind: LimitKind::AttributeValueBytes,
+                observed,
+                maximum: 16,
+            }) if observed > 16
+        ));
     }
 }

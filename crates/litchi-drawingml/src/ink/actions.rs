@@ -1177,6 +1177,10 @@ fn read_profile_with_source(
 /// Write a strict profile using its exact retained source bytes.
 pub fn write_profile(profile: &Profile, limits: Limits) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
+    // Re-scan source-backed profiles under the caller's complete policy
+    // before reserving output; a profile admitted under a wider policy must
+    // not bypass structural, payload, or decoded-value bounds on replay.
+    let _ = read_profile(profile.source(), limits)?;
     if profile.source.len() > limits.max_output_bytes {
         return Err(limit(
             LimitKind::OutputBytes,
@@ -1195,6 +1199,7 @@ pub fn write_profile(profile: &Profile, limits: Limits) -> Result<Vec<u8>> {
 /// Write a strict profile to a caller-provided sink.
 pub fn write_profile_to<W: Write>(writer: &mut W, profile: &Profile, limits: Limits) -> Result<()> {
     let limits = limits.validate()?;
+    let _ = read_profile(profile.source(), limits)?;
     if profile.source.len() > limits.max_output_bytes {
         return Err(limit(
             LimitKind::OutputBytes,
@@ -1213,6 +1218,7 @@ pub fn write_profile_to<W: Write>(writer: &mut W, profile: &Profile, limits: Lim
 /// Returns an error only when the caller-provided sink fails.
 pub fn write_to<W: Write>(writer: &mut W, actions: &Actions, limits: Limits) -> Result<()> {
     let limits = limits.validate()?;
+    let _ = read(actions.source(), limits)?;
     if actions.source().len() > limits.max_output_bytes {
         return Err(limit(
             LimitKind::OutputBytes,
@@ -1231,6 +1237,7 @@ pub fn write_to<W: Write>(writer: &mut W, actions: &Actions, limits: Limits) -> 
 /// Returns an error when source validation fails.
 pub fn write(actions: &Actions, limits: Limits) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
+    let _ = read(actions.source(), limits)?;
     if actions.source().len() > limits.max_output_bytes {
         return Err(limit(
             LimitKind::OutputBytes,
@@ -1964,6 +1971,10 @@ fn optional_attr<R: std::io::BufRead>(
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
+        crate::preflight_attribute_value_bytes(
+            attribute.value.as_ref(),
+            limits.max_attribute_value_bytes,
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
@@ -2001,6 +2012,10 @@ fn optional_xml_id<R: std::io::BufRead>(
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
+        crate::preflight_attribute_value_bytes(
+            attribute.value.as_ref(),
+            limits.max_attribute_value_bytes,
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
@@ -2153,6 +2168,10 @@ fn required_attr<R: std::io::BufRead>(
                 MAX_ATTRIBUTE_VALUE_BYTES,
             ));
         }
+        crate::preflight_attribute_value_bytes(
+            attribute.value.as_ref(),
+            limits.max_attribute_value_bytes,
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;
@@ -2380,6 +2399,14 @@ fn validate_element<R: std::io::BufRead>(
         }
         let is_namespace_declaration = attribute.key.as_ref() == b"xmlns"
             || attribute.key.as_ref().strip_prefix(b"xmlns:").is_some();
+        crate::preflight_attribute_value_bytes(
+            attribute.value.as_ref(),
+            if is_namespace_declaration {
+                MAX_ATTRIBUTE_VALUE_BYTES
+            } else {
+                limits.max_attribute_value_bytes
+            },
+        )?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(xml_error)?;

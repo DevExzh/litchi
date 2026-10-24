@@ -328,7 +328,7 @@ pub(crate) fn validate_general_ref(
 ) -> Result<Option<char>> {
     if reference.len() > limits.max_attribute_value_bytes {
         return Err(limit(
-            LimitKind::ScalarBytes,
+            LimitKind::AttributeValueBytes,
             reference.len(),
             limits.max_attribute_value_bytes,
         ));
@@ -664,13 +664,6 @@ fn validate_element_attributes(
                     limits.max_namespace_declarations,
                 ));
             }
-            if attribute.value.len() > limits.max_attribute_value_bytes {
-                return Err(limit(
-                    LimitKind::AttributeValueBytes,
-                    attribute.value.len(),
-                    limits.max_attribute_value_bytes,
-                ));
-            }
             let value = decode_attribute(&attribute, reader.decoder(), limits)?;
             let prefix = attribute
                 .key
@@ -693,13 +686,6 @@ fn validate_element_attributes(
                 ));
             }
             continue;
-        }
-        if attribute.value.len() > limits.max_attribute_value_bytes {
-            return Err(limit(
-                LimitKind::AttributeValueBytes,
-                attribute.value.len(),
-                limits.max_attribute_value_bytes,
-            ));
         }
         let value = decode_attribute(&attribute, reader.decoder(), limits)?;
         let (namespace, _) = reader.resolver().resolve_attribute(attribute.key);
@@ -757,6 +743,10 @@ fn decode_attribute(
     // interpreted. Literal tabs, CR, and LF therefore become spaces even for
     // xsd:string; character references retain their represented characters.
     validate_raw_attribute_value(attribute.value.as_ref(), "theme family attribute")?;
+    crate::preflight_attribute_value_bytes(
+        attribute.value.as_ref(),
+        limits.max_attribute_value_bytes,
+    )?;
     let value = attribute
         .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
         .map_err(xml_error)?
@@ -989,16 +979,21 @@ pub(crate) fn validate_namespace_binding(prefix: &[u8], value: &str) -> Result<(
     Ok(())
 }
 
-fn detached_len(name: &str, id: &str, variant_id: &str, limits: Limits) -> Result<usize> {
+fn detached_len(
+    name_len: usize,
+    id_len: usize,
+    variant_id_len: usize,
+    limits: Limits,
+) -> Result<usize> {
     let output_len = b"<thm15:themeFamily xmlns:thm15=\""
         .len()
         .checked_add(NAMESPACE.len())
         .and_then(|length| length.checked_add(b"\" name=\"".len()))
-        .and_then(|length| length.checked_add(name.len()))
+        .and_then(|length| length.checked_add(name_len))
         .and_then(|length| length.checked_add(b"\" id=\"".len()))
-        .and_then(|length| length.checked_add(id.len()))
+        .and_then(|length| length.checked_add(id_len))
         .and_then(|length| length.checked_add(b"\" vid=\"".len()))
-        .and_then(|length| length.checked_add(variant_id.len()))
+        .and_then(|length| length.checked_add(variant_id_len))
         .and_then(|length| length.checked_add(b"\"/>".len()))
         .ok_or_else(|| invalid("theme family output length overflows"))?;
     if output_len > limits.max_xml_bytes {
@@ -1025,18 +1020,26 @@ pub(crate) fn serialized_len(value: &Family, limits: Limits) -> Result<usize> {
         return Ok(source_rewrite(source, value, limits)?.output_len);
     }
     detached_len(
-        &escape_attribute(value.name()),
-        &escape_xml(value.id().as_str()),
-        &escape_xml(value.variant_id().as_str()),
+        escaped_attribute_len(value.name())?,
+        escaped_xml_len(value.id().as_str())?,
+        escaped_xml_len(value.variant_id().as_str())?,
         limits,
     )
 }
 
 fn write_detached(value: &Family, limits: Limits) -> Result<Vec<u8>> {
+    // Compute the exact escaped length before constructing any proportional
+    // serialized strings. This makes a tight output cap reject before the
+    // attribute values themselves are allocated.
+    let output_len = detached_len(
+        escaped_attribute_len(value.name())?,
+        escaped_xml_len(value.id().as_str())?,
+        escaped_xml_len(value.variant_id().as_str())?,
+        limits,
+    )?;
     let name = escape_attribute(value.name());
     let id = escape_xml(value.id().as_str());
     let variant_id = escape_xml(value.variant_id().as_str());
-    let output_len = detached_len(&name, &id, &variant_id, limits)?;
     let mut output = String::new();
     output
         .try_reserve_exact(output_len)
@@ -1053,6 +1056,30 @@ fn write_detached(value: &Family, limits: Limits) -> Result<Vec<u8>> {
     bounded_output(output.into_bytes(), limits)
 }
 
+fn escaped_attribute_len(value: &str) -> Result<usize> {
+    escaped_len(value, true)
+}
+
+fn escaped_xml_len(value: &str) -> Result<usize> {
+    escaped_len(value, false)
+}
+
+fn escaped_len(value: &str, attribute: bool) -> Result<usize> {
+    value.chars().try_fold(0usize, |length, character| {
+        let added = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '"' | '\'' => 6,
+            '\t' if attribute => 4,
+            '\n' | '\r' if attribute => 5,
+            _ => character.len_utf8(),
+        };
+        length
+            .checked_add(added)
+            .ok_or_else(|| invalid("theme family escaped value length overflows"))
+    })
+}
+
 struct SourceRewrite {
     output_len: usize,
     replacements: Vec<(std::ops::Range<usize>, String)>,
@@ -1065,43 +1092,30 @@ fn source_rewrite(source: &Source, value: &Family, limits: Limits) -> Result<Sou
         .ok_or_else(|| invalid("theme family source root range is invalid"))?;
     let tag_end = open_tag_end(root)?;
     let attributes = root_attributes(root, tag_end)?;
-    let mut replacements = Vec::with_capacity(3);
+    let mut ranges = Vec::with_capacity(3);
     if source.name.as_ref() != value.name() {
-        replacements.push((
-            attributes
-                .name
-                .ok_or_else(|| invalid("theme family source name attribute is missing"))?,
-            escape_attribute(value.name()),
-        ));
+        let range = attributes
+            .name
+            .clone()
+            .ok_or_else(|| invalid("theme family source name attribute is missing"))?;
+        ranges.push((range, escaped_attribute_len(value.name())?, 0_u8));
     }
     if source.id != *value.id() {
-        replacements.push((
-            attributes
-                .id
-                .ok_or_else(|| invalid("theme family source id attribute is missing"))?,
-            escape_xml(value.id().as_str()),
-        ));
+        let range = attributes
+            .id
+            .clone()
+            .ok_or_else(|| invalid("theme family source id attribute is missing"))?;
+        ranges.push((range, escaped_xml_len(value.id().as_str())?, 1_u8));
     }
     if source.variant_id != *value.variant_id() {
-        replacements.push((
-            attributes
-                .variant_id
-                .ok_or_else(|| invalid("theme family source vid attribute is missing"))?,
-            escape_xml(value.variant_id().as_str()),
-        ));
+        let range = attributes
+            .variant_id
+            .clone()
+            .ok_or_else(|| invalid("theme family source vid attribute is missing"))?;
+        ranges.push((range, escaped_xml_len(value.variant_id().as_str())?, 2_u8));
     }
-    let mut absolute = replacements
-        .into_iter()
-        .map(|(range, value)| {
-            (
-                (source.root_start + range.start)..(source.root_start + range.end),
-                value,
-            )
-        })
-        .collect::<Vec<_>>();
-    absolute.sort_by_key(|(range, _)| range.start);
     let mut output_len = source.xml.len();
-    for (range, replacement) in &absolute {
+    for (range, replacement_len, _) in &ranges {
         output_len = output_len
             .checked_sub(
                 range
@@ -1109,12 +1123,27 @@ fn source_rewrite(source: &Source, value: &Family, limits: Limits) -> Result<Sou
                     .checked_sub(range.start)
                     .ok_or_else(|| invalid("theme family replacement range underflow"))?,
             )
-            .and_then(|length| length.checked_add(replacement.len()))
+            .and_then(|length| length.checked_add(*replacement_len))
             .ok_or_else(|| invalid("theme family patched XML length overflows"))?;
     }
     if output_len > limits.max_xml_bytes {
         return Err(limit(LimitKind::XmlBytes, output_len, limits.max_xml_bytes));
     }
+    let mut absolute = ranges
+        .into_iter()
+        .map(|(range, _, kind)| {
+            let replacement = match kind {
+                0 => escape_attribute(value.name()),
+                1 => escape_xml(value.id().as_str()),
+                _ => escape_xml(value.variant_id().as_str()),
+            };
+            (
+                (source.root_start + range.start)..(source.root_start + range.end),
+                replacement,
+            )
+        })
+        .collect::<Vec<_>>();
+    absolute.sort_by_key(|(range, _)| range.start);
     Ok(SourceRewrite {
         output_len,
         replacements: absolute,
@@ -1257,6 +1286,12 @@ fn validate(value: &Family, limits: Limits) -> Result<()> {
     checked_name(value.name())?;
     let _ = Guid::new(value.id().as_str()).map_err(Error::from)?;
     let _ = Guid::new(value.variant_id().as_str()).map_err(Error::from)?;
+    validate_attribute_budget(value.name(), limits.max_attribute_value_bytes)?;
+    validate_attribute_budget(value.id().as_str(), limits.max_attribute_value_bytes)?;
+    validate_attribute_budget(
+        value.variant_id().as_str(),
+        limits.max_attribute_value_bytes,
+    )?;
     if let Some(source) = value.source_state() {
         if source.xml.len() > limits.max_xml_bytes {
             return Err(limit(
@@ -1268,6 +1303,63 @@ fn validate(value: &Family, limits: Limits) -> Result<()> {
         if source.root_start >= source.root_end || source.root_end > source.xml.len() {
             return Err(invalid("theme family source root range is invalid"));
         }
+        // A source parsed under a wider policy may later be written through a
+        // narrower caller policy. Re-scan before any sink or output
+        // allocation so structural, namespace, and decoded-value dimensions
+        // are enforced for the actual writer policy as well.
+        scan(source.xml.as_ref(), limits)?;
+    } else {
+        validate_detached_structure(limits)?;
+    }
+    Ok(())
+}
+
+fn validate_attribute_budget(value: &str, maximum: usize) -> Result<()> {
+    if value.len() > maximum {
+        return Err(limit(LimitKind::AttributeValueBytes, value.len(), maximum));
+    }
+    Ok(())
+}
+
+fn validate_detached_structure(limits: Limits) -> Result<()> {
+    const ROOT_ATTRIBUTES: usize = 4;
+    const ROOT_NODES: usize = 1;
+    const ROOT_DEPTH: usize = 1;
+    const ROOT_NAMESPACE_DECLARATIONS: usize = 1;
+    const ROOT_PREFIX_BYTES: usize = b"thm15".len();
+    if ROOT_NODES > limits.max_nodes {
+        return Err(limit(LimitKind::XmlNodes, ROOT_NODES, limits.max_nodes));
+    }
+    if ROOT_DEPTH > limits.max_depth {
+        return Err(limit(LimitKind::XmlDepth, ROOT_DEPTH, limits.max_depth));
+    }
+    if ROOT_ATTRIBUTES > limits.max_attributes {
+        return Err(limit(
+            LimitKind::XmlAttributes,
+            ROOT_ATTRIBUTES,
+            limits.max_attributes,
+        ));
+    }
+    if ROOT_NAMESPACE_DECLARATIONS > limits.max_namespace_declarations {
+        return Err(limit(
+            LimitKind::NamespaceDeclarations,
+            ROOT_NAMESPACE_DECLARATIONS,
+            limits.max_namespace_declarations,
+        ));
+    }
+    if ROOT_PREFIX_BYTES > limits.max_namespace_bytes {
+        return Err(limit(
+            LimitKind::NamespacePrefixBytes,
+            ROOT_PREFIX_BYTES,
+            limits.max_namespace_bytes,
+        ));
+    }
+    if NAMESPACE.len() > limits.max_namespace_bytes {
+        return Err(limit(
+            LimitKind::NamespaceBytes,
+            NAMESPACE.len(),
+            limits.max_namespace_bytes,
+        ));
     }
     Ok(())
 }

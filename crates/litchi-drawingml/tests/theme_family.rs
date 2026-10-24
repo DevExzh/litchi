@@ -25,6 +25,32 @@ fn family_value(name: &str) -> Family {
 }
 
 #[test]
+fn detached_family_writer_enforces_selected_structure_before_output() {
+    let value = family_value("Office");
+    let mut attribute_limits = family::Limits::DEFAULT;
+    attribute_limits.max_attributes = 3;
+    assert!(matches!(
+        family::write(&value, attribute_limits),
+        Err(Error::Limit {
+            kind: litchi_drawingml::LimitKind::XmlAttributes,
+            observed: 4,
+            maximum: 3,
+        })
+    ));
+
+    let mut value_limits = family::Limits::DEFAULT;
+    value_limits.max_attribute_value_bytes = 5;
+    assert!(matches!(
+        family::write(&value, value_limits),
+        Err(Error::Limit {
+            kind: litchi_drawingml::LimitKind::AttributeValueBytes,
+            observed,
+            maximum: 5,
+        }) if observed > 5
+    ));
+}
+
+#[test]
 fn guid_bounds_keep_typed_limit_dimensions() {
     let oversized_input = "x".repeat(MAX_ATTRIBUTE_VALUE_BYTES + 1);
     assert!(matches!(
@@ -441,7 +467,7 @@ fn extension_list_shape_and_text_are_checked_while_foreign_children_stay_opaque(
 
 #[test]
 fn opaque_extensions_and_unknown_attributes_survive_known_edits() {
-    let snapshot = Package::from_xml(FAMILY_WITH_OPAQUE_EXTENSION)
+    let snapshot = Package::from_xml(FAMILY_WITH_OPAQUE_EXTENSION, family::Limits::DEFAULT)
         .expect("theme-family extension fixture must parse");
     assert_eq!(snapshot.value().name(), "Office Theme");
     assert_eq!(snapshot.xml_bytes(), FAMILY_WITH_OPAQUE_EXTENSION);
@@ -463,7 +489,7 @@ fn opaque_extensions_and_unknown_attributes_survive_known_edits() {
 
 #[test]
 fn exact_no_op_inverse_and_stale_source_guards_are_enforced() {
-    let snapshot = Package::from_xml(FAMILY_WITH_OPAQUE_EXTENSION)
+    let snapshot = Package::from_xml(FAMILY_WITH_OPAQUE_EXTENSION, family::Limits::DEFAULT)
         .expect("theme-family extension fixture must parse");
 
     let unchanged = snapshot.edit().commit().expect("no-op must commit");
@@ -489,7 +515,7 @@ fn exact_no_op_inverse_and_stale_source_guards_are_enforced() {
         replayed.package().xml_bytes(),
         changed.package().xml_bytes()
     );
-    let reopened = Package::from_xml(snapshot.xml_bytes())
+    let reopened = Package::from_xml(snapshot.xml_bytes(), family::Limits::DEFAULT)
         .expect("equal bytes must reopen as a separate source allocation");
     let reopened_changed = reopened
         .apply(changed.patch())
@@ -519,6 +545,7 @@ fn exact_no_op_inverse_and_stale_source_guards_are_enforced() {
             .unwrap()
             .replace("Office Theme", "Other Theme")
             .into_bytes(),
+        family::Limits::DEFAULT,
     )
     .unwrap();
     assert!(matches!(
@@ -656,7 +683,7 @@ fn name_and_source_output_bounds_accept_exact_and_reject_over() {
 
 #[test]
 fn invalid_edits_do_not_leak_into_a_transaction() {
-    let snapshot = Package::from_xml(NATIVE).unwrap();
+    let snapshot = Package::from_xml(NATIVE, family::Limits::DEFAULT).unwrap();
     let mut edit = snapshot.edit();
     assert!(edit.set_id("not-a-guid").is_err());
     assert!(edit.set_variant_id("{bad}").is_err());
@@ -669,7 +696,7 @@ fn invalid_edits_do_not_leak_into_a_transaction() {
 fn bounded_malformed_inputs_fail_closed() {
     let oversized = vec![b'x'; MAX_XML_BYTES + 1];
     assert!(family::read(&oversized, family::Limits::DEFAULT).is_err());
-    assert!(Package::from_xml(oversized).is_err());
+    assert!(Package::from_xml(oversized, family::Limits::DEFAULT).is_err());
     assert!(family::read(br#"<thm15:themeFamily"#, family::Limits::DEFAULT).is_err());
     assert!(family::read(
         br#"<thm15:themeFamily xmlns:thm15="http://schemas.microsoft.com/office/thememl/2012/main" name="Office" id="{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}" vid="{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"><a:extLst/>"#,
