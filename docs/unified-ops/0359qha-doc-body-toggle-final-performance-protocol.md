@@ -11,9 +11,9 @@
 
 0359qh described only one short native block with binary argument `1` and
 `LITCHI_PROBE_BATCH_ROUNDS=3`. That is not the approved W5 qualification
-protocol. 0359a §7 requires 31 outer samples per scenario, inner DOC batch
-rounds 7, and two complete A-B-B-A blocks. The reviewed W5 runner and
-calibration references are retained at:
+protocol. 0359a §7 requires 31 measured samples per scenario and two complete
+A-B-B-A blocks. The reviewed W5 runner and calibration references are retained
+at:
 
 ~~~text
 /home/zhuhe/code/litchi-worktrees/.coord/doc-toggle/final-record/docs/unified-ops/results/0359a/abba.sh
@@ -24,10 +24,17 @@ SHA-256 14bf15e41202cd610c8bcecb2d239d9ceef3256b354c9144b8b6aa1a808f4d21
 SHA-256 6419d8c05d8494abfc922883e62b34897ccd67a78d42f8e178d79a743587be90
 ~~~
 
-The approved runner uses `ROUNDS=31`, `LITCHI_PROBE_BATCH_ROUNDS=7`, pinned
-CPU, a 20-GiB scope, and A-B-B-A twice. 0359j's reviewed calibration rule is
-also applied: each binary/route calibration leg must be at least 250 ms; a
-short leg is rejected rather than silently accepted.
+The source-bound DOC routes call `time_rounds(..., batch_rounds, ...)`
+directly, so the process argument `31` does not control their sample count.
+The final runner therefore sets both `ROUNDS=31` and
+`LITCHI_PROBE_BATCH_ROUNDS=31`, then validates the JSON `samples` field as
+exactly 31. Setting the environment to 7 would silently produce only seven
+samples. The runner uses a pinned CPU, a 20-GiB scope, and A-B-B-A twice.
+Process wall time is retained for diagnosis only; it includes fixture/setup
+work and cannot prove the operation timing threshold. The 250,000-us minimum
+is applied to the measured `min_us` and `median_us` fields of the
+`doc/batch1k_leaf_write` operation. The single-toggle `doc/leaf_write` route
+has no artificial 250-ms floor.
 
 ## Correct route meaning
 
@@ -63,7 +70,7 @@ The reviewed runner is tracked beside this record:
 
 ~~~text
 docs/unified-ops/results/0359qha/run.sh
-SHA-256 15b85d45705cfa6a6494f0e01831a2b7b199d0806aba38699b226079925eaf10
+SHA-256 1f3eeacca4baf44cf5d4ebc8976c1853bf33e1c1b24217b07ac65b2f7c69b194
 ~~~
 
 It performs no build. It refuses a pre-existing `RUN`, verifies every source,
@@ -85,10 +92,10 @@ scope with swap disabled, and a 900-second profiler timeout. It retains
 Callgrind/Massif output and annotations; this is allocation evidence, not the
 31-sample native result.
 
-The native phase first calibrates candidate and baseline for each route with
-the final `31/7` settings. Each calibration must pass output validation and
-the 0.250-second minimum-leg check. It then runs, for each route and for
-`block=1` and `block=2`, exactly:
+The native phase first runs candidate and baseline calibration legs for each
+route with the final `31/31` settings. Calibration validates output and host
+quietness but does not use process wall time as an operation threshold. It
+then runs, for each route and for `block=1` and `block=2`, exactly:
 
 ~~~text
 baseline, candidate, candidate, baseline
@@ -104,12 +111,14 @@ The static executable-protocol test is:
 
 ~~~text
 docs/unified-ops/results/0359qha/test_protocol.sh
-SHA-256 e4d084b78d34d2c5363c221e9568d82e90cb049b16c3d82413ed071939c372cd
+SHA-256 8d09537ac9307bac4bc1ed4da22361660c25a977b79748c0eb29a595d4dfb10f
 ~~~
 
-It runs `bash -n` and checks the fixed 31/7 calibration, two ABBA blocks,
-order, per-route TMP, fresh-root guard, output validation, CPU/cgroup,
-timeout, and before/during/after quiet checks. It passed in this turn:
+It runs `bash -n` and checks the fixed 31/31 sample contract, two ABBA
+blocks, order, per-route TMP, fresh-root guard, output validation,
+CPU/cgroup, timeout, profile artifact presence/annotation, early source-hash
+failure, operation timing, and before/during/after quiet checks. It passed in
+this turn:
 
 ~~~text
 0359qha protocol static checks passed

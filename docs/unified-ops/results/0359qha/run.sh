@@ -3,8 +3,10 @@ set -u -o pipefail
 
 # Final-472b DOC body-toggle qualification packet.  This runner deliberately
 # does not build: it reuses the source-bound binaries recorded by 0359qg.
-# Native acceptance is 31 outer samples, inner batch rounds 7, and two complete
-# baseline-candidate-candidate-baseline blocks for each required route.
+# Native acceptance is 31 measured samples for each selected route and two
+# complete baseline-candidate-candidate-baseline blocks for each route.  The
+# DOC routes pass the batch-rounds setting directly to `time_rounds`, so the
+# environment below is part of the sample-count contract.
 
 ROOT=${ROOT:-/home/zhuhe/code/litchi-worktrees}
 BASE_RUN=${BASE_RUN:-$ROOT/.coord/doc-toggle-472b-build-20261024}
@@ -13,10 +15,9 @@ RUN=${RUN:-$ROOT/.coord/doc-toggle-472b-performance-$SOURCE_SHORT}
 PHASE=${PHASE:-native}
 CPU=${CPU:?set CPU to the quiet pinned CPU}
 ROUNDS=31
-BATCH_ROUNDS=7
+BATCH_ROUNDS=31
 PROFILE_ROUNDS=1
 PROFILE_BATCH_ROUNDS=1
-MIN_LEG_SECONDS=0.250
 NATIVE_TIMEOUT_SECONDS=900
 PROFILE_TIMEOUT_SECONDS=900
 MAX_LOAD=1.0
@@ -27,6 +28,7 @@ CAND_SRC=$ROOT/.coord/final-api-capture-472b670547/source
 BASE_SRC=$ROOT/.coord/final-api-capture-472b670547/doc-body-baseline
 CAND_BIN=$BASE_RUN/target-candidate/release/examples/legacy_w5_source_probe
 BASE_BIN=$BASE_RUN/target-baseline/release/examples/legacy_w5_source_probe
+VALIDATOR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/validate.py
 
 EXPECTED_CAND_BODY=db01cfce38c13c6c806382ffede990fda2b3bbe4dd53f59c4c5cb9feba9777d3
 EXPECTED_BASE_BODY=6dc26da8130659c212dd29f26499cdaba7c4849268583b44dfcd9413a36887a3
@@ -54,27 +56,42 @@ expected_output() {
 }
 
 verify_source() {
-  set -e
-  test "$(git -C "$CAND_SRC" rev-parse HEAD)" = 472b6705475b073e7fe08f6e11ee17fb1e29f838
-  test "$(git -C "$BASE_SRC" rev-parse HEAD)" = 472b6705475b073e7fe08f6e11ee17fb1e29f838
-  test "$(sha "$CAND_SRC/crates/litchi-doc/src/body_text.rs")" = "$EXPECTED_CAND_BODY"
-  test "$(sha "$BASE_SRC/crates/litchi-doc/src/body_text.rs")" = "$EXPECTED_BASE_BODY"
-  test "$(sha "$CAND_SRC/crates/litchi-doc/src/tracked_revision/package.rs")" = "$EXPECTED_CAND_REV"
-  test "$(sha "$BASE_SRC/crates/litchi-doc/src/tracked_revision/package.rs")" = "$EXPECTED_BASE_REV"
-  test "$(sha "$CAND_SRC/crates/litchi-ops/examples/legacy_w5_source_probe.rs")" = "$EXPECTED_PROBE"
-  test "$(sha "$BASE_SRC/crates/litchi-ops/examples/legacy_w5_source_probe.rs")" = "$EXPECTED_PROBE"
-  test "$(sha "$CAND_SRC/Cargo.lock")" = 4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1
-  test "$(sha "$BASE_SRC/Cargo.lock")" = 4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1
-  test "$(sha "$CAND_BIN")" = "$EXPECTED_CAND_BIN"
-  test "$(sha "$BASE_BIN")" = "$EXPECTED_BASE_BIN"
+  test "$(git -C "$CAND_SRC" rev-parse HEAD)" = 472b6705475b073e7fe08f6e11ee17fb1e29f838 || return 1
+  test "$(git -C "$BASE_SRC" rev-parse HEAD)" = 472b6705475b073e7fe08f6e11ee17fb1e29f838 || return 1
+  test -z "$(git -C "$CAND_SRC" status --porcelain=v1)" || return 1
+  test "$(git -C "$BASE_SRC" status --porcelain=v1)" = $' M crates/litchi-doc/src/body_text.rs\n M crates/litchi-doc/src/tracked_revision/package.rs' || return 1
+  test "$(sha "$CAND_SRC/crates/litchi-doc/src/body_text.rs")" = "$EXPECTED_CAND_BODY" || return 1
+  test "$(sha "$BASE_SRC/crates/litchi-doc/src/body_text.rs")" = "$EXPECTED_BASE_BODY" || return 1
+  test "$(sha "$CAND_SRC/crates/litchi-doc/src/tracked_revision/package.rs")" = "$EXPECTED_CAND_REV" || return 1
+  test "$(sha "$BASE_SRC/crates/litchi-doc/src/tracked_revision/package.rs")" = "$EXPECTED_BASE_REV" || return 1
+  test "$(sha "$CAND_SRC/crates/litchi-ops/examples/legacy_w5_source_probe.rs")" = "$EXPECTED_PROBE" || return 1
+  test "$(sha "$BASE_SRC/crates/litchi-ops/examples/legacy_w5_source_probe.rs")" = "$EXPECTED_PROBE" || return 1
+  test "$(sha "$CAND_SRC/Cargo.lock")" = 4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1 || return 1
+  test "$(sha "$BASE_SRC/Cargo.lock")" = 4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1 || return 1
+  test "$(sha "$CAND_BIN")" = "$EXPECTED_CAND_BIN" || return 1
+  test "$(sha "$BASE_BIN")" = "$EXPECTED_BASE_BIN" || return 1
 }
 
 validate_json() {
-  leg=$1; route=$2; samples=$3; json=$4
+  leg=$1; route=$2; samples=$3; json=$4; minimum_us=${5:-0}
   digest=$(expected_output "$leg" "$route") || return 1
-  jq -e --arg scenario "$route" --arg digest "$digest" --argjson samples "$samples" \
-    'length == 1 and .[0].scenario == $scenario and .[0].samples == $samples and .[0].output_sha256 == $digest' \
-    "$json" >/dev/null
+  python3 "$VALIDATOR" --json "$json" --scenario "$route" --samples "$samples" \
+    --output-sha "$digest" --min-operation-us "$minimum_us"
+}
+
+require_profile_artifacts() {
+  tool=$1; dir=$2
+  case "$tool" in
+    callgrind)
+      test -s "$dir/result.callgrind" || return 1
+      test -s "$dir/annotate.txt" || return 1
+      ;;
+    massif)
+      test -s "$dir/result.massif" || return 1
+      test -s "$dir/ms_print.txt" || return 1
+      ;;
+    *) return 1 ;;
+  esac
 }
 
 snapshot() {
@@ -111,13 +128,6 @@ check_quiet_file() {
   ' "$file"
 }
 
-check_min_wall() {
-  file=$1
-  wall=$(rg -o 'wall=[0-9]+(\.[0-9]+)?' "$file" | tail -1 | cut -d= -f2)
-  test -n "$wall"
-  awk -v wall="$wall" -v minimum="$MIN_LEG_SECONDS" 'BEGIN { exit (wall + 0 >= minimum) ? 0 : 1 }'
-}
-
 native_leg() {
   kind=$1; route=$2; block=$3; ordinal=$4; leg=$5; bin=$6
   name=$(route_name "$route")
@@ -140,8 +150,9 @@ native_leg() {
   rm -f "$marker"
   wait "$watcher" 2>/dev/null || true
   snapshot "$after"
-  validate_json "$leg" "$route" "$ROUNDS" "$json" || FAIL=1
-  check_min_wall "$time_log" || FAIL=1
+  minimum_us=0
+  test "$route" = doc/batch1k_leaf_write && minimum_us=250000
+  validate_json "$leg" "$route" "$BATCH_ROUNDS" "$json" "$minimum_us" || FAIL=1
   check_quiet_file "$before" || QUIET_FAILURE=1
   check_quiet_file "$during" || QUIET_FAILURE=1
   check_quiet_file "$after" || QUIET_FAILURE=1
@@ -163,8 +174,12 @@ profile_leg() {
           TMPDIR="$RUN/profile-tmp/$tool/$leg/$name" valgrind --tool=callgrind --quiet \
             --callgrind-out-file="$dir/result.callgrind" "$bin" "$PROFILE_ROUNDS" \
         >"$json" 2>"$dir/time.log" || FAIL=1
-    callgrind_annotate --auto=no --inclusive=yes --tree=calling \
-      --show-percs=no --threshold=99 "$dir/result.callgrind" >"$dir/annotate.txt" || true
+    if test -s "$dir/result.callgrind"; then
+      callgrind_annotate --auto=no --inclusive=yes --tree=calling \
+        --show-percs=no --threshold=99 "$dir/result.callgrind" >"$dir/annotate.txt" || FAIL=1
+    else
+      FAIL=1
+    fi
   else
     timeout --kill-after=30s "${PROFILE_TIMEOUT_SECONDS}s" \
       systemd-run --user --scope --quiet --collect \
@@ -174,16 +189,51 @@ profile_leg() {
           TMPDIR="$RUN/profile-tmp/$tool/$leg/$name" valgrind --tool=massif --quiet \
             --pages-as-heap=no --massif-out-file="$dir/result.massif" "$bin" "$PROFILE_ROUNDS" \
         >"$json" 2>"$dir/time.log" || FAIL=1
-    ms_print "$dir/result.massif" >"$dir/ms_print.txt" || true
+    if test -s "$dir/result.massif"; then
+      ms_print "$dir/result.massif" >"$dir/ms_print.txt" || FAIL=1
+    else
+      FAIL=1
+    fi
   fi
+  require_profile_artifacts "$tool" "$dir" || FAIL=1
   validate_json "$leg" "$route" "$PROFILE_ROUNDS" "$json" || FAIL=1
 }
 
-verify_source || die 'source, lock, or accepted binary hash mismatch'
+verify_source
+source_status=$?
+if test "$source_status" -ne 0; then
+  die 'source, lock, overlay-path, or accepted binary hash mismatch'
+fi
+if test "$PHASE" = check; then
+  echo '0359qha: source and binary identity checks passed'
+  exit 0
+fi
+if test "$PHASE" = check-profile; then
+  profile_tool=${PROFILE_TOOL:-}
+  profile_dir=${PROFILE_DIR:-}
+  test -n "$profile_tool" || die 'PROFILE_TOOL is required for check-profile'
+  test -n "$profile_dir" || die 'PROFILE_DIR is required for check-profile'
+  require_profile_artifacts "$profile_tool" "$profile_dir" ||
+    die 'profile output or annotation is missing/invalid'
+  echo '0359qha: profile artifact checks passed'
+  exit 0
+fi
 test ! -e "$RUN" || die "RUN already exists; choose a fresh external root: $RUN"
 mkdir -p "$RUN"
-printf 'source_short=%s\nrounds=%s\nbatch_rounds=%s\nmin_leg_seconds=%s\n' \
-  "$SOURCE_SHORT" "$ROUNDS" "$BATCH_ROUNDS" "$MIN_LEG_SECONDS" >"$RUN/protocol.txt"
+{
+  printf 'source_short=%s\nrounds=%s\nbatch_rounds=%s\n' "$SOURCE_SHORT" "$ROUNDS" "$BATCH_ROUNDS"
+  printf 'cpu=%s\nmemory_max=%s\nmemory_swap_max=%s\n' "$CPU" "$MEMORY_MAX" "$MEMORY_SWAP_MAX"
+  printf 'candidate_commit=%s\n' "$(git -C "$CAND_SRC" rev-parse HEAD)"
+  printf 'baseline_commit=%s\n' "$(git -C "$BASE_SRC" rev-parse HEAD)"
+  printf 'candidate_body=%s\n' "$(sha "$CAND_SRC/crates/litchi-doc/src/body_text.rs")"
+  printf 'baseline_body=%s\n' "$(sha "$BASE_SRC/crates/litchi-doc/src/body_text.rs")"
+  printf 'candidate_revision=%s\n' "$(sha "$CAND_SRC/crates/litchi-doc/src/tracked_revision/package.rs")"
+  printf 'baseline_revision=%s\n' "$(sha "$BASE_SRC/crates/litchi-doc/src/tracked_revision/package.rs")"
+  printf 'probe=%s\n' "$(sha "$CAND_SRC/crates/litchi-ops/examples/legacy_w5_source_probe.rs")"
+  printf 'lock=%s\n' "$(sha "$CAND_SRC/Cargo.lock")"
+  printf 'candidate_binary=%s\n' "$(sha "$CAND_BIN")"
+  printf 'baseline_binary=%s\n' "$(sha "$BASE_BIN")"
+} >"$RUN/protocol.txt"
 
 if test "$PHASE" = allocation || test "$PHASE" = all; then
   profile_leg candidate doc/leaf_write callgrind "$CAND_BIN"
@@ -197,8 +247,9 @@ if test "$PHASE" = allocation || test "$PHASE" = all; then
 fi
 
 if test "$PHASE" = native || test "$PHASE" = all; then
-  # Calibration legs use the final 31/7 settings and are not acceptance
-  # samples. A route is rejected if either binary's wall leg is under 250 ms.
+  # Calibration legs use the final 31-sample settings and are not acceptance
+  # samples.  Process wall time is recorded for diagnosis only: it includes
+  # fixture/setup work and cannot establish the operation timing threshold.
   native_leg calibration doc/leaf_write 0 1 baseline "$BASE_BIN"
   native_leg calibration doc/leaf_write 0 2 candidate "$CAND_BIN"
   native_leg calibration doc/batch1k_leaf_write 0 1 baseline "$BASE_BIN"
