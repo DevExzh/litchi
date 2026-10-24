@@ -327,15 +327,6 @@ impl RowMove {
     }
 }
 
-/// Alias documenting a header record move at the physical-storage boundary.
-pub type HeaderRowMove = RowMove;
-
-/// Compatibility spelling for tile adapters that call a move an edit.
-pub type TileRowEdit = RowMove;
-
-/// Compatibility spelling for header adapters that call a move an edit.
-pub type HeaderRowEdit = RowMove;
-
 /// A validated row permutation for UID-map rewrites.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RowUidPermutation {
@@ -913,7 +904,7 @@ pub fn rewrite_tile_rows(
 pub fn plan_header_storage_bucket_rows<'source>(
     source: &'source [u8],
     row_index_limit: u32,
-    moves: &[HeaderRowMove],
+    moves: &[RowMove],
     options: DecodeOptions,
 ) -> Result<PreparedHeaderRowsRewrite<'source>, DecodeError> {
     if row_index_limit == 0 {
@@ -1059,7 +1050,7 @@ pub fn execute_header_storage_bucket_rows(
 pub fn rewrite_header_storage_bucket_rows(
     source: &[u8],
     row_index_limit: u32,
-    moves: &[HeaderRowMove],
+    moves: &[RowMove],
     options: DecodeOptions,
 ) -> Result<(Vec<u8>, RewriteReport), DecodeError> {
     let plan = plan_header_storage_bucket_rows(source, row_index_limit, moves, options)?;
@@ -3139,7 +3130,7 @@ mod tests {
         assert_eq!(header_report.changed_records(), 0);
         assert!(contains_bytes(&header_no_op, &header_root_unknown));
         assert!(contains_bytes(&header_no_op, &header_group_unknown));
-        let header_identity_moves = [HeaderRowMove::new(0, 0), HeaderRowMove::new(1, 1)];
+        let header_identity_moves = [RowMove::new(0, 0), RowMove::new(1, 1)];
         let (header_identity, _) = rewrite_header_storage_bucket_rows(
             &header_source,
             8,
@@ -3152,7 +3143,7 @@ mod tests {
             rewrite_header_storage_bucket_rows(
                 &header_source,
                 8,
-                &[HeaderRowMove::new(0, 1), HeaderRowMove::new(1, 0)],
+                &[RowMove::new(0, 1), RowMove::new(1, 0)],
                 options(),
             )
             .is_err()

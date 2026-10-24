@@ -2017,7 +2017,7 @@ fn rewrite_physical(
             continue;
         }
         let move_bytes = move_count
-            .checked_mul(size_of::<physical_codec::HeaderRowMove>())
+            .checked_mul(size_of::<physical_codec::RowMove>())
             .ok_or(Error::InvalidSource { path })?;
         budget
             .allocations(1)
@@ -2050,7 +2050,7 @@ fn rewrite_physical(
                 if moves.len() == moves.capacity() {
                     return Err(Error::Allocation { amount: 1, path });
                 }
-                moves.push(physical_codec::HeaderRowMove::new(
+                moves.push(physical_codec::RowMove::new(
                     source_index,
                     destination,
                 ));
