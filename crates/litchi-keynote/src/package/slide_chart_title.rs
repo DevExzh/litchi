@@ -268,25 +268,25 @@ impl<'a> Edit<'a> {
     }
 
     /// Return the selected semantic slide position.
-    #[must_use]
+    #[must_use = "handle the deferred chart-title result"]
     pub fn slide_position(&self) -> Result<Position, Error> {
         Ok(self.resolve()?.slide_position)
     }
 
     /// Return the selected semantic chart position within its slide.
-    #[must_use]
+    #[must_use = "handle the deferred chart-title result"]
     pub fn chart_position(&self) -> Result<Position, Error> {
         Ok(self.resolve()?.chart_position)
     }
 
     /// Borrow the visible title observed when this edit first resolves.
-    #[must_use]
+    #[must_use = "handle the deferred chart-title result"]
     pub fn before(&self) -> Result<Option<&str>, Error> {
         Ok(self.resolve()?.title.as_deref())
     }
 
     /// Borrow the title staged for publication.
-    #[must_use]
+    #[must_use = "handle the deferred chart-title result"]
     pub fn after(&self) -> Result<Option<&str>, Error> {
         if let Some(value) = self.after.as_ref() {
             return Ok(value.as_deref());

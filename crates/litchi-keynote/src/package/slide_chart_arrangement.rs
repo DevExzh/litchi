@@ -269,25 +269,25 @@ impl<'a> Edit<'a> {
     }
 
     /// Return the selected semantic slide position.
-    #[must_use]
+    #[must_use = "handle the deferred chart-arrangement result"]
     pub fn slide_position(&self) -> Result<Position, Error> {
         Ok(self.resolve()?.0.slide_position)
     }
 
     /// Return the selected semantic chart position within its slide.
-    #[must_use]
+    #[must_use = "handle the deferred chart-arrangement result"]
     pub fn chart_position(&self) -> Result<Position, Error> {
         Ok(self.resolve()?.0.chart_position)
     }
 
     /// Return the arrangement observed when this edit first resolves.
-    #[must_use]
+    #[must_use = "handle the deferred chart-arrangement result"]
     pub fn before(&self) -> Result<ChartArrangement, Error> {
         Ok(self.resolve()?.1)
     }
 
     /// Return the arrangement staged for publication.
-    #[must_use]
+    #[must_use = "handle the deferred chart-arrangement result"]
     pub fn after(&self) -> Result<ChartArrangement, Error> {
         if let Some(after) = self.after {
             return Ok(after);

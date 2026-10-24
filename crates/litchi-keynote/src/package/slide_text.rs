@@ -341,7 +341,7 @@ impl<'a> Edit<'a> {
     }
 
     /// Resolve and return the selected semantic slide position.
-    #[must_use]
+    #[must_use = "handle the deferred slide-text result"]
     pub fn position(&self) -> Result<Position, Error> {
         self.resolve()?;
         self.position.get().copied().ok_or(Error::InvalidSource)
@@ -354,7 +354,7 @@ impl<'a> Edit<'a> {
     }
 
     /// Resolve and borrow the selected placeholder text from the source snapshot.
-    #[must_use]
+    #[must_use = "handle the deferred slide-text result"]
     pub fn text(&self) -> Result<&str, Error> {
         Ok(self.resolve()?.text.as_str())
     }

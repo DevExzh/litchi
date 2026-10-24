@@ -266,25 +266,25 @@ impl Edit<'_> {
     }
 
     /// Return the selected semantic slide position.
-    #[must_use]
+    #[must_use = "handle the deferred chart-data result"]
     pub fn slide_position(&self) -> Result<Position, Error> {
         Ok(self.resolve()?.0.slide_position)
     }
 
     /// Return the selected semantic chart position.
-    #[must_use]
+    #[must_use = "handle the deferred chart-data result"]
     pub fn chart_position(&self) -> Result<Position, Error> {
         Ok(self.resolve()?.0.chart_position)
     }
 
     /// Return the chart data observed when this edit first resolves.
-    #[must_use]
+    #[must_use = "handle the deferred chart-data result"]
     pub fn before(&self) -> Result<&ChartData, Error> {
         Ok(self.resolve()?.1.as_ref())
     }
 
     /// Return the chart data currently staged for publication.
-    #[must_use]
+    #[must_use = "handle the deferred chart-data result"]
     pub fn after(&self) -> Result<&ChartData, Error> {
         match self.after.as_ref() {
             Some(after) => Ok(after),

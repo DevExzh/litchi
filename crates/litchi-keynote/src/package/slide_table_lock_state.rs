@@ -593,12 +593,12 @@ impl Edit<'_> {
         Ok(self.resolve()?.path())
     }
 
-    #[must_use]
+    #[must_use = "handle the deferred table-lock result"]
     pub fn state(&self) -> Result<State, Error> {
         self.after()
     }
 
-    #[must_use]
+    #[must_use = "handle the deferred table-lock result"]
     pub fn after(&self) -> Result<State, Error> {
         if let Some(after) = self.after {
             return Ok(after);
