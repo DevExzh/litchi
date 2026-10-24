@@ -4453,3 +4453,39 @@ See [0063](0063-source-pptx-modern-comments.md).
   core/ops/facade documentation row and actual CLI corpus are authorized
   only sequentially after their preceding row passes and all its owned
   processes terminate. No full gate or performance acceptance is claimed.
+
+- Coordinator isolated documentation result (2026-10-24):
+  Workspace `wsdoc` row 34 passes on clean frozen 9781, including generated
+  `litchi-iwa-protos` documentation. The isolated, offline/locked,
+  all-features run with warnings denied completes in 2,138.861 seconds with
+  no diagnostics. Target storage remains below 3.39 GB; all owned processes
+  terminate and all six locks remain unchanged. Record 0362ul36 binds the
+  actual command, tool identities and independently verified artifacts.
+  This closes the isolated workspace-documentation run, not the full gate.
+  Row 36 is now running alone; actual CLI corpus follows only if it passes.
+
+  Tooling registration merges at `3431ba566c` from reviewed `80caba940d`:
+  53 gate steps now include 31 tooling modules. The six added suites pass
+  together (68 tests); the OPC test's file-created-before-PID-written race
+  is fixed with a bounded handshake that preserves ownership and cleanup
+  assertions. Record 0362ul35 retains the failed run and corrected receipts.
+  Frozen 9781 tooling row 48 remains unrun; active documentation keeps its
+  original f5 runner. The signed-batch contract choice and final native
+  qualification remain open, and nothing is pushed.
+
+- Coordinator documentation and consumer-sweep update (2026-10-24):
+  The separate core/ops/facade documentation row 36 also passes on unchanged
+  9781: 612.126 seconds, no diagnostics, target below 1.92 GB, unchanged
+  locks and no remaining owned processes. Record 0362ul36 now binds both
+  isolated documentation results. CLI execution is briefly held for the
+  targeted validation of a newly discovered consumer repair.
+
+  The final source audit finds one compile-stale RTF fuzz consumer calling
+  removed decompression names, plus stale CLI/fuzz/DOC/PPT/XLSB examples.
+  Record 0362ul37 is assigned to migrate those consumers and register the
+  missing fuzz check; no alias will be restored. This is required engineering
+  work, not a new deferral. The audit also confirms that historical 0362j
+  changed-commit/replay measurements cannot be attributed to current 472b
+  because measured CFB/PPT paths have changed. A final run of that same
+  workload is being prepared separately from the diagnostic primary-noop
+  cold probe. Actual qualification and the signed-batch decision remain open.
