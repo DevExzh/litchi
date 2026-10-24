@@ -91,6 +91,7 @@ pub use package::{load_timeline_caches, load_timelines};
 pub(crate) use package::{
     load_timeline_caches_limited, load_timelines_limited, store_timeline_caches,
     store_timeline_caches_limited, store_timeline_caches_prepared_limited,
-    store_worksheet_timelines, store_worksheet_timelines_limited,
-    store_worksheet_timelines_prepared_limited,
+    store_timeline_caches_prepared_limited_with_budget, store_worksheet_timelines,
+    store_worksheet_timelines_limited, store_worksheet_timelines_prepared_limited,
+    store_worksheet_timelines_prepared_limited_with_budget,
 };
