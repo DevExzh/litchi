@@ -1222,6 +1222,125 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             self.assertIn("expired", event["runner_error"])
             self.assertEqual(event["post_exit_descendants"], [])
 
+    def test_runner_reaps_setsid_descendant_after_rapid_leader_exit(self) -> None:
+        """A detached helper cannot escape the generic runner's ownership."""
+
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-setsid-") as directory:
+            root = Path(directory)
+            source = self._make_escaping_fake_cargo_source(root / "source")
+            manifest, manifest_path, _permit, _lease_dir = self._overlap_fixture_with_sources(
+                root,
+                source_roots=(source.parent, source.parent),
+            )
+            manifest["build_execution"] = {"class": "exclusive"}
+            manifest["environment"] = {"ESCAPED_PID_FILE": str(root / "escaped.pid")}
+            for leg in ("before", "after"):
+                manifest["legs"][leg]["build"][0]["argv"] = [str(source), "build"]
+                manifest["legs"][leg]["allow_dirty"] = True
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            safe = runner.SafeRunner(manifest, manifest_path, "build", None)
+            safe.guard.require_quiet = lambda: None
+            safe.guard.offenders = lambda *_args, **_kwargs: []
+            with self.assertRaisesRegex(runner.RunnerError, "escaped its owned process tree"):
+                safe.build()
+
+            receipt = json.loads((root / "output" / "build-receipt.json").read_text(encoding="utf-8"))
+            self.assertEqual(receipt["status"], "failed")
+            events = [
+                json.loads(line)
+                for line in (root / "output" / "events-build.jsonl").read_text(encoding="utf-8").splitlines()
+            ]
+            self.assertEqual(len(events), 1)
+            event = events[0]
+            self.assertTrue(event["escaped_descendants"])
+            self.assertEqual(event["post_exit_descendants"], [])
+            self.assertEqual(event["owned_pid_reuse"], [])
+            escaped_pid = int((root / "escaped.pid").read_text(encoding="utf-8"))
+            self.assertIsNone(runner._read_proc(escaped_pid))
+
+    def test_owned_cleanup_does_not_signal_a_reused_pid(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-pid-reuse-") as directory:
+            root = Path(directory)
+            safe = runner.SafeRunner(
+                {
+                    "schema": runner.SCHEMA,
+                    "lane": "w5-legacy",
+                    "output_dir": str(root / "output"),
+                    "legs": {"before": {"target_dir": str(root / "target")}},
+                },
+                ROOT / "tools/native_qualification_runner.py",
+                "build",
+                None,
+            )
+            owned = {
+                991991: {
+                    "pid": 991991,
+                    "starttime": "old-start",
+                    "ppid": 1,
+                    "pgrp": 991991,
+                    "comm": "cargo",
+                    "exe": "/usr/bin/cargo",
+                    "cwd": str(ROOT),
+                    "cmdline": ["cargo", "build"],
+                }
+            }
+            snapshot = {
+                991991: {
+                    **owned[991991],
+                    "starttime": "new-start",
+                }
+            }
+            with mock.patch.object(runner, "_proc_snapshot", return_value=snapshot), mock.patch.object(
+                runner.os, "kill"
+            ) as kill:
+                safe._signal_owned_processes(owned, leader_pid=123, sig=runner.signal.SIGTERM)
+            kill.assert_not_called()
+
+    @staticmethod
+    def _make_escaping_fake_cargo_source(root: Path) -> Path:
+        """Create a fake Cargo that leaves a real setsid child behind."""
+
+        root.mkdir(parents=True, exist_ok=False)
+        (root / "Cargo.lock").write_text("# fake lock for runner tests\n", encoding="utf-8")
+        build = root / "build"
+        build.write_text(
+            "#!/bin/bash\n"
+            "set -eu\n"
+            "mkdir -p \"$CARGO_TARGET_DIR\"\n"
+            "printf '#!/bin/sh\\nexit 0\\n' > \"$CARGO_TARGET_DIR/probe\"\n"
+            "chmod +x \"$CARGO_TARGET_DIR/probe\"\n"
+            "setsid /bin/sh -c 'sleep 30' >/dev/null 2>&1 &\n"
+            "printf '%s\\n' \"$!\" > \"$ESCAPED_PID_FILE\"\n"
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        build.chmod(0o755)
+        (root / "cargo").symlink_to("/bin/bash")
+        subprocess.run(["git", "init", "--quiet", str(root)], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(
+            ["git", "-C", str(root), "add", "Cargo.lock", "build", "cargo"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Native runner test",
+                "-c",
+                "user.email=native-runner-test@example.invalid",
+                "commit",
+                "--quiet",
+                "-m",
+                "fake cargo setsid source",
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+        )
+        return root / "cargo"
+
     def test_compile_overlap_two_safe_runners_bind_real_cargo_children(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-build-overlap-integration-") as directory:
             root = Path(directory)

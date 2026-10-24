@@ -1355,6 +1355,75 @@ def _read_proc(pid: int) -> dict[str, Any] | None:
     }
 
 
+_SUBREAPER_ENABLED = False
+
+
+def _enable_child_subreaper() -> None:
+    """Make this runner the owner of orphaned descendants on Linux.
+
+    Cargo normally waits for every compiler child, but the process guard must
+    also be correct when a helper double-forks or calls ``setsid``.  A process
+    group is not an ownership boundary: such a child can leave the group and,
+    after its parent exits, be reparented to init before a post-exit scan sees
+    it.  Linux's child-subreaper facility keeps those descendants attached to
+    this runner so their recorded PID/start-time identities can be checked and
+    cleaned up.  There is no safe equivalent in the supported runner
+    environment on other platforms, so fail closed there rather than claiming
+    process-tree ownership we cannot enforce.
+    """
+
+    global _SUBREAPER_ENABLED
+    if _SUBREAPER_ENABLED:
+        return
+    if sys.platform != "linux":
+        raise RunnerError("native child lifecycle ownership requires Linux child subreaper support")
+    try:
+        import ctypes
+
+        libc = ctypes.CDLL(None, use_errno=True)
+        prctl = libc.prctl
+        prctl.argtypes = [
+            ctypes.c_int,
+            ctypes.c_ulong,
+            ctypes.c_ulong,
+            ctypes.c_ulong,
+            ctypes.c_ulong,
+        ]
+        prctl.restype = ctypes.c_int
+        # Linux include/uapi/linux/prctl.h: PR_SET_CHILD_SUBREAPER.
+        result = prctl(36, 1, 0, 0, 0)
+        if result != 0:
+            errno = ctypes.get_errno()
+            raise OSError(errno, os.strerror(errno))
+    except (AttributeError, OSError, ImportError) as error:
+        raise RunnerError(f"cannot enable Linux child subreaper: {error}") from error
+    _SUBREAPER_ENABLED = True
+
+
+def _process_record(entry: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep the identity needed to avoid signalling a reused PID."""
+
+    return {
+        "pid": int(entry["pid"]),
+        "starttime": str(entry["starttime"]),
+        "ppid": int(entry["ppid"]),
+        "pgrp": int(entry["pgrp"]),
+        "comm": str(entry.get("comm", "")),
+        "exe": str(entry.get("exe", "")),
+        "cwd": str(entry.get("cwd", "")),
+        "cmdline": [str(value) for value in entry.get("cmdline", [])],
+    }
+
+
+def _same_process_identity(entry: Mapping[str, Any], record: Mapping[str, Any]) -> bool:
+    """Compare the kernel start time, the PID-reuse guard's stable identity."""
+
+    return (
+        entry.get("pid") == record.get("pid")
+        and str(entry.get("starttime")) == str(record.get("starttime"))
+    )
+
+
 def _proc_snapshot() -> dict[int, dict[str, Any]]:
     entries: dict[int, dict[str, Any]] = {}
     try:
@@ -2596,20 +2665,196 @@ class SafeRunner:
                 process.kill()
             process.wait()
 
-    def _wait_descendants_gone(self, pid: int) -> list[int]:
+    @staticmethod
+    def _record_owned_processes(
+        snapshot: Mapping[int, Mapping[str, Any]],
+        *,
+        process_pid: int,
+        runner_pid: int,
+        preexisting: Mapping[int, str],
+        owned: dict[int, dict[str, Any]],
+        pid_reuse: list[dict[str, Any]],
+    ) -> None:
+        """Record descendants before and after a leader is reparented.
+
+        While the direct child is alive, its normal descendant closure is the
+        authoritative ownership boundary.  Once it exits, a Linux subreaper
+        receives the orphaned descendants as children of ``runner_pid``; the
+        second closure is therefore needed to retain ownership across the
+        reparenting event.  Existing runner children are excluded by their
+        PID/start-time snapshot, and a changed start time is treated as PID
+        reuse rather than a process we may signal.
+        """
+
+        candidates = set(_descendants(snapshot, process_pid))
+        for child_pid in _descendants(snapshot, runner_pid):
+            if child_pid == runner_pid:
+                continue
+            entry = snapshot.get(child_pid)
+            if entry is None:
+                continue
+            old_starttime = preexisting.get(child_pid)
+            if old_starttime is not None:
+                if old_starttime != str(entry.get("starttime")):
+                    pid_reuse.append(
+                        {
+                            "pid": child_pid,
+                            "kind": "preexisting_pid_reused",
+                            "expected_starttime": old_starttime,
+                            "observed_starttime": str(entry.get("starttime")),
+                        }
+                    )
+                continue
+            candidates.add(child_pid)
+
+        for child_pid in sorted(candidates):
+            if child_pid == runner_pid:
+                continue
+            entry = snapshot.get(child_pid)
+            if entry is None:
+                continue
+            existing = owned.get(child_pid)
+            if existing is not None:
+                if not _same_process_identity(entry, existing):
+                    pid_reuse.append(
+                        {
+                            "pid": child_pid,
+                            "kind": "owned_pid_reused",
+                            "expected_starttime": existing.get("starttime"),
+                            "observed_starttime": str(entry.get("starttime")),
+                        }
+                    )
+                continue
+            owned[child_pid] = _process_record(entry)
+
+    @staticmethod
+    def _reap_owned_processes(owned: Mapping[int, Mapping[str, Any]], *, leader_pid: int) -> None:
+        """Reap only descendants that this runner has already identified."""
+
+        for child_pid in sorted(owned):
+            if child_pid == leader_pid:
+                continue
+            try:
+                os.waitpid(child_pid, os.WNOHANG)
+            except (ChildProcessError, OSError):
+                # A descendant may have installed its own subreaper or may
+                # already have been reaped.  In either case it is not ours to
+                # wait for; liveness remains checked through /proc below.
+                continue
+
+    @staticmethod
+    def _signal_owned_processes(
+        owned: Mapping[int, Mapping[str, Any]],
+        *,
+        leader_pid: int,
+        sig: signal.Signals,
+    ) -> None:
+        """Signal exact, start-time-matched owned PIDs; never a reused PID."""
+
+        snapshot = _proc_snapshot()
+        for child_pid in sorted(owned, reverse=True):
+            if child_pid == leader_pid:
+                continue
+            entry = snapshot.get(child_pid)
+            record = owned[child_pid]
+            if entry is None or not _same_process_identity(entry, record):
+                continue
+            try:
+                os.kill(child_pid, sig)
+            except (ProcessLookupError, PermissionError):
+                continue
+
+    @staticmethod
+    def _live_owned_processes(
+        owned: Mapping[int, Mapping[str, Any]],
+        *,
+        leader_pid: int,
+        snapshot: Mapping[int, Mapping[str, Any]],
+    ) -> list[dict[str, Any]]:
+        live: list[dict[str, Any]] = []
+        for child_pid in sorted(owned):
+            if child_pid == leader_pid:
+                continue
+            entry = snapshot.get(child_pid)
+            if entry is not None and _same_process_identity(entry, owned[child_pid]):
+                live.append(dict(owned[child_pid]))
+        return live
+
+    def _cleanup_owned_descendants(
+        self,
+        *,
+        leader_pid: int,
+        runner_pid: int,
+        preexisting: Mapping[int, str],
+        owned: dict[int, dict[str, Any]],
+        pid_reuse: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Find, kill, and reap descendants that escaped the direct child.
+
+        The returned ``escaped`` list is deliberately retained even when the
+        children are successfully killed: an escaped process is a lifecycle
+        violation and must fail the event rather than being silently hidden by
+        cleanup.  ``survivors`` contains only identities still live after the
+        bounded TERM/KILL cleanup window.
+        """
+
+        snapshot = _proc_snapshot()
+        self._record_owned_processes(
+            snapshot,
+            process_pid=leader_pid,
+            runner_pid=runner_pid,
+            preexisting=preexisting,
+            owned=owned,
+            pid_reuse=pid_reuse,
+        )
+        escaped = [
+            dict(record)
+            for pid, record in sorted(owned.items())
+            if pid != leader_pid
+            and snapshot.get(pid) is not None
+            and _same_process_identity(snapshot[pid], record)
+        ]
+        if not escaped:
+            self._reap_owned_processes(owned, leader_pid=leader_pid)
+            return {"escaped": [], "survivors": [], "pid_reuse": list(pid_reuse)}
+
+        self._signal_owned_processes(owned, leader_pid=leader_pid, sig=signal.SIGTERM)
         deadline = time.monotonic() + 5.0
-        remaining: set[int] = set()
+        survivors: list[dict[str, Any]] = escaped
         while time.monotonic() < deadline:
             snapshot = _proc_snapshot()
-            remaining = {
-                child_pid
-                for child_pid, entry in snapshot.items()
-                if child_pid != pid and (child_pid in _descendants(snapshot, pid) or entry.get("pgrp") == pid)
-            }
-            if not remaining:
-                return []
-            time.sleep(0.1)
-        return sorted(remaining)
+            self._record_owned_processes(
+                snapshot,
+                process_pid=leader_pid,
+                runner_pid=runner_pid,
+                preexisting=preexisting,
+                owned=owned,
+                pid_reuse=pid_reuse,
+            )
+            self._reap_owned_processes(owned, leader_pid=leader_pid)
+            survivors = self._live_owned_processes(
+                owned,
+                leader_pid=leader_pid,
+                snapshot=snapshot,
+            )
+            if not survivors:
+                return {"escaped": escaped, "survivors": [], "pid_reuse": list(pid_reuse)}
+            time.sleep(0.05)
+
+        self._signal_owned_processes(owned, leader_pid=leader_pid, sig=signal.SIGKILL)
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            snapshot = _proc_snapshot()
+            self._reap_owned_processes(owned, leader_pid=leader_pid)
+            survivors = self._live_owned_processes(
+                owned,
+                leader_pid=leader_pid,
+                snapshot=snapshot,
+            )
+            if not survivors:
+                break
+            time.sleep(0.05)
+        return {"escaped": escaped, "survivors": survivors, "pid_reuse": list(pid_reuse)}
 
     def _stabilize_target(self, target: Path) -> int:
         previous: int | None = None
@@ -2674,6 +2919,18 @@ class SafeRunner:
         overlap_start: list[dict[str, Any]] = []
         overlap_end: list[dict[str, Any]] = []
         owned_job: dict[str, Any] | None = None
+        runner_pid = os.getpid()
+        _enable_child_subreaper()
+        preexisting_snapshot = _proc_snapshot()
+        preexisting = {
+            pid: str(entry.get("starttime"))
+            for pid in _descendants(preexisting_snapshot, runner_pid)
+            if pid != runner_pid
+            and (entry := preexisting_snapshot.get(pid)) is not None
+        }
+        owned: dict[int, dict[str, Any]] = {}
+        pid_reuse: list[dict[str, Any]] = []
+        lifecycle: dict[str, Any] = {"escaped": [], "survivors": [], "pid_reuse": []}
         if overlap is not None:
             overlap.prepare_phase(
                 phase_id=event_id,
@@ -2694,6 +2951,9 @@ class SafeRunner:
                     start_new_session=True,
                     preexec_fn=self._preexec(),
                 )
+                process_entry = _read_proc(process.pid)
+                if process_entry is not None:
+                    owned[process.pid] = _process_record(process_entry)
                 if overlap is not None:
                     try:
                         overlap.bind_child(
@@ -2728,8 +2988,26 @@ class SafeRunner:
                     while True:
                         returncode = process.poll()
                         if returncode is not None:
+                            snapshot = _proc_snapshot()
+                            self._record_owned_processes(
+                                snapshot,
+                                process_pid=process.pid,
+                                runner_pid=runner_pid,
+                                preexisting=preexisting,
+                                owned=owned,
+                                pid_reuse=pid_reuse,
+                            )
                             break
                         try:
+                            snapshot = _proc_snapshot()
+                            self._record_owned_processes(
+                                snapshot,
+                                process_pid=process.pid,
+                                runner_pid=runner_pid,
+                                preexisting=preexisting,
+                                owned=owned,
+                                pid_reuse=pid_reuse,
+                            )
                             if overlap is not None:
                                 offenders = self.guard.offenders(
                                     process.pid,
@@ -2789,8 +3067,28 @@ class SafeRunner:
                 overlap.unbind_child()
             except RunnerError as error:
                 runner_error = runner_error or f"overlap child unbinding failed at {event_id}: {error}"
+        if process is not None:
+            try:
+                lifecycle = self._cleanup_owned_descendants(
+                    leader_pid=process.pid,
+                    runner_pid=runner_pid,
+                    preexisting=preexisting,
+                    owned=owned,
+                    pid_reuse=pid_reuse,
+                )
+            except BaseException as error:
+                runner_error = runner_error or f"owned child cleanup failed at {event_id}: {error}"
+                lifecycle = {
+                    "escaped": [],
+                    "survivors": [],
+                    "pid_reuse": list(pid_reuse),
+                }
         ended_at = _now()
-        post_descendants = self._wait_descendants_gone(process.pid) if process is not None else []
+        post_descendants = [
+            int(record["pid"])
+            for record in lifecycle.get("survivors", [])
+            if isinstance(record, Mapping) and isinstance(record.get("pid"), int)
+        ]
         try:
             if overlap is not None:
                 overlap_end = overlap.peer_snapshots(_proc_snapshot())
@@ -2802,6 +3100,16 @@ class SafeRunner:
             runner_error = runner_error or str(error)
         if post_descendants:
             runner_error = runner_error or f"child descendants survived exit: {post_descendants}"
+        if lifecycle.get("escaped"):
+            runner_error = runner_error or (
+                "child escaped its owned process tree: "
+                f"{[record.get('pid') for record in lifecycle['escaped']]}"
+            )
+        if lifecycle.get("pid_reuse"):
+            runner_error = runner_error or (
+                "owned child PID was reused before cleanup: "
+                f"{lifecycle['pid_reuse']}"
+            )
         if post_offenders:
             runner_error = runner_error or "unrelated Litchi process remained after child exit"
         try:
@@ -2871,6 +3179,9 @@ class SafeRunner:
             "process_guard_violations": violation,
             "post_exit_descendants": post_descendants,
             "post_exit_offenders": post_offenders,
+            "owned_processes": [owned[pid] for pid in sorted(owned)],
+            "escaped_descendants": lifecycle.get("escaped", []),
+            "owned_pid_reuse": lifecycle.get("pid_reuse", []),
             "runner_error": runner_error,
             "execution_class": self._event_execution_class(event_kind),
         }
