@@ -108,19 +108,30 @@ impl<'a> Edit<'a> {
             return Ok(());
         }
         let mut budget = self.budget.take().ok_or(ChartDataError::InvalidSource)?;
-        let selection = select_chart_with_budget(
-            self.source,
-            self.sheet_selector.as_selector(),
-            ChartSelector::position(self.chart_position),
-            true,
-            &mut budget,
-        )
-        .map_err(map_arrangement_error)?;
-        ensure_standalone_chart(self.source, &selection, &mut budget)
+        let selected = (|| {
+            let selection = select_chart_with_budget(
+                self.source,
+                self.sheet_selector.as_selector(),
+                ChartSelector::position(self.chart_position),
+                true,
+                &mut budget,
+            )
             .map_err(map_arrangement_error)?;
-        self.selection = Some(selection);
-        self.budget = Some(budget);
-        Ok(())
+            ensure_standalone_chart(self.source, &selection, &mut budget)
+                .map_err(map_arrangement_error)?;
+            Ok(selection)
+        })();
+        match selected {
+            Ok(selection) => {
+                self.selection = Some(selection);
+                self.budget = Some(budget);
+                Ok(())
+            },
+            Err(error) => {
+                self.budget = Some(budget);
+                Err(error)
+            },
+        }
     }
 
     fn ensure_before(&mut self) -> Result<(), ChartDataError> {

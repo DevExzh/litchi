@@ -56,31 +56,50 @@ impl Edit<'_> {
             return Ok(());
         }
         let mut budget = self.budget.take().ok_or(TableMergesError::InvalidSource)?;
-        let (sheet_position, table_position) = select_semantic_positions(
-            self.source,
-            self.sheet_selector.as_selector(),
-            self.table_selector.as_selector(),
-            &mut budget,
-        )?;
-        let target = super::super::table_headers::resolve::resolve_target(
-            self.source,
-            sheet_position,
-            table_position,
-        )
-        .map_err(map_header_error)?;
-        let model = super::super::table_headers::rewrite::selected_payload(self.source, target)
+        let loaded = (|| {
+            let (sheet_position, table_position) = select_semantic_positions(
+                self.source,
+                self.sheet_selector.as_selector(),
+                self.table_selector.as_selector(),
+                &mut budget,
+            )?;
+            let target = super::super::table_headers::resolve::resolve_target(
+                self.source,
+                sheet_position,
+                table_position,
+            )
             .map_err(map_header_error)?;
-        let before = decode_model_merges(model, &mut budget)?;
-        let regions = clone_regions(&before)?;
-        self.max_regions = Some(budget.max_regions);
-        self.rows = Some(target.rows);
-        self.columns = Some(target.columns);
-        self.sheet_position = Some(sheet_position);
-        self.table_position = Some(table_position);
-        self.before = Some(before);
-        self.regions = Some(regions);
-        self.budget = Some(budget);
-        Ok(())
+            let model = super::super::table_headers::rewrite::selected_payload(self.source, target)
+                .map_err(map_header_error)?;
+            let before = decode_model_merges(model, &mut budget)?;
+            let regions = clone_regions(&before)?;
+            Ok((
+                sheet_position,
+                table_position,
+                target.rows,
+                target.columns,
+                before,
+                regions,
+                budget.max_regions,
+            ))
+        })();
+        match loaded {
+            Ok((sheet_position, table_position, rows, columns, before, regions, max_regions)) => {
+                self.max_regions = Some(max_regions);
+                self.rows = Some(rows);
+                self.columns = Some(columns);
+                self.sheet_position = Some(sheet_position);
+                self.table_position = Some(table_position);
+                self.before = Some(before);
+                self.regions = Some(regions);
+                self.budget = Some(budget);
+                Ok(())
+            },
+            Err(error) => {
+                self.budget = Some(budget);
+                Err(error)
+            },
+        }
     }
 
     /// Return the currently staged merged regions.

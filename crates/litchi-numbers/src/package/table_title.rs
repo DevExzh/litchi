@@ -254,13 +254,22 @@ impl Edit<'_> {
             return Ok(());
         }
         self.ensure_selected()?;
+        let sheet_position = self.sheet_position.ok_or_else(invalid_source)?;
+        let table_position = self.table_position.ok_or_else(invalid_source)?;
         let mut budget = self.budget.take().ok_or_else(invalid_source)?;
         let target = resolve_title_at_positions_with_budget(
             self.source,
-            self.sheet_position.ok_or_else(invalid_source)?,
-            self.table_position.ok_or_else(invalid_source)?,
+            sheet_position,
+            table_position,
             &mut budget,
-        )?;
+        );
+        let target = match target {
+            Ok(target) => target,
+            Err(error) => {
+                self.budget = Some(budget);
+                return Err(error);
+            },
+        };
         if self.settings.is_none() {
             self.settings = Some(target.settings);
         }
@@ -1804,8 +1813,8 @@ mod tests {
     use prost::Message as _;
 
     use super::{
-        Error, Package, TransactionBudget, decode_title_with_budget, reopen_cost,
-        resolve_title_at_positions_with_budget, validate_changed_source,
+        Error, LimitKind, Package, Refusal, TransactionBudget, decode_title_with_budget,
+        reopen_cost, resolve_title_at_positions_with_budget, validate_changed_source,
     };
 
     type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -2002,6 +2011,29 @@ mod tests {
             })
         ));
         assert_eq!(attempted_budget.test_usage(), (0, 0, 0, 0));
+        Ok(())
+    }
+
+    #[test]
+    fn deferred_selector_budget_is_cumulative_after_a_typed_refusal() -> TestResult {
+        let package = Package::new();
+        let mut edit = package.edit_table_title("missing", 0usize)?;
+        edit.budget
+            .as_mut()
+            .expect("a new title edit retains its transaction budget")
+            .remaining_transaction_work = 15;
+
+        assert!(matches!(
+            edit.path(),
+            Err(Error::Refused(Refusal::SheetNotFound))
+        ));
+        assert!(matches!(
+            edit.path(),
+            Err(Error::Limit {
+                kind: LimitKind::TransactionWork,
+                ..
+            })
+        ));
         Ok(())
     }
 }

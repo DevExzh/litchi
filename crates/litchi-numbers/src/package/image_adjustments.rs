@@ -377,7 +377,14 @@ impl<'a> Edit<'a> {
             ImageSelector::position(self.image_position),
             true,
             &mut budget,
-        )?;
+        );
+        let selection = match selection {
+            Ok(selection) => selection,
+            Err(error) => {
+                self.budget = Some(budget);
+                return Err(error);
+            },
+        };
         if self.after.is_none() {
             self.after = Some(selection.before);
         }
