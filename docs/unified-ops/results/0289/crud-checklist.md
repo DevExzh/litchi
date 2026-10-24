@@ -30,7 +30,7 @@ Evidence: `crud-adr0008.tsv`.
 | format | elements | claimed cells | ok | FAIL | unreached | gap | n/a | move/swap ok | move/swap refused | atomic failure | patch inverse | composition |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | docx | 45 | 363 | 363 | 0 | 0 | 78 | 66 | 8 | 44 | ok | ok | ok |
-| xlsx | 26 | 206 | 206 | 0 | 0 | 65 | 25 | 2 | 20 | ok | ok | ok |
+| xlsx | 26 | 206 | 206 | 0 | 0 | 65 | 25 | 2 | 22 | ok | ok | ok |
 | pptx | 37 | 308 | 308 | 0 | 0 | 65 | 44 | 2 | 42 | ok | ok | ok |
 | xlsb | 26 | 180 | 180 | 0 | 0 | 78 | 40 | 2 | 18 | ok | ok | ok |
 | doc | 27 | 188 | 188 | 0 | 0 | 0 | 109 | 2 | 30 | ok | ok | ok |
@@ -142,7 +142,7 @@ Evidence: `crud-adr0008.tsv`.
 | ole | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap | gap (works) | gap (works) |
 | rowbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 | colbreak | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
-| run | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
+| run | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 
 ## pptx
 
