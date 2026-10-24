@@ -4042,3 +4042,19 @@ See [0063](0063-source-pptx-modern-comments.md).
   excluded from final baseline qualification. The released build slot goes to
   actual OPC/DOCX report-rename compilation and glossary checks. Full gate,
   actual corpus replay and paired performance acceptance remain active.
+
+- Coordinator correctness handoff (2026-10-24):
+  Independent review accepts the exact c796 DrawingML release build and all
+  ten current native correctness reports. All artifact identities and native
+  semantic checks pass, as do thirteen protocol tests. Record 0362dvii merges
+  at `5affb487cf`; its four true historical baseline preparations validate all
+  ten profiles with the accepted 52ed/4100/eac862 locks. Historical builds and
+  paired performance runs remain unexecuted, and generated-lock diagnostics
+  are excluded.
+
+  The OLE paired runner refuses its build phase before Cargo because unrelated
+  builders are active. The failed receipt is retained; fresh retry roots are
+  ready for a globally exclusive build window. An available slot alone does
+  not satisfy that runner's guard. The OPC/DOCX rename is undergoing actual
+  validation, the full gate continues, and PPT builds remain active. Nothing
+  is pushed.
