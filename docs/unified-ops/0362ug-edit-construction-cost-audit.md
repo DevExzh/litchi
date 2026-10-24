@@ -328,3 +328,14 @@ combined CLI/ops/facade/Python consumers. This is a single selected check,
 not the final 53-step gate. Its build slot was released by XLSB. The other
 three slots now cover PPT, XLSX and DOCX validation. Final source freeze,
 all-68 inventory, full gate, corpus and native qualification remain required.
+
+
+A subsequent check of the actual XLS metadata getter exposed an omitted
+constructor path: `metadata::Edit::new` still constructs a property-set editor,
+parses `SummaryProperties` and clones the initial values before returning.
+The earlier XLS receipt establishes its tested source behavior, but does not
+close this entry-cost gap. Required follow-up 0362ugea is assigned in a fresh
+leaf for metadata/property-set lazy state and every consumer; a bounded XLS
+constructor review will identify any related omissions. This is engineering
+work before source freeze, not an accepted exception. The current XLS getter
+is infallible; its eventual migration must follow the actual corrected API.

@@ -803,3 +803,34 @@ The adjacent 624-byte manifest has SHA-256
 the 1,419-byte restore helper has SHA-256
 `a1f109fcc2acd13afa949ac1e682cfd2a89b30337956f185d0c52d4ce980469b`.
 Recreate the worktree from the retained branch, then run that `restore.py`.
+
+
+## Nineteenth cleanup, 2026-10-24
+
+After iWork integration at `9ea602e0e1` and XLSB integration at `0d35a83a31`,
+fresh ancestry, cleanliness and process audits permitted removal of three
+completed iWork leaves without force. Their branches remain:
+
+| Leaf | Retained tip | Apparent checkout bytes |
+| --- | --- | ---: |
+| Keynote | `c7e49c5b35b4d9483bb29ff73a40a791edef5416` | 411,791,360 |
+| Numbers | `ef0954e86ea25957e92529925907a4fb14ffdc98` | 412,499,968 |
+| Pages | `4441c86bbeb6ab11202ba2156cf73d18a8a44323` | 412,762,112 |
+
+Total apparent checkout size was 1,237,053,440 bytes. Four ignored lockfiles
+(total 455,063 bytes) were hash-quarantined with restore instructions. The
+coordinator independently verified all four file identities, retained refs,
+ancestry, removed paths and protected external-root existence. External
+Keynote, Numbers and Pages targets/logs/evidence remain untouched. XLSB was
+left intact because foreign searches held source descendants; its lockfile
+was not moved. No target or measurement artifact was removed.
+
+Receipt:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/nineteenth-wave/receipt.md`
+(3,049 bytes, SHA-256
+`a707b90ee0efd1df5862eafec108ebdea143cd5a4c8358a969a9f28c669b2c3c`).
+The adjacent 2,435-byte manifest has SHA-256
+`b0ae741e22054766a4438229347803b367d8e9c4172c41f7eba6e86513fc0fd0`;
+the 1,637-byte restore helper has SHA-256
+`b835c5ffeadcb9745344b3a608fd54729a305d7804c489c0d2cb16709b46deb7`.
+Recreate each worktree from its retained branch, then run that `restore.py`.
