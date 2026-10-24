@@ -25,9 +25,13 @@ without encryption.
 
 All commands used Rust 1.95.0, `--offline`, one Cargo build job, and the
 external target
-`/home/zhuhe/code/litchi-worktrees/.coord/docx-encrypted-target` (10,585,881,195
-bytes after the checks, below the 20-GB lane cap).  This worktree has no
-tracked `Cargo.lock`, so these checks omit `--locked`.
+`/home/zhuhe/code/litchi-worktrees/.coord/docx-encrypted-target`.
+The initial size transcription, 10,585,881,195 bytes, was incorrect;
+[0362uk1](0362uk1-docx-encrypted-locked-receipt.md) records the measured
+1,058,588,195 bytes. These initial diagnostic checks omitted `--locked`.
+The ignored lock remains a required pinned input; 0362uk1 supersedes that
+omission with locked reruns and verified lock, configuration and command
+identities.
 
 * `cargo test -p litchi-ops --features 'docx encryption' --test docx_transactions unlocked_encrypted_input_refuses_without_dropping_publication_protection -- --nocapture`: 1 passed.
 * `cargo test -p litchi-ops --features 'docx encryption' --test docx_transactions -- --nocapture`: 22 passed.
