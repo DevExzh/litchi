@@ -1466,7 +1466,10 @@ fn source_backed_numeric_owned_plan_preserves_direct_atomic_and_sink_contracts()
     let mut direct = Vec::new();
     let report = commit.write_to(&mut direct).unwrap();
     assert_eq!(direct, expected);
-    assert_eq!(report.output_bytes(), u64::try_from(expected.len()).unwrap());
+    assert_eq!(
+        report.output_bytes(),
+        u64::try_from(expected.len()).unwrap()
+    );
     assert_eq!(
         report.source_fingerprint(),
         commit.diagnostics().source_fingerprint()

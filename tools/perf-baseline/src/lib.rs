@@ -30618,7 +30618,7 @@ fn run_xls_visibility_edit_save(
     verify_xls_visibility_output(corpus, &expected, update_count)?;
     verify_xls_visibility_prepared(&expected_source, &expected_prepared, &expected)?;
     if let Some(report) = expected_report
-        && (report.bytes() != u64::try_from(expected.len())? || report.changed_spans() == 0)
+        && (report.output_bytes() != u64::try_from(expected.len())? || report.changed_spans() == 0)
     {
         return Err("XLS visibility expected overlay report is incomplete".into());
     }
@@ -30678,7 +30678,7 @@ fn run_xls_visibility_edit_save(
             }
             let report = report.ok_or("XLS visibility source-backed publication has no report")?;
             if evidence.changed_spans != Some(report.changed_spans())
-                || report.bytes() != sink.summary().accepted_bytes
+                || report.output_bytes() != sink.summary().accepted_bytes
                 || evidence.source_fingerprint
                     != Some(fingerprint_hex(report.source_fingerprint().as_bytes()))
                 || evidence.target_fingerprint
@@ -31228,7 +31228,7 @@ fn run_xls_comments_edit_save(
     verify_xls_comments_output(corpus, &expected, update_count)?;
     verify_xls_comments_prepared(&expected_source, &expected_prepared, &expected)?;
     if let Some(report) = expected_report
-        && (report.bytes() != u64::try_from(expected.len())? || report.changed_spans() == 0)
+        && (report.output_bytes() != u64::try_from(expected.len())? || report.changed_spans() == 0)
     {
         return Err("XLS comment expected overlay report is incomplete".into());
     }
@@ -31293,7 +31293,7 @@ fn run_xls_comments_edit_save(
             }
             let report = report.ok_or("XLS comment source-backed publication has no report")?;
             if evidence.changed_spans != Some(report.changed_spans())
-                || report.bytes() != sink.summary().accepted_bytes
+                || report.output_bytes() != sink.summary().accepted_bytes
                 || evidence.source_fingerprint
                     != Some(fingerprint_hex(report.source_fingerprint().as_bytes()))
                 || evidence.target_fingerprint
