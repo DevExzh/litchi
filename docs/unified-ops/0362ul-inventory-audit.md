@@ -71,6 +71,6 @@ The prior 60-test log remains retained at its original path and identity.
 
 Source commit `55c562e9cf4bc900c62787697eea974eef790201` contains the owner
 coverage implementation and the initial validator/tests. Follow-up commit
-`d2494012fc` adds malformed-row hardening; the current fail-closed owner and
-UTF-8 fixes are recorded in the next checked commit. No rustdoc capture, Cargo
-build, API-debt closure, or final acceptance claim is made here.
+`d2494012fc` adds malformed-row hardening; commit `45a9c4d747` adds the
+fail-closed owner and UTF-8 fixes. No rustdoc capture, Cargo build, API-debt
+closure, or final acceptance claim is made here.
