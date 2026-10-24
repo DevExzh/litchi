@@ -1419,3 +1419,44 @@ Evidence remains outside Git under
 The restore helper takes an optional leaf name after its worktree has been
 recreated. External targets, receipts, frozen source, active repair leaves
 and the trunk's untracked constructor probe were preserved.
+
+## Thirty-eighth cleanup: five reviewed API repair leaves
+
+At staging `2b837312365d3b8d2d9e16d6f02e00822e734712`, five clean,
+merged leaves were removed non-forced. Their branch refs remain at the
+reviewed tips:
+
+| Removed worktree | Retained branch tip | Retained files | Bytes |
+| --- | --- | ---: | ---: |
+| `uo2-sign-limits` | `4e2d49dd4339204c169c63cd44251dcdf58f49f5` | 4112 | 2945482862 |
+| `uo2-exhaustive-errors` | `c4740038e6d15c60c2d457135662c6bee170bd12` | 1 | 139592 |
+| `uo2-api-result-contract-repair` | `435e1547bd8fef14996e938f7e926fb69f63c56a` | 6 | 231998 |
+| `uo2-inventory-semantic-values` | `817134864abc3d1db0f488357abc0cc77594aa83` | 2 | 35724 |
+| `uo2-spreadsheet-chart-builder` | `341164e0bf38f5d5d90a8ad2dc46ea62a9211ba2` | 6 | 327708 |
+
+All 4,127 ignored payloads (2,946,217,884 bytes) remain in quarantine,
+including the signature leaf's build target. This removes redundant source
+worktrees; it does not claim those retained bytes as reclaimed disk space.
+The coordinator independently verifies every payload's size, mode and
+SHA-256, branch tips, ancestry at removal, and the absence of the old paths.
+The cleanup worker exercises restoration in five temporary sparse worktrees
+and removes those copies non-forced. An obsolete audit process group was
+identified and stopped by its owner before removal; cleanup sends no signals.
+
+Evidence remains outside Git under
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave38/`:
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `manifest.json` | 1870340 | `ef17f5ad6dfca16ca16855873638c08f3604577936279cb01d73681e25544ea8` |
+| `receipt.json` | 59382 | `f544befb1715094ad1776e809bcb12a7b0ae4027b83c0032256a83d25ec53adb` |
+| `prepare_cleanup.py` | 6268 | `bd6e312c39d96516b12f4b8ed82fc5c1e16334518b24ab8ea0168c0f01ef6013` |
+| `restore.py` | 4828 | `1b1c91898119bd4b05e39cf1e7c0356d2f430d9398f02f21066bf302a3cc7a31` |
+
+The manifest exceeds 1 MiB and is deliberately external. Recreate a selected
+worktree at its retained branch, then run `python3 restore.py <leaf>` from
+this evidence directory to restore its ignored payloads. The retained
+`prepare_cleanup.py` records how to regenerate the manifest from restored
+leaves; a new cleanup requires a fresh holder and identity audit. Active
+CFB, DrawingML, ZIP and legacy raw leaves, external targets, frozen source
+and the trunk's constructor probe are preserved.

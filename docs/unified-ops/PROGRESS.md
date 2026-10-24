@@ -3406,6 +3406,8 @@ See [0063](0063-source-pptx-modern-comments.md).
   deferred. Nothing is pushed.
 
 
+
+
 - Coordinator checkpoint (2026-10-24, acceptance repairs and source-bound evidence):
   The f6fe full gate passed 25 steps before its operations tests exposed the
   XLS duplicate source check, stale fidelity/CRUD reports and encrypted DOCX
@@ -3639,3 +3641,28 @@ See [0063](0063-source-pptx-modern-comments.md).
   fresh all-68 inventory/dispositions, full 53-step gate, real OfficeCLI corpus
   replay and native performance qualification. Only redaction audit 22 is
   deferred. Nothing is pushed.
+
+- Coordinator checkpoint (2026-10-24, chart/raw/ZIP composition):
+  Reviewed chart builders merge at `1f2d0509b5`, bounded legacy raw APIs at
+  `db433b2474`, and canonical ZIP limits at `0dcc767c68`. All consumers move
+  with their API changes. Review returns close typed-error/redaction gaps,
+  XLS revision-log allocation before admission, overlooked lazy-cache aliases
+  and ODF retained-budget propagation before merge. Record 0362ul6 separates
+  each leaf's validation from the still-pending final assembled gate.
+
+  The root dependency pin is now 4100b1fbb272: the sole graph change from
+  52ed is the required `litchi-ops -> litchi-vba` edge. All 518 registry
+  identities remain unchanged; both inputs are preserved. Historical 49c
+  evidence retains its original source and lock. The chart slice reports
+  2,675 passing tests, ZIP reports 631 with one existing ignore, and the
+  legacy repair's focused native/facade regressions pass. Seventy-seven
+  composed tooling tests and the corrected workspace formatting check pass
+  before the later raw/ZIP merges; neither substitutes for final acceptance.
+
+  Cleanup thirty-eight removes five merged leaf worktrees non-forced and
+  retains all 4,127 ignored files (2,946,217,884 bytes), branch refs and
+  restoration evidence. Payload hashes, modes and ancestry are independently
+  verified. The quarantined build target is retained, not claimed as freed
+  disk space. CFB and DrawingML engineering remain active. The next source
+  freeze still requires fresh inventory, the full gate, real corpus replay
+  and native qualification. Only audit 22 is deferred. Nothing is pushed.
