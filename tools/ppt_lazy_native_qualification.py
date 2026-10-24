@@ -557,11 +557,15 @@ def _overlap(first: Path, second: Path) -> bool:
     return _under(first, second) or _under(second, first)
 
 
-def _git(root: Path, *args: str) -> str:
+def _git(root: Path, *args: str, no_optional_locks: bool = False) -> str:
     import subprocess
 
+    command = ["git", "-C", str(root)]
+    if no_optional_locks:
+        command.append("--no-optional-locks")
+    command.extend(args)
     result = subprocess.run(
-        ["git", "-C", str(root), *args],
+        command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -631,7 +635,13 @@ def _check_baseline_overlay_shape(root: Path, label: str, adapter: Mapping[str, 
     sparse = _git(root, "config", "--get", "core.sparseCheckout")
     if sparse.lower() not in {"true", "1", "yes", "on"}:
         raise RunFailure(f"{label}.root must use the reviewed sparse baseline checkout")
-    status = _git(root, "status", "--porcelain", "--untracked-files=all")
+    status = _git(
+        root,
+        "status",
+        "--porcelain",
+        "--untracked-files=all",
+        no_optional_locks=True,
+    )
     if status != adapter["status"]:
         raise RunFailure(f"{label}.root changed outside the reviewed overlay closure")
     for relative in _baseline_overlay_paths(adapter):
@@ -1483,7 +1493,13 @@ def _recheck(
         status = endpoint["overlay_shape"]["status"]
     else:
         _check_worktree_shape(root, endpoint["name"])
-        status = _git(root, "status", "--porcelain", "--untracked-files=all")
+        status = _git(
+            root,
+            "status",
+            "--porcelain",
+            "--untracked-files=all",
+            no_optional_locks=True,
+        )
     head = _git(root, "rev-parse", "HEAD")
     tree = _git(root, "rev-parse", "HEAD^{tree}")
     if (status and endpoint.get("overlay_adapter") is None) or head != endpoint["head"] or tree != endpoint["tree"]:

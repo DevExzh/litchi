@@ -74,6 +74,12 @@ The command above completed with `status=structural_pass`; its output packet
 is the adapter artifact in the table.  This source-only pass rehashed the
 6,634,147,840-byte candidate archive and checked the frozen runner, preparation
 receipt, corrected preflight receipt, build logs, locks, and binary identities.
+The sparse baseline has roughly 450k index entries: an unrestricted porcelain
+status took 15.65 seconds in the review environment and exceeded the earlier
+10-second observation budget.  The runner and adapter now use Git's
+read-only `--no-optional-locks` mode for status reads; it produced byte-for-byte
+the same five-line status in 0.21 seconds.  This bounds the source command
+without weakening the exact status, HEAD/tree, or overlay-content fences.
 
 The supplemental cold first-commit route is documented separately in
 `0362ugja-ppt-lazy-cold-first-commit.md`.  It uses CPU 29, `warmups=0`, and
@@ -92,7 +98,7 @@ packet at
 | `ppt-lazy-edit-472b-repaired.json` | 9829 | `8cdcc3644bf072664d37651923245df0ff1c5425a3f73e695db3a3b77ec5dc15` |
 | `ppt-lazy-build-input-projection-472b-repaired.json` | 9724 | `762ba94ec10b83cb574d9d2b01a1992316a3a1592b31d42b8f6ca89d152250f6` |
 | `ppt-lazy-build-receipt-472b-repaired.json` | 9976 | `bc44f06bf77959edf0a67a43ea0be15701d547dc5b490395a59601ab27641d45` |
-| `ppt-lazy-build-adapter-472b-repaired-public-v2.json` | 3885 | `aa69930eba70750fb6436fed47ec4c6bd4b98bd4c5ab0702c3f5673aaefb1bfe` |
+| `ppt-lazy-build-adapter-472b-repaired-public-v3.json` | 3885 | `e8d5016528e58c2ee4e8e4c63c39c44fc88faa500ed81176c9e25c4d90b387b7` |
 
 The repaired manifest binds normal and allocator targets to their actual
 binary parents (`baseline-082-normal-target`, `baseline-082-allocator-target`,
@@ -105,8 +111,8 @@ directories/worktree state, and then validates the build receipt.  The adapter
 uses that public `validate_inputs` lifecycle; it does not construct endpoint
 objects or invoke frozen-runner internals.  It also rechecks the projection
 identity at every later endpoint lifecycle boundary.  The public runner identity is
-85764 bytes, SHA
-`56be0399ba88ba01bbec6ea0f42ef46823515d6eaeba735d4bab6e282e39752a`; the
+86075 bytes, SHA
+`88f10be52bf02a8d5210a831d38af4358738ea35aea956341d7d4e8af1342977`; the
 historical candidate runner remains independently pinned at 73596 bytes, SHA
 `19d80d7f6e9450b60862929c4d864c0caae213aaa9e0682fca1c5fcc67d28c4f`.
 
@@ -114,10 +120,10 @@ The repaired adapter completed `status=structural_pass` after rehashing the
 source archive and all endpoint/overlay identities; no Cargo, native probe,
 calibration, allocator measurement, or ABBA run was performed.  The earlier
 `ppt-lazy-build-adapter-472b-repaired.json` is retained as the pre-allowlist
-receipt, and `ppt-lazy-build-adapter-472b-repaired-public.json` is retained as
-the first public-lifecycle receipt.  The `-public-v2` artifact is the final
-receipt bound to the public runner, exact four-path probe allowlist, and
-projection rechecks at use.
+receipt, and the earlier `-public` and `-public-v2` artifacts are retained as
+intermediate public-lifecycle receipts.  The `-public-v3` artifact is the
+final receipt bound to the public runner, exact four-path probe allowlist,
+projection rechecks at use, and bounded read-only Git status.
 
 Its exact source-only invocation was:
 
@@ -127,5 +133,5 @@ python3 tools/ppt_lazy_build_receipt_adapter.py \
   --projection /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-build-input-projection-472b-repaired.json \
   --preflight-receipt /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/qualification-receipt-472b670547-corrected.json \
   --logs-root /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-compile-20261024/logs \
-  --output /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-build-adapter-472b-repaired-public-v2.json
+  --output /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-build-adapter-472b-repaired-public-v3.json
 ```

@@ -26,7 +26,10 @@ The aggregate contains only the probe-reported `elapsed_ns` operation values:
 `operation_mean_ns`.  Process setup/teardown wall time is not substituted, and
 no median or calibration estimate is used.  The pair validator rejects missing
 roles, reordered ABBA positions, non-one-operation samples, and aggregate
-values that are not the exact sum/count of the operation observations.
+values that are not the exact sum/count of the operation observations.  Each
+sample also retains the public runner's child-event provenance; the final
+validator checks its route label, arguments, binary digest shape, guard,
+target, and child-event fields.
 
 The source-only contract tests are
 `tools/test_ppt_lazy_cold_first_commit.py`.  The CLI can validate and emit a
@@ -36,7 +39,7 @@ plan without native execution:
 python3 tools/ppt_lazy_cold_first_commit.py \
   --manifest /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-edit-472b-repaired.json \
   --projection /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/ppt-lazy-build-input-projection-472b-repaired.json \
-  --out-dir /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/cold-first-plan-final-20261024
+  --out-dir /home/zhuhe/code/litchi-worktrees/.coord/ppt-lazy-native-final-472b-repaired-20261024/cold-first-plan-v3-20261024
 ```
 
 The source-only plan completed with `execution=not_run`; its external

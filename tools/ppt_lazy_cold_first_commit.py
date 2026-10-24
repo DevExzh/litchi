@@ -56,10 +56,11 @@ ARGS = (
 )
 ABBA_ORDER = ("a1", "b1", "b2", "a2")
 ROLE_ENDPOINT = {"a1": "baseline", "a2": "baseline", "b1": "candidate", "b2": "candidate"}
+PAIR_EVENT_KEYS = {"label", "endpoint", "binary", "args", "guard", "target", "event"}
 DEFAULT_ROUNDS = 2
 MAX_ROUNDS = 2
-PUBLIC_RUNNER_BYTES = 85_764
-PUBLIC_RUNNER_SHA256 = "56be0399ba88ba01bbec6ea0f42ef46823515d6eaeba735d4bab6e282e39752a"
+PUBLIC_RUNNER_BYTES = 86_075
+PUBLIC_RUNNER_SHA256 = "88f10be52bf02a8d5210a831d38af4358738ea35aea956341d7d4e8af1342977"
 HEX64 = set("0123456789abcdef")
 class ColdRouteError(ValueError):
     """The fixed cold-route contract was not satisfied."""
@@ -240,6 +241,36 @@ def _aggregate(samples: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     return {"operation_total_ns": total, "operation_count": count, "operation_mean_ns": total // count}
 
 
+def _validate_event_record(row: Mapping[str, Any], event: Any) -> None:
+    if not isinstance(event, dict) or set(event) != PAIR_EVENT_KEYS:
+        raise ColdRouteError("cold pair event provenance fields differ")
+    expected_label = f"cold-{row['kind']}-round-{row['round']}-{row['role']}"
+    if event.get("label") != expected_label or event.get("endpoint") != row["endpoint"]:
+        raise ColdRouteError("cold pair event route identity differs")
+    if event.get("args") != list(ARGS):
+        raise ColdRouteError("cold pair event arguments differ from the fixed route")
+    binary = event.get("binary")
+    if not isinstance(binary, dict) or set(binary) != {"path", "bytes", "sha256"}:
+        raise ColdRouteError("cold pair event binary identity is malformed")
+    if not isinstance(binary["path"], str) or type(binary["bytes"]) is not int or binary["bytes"] <= 0:
+        raise ColdRouteError("cold pair event binary identity is invalid")
+    if not isinstance(binary["sha256"], str) or len(binary["sha256"]) != 64 or set(binary["sha256"]) - HEX64:
+        raise ColdRouteError("cold pair event binary digest is invalid")
+    guard = event.get("guard")
+    if not isinstance(guard, dict) or set(guard) != {
+        "before", "live", "after", "memory_limit_bytes", "max_output_bytes", "max_load"
+    }:
+        raise ColdRouteError("cold pair event guard is malformed")
+    target = event.get("target")
+    if not isinstance(target, dict) or set(target) != {"path", "bytes_before", "bytes_after", "hard_limit_bytes"}:
+        raise ColdRouteError("cold pair event target accounting is malformed")
+    child_event = event.get("event")
+    if not isinstance(child_event, dict) or set(child_event) != {
+        "label", "command", "cwd", "returncode", "wall_ns", "target", "stdout", "stderr", "monitor"
+    }:
+        raise ColdRouteError("cold pair child event is malformed")
+
+
 def validate_pair_report(value: Mapping[str, Any], *, rounds: int) -> dict[str, Any]:
     """Validate the fixed ABBA aggregate without setup time or a median."""
 
@@ -272,7 +303,8 @@ def validate_pair_report(value: Mapping[str, Any], *, rounds: int) -> dict[str, 
     grouped: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
     for index, row_value in enumerate(rows):
         row = row_value if isinstance(row_value, dict) else None
-        if row is None or set(row) != {"round", "role", "endpoint", "kind", "sample"}:
+        row_keys = {"round", "role", "endpoint", "kind", "sample", "event"}
+        if row is None or set(row) != row_keys:
             raise ColdRouteError(f"cold pair sample {index} fields differ")
         round_index = row["round"]
         role = row["role"]
@@ -287,6 +319,7 @@ def validate_pair_report(value: Mapping[str, Any], *, rounds: int) -> dict[str, 
         sample = row["sample"]
         if not isinstance(sample, dict) or set(sample) != {"elapsed_ns", "iterations", "allocation"}:
             raise ColdRouteError("cold pair sample must be the operation timing observation")
+        _validate_event_record(row, row["event"])
         grouped.setdefault((endpoint, kind), []).append(sample)
     aggregate = value.get("aggregate")
     if not isinstance(aggregate, dict) or set(aggregate) != {"baseline", "candidate"}:
@@ -388,6 +421,21 @@ def run_pair(
                     target,
                     ARGS,
                 )
+                if not isinstance(event, dict) or "event" not in event:
+                    raise ColdRouteError("cold child did not return event provenance")
+                try:
+                    runner._validate_child_event(
+                        event["event"],
+                        endpoint=endpoint,
+                        out_dir=out_dir,
+                        label=f"cold-{kind}-round-{round_index}-{role}",
+                        binary=binary,
+                        target_dir=target,
+                        args=ARGS,
+                        protocol=protocol,
+                    )
+                except RuntimeError as error:
+                    raise ColdRouteError(f"cold child event provenance failed: {error}") from error
                 checked = validate_report(report, FIXTURE, allocator=kind == "allocator")
                 result["samples"].append({
                     "round": round_index,

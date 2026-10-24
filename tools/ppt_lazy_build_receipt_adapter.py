@@ -31,8 +31,8 @@ FROZEN_RUNNER_BYTES = 73_596
 FROZEN_RUNNER_SHA256 = "19d80d7f6e9450b60862929c4d864c0caae213aaa9e0682fca1c5fcc67d28c4f"
 # Updated after the public lifecycle integration is committed.  Keeping this
 # identity fixed prevents an adapter from silently loading a different runner.
-PUBLIC_RUNNER_BYTES = 85_764
-PUBLIC_RUNNER_SHA256 = "56be0399ba88ba01bbec6ea0f42ef46823515d6eaeba735d4bab6e282e39752a"
+PUBLIC_RUNNER_BYTES = 86_075
+PUBLIC_RUNNER_SHA256 = "88f10be52bf02a8d5210a831d38af4358738ea35aea956341d7d4e8af1342977"
 PREFLIGHT_BYTES = 7_646
 PREFLIGHT_SHA256 = "fbe59be89acb3a588b659c217f05ddf3c6ac49cdbeee2dce03c821e469714db8"
 NORMAL_LOG = (39_797, "ca7297042ecfc6cd212126ba8fe92eff78cd023cd4d4f5d658ebb0cc72fdd223")
@@ -113,7 +113,7 @@ def projection_value(manifest: Mapping[str, Any]) -> dict[str, Any]:
 
 def _git(root: Path, *args: str) -> str:
     result = subprocess.run(
-        ["git", "-C", str(root), *args],
+        ["git", "-C", str(root), "--no-optional-locks", *args],
         check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
