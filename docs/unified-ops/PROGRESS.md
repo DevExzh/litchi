@@ -4021,3 +4021,24 @@ See [0063](0063-source-pptx-modern-comments.md).
   build slots. The iWork allocator protocol and DOC body-toggle fidelity
   preparation have separate pending reviews. No previous binary or result is
   relabeled as current evidence.
+
+- Coordinator native-protocol update (2026-10-24):
+  The iWork allocation protocol now measures all fifteen constructor and four
+  owner routes using separate instrumented binaries, operation-scoped counters,
+  typed metric validation and guarded fixed-work ABBA collection. Independent
+  review and 23 Python tests pass; the protocol merges at `f729439957` with
+  native Rust compilation and execution still required. Record 0361fdc binds
+  the source and exact commands.
+
+  DOC body-toggle preparation merges at `27c7ffe0b5` after independent review.
+  Record 0359qf binds the exact two-file baseline reversal, current probe and
+  CHPX fidelity checks. Its candidate and baseline test commands are corrected
+  to separate filters and the actual leg-specific names. Output dumping is
+  opt-in and outside the measured interval. No native run is claimed.
+
+  The ordinary composed c796 DrawingML release build now passes, followed by
+  all six raw and four owner native correctness routes. The receipt is
+  independently under review; generated-lock historical diagnostics remain
+  excluded from final baseline qualification. The released build slot goes to
+  actual OPC/DOCX report-rename compilation and glossary checks. Full gate,
+  actual corpus replay and paired performance acceptance remain active.
