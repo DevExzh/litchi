@@ -125,7 +125,7 @@ impl crate::Package {
         let target = crate::record::Source::new(self, "edit_page_breaks")?;
         Ok(Edit {
             target,
-            selector: owned_selector(selector.into()),
+            selector: owned_selector(selector.into())?,
             before: None,
             staged: None,
             max_retained_bytes: options.max_retained_bytes_value(),
@@ -371,11 +371,12 @@ impl Edit {
     }
 }
 
-fn owned_selector(selector: Selector<'_>) -> Selector<'static> {
+fn owned_selector(selector: Selector<'_>) -> Result<Selector<'static>> {
     match selector {
-        Selector::Name(name) => Selector::Name(Cow::Owned(name.into_owned())),
-        Selector::Position(position) => Selector::Position(position),
+        Selector::Name(name) => Ok(Selector::Name(Cow::Owned(name.into_owned()))),
+        Selector::Position(position) => Ok(Selector::Position(position)),
         Selector::Id(id) => match id {},
+        _ => Err(Error::UnsupportedSelector),
     }
 }
 

@@ -405,7 +405,7 @@ impl Edit {
     ///
     /// Returns [`Error::Signed`], [`Error::PatchConflict`] and the
     /// publication's validation errors.
-    pub fn commit(mut self) -> Result<Commit> {
+    pub fn commit(self) -> Result<Commit> {
         self.publish().map(|(commit, _)| commit)
     }
 

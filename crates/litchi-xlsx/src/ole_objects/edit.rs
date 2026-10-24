@@ -192,7 +192,7 @@ impl Edit {
     /// Returns [`crate::Error::PatchConflict`] when the source changed,
     /// [`crate::Error::Signed`] for a changed edit of a signed workbook, and
     /// the publication's validation errors.
-    pub fn commit(mut self) -> Result<Commit> {
+    pub fn commit(self) -> Result<Commit> {
         self.publish().map(|(commit, _)| commit)
     }
 
