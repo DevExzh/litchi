@@ -216,18 +216,10 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Scene> {
 ///
 /// Returns an error if the output cannot be encoded or written.
 pub fn write(scene: &Scene, limits: Limits) -> Result<Vec<u8>> {
-    let mut wire = scene.wire.clone();
-    if !wire
-        .namespaces
-        .iter()
-        .any(|namespace| namespace.prefix() == Some("m3d"))
-    {
-        wire.namespaces.push(
-            drawing::Namespace::new(Some("m3d"), GRAPHIC_URI)
-                .map_err(|error| invalid(error.to_string()))?,
-        );
-    }
-    drawing::codec::write(&wire, limits.drawing()).map_err(super::model::drawing_error)
+    // The shared writer supplies missing model and relationship namespace
+    // declarations itself. Passing the borrowed wire directly keeps its
+    // structural/output preflight ahead of any clone of retained opaque XML.
+    drawing::codec::write(&scene.wire, limits.drawing()).map_err(super::model::drawing_error)
 }
 
 pub(crate) fn locate(xml: &[u8]) -> Result<Inventory> {
@@ -461,13 +453,25 @@ fn limit(resource: &'static str, limit: usize) -> Error {
     Error::Limit { resource, limit }
 }
 
+fn drawing_limit(kind: drawing::LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Drawing(drawing::Error::Limit {
+        kind,
+        observed,
+        maximum,
+    })
+}
+
 /// A model element is usually namespace-contextualized by its slide root.
 /// The shared codec intentionally accepts one self-contained fragment, so a
 /// package adapter supplies the inherited model and relationship declarations
 /// when the selected element did not repeat them locally.
 fn prepare_fragment<'a>(xml: &'a [u8], limits: Limits) -> Result<Cow<'a, [u8]>> {
     if xml.len() > limits.max_xml_bytes {
-        return Err(limit("model3d XML bytes", limits.max_xml_bytes));
+        return Err(drawing_limit(
+            drawing::LimitKind::XmlBytes,
+            xml.len(),
+            limits.max_xml_bytes,
+        ));
     }
     let open_end = opening_tag_end(xml)?;
     let opening = &xml[..open_end];
@@ -504,7 +508,11 @@ fn prepare_fragment<'a>(xml: &'a [u8], limits: Limits) -> Result<Cow<'a, [u8]>> 
                 resource: "model3d prepared XML",
             })?;
     if prepared_len > limits.max_xml_bytes {
-        return Err(limit("model3d prepared XML bytes", limits.max_xml_bytes));
+        return Err(drawing_limit(
+            drawing::LimitKind::XmlBytes,
+            prepared_len,
+            limits.max_xml_bytes,
+        ));
     }
     let mut prepared = Vec::new();
     prepared
