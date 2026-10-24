@@ -15,7 +15,7 @@ from unittest import mock
 
 from tools import w8_projection_policy as policy
 from tools import w8_file_provenance as provenance
-from tools.test_w8_file_provenance import EndpointManifest
+from tools import test_w8_file_provenance as provenance_tests
 
 
 class ProjectionPolicyTests(unittest.TestCase):
@@ -194,7 +194,7 @@ class ProjectionPolicyTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            endpoint_builder = EndpointManifest()
+            endpoint_builder = provenance_tests.EndpointManifest()
             before_args, _before_paths, before_values = endpoint_builder.inputs(root / "before")
             after_args, _after_paths, _after_values = endpoint_builder.inputs(root / "after")
             reviewed_routes.extend(before_values["routes"])

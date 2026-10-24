@@ -219,13 +219,19 @@ with scope, runtime guard, lock identity and projection identity fields).
 No tooling was changed while the f6fe gate is frozen; the proposal receipt
 records this as pending review.
 
-## Commands ready after the pairing decision
+## Historical diagnostic recipe (strict runner; not qualification)
 
 The following commands are recorded but intentionally not run in this lane.
-They use independent targets and temporary directories, one Cargo job, the
-20-GB memory-capped Cargo shim, offline/locked resolution, and release debug
-information disabled.  They must be executed only after the coordinator
-freezes the paired source inputs and confirms no forbidden process overlap.
+They are a historical diagnostic recipe that ends at the ordinary strict
+`shared_identity` ABBA path.  The f2 compatibility projection and the f6fe
+projection differ, so that path must reject this pair before timing; it is not
+an acceptance recipe and must not be reported as current native evidence.
+The f6fe production checkout used below predates the explicit 0362yh policy and
+does not contain its pair-receipt protocol.  They use independent targets and
+temporary directories, one Cargo job, the 20-GB memory-capped Cargo shim,
+offline/locked resolution, and release debug information disabled.  They must
+be executed only after the coordinator freezes the paired source inputs and
+confirms no forbidden process overlap.
 
 ```sh
 LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-f6fe
@@ -335,4 +341,53 @@ python3 "$CAND/docs/unified-ops/results/0362h/analyze.py" "$LANE/abba"
 ```
 
 The ABBA command requires at least five rounds and a quiet host.  It was not
-run here, and no native performance or acceptance status is implied.
+run here, and no native performance or acceptance status is implied.  Its
+ordinary strict identity failure is retained only to document the historical
+diagnostic boundary.
+
+## Reviewed pair-receipt protocol (opt-in, separate checkout)
+
+When the coordinator has regenerated endpoint manifests that match the fixed
+0362yh policy pins, use a clean protocol checkout separate from the f6fe
+production endpoint checkout above.  The f6fe checkout cannot run this path:
+it intentionally has no policy or pair-aware runner.  The protocol checkout
+below is pinned to the reviewed implementation commit
+`2b1f588560c0cbf2fc7cd549944dda7601a51352`; create it detached from a
+repository containing that commit and verify it is clean before use.  Do not
+build from this checkout: it supplies only the policy, receipt tool and runner;
+the binaries and endpoint manifests remain the separately pinned lane inputs.
+
+```sh
+PROTO=/home/zhuhe/code/litchi-worktrees/uo2-w8-native-protocol-2b1f588560
+PROTO_COMMIT=2b1f588560c0cbf2fc7cd549944dda7601a51352
+# One-time setup from a repository containing PROTO_COMMIT:
+# git -C /path/to/protocol-repository worktree add --detach "$PROTO" "$PROTO_COMMIT"
+test "$(git -C "$PROTO" rev-parse HEAD)" = "$PROTO_COMMIT"
+test -z "$(git -C "$PROTO" status --porcelain)"
+
+LANE=/home/zhuhe/code/litchi-worktrees/.coord/w8-file-candidate-f6fe
+POLICY="$PROTO/docs/unified-ops/results/0362yh/original-to-final-policy.json"
+PAIR_RECEIPT="$LANE/endpoint/original-to-final-pair-receipt.json"
+
+python3 "$PROTO/tools/w8_projection_policy.py" pair \
+  --policy "$POLICY" \
+  --before-manifest "$LANE/endpoint/f2/endpoint.json" \
+  --after-manifest "$LANE/endpoint/f6fe/endpoint.json" \
+  --output "$PAIR_RECEIPT"
+
+bash "$PROTO/docs/unified-ops/results/0362h/abba.sh" \
+  "$LANE/target-f2/release/examples/file_w8_original_baseline_probe" \
+  "$LANE/target-f6fe/release/examples/file_w8_qualified_probe" \
+  "$LANE/abba" 5 29 \
+  --before-manifest "$LANE/endpoint/f2/endpoint.json" \
+  --after-manifest "$LANE/endpoint/f6fe/endpoint.json" \
+  --original-to-final-policy "$POLICY" \
+  --original-to-final-receipt "$PAIR_RECEIPT"
+python3 "$PROTO/docs/unified-ops/results/0362h/analyze.py" "$LANE/abba"
+```
+
+The pair command is fail-closed and must be run before any timing.  If these
+lane manifests still carry the historical mismatched projection, it rejects
+them; that rejection is evidence of stale inputs, not a native result.  A
+successful receipt is protocol-only until the final production source freeze,
+native validation and ABBA review are separately recorded.

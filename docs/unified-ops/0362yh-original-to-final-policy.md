@@ -1,4 +1,4 @@
-# 0362uh — explicit original-to-final W8 projection policy
+# 0362yh — explicit original-to-final W8 projection policy
 
 This record defines the reviewed exception for comparing the historical f2
 before endpoint with the f6fe final endpoint.  The ordinary W8 runner remains
