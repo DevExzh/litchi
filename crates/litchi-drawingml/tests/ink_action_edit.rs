@@ -384,6 +384,18 @@ fn prepared_owner_routes_replay_and_optioned_edits_through_commit() {
         .expect("prepared owner replay")
         .into_package();
     assert_eq!(replayed.as_bytes(), commit.package().as_bytes());
+
+    // Owner entry only shares the retained profile and validates scalar
+    // options. A stricter source budget is deliberately enforced at commit,
+    // keeping `Prepared::edit_with_options` O(1) instead of rescanning it.
+    let source_limit = prepared.as_bytes().len() - 1;
+    let deferred = prepared
+        .edit_with_options(EditOptions {
+            max_output_bytes: source_limit,
+            ..EditOptions::default()
+        })
+        .expect("owner entry must not scan the retained profile");
+    expect_limit(deferred.commit(), "ink action source bytes", source_limit);
 }
 
 #[test]

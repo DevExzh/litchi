@@ -24,9 +24,10 @@ state before this return was `9034328f32657bec6b144f607bfe71e5caf7d1f3`.
   private implementation details. Consumers replay through the corresponding
   `Package::apply(&Patch) -> Result<Commit>` owner route, preserving stale
   source checks and exact no-op bytes.
-- The action `LimitKind` now names every `EditOptions` budget dimension and is
-  used by option validation; the typed dimensions remain visible through
-  stable resource labels in DrawingML limit errors.
+- The action `LimitKind` now names every `EditOptions` budget dimension plus
+  retained-source admission, and is wired into the actual budget-error paths;
+  the typed dimensions remain visible through stable resource labels in
+  DrawingML limit errors.
 
 The coordinator should not infer contract closure merely from the 22 inventory
 rows: this return specifically audits publication routes and owner entry

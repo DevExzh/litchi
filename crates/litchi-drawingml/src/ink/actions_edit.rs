@@ -36,6 +36,8 @@ use crate::Result;
 pub enum LimitKind {
     /// The complete serialized action profile.
     OutputBytes,
+    /// The retained source profile admitted to an edit.
+    SourceBytes,
     /// One opaque payload element.
     PayloadBytes,
     /// Structural XML node count.
@@ -58,6 +60,7 @@ impl LimitKind {
     pub const fn resource(self) -> &'static str {
         match self {
             Self::OutputBytes => "ink action output bytes",
+            Self::SourceBytes => "ink action source bytes",
             Self::PayloadBytes => "ink action payload bytes",
             Self::Nodes => "ink action XML nodes",
             Self::Depth => "ink action XML depth",
@@ -876,7 +879,6 @@ impl Edit {
 
     fn from_shared_profile(profile: Arc<Profile>, options: EditOptions) -> Result<Self> {
         options.validate()?;
-        validate_profile_limits(profile.as_ref(), options)?;
         Ok(Self {
             profile,
             options,
@@ -1166,10 +1168,13 @@ impl Edit {
     /// retained profile, so a removal or move cannot retarget a later
     /// operation. Scalar intents for one source attribute are coalesced;
     /// conflicting structural ranges are refused. With no queued operations,
-    /// the original source allocation is replayed exactly.
+    /// the original source allocation is replayed exactly. Profile-wide
+    /// limits are checked here, rather than when an owner creates an edit,
+    /// so [`Prepared::edit`] remains an O(1) shared-state entry point.
     pub fn commit(self) -> Result<Commit> {
         let before = self.profile.source.clone();
         if self.operations.is_empty() {
+            validate_profile_limits(&self.profile, self.options)?;
             let prepared = Prepared {
                 bytes: Arc::clone(&before),
                 profile: Arc::clone(&self.profile),
@@ -1183,6 +1188,7 @@ impl Edit {
         let plans = plan_operations(&self.profile, &before, &self.operations, self.options)?;
         let after = emit_plans(&before, &plans, self.options)?;
         if after.as_slice() == before.as_ref() {
+            validate_profile_limits(&self.profile, self.options)?;
             let prepared = Prepared {
                 bytes: Arc::clone(&before),
                 profile: Arc::clone(&self.profile),
@@ -5867,6 +5873,7 @@ fn invalid(message: impl Into<String>) -> Error {
 fn limit(resource: &'static str, limit: usize) -> Error {
     let kind = match resource {
         "ink action output bytes" => Some(LimitKind::OutputBytes),
+        "ink action source bytes" => Some(LimitKind::SourceBytes),
         "ink action payload bytes" => Some(LimitKind::PayloadBytes),
         "ink action XML nodes" => Some(LimitKind::Nodes),
         "ink action XML depth" => Some(LimitKind::Depth),
