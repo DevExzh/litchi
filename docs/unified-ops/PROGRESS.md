@@ -4078,3 +4078,53 @@ See [0063](0063-source-pptx-modern-comments.md).
   correcting the shared preparer/validator contract, including RTF, without
   weakening source or workload checks. Source-only preparation is not promoted
   to native acceptance. Only redaction audit 22 is deferred. Nothing is pushed.
+
+- Coordinator executable-protocol and corpus update (2026-10-24):
+  Legacy manifest identity repair 0362ul8e merges at `2b01fc91d7` after
+  independent review and 46 tooling tests. RTF, OLE-properties and
+  XLS-properties now bind the same exact external manifest through
+  preparation, build and validation. The fresh final-source packet 0362ul8f
+  independently validates all three manifests and six source legs; no native
+  qualification is inferred from preparation.
+
+  The c796 gate passes formatting, all 24 Clippy profiles and the full facade
+  selection. Its corpus failure is a stale golden caused by the newly tracked
+  PPT fixture. Every previous report row is unchanged. Record 0362ul20 adds
+  that fixture's byte-exact no-op row and correct summary counts; the fresh
+  diagnostic and non-blessing comparison both pass. The correction merges at
+  `93bdf16bf4`, with the failed original gate receipt preserved.
+
+  W8 original-f2 provenance closes its 459,676-file source fence. Review then
+  returns three executable-script defects: missing release/target flags,
+  missing build receipts, and an unbound candidate checkout. The repaired
+  script requires the exact clean 472b source, validates pinned inputs and
+  archive, creates build receipts and rejects stale targets. Independent
+  review and 45 tooling tests pass; the repair merges at `28c2ffcd90`.
+
+- Coordinator final-source evidence update (2026-10-24):
+  Record 0362ul21 binds 68 fresh API captures to 472b, with no reused artifact.
+  Independent review verifies every receipt and all 84 reviewed inventory
+  roles. The blank disposition scaffold remains explicitly unaccepted.
+  Supplemental glossary checks pass 58 of 59 profiles; only the known
+  Keynote-minimal/all-feature-JSON mismatch remains. Actual feature-specific
+  checks remain required. The capture record merges at `9781cf6d87`.
+
+  That assembled revision is frozen for the next full 53-step gate. Its Rust
+  production source is identical to 472b, and it includes the report and
+  qualification-tool repairs. The earlier c796 diagnostic endpoint stays
+  immutable. Isolated documentation and actual corpus verification remain
+  required before final acceptance.
+
+  PPT's c796 normal and allocator binaries pass all 28 correctness routes
+  across four fixtures under independent review. Final 472b builds are now
+  running. The final iWork constructor's four endpoint variants pass all
+  fifteen correctness routes with matching reports; owner builds continue.
+  Neither result is a timing or allocation-performance acceptance. Reviewed
+  DOC, Ink, W4b/W5, legacy and sheet preparation packets bind the final source;
+  actual remaining builds and quiet-host measurements stay required.
+
+  Cleanup wave 49 removes the merged DOCX validation leaf without force,
+  preserving its branch, six ignored files and validation evidence. Restore
+  exercises and independent hash/mode/ancestry checks pass (0362ul22). The
+  protected trunk probe remains intact. Nothing is pushed; only audit 22 is
+  deferred.
