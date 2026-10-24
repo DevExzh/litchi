@@ -77,7 +77,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut edit = package.edit_metadata();
         let mut app = edit.app_props()?.unwrap_or_default();
         app.company = Some("Acme".to_owned());
-        edit.set_app_props(Some(app));
+        edit.set_app_props(Some(app))?;
         let native = edit.commit()?.into_package();
         assert_eq!(unified.to_bytes()?, native.to_bytes()?);
         pair(
@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let mut edit = package.edit_metadata();
                 let mut app = edit.app_props()?.unwrap_or_default();
                 app.company = Some("Acme".to_owned());
-                edit.set_app_props(Some(app));
+                edit.set_app_props(Some(app))?;
                 black_box(edit.commit()?.into_package());
                 Ok(())
             }),

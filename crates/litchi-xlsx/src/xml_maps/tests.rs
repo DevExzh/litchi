@@ -431,7 +431,7 @@ fn transaction_crud_preserves_source_payload_and_round_trips_both_conformances()
         let value = fixture_info();
         let mut create = Transaction::new(&mut package).unwrap();
         create.set_conformance(conformance).unwrap();
-        assert!(create.info().is_none());
+        assert!(create.info().unwrap().is_none());
         assert!(create.set(value.clone()).unwrap());
         let commit = create.commit().unwrap();
         assert!(commit.changed());

@@ -832,11 +832,18 @@ crate::record::limit_kinds!("connections", Connections {
 /// A staged, failure-atomic edit of the workbook's inert connection catalog
 /// of one [`crate::Package`].
 ///
-/// Starting one reads the connection graph and copies no payload. Dropping
-/// the edit discards it; [`Self::commit`] publishes a new package.
+/// Starting one retains only the source package and performs no graph read or
+/// payload copy. The connection graph is materialized by the first getter,
+/// mutation or commit. Dropping the edit discards it; [`Self::commit`]
+/// publishes a new package.
 #[derive(Debug, Clone)]
 pub struct Edit {
     target: crate::record::Source,
+    loaded: Option<Loaded>,
+}
+
+#[derive(Debug, Clone)]
+struct Loaded {
     before: Snapshot,
     draft: Option<Connections>,
     strict: bool,
@@ -848,7 +855,8 @@ impl crate::Package {
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, and the validation errors of the connection graph.
+    /// refused. Connection-graph, XML and source-limit errors are deferred to
+    /// the first getter, mutation or commit.
     pub fn edit_connections(&self) -> Result<Edit> {
         Edit::start(crate::record::Source::new(self, "edit_connections")?)
     }
@@ -868,37 +876,54 @@ impl crate::Package {
 
 impl Edit {
     fn start(target: crate::record::Source) -> Result<Self> {
-        let limits = target.read_limits();
-        let before = Snapshot::load(&target, &limits)?;
-        let strict = before.conformance.strict();
         Ok(Self {
-            draft: before.connections.clone(),
             target,
-            before,
-            strict,
+            loaded: None,
         })
     }
 
-    /// The source snapshot captured when the edit started.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    fn ensure_loaded(&mut self) -> Result<&mut Loaded> {
+        if self.loaded.is_none() {
+            let limits = self.target.read_limits();
+            let before = Snapshot::load(&self.target, &limits)?;
+            let strict = before.conformance.strict();
+            self.loaded = Some(Loaded {
+                draft: before.connections.clone(),
+                before,
+                strict,
+            });
+        }
+        Ok(self.loaded.as_mut().expect("connections graph loaded"))
+    }
+
+    /// Materialize and return the source snapshot used by this edit.
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        Ok(&self.ensure_loaded()?.before)
     }
 
     /// The staged connection catalog, if any.
-    #[must_use]
-    pub fn connections(&self) -> Option<&Connections> {
-        self.draft.as_ref()
+    pub fn connections(&mut self) -> Result<Option<&Connections>> {
+        Ok(self.ensure_loaded()?.draft.as_ref())
     }
 
     /// Replace the complete catalog; `None` removes the connections part.
     pub fn replace(&mut self, value: Option<Connections>) -> Result<bool> {
+        self.ensure_loaded()?;
         let limits = self.target.read_limits();
         validate_draft(&self.target, value.as_ref(), &limits)?;
-        if self.draft == value {
+        if self
+            .loaded
+            .as_ref()
+            .expect("connections graph loaded")
+            .draft
+            == value
+        {
             return Ok(false);
         }
-        self.draft = value;
+        self.loaded
+            .as_mut()
+            .expect("connections graph loaded")
+            .draft = value;
         Ok(true)
     }
 
@@ -909,6 +934,7 @@ impl Edit {
         edit: impl FnOnce(&mut Connection) -> Result<()>,
     ) -> Result<bool> {
         let mut draft = self
+            .ensure_loaded()?
             .draft
             .clone()
             .ok_or_else(|| invalid("cannot edit an absent connections part"))?;
@@ -923,16 +949,26 @@ impl Edit {
         }
         let limits = self.target.read_limits();
         validate_draft(&self.target, Some(&draft), &limits)?;
-        if self.draft.as_ref() == Some(&draft) {
+        if self
+            .loaded
+            .as_ref()
+            .expect("connections graph loaded")
+            .draft
+            .as_ref()
+            == Some(&draft)
+        {
             return Ok(false);
         }
-        self.draft = Some(draft);
+        self.loaded
+            .as_mut()
+            .expect("connections graph loaded")
+            .draft = Some(draft);
         Ok(true)
     }
 
     /// Add a connection or replace the one with the same ID.
     pub fn set(&mut self, connection: Connection) -> Result<bool> {
-        let mut draft = self.draft.clone().unwrap_or(Connections {
+        let mut draft = self.ensure_loaded()?.draft.clone().unwrap_or(Connections {
             connections: Vec::new(),
         });
         if let Some(existing) = draft
@@ -949,7 +985,10 @@ impl Edit {
         }
         let limits = self.target.read_limits();
         validate_draft(&self.target, Some(&draft), &limits)?;
-        self.draft = Some(draft);
+        self.loaded
+            .as_mut()
+            .expect("connections graph loaded")
+            .draft = Some(draft);
         Ok(true)
     }
 
@@ -957,6 +996,7 @@ impl Edit {
     /// the connections part.
     pub fn remove(&mut self, id: u32) -> Result<Option<Connection>> {
         let mut draft = self
+            .ensure_loaded()?
             .draft
             .clone()
             .ok_or_else(|| invalid("cannot remove from an absent connections part"))?;
@@ -971,22 +1011,30 @@ impl Edit {
         if draft.connections.is_empty() {
             let limits = self.target.read_limits();
             validate_draft(&self.target, None, &limits)?;
-            self.draft = None;
+            self.loaded
+                .as_mut()
+                .expect("connections graph loaded")
+                .draft = None;
         } else {
             let limits = self.target.read_limits();
             validate_draft(&self.target, Some(&draft), &limits)?;
-            self.draft = Some(draft);
+            self.loaded
+                .as_mut()
+                .expect("connections graph loaded")
+                .draft = Some(draft);
         }
         Ok(Some(removed))
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.draft.clone_from(&self.before.connections);
+    pub fn reset(&mut self) -> Result<()> {
+        let loaded = self.ensure_loaded()?;
+        loaded.draft.clone_from(&loaded.before.connections);
+        Ok(())
     }
 
-    fn changed(&self) -> bool {
-        self.before.connections.as_ref() != self.draft.as_ref()
+    fn changed(loaded: &Loaded) -> bool {
+        loaded.before.connections.as_ref() != loaded.draft.as_ref()
     }
 
     /// Validate and publish the staged connections as a new package.
@@ -1005,37 +1053,48 @@ impl Edit {
     }
 
     /// [`Self::commit`], keeping the published snapshot.
-    fn publish(self) -> Result<(Commit, Snapshot)> {
-        if !self.changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
+    fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        let unchanged = {
+            let loaded = self.ensure_loaded()?;
+            !Self::changed(loaded)
+        };
+        if unchanged {
+            let loaded = self.loaded.take().expect("connections graph loaded");
+            let patch = Patch::new(loaded.before.clone(), loaded.before.clone());
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
-                self.before,
+                loaded.before,
             ));
         }
         crate::signature_policy::ensure_unsigned(&self.target)?;
+        let loaded = self.loaded.take().expect("connections graph loaded");
+        let Loaded {
+            before,
+            draft,
+            strict,
+        } = loaded;
         let limits = self.target.read_limits();
         let current = Snapshot::load(&self.target, &limits)?;
-        if !current.same_source(&self.before) {
+        if !current.same_source(&before) {
             return Err(invalid("connections edit source is stale"));
         }
         let mut candidate = OpcPackage::clone(&self.target);
         apply_connections(
             &mut candidate,
-            self.before.connections.as_ref(),
-            self.draft.as_ref(),
-            self.strict,
+            before.connections.as_ref(),
+            draft.as_ref(),
+            strict,
             &limits,
         )?;
         let snapshot = Snapshot::load(&candidate, &limits)?;
-        let mut staged = self.draft.clone();
+        let mut staged = draft.clone();
         if let (Some(actual), Some(staged)) = (snapshot.connections.as_ref(), staged.as_mut()) {
             normalize_connections_source_projection(actual, staged)?;
         }
         if snapshot.connections.as_ref() != staged.as_ref() {
             return Err(invalid("connection publication changed the staged model"));
         }
-        let patch = Patch::new(self.before, snapshot.clone());
+        let patch = Patch::new(before, snapshot.clone());
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),

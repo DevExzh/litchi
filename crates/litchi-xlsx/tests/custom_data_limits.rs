@@ -1681,14 +1681,14 @@ fn moved_payload_can_exceed_temporary_cap_without_copy() {
     let mut noop_transaction = noop_package
         .edit_custom_data_with_options(options(&limits))
         .expect("bounded no-op transaction starts");
-    let source_pointer = noop_transaction.entries()[0].value().data().as_ptr();
+    let source_pointer = noop_transaction.entries().unwrap()[0].value().data().as_ptr();
     assert!(
         !noop_transaction
             .set_data(0, b"source".to_vec())
             .expect("equal payload is a no-op")
     );
     assert_eq!(
-        noop_transaction.entries()[0].value().data().as_ptr(),
+        noop_transaction.entries().unwrap()[0].value().data().as_ptr(),
         source_pointer
     );
     let noop_commit = noop_transaction
@@ -1706,7 +1706,7 @@ fn moved_payload_can_exceed_temporary_cap_without_copy() {
         .set_data(0, payload)
         .expect("bounded move stages without a temporary copy");
     assert_eq!(
-        transaction.entries()[0].value().data().as_ptr(),
+        transaction.entries().unwrap()[0].value().data().as_ptr(),
         payload_pointer
     );
     let commit = transaction

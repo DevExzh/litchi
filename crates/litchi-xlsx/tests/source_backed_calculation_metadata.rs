@@ -138,7 +138,9 @@ fn changed_edit(
     editor: &SourceBackedWorkbook,
 ) -> litchi_xlsx::calculation_properties::source::Edit {
     let mut edit = editor.edit_calculation_metadata().unwrap();
-    assert!(edit.set_properties(Properties::new().with_calculation_id(Some(91))));
+    assert!(edit
+        .set_properties(Properties::new().with_calculation_id(Some(91)))
+        .unwrap());
     edit
 }
 
@@ -338,7 +340,8 @@ fn mce_limits_and_partial_sink_are_checked() {
     );
     let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
     let mut edit = editor.edit_calculation_metadata().unwrap();
-    edit.set_properties(Properties::new().with_calculation_id(Some(91)));
+    edit.set_properties(Properties::new().with_calculation_id(Some(91)))
+        .unwrap();
     assert!(edit.commit().is_err());
 
     let limits = SourceLimits::builder()

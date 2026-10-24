@@ -728,13 +728,19 @@ impl EditOptions {
 
 /// A staged, source-bound Custom Data edit of one [`crate::Package`].
 ///
-/// Starting one reads the catalog and copies no part payload. Dropping the
-/// edit discards it; [`Self::commit`] publishes a new package.
+/// Starting one retains only the source package and limits; it does not read
+/// the catalog or copy part payloads. The graph and semantic draft are
+/// materialized by the first getter, mutation or commit. Dropping the edit
+/// discards it; [`Self::commit`] publishes a new package.
 pub struct Edit {
     target: crate::record::Source,
+    limits: Limits,
+    loaded: Option<Loaded>,
+}
+
+struct Loaded {
     before: Snapshot,
     draft: Vec<Part>,
-    limits: Limits,
     connections: Bindings,
 }
 
@@ -744,7 +750,8 @@ impl crate::Package {
     /// # Errors
     ///
     /// Returns the encryption-policy error for a package whose mutations are
-    /// refused, and the catalog's read errors.
+    /// refused. Catalog, graph, XML and limit errors are deferred to the first
+    /// getter, mutation or commit.
     pub fn edit_custom_data(&self) -> Result<Edit> {
         self.edit_custom_data_with_options(EditOptions::default())
     }
@@ -780,31 +787,38 @@ impl crate::Package {
 impl Edit {
     fn start(target: crate::record::Source, limits: &Limits) -> Result<Self> {
         let limits = validate_limits(*limits)?;
-        let before = Snapshot::load_with_limits(&target, &limits)?;
-        let mut draft = Vec::new();
-        draft
-            .try_reserve_exact(before.entries.len())
-            .map_err(|source| allocation("Custom Data transaction entries", source))?;
-        draft.extend_from_slice(&before.entries);
         Ok(Self {
-            draft,
-            connections: before.source.connections.clone(),
             target,
-            before,
             limits,
+            loaded: None,
         })
     }
 
-    /// Source snapshot captured at transaction start.
-    #[must_use]
-    pub fn before(&self) -> &Snapshot {
-        &self.before
+    fn ensure_loaded(&mut self) -> Result<&mut Loaded> {
+        if self.loaded.is_none() {
+            let before = Snapshot::load_with_limits(&self.target, &self.limits)?;
+            let mut draft = Vec::new();
+            draft
+                .try_reserve_exact(before.entries.len())
+                .map_err(|source| allocation("Custom Data transaction entries", source))?;
+            draft.extend_from_slice(&before.entries);
+            self.loaded = Some(Loaded {
+                connections: before.source.connections.clone(),
+                before,
+                draft,
+            });
+        }
+        Ok(self.loaded.as_mut().expect("Custom Data graph loaded"))
+    }
+
+    /// Materialize and return the source snapshot used by this edit.
+    pub fn before(&mut self) -> Result<&Snapshot> {
+        Ok(&self.ensure_loaded()?.before)
     }
 
     /// Currently staged entries.
-    #[must_use]
-    pub fn entries(&self) -> &[Part] {
-        &self.draft
+    pub fn entries(&mut self) -> Result<&[Part]> {
+        Ok(&self.ensure_loaded()?.draft)
     }
 
     /// Replace one storage while retaining its physical graph identity.
@@ -813,31 +827,50 @@ impl Edit {
     }
 
     fn set_shared(&mut self, index: usize, value: CustomDataView) -> Result<bool> {
+        self.ensure_loaded()?;
         validate_value(&value, &self.limits)?;
         let current = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
             .draft
             .get(index)
             .ok_or_else(|| invalid(format!("custom-data index {index} is absent")))?;
         if current.value == value {
             return Ok(false);
         }
-        let mut candidate = self.draft.clone();
+        let mut candidate = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
+            .draft
+            .clone();
         candidate[index].value = value;
         validate_entries(&self.target, &candidate, &self.limits)?;
-        if candidate[index].id().is_empty() && self.connections.count(current.id()) > 0 {
+        if candidate[index].id().is_empty()
+            && self
+                .loaded
+                .as_ref()
+                .expect("Custom Data graph loaded")
+                .connections
+                .count(current.id())
+                > 0
+        {
             return Err(Error::Unsupported {
                 feature: "renaming a referenced Custom Data storage to the unreferencable empty UID",
             });
         }
-        let connections = self.connections.rebind_with_limits(
-            current.id(),
-            candidate[index].id(),
-            self.limits,
-        )?;
+        let connections = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
+            .connections
+            .rebind_with_limits(current.id(), candidate[index].id(), self.limits)?;
         let ids = collect_ids(&candidate, &self.limits)?;
         connections.validate_ids(&ids)?;
-        self.draft = candidate;
-        self.connections = connections;
+        let loaded = self.loaded.as_mut().expect("Custom Data graph loaded");
+        loaded.draft = candidate;
+        loaded.connections = connections;
         Ok(true)
     }
 
@@ -847,7 +880,11 @@ impl Edit {
         index: usize,
         edit: impl FnOnce(&mut super::Properties) -> Result<()>,
     ) -> Result<bool> {
+        self.ensure_loaded()?;
         let mut value = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
             .draft
             .get(index)
             .map(|entry| entry.value.clone())
@@ -860,6 +897,7 @@ impl Edit {
 
     /// Replace one inert payload without exposing package relationships.
     pub fn set_data(&mut self, index: usize, data: Vec<u8>) -> Result<bool> {
+        self.ensure_loaded()?;
         if data.len() > self.limits.max_payload_bytes() {
             return Err(limit(
                 LimitKind::PayloadBytes,
@@ -868,6 +906,9 @@ impl Edit {
             ));
         }
         let mut value = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
             .draft
             .get(index)
             .map(|entry| entry.value.clone())
@@ -878,9 +919,13 @@ impl Edit {
 
     /// Insert a new storage with an allocated, source-bound graph.
     pub fn insert(&mut self, value: CustomData) -> Result<usize> {
+        self.ensure_loaded()?;
         let value = CustomDataView::from(value);
         validate_value(&value, &self.limits)?;
         if self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
             .draft
             .iter()
             .any(|entry| entry.id() == value.properties.id)
@@ -888,15 +933,20 @@ impl Edit {
             return Err(invalid("Custom Data storage IDs must be unique"));
         }
         let workbook = self.target.main_document_part()?;
-        let properties_part_name = allocate_part_name(&self.target, &self.draft, "properties")?;
-        let data_part_name = allocate_part_name(&self.target, &self.draft, "data")?;
+        let draft = &self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
+            .draft;
+        let properties_part_name = allocate_part_name(&self.target, draft, "properties")?;
+        let data_part_name = allocate_part_name(&self.target, draft, "data")?;
         let workbook_relationship_id =
-            allocate_relationship_id(workbook, &self.draft, "rIdCustomData", true);
+            allocate_relationship_id(workbook, draft, "rIdCustomData", true);
         let data_relationship_id = "rIdCustomData".to_owned();
         let workbook_relationship_target =
             properties_part_name.relative_ref(workbook.partname().base_uri());
         let data_relationship_target = data_part_name.relative_ref(properties_part_name.base_uri());
-        let mut candidate = self.draft.clone();
+        let mut candidate = draft.clone();
         candidate.push(Part {
             value,
             properties_part_name,
@@ -912,13 +962,18 @@ impl Edit {
             data_relationships: None,
         });
         validate_entries(&self.target, &candidate, &self.limits)?;
-        self.draft = candidate;
-        Ok(self.draft.len() - 1)
+        let loaded = self.loaded.as_mut().expect("Custom Data graph loaded");
+        loaded.draft = candidate;
+        Ok(loaded.draft.len() - 1)
     }
 
     /// Insert or replace the storage with the same UID.
     pub fn upsert(&mut self, value: CustomData) -> Result<usize> {
+        self.ensure_loaded()?;
         if let Some(index) = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
             .draft
             .iter()
             .position(|entry| entry.id() == value.properties.id)
@@ -945,8 +1000,12 @@ impl Edit {
     }
 
     /// The staged index of the storage with UID `id`.
-    fn index_of(&self, id: &str) -> Option<usize> {
-        self.draft.iter().position(|entry| entry.id() == id)
+    fn index_of(&mut self, id: &str) -> Result<Option<usize>> {
+        Ok(self
+            .ensure_loaded()?
+            .draft
+            .iter()
+            .position(|entry| entry.id() == id))
     }
 
     /// Remove the storage with UID `id` with an explicit connection
@@ -959,7 +1018,7 @@ impl Edit {
     /// [`RemovalDisposition::RejectReferenced`], and the validation errors of
     /// the remaining catalog.
     pub fn remove_storage(&mut self, id: &str, disposition: RemovalDisposition) -> Result<bool> {
-        match self.index_of(id) {
+        match self.index_of(id)? {
             Some(index) => Ok(self.remove_with(index, disposition)?.is_some()),
             None => Ok(false),
         }
@@ -973,7 +1032,7 @@ impl Edit {
     /// Returns a `NotFound` refusal for an absent UID and the validation
     /// errors of the renamed catalog.
     pub fn rename_storage(&mut self, id: &str, new_id: impl Into<String>) -> Result<bool> {
-        let index = self.index_of(id).ok_or(Error::refused(
+        let index = self.index_of(id)?.ok_or(Error::refused(
             litchi_core::edit::RefusalKind::NotFound,
             "rename_storage",
             "the Custom Data storage UID is absent",
@@ -987,13 +1046,31 @@ impl Edit {
         index: usize,
         disposition: RemovalDisposition,
     ) -> Result<Option<Part>> {
-        if index >= self.draft.len() {
+        self.ensure_loaded()?;
+        if index
+            >= self
+                .loaded
+                .as_ref()
+                .expect("Custom Data graph loaded")
+                .draft
+                .len()
+        {
             return Ok(None);
         }
-        let mut candidate = self.draft.clone();
+        let mut candidate = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
+            .draft
+            .clone();
         let removed = candidate.remove(index);
         validate_entries(&self.target, &candidate, &self.limits)?;
-        let count = self.connections.count(removed.id());
+        let count = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
+            .connections
+            .count(removed.id());
         let replacement = match &disposition {
             RemovalDisposition::RejectReferenced if count > 0 => {
                 return Err(Error::CustomDataReferenced {
@@ -1011,31 +1088,37 @@ impl Edit {
                 id.as_str()
             },
         };
-        let connections =
-            self.connections
-                .rebind_with_limits(removed.id(), replacement, self.limits)?;
+        let connections = self
+            .loaded
+            .as_ref()
+            .expect("Custom Data graph loaded")
+            .connections
+            .rebind_with_limits(removed.id(), replacement, self.limits)?;
         let ids = collect_ids(&candidate, &self.limits)?;
         connections.validate_ids(&ids)?;
-        self.draft = candidate;
-        self.connections = connections;
+        let loaded = self.loaded.as_mut().expect("Custom Data graph loaded");
+        loaded.draft = candidate;
+        loaded.connections = connections;
         Ok(Some(removed))
     }
 
     /// Whether staged typed values or graph identities differ.
-    fn changed(&self) -> bool {
-        !self.before.same_semantics(&self.draft) || self.connections.is_changed()
+    fn changed(loaded: &Loaded) -> bool {
+        !loaded.before.same_semantics(&loaded.draft) || loaded.connections.is_changed()
     }
 
     #[cfg(test)]
-    pub(crate) fn is_changed(&self) -> bool {
-        self.changed()
+    pub(crate) fn is_changed(&mut self) -> Result<bool> {
+        Ok(Self::changed(self.ensure_loaded()?))
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.draft.clear();
-        self.draft.extend_from_slice(&self.before.entries);
-        self.connections = self.before.source.connections.clone();
+    pub fn reset(&mut self) -> Result<()> {
+        let loaded = self.ensure_loaded()?;
+        loaded.draft.clear();
+        loaded.draft.extend_from_slice(&loaded.before.entries);
+        loaded.connections = loaded.before.source.connections.clone();
+        Ok(())
     }
 
     /// Validate the source closure and publish the staged graph as a new
@@ -1051,65 +1134,72 @@ impl Edit {
     }
 
     /// [`Self::commit`], keeping the published catalog.
-    fn publish(self) -> Result<(Commit, Snapshot)> {
-        if !self.changed() {
-            let patch = Patch::new(self.before.clone(), self.before.clone());
+    fn publish(mut self) -> Result<(Commit, Snapshot)> {
+        let unchanged = {
+            let loaded = self.ensure_loaded()?;
+            !Self::changed(loaded)
+        };
+        if unchanged {
+            let loaded = self.loaded.take().expect("Custom Data graph loaded");
+            let patch = Patch::new(loaded.before.clone(), loaded.before.clone());
             return Ok((
                 Commit::new(self.target.into_package(), patch, Diagnostics::new(false)),
-                self.before,
+                loaded.before,
             ));
         }
+        let loaded = self.loaded.take().expect("Custom Data graph loaded");
+        let Loaded {
+            before,
+            draft,
+            connections,
+        } = loaded;
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
         let current = Snapshot::load_with_limits(&self.target, &self.limits)?;
-        if !current.same_source(&self.before) {
+        if !current.same_source(&before) {
             return Err(Error::PatchConflict {
                 part: "Custom Data source closure".into(),
             });
         }
         let content_types = transition_content_types(
-            &self.before.source.content_types,
-            &self.before.entries,
-            &self.draft,
+            &before.source.content_types,
+            &before.entries,
+            &draft,
             self.limits,
             bounded_read_limits(&self.target, self.limits)?,
         )?;
         preflight_staged_output_budget(
             &self.target,
-            &self.before,
-            &self.draft,
-            &self.connections,
+            &before,
+            &draft,
+            &connections,
             &content_types,
             self.limits,
         )?;
         let mut candidate = OpcPackage::clone(&self.target);
         apply_entries(
             &mut candidate,
-            self.before.entries(),
-            &self.draft,
+            before.entries(),
+            &draft,
             &self.limits,
             &content_types,
         )?;
-        let connection_output_limit = if let Some(bytes) = self.connections.source_bytes_len() {
+        let connection_output_limit = if let Some(bytes) = connections.source_bytes_len() {
             replacement_output_limit(&candidate, bytes, self.limits)?
         } else {
             self.limits.max_output_bytes()
         };
-        self.connections.publish_with_limits(
-            &mut candidate,
-            self.limits,
-            connection_output_limit,
-        )?;
+        connections.publish_with_limits(&mut candidate, self.limits, connection_output_limit)?;
         validate_package_limits(&candidate, self.limits)?;
         validate_output_limits(&candidate, self.limits)?;
         let snapshot = Snapshot::load_with_limits(&candidate, &self.limits)?;
-        if !snapshot.same_published_semantics(&self.draft)?
-            || !snapshot.source.connections.same_values(&self.connections)
+        if !snapshot.same_published_semantics(&draft)?
+            || !snapshot.source.connections.same_values(&connections)
         {
             return Err(invalid("Custom Data publication changed staged semantics"));
         }
-        let patch = Patch::new(self.before, snapshot.clone());
+        let patch = Patch::new(before, snapshot.clone());
         let package = self.target.publish(candidate)?;
         Ok((
             Commit::new(package, patch, Diagnostics::new(true)),
@@ -3103,14 +3193,14 @@ mod tests {
         let mut transaction = Transaction::new(&mut package).unwrap();
         transaction.rename(0, "temporary").unwrap();
         assert!(transaction.rename(0, "").is_err());
-        assert_eq!(transaction.entries()[0].id(), "temporary");
+        assert_eq!(transaction.entries().unwrap()[0].id(), "temporary");
         transaction
             .edit_properties(0, |properties| {
                 properties.id = "Storage-1".into();
                 Ok(())
             })
             .unwrap();
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         let commit = transaction.commit().unwrap();
         assert!(!commit.changed());
         assert!(Snapshot::load(&package).unwrap().same_source(&before));
@@ -3125,7 +3215,7 @@ mod tests {
             transaction.remove(0),
             Err(Error::CustomDataReferenced { connections: 2, .. })
         ));
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         transaction
             .remove_with(0, RemovalDisposition::DetachConnections)
             .unwrap();
@@ -3150,7 +3240,7 @@ mod tests {
                 .remove_with(0, RemovalDisposition::RetargetConnections("missing".into()))
                 .is_err()
         );
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         let second = transaction
             .insert(CustomData::new("Storage-2", vec![2]))
             .unwrap();
@@ -3239,7 +3329,7 @@ mod tests {
             transaction.rename(0, "New"),
             Err(Error::Unsupported { .. })
         ));
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
     }
 
     #[test]
@@ -3543,7 +3633,7 @@ mod tests {
         ));
         let mut transaction = Transaction::new(&mut package).unwrap();
         assert_eq!(
-            transaction.entries()[0].value().data().as_ptr(),
+            transaction.entries().unwrap()[0].value().data().as_ptr(),
             data.as_ptr()
         );
         transaction
@@ -3553,7 +3643,7 @@ mod tests {
             })
             .unwrap();
         assert_eq!(
-            transaction.entries()[0].value().data().as_ptr(),
+            transaction.entries().unwrap()[0].value().data().as_ptr(),
             data.as_ptr()
         );
         assert_eq!(snapshot.entries[0].value().properties().id, "Storage-1");
@@ -3585,11 +3675,11 @@ mod tests {
             .insert(CustomData::new("Storage-2", inserted))
             .unwrap();
         assert_eq!(
-            transaction.entries()[0].value().data().as_ptr(),
+            transaction.entries().unwrap()[0].value().data().as_ptr(),
             replacement_ptr
         );
         assert_eq!(
-            transaction.entries()[1].value().data().as_ptr(),
+            transaction.entries().unwrap()[1].value().data().as_ptr(),
             inserted_ptr
         );
         let commit = transaction.commit().unwrap();
@@ -3632,7 +3722,7 @@ mod tests {
         // An existing empty binary part is not a newly allocated graph identity.
         transaction.set_data(0, vec![42]).unwrap();
         transaction.set_data(0, Vec::new()).unwrap();
-        assert!(!transaction.is_changed());
+        assert!(!transaction.is_changed().unwrap());
         transaction.remove(0).unwrap();
         let commit = transaction.commit().unwrap();
         commit.patch().inverse().apply(&mut package).unwrap();
