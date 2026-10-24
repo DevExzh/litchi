@@ -1266,6 +1266,62 @@ def _validate_cargo_paths(argv: Sequence[str], *, cwd: Path, source: Path, targe
             raise RunnerError(f"Cargo config redirects target outside the runner target: {config} -> {configured}")
 
 
+def _build_phase_identity(
+    manifest: Mapping[str, Any], manifest_path: Path, phase_id: str
+) -> tuple[list[str], Path, Path, Path]:
+    """Resolve and validate one recorded build phase from its manifest."""
+
+    legs = manifest.get("legs")
+    if not isinstance(legs, Mapping):
+        raise RunnerError("phase manifest legs are malformed")
+    shared = manifest.get("shared", {})
+    if not isinstance(shared, Mapping):
+        raise RunnerError("phase manifest shared section is malformed")
+    output = _resolve_path(str(manifest.get("output_dir", "")))
+    for leg, spec in legs.items():
+        if not isinstance(leg, str) or not isinstance(spec, Mapping):
+            raise RunnerError("phase manifest leg is malformed")
+        commands = spec.get("build")
+        if not isinstance(commands, list):
+            raise RunnerError(f"phase manifest build list is malformed for {leg}")
+        for command in commands:
+            if not isinstance(command, Mapping) or not isinstance(command.get("id"), str):
+                raise RunnerError(f"phase manifest build command is malformed for {leg}")
+            if f"build-{leg}-{command['id']}" != phase_id:
+                continue
+            source = _resolve_path(str(spec.get("source_root", "")))
+            target = _resolve_path(str(spec.get("target_dir", "")))
+            shared_fixtures = shared.get("fixture_paths", [])
+            leg_fixtures = spec.get("fixture_paths", [])
+            if not isinstance(shared_fixtures, list) or not isinstance(leg_fixtures, list):
+                raise RunnerError(f"phase manifest fixture paths are malformed for {leg}")
+            fixture_values = [*shared_fixtures, *leg_fixtures]
+            fixture = ""
+            if len(fixture_values) == 1:
+                fixture = str(_resolve_path(str(fixture_values[0]), base=source))
+            context: dict[str, Any] = {
+                "source_root": source,
+                "target_dir": target,
+                "output_dir": output,
+                "manifest_path": manifest_path,
+                "leg": leg,
+                "index": 0,
+                "rounds": int(manifest.get("rounds", 31)),
+                "block": 1,
+                "fixture": fixture,
+            }
+            argv_value = command.get("argv")
+            if not isinstance(argv_value, list) or not all(isinstance(item, str) for item in argv_value):
+                raise RunnerError(f"phase manifest argv is malformed for {phase_id}")
+            argv = normalize_cargo_argv(_render_argv(argv_value, context))
+            cwd = _resolve_path(_render(str(command.get("cwd", ".")), context), base=source)
+            if not _under(cwd, source):
+                raise RunnerError(f"phase build cwd escapes source root: {cwd}")
+            _validate_cargo_paths(argv, cwd=cwd, source=source, target=target)
+            return argv, cwd, target, source
+    raise RunnerError(f"phase {phase_id!r} is not an admitted manifest build entry")
+
+
 def _read_proc(pid: int) -> dict[str, Any] | None:
     proc = Path("/proc") / str(pid)
     try:
@@ -1638,6 +1694,17 @@ class BuildOverlapLease:
             records.append((path, value))
         return records
 
+    def _phase_manifest(self, path: Path) -> Mapping[str, Any]:
+        if path == self.manifest_path:
+            return self.manifest
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise RunnerError(f"cannot read phase manifest {path}: {error}") from error
+        if not isinstance(value, dict):
+            raise RunnerError(f"phase manifest is not an object: {path}")
+        return _expand_environment(value)
+
     def _validate_record(
         self,
         path: Path,
@@ -1726,6 +1793,20 @@ class BuildOverlapLease:
             or str(phase_target_path) not in binding["target_dirs"]
         ):
             raise RunnerError(f"build lease phase paths differ from their manifest binding: {path}")
+        if phase_id is not None:
+            phase_manifest = self._phase_manifest(resolved_manifest_path)
+            expected_argv, expected_cwd, expected_target, expected_source = _build_phase_identity(
+                phase_manifest,
+                resolved_manifest_path,
+                phase_id,
+            )
+            if (
+                phase_argv != expected_argv
+                or phase_cwd != str(expected_cwd)
+                or phase_target_dir != str(expected_target)
+                or str(expected_source) not in binding["source_roots"]
+            ):
+                raise RunnerError(f"build lease phase differs from its admitted manifest entry: {path}")
         if command_class == "controller-reservation":
             if phase_id is not None and _cargo_command_class(phase_argv) != "cargo-build":
                 raise RunnerError(f"controller build lease phase is not cargo build: {path}")
@@ -1764,6 +1845,8 @@ class BuildOverlapLease:
             raise RunnerError(f"active build lease root process is gone: {path}")
         if entry.get("starttime") != starttime:
             raise RunnerError(f"active build lease root PID was reused: {path}")
+        if command_class in PEER_COMMAND_CLASSES and entry.get("ppid") != controller_pid:
+            raise RunnerError(f"active Cargo build parent changed from its controller: {path}")
         if command_class == "cargo-build" and (
             entry.get("cmdline") != phase_argv or entry.get("cwd") != phase_cwd
         ):

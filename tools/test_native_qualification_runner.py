@@ -894,9 +894,10 @@ class NativeQualificationRunnerTests(unittest.TestCase):
 
     @staticmethod
     def _peer_entry(pid: int, starttime: str, argv: list[str]) -> dict[str, object]:
+        argv = runner.normalize_cargo_argv(argv)
         return {
             "pid": pid,
-            "ppid": 1,
+            "ppid": pid,
             "pgrp": pid,
             "starttime": starttime,
             "comm": "cargo",
@@ -931,8 +932,8 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             "command_class": "cargo-build",
             "allowed_command_classes": ["cargo-build"],
             "phase": "build",
-            "phase_id": "peer-build",
-            "phase_argv": ["cargo", "build"],
+            "phase_id": "build-before-build",
+            "phase_argv": ["cargo", "build", "--offline", "--locked"],
             "phase_cwd": str(ROOT),
             "phase_target_dir": str(Path(lease.manifest["legs"]["before"]["target_dir"]).resolve()),
             "source_roots": [str(ROOT), str(lease.manifest["legs"]["after"]["source_root"])],
@@ -1015,6 +1016,24 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             with self.assertRaisesRegex(runner.RunnerError, "expired"):
                 runner.BuildOverlapLease(manifest, manifest_path)
 
+    def test_compile_overlap_lease_rejects_bound_peer_reparented_to_init(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-parent-") as directory:
+            root = Path(directory)
+            manifest, manifest_path, _permit, lease_dir = self._overlap_fixture(root)
+            lease = runner.BuildOverlapLease(manifest, manifest_path)
+            lease.acquire()
+            own = runner._read_proc(os.getpid())
+            assert own is not None
+            peer_path = lease_dir / "peer.json"
+            self._write_peer_lease(lease, peer_path)
+            peer = self._peer_entry(999991, "peer-start", ["cargo", "build"])
+            peer["ppid"] = 1
+            snapshot = {os.getpid(): own, 999991: peer}
+            with mock.patch.object(runner, "_proc_snapshot", return_value=snapshot):
+                with self.assertRaisesRegex(runner.RunnerError, "parent changed"):
+                    lease.peer_snapshots(snapshot)
+            lease.release()
+
     def test_compile_overlap_lease_rejects_tampered_peer_manifest_bindings(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-build-overlap-binding-") as directory:
             root = Path(directory)
@@ -1040,6 +1059,41 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                 with mock.patch.object(runner, "_proc_snapshot", return_value=snapshot):
                     with self.assertRaisesRegex(runner.RunnerError, reason):
                         lease.peer_snapshots(snapshot)
+            lease.release()
+
+    def test_compile_overlap_lease_rejects_phase_argv_redirection(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="native-build-overlap-phase-path-") as directory:
+            root = Path(directory)
+            manifest, manifest_path, _permit, lease_dir = self._overlap_fixture(root)
+            lease = runner.BuildOverlapLease(manifest, manifest_path)
+            lease.acquire()
+            own = runner._read_proc(os.getpid())
+            assert own is not None
+            peer_path = lease_dir / "peer.json"
+            original = json.loads(
+                json.dumps(
+                    {
+                        "manifest_path": str(lease.manifest_path),
+                        "manifest_sha256": lease.manifest_hash,
+                    }
+                )
+            )
+            self._write_peer_lease(lease, peer_path)
+            base = json.loads(peer_path.read_text(encoding="utf-8"))
+            for extra in (
+                ["--manifest-path", str(root / "outside" / "Cargo.toml")],
+                ["--target-dir", str(root / "outside-target")],
+            ):
+                value = dict(base)
+                phase_argv = runner.normalize_cargo_argv(["cargo", "build", *extra])
+                value["phase_argv"] = phase_argv
+                peer_path.write_text(json.dumps(value), encoding="utf-8")
+                peer = self._peer_entry(999991, "peer-start", phase_argv)
+                snapshot = {os.getpid(): own, 999991: peer}
+                with mock.patch.object(runner, "_proc_snapshot", return_value=snapshot):
+                    with self.assertRaisesRegex(runner.RunnerError, "phase differs"):
+                        lease.peer_snapshots(snapshot)
+            self.assertEqual(original["manifest_path"], str(lease.manifest_path))
             lease.release()
 
     def test_compile_overlap_lease_rejects_peer_expiry_after_permit(self) -> None:
