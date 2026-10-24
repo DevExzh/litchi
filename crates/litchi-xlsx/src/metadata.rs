@@ -498,7 +498,7 @@ mod tests {
     fn no_op_edits_return_the_same_snapshot() {
         let package = Package::new().unwrap();
         let mut edit = package.edit_metadata().unwrap();
-        edit.set(package.metadata().unwrap());
+        edit.set(package.metadata().unwrap()).unwrap();
         let commit = edit.commit().unwrap();
         assert!(!commit.diagnostics().changed());
         assert!(commit.patch().is_noop());
@@ -509,7 +509,7 @@ mod tests {
     fn no_op_patch_replay_still_requires_its_recorded_property_scope() {
         let source = Package::new().unwrap();
         let mut edit = source.edit_metadata().unwrap();
-        edit.set(source.metadata().unwrap());
+        edit.set(source.metadata().unwrap()).unwrap();
         let no_op = edit.commit().unwrap();
         assert!(no_op.patch().is_noop());
 

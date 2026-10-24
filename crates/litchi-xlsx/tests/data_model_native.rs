@@ -182,7 +182,7 @@ fn native_descriptor_patch_rejects_relationship_lexical_source_changes() {
 fn public_structural_descriptor_and_payload_replacement_is_refused_without_inner_identity_proof() {
     let package = Package::from_bytes(SOURCE).unwrap();
     let mut edit = package.edit_data_model().unwrap();
-    let mut replacement = edit.model().unwrap().to_owned();
+    let mut replacement = edit.model().unwrap().unwrap().to_owned();
     replacement.definition.tables[0].id.push_str("-replacement");
     replacement.definition.extension_list = Some(litchi_xlsx::DataModelOpaqueXml {
         xml: br#"<x15:extLst xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"><x15:ext uri="urn:replacement"/></x15:extLst>"#.to_vec(),
