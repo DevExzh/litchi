@@ -115,7 +115,7 @@ Leftovers by variant:
   `out_of_range`, as DOCX `OutOfBounds` and the RTF positional errors are;
   `ResourceCollision` is `duplicate_name`; the budgets `OperationLimit`/
   `ReplacementLimit` are `limit_exceeded`; removing the sole paragraph is
-  the final-element `invalid_argument` of every format (PPTX final slide,
+  the final-element `invalid_value` of every format (PPTX final slide,
   0361); the protected kinds keep their specific suggestions. Visible code
   change: refusals whose kind is `UnsupportedTarget` (`EmptyParagraph`)
   report `unsupported_type` (was `unsupported_capability`), as the DOCX and
@@ -128,9 +128,9 @@ Leftovers by variant:
   `ProtectedDocument` reports `document_protected`. The codes are already
   the kind codes; moving RTF onto `Refused(Refusal)` is a W5 residual for
   the Part B sweep (§6).
-- **PPTX** `SlideOrderRefusal::AmbiguousBindings` → `corrupt_file` and
-  `SlideRemovalRefusal::FinalSlide` → `invalid_argument` are the documented
-  0356/0361 exceptions. XLSX/XLSB arms are W4's.
+- **PPTX** `SlideOrderRefusal::AmbiguousBindings` → `corrupt_file` remains the
+  documented exception; `SlideRemovalRefusal::FinalSlide` now follows its
+  shared `InvalidValue` kind as `invalid_value`. XLSX/XLSB arms are W4's.
 
 ## 4. Fidelity
 

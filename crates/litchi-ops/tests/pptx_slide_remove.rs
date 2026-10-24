@@ -93,7 +93,7 @@ fn path_removal_reindexes_slides_and_refuses_the_final_slide_atomically() {
     let error = one_left
         .remove("/slide[1]")
         .expect_err("the final slide must be retained");
-    assert_eq!(error.code(), Code::InvalidArgument);
+    assert_eq!(error.code(), Code::InvalidValue);
     assert_eq!(one_left.to_bytes().unwrap(), one_left_bytes);
 }
 
@@ -127,7 +127,7 @@ fn scoped_union_removes_descending_positions_and_all_slide_removal_is_atomic() {
     let all = source
         .edit(|edit| edit.remove(scoped_slide_query("slide")))
         .expect_err("removing every slide must fail at the final slide");
-    assert_eq!(all.code(), Code::InvalidArgument);
+    assert_eq!(all.code(), Code::InvalidValue);
     assert_eq!(source.to_bytes().unwrap(), original_bytes);
 }
 
@@ -176,7 +176,7 @@ fn source_backed_removal_survives_reopen_and_eager_removal_keeps_its_route() {
     let final_error = source_one_left
         .remove("/slide[1]")
         .expect_err("source-backed final slide refusal");
-    assert_eq!(final_error.code(), Code::InvalidArgument);
+    assert_eq!(final_error.code(), Code::InvalidValue);
     assert_eq!(source_one_left.to_bytes().unwrap(), source_one_left_bytes);
 
     let eager = litchi_ops::open_bytes_with(
@@ -386,7 +386,7 @@ fn native_final_slide_refuses_and_notes_slides_leave_with_their_slide() {
         let late = dependency
             .remove(scoped_slide_query("slide[1], slide[2], slide[3]"))
             .unwrap_err();
-        assert_eq!(late.code(), Code::InvalidArgument);
+        assert_eq!(late.code(), Code::InvalidValue);
         assert_eq!(dependency.to_bytes().unwrap(), before);
     }
 }
@@ -424,6 +424,6 @@ fn source_removal_keeps_retained_slide_notes_and_late_refusal_is_atomic() {
     let failure = source
         .remove(scoped_slide_query("slide[1], slide[2], slide[3]"))
         .unwrap_err();
-    assert_eq!(failure.code(), Code::InvalidArgument);
+    assert_eq!(failure.code(), Code::InvalidValue);
     assert_eq!(source.to_bytes().unwrap(), original);
 }

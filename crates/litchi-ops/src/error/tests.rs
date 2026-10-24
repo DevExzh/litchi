@@ -1602,7 +1602,7 @@ fn pptx_slide_removal_refusals_preserve_semantic_classification() {
     for (kind, code) in [
         (Refusal::SignedPackage, Code::DocumentProtected),
         (Refusal::ProtectedPresentation, Code::DocumentProtected),
-        (Refusal::FinalSlide, Code::InvalidArgument),
+        (Refusal::FinalSlide, Code::InvalidValue),
         (Refusal::MacroEnabledPackage, Code::UnsupportedCapability),
         (Refusal::MarkupCompatibility, Code::UnsupportedCapability),
         (Refusal::UnknownSemanticSurface, Code::UnsupportedCapability),
@@ -1627,6 +1627,40 @@ fn pptx_slide_removal_refusals_preserve_semantic_classification() {
             )),
             code,
         );
+    }
+}
+
+#[cfg(feature = "pptx")]
+#[test]
+fn pptx_refusals_classify_by_kind_not_operation_or_reason() {
+    use litchi_core::edit::{Refusal, RefusalKind};
+
+    let expected = |kind| match kind {
+        RefusalKind::UnsupportedOperation | RefusalKind::UnsupportedContent => {
+            Code::UnsupportedCapability
+        },
+        RefusalKind::UnsupportedTarget => Code::UnsupportedType,
+        RefusalKind::UnsupportedProperty => Code::UnsupportedProperty,
+        RefusalKind::InvalidValue => Code::InvalidValue,
+        RefusalKind::NotFound => Code::NotFound,
+        RefusalKind::Protected => Code::DocumentProtected,
+        _ => Code::UnsupportedCapability,
+    };
+
+    for kind in RefusalKind::ALL.iter().copied() {
+        for (operation, reason) in [
+            ("slide_removal", "the package is signed"),
+            ("unrelated_operation", "caller-authored reason marker"),
+        ] {
+            let error = assert_code(
+                litchi_pptx::Error::Refused(Refusal::new(kind, operation, reason)),
+                expected(kind),
+            );
+            assert!(
+                !error.to_string().contains("caller-authored reason marker"),
+                "refusal diagnostics must remain content-free: {error}"
+            );
+        }
     }
 }
 

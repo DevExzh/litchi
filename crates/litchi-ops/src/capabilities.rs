@@ -3481,7 +3481,7 @@ static PPTX_WRITE_GAPS: [GapSpec; 15] = [
             element: "slide",
             context: "final-slide",
         },
-        code: Code::InvalidArgument,
+        code: Code::InvalidValue,
         follow_up: "M2 PPTX final-slide removal policy",
         reason: "native PPTX slide removal currently preserves the final slide and cannot remove the last slide from a presentation",
     },

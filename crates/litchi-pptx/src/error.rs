@@ -213,8 +213,7 @@ impl SlideRemovalRefusal {
     ///
     /// [`Self::FinalSlide`] is an invalid value: the selection would leave
     /// the presentation without slides. litchi-ops reports it as
-    /// `invalid_argument`, the code every format uses for deleting the final
-    /// slide.
+    /// `invalid_value`, by the shared refusal-kind contract.
     #[must_use]
     pub const fn kind(self) -> litchi_core::edit::RefusalKind {
         use litchi_core::edit::RefusalKind;

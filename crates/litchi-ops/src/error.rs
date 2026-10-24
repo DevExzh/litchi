@@ -1397,17 +1397,8 @@ impl Classify for litchi_pptx::Error {
             Self::Io(error) => error.classify(),
             // A patch for another base: the caller supplied it (record 0351).
             Self::PatchConflict => Class::of(Code::InvalidInput),
-            Self::Refused(refusal)
-                if refusal.operation() == "slide_removal"
-                    && refusal.reason() == "the package is signed"
-                    && refusal.kind() == litchi_core::edit::RefusalKind::Protected => {
-                Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION)
-            },
-            Self::Refused(refusal)
-                if refusal.operation() == "slide_removal"
-                    && refusal.kind() == litchi_core::edit::RefusalKind::InvalidValue => {
-                Class::of(Code::InvalidArgument)
-            },
+            // Every well-formed refusal is classified by its shared kind;
+            // operation and reason remain content-free diagnostics only.
             Self::Refused(refusal) => refusal.classify(),
             Self::UnsupportedOpenPolicy { .. } => Class::of(Code::InvalidArgument),
             Self::EditLimit { .. } => Class::of(Code::LimitExceeded),
