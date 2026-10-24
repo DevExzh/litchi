@@ -657,7 +657,12 @@ def _receipt_from_validated(policy: dict[str, Any], before: object, after: objec
     after_fixture = _load_json(Path(after_value["fixture"]["path"]), "after fixture")
     before_routes = provenance.fixture_routes(before_fixture, "before fixture")
     after_routes = provenance.fixture_routes(after_fixture, "after fixture")
-    if before_routes != after_routes or before_routes != before_fields["routes"] or after_routes != after_fields["routes"] or len(before_routes) != 109:
+    if (
+        before_routes != after_routes
+        or before_routes != list(before_fields["routes"])
+        or after_routes != list(after_fields["routes"])
+        or len(before_routes) != 109
+    ):
         raise fail("before/after route order is not the exact reviewed 109-route order")
 
     def endpoint_part(fields: _ValidatedEndpoint) -> dict[str, Any]:

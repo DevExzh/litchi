@@ -716,7 +716,11 @@ def main() -> int:
     guard(out, "initial")
     before_routes, before_route_receipt = routes(before, out, args.cpu, "before")
     after_routes, after_route_receipt = routes(after, out, args.cpu, "after")
-    expected_routes = before_endpoint["routes"]
+    # Pair validation exposes an immutable endpoint capability, whose recursive
+    # freeze stores route sequences as tuples.  The route probe returns its
+    # canonical JSON-shaped list, so normalize the validated value at this
+    # boundary before enforcing the exact reviewed order.
+    expected_routes = list(before_endpoint["routes"])
     if before_routes != expected_routes or after_routes != expected_routes:
         raise RuntimeError("endpoint validation does not cover the complete 109-route list")
     if before_routes != after_routes:

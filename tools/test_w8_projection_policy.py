@@ -8,11 +8,14 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest import mock
 
 from tools import w8_projection_policy as policy
+from tools import w8_file_provenance as provenance
+from tools.test_w8_file_provenance import EndpointManifest
 
 
 class ProjectionPolicyTests(unittest.TestCase):
@@ -134,6 +137,111 @@ class ProjectionPolicyTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             fields["manifest"] = {"path": "forged.json"}
         self.assertEqual(fields["manifest"]["path"], str(Path("original.json").resolve()))
+
+    def test_pair_runner_accepts_real_validated_endpoints_and_preserves_route_order(self) -> None:
+        """Exercise the pair path through the runner, not only its helpers.
+
+        The endpoint validator returns the opaque recursively-frozen capability,
+        so this catches the list/tuple boundary between that capability and the
+        runner's JSON-shaped route probe result.
+        """
+        runner_path = Path(__file__).resolve().parents[1] / "docs/unified-ops/results/0362h/run.py"
+        spec = importlib.util.spec_from_file_location("w8_run_pair_integration", runner_path)
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        runner = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(runner)
+        reviewed_routes: list[str] = []
+
+        def fake_probe(
+            _out: Path,
+            _label: str,
+            _binary: Path,
+            route: str,
+            mode: str,
+            calls: int | None,
+            _blocks: int,
+            _cpu: int,
+        ) -> dict[str, object]:
+            if mode == "calibrate":
+                return {
+                    "route": route,
+                    "common_calls": 1,
+                    "minimum_elapsed_ns": runner.MIN_SAMPLE_NS,
+                }
+            return {"route": route, "calls": calls}
+
+        pair = {
+            "policy": {"schema": "test-policy"},
+            "projection": {"registry_package_count": 518},
+            "workload": {"route_count": 109},
+            "build": {"profile": "release"},
+        }
+        verify_calls: list[tuple[object, object]] = []
+
+        def fake_verify(
+            _policy_path: Path,
+            _receipt_path: Path,
+            before_endpoint: object,
+            after_endpoint: object,
+        ) -> dict[str, object]:
+            self.assertIsInstance(before_endpoint, policy._ValidatedEndpoint)
+            self.assertIsInstance(after_endpoint, policy._ValidatedEndpoint)
+            self.assertEqual(list(before_endpoint["routes"]), reviewed_routes)
+            self.assertEqual(list(after_endpoint["routes"]), reviewed_routes)
+            verify_calls.append((before_endpoint, after_endpoint))
+            return pair
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            endpoint_builder = EndpointManifest()
+            before_args, _before_paths, before_values = endpoint_builder.inputs(root / "before")
+            after_args, _after_paths, _after_values = endpoint_builder.inputs(root / "after")
+            reviewed_routes.extend(before_values["routes"])
+            before_binary = before_args.binary
+            after_binary = after_args.binary
+            before_manifest = root / "before" / "endpoint.json"
+            after_manifest = root / "after" / "endpoint.json"
+            before_manifest.write_bytes(provenance.canonical(provenance.endpoint_manifest(before_args)))
+            after_manifest.write_bytes(provenance.canonical(provenance.endpoint_manifest(after_args)))
+            receipt = root / "pair-receipt.json"
+            receipt.write_bytes(b"pair receipt")
+            output = root / "qualification"
+            cpu = min(os.sched_getaffinity(0))
+            arguments = [
+                str(before_binary),
+                str(after_binary),
+                str(output),
+                "5",
+                str(cpu),
+                "--before-manifest",
+                str(before_manifest),
+                "--after-manifest",
+                str(after_manifest),
+                "--original-to-final-policy",
+                str(policy.ROOT / policy.POLICY_RELATIVE),
+                "--original-to-final-receipt",
+                str(receipt),
+            ]
+            with (
+                mock.patch.object(policy, "verify_pair_receipt", side_effect=fake_verify),
+                mock.patch.object(runner, "guard", return_value="guard"),
+                mock.patch.object(
+                    runner,
+                    "routes",
+                    side_effect=lambda *_args: (list(reviewed_routes), {"routes": list(reviewed_routes)}),
+                ),
+                mock.patch.object(runner, "run_probe", side_effect=fake_probe),
+                mock.patch.object(sys, "argv", [str(runner_path), *arguments]),
+            ):
+                self.assertEqual(runner.main(), 0)
+
+            self.assertEqual(len(verify_calls), 1)
+            manifest = json.loads((output / "manifest.json").read_text())
+            self.assertEqual(manifest["status"], "complete; analyze.py review pending")
+            self.assertEqual(manifest["routes"], reviewed_routes)
+            self.assertEqual(manifest["provenance"]["before"]["routes"], reviewed_routes)
+            self.assertEqual(manifest["provenance"]["after"]["routes"], reviewed_routes)
 
     def test_pair_receipt_binds_metadata_and_route_order(self) -> None:
         expected = {
