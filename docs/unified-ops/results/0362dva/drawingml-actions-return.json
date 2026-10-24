@@ -6,7 +6,9 @@
     "precommit_parent": "9034328f32657bec6b144f607bfe71e5caf7d1f3",
     "postcommit_source": "9e35acd7f7",
     "postcommit_tree": "ff397ceb78307f860b156471cbc37f5ddbb471f8",
-    "execution_phase": "Cargo commands ran on the prepared pre-commit working tree; the source and consumer changes were committed as postcommit_source. The final post-commit checks below are non-Cargo static checks and status checks.",
+    "followup_source": "f5514ea4135ea26e912b275050b48359f365e419",
+    "followup_tree": "57a6908516fad835d6a65994f9198f74599225f1",
+    "execution_phase": "Cargo commands ran on the prepared pre-commit working tree before the O(1) follow-up. The source and consumer changes were committed as postcommit_source; the follow-up deferral and typed-limit repair were committed as followup_source. No Cargo rerun was needed after that repair; final checks are non-Cargo static checks and status checks.",
     "lock": {
       "path": "Cargo.lock",
       "source": "/home/zhuhe/code/litchi-worktrees/uo2-budget-validation/Cargo.lock",
@@ -94,7 +96,8 @@
   },
   "notes": [
     "The large rustdoc JSON and all command logs remain outside the repository; no evidence artifact at or above 1 MiB is committed.",
-    "Prepared owner routes use Arc-held source/profile state for O(1) edit entry and exact no-op replay; changed replay is read back before publication.",
+    "Prepared owner routes use Arc-held source/profile state for O(1) edit entry and exact no-op replay; edit entry validates only scalar options, while profile-wide limits are deferred to commit (including no-op commits), and changed replay is read back before publication.",
+    "LimitKind maps every stable action budget resource, including retained source admission, through the actual limit-error helper rather than remaining declaration-only vocabulary.",
     "The glossary collision is reported as a diagnostic for the resolver/checker follow-up; no public alias or proc-macro workaround was introduced."
   ]
 }
