@@ -34,7 +34,7 @@ final paired qualification. This binding update preserves the fixed 173dd
 baseline, all routes, proof checks and measurement boundaries.
 
 Build-free validation: `python3 -m unittest tools.test_odf_shared_triad_runner
-tools.test_odf_shared_triad_paired_runner` passes 56 tests, with no failures
+tools.test_odf_shared_triad_paired_runner` passes 16 tests, with no failures
 or skips. The external log is
 `.coord/final-acceptance-2026-10-24/odf-manifest-binding-tests.log`
 (115 bytes, SHA-256 `0c5b9385d3e288ccac90e88b3a2e57269f17a8cbc122007aafa74ce027262458`). No native
