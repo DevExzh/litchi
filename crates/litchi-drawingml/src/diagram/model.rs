@@ -19,6 +19,23 @@ const DGM_NAMESPACE_STRICT_BYTES: &[u8] = b"http://purl.oclc.org/ooxml/drawingml
 const DML_NAMESPACE_BYTES: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
 const DML_NAMESPACE_STRICT_BYTES: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SmartArtNamespace {
+    Diagram,
+    Drawing,
+    Other,
+}
+
+fn namespace_kind(resolved: &ResolveResult<'_>) -> SmartArtNamespace {
+    if is_dgm_namespace(resolved) {
+        SmartArtNamespace::Diagram
+    } else if is_dml_namespace(resolved) {
+        SmartArtNamespace::Drawing
+    } else {
+        SmartArtNamespace::Other
+    }
+}
+
 /// `SmartArt` diagram type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DiagramType {
@@ -191,13 +208,18 @@ impl SmartArt {
         let mut text_bytes = 0_usize;
         let mut depth = 0_usize;
         let mut xml_nodes = 0_usize;
-        let mut stack: Vec<(bool, Vec<u8>)> = Vec::new();
+        let mut stack: Vec<(SmartArtNamespace, Vec<u8>)> = Vec::new();
         let mut root_seen = false;
         let mut root_closed = false;
         let max_depth = limits.xml_depth_value().min(128);
         let max_xml_nodes = limits.xml_nodes_value().min(200_000);
+        let max_points = limits.points_value().min(100_000);
+        let max_connections = limits.connections_value().min(100_000);
         let max_nodes = limits.nodes_value().min(200_000);
-        let max_text = limits.node_text_bytes_value().min(1024 * 1024);
+        let max_node_depth = limits.node_depth_value().min(128);
+        let max_text = limits.data_text_bytes_value().min(1024 * 1024);
+        let mut point_list_seen = false;
+        let mut connection_list_seen = false;
 
         loop {
             buffer.clear();
@@ -224,8 +246,9 @@ impl SmartArt {
                     if depth > max_depth {
                         return Err(Error::limit(LimitKind::XmlDepth, depth, max_depth));
                     }
-                    let dgm = is_dgm_namespace(&resolved);
-                    let dml = is_dml_namespace(&resolved);
+                    let namespace = namespace_kind(&resolved);
+                    let dgm = namespace == SmartArtNamespace::Diagram;
+                    let dml = namespace == SmartArtNamespace::Drawing;
                     let local = element.local_name().as_ref().to_vec();
                     if depth == 1 {
                         if root_seen {
@@ -244,21 +267,47 @@ impl SmartArt {
                             "the SmartArt data model has a nested root".to_owned(),
                         ));
                     }
-                    let parent = stack
-                        .last()
-                        .filter(|(is_dgm, _)| *is_dgm)
-                        .map(|(_, name)| name.as_slice());
-                    if dgm && local == b"pt" && parent == Some(b"ptLst".as_slice()) {
+                    let parent = stack.last().map(|(kind, name)| (*kind, name.as_slice()));
+                    if dgm && local == b"dataModel" {
+                        return Err(Error::Invalid(
+                            "the SmartArt data model has a nested root".to_owned(),
+                        ));
+                    } else if dgm && local == b"ptLst" {
+                        if parent != Some((SmartArtNamespace::Diagram, b"dataModel".as_slice()))
+                            || point_list_seen
+                        {
+                            return Err(Error::Invalid(
+                                "the SmartArt point list is misplaced or duplicated".to_owned(),
+                            ));
+                        }
+                        point_list_seen = true;
+                    } else if dgm && local == b"cxnLst" {
+                        if parent != Some((SmartArtNamespace::Diagram, b"dataModel".as_slice()))
+                            || !point_list_seen
+                            || connection_list_seen
+                        {
+                            return Err(Error::Invalid(
+                                "the SmartArt connection list is misplaced or duplicated"
+                                    .to_owned(),
+                            ));
+                        }
+                        connection_list_seen = true;
+                    } else if dgm && local == b"pt" {
+                        if parent != Some((SmartArtNamespace::Diagram, b"ptLst".as_slice())) {
+                            return Err(Error::Invalid(
+                                "the SmartArt point is outside its point list".to_owned(),
+                            ));
+                        }
                         if current_point.is_some() {
                             return Err(Error::Invalid(
                                 "nested SmartArt points are invalid".to_owned(),
                             ));
                         }
-                        if points.len() >= max_nodes {
+                        if points.len() >= max_points {
                             return Err(Error::limit(
-                                LimitKind::DiagramNodes,
+                                LimitKind::DiagramPoints,
                                 points.len() + 1,
-                                max_nodes,
+                                max_points,
                             ));
                         }
                         let id = attribute_value(element, b"modelId")?
@@ -271,14 +320,43 @@ impl SmartArt {
                             text: None,
                         });
                         current_point = Some(points.len() - 1);
-                    } else if dgm && local == b"cxn" && parent == Some(b"cxnLst".as_slice()) {
+                    } else if dgm && local == b"cxn" {
+                        if parent != Some((SmartArtNamespace::Diagram, b"cxnLst".as_slice())) {
+                            return Err(Error::Invalid(
+                                "the SmartArt connection is outside its connection list"
+                                    .to_owned(),
+                            ));
+                        }
+                        if connections.len() >= max_connections {
+                            return Err(Error::limit(
+                                LimitKind::DiagramConnections,
+                                connections.len() + 1,
+                                max_connections,
+                            ));
+                        }
+                        let source_order = attribute_value(element, b"srcOrd")?
+                            .map(|value| {
+                                value.parse::<usize>().map_err(|_| {
+                                    Error::Invalid(
+                                        "the SmartArt connection source order is invalid"
+                                            .to_owned(),
+                                    )
+                                })
+                            })
+                            .transpose()?
+                            .unwrap_or(connections.len());
                         connections.push(RawConnection {
                             kind: attribute_value(element, b"type")?
                                 .unwrap_or_else(|| "parOf".to_owned()),
                             source: attribute_value(element, b"srcId")?.unwrap_or_default(),
                             destination: attribute_value(element, b"destId")?.unwrap_or_default(),
+                            source_order,
                         });
-                    } else if dgm && local == b"t" && current_point.is_some() {
+                    } else if dgm
+                        && local == b"t"
+                        && parent == Some((SmartArtNamespace::Diagram, b"pt".as_slice()))
+                        && current_point.is_some()
+                    {
                         in_text_body = true;
                         in_text_run = false;
                         current_text.clear();
@@ -286,7 +364,7 @@ impl SmartArt {
                     } else if dml && local == b"t" && in_text_body {
                         in_text_run = true;
                     }
-                    stack.push((dgm, local));
+                    stack.push((namespace, local));
                 },
                 Event::Empty(ref element) => {
                     xml_nodes = xml_nodes.checked_add(1).ok_or_else(|| {
@@ -306,7 +384,8 @@ impl SmartArt {
                     if child_depth > max_depth {
                         return Err(Error::limit(LimitKind::XmlDepth, child_depth, max_depth));
                     }
-                    let dgm = is_dgm_namespace(&resolved);
+                    let namespace = namespace_kind(&resolved);
+                    let dgm = namespace == SmartArtNamespace::Diagram;
                     let local = element.local_name().as_ref().to_vec();
                     if depth == 0 {
                         if root_seen {
@@ -323,16 +402,42 @@ impl SmartArt {
                             "the SmartArt data model root is empty".to_owned(),
                         ));
                     }
-                    let parent = stack
-                        .last()
-                        .filter(|(is_dgm, _)| *is_dgm)
-                        .map(|(_, name)| name.as_slice());
-                    if dgm && local == b"pt" && parent == Some(b"ptLst".as_slice()) {
-                        if points.len() >= max_nodes {
+                    let parent = stack.last().map(|(kind, name)| (*kind, name.as_slice()));
+                    if dgm && local == b"dataModel" {
+                        return Err(Error::Invalid(
+                            "the SmartArt data model has a nested root".to_owned(),
+                        ));
+                    } else if dgm && local == b"ptLst" {
+                        if parent != Some((SmartArtNamespace::Diagram, b"dataModel".as_slice()))
+                            || point_list_seen
+                        {
+                            return Err(Error::Invalid(
+                                "the SmartArt point list is misplaced or duplicated".to_owned(),
+                            ));
+                        }
+                        point_list_seen = true;
+                    } else if dgm && local == b"cxnLst" {
+                        if parent != Some((SmartArtNamespace::Diagram, b"dataModel".as_slice()))
+                            || !point_list_seen
+                            || connection_list_seen
+                        {
+                            return Err(Error::Invalid(
+                                "the SmartArt connection list is misplaced or duplicated"
+                                    .to_owned(),
+                            ));
+                        }
+                        connection_list_seen = true;
+                    } else if dgm && local == b"pt" {
+                        if parent != Some((SmartArtNamespace::Diagram, b"ptLst".as_slice())) {
+                            return Err(Error::Invalid(
+                                "the SmartArt point is outside its point list".to_owned(),
+                            ));
+                        }
+                        if points.len() >= max_points {
                             return Err(Error::limit(
-                                LimitKind::DiagramNodes,
+                                LimitKind::DiagramPoints,
                                 points.len() + 1,
-                                max_nodes,
+                                max_points,
                             ));
                         }
                         let id = attribute_value(element, b"modelId")?
@@ -344,12 +449,37 @@ impl SmartArt {
                             kind,
                             text: None,
                         });
-                    } else if dgm && local == b"cxn" && parent == Some(b"cxnLst".as_slice()) {
+                    } else if dgm && local == b"cxn" {
+                        if parent != Some((SmartArtNamespace::Diagram, b"cxnLst".as_slice())) {
+                            return Err(Error::Invalid(
+                                "the SmartArt connection is outside its connection list"
+                                    .to_owned(),
+                            ));
+                        }
+                        if connections.len() >= max_connections {
+                            return Err(Error::limit(
+                                LimitKind::DiagramConnections,
+                                connections.len() + 1,
+                                max_connections,
+                            ));
+                        }
+                        let source_order = attribute_value(element, b"srcOrd")?
+                            .map(|value| {
+                                value.parse::<usize>().map_err(|_| {
+                                    Error::Invalid(
+                                        "the SmartArt connection source order is invalid"
+                                            .to_owned(),
+                                    )
+                                })
+                            })
+                            .transpose()?
+                            .unwrap_or(connections.len());
                         connections.push(RawConnection {
                             kind: attribute_value(element, b"type")?
                                 .unwrap_or_else(|| "parOf".to_owned()),
                             source: attribute_value(element, b"srcId")?.unwrap_or_default(),
                             destination: attribute_value(element, b"destId")?.unwrap_or_default(),
+                            source_order,
                         });
                     }
                 },
@@ -359,8 +489,20 @@ impl SmartArt {
                             "unexpected SmartArt data-model closing element".to_owned(),
                         ));
                     }
-                    let dgm = is_dgm_namespace(&resolved);
+                    let namespace = namespace_kind(&resolved);
+                    let dgm = namespace == SmartArtNamespace::Diagram;
                     let local = element.local_name();
+                    let Some((expected_namespace, expected_local)) = stack.last() else {
+                        return Err(Error::Invalid(
+                            "unexpected SmartArt data-model closing element".to_owned(),
+                        ));
+                    };
+                    if *expected_namespace != namespace || expected_local.as_slice() != local.as_ref()
+                    {
+                        return Err(Error::Invalid(
+                            "SmartArt data-model element names are unbalanced".to_owned(),
+                        ));
+                    }
                     if depth == 1 && (!dgm || local.as_ref() != b"dataModel") {
                         return Err(Error::Invalid(
                             "the SmartArt data model root is not closed".to_owned(),
@@ -374,7 +516,10 @@ impl SmartArt {
                         }
                         in_text_body = false;
                         in_text_run = false;
-                    } else if is_dml_namespace(&resolved) && local.as_ref() == b"t" && in_text_run {
+                    } else if namespace == SmartArtNamespace::Drawing
+                        && local.as_ref() == b"t"
+                        && in_text_run
+                    {
                         in_text_run = false;
                     }
                     stack.pop();
@@ -395,6 +540,7 @@ impl SmartArt {
                             &mut text_bytes,
                             decoded.as_ref(),
                             max_text,
+                            LimitKind::DiagramDataModelTextBytes,
                         )?;
                     } else if text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
                         return Err(Error::Invalid(
@@ -404,7 +550,13 @@ impl SmartArt {
                 },
                 Event::CData(data) if in_text_body => {
                     let text = String::from_utf8_lossy(data.as_ref());
-                    append_text(&mut current_text, &mut text_bytes, &text, max_text)?;
+                    append_text(
+                        &mut current_text,
+                        &mut text_bytes,
+                        &text,
+                        max_text,
+                        LimitKind::DiagramDataModelTextBytes,
+                    )?;
                 },
                 Event::CData(_) => {
                     return Err(Error::Invalid("CDATA is outside SmartArt text".to_owned()));
@@ -416,7 +568,13 @@ impl SmartArt {
                     let entity = format!("&{name};");
                     let text = quick_xml::escape::unescape(&entity)
                         .map_err(|error| Error::Xml(error.to_string()))?;
-                    append_text(&mut current_text, &mut text_bytes, &text, max_text)?;
+                    append_text(
+                        &mut current_text,
+                        &mut text_bytes,
+                        &text,
+                        max_text,
+                        LimitKind::DiagramDataModelTextBytes,
+                    )?;
                 },
                 Event::GeneralRef(_) => {
                     return Err(Error::Invalid(
@@ -429,14 +587,45 @@ impl SmartArt {
             }
         }
 
-        if !root_seen || !root_closed || depth != 0 || !stack.is_empty() || in_text_body {
+        if !root_seen
+            || !root_closed
+            || !point_list_seen
+            || depth != 0
+            || !stack.is_empty()
+            || in_text_body
+        {
             return Err(Error::Invalid("unterminated SmartArt data XML".to_owned()));
         }
+        let mut point_ids = HashMap::with_capacity(points.len());
+        for point in &points {
+            if point_ids.insert(point.id.clone(), ()).is_some() {
+                return Err(Error::Invalid(
+                    "duplicate SmartArt point identifier".to_owned(),
+                ));
+            }
+        }
+        let document_id = points
+            .iter()
+            .find(|point| point.kind == "doc")
+            .map(|point| point.id.clone());
         let mut content = Vec::new();
         let mut index_by_id = HashMap::new();
-        for point in points.into_iter().filter(|point| {
-            point.kind != "doc" && point.text.as_deref().is_some_and(|text| !text.is_empty())
-        }) {
+        for point in points
+            .into_iter()
+            .filter(|point| {
+                !matches!(
+                    point.kind.as_str(),
+                    "doc" | "pres" | "parTrans" | "sibTrans"
+                )
+            })
+        {
+            if content.len() >= max_nodes {
+                return Err(Error::limit(
+                    LimitKind::DiagramNodes,
+                    content.len() + 1,
+                    max_nodes,
+                ));
+            }
             if index_by_id
                 .insert(point.id.clone(), content.len())
                 .is_some()
@@ -448,42 +637,70 @@ impl SmartArt {
             content.push(point);
         }
         let mut parents = vec![None; content.len()];
+        let mut parent_seen = vec![false; content.len()];
+        let mut parent_orders = vec![None; content.len()];
         for connection in connections
             .into_iter()
             .filter(|connection| connection.kind == "parOf")
         {
             let Some(&child) = index_by_id.get(&connection.destination) else {
-                continue;
+                return Err(Error::Invalid(
+                    "a SmartArt parent connection has a dangling destination".to_owned(),
+                ));
             };
-            let parent = index_by_id.get(&connection.source).copied();
-            if let Some(previous) = parents[child]
-                && Some(previous) != parent
-            {
+            let parent = if document_id.as_deref() == Some(connection.source.as_str()) {
+                None
+            } else {
+                Some(*index_by_id.get(&connection.source).ok_or_else(|| {
+                    Error::Invalid(
+                        "a SmartArt parent connection has a dangling source".to_owned(),
+                    )
+                })?)
+            };
+            if parent_seen[child] {
                 return Err(Error::Invalid(
                     "a SmartArt point has multiple parents".to_owned(),
                 ));
             }
+            parent_seen[child] = true;
             parents[child] = parent;
+            parent_orders[child] = Some(connection.source_order);
         }
         let mut children = vec![Vec::new(); content.len()];
         let mut roots = Vec::new();
         for (index, parent) in parents.iter().copied().enumerate() {
             if let Some(parent) = parent {
-                children[parent].push(index);
+                // The source order on a parOf connection is the semantic
+                // sibling order.  Preserve the XML order only as a stable
+                // tie-breaker for malformed-but-readable inputs that repeat
+                // an order value.
+                children[parent].push((parent_orders[index].unwrap_or(usize::MAX), index));
             } else {
                 roots.push(index);
             }
+        }
+        roots.sort_unstable_by_key(|index| parent_orders[*index].unwrap_or(usize::MAX));
+        for siblings in &mut children {
+            siblings.sort_unstable_by_key(|(order, index)| (*order, *index));
         }
         let mut visiting = vec![false; content.len()];
         let mut visited = vec![false; content.len()];
         fn build(
             index: usize,
-            depth: u32,
+            depth: usize,
             content: &[RawPoint],
-            children: &[Vec<usize>],
+            children: &[Vec<(usize, usize)>],
             visiting: &mut [bool],
             visited: &mut [bool],
+            max_depth: usize,
         ) -> Result<DiagramNode> {
+            if depth > max_depth {
+                return Err(Error::limit(
+                    LimitKind::DiagramNodeDepth,
+                    depth,
+                    max_depth,
+                ));
+            }
             if visiting[index] {
                 return Err(Error::Invalid(
                     "the SmartArt point graph contains a cycle".to_owned(),
@@ -491,15 +708,20 @@ impl SmartArt {
             }
             visiting[index] = true;
             let mut node = DiagramNode::new(content[index].text.as_deref().unwrap_or_default());
-            node.depth = depth;
-            for &child in &children[index] {
+            node.depth = u32::try_from(depth)
+                .map_err(|_| Error::Invalid("SmartArt node depth overflows".to_owned()))?;
+            for &(_, child) in &children[index] {
+                let child_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| Error::Invalid("SmartArt node depth overflows".to_owned()))?;
                 node.children.push(build(
                     child,
-                    depth.saturating_add(1),
+                    child_depth,
                     content,
                     children,
                     visiting,
                     visited,
+                    max_depth,
                 )?);
             }
             visiting[index] = false;
@@ -515,6 +737,7 @@ impl SmartArt {
                 &children,
                 &mut visiting,
                 &mut visited,
+                max_node_depth,
             )?);
         }
         if visited.iter().any(|visited| !visited) {
@@ -538,6 +761,7 @@ struct RawConnection {
     kind: String,
     source: String,
     destination: String,
+    source_order: usize,
 }
 
 fn is_dgm_namespace(resolved: &ResolveResult<'_>) -> bool {
@@ -572,13 +796,19 @@ fn attribute_value(element: &BytesStart<'_>, name: &[u8]) -> Result<Option<Strin
     Ok(None)
 }
 
-fn append_text(output: &mut String, bytes: &mut usize, text: &str, maximum: usize) -> Result<()> {
+fn append_text(
+    output: &mut String,
+    bytes: &mut usize,
+    text: &str,
+    maximum: usize,
+    kind: LimitKind,
+) -> Result<()> {
     let observed = bytes
         .checked_add(text.len())
         .ok_or_else(|| Error::Invalid("SmartArt text length overflows".to_owned()))?;
     if observed > maximum {
         return Err(Error::limit(
-            LimitKind::DiagramNodeTextBytes,
+            kind,
             observed,
             maximum,
         ));
@@ -1674,5 +1904,134 @@ mod tests {
         assert!(drawing.contains("modelId=\"1001\""));
         assert!(drawing.contains("modelId=\"1002\""));
         assert!(drawing.contains("modelId=\"1003\""));
+    }
+
+    fn limits_with(
+        points: usize,
+        connections: usize,
+        data_text_bytes: usize,
+        nodes: usize,
+        node_depth: usize,
+    ) -> Limits {
+        let defaults = Limits::default();
+        Limits::new(
+            defaults.input_bytes_value(),
+            defaults.output_bytes_value(),
+            defaults.xml_nodes_value(),
+            defaults.xml_depth_value(),
+            points,
+            connections,
+            data_text_bytes,
+            nodes,
+            node_depth,
+            defaults.node_text_bytes_value(),
+        )
+    }
+
+    #[test]
+    fn raw_parser_honors_points_connections_text_and_depth_limits() {
+        let xml = concat!(
+            "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">",
+            "<dgm:ptLst>",
+            "<dgm:pt modelId=\"0\" type=\"doc\"/>",
+            "<dgm:pt modelId=\"1\"><dgm:t>parent</dgm:t></dgm:pt>",
+            "<dgm:pt modelId=\"2\"><dgm:t>child</dgm:t></dgm:pt>",
+            "<dgm:pt modelId=\"3\"><dgm:t>grandchild</dgm:t></dgm:pt>",
+            "</dgm:ptLst>",
+            "<dgm:cxnLst>",
+            "<dgm:cxn modelId=\"10\" srcId=\"0\" destId=\"1\" srcOrd=\"0\"/>",
+            "<dgm:cxn modelId=\"11\" srcId=\"1\" destId=\"2\" srcOrd=\"0\"/>",
+            "<dgm:cxn modelId=\"12\" srcId=\"2\" destId=\"3\" srcOrd=\"0\"/>",
+            "</dgm:cxnLst>",
+            "</dgm:dataModel>"
+        );
+        assert!(matches!(
+            SmartArt::parse_data_xml(&xml, &limits_with(2, 100, 100, 100, 100)),
+            Err(Error::Limit {
+                kind: LimitKind::DiagramPoints,
+                ..
+            })
+        ));
+        assert!(matches!(
+            SmartArt::parse_data_xml(&xml, &limits_with(100, 1, 100, 100, 100)),
+            Err(Error::Limit {
+                kind: LimitKind::DiagramConnections,
+                ..
+            })
+        ));
+        assert!(matches!(
+            SmartArt::parse_data_xml(&xml, &limits_with(100, 100, 3, 100, 100)),
+            Err(Error::Limit {
+                kind: LimitKind::DiagramDataModelTextBytes,
+                ..
+            })
+        ));
+        assert!(matches!(
+            SmartArt::parse_data_xml(&xml, &limits_with(100, 100, 100, 100, 1)),
+            Err(Error::Limit {
+                kind: LimitKind::DiagramNodeDepth,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn raw_parser_preserves_empty_parents_and_source_order() {
+        let xml = concat!(
+            "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">",
+            "<dgm:ptLst>",
+            "<dgm:pt modelId=\"0\" type=\"doc\"/>",
+            "<dgm:pt modelId=\"1\"/>",
+            "<dgm:pt modelId=\"2\"><dgm:t>second</dgm:t></dgm:pt>",
+            "<dgm:pt modelId=\"3\"><dgm:t>first</dgm:t></dgm:pt>",
+            "</dgm:ptLst>",
+            "<dgm:cxnLst>",
+            "<dgm:cxn modelId=\"10\" srcId=\"0\" destId=\"1\" srcOrd=\"0\"/>",
+            "<dgm:cxn modelId=\"11\" srcId=\"1\" destId=\"2\" srcOrd=\"1\"/>",
+            "<dgm:cxn modelId=\"12\" srcId=\"1\" destId=\"3\" srcOrd=\"0\"/>",
+            "</dgm:cxnLst>",
+            "</dgm:dataModel>"
+        );
+        let nodes = SmartArt::parse_data_xml(&xml, &Limits::default()).unwrap();
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(nodes[0].text, "");
+        assert_eq!(
+            nodes[0]
+                .children
+                .iter()
+                .map(|node| node.text.as_str())
+                .collect::<Vec<_>>(),
+            ["first", "second"]
+        );
+    }
+
+    #[test]
+    fn raw_parser_rejects_misplaced_roots_and_dangling_parent_connections() {
+        let dgm = "http://schemas.openxmlformats.org/drawingml/2006/diagram";
+        for xml in [
+            format!("<dgm:dataModel xmlns:dgm=\"{dgm}\"></dgm:dataModel>"),
+            format!(
+                "<dgm:dataModel xmlns:dgm=\"{dgm}\"><dgm:pt modelId=\"1\"/></dgm:dataModel>"
+            ),
+            format!(
+                "<dgm:dataModel xmlns:dgm=\"{dgm}\"><dgm:ptLst><dgm:ptLst/></dgm:ptLst></dgm:dataModel>"
+            ),
+            format!(
+                "<dgm:dataModel xmlns:dgm=\"{dgm}\"><dgm:ptLst><dgm:pt modelId=\"1\"/></dgm:ptLst><dgm:cxn modelId=\"2\"/></dgm:dataModel>"
+            ),
+            format!(
+                "<dgm:dataModel xmlns:dgm=\"{dgm}\"><dgm:ptLst><dgm:dataModel/></dgm:ptLst></dgm:dataModel>"
+            ),
+        ] {
+            assert!(SmartArt::parse_data_xml(&xml, &Limits::default()).is_err(), "{xml}");
+        }
+
+        let dangling = format!(
+            "<dgm:dataModel xmlns:dgm=\"{dgm}\"><dgm:ptLst><dgm:pt modelId=\"0\" type=\"doc\"/><dgm:pt modelId=\"1\"/></dgm:ptLst><dgm:cxnLst><dgm:cxn modelId=\"2\" srcId=\"0\" destId=\"missing\"/></dgm:cxnLst></dgm:dataModel>"
+        );
+        assert!(matches!(
+            SmartArt::parse_data_xml(&dangling, &Limits::default()),
+            Err(Error::Invalid(_))
+        ));
     }
 }

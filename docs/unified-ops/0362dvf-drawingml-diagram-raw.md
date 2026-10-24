@@ -93,7 +93,7 @@ included.
 No fixture or performance artifact is added by this source migration. The
 focused qualification used one build job, offline locked dependencies, the
 repository memory-capped cargo shim, and an external target below 20 GB. The
-DrawingML all-feature library/integration run passed 240 unit tests and all
+DrawingML all-feature library/integration run passed 245 unit tests and all
 integration suites. All-feature library checks passed for `litchi-docx`,
 `litchi-pptx`, and `litchi-ops`; the four changed `litchi` SmartArt examples,
 the DOCX residue benchmark example, and the standalone unified SmartArt

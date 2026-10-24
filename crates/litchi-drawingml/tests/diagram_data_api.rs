@@ -62,3 +62,14 @@ fn invalid_fixed_domain_values_never_reach_the_public_model() {
     );
     assert!(parse(xml).is_err());
 }
+
+#[test]
+fn nested_data_model_root_is_rejected() {
+    let xml = concat!(
+        "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">",
+        "<dgm:ptLst><dgm:pt modelId=\"1\"/></dgm:ptLst>",
+        "<dgm:dataModel><dgm:ptLst/></dgm:dataModel>",
+        "</dgm:dataModel>"
+    );
+    assert!(parse(xml).is_err());
+}

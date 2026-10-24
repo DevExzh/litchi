@@ -344,6 +344,10 @@ impl Spec {
         // The path of child indexes to the last node at each depth.
         let path_capacity = limits.node_depth_value().min(MAX_DEPTH as usize);
         let mut path: Vec<usize> = Vec::with_capacity(path_capacity);
+        let max_nodes = limits.nodes_value().min(MAX_NODES);
+        let max_depth = limits.node_depth_value().min(MAX_DEPTH as usize);
+        let max_text = limits.node_text_bytes_value().min(MAX_NODE_TEXT);
+        let mut node_count = 0_usize;
         for line in normalized.split('\n') {
             let line = line.strip_suffix('\r').unwrap_or(line);
             if line.trim().is_empty() {
@@ -362,10 +366,41 @@ impl Spec {
                 level += 1;
             }
             let rest = rest.trim();
+            if level > max_depth {
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodeDepth,
+                    level,
+                    max_depth,
+                ));
+            }
             if level > path.len() {
                 return Err(Error::Invalid(format!(
                     "outline line \"{rest}\" is indented more than one level below the line before it"
                 )));
+            }
+            node_count = node_count
+                .checked_add(1)
+                .ok_or_else(|| Error::Invalid("SmartArt node count overflows".to_owned()))?;
+            if node_count > max_nodes {
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodes,
+                    node_count,
+                    max_nodes,
+                ));
+            }
+            if rest.len() > max_text {
+                return Err(Error::limit(
+                    crate::LimitKind::SmartArtNodeTextBytes,
+                    rest.len(),
+                    max_text,
+                ));
+            }
+            if rest.chars().any(|character| {
+                !matches!(character, '\t' | '\n' | '\r' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..)
+            }) {
+                return Err(Error::Invalid(
+                    "SmartArt node text holds a character XML cannot carry".to_owned(),
+                ));
             }
             path.truncate(level);
             let mut siblings = &mut spec.nodes;

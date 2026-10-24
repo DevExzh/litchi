@@ -94,6 +94,9 @@ impl DiagramDataModel {
                         root_seen = true;
                     } else if is_dgm(&namespace) {
                         match local.as_str() {
+                            "dataModel" => {
+                                return Err(invalid("nested data-model root"));
+                            },
                             "ptLst" => {
                                 if depth != 2 || point_list_seen {
                                     return Err(invalid("invalid or duplicate diagram point list"));
@@ -205,6 +208,9 @@ impl DiagramDataModel {
                         return Err(invalid("diagram data model lacks its required point list"));
                     } else if is_dgm(&namespace) {
                         match local.as_str() {
+                            "dataModel" => {
+                                return Err(invalid("nested data-model root"));
+                            },
                             "ptLst" => {
                                 if child_depth != 2 || point_list_seen {
                                     return Err(invalid("invalid or duplicate diagram point list"));

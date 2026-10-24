@@ -1387,6 +1387,7 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
     let mut strict = false;
     let mut root_seen = false;
     let mut root_closed = false;
+    let mut sp_tree_seen = false;
     let mut shape_count = 0_usize;
     loop {
         buffer.clear();
@@ -1425,6 +1426,12 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
                     root_seen = true;
                 } else if drawing && local.as_ref() == b"drawing" {
                     return Err(invalid("the diagram drawing has a nested root"));
+                }
+                if drawing && local.as_ref() == b"spTree" && depth == 1 {
+                    if sp_tree_seen {
+                        return Err(invalid("the diagram drawing has duplicate shape trees"));
+                    }
+                    sp_tree_seen = true;
                 }
                 if drawing && local.as_ref() == b"txBody" {
                     let body = read_body(
@@ -1493,6 +1500,12 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
                 if drawing && local.as_ref() == b"drawing" {
                     return Err(invalid("the diagram drawing has a nested root"));
                 }
+                if drawing && local.as_ref() == b"spTree" && depth == 1 {
+                    if sp_tree_seen {
+                        return Err(invalid("the diagram drawing has duplicate shape trees"));
+                    }
+                    sp_tree_seen = true;
+                }
                 if drawing && local.as_ref() == b"sp" {
                     let max_shapes = limits.nodes_value().min(MAX_NODES);
                     shape_count = shape_count
@@ -1544,7 +1557,7 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
             _ => {},
         }
     }
-    if !root_seen || !root_closed || depth != 0 || !models.is_empty() {
+    if !root_seen || !root_closed || !sp_tree_seen || depth != 0 || !models.is_empty() {
         return Err(invalid("unterminated diagram drawing"));
     }
     Ok((shapes, strict))
@@ -1851,6 +1864,15 @@ mod tests {
     #[test]
     fn drawing_rejects_nested_empty_root() {
         let drawing = br#"<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram"><dsp:drawing/></dsp:drawing>"#;
+        assert!(matches!(
+            read_drawing(drawing, &Limits::default()),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn drawing_requires_a_shape_tree() {
+        let drawing = br#"<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram"></dsp:drawing>"#;
         assert!(matches!(
             read_drawing(drawing, &Limits::default()),
             Err(Error::Invalid(_))

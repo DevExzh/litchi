@@ -35,6 +35,46 @@ fn outline_round_trips_and_nests() {
 }
 
 #[test]
+fn outline_applies_custom_limits_before_building_the_tree() {
+    let defaults = Limits::default();
+    let limits = |nodes, node_depth, node_text_bytes| {
+        Limits::new(
+            defaults.input_bytes_value(),
+            defaults.output_bytes_value(),
+            defaults.xml_nodes_value(),
+            defaults.xml_depth_value(),
+            defaults.points_value(),
+            defaults.connections_value(),
+            defaults.data_text_bytes_value(),
+            nodes,
+            node_depth,
+            node_text_bytes,
+        )
+    };
+    assert!(matches!(
+        Spec::parse_outline(Layout::List, "A\nB", &limits(1, 7, 32 * 1024)),
+        Err(Error::Limit {
+            kind: crate::LimitKind::SmartArtNodes,
+            ..
+        })
+    ));
+    assert!(matches!(
+        Spec::parse_outline(Layout::List, "A\n\tB\n\t\tC", &limits(100, 1, 32 * 1024)),
+        Err(Error::Limit {
+            kind: crate::LimitKind::SmartArtNodeDepth,
+            ..
+        })
+    ));
+    assert!(matches!(
+        Spec::parse_outline(Layout::List, "AB", &limits(100, 7, 1)),
+        Err(Error::Limit {
+            kind: crate::LimitKind::SmartArtNodeTextBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn every_layout_writes_parts_that_read_back() {
     for layout in Layout::ALL {
         let limits = Limits::default();
