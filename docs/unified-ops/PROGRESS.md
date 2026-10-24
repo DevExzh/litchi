@@ -3534,8 +3534,62 @@ See [0063](0063-source-pptx-modern-comments.md).
   unchanged. The reviewed 0362uva runner is adopted from its separate path.
   Isolated workspace documentation passes with warnings denied in 1,057.472
   seconds, with no competing builds and a 4,504,969,096-byte final target.
-  The fresh all-68 library inventory is now running sequentially on the same
-  source; every row still needs semantic disposition review. Full gate
+  All 68 fresh library rustdoc captures subsequently pass on the same source:
+  1,094,716,714 JSON bytes, maximum per-command RSS 2,997,526,528 bytes, and
+  maximum target size 5,644,910,073 bytes. The coordinator verifies every
+  artifact and receipt; raw JSON stays external under the reduced 0362uma
+  capture receipt. The final inventory generator then fails on the facade's
+  foreign module glob `litchi_core::detection`, before emitting findings.
+  The process exits 2 and the run remains explicitly incomplete. Header-only
+  output is not zero debt; resolver repair and independent coverage review
+  are required before the full gate launch. Every row still needs semantic
+  disposition review. Full gate
   completion on this source, all-68 closure, actual OfficeCLI corpus replay,
   glossary closure and quiet native qualification remain required. Only
   comprehensive redaction audit 22 is deferred. Nothing is pushed.
+
+- Coordinator checkpoint (2026-10-24, complete capture and inventory findings):
+  All 68 frozen-49c rustdoc artifacts pass independent identity and hash
+  verification. The failed aggregate run remains unchanged. Reviewed repair
+  `2099c66520` merges at `fae96321e3`: the inventory follows explicitly
+  delegated facade roots, requires their JSON inputs, retains local facade
+  findings, and removes only exact duplicate rows. The diagnostic rerun
+  produces 440 unique rows from the 442 pre-dedup findings. Record 0362ul1
+  distinguishes the captured source from the repaired tooling; this is not
+  final-source inventory closure or a disposition waiver.
+
+  Reviewed OPC protocol `80983c725d` merges at `945eb1d6b9`. Its exact and
+  4 KiB forward-read oracles, bounded builds, source identities and quiet-host
+  validation are explicit; no measurement has run. Cleanup thirty-five
+  removes its merged leaf with zero payloads and retains the branch.
+  Reviewed W8 packet `e814e4512f` merges at `54398757b8`: the candidate
+  binding uses 49c and preserves the pristine f2 baseline and historical
+  lock. Its analyzer now validates the original-to-final pair mode, with a
+  complete 109-route regression in the existing registered test module.
+  The coordinator independently hashes the external 6,630,123,520-byte
+  candidate archive. All 119 composed inventory, glossary and W8 tests pass
+  at `fae96321e3`; the W8 policy remains preparation only, pending the next
+  production source and native qualification.
+
+  Cleanup thirty-six removes the two reviewed inventory/W8 leaves, retaining
+  both branches and all 15 ignored files (598,662 bytes) in verified
+  quarantine. The three leaves removed in this checkpoint are no longer
+  active worktrees; current API repair worktrees and targets remain intact.
+
+  Inventory-driven engineering is now split into the six remaining format
+  limits entry points, DrawingML and Markdown publication families, nineteen
+  public error enums, four iWork wire-request compatibility aliases, and
+  replay/type-resolution coverage. The alias repair keeps generated protobuf
+  schema names and wire layouts intact. Diagnostic review identifies 262
+  replay rows requiring policy registration, nine ODF external generic-commit
+  resolution cases and two File owner-registration cases. The File triad's
+  `file`/`into_file` names are explicitly required by 0351 §2.6; they are not
+  new naming exceptions. Raw-value and transport findings require exact
+  semantic evidence before final disposition.
+
+  The full 53-step gate has not been launched on 49c after this capture.
+  Required API repairs will change production source, so final capture,
+  corpus replay, gate, glossary closure and native qualification must bind
+  the resulting assembled source. The documentation pass on 49c remains
+  valid evidence for that revision. Only redaction audit 22 is deferred.
+  Nothing is pushed.

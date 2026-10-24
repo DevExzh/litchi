@@ -1339,3 +1339,50 @@ inodes and event times will differ. All source receipts bind the binaries to
 `f6fe430a4d19d94aa360c0e9ed03ebd757265225`; `49c25ef67f` is only the later
 checkout at deletion time. The corrected reproduction README is 4,277 bytes,
 SHA-256 `d138191537a51d4349e382fba5aeea50bccc40a359efece46b7e769a2afcdad7`.
+
+## Thirty-fifth cleanup: reviewed OPC protocol leaf
+
+The coordinator merged the reviewed OPC read-ahead protocol tip
+`80983c725d9b803f066545e05f8463a25de4120c` at `945eb1d6b9`, then removed
+only `uo2-final-opc-read-ahead-perf` with non-forced worktree removal.
+There were zero ignored or untracked payloads. The branch remains at its
+exact tip; ancestry, the absent worktree and the zero-payload manifest verify.
+The pending W8 leaf, frozen source and external targets were untouched.
+
+Evidence remains under
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave35/`:
+
+- `manifest.json`: 11,174 bytes, SHA-256
+  `8d3b95bdcf8801bad2f4c55c883d389e5ea777cae31f2dec8b7957361cb5ec98`.
+- `receipt.json`: 20,058 bytes, SHA-256
+  `5ee533109c90daf7eb5ec399c6af9b0ed4e7112870a73a90448013503d558ca5`.
+- `restore.py`: 4,865 bytes, SHA-256
+  `8e0a25698e0425d7d89f849ae9ba107d4ba687b5e7607059059fee62a4e6494e`.
+
+This helper requires the worktree to be recreated before invocation; it has
+no `--dry-run` option. No payload restoration is needed for this empty leaf.
+No cache artifacts or measurements were deleted by this cleanup.
+
+## Thirty-sixth cleanup: reviewed inventory and W8 leaves
+
+After merges `54398757b8` and `fae96321e3`, the coordinator removed
+`uo2-w8-final-rebind` at `e814e4512f7414d3e3136699b8a98e37e09710a5`
+and `uo2-inventory-delegated-globs` at
+`2099c66520cace074d788e1e3b5ac5b12ade1587`. Both branch refs remain.
+The 15 ignored files, totaling 598,662 bytes, were quarantined; the
+coordinator independently verified every hash and mode. Removal was
+non-forced. The first preflight stopped on a lingering W8 audit pipeline;
+its owner identified and terminated only that owned process group before
+cleanup rechecked the exact leaf paths. Active repair leaves and targets
+were untouched.
+
+Evidence directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave36/`.
+The 20,692-byte manifest has SHA-256
+`34e8f18483af99f0319f4ee3c210035ce6c244ff758ed74fab6836682f60a2c0`;
+the 21,242-byte receipt has SHA-256
+`7be76f199d9c4488966445a455ed9102847c718397b9defeccf9ceb11834354e`.
+The 4,849-byte restore helper has SHA-256
+`92737064528012e0d8404846876fbf149f5590f3d2da1e00a86d773b5c1c6fe9`.
+Its CLI is `python3 restore.py [leaf]`, after recreating the selected
+worktree; it has no `--dry-run` option.
