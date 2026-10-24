@@ -17,8 +17,8 @@
   "source": [
     {
       "path": "tools/native_qualification_runner.py",
-      "bytes": 151991,
-      "sha256": "3c7827d8e17c151e1e8f16b4f46bb5d9ae68fb0d16db4ec63bd48bdf91935060"
+      "bytes": 152560,
+      "sha256": "597c2e46027b11c7f882d7ae28bc3c8b3a8abff9d92e015fbb25e6be32a8752c"
     },
     {
       "path": "tools/test_native_qualification_runner.py",
@@ -60,7 +60,7 @@
       "tests_passed": 30,
       "log": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-overlap-protocol-20261024/native-runner-tests.log",
       "log_bytes": 6058,
-      "log_sha256": "28743d29af63ed0ddeb894dee8ede64673a5be14768e1bf9fd69e09ef9e43cde"
+      "log_sha256": "28bd13f6313947522970ece44313a324dafc9c1a2244ed4ce75f9a5a3f2200e4"
     },
     {
       "command": "python3 -m unittest tools.test_drawingml_raw_qualification tools.test_legacy_native_qualification -v",
@@ -68,7 +68,7 @@
       "tests_passed": 31,
       "log": "/home/zhuhe/code/litchi-worktrees/.coord/cfb-compile-overlap-protocol-20261024/paired-legacy-tests.log",
       "log_bytes": 5941,
-      "log_sha256": "c0e3c58176d3dd1e23218ca30eafa81358b1715a5afd7d78b9caa1151c57c3c9"
+      "log_sha256": "4cc8b5662f98f28f94fbc5efb86123553e4fa3c24a6bf3f4e059579029f6bd12"
     }
   ],
   "claims": {

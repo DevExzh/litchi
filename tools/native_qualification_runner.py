@@ -1785,6 +1785,12 @@ class BuildOverlapLease:
         }
         if self.lease_path is not None and self.lease_path.is_file() and not self.lease_path.is_symlink():
             record["lease_sha256"], record["lease_bytes"] = _sha256_file(self.lease_path)
+            try:
+                lease_value = json.loads(self.lease_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                lease_value = None
+            if isinstance(lease_value, dict):
+                record["lease_status"] = lease_value.get("status")
         return record
 
     def release(self) -> None:
@@ -2663,17 +2669,18 @@ class SafeRunner:
                 identities[leg]["artifacts"] = artifacts
                 identities[leg]["target_final_bytes"] = self._check_target(target)
             self._capture_overlap_end()
+            if self.overlap_lease is not None:
+                self.overlap_lease.release()
             self._write_receipt("passed", identities=identities, events=self.recorded_events)
         except (BaseException,) as error:
             try:
                 self._capture_overlap_end()
             except RunnerError:
                 pass
-            self._write_receipt("failed", identities=identities, events=self.recorded_events, error=str(error))
-            raise
-        finally:
             if self.overlap_lease is not None:
                 self.overlap_lease.release()
+            self._write_receipt("failed", identities=identities, events=self.recorded_events, error=str(error))
+            raise
 
     def _load_build_receipt(self) -> dict[str, Any]:
         path = self.output / "build-receipt.json"
