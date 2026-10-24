@@ -1028,3 +1028,31 @@ the 1,639-byte restore helper has SHA-256
 `f5b3ad7169441de455310d76374f0c8bce50b1d07299b6368fd16686a6f8050d`.
 Recreate the leaves from their retained branches, then run the adjacent
 `restore.py`.
+
+
+## Twenty-seventh cleanup, 2026-10-24
+
+The reviewed W4b/W5 historical-probe leaf was removed without force after
+merge at `f6fe430a4d19d94aa360c0e9ed03ebd757265225`. Its retained branch
+`uo2/w4b-baseline-compat` points to
+`ccc536d5242cefcc6f58df200342c38faa5ec91e`. The first attempt correctly
+left the leaf intact while two review searches held it; their owner stopped
+only those searches before the final process checks and removal.
+
+The sparse checkout measured 16,750,285 apparent bytes before removal. Four
+ignored bytecode files totaling 185,161 bytes remain hash-quarantined. The
+coordinator verified every payload's size, hash and mode, the retained ref,
+merge ancestry, removed path and all four protected native source endpoints.
+Native baseline/candidate endpoints, external targets and logs remain intact.
+
+External directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/`.
+The successful `wave27-w4b-success.json` is 2,889 bytes, SHA-256
+`1e69594e4eb3aa1a6a99ce06464a2cf15624f898cb9851a9d493dc92a30d7db2`.
+The earlier 3,137-byte blocked receipt is retained, SHA-256
+`6b13e5584001370a7bd4227bd1598d20a03062fb6635a7ebde0f7aeeb6551f51`.
+Under `quarantine/wave27-w4b/`, the 1,210-byte manifest has SHA-256
+`4b387d4d6b2d193b3e04c29e42f9994ff2d126bf42d5869f90d01e9f8a260bc1`;
+the 1,489-byte restore helper has SHA-256
+`cb07b3abea6858b661984627c73c01f8e3cf69289836308d95168b05c7542536`.
+Recreate the leaf from its retained branch, then run that `restore.py`.

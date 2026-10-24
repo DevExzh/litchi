@@ -3360,3 +3360,47 @@ See [0063](0063-source-pptx-modern-comments.md).
   gate, all-68 inventory, actual corpus replay, glossary closure and quiet
   native qualification. Only comprehensive redaction audit 22 is deferred.
   Nothing is pushed.
+
+
+- Coordinator checkpoint (2026-10-24, feature correction and frozen acceptance):
+  The full gate on b673 passed its first 17 steps and returned an unused ODF
+  helper in the ODG-only profile. Correction `e1576fa6dc` matches the helper
+  to its production callers and ODB-only tests; all eight remaining strict
+  feature profiles pass. Record 0362ugx retains both failed attempts and the
+  passing selection. The ownership guard also correctly rejected an iWork
+  fixture generator that used the gate checkout; its owner validation remains
+  content-only diagnostic evidence, with an explicit operational rejection.
+
+  Reviewed historical W4b/W5 probe adapters `ccc536d524` merge at
+  `f6fe430a4d19d94aa360c0e9ed03ebd757265225`. They preserve all workloads,
+  including both DOC publication controls, and translate only the historical
+  selector/options/result API differences. All 21 protocol tests and the
+  historical consumer compilation checks pass. Record 0362ugy binds exact
+  source, overlays, locks and commands; no diagnostic compilation is treated
+  as native qualification.
+
+  Production/protocol source is frozen at that f6fe merge. The fresh full
+  53-step gate has passed formatting, combined strict consumers and every
+  per-format strict profile (25 steps); remaining tests and documentation are
+  running. Receipt-only commits retain that exact acceptance source. Required
+  production or protocol fixes will trigger a new freeze.
+
+  Independent iWork constructor/owner and DOCX Ink diagnostic verification
+  finds no artifact mismatch. Constructor variants validate 15 routes each;
+  owner variants validate four each, subject to the operational rejection
+  above. Ink native/allocation untimed outputs match. ODP diagnostics exposed
+  differing dependency resolutions, so a fresh e4-backed projection now
+  matches f6fe across all 204 external lock records and 157 ODP external
+  dependency rows. The coordinator verified the matched sets and corrected
+  provenance identities. Quiet native execution remains pending.
+
+  Cleanup twenty-seven removes the merged W4b/W5 leaf after its reviewer
+  stops two owned stale searches. The branch, all native endpoints, targets
+  and logs remain. Four ignored files are hash-quarantined with a restore
+  helper; the coordinator independently verified every payload and retained
+  source ref.
+
+  Source integration remains staging. Full gate completion, all-68 inventory
+  and dispositions, actual corpus replay, glossary closure and quiet native
+  qualification remain required. Only comprehensive redaction audit 22 is
+  deferred. Nothing is pushed.
