@@ -378,8 +378,12 @@ fn assert_noop(
         "changed": false,
         "patch_noop": true,
         "operation_count": result.operation_count,
-        "patch_before_exact": result.patch_before.is_some_and(|before| before == source),
-        "patch_after_exact": result.patch_after.is_some_and(|after| after == source),
+        // Some edit families do not expose byte endpoints on their no-op
+        // patch.  Keep those fields absent/null rather than turning the
+        // absence into a false claim; when an endpoint exists it must still
+        // match the source exactly.
+        "patch_before_exact": result.patch_before.as_ref().map(|before| before == source),
+        "patch_after_exact": result.patch_after.as_ref().map(|after| after == source),
         "entry": "commit",
     }))
 }
