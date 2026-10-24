@@ -590,24 +590,24 @@ fn complete_theme_codec_accepts_family_extension_with_inherited_namespace() {
 #[test]
 fn family_edit_preserves_unknown_attributes_children_and_exact_inverse() {
     let source = opaque_family();
-    let snapshot = family::Snapshot::from_xml(source.clone()).expect("opaque family snapshot");
-    assert_eq!(snapshot.xml_bytes(), source.as_slice());
+    let package = family::Package::from_xml(source.clone()).expect("opaque family package");
+    assert_eq!(package.xml_bytes(), source.as_slice());
 
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit();
     edit.set_name("Edited Office").expect("set family name");
     let commit = edit.commit().expect("commit family edit");
-    assert!(commit.changed());
-    assert_eq!(commit.snapshot().value().name(), "Edited Office");
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.package().value().name(), "Edited Office");
     assert!(
         commit
-            .snapshot()
+            .package()
             .xml_bytes()
             .windows(b"x:marker=\"keep\"".len())
             .any(|window| window == b"x:marker=\"keep\"")
     );
     assert!(
         commit
-            .snapshot()
+            .package()
             .xml_bytes()
             .windows(b"<x:future value=\"keep\"/>".len())
             .any(|window| window == b"<x:future value=\"keep\"/>")
@@ -617,7 +617,7 @@ fn family_edit_preserves_unknown_attributes_children_and_exact_inverse() {
         .patch()
         .clone()
         .inverse()
-        .apply(commit.snapshot())
+        .apply(commit.package())
         .expect("exact inverse family patch");
     assert_eq!(restored.xml_bytes(), source.as_slice());
 }
@@ -625,29 +625,29 @@ fn family_edit_preserves_unknown_attributes_children_and_exact_inverse() {
 #[test]
 fn scalar_family_update_preserves_processing_tokens_in_opaque_markup() {
     let source = opaque_markup_with_processing_token();
-    let snapshot = family::Snapshot::from_xml(source.clone()).expect("opaque family snapshot");
-    let mut edit = snapshot.edit();
+    let package = family::Package::from_xml(source.clone()).expect("opaque family package");
+    let mut edit = package.edit();
     edit.set_name("Edited Office").expect("set family name");
     let commit = edit
         .commit()
         .expect("scalar update preserves opaque comment and CDATA");
-    assert_eq!(commit.snapshot().value().name(), "Edited Office");
+    assert_eq!(commit.package().value().name(), "Edited Office");
     assert!(
         commit
-            .snapshot()
+            .package()
             .xml_bytes()
             .windows(b"<!-- opaque <? marker -->".len())
             .any(|window| window == b"<!-- opaque <? marker -->")
     );
     assert!(
         commit
-            .snapshot()
+            .package()
             .xml_bytes()
             .windows(b"<![CDATA[opaque <? marker]]>".len())
             .any(|window| window == b"<![CDATA[opaque <? marker]]>")
     );
     assert_eq!(
-        family::read(commit.snapshot().xml_bytes())
+        family::read(commit.package().xml_bytes())
             .expect("reopen scalar-updated family")
             .name(),
         "Edited Office"
@@ -758,20 +758,20 @@ fn legal_default_namespace_reset_and_namespace_heavy_foreign_children_round_trip
 #[test]
 fn family_noop_and_stale_source_are_source_checked() {
     let source = opaque_family();
-    let snapshot = family::Snapshot::from_xml(source.clone()).expect("family snapshot");
-    let noop = snapshot.edit().commit().expect("family no-op");
-    assert!(!noop.changed());
-    assert_eq!(noop.snapshot().xml_bytes(), source.as_slice());
+    let package = family::Package::from_xml(source.clone()).expect("family package");
+    let noop = package.edit().commit().expect("family no-op");
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.package().xml_bytes(), source.as_slice());
     assert_eq!(noop.patch().before_xml(), noop.patch().after_xml());
 
-    let mut changed = snapshot.edit();
+    let mut changed = package.edit();
     changed
         .set_id("{11111111-2222-3333-4444-555555555555}")
         .expect("change family id");
     let changed = changed.commit().expect("changed family");
     let other =
-        family::Snapshot::from_xml(source.iter().copied().chain(Some(b' ')).collect::<Vec<_>>())
-            .expect("different source snapshot");
+        family::Package::from_xml(source.iter().copied().chain(Some(b' ')).collect::<Vec<_>>())
+            .expect("different source package");
     assert!(changed.patch().apply(&other).is_err());
 }
 

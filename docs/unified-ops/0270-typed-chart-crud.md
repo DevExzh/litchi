@@ -13,7 +13,7 @@ DOCX charts remain a gap (§6).
 
 | Owner | Could author | Could edit | Could read |
 |---|---|---|---|
-| `litchi-drawingml::chart` | a complete typed `Chart` model and `writer::write` (every classic family, 3D, axes, labels) | `edit::Transaction`: title, language, style, blanks, series title, data-label flags, axis range/position (byte-range, source-preserving) | `reader::read` to the typed model |
+| `litchi-drawingml::chart` | a complete typed `Chart` model and `writer::write` (every classic family, 3D, axes, labels) | `edit::Edit`: title, language, style, blanks, series title, data-label flags, axis range/position (byte-range, source-preserving) | `reader::read` to the typed model |
 | `litchi-pptx` | `opened::Edit::add_chart` from a small `chart::Chart` model with its own hand-written XML, no embedded workbook | nothing | `chart_info` (type, title, legend flag); frames counted in the scene |
 | `litchi-pptx::presentation::embedded::excel` | `Workbook::from_chart`: a deterministic XLSX for chart data, never wired to a chart | — | — |
 | `litchi-xlsx` | chartsheets only; no worksheet chart authoring on `Package` | drawing transfer when a sheet is copied | drawing inventory (`Drawing::charts`), no chart-part read on the owners |
@@ -43,7 +43,7 @@ DOCX charts remain a gap (§6).
   series, labels at a position the chart group's schema omits, ...) are
   `Error::Invalid`; series, points, text and worksheet bounds are
   `Error::Limit`.
-- `chart::edit::Transaction` gains `set_legend`, `set_axis_title`,
+- `chart::edit::Edit` gains `set_legend`, `set_axis_title`,
   `set_series_values` and `set_categories`. Like the existing verbs they
   rewrite only the selected element's bytes; a reference keeps its formula
   and gets a new cache; a single-column reference is resized when the

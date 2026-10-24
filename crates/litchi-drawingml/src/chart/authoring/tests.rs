@@ -1,5 +1,5 @@
 use super::*;
-use crate::chart::edit::Snapshot;
+use crate::chart::edit::Package;
 use crate::chart::reader;
 
 fn sales(variant: Variant) -> Spec {
@@ -63,7 +63,7 @@ fn every_variant_round_trips_through_the_reader() {
                     // Deterministic: the same spec writes the same bytes.
                     assert_eq!(xml, spec.to_xml(Some("rId1")).unwrap());
                     // The source-preserving editor accepts every authored part.
-                    Snapshot::from_xml(xml).unwrap();
+                    Package::from_xml(xml).unwrap();
                 }
             }
         }
@@ -124,7 +124,7 @@ fn source_preserving_edits_change_title_legend_axes_and_data() {
     let spec = sales(Variant::new(Kind::Column))
         .with_binding(Binding::sheet("Sheet1"))
         .with_value_axis_title("Units");
-    let snapshot = Snapshot::from_xml(spec.to_xml(Some("rId1")).unwrap()).unwrap();
+    let snapshot = Package::from_xml(spec.to_xml(Some("rId1")).unwrap()).unwrap();
     let mut edit = snapshot.edit();
     edit.set_title(Some(TitleText::from_string("Revenue")))
         .unwrap();
@@ -137,7 +137,7 @@ fn source_preserving_edits_change_title_legend_axes_and_data() {
     edit.set_series_values(0, &[1.0, 2.0, 3.0]).unwrap();
     edit.set_categories(&["A".into(), "B".into(), "C".into()])
         .unwrap();
-    let after = edit.commit().unwrap().into_snapshot();
+    let after = edit.commit().unwrap().into_package();
     let chart = after.value();
     assert_eq!(text(chart.title.as_ref()).as_deref(), Some("Revenue"));
     assert_eq!(
@@ -164,21 +164,21 @@ fn source_preserving_edits_change_title_legend_axes_and_data() {
 
     let mut edit = after.edit();
     edit.set_legend(None).unwrap();
-    let hidden = edit.commit().unwrap().into_snapshot();
+    let hidden = edit.commit().unwrap().into_package();
     assert!(hidden.value().legend.is_none());
     // An exact no-op keeps the bytes.
     let mut edit = hidden.edit();
     edit.set_legend(None).unwrap();
-    assert!(!edit.is_changed());
+    assert!(!edit.commit().unwrap().diagnostics().changed());
 }
 
 #[test]
 fn literal_data_is_rewritten_in_place() {
     let spec = sales(Variant::new(Kind::Line));
-    let snapshot = Snapshot::from_xml(spec.to_xml(None).unwrap()).unwrap();
+    let snapshot = Package::from_xml(spec.to_xml(None).unwrap()).unwrap();
     let mut edit = snapshot.edit();
     edit.set_series_values(1, &[7.0, 8.0]).unwrap();
-    let after = edit.commit().unwrap().into_snapshot();
+    let after = edit.commit().unwrap().into_package();
     let series = &after.value().plot_area.type_groups[0].common().series;
     assert_eq!(series[1].values.as_ref().unwrap().values, vec![7.0, 8.0]);
     assert!(series[1].values.as_ref().unwrap().source_ref.is_none());

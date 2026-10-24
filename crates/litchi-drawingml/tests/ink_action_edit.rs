@@ -229,7 +229,7 @@ fn detached_builder_round_trips_ordered_children_and_opaque_payloads() {
 fn scalar_edits_preserve_source_spans_comments_and_opaque_descendants() {
     let original = source();
     let profile = actions::read_profile(&original).expect("profile");
-    let mut edit = Edit::from_profile(&profile).expect("edit");
+    let mut edit = Edit::from_profile(&profile, Limits::default()).expect("edit");
     let action = ActionSelector::ordinal(0);
     let data = DataSelector::Action { action, index: 0 };
     let property = ChildSelector::Property { action, index: 0 };
@@ -245,11 +245,11 @@ fn scalar_edits_preserve_source_spans_comments_and_opaque_descendants() {
     edit.set_data_reference(data, Some("#d1&<\"'"))
         .expect("data reference");
     let commit = edit.finish().expect("scalar edit");
-    let edited = commit.as_bytes();
+    let edited = commit.package().as_bytes();
     assert_ne!(edited, original.as_slice());
     assert_eq!(
         edited.as_ptr(),
-        commit.prepared().profile().source().as_ptr(),
+        commit.package().profile().source().as_ptr(),
         "changed typed readback should reuse the emitted source allocation"
     );
     for preserved in [
@@ -272,7 +272,7 @@ fn scalar_edits_preserve_source_spans_comments_and_opaque_descendants() {
     assert!(text.contains("name=\"name&amp;&lt;&quot;&apos;\""));
     assert!(text.contains("value=\"value&amp;&lt;&quot;&apos;\""));
     assert!(text.contains("ref=\"#d1&amp;&lt;&quot;&apos;\""));
-    let updated = commit.prepared().profile();
+    let updated = commit.package().profile();
     let RootChild::Action(action_value) = &updated.children()[0] else {
         panic!("root action expected")
     };
@@ -291,7 +291,7 @@ fn scalar_edits_preserve_source_spans_comments_and_opaque_descendants() {
 fn no_op_identity_edits_and_patches_are_exact_and_source_checked() {
     let original = source();
     let profile = actions::read_profile(&original).expect("profile");
-    let mut identity = Edit::from_profile(&profile).expect("edit");
+    let mut identity = Edit::from_profile(&profile, Limits::default()).expect("edit");
     identity
         .set_action_id(ActionSelector::ordinal(0), "a0")
         .expect("same action id is a no-op");
@@ -305,7 +305,7 @@ fn no_op_identity_edits_and_patches_are_exact_and_source_checked() {
         )
         .expect("same data id is a no-op");
     let no_op = identity.finish().expect("identity no-op");
-    assert_eq!(no_op.as_bytes(), original.as_slice());
+    assert_eq!(no_op.package().as_bytes(), original.as_slice());
     assert_eq!(no_op.patch().before(), original.as_slice());
     assert_eq!(no_op.patch().after(), original.as_slice());
     assert_eq!(no_op.patch().apply(&original).expect("patch"), original);
@@ -322,13 +322,13 @@ fn no_op_identity_edits_and_patches_are_exact_and_source_checked() {
     stale[last] = b'!';
     expect_invalid(no_op.patch().apply(&stale), "patch source is stale");
 
-    let mut changed_id = Edit::from_profile(&profile).expect("edit");
+    let mut changed_id = Edit::from_profile(&profile, Limits::default()).expect("edit");
     expect_invalid(
         changed_id.set_action_id(ActionSelector::ordinal(0), "renamed"),
         "modeled reference closure",
     );
     assert_eq!(changed_id.profile().source(), original.as_slice());
-    let mut changed_data_id = Edit::from_profile(&profile).expect("edit");
+    let mut changed_data_id = Edit::from_profile(&profile, Limits::default()).expect("edit");
     expect_invalid(
         changed_data_id.set_data_id(
             DataSelector::Action {
@@ -345,7 +345,7 @@ fn no_op_identity_edits_and_patches_are_exact_and_source_checked() {
 #[test]
 fn add_move_and_remove_operations_preserve_order_and_reference_closure() {
     let profile = profile();
-    let mut add = Edit::from_profile(&profile).expect("edit");
+    let mut add = Edit::from_profile(&profile, Limits::default()).expect("edit");
     add.add_action(ActionParent::Root, bare_action("a2", ActionType::Add, "3"))
         .expect("root action");
     add.add_action(
@@ -354,10 +354,10 @@ fn add_move_and_remove_operations_preserve_order_and_reference_closure() {
     )
     .expect("group action");
     let added = add.finish().expect("add actions");
-    assert_eq!(added.prepared().profile().actions().count(), 2);
+    assert_eq!(added.package().profile().actions().count(), 2);
     assert_eq!(
         added
-            .prepared()
+            .package()
             .profile()
             .action_groups()
             .next()
@@ -366,16 +366,17 @@ fn add_move_and_remove_operations_preserve_order_and_reference_closure() {
             .len(),
         2
     );
-    let mut reorder = Edit::from_profile(added.prepared().profile()).expect("reorder edit");
+    let mut reorder =
+        Edit::from_profile(added.package().profile(), Limits::default()).expect("reorder edit");
     reorder
         .move_before(ActionSelector::direct(1), ActionSelector::direct(0))
         .expect("same root sequence move");
     let reordered = reorder.finish().expect("reorder");
-    let direct_actions: Vec<_> = reordered.prepared().profile().actions().collect();
+    let direct_actions: Vec<_> = reordered.package().profile().actions().collect();
     assert_eq!(direct_actions[0].xml_id(), Some("a2"));
     assert_eq!(direct_actions[1].xml_id(), Some("a0"));
 
-    let mut duplicate = Edit::from_profile(&profile).expect("duplicate edit");
+    let mut duplicate = Edit::from_profile(&profile, Limits::default()).expect("duplicate edit");
     duplicate
         .add_action(
             ActionParent::Root,
@@ -384,7 +385,8 @@ fn add_move_and_remove_operations_preserve_order_and_reference_closure() {
         .expect("queue duplicate");
     expect_invalid(duplicate.finish(), "duplicate xml:id values");
 
-    let mut remove_referenced = Edit::from_profile(&profile).expect("remove edit");
+    let mut remove_referenced =
+        Edit::from_profile(&profile, Limits::default()).expect("remove edit");
     remove_referenced
         .remove_group_data(DataSelector::Group {
             action: ActionSelector::ordinal(0),
@@ -394,7 +396,7 @@ fn add_move_and_remove_operations_preserve_order_and_reference_closure() {
         .expect("queue referenced removal");
     expect_invalid(remove_referenced.finish(), "break an xml:id reference");
 
-    let mut remove = Edit::from_profile(&profile).expect("remove edit");
+    let mut remove = Edit::from_profile(&profile, Limits::default()).expect("remove edit");
     let action = ActionSelector::ordinal(0);
     let data = DataSelector::Action { action, index: 0 };
     remove
@@ -412,7 +414,7 @@ fn add_move_and_remove_operations_preserve_order_and_reference_closure() {
         .expect("clear reference before removing data");
     remove.remove_data(data).expect("remove direct data");
     let removed = remove.finish().expect("removals");
-    let RootChild::Action(action_value) = &removed.prepared().profile().children()[0] else {
+    let RootChild::Action(action_value) = &removed.package().profile().children()[0] else {
         panic!("root action expected")
     };
     assert!(action_value.properties().is_empty());
@@ -426,7 +428,8 @@ fn add_move_and_remove_operations_preserve_order_and_reference_closure() {
     assert_eq!(group.data().len(), 1);
     assert_eq!(group.data()[0].xml_id(), Some("d2"));
 
-    let mut remove_action = Edit::from_profile(&profile).expect("action removal");
+    let mut remove_action =
+        Edit::from_profile(&profile, Limits::default()).expect("action removal");
     remove_action
         .set_data_reference(data, None::<&str>)
         .expect("clear reference");
@@ -434,9 +437,9 @@ fn add_move_and_remove_operations_preserve_order_and_reference_closure() {
         .remove_action(action)
         .expect("remove root action");
     let removed_action = remove_action.finish().expect("root action removed");
-    assert_eq!(removed_action.prepared().profile().actions().count(), 0);
+    assert_eq!(removed_action.package().profile().actions().count(), 0);
     assert_eq!(
-        removed_action.prepared().profile().action_groups().count(),
+        removed_action.package().profile().action_groups().count(),
         1
     );
 }
@@ -444,26 +447,27 @@ fn add_move_and_remove_operations_preserve_order_and_reference_closure() {
 #[test]
 fn forward_and_inverse_moves_reorder_source_sequence() {
     let initial = actions::read_profile(&ordered_source()).expect("ordered profile");
-    let mut forward = Edit::from_profile(&initial).expect("forward move edit");
+    let mut forward = Edit::from_profile(&initial, Limits::default()).expect("forward move edit");
     forward
         .move_before(ActionSelector::direct(0), ActionSelector::direct(2))
         .expect("move first action before third");
     let moved = forward.finish().expect("forward move");
     let moved_ids: Vec<_> = moved
-        .prepared()
+        .package()
         .profile()
         .actions()
         .map(|action| action.xml_id())
         .collect();
     assert_eq!(moved_ids, [Some("a1"), Some("a0"), Some("a2")]);
 
-    let mut inverse = Edit::from_profile(moved.prepared().profile()).expect("inverse edit");
+    let mut inverse =
+        Edit::from_profile(moved.package().profile(), Limits::default()).expect("inverse edit");
     inverse
         .move_before(ActionSelector::direct(1), ActionSelector::direct(0))
         .expect("move first action back before second");
     let restored = inverse.finish().expect("inverse move");
     let restored_ids: Vec<_> = restored
-        .prepared()
+        .package()
         .profile()
         .actions()
         .map(|action| action.xml_id())
@@ -475,7 +479,7 @@ fn forward_and_inverse_moves_reorder_source_sequence() {
 fn failed_edits_are_atomic_and_invalid_selectors_do_not_mutate_source_snapshot() {
     let profile = profile();
     let original = profile.source().to_vec();
-    let mut bad_selector = Edit::from_profile(&profile).expect("edit");
+    let mut bad_selector = Edit::from_profile(&profile, Limits::default()).expect("edit");
     bad_selector
         .remove_data(DataSelector::Action {
             action: ActionSelector::ordinal(99),
@@ -488,7 +492,7 @@ fn failed_edits_are_atomic_and_invalid_selectors_do_not_mutate_source_snapshot()
         "action ordinal selector is out of range",
     );
 
-    let mut bad_group = Edit::from_profile(&profile).expect("edit");
+    let mut bad_group = Edit::from_profile(&profile, Limits::default()).expect("edit");
     bad_group
         .add_action(
             ActionParent::Group(99),
@@ -498,7 +502,7 @@ fn failed_edits_are_atomic_and_invalid_selectors_do_not_mutate_source_snapshot()
     assert_eq!(bad_group.profile().source(), original.as_slice());
     expect_invalid(bad_group.finish(), "action group selector is out of range");
 
-    let mut wrong_remove = Edit::from_profile(&profile).expect("edit");
+    let mut wrong_remove = Edit::from_profile(&profile, Limits::default()).expect("edit");
     expect_invalid(
         wrong_remove.remove_data_group(ChildSelector::Data {
             action: ActionSelector::ordinal(0),
@@ -617,7 +621,7 @@ fn edit_output_limit_is_checked_before_replacement_allocation() {
     let profile = profile();
     let mut limits = default_limits();
     limits.max_output_bytes = profile.source().len();
-    let mut edit = Edit::with_limits(profile.clone(), limits).expect("source fits bound");
+    let mut edit = Edit::new(profile.clone(), limits).expect("source fits bound");
     edit.set_property_value(
         ChildSelector::Property {
             action: ActionSelector::ordinal(0),
@@ -686,7 +690,7 @@ fn scalar_control_references_have_exact_lengths_in_detached_and_source_edits() {
     );
 
     let profile = profile();
-    let mut edit = Edit::from_profile(&profile).expect("source edit");
+    let mut edit = Edit::from_profile(&profile, Limits::default()).expect("source edit");
     let action = ActionSelector::ordinal(0);
     let property = ChildSelector::Property { action, index: 0 };
     let data = DataSelector::Action { action, index: 0 };
@@ -699,7 +703,7 @@ fn scalar_control_references_have_exact_lengths_in_detached_and_source_edits() {
     edit.set_data_reference(data, Some(controls))
         .expect("source data reference");
     let commit = edit.finish().expect("source control output");
-    let source_xml = std::str::from_utf8(commit.as_bytes()).expect("source XML");
+    let source_xml = std::str::from_utf8(commit.package().as_bytes()).expect("source XML");
     assert!(source_xml.contains("type=\"&#x9;&#xA;&#xD;\""));
     assert!(source_xml.contains("value=\"&#x9;&#xA;&#xD;\""));
     assert!(source_xml.contains("name=\"&#x9;&#xA;&#xD;\""));
@@ -710,7 +714,8 @@ fn scalar_control_references_have_exact_lengths_in_detached_and_source_edits() {
 fn source_selectors_remain_stable_across_removal_and_move() {
     let ordered = ordered_source();
     let profile = actions::read_profile(&ordered).expect("ordered profile");
-    let mut remove_then_edit = Edit::from_profile(&profile).expect("remove edit");
+    let mut remove_then_edit =
+        Edit::from_profile(&profile, Limits::default()).expect("remove edit");
     let first = ActionSelector::ordinal(0);
     remove_then_edit
         .remove_property(ChildSelector::Property {
@@ -728,7 +733,7 @@ fn source_selectors_remain_stable_across_removal_and_move() {
         )
         .expect("edit property after removal");
     let removed = remove_then_edit.finish().expect("remove then edit");
-    let RootChild::Action(removed_action) = &removed.prepared().profile().children()[0] else {
+    let RootChild::Action(removed_action) = &removed.package().profile().children()[0] else {
         panic!("removed action expected")
     };
     assert_eq!(removed_action.properties().len(), 2);
@@ -740,7 +745,7 @@ fn source_selectors_remain_stable_across_removal_and_move() {
     assert_eq!(removed_action.properties()[1].name(), "p2");
     assert_eq!(removed_action.properties()[1].value(), "two");
 
-    let mut move_then_edit = Edit::from_profile(&profile).expect("move edit");
+    let mut move_then_edit = Edit::from_profile(&profile, Limits::default()).expect("move edit");
     move_then_edit
         .move_before(ActionSelector::direct(2), ActionSelector::direct(0))
         .expect("move action");
@@ -748,7 +753,7 @@ fn source_selectors_remain_stable_across_removal_and_move() {
         .set_action_type(ActionSelector::direct(1), ActionType::Transform)
         .expect("edit moved sequence");
     let moved = move_then_edit.finish().expect("move then edit");
-    let moved_actions: Vec<_> = moved.prepared().profile().actions().collect();
+    let moved_actions: Vec<_> = moved.package().profile().actions().collect();
     assert_eq!(moved_actions[0].xml_id(), Some("a2"));
     assert_eq!(moved_actions[0].action_type().as_str(), "transform");
     assert_eq!(moved_actions[1].xml_id(), Some("a0"));
@@ -761,7 +766,7 @@ fn source_selectors_remain_stable_across_removal_and_move() {
 fn equal_scalar_edit_reuses_the_retained_source_when_observable() {
     let profile = profile();
     let source_pointer = profile.source().as_ptr();
-    let mut edit = Edit::from_profile(&profile).expect("equal edit");
+    let mut edit = Edit::from_profile(&profile, Limits::default()).expect("equal edit");
     edit.set_property_value(
         ChildSelector::Property {
             action: ActionSelector::ordinal(0),
@@ -771,14 +776,14 @@ fn equal_scalar_edit_reuses_the_retained_source_when_observable() {
     )
     .expect("equal property value");
     let commit = edit.finish().expect("equal edit result");
-    assert_eq!(commit.as_bytes(), profile.source());
-    assert_eq!(commit.as_bytes().as_ptr(), source_pointer);
+    assert_eq!(commit.package().as_bytes(), profile.source());
+    assert_eq!(commit.package().as_bytes().as_ptr(), source_pointer);
 }
 
 #[test]
 fn identity_reservations_cover_root_action_group_and_data_group_ids() {
     for duplicate_id in ["root", "ag0", "dg0"] {
-        let mut edit = Edit::from_profile(&profile()).expect("duplicate edit");
+        let mut edit = Edit::from_profile(&profile(), Limits::default()).expect("duplicate edit");
         edit.add_action(
             ActionParent::Root,
             bare_action(duplicate_id, ActionType::Add, "3"),
@@ -787,7 +792,8 @@ fn identity_reservations_cover_root_action_group_and_data_group_ids() {
         expect_invalid(edit.finish(), "duplicate xml:id values");
     }
 
-    let mut data_group_duplicate = Edit::from_profile(&profile()).expect("data-group edit");
+    let mut data_group_duplicate =
+        Edit::from_profile(&profile(), Limits::default()).expect("data-group edit");
     data_group_duplicate
         .add_action(
             ActionParent::Root,
@@ -837,7 +843,7 @@ fn removing_an_action_referenced_by_data_is_refused() {
         .replace("ref=\"#d1\"", "ref=\"#a1\"")
         .into_bytes();
     let profile = actions::read_profile(&referenced_source).expect("referenced profile");
-    let mut edit = Edit::from_profile(&profile).expect("referenced edit");
+    let mut edit = Edit::from_profile(&profile, Limits::default()).expect("referenced edit");
     edit.remove_action(ActionSelector::ordinal(1))
         .expect("queue referenced action removal");
     expect_invalid(edit.finish(), "break an xml:id reference");
@@ -855,7 +861,7 @@ fn restored_reference_before_target_removal_is_still_refused() {
         group: 0,
         index: 0,
     };
-    let mut edit = Edit::from_profile(&profile).expect("reference edit");
+    let mut edit = Edit::from_profile(&profile, Limits::default()).expect("reference edit");
     edit.set_data_reference(d0, None::<&str>)
         .expect("clear source reference");
     edit.set_data_reference(d0, Some("#d1"))
@@ -872,7 +878,7 @@ fn removing_a_referenced_data_group_id_is_refused() {
         .replace("ref=\"#d1\"", "ref=\"#dg0\"")
         .into_bytes();
     let profile = actions::read_profile(&referenced_source).expect("referenced group profile");
-    let mut edit = Edit::from_profile(&profile).expect("group removal edit");
+    let mut edit = Edit::from_profile(&profile, Limits::default()).expect("group removal edit");
     edit.remove_data_group(ChildSelector::DataGroup {
         action: ActionSelector::ordinal(0),
         index: 0,
@@ -893,14 +899,15 @@ fn changed_edits_refuse_duplicate_ids_but_exact_no_op_replays() {
         index: 0,
     };
 
-    let mut no_op = Edit::from_profile(&profile).expect("duplicate no-op edit");
+    let mut no_op = Edit::from_profile(&profile, Limits::default()).expect("duplicate no-op edit");
     no_op
         .set_property_value(property, "old")
         .expect("queue exact no-op");
     let retained = no_op.finish().expect("exact duplicate no-op");
-    assert_eq!(retained.as_bytes(), duplicate_source.as_slice());
+    assert_eq!(retained.package().as_bytes(), duplicate_source.as_slice());
 
-    let mut changed = Edit::from_profile(&profile).expect("duplicate changed edit");
+    let mut changed =
+        Edit::from_profile(&profile, Limits::default()).expect("duplicate changed edit");
     changed
         .set_property_value(property, "changed")
         .expect("queue duplicate-source edit");
@@ -914,7 +921,7 @@ fn expect_aggregate_limit(
     resource: &'static str,
     value: usize,
 ) {
-    match Edit::with_limits(profile.clone(), limits) {
+    match Edit::new(profile.clone(), limits) {
         Err(error) => expect_limit::<()>(Err(error), resource, value),
         Ok(mut edit) => {
             edit.add_action(ActionParent::Root, action)
@@ -952,7 +959,8 @@ fn aggregate_existing_and_added_records_are_bounded() {
 fn alias_only_self_closing_and_whitespace_close_roots_are_handled_without_rewriting() {
     let alias_source = alias_only_source();
     let alias_profile = actions::read_profile(&alias_source).expect("alias-only profile");
-    let mut alias_edit = Edit::from_profile(&alias_profile).expect("alias-only edit");
+    let mut alias_edit =
+        Edit::from_profile(&alias_profile, Limits::default()).expect("alias-only edit");
     alias_edit
         .add_action(
             ActionParent::Root,
@@ -961,16 +969,16 @@ fn alias_only_self_closing_and_whitespace_close_roots_are_handled_without_rewrit
         .expect("alias-only add");
     let alias_commit = alias_edit.finish().expect("alias-only result");
     assert!(
-        std::str::from_utf8(alias_commit.as_bytes())
+        std::str::from_utf8(alias_commit.package().as_bytes())
             .expect("alias-only XML")
             .contains("<p:action xml:id=\"alias-added\"")
     );
-    assert_eq!(alias_commit.prepared().profile().actions().count(), 2);
+    assert_eq!(alias_commit.package().profile().actions().count(), 2);
 
     let self_closing_profile =
         actions::read_profile(&self_closing_source()).expect("self-closing profile");
-    let mut first_action_edit =
-        Edit::from_profile(&self_closing_profile).expect("self-closing action edit");
+    let mut first_action_edit = Edit::from_profile(&self_closing_profile, Limits::default())
+        .expect("self-closing action edit");
     first_action_edit
         .add_action(
             ActionParent::Root,
@@ -980,13 +988,14 @@ fn alias_only_self_closing_and_whitespace_close_roots_are_handled_without_rewrit
     let first_action = first_action_edit
         .finish()
         .expect("first self-closing action");
-    let first_action_xml = std::str::from_utf8(first_action.as_bytes()).expect("action XML");
+    let first_action_xml =
+        std::str::from_utf8(first_action.package().as_bytes()).expect("action XML");
     assert!(first_action_xml.contains("<p:actions xmlns:p="));
     assert!(first_action_xml.contains("</p:actions>"));
-    assert_eq!(first_action.prepared().profile().actions().count(), 1);
+    assert_eq!(first_action.package().profile().actions().count(), 1);
 
-    let mut first_group_edit =
-        Edit::from_profile(&self_closing_profile).expect("self-closing group edit");
+    let mut first_group_edit = Edit::from_profile(&self_closing_profile, Limits::default())
+        .expect("self-closing group edit");
     first_group_edit
         .add_action_group(
             ActionGroupDraft::new(bare_action("self-group-action", ActionType::Remove, "1"))
@@ -994,17 +1003,18 @@ fn alias_only_self_closing_and_whitespace_close_roots_are_handled_without_rewrit
         )
         .expect("queue first self-closing group");
     let first_group = first_group_edit.finish().expect("first self-closing group");
-    let first_group_xml = std::str::from_utf8(first_group.as_bytes()).expect("group XML");
+    let first_group_xml = std::str::from_utf8(first_group.package().as_bytes()).expect("group XML");
     assert!(first_group_xml.contains("<p:actionGroup"));
     assert!(first_group_xml.contains("</p:actions>"));
-    assert_eq!(first_group.prepared().profile().action_groups().count(), 1);
-    let RootChild::ActionGroup(group) = &first_group.prepared().profile().children()[0] else {
+    assert_eq!(first_group.package().profile().action_groups().count(), 1);
+    let RootChild::ActionGroup(group) = &first_group.package().profile().children()[0] else {
         panic!("root action group expected")
     };
     assert_eq!(group.actions().len(), 1);
     assert_eq!(group.actions()[0].xml_id(), Some("self-group-action"));
 
-    let mut multi_add = Edit::from_profile(&self_closing_profile).expect("multi-add edit");
+    let mut multi_add =
+        Edit::from_profile(&self_closing_profile, Limits::default()).expect("multi-add edit");
     multi_add
         .add_action(
             ActionParent::Root,
@@ -1018,11 +1028,11 @@ fn alias_only_self_closing_and_whitespace_close_roots_are_handled_without_rewrit
         )
         .expect("queue second multi-add action");
     let multi_commit = multi_add.finish().expect("multi-add self-closing root");
-    let multi_xml = std::str::from_utf8(multi_commit.as_bytes()).expect("multi-add XML");
+    let multi_xml = std::str::from_utf8(multi_commit.package().as_bytes()).expect("multi-add XML");
     assert_eq!(multi_xml.matches("<p:actions").count(), 1);
     assert_eq!(multi_xml.matches("</p:actions>").count(), 1);
     let multi_ids: Vec<_> = multi_commit
-        .prepared()
+        .package()
         .profile()
         .actions()
         .map(|action| action.xml_id())
@@ -1032,7 +1042,7 @@ fn alias_only_self_closing_and_whitespace_close_roots_are_handled_without_rewrit
         multi_commit
             .patch()
             .inverse()
-            .apply(multi_commit.as_bytes())
+            .apply(multi_commit.package().as_bytes())
             .expect("multi-add inverse"),
         self_closing_source()
     );
@@ -1040,7 +1050,8 @@ fn alias_only_self_closing_and_whitespace_close_roots_are_handled_without_rewrit
     let whitespace_source = whitespace_close_source();
     let whitespace_profile =
         actions::read_profile(&whitespace_source).expect("whitespace-close profile");
-    let mut whitespace_edit = Edit::from_profile(&whitespace_profile).expect("whitespace edit");
+    let mut whitespace_edit =
+        Edit::from_profile(&whitespace_profile, Limits::default()).expect("whitespace edit");
     whitespace_edit
         .add_action(
             ActionParent::Root,
@@ -1048,9 +1059,9 @@ fn alias_only_self_closing_and_whitespace_close_roots_are_handled_without_rewrit
         )
         .expect("whitespace-close add");
     let whitespace_commit = whitespace_edit.finish().expect("whitespace-close result");
-    assert_eq!(whitespace_commit.prepared().profile().actions().count(), 2);
+    assert_eq!(whitespace_commit.package().profile().actions().count(), 2);
     assert!(
-        std::str::from_utf8(whitespace_commit.as_bytes())
+        std::str::from_utf8(whitespace_commit.package().as_bytes())
             .expect("whitespace-close XML")
             .contains("</p:actions   >")
     );
@@ -1065,12 +1076,12 @@ fn absent_data_reference_none_is_an_exact_no_op() {
         index: 0,
     };
     let source_pointer = profile.source().as_ptr();
-    let mut edit = Edit::from_profile(&profile).expect("absent-reference edit");
+    let mut edit = Edit::from_profile(&profile, Limits::default()).expect("absent-reference edit");
     edit.set_data_reference(data, None::<&str>)
         .expect("queue absent-reference no-op");
     let commit = edit.finish().expect("absent-reference no-op");
-    assert_eq!(commit.as_bytes(), profile.source());
-    assert_eq!(commit.as_bytes().as_ptr(), source_pointer);
+    assert_eq!(commit.package().as_bytes(), profile.source());
+    assert_eq!(commit.package().as_bytes().as_ptr(), source_pointer);
 }
 
 #[test]
@@ -1080,7 +1091,7 @@ fn group_and_data_group_metadata_edits_preserve_source_and_exact_no_ops() {
         action: ActionSelector::ordinal(0),
         index: 0,
     };
-    let mut edit = Edit::from_profile(&profile).expect("metadata edit");
+    let mut edit = Edit::from_profile(&profile, Limits::default()).expect("metadata edit");
     edit.set_action_group_type(0, ActionType::Remove)
         .expect("group type");
     edit.set_group_start_time(0, "2.5")
@@ -1088,16 +1099,16 @@ fn group_and_data_group_metadata_edits_preserve_source_and_exact_no_ops() {
     edit.set_data_group_name(group_data, "renamed-group")
         .expect("data group name");
     let commit = edit.finish().expect("metadata result");
-    let xml = std::str::from_utf8(commit.as_bytes()).expect("metadata XML");
+    let xml = std::str::from_utf8(commit.package().as_bytes()).expect("metadata XML");
     assert!(xml.contains("type=\"remove\" startTime=\"2.5\""));
     assert!(xml.contains("<a:actionDataGroup xml:id=\"dg0\" name=\"renamed-group\""));
     assert!(xml.contains("<!--group comment-->"));
-    let RootChild::ActionGroup(group) = &commit.prepared().profile().children()[1] else {
+    let RootChild::ActionGroup(group) = &commit.package().profile().children()[1] else {
         panic!("group child expected")
     };
     assert_eq!(group.action_type().as_str(), "remove");
     assert_eq!(group.start_time(), "2.5");
-    let RootChild::Action(action) = &commit.prepared().profile().children()[0] else {
+    let RootChild::Action(action) = &commit.package().profile().children()[0] else {
         panic!("action child expected")
     };
     let Some(ActionChild::DataGroup(data_group)) = action
@@ -1110,7 +1121,7 @@ fn group_and_data_group_metadata_edits_preserve_source_and_exact_no_ops() {
     assert_eq!(data_group.name(), "renamed-group");
 
     let source_pointer = profile.source().as_ptr();
-    let mut no_op = Edit::from_profile(&profile).expect("metadata no-op");
+    let mut no_op = Edit::from_profile(&profile, Limits::default()).expect("metadata no-op");
     no_op
         .set_group_type(0, ActionType::Transform)
         .expect("same group type alias");
@@ -1121,8 +1132,8 @@ fn group_and_data_group_metadata_edits_preserve_source_and_exact_no_ops() {
         .set_data_group_name(group_data, "group")
         .expect("same data group name");
     let retained = no_op.finish().expect("metadata no-op result");
-    assert_eq!(retained.as_bytes(), profile.source());
-    assert_eq!(retained.as_bytes().as_ptr(), source_pointer);
+    assert_eq!(retained.package().as_bytes(), profile.source());
+    assert_eq!(retained.package().as_bytes().as_ptr(), source_pointer);
 }
 
 #[test]
@@ -1130,7 +1141,7 @@ fn adding_data_then_property_to_empty_action_preserves_schema_order_and_inverse(
     let source = alias_only_source();
     let profile = actions::read_profile(&source).expect("empty action profile");
     let action = ActionSelector::ordinal(0);
-    let mut edit = Edit::from_profile(&profile).expect("empty action edit");
+    let mut edit = Edit::from_profile(&profile, Limits::default()).expect("empty action edit");
     edit.add_data(action, ActionDataDraft::new())
         .expect("queue data insertion");
     edit.add_property(
@@ -1139,12 +1150,12 @@ fn adding_data_then_property_to_empty_action_preserves_schema_order_and_inverse(
     )
     .expect("queue property insertion");
     let commit = edit.finish().expect("data then property edit");
-    let xml = std::str::from_utf8(commit.as_bytes()).expect("edited empty action XML");
+    let xml = std::str::from_utf8(commit.package().as_bytes()).expect("edited empty action XML");
     assert!(
         xml.find("<p:property").expect("property XML")
             < xml.find("<p:actionData").expect("data XML")
     );
-    let action_value = &commit.prepared().profile().children()[0];
+    let action_value = &commit.package().profile().children()[0];
     let RootChild::Action(action_value) = action_value else {
         panic!("root action expected")
     };
@@ -1158,7 +1169,7 @@ fn adding_data_then_property_to_empty_action_preserves_schema_order_and_inverse(
         commit
             .patch()
             .inverse()
-            .apply(commit.as_bytes())
+            .apply(commit.package().as_bytes())
             .expect("empty action inverse"),
         source
     );

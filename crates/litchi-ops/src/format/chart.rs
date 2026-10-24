@@ -1883,7 +1883,7 @@ impl ChartEdit {
         if self.rebuild.is_some() {
             return self.apply_rebuild(&xml, embedded);
         }
-        let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)
+        let snapshot = litchi_drawingml::chart::edit::Package::from_xml(xml)
             .map_err(|error| native(error, "chart"))?;
         let mut edit = snapshot.edit();
         if let Some(title) = self.title {
@@ -1920,13 +1920,11 @@ impl ChartEdit {
             edit.set_axis_range(id, min, max)
                 .map_err(|error| native(error, "min"))?;
         }
-        if !edit.is_changed() {
+        let commit = edit.commit().map_err(|error| native(error, "chart"))?;
+        if !commit.diagnostics().changed() {
             return Ok(None);
         }
-        let snapshot = edit
-            .commit()
-            .map_err(|error| native(error, "chart"))?
-            .into_snapshot();
+        let snapshot = commit.into_package();
         Ok(Some(Edited {
             xml: snapshot.xml_bytes().to_vec(),
             data_changed,

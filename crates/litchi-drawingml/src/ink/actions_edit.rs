@@ -23,7 +23,19 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::{Error, Result};
+pub use crate::Error;
+use crate::Result;
+
+/// No caller-selected limit dimension is exposed by this source-backed
+/// profile; the bounded [`Limits`] value owns all active budgets.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// The complete serialized action profile.
+    OutputBytes,
+}
+
+pub use litchi_core::edit::Diagnostics;
 
 use super::{
     ACTION_NAMESPACE, Action, ActionChild, ActionData, ActionDataGroup, ActionGroup,
@@ -752,6 +764,12 @@ impl Patch {
         }
     }
 
+    /// Whether this patch preserves the exact source bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before.as_ref() == self.after.as_ref()
+    }
+
     /// Exact source bytes required by this patch.
     #[must_use]
     pub fn before(&self) -> &[u8] {
@@ -765,43 +783,9 @@ impl Patch {
     }
 }
 
-/// Result of a source-backed edit, carrying both typed readback and inverse.
-#[derive(Clone, Debug)]
-pub struct Commit {
-    prepared: Prepared,
-    patch: Patch,
-}
-
-impl Commit {
-    /// Borrow the checked edited value.
-    #[must_use]
-    pub fn prepared(&self) -> &Prepared {
-        &self.prepared
-    }
-
-    /// Borrow the strict typed readback directly.
-    #[must_use]
-    pub fn profile(&self) -> &Profile {
-        self.prepared.profile()
-    }
-
-    /// Borrow the reversible source-checked patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Borrow final bytes.
-    #[must_use]
-    pub fn as_bytes(&self) -> &[u8] {
-        self.prepared.as_bytes()
-    }
-
-    /// Clone final bytes for a host-owned buffer.
-    pub fn to_vec(&self) -> Result<Vec<u8>> {
-        self.prepared.to_vec()
-    }
-}
+/// Result of a source-backed edit, carrying the checked package, inverse and
+/// content-free diagnostics.
+pub type Commit = litchi_core::edit::Commit<Prepared, Patch>;
 
 /// A source-backed transaction over one strict profile.
 #[derive(Clone, Debug)]
@@ -845,18 +829,8 @@ enum ChildParent {
 }
 
 impl Edit {
-    /// Start an edit with default output/resource limits.
-    pub fn new(profile: Profile) -> Result<Self> {
-        Self::with_limits(profile, Limits::default())
-    }
-
-    /// Clone a profile into a source-backed edit.
-    pub fn from_profile(profile: &Profile) -> Result<Self> {
-        Self::new(profile.clone())
-    }
-
     /// Start an edit with explicit output/resource limits.
-    pub fn with_limits(profile: Profile, limits: Limits) -> Result<Self> {
+    pub fn new(profile: Profile, limits: Limits) -> Result<Self> {
         limits.validate()?;
         validate_profile_limits(&profile, limits)?;
         Ok(Self {
@@ -864,6 +838,11 @@ impl Edit {
             limits,
             operations: Vec::new(),
         })
+    }
+
+    /// Clone a profile into a source-backed edit with explicit limits.
+    pub fn from_profile(profile: &Profile, limits: Limits) -> Result<Self> {
+        Self::new(profile.clone(), limits)
     }
 
     /// Borrow the unchanged source snapshot.
@@ -1187,7 +1166,7 @@ impl Edit {
                 before: before.clone(),
                 after: before,
             };
-            return Ok(Commit { prepared, patch });
+            return Ok(Commit::new(prepared, patch, Diagnostics::UNCHANGED));
         }
         let plans = plan_operations(&self.profile, &before, &self.operations, self.limits)?;
         let after = emit_plans(&before, &plans, self.limits)?;
@@ -1197,7 +1176,7 @@ impl Edit {
                 before: before.clone(),
                 after: before,
             };
-            return Ok(Commit { prepared, patch });
+            return Ok(Commit::new(prepared, patch, Diagnostics::UNCHANGED));
         }
         let after: Arc<[u8]> = Arc::from(after.into_boxed_slice());
         let profile = read_profile_owned(after.clone())?;
@@ -1208,7 +1187,7 @@ impl Edit {
             profile,
         };
         let patch = Patch { before, after };
-        Ok(Commit { prepared, patch })
+        Ok(Commit::new(prepared, patch, Diagnostics::CHANGED))
     }
 
     /// Alias for [`Edit::finish`].
@@ -1218,7 +1197,7 @@ impl Edit {
 
     /// Return the checked edited value without discarding the patch.
     pub fn prepare(self) -> Result<Prepared> {
-        Ok(self.finish()?.prepared)
+        Ok(self.finish()?.into_package())
     }
 
     fn push(&mut self, operation: EditOp) -> Result<()> {
@@ -5932,7 +5911,7 @@ mod tests {
         let prepared = authored();
         let original = prepared.as_bytes().to_vec();
         let profile = prepared.profile().clone();
-        let mut edit = Edit::new(profile).expect("edit");
+        let mut edit = Edit::new(profile, Limits::default()).expect("edit");
         edit.set_property_value(
             ChildSelector::Property {
                 action: ActionSelector::ordinal(0),
@@ -5948,9 +5927,10 @@ mod tests {
         edit.add_action(ActionParent::Root, added)
             .expect("add action");
         let commit = edit.finish().expect("commit");
-        assert_ne!(commit.as_bytes(), original.as_slice());
+        assert_ne!(commit.package().as_bytes(), original.as_slice());
         assert!(
             commit
+                .package()
                 .as_bytes()
                 .windows(b"value=\"style\"".len())
                 .any(|window| window == b"value=\"style\"")
@@ -5958,7 +5938,7 @@ mod tests {
         let inverse = commit
             .patch()
             .inverse()
-            .apply(commit.as_bytes())
+            .apply(commit.package().as_bytes())
             .expect("inverse");
         assert_eq!(inverse, original);
         assert!(commit.patch().apply(b"<stale/>").is_err());
@@ -5968,11 +5948,13 @@ mod tests {
     fn no_op_edit_replays_exact_source() {
         let prepared = authored();
         let original = prepared.as_bytes().to_vec();
-        let edit = Edit::new(prepared.profile().clone()).expect("edit");
+        let edit = Edit::new(prepared.profile().clone(), Limits::default()).expect("edit");
         let commit = edit.finish().expect("no-op");
-        assert_eq!(commit.as_bytes(), original.as_slice());
+        assert_eq!(commit.package().as_bytes(), original.as_slice());
         assert_eq!(commit.patch().before(), original.as_slice());
         assert_eq!(commit.patch().after(), original.as_slice());
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
     }
 
     #[test]
@@ -5995,14 +5977,14 @@ mod tests {
             .expect("second action")
             .with_xml_id("g2")
             .expect("second id");
-        let mut edit = Edit::from_profile(prepared.profile()).expect("edit");
+        let mut edit = Edit::from_profile(prepared.profile(), Limits::default()).expect("edit");
         edit.add_action(ActionParent::Group(0), second)
             .expect("group insertion");
         let commit = edit.finish().expect("group commit");
-        assert_eq!(commit.prepared().profile().action_groups().count(), 1);
+        assert_eq!(commit.package().profile().action_groups().count(), 1);
         assert_eq!(
             commit
-                .prepared()
+                .package()
                 .profile()
                 .action_groups()
                 .next()
@@ -6011,14 +5993,15 @@ mod tests {
                 .len(),
             2
         );
-        let mut reorder = Edit::from_profile(commit.prepared().profile()).expect("reorder");
+        let mut reorder =
+            Edit::from_profile(commit.package().profile(), Limits::default()).expect("reorder");
         reorder
             .move_before(ActionSelector::grouped(0, 1), ActionSelector::grouped(0, 0))
             .expect("move");
         let reordered = reorder.finish().expect("reordered commit");
         assert_eq!(
             reordered
-                .prepared()
+                .package()
                 .profile()
                 .action_groups()
                 .next()

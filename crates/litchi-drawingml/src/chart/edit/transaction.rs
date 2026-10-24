@@ -2,20 +2,31 @@
 
 use super::model::DataLabelFlag;
 use super::{codec, validation};
+pub use crate::Error;
+use crate::Result;
 use crate::chart::data::TitleText;
 use crate::chart::model::Chart;
 use crate::chart::types::{AxisPosition, DisplayBlanks, LegendPosition};
-use crate::{Error, Result};
 use std::sync::Arc;
+
+pub use litchi_core::edit::Diagnostics;
+
+/// Resource dimensions reserved for future caller-configured chart bounds.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete chart-space XML bytes.
+    XmlBytes,
+}
 
 /// An immutable source snapshot of one host-neutral chart-space part.
 #[derive(Debug, Clone)]
-pub struct Snapshot {
+pub struct Package {
     xml: Arc<[u8]>,
     value: Chart,
 }
 
-impl Snapshot {
+impl Package {
     /// Parse and retain one bounded chart part without normalizing its bytes.
     /// # Errors
     ///
@@ -58,8 +69,8 @@ impl Snapshot {
 
     /// Start an isolated edit from this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             base: self.clone(),
             working_xml: self.xml.as_ref().to_vec(),
             working: self.value.clone(),
@@ -69,13 +80,13 @@ impl Snapshot {
 
 /// A detached chart edit that is not visible until it commits.
 #[derive(Debug, Clone)]
-pub struct Transaction {
-    base: Snapshot,
+pub struct Edit {
+    base: Package,
     working_xml: Vec<u8>,
     working: Chart,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the projected chart value after pending edits.
     #[must_use]
     pub const fn value(&self) -> &Chart {
@@ -245,14 +256,14 @@ impl Transaction {
     ///
     /// ```
     /// use litchi_drawingml::chart::authoring::{Kind, Series, Spec, Variant};
-    /// use litchi_drawingml::chart::edit::Snapshot;
+    /// use litchi_drawingml::chart::edit::Package;
     ///
     /// let spec = Spec::new(Variant::new(Kind::Column))
     ///     .with_series(Series::new("East", vec![1.0, 2.0]));
-    /// let snapshot = Snapshot::from_xml(spec.to_xml(None)?)?;
-    /// let mut edit = snapshot.edit();
+    /// let package = Package::from_xml(spec.to_xml(None)?)?;
+    /// let mut edit = package.edit();
     /// edit.set_series_color(0, Some("C00000"))?;
-    /// let xml = edit.commit()?.into_snapshot().xml_bytes().to_vec();
+    /// let xml = edit.commit()?.into_package().xml_bytes().to_vec();
     /// assert!(String::from_utf8_lossy(&xml).contains(r#"<a:srgbClr val="C00000"/>"#));
     /// # Ok::<(), litchi_drawingml::Error>(())
     /// ```
@@ -297,30 +308,23 @@ impl Transaction {
         self.apply(candidate)
     }
 
-    /// Whether pending source bytes differ from the original snapshot.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.working_xml != self.base.xml.as_ref()
-    }
-
-    /// Publish the edit and return its exact snapshot plus reversible patch.
+    /// Publish the edit and return its exact package plus reversible patch.
     /// # Errors
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn commit(self) -> Result<Commit> {
-        let snapshot = if self.is_changed() {
-            Snapshot::from_xml(self.working_xml)?
+        let changed = self.working_xml != self.base.xml.as_ref();
+        let package = if changed {
+            Package::from_xml(self.working_xml)?
         } else {
             self.base.clone()
         };
-        Ok(Commit {
-            patch: Patch {
-                before: self.base.xml.clone(),
-                after: snapshot.xml.clone(),
-            },
-            snapshot,
-        })
+        let patch = Patch {
+            before: self.base.xml.clone(),
+            after: package.xml.clone(),
+        };
+        Ok(Commit::new(package, patch, Diagnostics::new(changed)))
     }
 
     fn apply(&mut self, candidate: Vec<u8>) -> Result<&mut Self> {
@@ -335,37 +339,7 @@ impl Transaction {
 }
 
 /// A successful source-preserving chart publication.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-impl Commit {
-    /// Borrow the published snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Move the published snapshot out of the commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Borrow the reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Move the reversible patch out of the commit.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-}
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 /// An exact, source-preconditioned and reversible chart patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -396,17 +370,38 @@ impl Patch {
         }
     }
 
-    /// Apply only to the exact source snapshot from which this patch came.
+    /// Whether this patch preserves the exact source bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before.as_ref() == self.after.as_ref()
+    }
+
+    /// Apply only to the exact source package from which this patch came.
     /// # Errors
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub fn apply(&self, source: &Package) -> Result<Package> {
         if source.xml.as_ref() != self.before.as_ref() {
             return Err(Error::Invalid(
                 "chart patch source does not match its byte precondition".into(),
             ));
         }
-        Snapshot::from_xml(self.after.as_ref().to_vec())
+        Package::from_xml(self.after.as_ref().to_vec())
+    }
+}
+
+impl Package {
+    /// Replay a patch against this exact package and publish a commit triad.
+    ///
+    /// The retained source allocation is reused for an exact no-op. Changed
+    /// patches are decoded and validated before they become visible.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
+        let package = patch.apply(self)?;
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 }

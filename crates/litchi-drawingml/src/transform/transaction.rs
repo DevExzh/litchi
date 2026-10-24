@@ -2,9 +2,20 @@
 
 use std::sync::Arc;
 
-use crate::{Error, Result};
+pub use crate::Error;
+use crate::Result;
 
 use super::{Angle, Point, Size, Transform, codec, validation};
+
+pub use litchi_core::edit::Diagnostics;
+
+/// Resource dimensions reserved for future caller-configured transform bounds.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete transform XML bytes.
+    XmlBytes,
+}
 
 /// An immutable, cheaply clonable source snapshot of one `a:xfrm` element.
 ///
@@ -12,12 +23,12 @@ use super::{Angle, Point, Size, Transform, codec, validation};
 /// prefixes, attribute order, whitespace, and lexical defaults exactly.
 /// Changed commits are rebuilt from the fully typed transform model.
 #[derive(Debug, Clone)]
-pub struct Snapshot {
+pub struct Package {
     xml: Arc<[u8]>,
     value: Transform,
 }
 
-impl Snapshot {
+impl Package {
     /// Parse and retain a bounded transform fragment.
     /// # Errors
     ///
@@ -67,8 +78,8 @@ impl Snapshot {
     /// Start an isolated edit based on this immutable snapshot.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             base: self.clone(),
             working: self.value.clone(),
         }
@@ -77,12 +88,12 @@ impl Snapshot {
 
 /// A transform edit that has not yet been published.
 #[derive(Debug, Clone)]
-pub struct Transaction {
-    base: Snapshot,
+pub struct Edit {
+    base: Package,
     working: Transform,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the projected typed transform.
     #[inline]
     #[must_use]
@@ -151,14 +162,7 @@ impl Transaction {
         self
     }
 
-    /// Whether this edit changes the typed snapshot.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.base.value != self.working
-    }
-
-    /// Validate and publish the edit without changing the source snapshot.
+    /// Validate and publish the edit without changing the source package.
     /// # Errors
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
@@ -170,52 +174,19 @@ impl Transaction {
         } else {
             codec::write(&self.working)?
         };
-        let snapshot = Snapshot::from_xml(xml)?;
-        Ok(Commit {
-            patch: Patch {
-                before: self.base.value,
-                after: self.working,
-            },
-            snapshot,
-        })
+        let changed = self.base.value != self.working;
+        let package = Package::from_xml(xml)?;
+        let patch = Patch {
+            before: self.base.value,
+            after: self.working,
+        };
+        Ok(Commit::new(package, patch, Diagnostics::new(changed)))
     }
 }
 
-/// A successful transform publication containing a new snapshot and a
+/// A successful transform publication containing a new package and a
 /// reversible semantic patch.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-}
-
-impl Commit {
-    /// Borrow the published snapshot.
-    #[inline]
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Move the published snapshot out of this commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Borrow the reversible patch.
-    #[inline]
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Move the reversible patch out of this commit.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-}
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 /// A lineage-independent, preconditioned reversible transform patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -248,12 +219,18 @@ impl Patch {
         }
     }
 
+    /// Whether this patch leaves the semantic transform unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before == self.after
+    }
+
     /// Apply the patch only when the target has the expected semantic state.
     /// # Errors
     ///
     /// Returns an error when input violates DrawingML constraints, exceeds a configured
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub fn apply(&self, source: &Package) -> Result<Package> {
         if source.value != self.before {
             return Err(Error::Invalid(
                 "DrawingML transform patch source state does not match its precondition".into(),
@@ -264,6 +241,18 @@ impl Patch {
         } else {
             codec::write(&self.after)?
         };
-        Snapshot::from_xml(xml)
+        Package::from_xml(xml)
+    }
+}
+
+impl Package {
+    /// Replay a patch against this exact package and publish a commit triad.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
+        let package = patch.apply(self)?;
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 }

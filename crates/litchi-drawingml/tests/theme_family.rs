@@ -7,7 +7,7 @@
 
 use litchi_drawingml::theme::family::{
     self, DRAWINGML_NAMESPACE, Family, Guid, MAX_ATTRIBUTES, MAX_DEPTH, MAX_NAME_BYTES,
-    MAX_NAMESPACE_BYTES, MAX_NAMESPACE_DECLARATIONS, MAX_XML_BYTES, NAMESPACE, Snapshot,
+    MAX_NAMESPACE_BYTES, MAX_NAMESPACE_DECLARATIONS, MAX_XML_BYTES, NAMESPACE, Package,
     XML_NAMESPACE,
 };
 
@@ -392,7 +392,7 @@ fn extension_list_shape_and_text_are_checked_while_foreign_children_stay_opaque(
 
 #[test]
 fn opaque_extensions_and_unknown_attributes_survive_known_edits() {
-    let snapshot = Snapshot::from_xml(FAMILY_WITH_OPAQUE_EXTENSION)
+    let snapshot = Package::from_xml(FAMILY_WITH_OPAQUE_EXTENSION)
         .expect("theme-family extension fixture must parse");
     assert_eq!(snapshot.value().name(), "Office Theme");
     assert_eq!(snapshot.xml_bytes(), FAMILY_WITH_OPAQUE_EXTENSION);
@@ -405,21 +405,21 @@ fn opaque_extensions_and_unknown_attributes_survive_known_edits() {
     edit.set_name("Edited Theme")
         .expect("name edit must validate");
     let commit = edit.commit().expect("known edit must commit");
-    let changed = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+    let changed = std::str::from_utf8(commit.package().xml_bytes()).unwrap();
     assert!(changed.contains("name=\"Edited Theme\""));
     assert!(changed.contains("x:opaque=\"keep\""));
     assert!(changed.contains("<x:future x:flag=\"keep\">opaque</x:future>"));
-    assert_eq!(commit.snapshot().value().name(), "Edited Theme");
+    assert_eq!(commit.package().value().name(), "Edited Theme");
 }
 
 #[test]
 fn exact_no_op_inverse_and_stale_source_guards_are_enforced() {
-    let snapshot = Snapshot::from_xml(FAMILY_WITH_OPAQUE_EXTENSION)
+    let snapshot = Package::from_xml(FAMILY_WITH_OPAQUE_EXTENSION)
         .expect("theme-family extension fixture must parse");
 
     let unchanged = snapshot.edit().commit().expect("no-op must commit");
     assert_eq!(
-        unchanged.snapshot().xml_bytes(),
+        unchanged.package().xml_bytes(),
         FAMILY_WITH_OPAQUE_EXTENSION
     );
     assert_eq!(unchanged.patch().before_xml(), FAMILY_WITH_OPAQUE_EXTENSION);
@@ -432,13 +432,21 @@ fn exact_no_op_inverse_and_stale_source_guards_are_enforced() {
     edit.set_variant_id("{00000000-0000-0000-0000-000000000001}")
         .unwrap();
     let changed = edit.commit().expect("changed edit must commit");
-    let reopened = Snapshot::from_xml(snapshot.xml_bytes())
+    let replayed = snapshot
+        .apply(changed.patch())
+        .expect("package replay must publish a commit");
+    assert!(replayed.diagnostics().changed());
+    assert_eq!(
+        replayed.package().xml_bytes(),
+        changed.package().xml_bytes()
+    );
+    let reopened = Package::from_xml(snapshot.xml_bytes())
         .expect("equal bytes must reopen as a separate source allocation");
     let reopened_changed = changed
         .patch()
         .apply(&reopened)
         .expect("forward patch must apply to equal reopened bytes");
-    assert_eq!(reopened_changed.xml_bytes(), changed.snapshot().xml_bytes());
+    assert_eq!(reopened_changed.xml_bytes(), changed.package().xml_bytes());
     let reopened_restored = changed
         .patch()
         .clone()
@@ -451,11 +459,11 @@ fn exact_no_op_inverse_and_stale_source_guards_are_enforced() {
         .patch()
         .clone()
         .inverse()
-        .apply(changed.snapshot())
+        .apply(changed.package())
         .expect("inverse patch must apply to its commit");
     assert_eq!(restored.xml_bytes(), FAMILY_WITH_OPAQUE_EXTENSION);
 
-    let stale = Snapshot::from_xml(
+    let stale = Package::from_xml(
         std::str::from_utf8(FAMILY_WITH_OPAQUE_EXTENSION)
             .unwrap()
             .replace("Office Theme", "Other Theme")
@@ -580,20 +588,20 @@ fn name_and_source_output_bounds_accept_exact_and_reject_over() {
 
 #[test]
 fn invalid_edits_do_not_leak_into_a_transaction() {
-    let snapshot = Snapshot::from_xml(NATIVE).unwrap();
+    let snapshot = Package::from_xml(NATIVE).unwrap();
     let mut edit = snapshot.edit();
     assert!(edit.set_id("not-a-guid").is_err());
     assert!(edit.set_variant_id("{bad}").is_err());
     assert!(edit.set_name("bad\u{1}").is_err());
-    assert!(!edit.is_changed());
     assert_eq!(edit.value(), snapshot.value());
+    assert!(!edit.commit().unwrap().diagnostics().changed());
 }
 
 #[test]
 fn bounded_malformed_inputs_fail_closed() {
     let oversized = vec![b'x'; MAX_XML_BYTES + 1];
     assert!(family::read(&oversized).is_err());
-    assert!(Snapshot::from_xml(oversized).is_err());
+    assert!(Package::from_xml(oversized).is_err());
     assert!(family::read(br#"<thm15:themeFamily"#).is_err());
     assert!(family::read(br#"<thm15:themeFamily xmlns:thm15="http://schemas.microsoft.com/office/thememl/2012/main" name="Office" id="{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}" vid="{4A3C46E8-61CC-4603-A589-7422A47A8E4A}"><a:extLst/>"#).is_err());
 
@@ -612,7 +620,7 @@ fn bounded_malformed_inputs_fail_closed() {
 
 #[test]
 fn immutable_snapshots_are_send_sync() {
-    assert_send_sync::<Snapshot>();
+    assert_send_sync::<Package>();
     assert_send_sync::<Family>();
     assert_send_sync::<Guid>();
 }

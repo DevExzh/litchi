@@ -1,6 +1,6 @@
 use std::{error::Error, fs, path::PathBuf};
 
-use litchi_drawingml::theme::family::{self, Family, Snapshot};
+use litchi_drawingml::theme::family::{self, Family, Package};
 
 const ID: &str = "{62F939B6-93AF-4DB8-9C6B-D6C7DFDC589F}";
 const VID: &str = "{4A3C46E8-61CC-4603-A589-7422A47A8E4A}";
@@ -16,14 +16,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         family::write(&authored)?,
     )?;
 
-    let snapshot = Snapshot::from_xml(fs::read(fixture)?)?;
+    let snapshot = Package::from_xml(fs::read(fixture)?)?;
     let mut edit = snapshot.edit();
     edit.set_name("Office Theme (caller edit)")?;
     edit.set_variant_id("{00000000-0000-0000-0000-000000000001}")?;
     let commit = edit.commit()?;
     fs::write(
         evidence.join("caller-edited-native.xml"),
-        commit.snapshot().xml_bytes(),
+        commit.package().xml_bytes(),
     )?;
     Ok(())
 }

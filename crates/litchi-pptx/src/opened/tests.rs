@@ -5706,7 +5706,7 @@ fn authored_charts_carry_a_deterministic_embedded_workbook_and_edit_in_place() -
     assert!(parsed.external_data.is_some());
     // Identical bytes are an exact no-op; a new title changes only the chart part.
     assert!(!edit.set_chart(0_usize, position, xml.clone(), None)?);
-    let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)
+    let snapshot = litchi_drawingml::chart::edit::Package::from_xml(xml)
         .map_err(|error| Error::Invalid(error.to_string()))?;
     let mut chart_edit = snapshot.edit();
     chart_edit
@@ -5717,7 +5717,7 @@ fn authored_charts_carry_a_deterministic_embedded_workbook_and_edit_in_place() -
     let retitled = chart_edit
         .commit()
         .map_err(|error| Error::Invalid(error.to_string()))?
-        .into_snapshot();
+        .into_package();
     assert!(edit.set_chart(0_usize, position, retitled.xml_bytes().to_vec(), None)?);
     assert!(
         edit.set_chart(0_usize, position, b"<x/>".to_vec(), None)

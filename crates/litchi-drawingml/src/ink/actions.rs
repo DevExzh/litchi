@@ -11,7 +11,8 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::{Error, Result};
+pub use crate::Error;
+use crate::Result;
 
 use super::{
     ACTION_NAMESPACE, INKML_NAMESPACE, MAX_ATTRIBUTE_VALUE_BYTES, MAX_DEPTH, MAX_NODES,
@@ -25,8 +26,8 @@ pub mod edit;
 
 pub use edit::{
     ActionDataDraft, ActionDraft, ActionGroupDraft, ActionParent, ActionSelector, ChildSelector,
-    Commit, DataChildDraft, DataGroupDraft, DataSelector, Draft, Edit, Limits, OpaquePayload,
-    Patch, Prepared, PropertyDraft,
+    Commit, DataChildDraft, DataGroupDraft, DataSelector, Diagnostics, Draft, Edit, LimitKind,
+    Limits, OpaquePayload, Patch, Prepared, PropertyDraft,
 };
 
 /// Maximum action records retained by one action part.

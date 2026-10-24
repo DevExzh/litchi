@@ -2160,18 +2160,48 @@ through `Edit::set_chart`; XLSX through the scoped family
 `Package::{chart_count, chart_xml}` and `SourceWorksheet::{chart_count,
 chart_xml}`. The source-preserving chart editor gains
 `set_legend`, `set_axis_title`, `set_series_values` and `set_categories`
-on the existing `chart::edit::Transaction` (a pre-W2 name, unchanged here).
+on the focused `chart::edit::Edit` family. Its immutable `chart::Package`
+publishes a core `Commit<Package, Patch>` through `Package::apply`, preserving
+the exact source bytes on no-op edits; `Commit::package()` and
+`Commit::diagnostics()` are the only publication accessors.
 
 | Name | Status |
 |---|---|
 | `litchi_drawingml::chart::authoring::{Spec, Variant, Kind, Grouping, Series, Binding, Cell, Appearance, Labels, Line}` | adopted (0270) |
-| `litchi_drawingml::chart::edit::Transaction::{set_legend, set_axis_title, set_series_values, set_categories}` | adopted (0270) |
+| `litchi_drawingml::chart::edit::Edit::{set_legend, set_axis_title, set_series_values, set_categories}` | adopted (0270; DrawingML family closure 0362dv) |
 | `litchi_pptx::opened::Edit::{add_chart, chart, set_chart}` | adopted (0270); `add_chart` takes a `Spec`, the old `crate::chart::Chart` argument is removed |
 | `litchi_pptx::presentation::embedded::excel::Workbook::from_spec` | adopted (0270) |
 | `litchi_pptx::slide::Slide::chart_xml`, `SourceSlide::chart_xml`, `source::Slide::chart_xml` | adopted (0270) |
 | `litchi_xlsx::chart::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0270); family registered in the gate |
 | `litchi_xlsx::Package::{edit_charts, apply_charts, chart_count, chart_xml}` | adopted (0270) |
 | `litchi_xlsx::SourceWorksheet::{chart_count, chart_xml}` | adopted (0270) |
+
+## DrawingML detached family closure (record 0362dv)
+
+The host-neutral DrawingML editors now use the same focused family vocabulary
+as package owners. `chart::Package`, `transform::Package`, and
+`theme::family::Package` retain exact source bytes, expose `edit()` and
+`apply(&Patch) -> Result<Commit>`, and publish the core
+`Commit<Package, Patch, Diagnostics>` triad. Their commits expose
+`package()`/`into_package()`, `patch()`, `diagnostics()`, and `into_parts()`;
+no snapshot accessors or `Transaction` aliases remain. `Patch::is_noop()` and
+`Diagnostics::changed()` provide no-op introspection without eager
+serialization. The action profile follows the same triad with `Prepared` as
+its checked package value.
+
+Raw authoring remains explicitly bounded: `ink::Prepared::from_bytes` requires
+an `AuthoringLimits` value, and `ink::actions::Edit::{new, from_profile}`
+require `Limits`. The former `_with_limits` entry points are deleted without
+aliases or deprecations. Every chart, transform, theme-family, and ink-action
+consumer uses the focused `Edit`/`Commit` shape in the same migration.
+
+| Name | Status |
+|---|---|
+| `litchi_drawingml::{chart, transform}::{Package, Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0362dv; registered family triads and replay) |
+| `litchi_drawingml::theme::family::{Package, Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0362dv; exact opaque-markup preservation) |
+| `litchi_drawingml::ink::actions::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0362dv; `Prepared` package triad) |
+| `litchi_drawingml::ink::Prepared::from_bytes(bytes, AuthoringLimits)` | adopted (0362dv; required raw limit) |
+| `litchi_drawingml::chart::Package::apply`, `transform::Package::apply`, `theme::family::Package::apply` | adopted (0362dv; source-checked replay returns `Commit`) |
 
 ## Per-series chart keys and warn-mode failures (record 0271)
 
@@ -2486,7 +2516,7 @@ generator so DOCX shares it.
 | `litchi_drawingml::chart::authoring::{read, Parsed}`, `Parsed::is_authored`, `Spec::of` | adopted (0283) |
 | `litchi_drawingml::chart::authoring::Spec::{category_axis_title, value_axis_title, series_kinds, with_variant, without_title, with_data, series_mut, appearance_mut, workbook_members}` | adopted (0283) |
 | `litchi_drawingml::chart::chartex::{read, style_xml, colors_xml, NAMESPACE, CONTENT_TYPE, RELATIONSHIP_TYPE, GRAPHIC_DATA_URI, STYLE_CONTENT_TYPE, STYLE_RELATIONSHIP_TYPE, COLORS_CONTENT_TYPE, COLORS_RELATIONSHIP_TYPE, MAX_XML_BYTES}` | adopted (0283) |
-| `litchi_drawingml::chart::edit::Transaction::set_series_color` | adopted (0283) |
+| `litchi_drawingml::chart::edit::Edit::set_series_color` | adopted (0283; 0362dv) |
 | `litchi_drawingml::chart::chartex::is_chartex` | adopted (0283) |
 | `litchi_pptx::opened::Edit::add_chart` with an extended `Spec` (a `cx:chartSpace` part, its companions and a `cx:chart` frame); `Slide::chart_xml`, `SourceSlide::chart_xml` and `chart`/`set_chart` read and replace extended parts too | adopted (0283) |
 | `litchi_pptx::opened::Edit::set_shape_properties` bounds also move and resize chart graphic frames (`p:graphicFrame/p:xfrm`) | adopted (0283) |

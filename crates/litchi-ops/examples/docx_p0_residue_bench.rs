@@ -136,10 +136,10 @@ fn main() -> Outcome<()> {
         || {
             let mut edit = package.edit()?;
             let (xml, _) = edit.chart_parts(&chart)?.ok_or("the chart")?;
-            let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)?;
+            let snapshot = litchi_drawingml::chart::edit::Package::from_xml(xml)?;
             let mut chart_edit = snapshot.edit();
             chart_edit.set_series_color(0, Some("70AD47"))?;
-            let xml = chart_edit.commit()?.into_snapshot().xml_bytes().to_vec();
+            let xml = chart_edit.commit()?.into_package().xml_bytes().to_vec();
             edit.set_chart(&chart, xml, None)?;
             Ok(edit.commit()?.into_package())
         },
@@ -155,7 +155,7 @@ fn main() -> Outcome<()> {
         || {
             let mut edit = package.edit()?;
             let (xml, _) = edit.chart_parts(&chart)?.ok_or("the chart")?;
-            let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)?;
+            let snapshot = litchi_drawingml::chart::edit::Package::from_xml(xml)?;
             let axis = litchi_drawingml::chart::reader::read(snapshot.xml_bytes())?
                 .plot_area
                 .axes
@@ -172,7 +172,7 @@ fn main() -> Outcome<()> {
                     "Units".to_owned(),
                 )),
             )?;
-            let xml = chart_edit.commit()?.into_snapshot().xml_bytes().to_vec();
+            let xml = chart_edit.commit()?.into_package().xml_bytes().to_vec();
             edit.set_chart(&chart, xml, None)?;
             Ok(edit.commit()?.into_package())
         },
@@ -228,10 +228,10 @@ fn main() -> Outcome<()> {
             let package = litchi_docx::Package::from_bytes(&bytes)?;
             let mut edit = package.edit()?;
             let (xml, _) = edit.chart_parts(&chart)?.ok_or("the chart")?;
-            let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)?;
+            let snapshot = litchi_drawingml::chart::edit::Package::from_xml(xml)?;
             let mut chart_edit = snapshot.edit();
             chart_edit.set_series_color(0, Some("70AD47"))?;
-            let xml = chart_edit.commit()?.into_snapshot().xml_bytes().to_vec();
+            let xml = chart_edit.commit()?.into_package().xml_bytes().to_vec();
             edit.set_chart(&chart, xml, None)?;
             Ok(edit.commit()?.into_package())
         },

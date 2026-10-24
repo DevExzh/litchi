@@ -94,7 +94,7 @@ pub use axis::{Axis, AxisCommon, CategoryAxis, DateAxis, SeriesAxis, ValueAxis};
 pub use data::{
     Layout, MultiLevelStringData, NumberFormat, NumericData, RichText, StringData, TitleText,
 };
-pub use edit::{Commit, DataLabelFlag, Patch, Snapshot, Transaction};
+pub use edit::{Commit, DataLabelFlag, Diagnostics, Edit, Error, LimitKind, Package, Patch};
 pub use legend::Legend;
 pub use model::{
     Chart, ColorMapOverride, ColorMapping, ColorSchemeIndex, ExtensionList, ExternalData,

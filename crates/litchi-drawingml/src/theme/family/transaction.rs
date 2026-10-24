@@ -2,18 +2,29 @@
 
 use std::sync::Arc;
 
-use crate::{Error, Result};
+pub use crate::Error;
+use crate::Result;
 
 use super::{Family, codec};
 
+pub use litchi_core::edit::Diagnostics;
+
+/// Resource dimensions reserved for future caller-configured theme bounds.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete theme-family XML bytes.
+    XmlBytes,
+}
+
 /// An immutable, cheap-to-share Theme Family source snapshot.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Snapshot {
+pub struct Package {
     xml: Arc<[u8]>,
     value: Family,
 }
 
-impl Snapshot {
+impl Package {
     /// Parse and retain a bounded Theme Family fragment.
     ///
     /// Validation precedes the source copy. Already shared callers can use
@@ -67,14 +78,14 @@ impl Snapshot {
 /// A detached Theme Family edit that is not visible until commit.
 #[derive(Debug, Clone)]
 pub struct Edit {
-    before: Snapshot,
+    before: Package,
     staged: Family,
 }
 
 impl Edit {
     /// Borrow the immutable source snapshot used for stale and inverse checks.
     #[must_use]
-    pub const fn before(&self) -> &Snapshot {
+    pub const fn before(&self) -> &Package {
         &self.before
     }
 
@@ -111,23 +122,18 @@ impl Edit {
         Ok(self)
     }
 
-    /// Whether staged semantic fields differ from the source snapshot.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.before.value.semantic_eq(&self.staged)
-    }
-
     /// Validate and publish the edit with an exact reversible source patch.
     pub fn commit(self) -> Result<Commit> {
-        if !self.is_changed() {
-            return Ok(Commit {
-                snapshot: self.before.clone(),
-                patch: Patch {
+        let changed = !self.before.value.semantic_eq(&self.staged);
+        if !changed {
+            return Ok(Commit::new(
+                self.before.clone(),
+                Patch {
                     before: self.before.clone(),
                     after: self.before.clone(),
                 },
-                changed: false,
-            });
+                Diagnostics::UNCHANGED,
+            ));
         }
 
         let mut source_value = self.before.value.clone();
@@ -141,63 +147,22 @@ impl Edit {
             source_value.set_variant_id(self.staged.variant_id().as_str())?;
         }
         let xml = codec::write(&source_value)?;
-        let snapshot = Snapshot::from_xml(xml)?;
-        if snapshot.value() != &self.staged {
+        let package = Package::from_xml(xml)?;
+        if package.value() != &self.staged {
             return Err(Error::Invalid(
                 "theme family edit read-back did not match staged fields".into(),
             ));
         }
         let patch = Patch {
             before: self.before.clone(),
-            after: snapshot.clone(),
+            after: package.clone(),
         };
-        Ok(Commit {
-            snapshot,
-            patch,
-            changed: true,
-        })
+        Ok(Commit::new(package, patch, Diagnostics::CHANGED))
     }
 }
 
 /// A successful Theme Family publication.
-#[derive(Debug, Clone)]
-pub struct Commit {
-    snapshot: Snapshot,
-    patch: Patch,
-    changed: bool,
-}
-
-impl Commit {
-    /// Whether the publication changed any bytes.
-    #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Borrow the resulting snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
-    }
-
-    /// Move the resulting snapshot out of this commit.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
-    }
-
-    /// Borrow the exact reversible patch.
-    #[must_use]
-    pub const fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Move the reversible patch out of this commit.
-    #[must_use]
-    pub fn into_patch(self) -> Patch {
-        self.patch
-    }
-}
+pub type Commit = litchi_core::edit::Commit<Package, Patch>;
 
 /// An exact-source-checked and reversible Theme Family patch.
 ///
@@ -207,8 +172,8 @@ impl Commit {
 /// and three-way merging are not provided by this fragment owner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Patch {
-    before: Snapshot,
-    after: Snapshot,
+    before: Package,
+    after: Package,
 }
 
 impl Patch {
@@ -233,8 +198,16 @@ impl Patch {
         }
     }
 
+    /// Whether this patch preserves the exact source bytes and semantics.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        (Arc::ptr_eq(&self.before.xml, &self.after.xml)
+            || self.before.xml.as_ref() == self.after.xml.as_ref())
+            && self.before.value.semantic_eq(&self.after.value)
+    }
+
     /// Apply this patch only to the exact source snapshot from which it came.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub fn apply(&self, source: &Package) -> Result<Package> {
         if !Arc::ptr_eq(&source.xml, &self.before.xml)
             && source.xml.as_ref() != self.before.xml.as_ref()
         {
@@ -246,5 +219,17 @@ impl Patch {
             return Ok(source.clone());
         }
         Ok(self.after.clone())
+    }
+}
+
+impl Package {
+    /// Replay a patch against this exact package and publish a commit triad.
+    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
+        let package = patch.apply(self)?;
+        Ok(Commit::new(
+            package,
+            patch.clone(),
+            Diagnostics::new(!patch.is_noop()),
+        ))
     }
 }

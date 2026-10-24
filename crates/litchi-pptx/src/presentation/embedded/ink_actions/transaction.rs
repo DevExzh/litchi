@@ -50,13 +50,13 @@ impl Draft {
         F: FnOnce(&mut ProfileEdit) -> Result<()>,
     {
         let index = self.source.find(selector)?;
-        let mut profile_edit = actions::Edit::with_limits(
+        let mut profile_edit = actions::Edit::new(
             self.source.anchors()[index].profile().clone(),
             profile_limits(self.source.limits()),
         )?;
         edit(&mut profile_edit)?;
         let committed = profile_edit.finish()?;
-        self.replace_profile(selector, committed.profile().clone())
+        self.replace_profile(selector, committed.package().profile().clone())
     }
 
     /// Replace one existing target with an already validated shared profile.

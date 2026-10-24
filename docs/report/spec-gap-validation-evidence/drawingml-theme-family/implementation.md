@@ -2,8 +2,9 @@
 
 The shared `litchi_drawingml::theme::family` owner implements the exact
 `themeFamily` fragment in MS-ODRAWXML sections 2.4 and 5.17. `Family` and
-`Guid` provide bounded typed authoring; `Snapshot::edit` publishes a new
-snapshot and an exact-source-checked reversible `Patch`.
+`Guid` provide bounded typed authoring; `Package::edit` publishes a new
+package and an exact-source-checked reversible `Patch` through the shared
+commit triad.
 
 The three required attributes are the applied theme name, theme GUID, and
 variant GUID. Name decoding follows XML 1.0 attribute normalization; authored
@@ -21,11 +22,11 @@ XML 1.0 with UTF-8, including an optional UTF-8 BOM; processing instructions
 are outside this profile. This reader is not a general XSD validator or an
 MCE processor. It requires a namespace-self-contained fragment.
 
-Clone and no-op transactions share retained allocations. Changed transactions
+Clone and no-op edits share retained allocations. Changed edits
 replace only changed attribute value spans and validate the result before
 publication. Patch application uses a shared-source fast path or complete byte
 comparison, so independently reopened equal sources work and stale sources
-fail. Patches are in-memory snapshots, not durable serialized operations;
+fail. Patches are in-memory package operations, not durable serialized operations;
 composition, three-way merging, and host package attachment/removal remain
 open. The reader also accepts Strict DrawingML `ext` children; the retained
 independent XSD evidence exercises the Transitional profile.
@@ -38,7 +39,7 @@ checks. Source hashes are captured before and after the commands and must
 match. The 19 independent feature tests include exact/over-limit cases,
 malformed XML, semantic whitespace, exact native replay, opaque retention,
 failure atomicity, and forward/inverse application to independently reopened
-snapshots. Run `python3 -B run_gates.py` from this directory or use its full
+packages. Run `python3 -B run_gates.py` from this directory or use its full
 repository-relative path.
 
 The native fixture is an exact substring of a checked-in LibreOffice test

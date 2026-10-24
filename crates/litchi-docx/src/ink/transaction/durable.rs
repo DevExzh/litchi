@@ -1059,7 +1059,7 @@ fn decode_prepared(bytes: &[u8], maximum: usize) -> Result<litchi_drawingml::ink
         max_output_bytes: maximum,
         ..Default::default()
     };
-    litchi_drawingml::ink::Prepared::from_bytes_with_limits(bytes, authoring_limits)
+    litchi_drawingml::ink::Prepared::from_bytes(bytes, authoring_limits)
         .map_err(|error| invalid_durable(format!("invalid canonical Ink payload: {error}")))
 }
 

@@ -1,6 +1,6 @@
 //! Focused conformance tests for typed DrawingML transforms.
 
-use super::{Angle, Point, Size, Snapshot, Transform, codec};
+use super::{Angle, Package, Point, Size, Transform, codec};
 
 const TRANSFORM_XML: &[u8] = br#"<x:xfrm xmlns:x="http://schemas.openxmlformats.org/drawingml/2006/main" flipV="true" rot=" 60000 "><x:off y="2" x="1"/><x:ext cx="3" cy="4"/><x:chOff x="-5" y="6"/><x:chExt cx="7" cy="8"/></x:xfrm>"#;
 
@@ -48,32 +48,34 @@ fn detached_builder_keeps_authored_defaults_distinct() {
 
 #[test]
 fn snapshots_replay_source_exactly_and_edits_are_atomic() {
-    let snapshot = Snapshot::from_xml(TRANSFORM_XML).expect("source snapshot must parse");
-    assert_eq!(snapshot.xml_bytes(), TRANSFORM_XML);
+    let package = Package::from_xml(TRANSFORM_XML).expect("source package must parse");
+    assert_eq!(package.xml_bytes(), TRANSFORM_XML);
 
-    let unchanged = snapshot.edit().commit().unwrap();
-    assert_eq!(unchanged.snapshot().xml_bytes(), TRANSFORM_XML);
-    assert!(!snapshot.edit().is_changed());
+    let unchanged = package.edit().commit().unwrap();
+    assert_eq!(unchanged.package().xml_bytes(), TRANSFORM_XML);
+    assert!(!unchanged.diagnostics().changed());
 
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit();
     edit.set_rotation(Some(Angle::new(-120_000)))
         .set_flip_horizontal(Some(true));
-    assert!(edit.is_changed());
     let committed = edit.commit().expect("valid transform edit must commit");
-    assert_eq!(
-        committed.snapshot().value().rotation(),
-        Angle::new(-120_000)
-    );
-    assert!(committed.snapshot().value().flip_horizontal());
-    assert_eq!(snapshot.value().rotation(), Angle::new(60_000));
+    assert_eq!(committed.package().value().rotation(), Angle::new(-120_000));
+    assert!(committed.package().value().flip_horizontal());
+    assert!(committed.diagnostics().changed());
+    assert_eq!(package.value().rotation(), Angle::new(60_000));
+    let replayed = package
+        .apply(committed.patch())
+        .expect("package replay must publish a commit");
+    assert!(replayed.diagnostics().changed());
+    assert_eq!(replayed.package().value(), committed.package().value());
 
     let restored = committed
         .patch()
         .clone()
         .inverse()
-        .apply(committed.snapshot())
+        .apply(committed.package())
         .expect("inverse patch must apply to its commit");
-    assert_eq!(restored.value(), snapshot.value());
+    assert_eq!(restored.value(), package.value());
 }
 
 #[test]

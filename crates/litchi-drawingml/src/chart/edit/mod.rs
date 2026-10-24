@@ -14,4 +14,4 @@ mod validation;
 mod tests;
 
 pub use model::DataLabelFlag;
-pub use transaction::{Commit, Patch, Snapshot, Transaction};
+pub use transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Package, Patch};

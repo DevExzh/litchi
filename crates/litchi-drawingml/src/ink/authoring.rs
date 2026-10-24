@@ -598,10 +598,6 @@ impl Prepared {
     /// Returns an error when the input is malformed, exceeds the supplied
     /// limits, uses an unsupported canonical shape, or differs from the
     /// bytes emitted after typed reconstruction.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, AuthoringLimits::default())
-    }
-
     /// Admit bytes using explicit finite authoring limits.
     ///
     /// The input is scanned and reconstructed while borrowed. No caller input
@@ -613,7 +609,7 @@ impl Prepared {
     /// Returns an error when the input is malformed, exceeds the supplied
     /// limits, uses an unsupported canonical shape, or differs from the
     /// bytes emitted after typed reconstruction.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: AuthoringLimits) -> Result<Self> {
+    pub fn from_bytes(bytes: &[u8], limits: AuthoringLimits) -> Result<Self> {
         limits.validate()?;
         if bytes.len() > limits.max_source_bytes {
             return Err(limit("InkML source bytes", limits.max_source_bytes));
@@ -2701,7 +2697,8 @@ mod tests {
     #[test]
     fn canonical_bytes_import_with_all_typed_fields() {
         let prepared = all_typed_fields_draft().finish().expect("canonical InkML");
-        let imported = Prepared::from_bytes(prepared.as_bytes()).expect("canonical import");
+        let imported = Prepared::from_bytes(prepared.as_bytes(), AuthoringLimits::default())
+            .expect("canonical import");
         assert_eq!(imported.as_bytes(), prepared.as_bytes());
         assert_eq!(imported.metadata(), prepared.metadata());
         assert_eq!(imported.metadata().context_count(), 2);
@@ -2711,7 +2708,8 @@ mod tests {
         assert_eq!(document.traces()[0].data(&document), b"1 2, -3 4");
 
         let empty = Draft::default().finish().expect("empty canonical InkML");
-        let empty_import = Prepared::from_bytes(empty.as_bytes()).expect("empty import");
+        let empty_import = Prepared::from_bytes(empty.as_bytes(), AuthoringLimits::default())
+            .expect("empty import");
         assert_eq!(empty_import.as_bytes(), empty.as_bytes());
     }
 
@@ -2728,7 +2726,11 @@ mod tests {
             .finish()
             .expect("canonical InkML");
         assert!(
-            Prepared::from_bytes(&prepared.as_bytes()[..prepared.as_bytes().len() - 1]).is_err()
+            Prepared::from_bytes(
+                &prepared.as_bytes()[..prepared.as_bytes().len() - 1],
+                AuthoringLimits::default(),
+            )
+            .is_err()
         );
 
         let mut noncanonical = prepared.as_bytes().to_vec();
@@ -2738,24 +2740,24 @@ mod tests {
             .position(|window| window == channel)
             .expect("canonical channel");
         noncanonical[position + channel.len() - 2] = b'Q';
-        assert!(Prepared::from_bytes(&noncanonical).is_err());
+        assert!(Prepared::from_bytes(&noncanonical, AuthoringLimits::default()).is_err());
 
         let exact_limits = AuthoringLimits {
             max_source_bytes: prepared.as_bytes().len(),
             max_output_bytes: prepared.as_bytes().len(),
             ..AuthoringLimits::default()
         };
-        assert!(Prepared::from_bytes_with_limits(prepared.as_bytes(), exact_limits).is_ok());
+        assert!(Prepared::from_bytes(prepared.as_bytes(), exact_limits).is_ok());
         let below_source = AuthoringLimits {
             max_source_bytes: prepared.as_bytes().len() - 1,
             ..exact_limits
         };
-        assert!(Prepared::from_bytes_with_limits(prepared.as_bytes(), below_source).is_err());
+        assert!(Prepared::from_bytes(prepared.as_bytes(), below_source).is_err());
         let below_trace = AuthoringLimits {
             max_trace_text_bytes: 7,
             ..exact_limits
         };
-        assert!(Prepared::from_bytes_with_limits(prepared.as_bytes(), below_trace).is_err());
+        assert!(Prepared::from_bytes(prepared.as_bytes(), below_trace).is_err());
     }
 
     #[test]
@@ -2831,7 +2833,7 @@ mod tests {
                 .windows(b"&amp;".len())
                 .any(|window| { window == b"&amp;" })
         );
-        assert!(Prepared::from_bytes_with_limits(prepared.as_bytes(), limits).is_ok());
+        assert!(Prepared::from_bytes(prepared.as_bytes(), limits).is_ok());
     }
 
     #[test]
@@ -2878,7 +2880,8 @@ mod tests {
                 .any(|window| window == b"&#xD;")
         );
 
-        let imported = Prepared::from_bytes(prepared.as_bytes()).expect("custom readback import");
+        let imported = Prepared::from_bytes(prepared.as_bytes(), AuthoringLimits::default())
+            .expect("custom readback import");
         assert_eq!(imported.as_bytes(), prepared.as_bytes());
     }
 
