@@ -679,7 +679,9 @@ impl SmartArt {
                 roots.push(index);
             }
         }
-        roots.sort_unstable_by_key(|index| parent_orders[*index].unwrap_or(usize::MAX));
+        roots.sort_unstable_by_key(|index| {
+            (parent_orders[*index].unwrap_or(usize::MAX), *index)
+        });
         for siblings in &mut children {
             siblings.sort_unstable_by_key(|(order, index)| (*order, *index));
         }
@@ -2002,6 +2004,33 @@ mod tests {
                 .map(|node| node.text.as_str())
                 .collect::<Vec<_>>(),
             ["first", "second"]
+        );
+    }
+
+    #[test]
+    fn raw_parser_stably_orders_equal_source_order_roots() {
+        let xml = concat!(
+            "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">",
+            "<dgm:ptLst>",
+            "<dgm:pt modelId=\"0\" type=\"doc\"/>",
+            "<dgm:pt modelId=\"1\"><dgm:t>point order one</dgm:t></dgm:pt>",
+            "<dgm:pt modelId=\"2\"><dgm:t>point order two</dgm:t></dgm:pt>",
+            "<dgm:pt modelId=\"3\"><dgm:t>point order three</dgm:t></dgm:pt>",
+            "</dgm:ptLst>",
+            "<dgm:cxnLst>",
+            "<dgm:cxn modelId=\"10\" srcId=\"0\" destId=\"3\" srcOrd=\"0\"/>",
+            "<dgm:cxn modelId=\"11\" srcId=\"0\" destId=\"1\" srcOrd=\"0\"/>",
+            "<dgm:cxn modelId=\"12\" srcId=\"0\" destId=\"2\" srcOrd=\"0\"/>",
+            "</dgm:cxnLst>",
+            "</dgm:dataModel>"
+        );
+        let nodes = SmartArt::parse_data_xml(&xml, &Limits::default()).unwrap();
+        assert_eq!(
+            nodes
+                .iter()
+                .map(|node| node.text.as_str())
+                .collect::<Vec<_>>(),
+            ["point order one", "point order two", "point order three"]
         );
     }
 

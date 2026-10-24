@@ -54,3 +54,12 @@ The packet adds behavior tests for:
 No fixture, binary, performance artifact or `3rdparty/` reference was added.
 No Cargo command was run for this source-only repair before a new validation
 slot was granted.
+
+## Root-order follow-up
+
+The follow-up review found one deterministic-order defect in the first repair:
+root entries were sorted only by `srcOrd`, so equal document-level orders could
+be reordered by `sort_unstable`. `diagram/model.rs` now uses the same
+`(srcOrd, point-index)` key for roots and child vectors. A regression supplies
+three roots whose points and connections are in different orders but whose
+`srcOrd` values are equal, and asserts stable point order.
