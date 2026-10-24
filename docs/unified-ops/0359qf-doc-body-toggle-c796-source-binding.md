@@ -159,11 +159,12 @@ The focused semantic checks are also required on the fresh candidate and
 overlay builds:
 
 ~~~sh
-for src in "$CAND" "$BASE"; do
-  (cd "$src" && cargo test --offline --locked -p litchi-doc --lib
-    deferred_body_formatting_flushes_before_table_edits_and_keeps_failures_atomic
-    retained_render_is_cleared_by_resource_reopen_and_formatting_flushes_at_commit)
-done
+(cd "$CAND" && cargo test --offline --locked -p litchi-doc --lib \
+  deferred_body_formatting_flushes_before_table_edits_and_keeps_failures_atomic)
+(cd "$CAND" && cargo test --offline --locked -p litchi-doc --lib \
+  retained_render_is_cleared_by_resource_reopen_and_formatting_flushes_at_commit)
+(cd "$BASE" && cargo test --offline --locked -p litchi-doc --lib \
+  retained_render_is_cleared_by_resource_reopen_and_reenabled_for_formatting)
 ~~~
 
 ## Quiet-host ABBA and allocation protocol
