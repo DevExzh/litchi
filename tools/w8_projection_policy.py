@@ -469,6 +469,12 @@ def _check_fields_fixed(endpoint: dict[str, Any], fields: dict[str, Any], side: 
     expected = FIXED_INPUTS[side]
     if endpoint.get("schema") != "litchi_file_endpoint.v1":
         raise fail(f"{side} endpoint schema is invalid")
+    manifest = fields.get("manifest")
+    if not isinstance(manifest, dict) or not isinstance(manifest.get("path"), str):
+        raise fail(f"{side} runner fields have no endpoint manifest identity")
+    actual_manifest = artifact(Path(manifest["path"]))
+    if (actual_manifest["bytes"], actual_manifest["sha256"]) != (manifest.get("bytes"), manifest.get("sha256")):
+        raise fail(f"{side} endpoint manifest identity is stale")
     if fields.get("source_commit") != expected["source_commit"]:
         raise fail(f"{side} source commit is not the reviewed full commit")
     if endpoint.get("source_commit") != fields.get("source_commit") or endpoint.get("dependency_projection_sha256") != fields.get("dependency_projection_sha256"):

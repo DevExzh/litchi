@@ -234,6 +234,10 @@ class ProjectionPolicyTests(unittest.TestCase):
                 patch_path.write_bytes(b"tampered adapter")
                 with self.assertRaises(policy.ProjectionPolicyError):
                     policy._check_fields_fixed(endpoint, fields, "before")
+                patch_path.write_bytes(b"adapter")
+                manifest_path.write_bytes(b"tampered endpoint manifest")
+                with self.assertRaises(policy.ProjectionPolicyError):
+                    policy._check_fields_fixed(endpoint, fields, "before")
 
 
 if __name__ == "__main__":
