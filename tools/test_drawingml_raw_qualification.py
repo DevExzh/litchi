@@ -6,6 +6,7 @@ These tests never invoke Cargo, Rust, a native probe, or a timing workload.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -56,6 +57,8 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         self.assertEqual(manifest["paired"]["samples_per_leg"], 20)
         self.assertTrue(manifest["paired"]["normal_and_allocator_are_separate"])
         self.assertEqual(manifest["status"], "real_adapters_ready_external_receipts_pending")
+        self.assertEqual(manifest["plan_path"], paired.PLAN_PATH)
+        self.assertEqual(manifest["plan_sha256"], paired.PLAN_SHA256)
         self.assertEqual(
             manifest["baseline_workspace_lock_sha256"],
             preparation.HISTORICAL_WORKSPACE_LOCK_SHA256,
@@ -202,6 +205,186 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         self.assertNotEqual(identity, validator._generated_fixture_identity(changed))
         resized = [dict(parts[0], malformed_bytes=4)]
         self.assertNotEqual(identity, validator._generated_fixture_identity(resized))
+    def _write_external_resource_capture(self, output: Path) -> tuple[dict, dict]:
+        event_id = validator._external_event_id(1, "baseline", "normal")
+        argv = ["/external/drawingml-raw-native", "--lane", LANES[0]]
+        source_root = "/external/drawingml-source"
+        source_revision = "a" * 40
+        source_identity = "c" * 64
+        resource_path = output / validator.EXTERNAL_RESOURCE_FILENAME
+        record = {
+            "schema": validator.EXTERNAL_RESOURCE_SCHEMA,
+            "event_id": event_id,
+            "leg": "baseline",
+            "status": "captured",
+            "reason": None,
+            "pid": 4242,
+            "start_identity": {
+                "pid": 4242,
+                "boot_id": "boot-id",
+                "starttime_ticks": 1234,
+            },
+            "argv_sha256": validator._argv_sha256(argv),
+            "cwd": "/external/drawingml-output",
+            "source_ref": {
+                "source_root": source_root,
+                "source_revision": source_revision,
+                "source_identity_sha256": source_identity,
+                "leg": "baseline",
+            },
+            "returncode": 0,
+            "sample_count": 2,
+            "process_rss_bytes": 2048,
+            "peak_rss_bytes": 3072,
+            "peak_vm_hwm_bytes": 4096,
+        }
+        record_line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
+        resource_path.write_text(record_line, encoding="utf-8")
+        event = {
+            "event_id": event_id,
+            "leg": "baseline",
+            "argv": argv,
+            "cwd": record["cwd"],
+            "source_root": source_root,
+            "source_head": source_revision,
+            "source_identity_sha256": source_identity,
+            "returncode": 0,
+            "runner_error": None,
+            "process_observation": {
+                "schema": validator.EXTERNAL_RESOURCE_SCHEMA,
+                "path": str(resource_path),
+                "event_id": event_id,
+                "record_sha256": hashlib.sha256(record_line.encode()).hexdigest(),
+                "record_bytes": len(record_line.encode()),
+            },
+        }
+        (output / "events-abba.jsonl").write_text(
+            json.dumps(event, sort_keys=True, separators=(",", ":")) + "\n",
+            encoding="utf-8",
+        )
+        report = {
+            "source_revision": source_revision,
+            "resource_metrics": {
+                "pid": 4242,
+                "command_sha256": validator._argv_sha256(argv),
+                "source_revision": source_revision,
+                "process_rss_bytes": 2048,
+                "peak_rss_bytes": 3072,
+                "whole_process_peak_rss_bytes": 4096,
+            },
+        }
+        return report, event
+
+    def test_external_resource_capture_binds_mutations_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="drawingml-raw-resource-") as directory:
+            output = Path(directory)
+            report, _ = self._write_external_resource_capture(output)
+            path = output / "dml-native-before-1.json"
+            capture = validator._load_external_resource_capture(output)
+            observed = validator._validate_external_resource(
+                capture,
+                report,
+                path,
+                index=1,
+                role="baseline",
+                mode="normal",
+            )
+            self.assertEqual(observed["pid"], 4242)
+
+            def mutate_argv(value: dict) -> None:
+                value["records"][next(iter(value["records"]))]["argv_sha256"] = "0" * 64
+
+            def mutate_source(value: dict) -> None:
+                value["events"][next(iter(value["events"]))]["source_head"] = "b" * 40
+
+            def mutate_pointer(value: dict) -> None:
+                value["events"][next(iter(value["events"]))]["process_observation"][
+                    "record_sha256"
+                ] = "0" * 64
+
+            mutations = (
+                ("argv", mutate_argv, "external argv hash differs"),
+                ("source", mutate_source, "external source/event binding differs"),
+                ("pointer", mutate_pointer, "external observation pointer differs"),
+            )
+            for _, mutate, message in mutations:
+                mutated = validator._load_external_resource_capture(output)
+                mutate(mutated)
+                with self.assertRaisesRegex(ValueError, message):
+                    validator._validate_external_resource(
+                        mutated,
+                        report,
+                        path,
+                        index=1,
+                        role="baseline",
+                        mode="normal",
+                    )
+
+    def test_validator_control_handoff_does_not_change_sidecar_receipt(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="drawingml-raw-handoff-") as directory:
+            output = Path(directory)
+            observer = paired.ExternalResourceObserver(output)
+
+            class ProbeToken:
+                def finish(self, returncode: int | None) -> dict:
+                    return {
+                        "schema": paired.EXTERNAL_RESOURCE_SCHEMA,
+                        "event_id": "abba-01-baseline-raw-native",
+                        "leg": "baseline",
+                        "status": "captured",
+                        "returncode": returncode,
+                    }
+
+            observer.process_finished(ProbeToken(), returncode=0)
+            before = observer.receipt()
+            for event_id in (
+                "validator-drawingml-raw-identity",
+                "control-drawingml-fixture-preflight-before",
+                "control-drawingml-fixture-preflight-after",
+            ):
+                self.assertIsNone(observer.process_started(event_id=event_id))
+            self.assertIsNone(
+                observer.process_started(
+                    event_id="unlisted-control",
+                    event_kind="control",
+                    measured=False,
+                )
+            )
+            self.assertIsNone(
+                observer.process_started(
+                    event_id="untimed-measurement",
+                    event_kind="measurement",
+                    measured=False,
+                )
+            )
+            after = observer.receipt()
+            self.assertEqual(after, before)
+            self.assertEqual(after["records"], 1)
+
+    def test_disappeared_child_is_recorded_unavailable_without_claim(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="drawingml-raw-disappeared-child-") as directory:
+            output = Path(directory)
+            observer = paired.ExternalResourceObserver(output)
+            token = observer.process_started(
+                event_id="abba-01-baseline-raw-native",
+                leg="baseline",
+                argv=["/external/drawingml-raw-native"],
+                cwd=output,
+                identity={
+                    "source_root": "/external/drawingml-source",
+                    "head": "a" * 40,
+                    "identity_sha256": "b" * 64,
+                },
+                process=type("FastProcess", (), {"pid": 999999999})(),
+            )
+            self.assertIsNotNone(token)
+            observer.process_finished(token, returncode=0)
+            record = json.loads(
+                (output / paired.EXTERNAL_RESOURCE_FILENAME).read_text(encoding="utf-8")
+            )
+            self.assertEqual(record["status"], "unavailable")
+            self.assertEqual(record["sample_count"], 0)
+            self.assertIn("disappeared", record["reason"])
 
     def test_reviewed_adapter_hashes_bind_checked_in_sources(self) -> None:
         import hashlib

@@ -1253,11 +1253,23 @@ def _json_hash(path: Path) -> tuple[str, int]:
 
 
 class SafeRunner:
-    def __init__(self, manifest: Mapping[str, Any], manifest_path: Path, phase: str, cpu: int | None):
+    def __init__(
+        self,
+        manifest: Mapping[str, Any],
+        manifest_path: Path,
+        phase: str,
+        cpu: int | None,
+        process_observer: Any | None = None,
+    ):
         self.manifest = manifest
         self.manifest_path = manifest_path.resolve()
         self.phase = phase
         self.cpu = cpu
+        # The default remains deliberately inert for the established W4b/W4/W5
+        # lanes.  The DrawingML paired runner supplies a narrow observer only
+        # for its measurement children; it never has to intercept helper
+        # subprocesses used by this runner's git/config checks.
+        self.process_observer = process_observer
         self.guard = ProcessGuard()
         self.target_preflight_limit = TARGET_PREFLIGHT_BYTES
         self.target_limit = TARGET_HARD_LIMIT_BYTES
@@ -1597,6 +1609,7 @@ class SafeRunner:
         violation: list[dict[str, Any]] = []
         returncode: int | None = None
         process: subprocess.Popen[Any] | None = None
+        process_observation: Any | None = None
         runner_error: str | None = None
         last_target_check = 0.0
         with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
@@ -1611,33 +1624,63 @@ class SafeRunner:
                     start_new_session=True,
                     preexec_fn=self._preexec(),
                 )
-                while True:
-                    returncode = process.poll()
-                    if returncode is not None:
-                        break
+                if self.process_observer is not None:
                     try:
-                        offenders = self.guard.offenders(process.pid)
-                        if offenders:
-                            violation.extend(offenders)
-                            runner_error = "process guard rejected an unrelated Litchi process"
+                        process_observation = self.process_observer.process_started(
+                            event_id=event_id,
+                            leg=leg,
+                            argv=list(argv),
+                            cwd=cwd,
+                            identity=identity,
+                            process=process,
+                            event_kind=event_kind,
+                            measured=measured,
+                        )
+                    except BaseException as error:
+                        runner_error = f"process observer failed at {event_id}: {error}"
+                        self._terminate(process)
+                        returncode = process.returncode
+                if runner_error is None:
+                    while True:
+                        returncode = process.poll()
+                        if returncode is not None:
+                            break
+                        try:
+                            offenders = self.guard.offenders(process.pid)
+                            if offenders:
+                                violation.extend(offenders)
+                                runner_error = "process guard rejected an unrelated Litchi process"
+                                self._terminate(process)
+                                returncode = process.returncode
+                                break
+                            now = time.monotonic()
+                            if now - last_target_check >= 1.0:
+                                self._check_target(target)
+                                last_target_check = now
+                        except RunnerError as error:
+                            runner_error = str(error)
                             self._terminate(process)
                             returncode = process.returncode
                             break
-                        now = time.monotonic()
-                        if now - last_target_check >= 1.0:
-                            self._check_target(target)
-                            last_target_check = now
-                    except RunnerError as error:
-                        runner_error = str(error)
-                        self._terminate(process)
-                        returncode = process.returncode
-                        break
-                    time.sleep(0.1)
+                        time.sleep(0.1)
             except BaseException as error:
                 if process is not None and process.poll() is None:
                     self._terminate(process)
                 runner_error = str(error)
                 returncode = process.returncode if process is not None else None
+        if self.process_observer is not None and process_observation is not None:
+            try:
+                process_observation = self.process_observer.process_finished(
+                    process_observation,
+                    returncode=returncode,
+                )
+            except BaseException as error:
+                runner_error = runner_error or f"process observer failed at {event_id}: {error}"
+                # Do not let an observer implementation detail become an
+                # unserialisable event payload.  The failed event remains
+                # journaled without a false observation pointer and the
+                # runner still fails closed below.
+                process_observation = None
         ended_at = _now()
         post_descendants = self._wait_descendants_gone(process.pid) if process is not None else []
         post_offenders = self.guard.offenders()
@@ -1714,6 +1757,8 @@ class SafeRunner:
             "post_exit_offenders": post_offenders,
             "runner_error": runner_error,
         }
+        if process_observation is not None:
+            event["process_observation"] = process_observation
         self._append_event(event)
         self.recorded_events.append(event)
         if runner_error is not None:
