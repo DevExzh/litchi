@@ -60,12 +60,15 @@ pub struct Edit {
 }
 
 impl Package {
-    /// Start a timeline edit. Starting one copies nothing.
+    /// Start a timeline edit. Starting one copies nothing and defers workbook
+    /// projection validation until the first operation or commit that needs
+    /// the projection.
     ///
     /// # Errors
     ///
-    /// Returns the workbook validation errors of a package whose projection
-    /// was not parsed yet.
+    /// Returns a cold edit. Workbook validation errors are reported by the
+    /// first fallible operation or by [`Edit::commit`] after the projection is
+    /// needed.
     pub fn edit_timelines(&self) -> Result<Edit> {
         Ok(Edit {
             staged: Staged::of_package(self)?,
