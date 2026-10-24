@@ -3826,3 +3826,38 @@ See [0063](0063-source-pptx-modern-comments.md).
   qualify that migration. Raw lanes retain their separate baselines. Final
   source capture, the full gate, real corpus and all native qualification
   remain required. Only redaction audit 22 is deferred. Nothing is pushed.
+
+- Coordinator continuation (2026-10-24, DrawingML composition and six-leaf cleanup):
+  Shared DrawingML owners and all five raw codec lanes merge at `04058bc7e1`.
+  Composed 4100 locked consumer checks and 501 Rust tests pass; record 0362dvj
+  preserves stale-cache and missing-argument failures before the repairs.
+  The migration retains input budgets and opaque namespace fidelity, and all
+  affected live consumers follow the required API.
+
+  PPT probe correctness merges at `571f31a8bd`: both normal release endpoints
+  verify 28 routes across four fixtures with identical output reports. RTF
+  native adapters and the live example merge at `2a50681aec` after 42 tooling
+  tests; OLE oracle and per-endpoint lock repair merges at `07cd359eb4` after
+  63. These are source/protocol and correctness receipts, not final paired
+  performance acceptance.
+
+  DrawingML owner adapters, raw fixture/fidelity checks and independent child
+  memory observation merge through `cef9dd63cb`, with all 80 composed tooling
+  tests passing. Actual current compilation exposes fixture-generator and
+  SVG oracle mistakes; repair `5c67e58938` compiles and passes ten untimed
+  fixture preflights. Historical 945/11728 compile, while 2f7/996 expose
+  raw-family feature gates corrected at `418cff01db`. The broad performance
+  harness still needs current defaults, isolation from unrelated historical
+  lanes and actual paired build validation. Record 0362dvid distinguishes
+  those obligations from the successful minimal-driver diagnostics.
+
+  Cleanup waves 43–45 remove six merged leaves non-forced, retaining every
+  branch and all eighteen ignored payloads (1,255,989 bytes). Restore exercises
+  and independent hash/mode/ancestry checks pass. OLE cleanup waits for foreign
+  read-only holders; external targets, native endpoints and the protected trunk
+  probe remain intact. Record 0362ul12 captures the integration and cleanup.
+
+  Fresh all-68 capture/dispositions, the full 53-step gate, actual corpus
+  replay, glossary closure and every required native qualification remain
+  active work. The prepared gate now registers 25 tooling modules without
+  changing its 53 steps. Only redaction audit 22 is deferred. Nothing is pushed.
