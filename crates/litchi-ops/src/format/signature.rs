@@ -160,7 +160,8 @@ pub(crate) fn unsign_compound_file(
     bytes: Vec<u8>,
     format: litchi_sign::cfb::Format,
 ) -> Result<Vec<u8>> {
-    let mut editor = litchi_sign::cfb::Editor::open(bytes, format)?;
+    let mut editor =
+        litchi_sign::cfb::Editor::open(bytes, format, litchi_sign::Limits::standard())?;
     editor.clear()?;
     Ok(editor.finish()?)
 }

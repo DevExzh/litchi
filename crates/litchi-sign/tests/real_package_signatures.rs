@@ -227,7 +227,7 @@ fn verify_fixture(bytes: &[u8]) -> litchi_sign::Report {
     let signature = archive
         .read("_xmlsignatures/sig1.xml")
         .expect("fixture signature part is readable");
-    let resolver = FixtureResolver::new(archive, policy.limits());
+    let resolver = FixtureResolver::new(archive, policy.limits_value());
     xml::verify(Profile::Package, &signature, &resolver, &policy)
         .expect("fixture signature verifies")
 }
@@ -252,7 +252,7 @@ fn real_microsoft_package_signatures_require_compatible_weak_algorithm_policy() 
             .read("_xmlsignatures/sig1.xml")
             .expect("fixture signature part is readable");
         let policy = Policy::strict();
-        let resolver = FixtureResolver::new(archive, policy.limits());
+        let resolver = FixtureResolver::new(archive, policy.limits_value());
         assert!(matches!(
             xml::verify(Profile::Package, &signature, &resolver, &policy),
             Err(Error::Sha1)

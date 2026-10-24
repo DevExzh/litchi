@@ -315,14 +315,16 @@ impl Policy {
         }
     }
 
+    /// Configure the resource ceilings used while verifying signatures.
     #[must_use]
-    pub fn with_limits(mut self, limits: Limits) -> Self {
+    pub fn limits(mut self, limits: Limits) -> Self {
         self.limits = limits;
         self
     }
 
+    /// Return the configured signature-verification resource ceilings.
     #[must_use]
-    pub fn limits(&self) -> &Limits {
+    pub fn limits_value(&self) -> &Limits {
         &self.limits
     }
 
