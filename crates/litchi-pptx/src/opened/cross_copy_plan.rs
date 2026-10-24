@@ -1762,6 +1762,13 @@ fn build_candidate(
         transfers,
         destination_view,
     } = inputs;
+    // A recompressing candidate is published by clone-and-apply.  It must
+    // therefore never be re-opened under the destination's source policy:
+    // adding the copied closure may legitimately exceed a member ceiling that
+    // admitted the destination itself.  Transferring candidates still reopen
+    // their exact archive, because that reopen is what authorizes the source
+    // compressed spans they publish.
+    let recompressing = transfers.is_empty();
     let archive_limit = limits.max_patch_bytes();
     let mut transferred = Vec::new();
     transferred
@@ -1901,39 +1908,47 @@ fn build_candidate(
         },
     };
     let serialized_bytes = serialized.len();
-    let candidate_read_limits = candidate.read_limits();
     // Clean owned ingress proves the destination has built-in parts. Keep
-    // the existing path for caller-defined parts and revoked authorization.
-    let reopened = match serialized {
-        CandidateBytes::Owned(bytes) if destination_view.is_unmodified_owned_source() => {
-            OpcPackage::from_vec_reusing_payloads(bytes, candidate_read_limits, &candidate)?
-        },
-        CandidateBytes::Owned(bytes) => OpcPackage::from_vec(bytes, candidate_read_limits)?,
-        CandidateBytes::Shared(bytes) if destination_view.is_unmodified_owned_source() => {
-            OpcPackage::from_shared_vec_reusing_payloads(bytes, candidate_read_limits, &candidate)?
-        },
-        CandidateBytes::Shared(bytes) => OpcPackage::from_shared_vec(bytes, candidate_read_limits)?,
+    // the existing exact-archive reopen for transferring candidates; a
+    // recompressing candidate stays as the already-built graph and is never
+    // read back under the destination's source policy.
+    let (reopened, archive_revision) = if recompressing {
+        (candidate, None)
+    } else {
+        let candidate_read_limits = candidate.read_limits();
+        let reopened = match serialized {
+            CandidateBytes::Owned(bytes) if destination_view.is_unmodified_owned_source() => {
+                OpcPackage::from_vec_reusing_payloads(bytes, candidate_read_limits, &candidate)?
+            },
+            CandidateBytes::Owned(bytes) => OpcPackage::from_vec(bytes, candidate_read_limits)?,
+            CandidateBytes::Shared(bytes) if destination_view.is_unmodified_owned_source() => {
+                OpcPackage::from_shared_vec_reusing_payloads(
+                    bytes,
+                    candidate_read_limits,
+                    &candidate,
+                )?
+            },
+            CandidateBytes::Shared(bytes) => {
+                OpcPackage::from_shared_vec(bytes, candidate_read_limits)?
+            },
+        };
+        // Owned ingress retains the archive it was opened from and republishes
+        // it verbatim, so the bytes just hashed are exactly what a serializing
+        // hash sink would read back. A reopen that revoked that authorization
+        // is left to the ordinary recomputation.
+        let archive_revision = match written_digest {
+            Some(digest) => reopened
+                .is_unmodified_owned_source()
+                .then(|| seal_physical_revision(digest, serialized_bytes))
+                .transpose()?,
+            None => reopened
+                .exact_source_sha256()
+                .map(|digest| seal_physical_revision(digest, serialized_bytes))
+                .transpose()?,
+        };
+        (reopened, archive_revision)
     };
-    // Owned ingress retains the archive it was opened from and republishes it
-    // verbatim, so the bytes just hashed are exactly what a serializing hash
-    // sink would read back. A reopen that revoked that authorization is left
-    // to the ordinary recomputation.
-    //
-    // A retained archive's digest is recomputed here, at application, over
-    // the bytes about to be published, never carried beside them (change
-    // 0646's G5): the reopened package hashes the archive it now holds, and
-    // keeps the digest bound to that archive for any later request.
-    let archive_revision = match written_digest {
-        Some(digest) => reopened
-            .is_unmodified_owned_source()
-            .then(|| seal_physical_revision(digest, serialized_bytes))
-            .transpose()?,
-        None => reopened
-            .exact_source_sha256()
-            .map(|digest| seal_physical_revision(digest, serialized_bytes))
-            .transpose()?,
-    };
-    let copied_media = if transferred.is_empty() {
+    let copied_media = if recompressing {
         CopiedMedia::Recompressed
     } else {
         CopiedMedia::SourceCompressed
