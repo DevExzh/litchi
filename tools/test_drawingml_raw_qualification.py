@@ -274,8 +274,25 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
 
             observer.process_finished(ProbeToken(), returncode=0)
             before = observer.receipt()
+            for event_id in (
+                "validator-drawingml-raw-identity",
+                "control-drawingml-fixture-preflight-before",
+                "control-drawingml-fixture-preflight-after",
+            ):
+                self.assertIsNone(observer.process_started(event_id=event_id))
             self.assertIsNone(
-                observer.process_started(event_id="validator-drawingml-raw-identity")
+                observer.process_started(
+                    event_id="unlisted-control",
+                    event_kind="control",
+                    measured=False,
+                )
+            )
+            self.assertIsNone(
+                observer.process_started(
+                    event_id="untimed-measurement",
+                    event_kind="measurement",
+                    measured=False,
+                )
             )
             after = observer.receipt()
             self.assertEqual(after, before)

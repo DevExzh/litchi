@@ -50,10 +50,11 @@ qualification claim.
 
 The validator also requires the sidecar event set to be exactly the qualified
 ABBA probe set. The generic event journal still records the validator control
-process, but the external observer deliberately excludes the exact
-`validator-drawingml-raw-identity` event. This keeps the final sidecar hash
-unchanged across validator handoff and leaves its event set exactly equal to
-the qualified probe set.
+process and fixture-preflight controls, but the external observer deliberately
+excludes explicit `event_kind=control`/`measured=false` events plus the exact
+validator and fixture-preflight IDs. This keeps the final sidecar hash
+unchanged across control handoff and leaves its event set exactly equal to the
+qualified probe set.
 
 ## Focused checks
 
@@ -67,9 +68,10 @@ python3 tools/test_native_qualification_runner.py        # 23 passed
 ```
 
 The DrawingML tests include mutation cases for argv identity, source binding,
-and the sidecar line pointer, plus validator-handoff and a deterministic
-disappeared-PID/unavailable-child control. The unavailable-child test simulates
-loss before start-identity capture; it is not a rapid-subprocess measurement.
+and the sidecar line pointer, plus validator/control handoff and a
+deterministic disappeared-PID/unavailable-child control. The unavailable-child
+test simulates loss before start-identity capture; it is not a rapid-subprocess
+measurement.
 A separate Python child smoke check captured a positive independent RSS/VmHWM
 sample through the observer. No performance or native acceptance result is
 inferred from these checks.

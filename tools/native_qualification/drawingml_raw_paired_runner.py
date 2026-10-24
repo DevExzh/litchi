@@ -43,7 +43,13 @@ PLAN_PATH = ".coord/final-acceptance-2026-10-24/drawingml-additional-qualificati
 PLAN_SHA256 = "cf5208bc30eb1b650cfc7f2c15a53d6ae4d0cb3c43999236eb83bb9e58cd4eeb"
 EXTERNAL_RESOURCE_SCHEMA = "litchi.drawingml.external-process-resource.v1"
 EXTERNAL_RESOURCE_FILENAME = "external-process-resource.jsonl"
-EXTERNAL_RESOURCE_EXCLUDED_EVENTS = frozenset({"validator-drawingml-raw-identity"})
+EXTERNAL_RESOURCE_EXCLUDED_EVENTS = frozenset(
+    {
+        "validator-drawingml-raw-identity",
+        "control-drawingml-fixture-preflight-before",
+        "control-drawingml-fixture-preflight-after",
+    }
+)
 LANES = (
     "drawingml-chart-raw",
     "drawingml-diagram-raw",
@@ -246,10 +252,14 @@ class ExternalResourceObserver:
         self._records = 0
 
     def process_started(self, **kwargs: Any) -> _ResourceToken | None:
-        # The validator is a control process.  It reads the eight probe rows
-        # before writing summary.json, so appending its own row here would
-        # mutate the sidecar after the validator had hashed/validated it.
-        if kwargs.get("event_id") in EXTERNAL_RESOURCE_EXCLUDED_EVENTS:
+        # Explicit metadata from the raw adapter takes precedence over an
+        # event-name fallback.  Controls are journaled generically but are
+        # never measured in the eight-child resource sidecar.
+        if (
+            kwargs.get("event_kind") == "control"
+            or kwargs.get("measured") is False
+            or kwargs.get("event_id") in EXTERNAL_RESOURCE_EXCLUDED_EVENTS
+        ):
             return None
         return _ResourceToken(boot_id=self._boot_id, **kwargs)
 
