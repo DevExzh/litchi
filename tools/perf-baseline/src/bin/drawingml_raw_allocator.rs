@@ -1,8 +1,6 @@
-#![forbid(unsafe_code)]
-
-#[path = "../drawingml_raw_probe.rs"]
-mod probe;
+#[path = "support/drawingml_counting_allocator.rs"]
+mod allocator;
 
 fn main() -> std::io::Result<()> {
-    probe::run(true)
+    litchi_perf_baseline::drawingml_raw_probe::run(Some(&allocator::OBSERVER))
 }

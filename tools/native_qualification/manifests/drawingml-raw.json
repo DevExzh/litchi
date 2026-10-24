@@ -79,5 +79,5 @@
     "fidelity_outside_timing": true
   },
   "claim_scope": "paired raw DrawingML protocol only; current-source absolute profiles are controls, not qualification",
-  "status": "adapter_pending_until_final_source_freeze"
+  "status": "real_adapters_ready_source_fence_pending"
 }

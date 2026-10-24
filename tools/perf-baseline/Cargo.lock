@@ -1263,6 +1263,7 @@ dependencies = [
  "litchi-crypto",
  "litchi-doc",
  "litchi-docx",
+ "litchi-drawingml",
  "litchi-odf-common",
  "litchi-odp",
  "litchi-odraw",

@@ -1,8 +1,3 @@
-#![forbid(unsafe_code)]
-
-#[path = "../drawingml_raw_probe.rs"]
-mod probe;
-
 fn main() -> std::io::Result<()> {
-    probe::run(false)
+    litchi_perf_baseline::drawingml_raw_probe::run(None)
 }

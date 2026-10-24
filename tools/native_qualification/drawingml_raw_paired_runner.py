@@ -9,9 +9,10 @@ Cargo path validation, 20 GB target/address-space limits, process quietness,
 fresh child processes, output handoff, and ABBA ordering remain shared with
 the established W4b/W5 lanes.
 
-This command is orchestration only.  A probe that has no final-source adapter
-must emit explicit ``unavailable`` rows; the validator preserves that state
-and never turns it into an acceptance claim.
+This command is orchestration only.  The checked-in probe contains real
+source-backed adapters; a source-pair preparation or endpoint failure is
+fatal and cannot be converted into an acceptance claim.  The validator still
+understands ``unavailable`` control reports for static protocol tests.
 """
 
 from __future__ import annotations

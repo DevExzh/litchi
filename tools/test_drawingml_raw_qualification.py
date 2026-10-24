@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from native_qualification import drawingml_raw_paired_runner as paired  # noqa: E402
+from native_qualification import prepare_drawingml_raw_inputs as preparation  # noqa: E402
 from native_qualification import drawingml_raw_validator as validator  # noqa: E402
 
 
@@ -54,6 +55,7 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         self.assertEqual(manifest["paired"]["minimum_leg_ms"], 150)
         self.assertEqual(manifest["paired"]["samples_per_leg"], 20)
         self.assertTrue(manifest["paired"]["normal_and_allocator_are_separate"])
+        self.assertEqual(manifest["status"], "real_adapters_ready_source_fence_pending")
         for profile in manifest["profiles"]:
             self.assertTrue(profile["source_fence"])
             self.assertTrue(profile["record"])
@@ -92,6 +94,33 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         paired.generic._validate_drawingml_raw_workload(materialized)
         self.assertEqual(materialized["abba_order"], list(paired.generic.ABBA_ORDER))
         self.assertEqual(materialized["legs"]["before"]["lock_paths"], ["Cargo.lock", "tools/perf-baseline/Cargo.lock"])
+
+    def test_probe_is_real_source_backed_adapter(self) -> None:
+        source = (ROOT / "tools/perf-baseline/src/drawingml_raw_probe.rs").read_text(encoding="utf-8")
+        for endpoint in (
+            "chart::reader::read",
+            "diagram::edit::set_drawing_reference",
+            "text::body::reader::read",
+            "svg_blip::read",
+            "model3d::codec::read",
+            "theme::family::read_shared",
+            "ink::actions::read_profile",
+            "CustomGeometryBuilder",
+            "color::read",
+            "transform::codec::read",
+        ):
+            self.assertIn(endpoint, source)
+        self.assertIn("size_class_receipts", source)
+        self.assertIn("conservation_ok", source)
+        self.assertNotIn("lane adapter is not supplied until the final source freeze", source)
+
+    def test_reviewed_adapter_hashes_bind_checked_in_sources(self) -> None:
+        import hashlib
+
+        for relative, expected in preparation.STATIC_REVIEWED_ADAPTER_SHA256.items():
+            path = ROOT / relative
+            if path.is_file():
+                self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), expected, relative)
 
     def _write_unavailable_reports(self, output: Path) -> None:
         fixture = ROOT / "tools/native_qualification/fixtures/drawingml_raw_fixtures.json"

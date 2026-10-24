@@ -26,9 +26,12 @@ WORKSPACE_LOCK_BYTES = 139591
 ADAPTER_PATHS = (
     "Cargo.lock",
     "tools/perf-baseline/Cargo.lock",
+    "tools/perf-baseline/Cargo.toml",
+    "tools/perf-baseline/src/lib.rs",
     "tools/perf-baseline/src/drawingml_raw_probe.rs",
     "tools/perf-baseline/src/bin/drawingml_raw_native.rs",
     "tools/perf-baseline/src/bin/drawingml_raw_allocator.rs",
+    "tools/perf-baseline/src/bin/support/drawingml_counting_allocator.rs",
     "tools/native_qualification/drawingml_raw_validator.py",
     "tools/native_qualification/fixtures/drawingml_raw_fixtures.json",
 )
@@ -38,10 +41,13 @@ ADAPTER_PATHS = (
 # baseline evidence merely because it is copied into a worktree.
 STATIC_REVIEWED_ADAPTER_SHA256 = {
     "Cargo.lock": "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6",
-    "tools/perf-baseline/src/drawingml_raw_probe.rs": "7de752332b10cf7b3542efc303c70be193d9872aee043a052f11a3e549084c97",
-    "tools/perf-baseline/src/bin/drawingml_raw_native.rs": "faf0d4ecffe07a27b32aa13318bb9e01f22d521351f85f39b6d7bef4b928d392",
-    "tools/perf-baseline/src/bin/drawingml_raw_allocator.rs": "7ab157c997f25a8678827d2f4b4384d19cf87ba3ea343ed75a0eb381e79c7d7e",
-    "tools/native_qualification/drawingml_raw_validator.py": "cca13390809fe1b1121ad0b2d946d59f9ba78af6a959784590ca23f1f80eb2a4",
+    "tools/perf-baseline/Cargo.toml": "0d93c8aa779bf45dded1359517466c5c1566a5e97875a055723ff71e3c780f7f",
+    "tools/perf-baseline/src/lib.rs": "99b2595d031c9d0ece1a5b46e17d0ddc017629c7e69655909508a28e725aed04",
+    "tools/perf-baseline/src/drawingml_raw_probe.rs": "dbc52409556bdc5931a8767e9ae961604f660be1975d8b94cd60afe9f756aa64",
+    "tools/perf-baseline/src/bin/drawingml_raw_native.rs": "c64e5cb9436622d383a55f6720c940344c7575cc56404ab6459133afbc63116e",
+    "tools/perf-baseline/src/bin/drawingml_raw_allocator.rs": "6dd60e14b760bf7562017ddc99b9356699a13155eb88a46cdb62a81aa3b0d3b9",
+    "tools/perf-baseline/src/bin/support/drawingml_counting_allocator.rs": "3db5f3a49cf1c3e5ef496f6f3a787f94e74fa3d995879af578a60cb910d13117",
+    "tools/native_qualification/drawingml_raw_validator.py": "75bd77ba6db9452a456a8e65e75eaa102277631ae2889e9ed50abdfd650d5673",
     "tools/native_qualification/fixtures/drawingml_raw_fixtures.json": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
 }
 
