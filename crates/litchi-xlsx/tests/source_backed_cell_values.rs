@@ -891,8 +891,8 @@ fn multi_source_insert_uses_selector_first_operations_across_sheets() {
 #[test]
 fn selector_first_batch_stays_cold_until_first_use_and_defers_selector_errors() {
     let source = Arc::new(VersionedSource::new(three_cells()));
-    let editor = SourceBackedEditor::from_read_at(Arc::clone(&source) as Arc<dyn ReadAt>)
-        .unwrap();
+    let source_reader: Arc<dyn ReadAt> = Arc::clone(&source);
+    let editor = SourceBackedEditor::from_read_at(source_reader).unwrap();
     source.reset_read_diagnostics();
     let before = source.read_diagnostics();
 
