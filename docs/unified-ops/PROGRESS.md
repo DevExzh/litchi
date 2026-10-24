@@ -3889,3 +3889,14 @@ See [0063](0063-source-pptx-modern-comments.md).
   Full gate, actual corpus replay, final inventory/glossary closure and native
   qualification remain active. Only redaction audit 22 is deferred. Nothing is
   pushed.
+
+- Coordinator continuation (2026-10-24, OLE allocator metadata):
+  Both locked allocator builds and native oracle executions pass. Actual output
+  exposes two protocol-fixture mistakes: replacement size 19 instead of 18 and
+  a hyphenated stream name instead of the native underscore. Record 0362ul10k
+  repairs both consumers and the fixture, adds stream-size agreement checks,
+  and retains the original rejected diagnostic. Both normal and allocator
+  output pairs pass the repaired validators; 66 tooling tests and independent
+  artifact/conservation/history review pass. Peak allocation-count increases
+  remain visible in the record for final qualification review. No native
+  performance acceptance is claimed; no branch is pushed.
