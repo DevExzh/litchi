@@ -24,6 +24,8 @@ import os
 from pathlib import Path
 import re
 import sys
+import threading
+import time
 from typing import Any, Mapping
 
 
@@ -37,7 +39,10 @@ from native_qualification import prepare_drawingml_raw_inputs as preparation  # 
 
 SCHEMA = "litchi.drawingml.raw-qualification.manifest.v1"
 RECEIPT_SCHEMA = "litchi.drawingml.raw-qualification.receipt.v1"
-PLAN_SHA256 = "d671c2dbd793d6b1b68c0aae25def384d6ceb44169be93b7daf848d6f13044f9"
+PLAN_PATH = ".coord/final-acceptance-2026-10-24/drawingml-additional-qualification-plan-20261024T125856Z.json"
+PLAN_SHA256 = "cf5208bc30eb1b650cfc7f2c15a53d6ae4d0cb3c43999236eb83bb9e58cd4eeb"
+EXTERNAL_RESOURCE_SCHEMA = "litchi.drawingml.external-process-resource.v1"
+EXTERNAL_RESOURCE_FILENAME = "external-process-resource.jsonl"
 LANES = (
     "drawingml-chart-raw",
     "drawingml-diagram-raw",
@@ -61,6 +66,219 @@ TOKEN = re.compile(r"\$\{([A-Z][A-Z0-9_]*)\}")
 
 class RunnerError(RuntimeError):
     """A fail-closed manifest, preparation, or child-runner error."""
+
+
+def _argv_sha256(argv: list[str]) -> str:
+    """Match the probe's NUL-joined command identity, independently."""
+
+    return hashlib.sha256("\0".join(argv).encode("utf-8")).hexdigest()
+
+
+def _boot_id() -> str:
+    try:
+        value = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="ascii").strip()
+    except (OSError, UnicodeError) as error:
+        raise RunnerError(f"cannot read kernel boot identity: {error}") from error
+    if not value:
+        raise RunnerError("kernel boot identity is empty")
+    return value
+
+
+def _process_start_identity(pid: int, boot_id: str) -> dict[str, Any] | None:
+    """Read a PID identity that remains meaningful if the PID is recycled."""
+
+    try:
+        stat = (Path("/proc") / str(pid) / "stat").read_text(
+            encoding="utf-8", errors="replace"
+        )
+    except (FileNotFoundError, PermissionError, OSError):
+        return None
+    right = stat.rsplit(") ", 1)
+    if len(right) != 2:
+        return None
+    fields = right[1].split()
+    try:
+        # /proc/<pid>/stat field 22 is the twentieth value after the
+        # comm/state prefix: starttime in clock ticks since boot.
+        starttime_ticks = int(fields[19])
+    except (IndexError, ValueError):
+        return None
+    return {"pid": pid, "boot_id": boot_id, "starttime_ticks": starttime_ticks}
+
+
+def _status_bytes(pid: int, key: str) -> int | None:
+    try:
+        status = (Path("/proc") / str(pid) / "status").read_text(
+            encoding="ascii", errors="replace"
+        )
+    except (FileNotFoundError, PermissionError, OSError):
+        return None
+    prefix = f"{key}:"
+    for line in status.splitlines():
+        if not line.startswith(prefix):
+            continue
+        fields = line[len(prefix) :].split()
+        if not fields:
+            return None
+        try:
+            value = int(fields[0])
+        except ValueError:
+            return None
+        unit = fields[1] if len(fields) > 1 else "bytes"
+        multiplier = {"kB": 1024, "MB": 1024 * 1024, "GB": 1024 * 1024 * 1024}.get(
+            unit, 1
+        )
+        return value * multiplier
+    return None
+
+
+class _ResourceToken:
+    """Poll one actual measurement child until its process exits."""
+
+    def __init__(
+        self,
+        *,
+        event_id: str,
+        leg: str,
+        argv: list[str],
+        cwd: Path,
+        identity: Mapping[str, Any],
+        process: Any,
+        boot_id: str,
+    ) -> None:
+        self.event_id = event_id
+        self.leg = leg
+        self.argv = argv
+        self.cwd = str(cwd)
+        self.source_ref = {
+            "source_root": str(identity["source_root"]),
+            "source_revision": str(identity["head"]),
+            "source_identity_sha256": str(identity["identity_sha256"]),
+            "leg": leg,
+        }
+        self.pid = int(process.pid)
+        self.start_identity = _process_start_identity(self.pid, boot_id)
+        self.argv_sha256 = _argv_sha256(argv)
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self.sample_count = 0
+        self.process_rss_bytes = 0
+        self.peak_rss_bytes = 0
+        self.peak_vm_hwm_bytes = 0
+        self.error: str | None = (
+            None
+            if self.start_identity is not None
+            else f"measurement child {self.pid} disappeared before start identity capture"
+        )
+        if self.start_identity is not None:
+            self._thread = threading.Thread(
+                target=self._poll,
+                name=f"drawingml-resource-{self.pid}",
+                daemon=True,
+            )
+            self._thread.start()
+
+    def _sample(self) -> bool:
+        current = _process_start_identity(self.pid, self.start_identity["boot_id"])
+        if current is None:
+            return False
+        if current["starttime_ticks"] != self.start_identity["starttime_ticks"]:
+            self.error = "measurement PID was recycled while sampling"
+            return False
+        rss = _status_bytes(self.pid, "VmRSS")
+        hwm = _status_bytes(self.pid, "VmHWM")
+        if rss is None or hwm is None:
+            self.error = "measurement child has no readable VmRSS/VmHWM"
+            return False
+        self.sample_count += 1
+        self.process_rss_bytes = rss
+        self.peak_rss_bytes = max(self.peak_rss_bytes, rss)
+        self.peak_vm_hwm_bytes = max(self.peak_vm_hwm_bytes, hwm)
+        return True
+
+    def _poll(self) -> None:
+        self._sample()
+        while not self._stop.wait(0.01):
+            if not self._sample():
+                return
+
+    def finish(self, returncode: int | None) -> dict[str, Any]:
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2)
+            if self._thread.is_alive() and self.error is None:
+                self.error = "resource sampler did not stop"
+        captured = (
+            self.error is None
+            and self.sample_count > 0
+            and self.process_rss_bytes > 0
+            and self.peak_vm_hwm_bytes > 0
+        )
+        return {
+            "schema": EXTERNAL_RESOURCE_SCHEMA,
+            "event_id": self.event_id,
+            "leg": self.leg,
+            "status": "captured" if captured else "unavailable",
+            "reason": None if captured else (self.error or "resource sampler observed no usable memory"),
+            "pid": self.pid,
+            "start_identity": self.start_identity,
+            "argv_sha256": self.argv_sha256,
+            "cwd": self.cwd,
+            "source_ref": self.source_ref,
+            "returncode": returncode,
+            "sample_count": self.sample_count,
+            "process_rss_bytes": self.process_rss_bytes,
+            "peak_rss_bytes": self.peak_rss_bytes,
+            "peak_vm_hwm_bytes": self.peak_vm_hwm_bytes,
+        }
+
+
+class ExternalResourceObserver:
+    """Capture only the direct child exposed by SafeRunner's observer hook."""
+
+    def __init__(self, output_dir: Path) -> None:
+        self.path = output_dir / EXTERNAL_RESOURCE_FILENAME
+        if self.path.is_symlink() or self.path.exists():
+            raise RunnerError(f"external resource journal is not fresh: {self.path}")
+        self._boot_id = _boot_id()
+        self._lock = threading.Lock()
+        self._records = 0
+
+    def process_started(self, **kwargs: Any) -> _ResourceToken:
+        return _ResourceToken(boot_id=self._boot_id, **kwargs)
+
+    def process_finished(self, token: _ResourceToken, *, returncode: int | None) -> dict[str, Any]:
+        record = token.finish(returncode)
+        line = json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n"
+        with self._lock:
+            if self.path.is_symlink():
+                raise RunnerError(f"external resource journal became a symlink: {self.path}")
+            mode = "x" if not self.path.exists() else "a"
+            with self.path.open(mode, encoding="utf-8") as stream:
+                stream.write(line)
+                stream.flush()
+                os.fsync(stream.fileno())
+            self._records += 1
+        line_hash = _sha256_bytes(line.encode("utf-8"))
+        return {
+            "schema": EXTERNAL_RESOURCE_SCHEMA,
+            "path": str(self.path),
+            "event_id": record["event_id"],
+            "record_sha256": line_hash,
+            "record_bytes": len(line.encode("utf-8")),
+        }
+
+    def receipt(self) -> dict[str, Any]:
+        if self.path.is_symlink() or not self.path.is_file():
+            raise RunnerError(f"external resource journal is missing: {self.path}")
+        digest, size = _sha256_file(self.path)
+        return {
+            "schema": EXTERNAL_RESOURCE_SCHEMA,
+            "path": str(self.path),
+            "sha256": digest,
+            "bytes": size,
+            "records": self._records,
+        }
 
 
 def _sha256_file(path: Path) -> tuple[str, int]:
@@ -141,6 +359,8 @@ def _full_hash(value: Any, label: str) -> str:
 def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
     if data.get("schema") != SCHEMA:
         raise RunnerError(f"manifest schema must be {SCHEMA!r}")
+    if data.get("plan_path") != PLAN_PATH:
+        raise RunnerError("external DrawingML qualification plan path differs")
     if data.get("plan_sha256") != PLAN_SHA256:
         raise RunnerError("external DrawingML qualification plan hash differs")
     if tuple(profile.get("id") for profile in data.get("profiles", []) if isinstance(profile, dict)) != LANES:
@@ -313,6 +533,7 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
     # external preparation receipts by the checks above.
     return {
         "schema": SCHEMA,
+        "plan_path": PLAN_PATH,
         "plan_sha256": PLAN_SHA256,
         "candidate_root": candidate_root,
         "candidate_revision": candidate_revision,
@@ -495,9 +716,16 @@ def _run_profile(master: Mapping[str, Any], profile: Mapping[str, Any], phase: s
     rendered, _ = _load(profile_path)
     if rendered != data:
         raise RunnerError(f"materialized {profile['id']} profile manifest changed")
+    observer = ExternalResourceObserver(Path(data["output_dir"])) if phase == "abba" else None
     try:
         loaded = generic.load_manifest(profile_path)
-        runner = generic.SafeRunner(loaded, profile_path, phase, cpu)
+        runner = generic.SafeRunner(
+            loaded,
+            profile_path,
+            phase,
+            cpu,
+            process_observer=observer,
+        )
         if phase == "build":
             runner.build()
         else:
@@ -508,6 +736,8 @@ def _run_profile(master: Mapping[str, Any], profile: Mapping[str, Any], phase: s
     if not receipt.is_file() or receipt.is_symlink():
         raise RunnerError(f"{profile['id']} did not produce its {phase} receipt")
     value, _ = _load(receipt)
+    if observer is not None:
+        value["external_resource_capture"] = observer.receipt()
     return value
 
 
@@ -532,8 +762,11 @@ def run(manifest_path: Path, phase: str, cpu: int | None) -> None:
         build_receipt, _ = _load(build_receipt_path)
         if build_receipt.get("schema") != RECEIPT_SCHEMA or build_receipt.get("phase") != "build" or build_receipt.get("status") != "passed":
             raise RunnerError("master build receipt is not a passed build handoff")
-        if build_receipt.get("plan_sha256") != PLAN_SHA256:
-            raise RunnerError("master build receipt plan hash differs")
+        if (
+            build_receipt.get("plan_path") != PLAN_PATH
+            or build_receipt.get("plan_sha256") != PLAN_SHA256
+        ):
+            raise RunnerError("master build receipt plan identity differs")
         if build_receipt.get("manifest_sha256") != manifest_hash:
             raise RunnerError("master manifest differs from the build receipt")
         if build_receipt.get("runner") != {
@@ -580,6 +813,7 @@ def run(manifest_path: Path, phase: str, cpu: int | None) -> None:
             "schema": RECEIPT_SCHEMA,
             "phase": phase,
             "status": "passed",
+            "plan_path": PLAN_PATH,
             "manifest": {"path": str(manifest_path.resolve()), "sha256": manifest_hash},
             "runner": {
                 "path": str(runner_path),
@@ -628,6 +862,7 @@ def run(manifest_path: Path, phase: str, cpu: int | None) -> None:
             "schema": RECEIPT_SCHEMA,
             "phase": phase,
             "status": "failed",
+            "plan_path": PLAN_PATH,
             "manifest": {"path": str(manifest_path.resolve()), "sha256": manifest_hash},
             "runner": {
                 "path": str(runner_path),

@@ -254,6 +254,23 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                     {},
                 )
 
+    def test_shared_runner_process_observer_is_inert_by_default(self) -> None:
+        """Existing lanes do not opt into the DrawingML child hook."""
+
+        with tempfile.TemporaryDirectory(prefix="native-qual-observer-") as directory:
+            root = Path(directory)
+            safe = runner.SafeRunner(
+                {
+                    "lane": "w5-legacy",
+                    "output_dir": str(root / "output"),
+                    "legs": {"before": {"target_dir": str(root / "target")}},
+                },
+                ROOT / "tools/native_qualification_runner.py",
+                "build",
+                None,
+            )
+            self.assertIsNone(safe.process_observer)
+
     def test_environment_uses_fixed_decimal_memory_cap(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-qual-env-") as directory:
             root = Path(directory)
@@ -567,6 +584,25 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             helper.write_text("raise SystemExit(7)\n", encoding="utf-8")
             output = root / "output"
             target = root / "target"
+            class Observer:
+                def __init__(self) -> None:
+                    self.started: list[tuple[str, int]] = []
+                    self.finished: list[tuple[str, int | None]] = []
+
+                def process_started(self, **kwargs):
+                    event_id = kwargs["event_id"]
+                    process = kwargs["process"]
+                    self.started.append((event_id, process.pid))
+                    return {"event_id": event_id, "pid": process.pid}
+
+                def process_finished(self, token, *, returncode):
+                    self.finished.append((token["event_id"], returncode))
+                    return {
+                        "schema": "test.process-observer.v1",
+                        "event_id": token["event_id"],
+                    }
+
+            observer = Observer()
             manifest = {
                 "schema": runner.SCHEMA,
                 "output_dir": str(output),
@@ -587,7 +623,13 @@ class NativeQualificationRunnerTests(unittest.TestCase):
                     },
                 },
             }
-            safe = runner.SafeRunner(manifest, ROOT / "tools/native_qualification_runner.py", "build", None)
+            safe = runner.SafeRunner(
+                manifest,
+                ROOT / "tools/native_qualification_runner.py",
+                "build",
+                None,
+                process_observer=observer,
+            )
             # The real host currently has unrelated wave builders; this unit
             # test isolates child-journaling behavior from the host guard.
             safe.guard.require_quiet = lambda: None
@@ -607,6 +649,9 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             event = json.loads(journal.read_text(encoding="utf-8").splitlines()[0])
             self.assertEqual(event["returncode"], 7)
             self.assertEqual(event["event_id"], "failed-child")
+            self.assertEqual(observer.started[0][0], "failed-child")
+            self.assertEqual(observer.finished, [("failed-child", 7)])
+            self.assertEqual(event["process_observation"]["event_id"], "failed-child")
 
 
 if __name__ == "__main__":

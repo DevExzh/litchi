@@ -51,7 +51,7 @@ STATIC_REVIEWED_ADAPTER_SHA256 = {
     "tools/perf-baseline/src/bin/drawingml_raw_native.rs": "c64e5cb9436622d383a55f6720c940344c7575cc56404ab6459133afbc63116e",
     "tools/perf-baseline/src/bin/drawingml_raw_allocator.rs": "6dd60e14b760bf7562017ddc99b9356699a13155eb88a46cdb62a81aa3b0d3b9",
     "tools/perf-baseline/src/bin/support/drawingml_counting_allocator.rs": "3db5f3a49cf1c3e5ef496f6f3a787f94e74fa3d995879af578a60cb910d13117",
-    "tools/native_qualification/drawingml_raw_validator.py": "d24133a130977081caae190af826d36cc9b0f31b4efb0dba7ab9a0c2a124e954",
+    "tools/native_qualification/drawingml_raw_validator.py": "7b63606cce01f0af952343ce41ea2ae63036b218d599331b37d12f29561dbe53",
     "tools/native_qualification/fixtures/drawingml_raw_fixtures.json": "e72237ec2095535667fa34e962e37950c96ef558eef151839a4e8235a1256925",
 }
 

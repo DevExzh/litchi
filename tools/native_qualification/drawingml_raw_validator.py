@@ -59,6 +59,8 @@ PRODUCTION_SINK_PARTS = {
     "transform",
 }
 STRUCTURAL_BOUNDARY_PARTS = {"geometry"}
+EXTERNAL_RESOURCE_SCHEMA = "litchi.drawingml.external-process-resource.v1"
+EXTERNAL_RESOURCE_FILENAME = "external-process-resource.jsonl"
 
 
 class ValidationError(ValueError):
@@ -110,6 +112,174 @@ def _is_hash(value: Any) -> bool:
     return isinstance(value, str) and len(value) == 64 and all(
         character in "0123456789abcdef" for character in value
     )
+
+
+def _argv_sha256(argv: list[str]) -> str:
+    return hashlib.sha256("\0".join(argv).encode("utf-8")).hexdigest()
+
+
+def _load_jsonl(path: Path, label: str) -> tuple[list[dict[str, Any]], str, int]:
+    _expect(not path.is_symlink() and path.is_file(), f"{label} is missing or symlinked: {path}")
+    raw = path.read_bytes()
+    _expect(raw, f"{label} is empty: {path}")
+    digest = hashlib.sha256(raw).hexdigest()
+    rows: list[dict[str, Any]] = []
+    for line_number, line in enumerate(raw.splitlines(keepends=True), 1):
+        _expect(line.endswith(b"\n"), f"{label} line {line_number} is not newline terminated")
+        try:
+            value = json.loads(line.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValidationError(f"{label} line {line_number} is invalid JSON: {error}") from error
+        _expect(isinstance(value, dict), f"{label} line {line_number} is not an object")
+        value["_line_sha256"] = hashlib.sha256(line).hexdigest()
+        value["_line_bytes"] = len(line)
+        rows.append(value)
+    return rows, digest, len(raw)
+
+
+def _load_external_resource_capture(output_dir: Path) -> dict[str, Any]:
+    resource_path = output_dir / EXTERNAL_RESOURCE_FILENAME
+    records, digest, byte_count = _load_jsonl(resource_path, "external resource journal")
+    by_event: dict[str, Mapping[str, Any]] = {}
+    for record in records:
+        _expect(
+            record.get("schema") == EXTERNAL_RESOURCE_SCHEMA,
+            f"external resource record schema differs: {resource_path}",
+        )
+        event_id = record.get("event_id")
+        _expect(
+            isinstance(event_id, str) and event_id and event_id not in by_event,
+            f"external resource event identity is missing or duplicated: {resource_path}",
+        )
+        by_event[event_id] = record
+    event_path = output_dir / "events-abba.jsonl"
+    events, _, _ = _load_jsonl(event_path, "ABBA event journal")
+    events_by_id: dict[str, Mapping[str, Any]] = {}
+    for event in events:
+        event_id = event.get("event_id")
+        _expect(
+            isinstance(event_id, str) and event_id and event_id not in events_by_id,
+            f"ABBA event identity is missing or duplicated: {event_path}",
+        )
+        events_by_id[event_id] = event
+    return {
+        "path": resource_path,
+        "sha256": digest,
+        "bytes": byte_count,
+        "records": by_event,
+        "events": events_by_id,
+    }
+
+
+def _external_event_id(index: int, role: str, mode: str) -> str:
+    _expect(mode in {"normal", "allocator"}, f"unsupported probe mode: {mode}")
+    program = "raw-native" if mode == "normal" else "raw-allocator"
+    return f"abba-{index:02d}-{role}-{program}"
+
+
+def _validate_external_resource(
+    capture: Mapping[str, Any],
+    report: Mapping[str, Any],
+    path: Path,
+    *,
+    index: int,
+    role: str,
+    mode: str,
+) -> dict[str, Any]:
+    event_id = _external_event_id(index, role, mode)
+    record = capture["records"].get(event_id)
+    _expect(isinstance(record, Mapping), f"{path}: external resource record is missing for {event_id}")
+    event = capture["events"].get(event_id)
+    _expect(isinstance(event, Mapping), f"{path}: ABBA event is missing for {event_id}")
+    _expect(record.get("status") == "captured", f"{path}: external resource capture is unavailable for {event_id}")
+    _expect(record.get("event_id") == event_id and record.get("leg") == role, f"{path}: external event binding differs for {event_id}")
+    _expect(record.get("returncode") == 0, f"{path}: external child failed for {event_id}")
+    pid = record.get("pid")
+    _expect(isinstance(pid, int) and pid > 0, f"{path}: external PID is missing for {event_id}")
+    start_identity = record.get("start_identity")
+    _expect(isinstance(start_identity, Mapping), f"{path}: external start identity is missing for {event_id}")
+    _expect(
+        start_identity.get("pid") == pid
+        and isinstance(start_identity.get("boot_id"), str)
+        and bool(start_identity["boot_id"])
+        and isinstance(start_identity.get("starttime_ticks"), int)
+        and start_identity["starttime_ticks"] > 0,
+        f"{path}: external start identity is invalid for {event_id}",
+    )
+    _expect(
+        isinstance(record.get("argv_sha256"), str) and _is_hash(record["argv_sha256"]),
+        f"{path}: external argv identity is missing for {event_id}",
+    )
+    argv = event.get("argv")
+    _expect(
+        isinstance(argv, list) and all(isinstance(value, str) for value in argv),
+        f"{path}: ABBA argv is missing for {event_id}",
+    )
+    argv_hash = _argv_sha256(argv)
+    _expect(argv_hash == record["argv_sha256"], f"{path}: external argv hash differs for {event_id}")
+    _expect(
+        event.get("event_id") == event_id
+        and event.get("leg") == role
+        and event.get("returncode") == 0
+        and event.get("runner_error") is None,
+        f"{path}: ABBA event outcome is not successful for {event_id}",
+    )
+    source_ref = record.get("source_ref")
+    _expect(isinstance(source_ref, Mapping), f"{path}: external source reference is missing for {event_id}")
+    _expect(
+        source_ref.get("leg") == role
+        and source_ref.get("source_revision") == report.get("source_revision")
+        and source_ref.get("source_revision") == event.get("source_head")
+        and source_ref.get("source_root") == event.get("source_root")
+        and source_ref.get("source_identity_sha256") == event.get("source_identity_sha256"),
+        f"{path}: external source/event binding differs for {event_id}",
+    )
+    _expect(record.get("cwd") == event.get("cwd"), f"{path}: external cwd differs for {event_id}")
+    pointer = event.get("process_observation")
+    _expect(isinstance(pointer, Mapping), f"{path}: ABBA event lacks external observation pointer for {event_id}")
+    _expect(
+        pointer.get("schema") == EXTERNAL_RESOURCE_SCHEMA
+        and pointer.get("path") == str(capture["path"])
+        and pointer.get("event_id") == event_id
+        and pointer.get("record_sha256") == record.get("_line_sha256")
+        and pointer.get("record_bytes") == record.get("_line_bytes"),
+        f"{path}: external observation pointer differs for {event_id}",
+    )
+    for key in ("sample_count", "process_rss_bytes", "peak_rss_bytes", "peak_vm_hwm_bytes"):
+        _expect(
+            isinstance(record.get(key), int) and record[key] > 0,
+            f"{path}: external {key} is missing for {event_id}",
+        )
+    _expect(
+        record["peak_vm_hwm_bytes"] >= record["peak_rss_bytes"],
+        f"{path}: external VmHWM is below sampled RSS for {event_id}",
+    )
+    metrics = report.get("resource_metrics")
+    _expect(isinstance(metrics, Mapping), f"{path}: probe resource metrics are missing")
+    _expect(
+        metrics.get("pid") == pid
+        and metrics.get("command_sha256") == record["argv_sha256"]
+        and metrics.get("source_revision") == source_ref["source_revision"],
+        f"{path}: probe self-report is not bound to external child identity for {event_id}",
+    )
+    _expect(
+        isinstance(metrics.get("whole_process_peak_rss_bytes"), int)
+        and metrics["whole_process_peak_rss_bytes"] > 0
+        and record["peak_vm_hwm_bytes"] >= metrics["whole_process_peak_rss_bytes"],
+        f"{path}: external VmHWM does not cover the probe report for {event_id}",
+    )
+    return {
+        "event_id": event_id,
+        "mode": mode,
+        "role": role,
+        "pid": pid,
+        "start_identity": dict(start_identity),
+        "argv_sha256": record["argv_sha256"],
+        "process_rss_bytes": record["process_rss_bytes"],
+        "peak_rss_bytes": record["peak_rss_bytes"],
+        "peak_vm_hwm_bytes": record["peak_vm_hwm_bytes"],
+        "sample_count": record["sample_count"],
+    }
 
 
 def _fixture_lane_identity(lane: str, fixture: Mapping[str, Any]) -> str:
@@ -896,6 +1066,9 @@ def validate(arguments: argparse.Namespace) -> dict[str, Any]:
     fixture_lane_identity = _fixture_lane_identity(arguments.lane, fixture_data)
     reports: list[dict[str, Any]] = []
     unavailable = False
+    external_capture: dict[str, Any] | None = None
+    external_observations: list[dict[str, Any]] = []
+    expected_external_events: set[str] = set()
     for mode, prefix in (("normal", "dml-native"), ("allocator", "dml-allocator")):
         for index, path in enumerate(_ordered_outputs(output_dir, prefix)):
             report = _load(path)
@@ -910,6 +1083,19 @@ def validate(arguments: argparse.Namespace) -> dict[str, Any]:
             _expect(report.get("fixture_bytes") == fixture_bytes, f"{path}: fixture byte count differs")
             status = _validate_rows(report, path, fixture_lane_identity)
             if status == "qualified":
+                if external_capture is None:
+                    external_capture = _load_external_resource_capture(output_dir)
+                external_observations.append(
+                    _validate_external_resource(
+                        external_capture,
+                        report,
+                        path,
+                        index=index + 1,
+                        role=expected_role,
+                        mode=mode,
+                    )
+                )
+                expected_external_events.add(_external_event_id(index + 1, expected_role, mode))
                 _expect(report.get("fixture_sha256") == fixture_hash, f"{path}: fixture SHA-256 differs")
                 _expect(report.get("fixture_root_sha256") == hashlib.sha256(fixture_root.encode()).hexdigest(), f"{path}: fixture root identity differs")
                 _expect(isinstance(report.get("fixture_mutation"), str) and report["fixture_mutation"], f"{path}: fixture mutation receipt is missing")
@@ -985,6 +1171,11 @@ def validate(arguments: argparse.Namespace) -> dict[str, Any]:
                         and allocator_metrics.get("source_revision") == resource_metrics.get("source_revision"),
                         f"{path}: allocator and process RSS receipts differ",
                     )
+    if external_capture is not None:
+        _expect(
+            set(external_capture["records"]) == expected_external_events,
+            "external resource journal contains an unexpected or missing child event",
+        )
     return {
         "schema": SUMMARY_SCHEMA,
         "lane": arguments.lane,
@@ -998,6 +1189,15 @@ def validate(arguments: argparse.Namespace) -> dict[str, Any]:
         "accepted": not unavailable,
         "claim_scope": "paired DrawingML raw and detached-owner endpoints only; no absolute-profile or whole-library claim",
         "reports": reports,
+        "external_resource_capture": None
+        if external_capture is None
+        else {
+            "schema": EXTERNAL_RESOURCE_SCHEMA,
+            "path": str(external_capture["path"]),
+            "sha256": external_capture["sha256"],
+            "bytes": external_capture["bytes"],
+            "events": external_observations,
+        },
         "unavailable_reason": "an external source receipt is unavailable" if unavailable else None,
     }
 
