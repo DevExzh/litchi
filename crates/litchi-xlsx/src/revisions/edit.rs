@@ -76,14 +76,14 @@ impl Edit {
     }
 
     /// Immutable source snapshot used for conflict checks and inverse patches.
-    #[must_use]
+    #[must_use = "use the source snapshot or handle the error"]
     pub fn before(&mut self) -> Result<&Snapshot> {
         self.ensure_prepared()?;
         self.snapshot()
     }
 
     /// Borrow the currently staged revision package.
-    #[must_use]
+    #[must_use = "use the staged revisions or handle the error"]
     pub fn revisions(&mut self) -> Result<Option<&Revisions>> {
         self.ensure_prepared()?;
         self.draft()
@@ -412,19 +412,6 @@ impl crate::Package {
 
 crate::record::raw_test_route!(edit_revisions);
 
-#[cfg(test)]
-mod lazy_tests {
-    #[test]
-    fn edit_entry_defers_revision_graph() {
-        let package = crate::Package::new().expect("minimal XLSX");
-        let mut edit = package.edit_revisions().expect("revision edit");
-        assert!(edit.before.is_none());
-        assert!(edit.draft.is_none());
-        assert!(edit.revisions().expect("first revision read").is_none());
-        assert!(edit.before.is_some());
-    }
-}
-
 /// Whether two revision owners are equal up to the order of XML attributes,
 /// which the writer serializes canonically.
 fn same_model(left: Option<&Revisions>, right: Option<&Revisions>) -> bool {
@@ -452,4 +439,17 @@ fn canonical(value: &Revisions) -> Revisions {
         }
     }
     value
+}
+
+#[cfg(test)]
+mod lazy_tests {
+    #[test]
+    fn edit_entry_defers_revision_graph() {
+        let package = crate::Package::new().expect("minimal XLSX");
+        let mut edit = package.edit_revisions().expect("revision edit");
+        assert!(edit.before.is_none());
+        assert!(edit.draft.is_none());
+        assert!(edit.revisions().expect("first revision read").is_none());
+        assert!(edit.before.is_some());
+    }
 }

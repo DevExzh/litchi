@@ -3473,14 +3473,14 @@ impl Edit {
     }
 
     /// Immutable source captured at transaction start.
-    #[must_use]
+    #[must_use = "use the source snapshot or handle the error"]
     pub fn before(&mut self) -> Result<&Snapshot> {
         self.ensure_prepared()?;
         self.snapshot()
     }
 
     /// Currently staged Survey entries.
-    #[must_use]
+    #[must_use = "use the staged survey entries or handle the error"]
     pub fn entries(&mut self) -> Result<&[Part]> {
         self.ensure_prepared()?;
         self.draft()

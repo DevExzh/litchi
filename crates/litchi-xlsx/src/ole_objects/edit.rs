@@ -92,14 +92,14 @@ impl Edit {
     }
 
     /// Immutable source snapshot used for conflict checks and inverse patches.
-    #[must_use]
+    #[must_use = "use the source snapshot or handle the error"]
     pub fn before(&mut self) -> Result<&Snapshot> {
         self.ensure_prepared()?;
         self.snapshot()
     }
 
     /// Borrow the currently staged typed graph.
-    #[must_use]
+    #[must_use = "use the staged OLE objects or handle the error"]
     pub fn objects(&mut self) -> Result<Option<&OleObjects>> {
         self.ensure_prepared()?;
         Ok(self.draft.as_ref())

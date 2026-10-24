@@ -267,14 +267,14 @@ impl Edit {
     }
 
     /// Exact immutable source captured when the edit started.
-    #[must_use]
+    #[must_use = "use the source snapshot or handle the error"]
     pub fn before(&mut self) -> Result<&Snapshot> {
         self.ensure_prepared()?;
         self.snapshot()
     }
 
     /// Currently staged type metadata.
-    #[must_use]
+    #[must_use = "use the staged type metadata or handle the error"]
     pub fn types(&mut self) -> Result<&[TypeRefreshIntervals]> {
         self.ensure_prepared()?;
         self.staged()

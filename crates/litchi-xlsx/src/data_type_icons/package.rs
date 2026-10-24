@@ -328,13 +328,13 @@ impl Edit {
             .ok_or_else(|| invalid("data-type-icon edit is not prepared"))
     }
 
-    #[must_use]
+    #[must_use = "use the source snapshot or handle the error"]
     pub fn before(&mut self) -> Result<&Snapshot> {
         self.ensure_prepared()?;
         self.snapshot()
     }
 
-    #[must_use]
+    #[must_use = "use the worksheet views or handle the error"]
     pub fn worksheet_views(&mut self) -> Result<&[Option<ShowDataTypeIcons>]> {
         self.ensure_prepared()?;
         self.worksheet_views
@@ -342,7 +342,7 @@ impl Edit {
             .ok_or_else(|| invalid("data-type-icon edit is not prepared"))
     }
 
-    #[must_use]
+    #[must_use = "use the custom sheet views or handle the error"]
     pub fn custom_sheet_views(&mut self) -> Result<&[Option<ShowDataTypeIcons>]> {
         self.ensure_prepared()?;
         self.custom_sheet_views

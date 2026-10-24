@@ -173,14 +173,14 @@ impl Edit {
     }
 
     /// Exact source state captured at transaction start.
-    #[must_use]
+    #[must_use = "use the source snapshot or handle the error"]
     pub fn before(&mut self) -> Result<&Snapshot> {
         self.ensure_prepared()?;
         self.snapshot()
     }
 
     /// Currently staged page-break state.
-    #[must_use]
+    #[must_use = "use the staged page breaks or handle the error"]
     pub fn page_breaks(&mut self) -> Result<&PageBreaks> {
         self.ensure_prepared()?;
         self.staged()

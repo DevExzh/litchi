@@ -408,7 +408,7 @@ pub(crate) fn store_timeline_caches_prepared_limited_with_budget(
         |replacement_len| {
             crate::raw::check_part_budget_with_ledger(
                 package,
-                &budget,
+                budget,
                 prepared.len(),
                 added_bytes,
                 &[(workbook_name, replacement_len)],
@@ -738,7 +738,7 @@ pub(crate) fn store_worksheet_timelines_prepared_limited_with_budget(
         |replacement_len| {
             crate::raw::check_part_budget_with_ledger(
                 package,
-                &budget,
+                budget,
                 1,
                 prepared.xml.len(),
                 &[(&worksheet_uri, replacement_len)],

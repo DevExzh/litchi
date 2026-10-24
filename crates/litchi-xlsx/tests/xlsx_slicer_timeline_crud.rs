@@ -103,7 +103,7 @@ fn slicer_pivot_validation_preserves_typed_nested_limits_and_staging() {
         .rels_mut()
         .add_relationship(
             rt::PIVOT_CACHE_DEFINITION.into(),
-            pivot_cache_uri.relative_ref("/xl/").into(),
+            pivot_cache_uri.relative_ref("/xl/"),
             "rIdPivotCache".into(),
             false,
         );

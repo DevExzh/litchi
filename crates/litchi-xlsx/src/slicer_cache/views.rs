@@ -587,7 +587,7 @@ pub(crate) fn store_slicer_part_prepared_limited_with_budget(
             "Slicers part '{part_name}' already exists"
         )));
     }
-    crate::raw::check_part_budget_with_ledger(package, &budget, 1, xml.len(), &[], limits)?;
+    crate::raw::check_part_budget_with_ledger(package, budget, 1, xml.len(), &[], limits)?;
     let target = part_name.relative_ref(worksheet_name.base_uri());
     crate::signature_policy::ensure_unsigned(package)?;
     package.try_add_part(Box::new(BlobPart::new(
