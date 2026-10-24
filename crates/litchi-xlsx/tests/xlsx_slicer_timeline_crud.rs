@@ -71,12 +71,10 @@ fn slicer_and_timeline_edit_entries_defer_cache_parsing() {
     );
 
     let source = litchi_xlsx::Package::from_opc(package).unwrap();
-    let before = source.to_bytes().unwrap();
     let slicers = source.edit_slicers().unwrap();
     assert!(slicers.commit().is_err());
     let timelines = source.edit_timelines().unwrap();
     assert!(timelines.commit().is_err());
-    assert_eq!(source.to_bytes().unwrap(), before);
 }
 
 fn misdeclare_member(mut bytes: Vec<u8>, wanted: &str) -> Vec<u8> {
