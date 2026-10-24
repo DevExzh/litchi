@@ -43,6 +43,55 @@ def main() -> None:
             else:
                 os.environ["LITCHI_CAPPED"] = previous
 
+        # A /proc entry can disappear between glob and its first read. The
+        # scanner skips only that ESRCH race rather than masking unrelated
+        # process-table failures.
+        original_path = gate.Path
+
+        class VanishingEntry:
+            name = "424242"
+
+            def __truediv__(self, child):
+                return self
+
+            def read_bytes(self):
+                raise ProcessLookupError("mock vanished PID")
+
+        class VanishingProc:
+            def glob(self, pattern):
+                assert pattern == "[0-9]*"
+                return [VanishingEntry()]
+
+        def mock_path(value):
+            if value == "/proc":
+                return VanishingProc()
+            return original_path(value)
+
+        try:
+            gate.Path = mock_path
+            assert gate.process_table() == {}
+        finally:
+            gate.Path = original_path
+
+        class UnexpectedEntry(VanishingEntry):
+            def read_bytes(self):
+                raise RuntimeError("mock unrelated process-table failure")
+
+        class UnexpectedProc:
+            def glob(self, pattern):
+                return [UnexpectedEntry()]
+
+        try:
+            gate.Path = lambda value: UnexpectedProc() if value == "/proc" else original_path(value)
+            try:
+                gate.process_table()
+            except RuntimeError as error:
+                assert "unrelated process-table failure" in str(error)
+            else:
+                raise AssertionError("unexpected process-table failure was hidden")
+        finally:
+            gate.Path = original_path
+
         # A real child can exit while an inherited helper continues touching
         # the target. The runner must wait for a stable target sample even
         # when this is the final step; this child is wholly owned by the test
