@@ -341,7 +341,7 @@ mod routes {
     pub(super) fn doc_source_set(bytes: &[u8]) -> Vec<u8> {
         let package = litchi_doc::source_backed::Package::from_bytes(bytes.to_vec()).expect("open");
         let mut edit = package.edit_paragraph(Position::new(500)).expect("edit");
-        let text = same_width(edit.text());
+        let text = same_width(edit.text().expect("resolve paragraph"));
         edit.set_text(text).expect("set");
         let commit = edit.commit().expect("commit");
         let mut output = Vec::new();

@@ -53,7 +53,7 @@ struct Item {
 /// One coalesced body-text transaction.
 pub(crate) struct Run {
     base: Doc,
-    edit: Edit,
+    edit: Edit<'static>,
     items: Vec<Item>,
     last_target: Option<(Box<str>, Position)>,
     signed: bool,
@@ -202,8 +202,8 @@ impl Run {
 
     /// Conservative retained-snapshot charge used before commit. The final
     /// rendered snapshot is charged again by `flush_pending`.
-    pub(crate) fn snapshot_bytes(&self) -> usize {
-        let source = self.edit.source_bytes().len().saturating_mul(2);
+    pub(crate) fn snapshot_bytes(&mut self) -> Result<usize> {
+        let source = self.edit.source_bytes()?.len().saturating_mul(2);
         let text = self
             .items
             .iter()
@@ -211,9 +211,9 @@ impl Run {
                 Change::Text(text) => total.saturating_add(text.len().saturating_mul(2)),
                 Change::Toggle { .. } => total,
             });
-        source
+        Ok(source
             .saturating_add(text)
-            .saturating_add(size_of::<litchi_doc::Patch>())
+            .saturating_add(size_of::<litchi_doc::Patch>()))
     }
 
     pub(crate) fn stage(
@@ -223,7 +223,7 @@ impl Run {
         spelling: Option<&str>,
     ) -> Result<bool> {
         self.base.check_source_for_write()?;
-        let prospective = self.snapshot_bytes_for(&plan).ok_or_else(|| {
+        let prospective = self.snapshot_bytes_for(&plan)?.ok_or_else(|| {
             Error::from(TransactionError::Limit {
                 kind: LimitKind::SnapshotBytes,
                 observed: usize::MAX,
@@ -308,8 +308,10 @@ impl Run {
         Ok(changed)
     }
 
-    fn snapshot_bytes_for(&self, plan: &Plan) -> Option<usize> {
-        let source = self.edit.source_bytes().len().checked_mul(2)?;
+    fn snapshot_bytes_for(&mut self, plan: &Plan) -> Result<Option<usize>> {
+        let Some(source) = self.edit.source_bytes()?.len().checked_mul(2) else {
+            return Ok(None);
+        };
         let text = self
             .items
             .iter()
@@ -321,15 +323,19 @@ impl Run {
             Change::Text(text) => text.len().saturating_mul(2),
             Change::Toggle { .. } => 0,
         };
-        source
-            .checked_add(text.saturating_add(incoming))?
-            .checked_add(size_of::<litchi_doc::Patch>())?
-            .checked_add(
-                self.items
-                    .len()
-                    .saturating_add(1)
-                    .saturating_mul(size_of::<litchi_doc::body_text::ChangeRef<'static>>()),
-            )
+        let Some(total) = source.checked_add(text.saturating_add(incoming)) else {
+            return Ok(None);
+        };
+        let Some(total) = total.checked_add(size_of::<litchi_doc::Patch>()) else {
+            return Ok(None);
+        };
+        let total = total.checked_add(
+            self.items
+                .len()
+                .saturating_add(1)
+                .saturating_mul(size_of::<litchi_doc::body_text::ChangeRef<'static>>()),
+        );
+        Ok(total)
     }
 
     pub(crate) fn commit(self) -> Result<WriteCommit> {

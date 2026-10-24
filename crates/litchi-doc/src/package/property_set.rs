@@ -55,6 +55,11 @@ impl Snapshot {
         &self.bytes
     }
 
+    /// Shared ownership of the exact source allocation.
+    pub(crate) fn bytes_shared(&self) -> Arc<[u8]> {
+        Arc::clone(&self.bytes)
+    }
+
     /// Projects the standard `SummaryInformation` section, when present.
     pub fn summary_information(
         &self,
@@ -421,7 +426,7 @@ crate::scoped::family!("property set");
 /// A staged property-set edit of one package. Dropping it discards it.
 pub struct Edit {
     base: crate::scoped::Base,
-    inner: Staging,
+    inner: Option<Staging>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -435,9 +440,31 @@ impl std::fmt::Debug for Edit {
 
 impl Edit {
     fn open(base: crate::scoped::Base) -> Result<Self> {
-        let source = Snapshot::from_bytes(base.to_vec())?;
-        let inner = Staging::new(source, base.options().protection_policy_value())?;
-        Ok(Self { base, inner })
+        Ok(Self { base, inner: None })
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut Staging> {
+        if self.inner.is_none() {
+            let source = Snapshot::from_bytes(self.base.to_vec()?)?;
+            self.inner = Some(Staging::new(
+                source,
+                self.base.options().protection_policy_value(),
+            )?);
+        }
+        self.inner.as_mut().ok_or_else(|| {
+            Error::Package(PackageError::InvalidFormat(
+                "property-set edit was not initialized".into(),
+            ))
+        })
+    }
+
+    fn take_inner(&mut self) -> Result<Staging> {
+        self.inner_mut()?;
+        self.inner.take().ok_or_else(|| {
+            Error::Package(PackageError::InvalidFormat(
+                "property-set edit was not initialized".into(),
+            ))
+        })
     }
 
     /// Projects the staged `SummaryInformation` section.
@@ -446,9 +473,9 @@ impl Edit {
     ///
     /// Returns an error when the staged stream is not a valid property set.
     pub fn summary_information(
-        &self,
+        &mut self,
     ) -> Result<Option<property_set::summary_information::Snapshot>> {
-        Ok(self.inner.summary_information()?)
+        Ok(self.inner_mut()?.summary_information()?)
     }
 
     /// Projects the staged `DocumentSummaryInformation` section.
@@ -457,9 +484,9 @@ impl Edit {
     ///
     /// Returns an error when the staged stream is not a valid property set.
     pub fn document_summary_information(
-        &self,
+        &mut self,
     ) -> Result<Option<property_set::document_summary::Snapshot>> {
-        Ok(self.inner.document_summary_information()?)
+        Ok(self.inner_mut()?.document_summary_information()?)
     }
 
     /// Reads the staged inert VBA `DigSigBlob` with explicit limits.
@@ -468,10 +495,10 @@ impl Edit {
     ///
     /// Returns an error when the staged blob is malformed or over `limits`.
     pub fn vba_signature(
-        &self,
+        &mut self,
         limits: vba_signature::Limits,
     ) -> Result<Option<vba_signature::Snapshot>> {
-        Ok(self.inner.vba_signature_with(limits)?)
+        Ok(self.inner_mut()?.vba_signature_with(limits)?)
     }
 
     /// Replaces PIDDSI `DigitalSignature` with an already validated inert
@@ -481,7 +508,7 @@ impl Edit {
     ///
     /// Returns an error when the property set cannot hold the blob.
     pub fn set_vba_signature(&mut self, signature: &vba_signature::Snapshot) -> Result<bool> {
-        Ok(self.inner.set_vba_signature(signature)?)
+        Ok(self.inner_mut()?.set_vba_signature(signature)?)
     }
 
     /// Removes PIDDSI `DigitalSignature`, when present. Returns whether the
@@ -491,7 +518,7 @@ impl Edit {
     ///
     /// Returns an error when the staged property set is malformed.
     pub fn remove_vba_signature(&mut self) -> Result<bool> {
-        Ok(self.inner.remove_vba_signature()?)
+        Ok(self.inner_mut()?.remove_vba_signature()?)
     }
 
     /// Edits the opaque VBA signature using explicit nested-blob limits.
@@ -503,7 +530,7 @@ impl Edit {
     where
         F: FnOnce(&mut vba_signature::Edit) -> std::result::Result<(), vba_signature::Error>,
     {
-        Ok(self.inner.edit_vba_signature(limits, edit)?)
+        Ok(self.inner_mut()?.edit_vba_signature(limits, edit)?)
     }
 
     /// Returns the staged user-defined section.
@@ -511,8 +538,8 @@ impl Edit {
     /// # Errors
     ///
     /// Returns an error when the staged stream is not a valid property set.
-    pub fn user_defined_properties(&self) -> Result<Option<Section>> {
-        Ok(self.inner.user_defined_properties()?)
+    pub fn user_defined_properties(&mut self) -> Result<Option<Section>> {
+        Ok(self.inner_mut()?.user_defined_properties()?)
     }
 
     /// Applies a typed `SummaryInformation` edit through the common PIDSI
@@ -528,7 +555,7 @@ impl Edit {
             &mut property_set::summary_information::Edit<'a>,
         ) -> std::result::Result<(), OleError>,
     {
-        Ok(self.inner.edit_summary_information(edit)?)
+        Ok(self.inner_mut()?.edit_summary_information(edit)?)
     }
 
     /// Applies a typed `DocumentSummaryInformation` edit through the common
@@ -543,7 +570,7 @@ impl Edit {
             &mut property_set::document_summary::Edit<'a>,
         ) -> std::result::Result<(), OleError>,
     {
-        Ok(self.inner.edit_document_summary_information(edit)?)
+        Ok(self.inner_mut()?.edit_document_summary_information(edit)?)
     }
 
     /// Applies a generic user-defined property-section edit. Returns whether
@@ -556,7 +583,7 @@ impl Edit {
     where
         F: FnOnce(&mut Section) -> std::result::Result<(), litchi_ole_common::Error>,
     {
-        Ok(self.inner.edit_user_defined_properties(edit)?)
+        Ok(self.inner_mut()?.edit_user_defined_properties(edit)?)
     }
 
     /// Removes the user-defined section while retaining the rest of the
@@ -566,7 +593,7 @@ impl Edit {
     ///
     /// Returns an error when the staged property set is malformed.
     pub fn remove_user_defined_properties(&mut self) -> Result<bool> {
-        Ok(self.inner.remove_user_defined_properties()?)
+        Ok(self.inner_mut()?.remove_user_defined_properties()?)
     }
 
     /// Replaces `_PID_HLINKS` with explicit shared typed-overlay limits.
@@ -581,7 +608,16 @@ impl Edit {
         hyperlinks: &UserDefinedHyperlinks,
         limits: Limits,
     ) -> std::result::Result<bool, MutationError> {
-        self.inner.put_user_defined_hyperlinks(hyperlinks, limits)
+        self.inner_mut()
+            .map_err(|error| match error {
+                Error::Package(error) => MutationError::Package(error),
+                Error::Refused(_) | Error::PatchConflict | Error::Signed => {
+                    MutationError::Package(PackageError::InvalidFormat(
+                        "property-set hyperlink edit could not be initialized".into(),
+                    ))
+                },
+            })?
+            .put_user_defined_hyperlinks(hyperlinks, limits)
     }
 
     /// Removes only the named `_PID_HLINKS` user-defined property. Returns
@@ -591,7 +627,7 @@ impl Edit {
     ///
     /// Returns an error when the staged property set is malformed.
     pub fn remove_user_defined_hyperlinks(&mut self) -> Result<bool> {
-        Ok(self.inner.remove_user_defined_hyperlinks()?)
+        Ok(self.inner_mut()?.remove_user_defined_hyperlinks()?)
     }
 
     /// Validate the staged edits and publish them as a new package.
@@ -601,8 +637,8 @@ impl Edit {
     /// Returns an error when the protection policy refuses a changed write,
     /// the package cannot be republished, or [`Error::Signed`] for a changed
     /// signed package.
-    pub fn commit(self) -> Result<Commit> {
-        let after = self.inner.finish()?;
+    pub fn commit(mut self) -> Result<Commit> {
+        let after = self.take_inner()?.finish()?;
         Ok(published(self.base.publish(after)?))
     }
 }

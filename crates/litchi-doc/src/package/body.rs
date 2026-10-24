@@ -179,22 +179,19 @@ impl Package {
     ///
     /// Returns the same errors as [`Package::edit_with_options`].
     #[cfg(feature = "performance-diagnostics")]
-    pub fn edit_profiled(
+    pub fn edit_profiled<'a>(
         &self,
         options: super::EditOptions,
-        observer: impl FnMut(body_text::DiagnosticEvent),
-        cfb_observer: impl FnMut(body_text::CfbParseEvent),
-    ) -> Result<Edit> {
+        observer: impl FnMut(body_text::DiagnosticEvent) + 'a,
+        cfb_observer: impl FnMut(body_text::CfbParseEvent) + 'a,
+    ) -> Result<Edit<'a, super::edit::ProfiledOpen<'a>>> {
         let options = self.constrained_edit_options(options);
-        let snapshot = body_text::Snapshot::open_bounded_profiled_with_cfb_observer(
-            self.to_bytes().map_err(Error::Package)?,
-            options.revision_limits_value(),
-            options.transaction_limits_value(),
+        Ok(Edit::from_profiled(
+            self.clone(),
+            options,
             observer,
             cfb_observer,
-        )?;
-        let inner = snapshot.edit_with_options(options)?;
-        Ok(Edit::from_body(self.clone(), inner))
+        ))
     }
 
     /// A bounded undo/redo history starting at this package.

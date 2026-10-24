@@ -30,7 +30,7 @@ crate::scoped::family!("annotation bookmark");
 #[derive(Clone)]
 pub struct Edit {
     base: crate::scoped::Base,
-    inner: Editor,
+    inner: Option<Editor>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -44,37 +44,57 @@ impl std::fmt::Debug for Edit {
 
 impl Edit {
     fn open(base: crate::scoped::Base) -> Result<Self> {
-        let bytes = base.to_vec();
-        let options = base.options();
-        let inner = Editor::open_with_options(bytes, options)?;
-        Ok(Self { base, inner })
+        Ok(Self { base, inner: None })
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut Editor> {
+        if self.inner.is_none() {
+            let bytes = self.base.to_vec()?;
+            let options = self.base.options();
+            self.inner = Some(Editor::open_with_options(bytes, options)?);
+        }
+        self.inner.as_mut().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "annotation bookmark edit was not initialized".into(),
+            ))
+        })
+    }
+
+    fn take_inner(&mut self) -> Result<Editor> {
+        self.inner_mut()?;
+        self.inner.take().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "annotation bookmark edit was not initialized".into(),
+            ))
+        })
     }
 
     /// Current immutable semantic table state.
-    #[must_use]
-    pub fn tags(&self) -> &TransactionSnapshot {
-        self.inner.tags()
+    pub fn tags(&mut self) -> Result<&TransactionSnapshot> {
+        Ok(self.inner_mut()?.tags())
     }
 
     /// Decoded tags, when present.
-    #[must_use]
-    pub fn value(&self) -> Option<&Tags> {
-        self.inner.value()
+    pub fn value(&mut self) -> Result<Option<&Tags>> {
+        Ok(self.inner_mut()?.value())
     }
 
     /// Set or replace the complete present table.
     pub fn set(&mut self, tags: Tags) -> Result<()> {
-        self.inner.set(tags).map(|_| ()).map_err(Error::from)
+        self.inner_mut()?.set(tags).map(|_| ()).map_err(Error::from)
     }
 
     /// Replace the table, requiring an existing FIB range.
     pub fn replace(&mut self, tags: Tags) -> Result<()> {
-        self.inner.replace(tags).map(|_| ()).map_err(Error::from)
+        self.inner_mut()?
+            .replace(tags)
+            .map(|_| ())
+            .map_err(Error::from)
     }
 
     /// Apply and publish a semantic transaction atomically.
     pub fn apply(&mut self, transaction: RecordEdit) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .apply(transaction)
             .map(|_| ())
             .map_err(Error::from)
@@ -82,7 +102,7 @@ impl Edit {
 
     /// Replace one annotation tag and publish atomically.
     pub fn replace_entry(&mut self, index: usize, tag: Tag) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .replace_entry(index, tag)
             .map(|_| ())
             .map_err(Error::from)
@@ -90,7 +110,7 @@ impl Edit {
 
     /// Insert one annotation tag and publish atomically.
     pub fn insert(&mut self, index: usize, tag: Tag) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .insert(index, tag)
             .map(|_| ())
             .map_err(Error::from)
@@ -98,12 +118,15 @@ impl Edit {
 
     /// Remove one annotation tag and publish atomically.
     pub fn remove(&mut self, index: usize) -> Result<()> {
-        self.inner.remove(index).map(|_| ()).map_err(Error::from)
+        self.inner_mut()?
+            .remove(index)
+            .map(|_| ())
+            .map_err(Error::from)
     }
 
     /// Remove the complete FIB range.
     pub fn clear(&mut self) -> Result<()> {
-        self.inner.clear().map(|_| ()).map_err(Error::from)
+        self.inner_mut()?.clear().map(|_| ()).map_err(Error::from)
     }
 
     /// Validate the staged edits and publish them as a new package.
@@ -113,8 +136,8 @@ impl Edit {
     /// Returns an error when the edited part fails validation, the package
     /// cannot be republished, or [`Error::Signed`] for a changed signed
     /// package.
-    pub fn commit(self) -> Result<Commit> {
-        let after = self.inner.finish()?;
+    pub fn commit(mut self) -> Result<Commit> {
+        let after = self.take_inner()?.finish()?;
         Ok(published(self.base.publish(after)?))
     }
 }

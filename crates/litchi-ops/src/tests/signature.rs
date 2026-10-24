@@ -646,6 +646,7 @@ fn signed_leaf(file: &File) -> File {
     }
 }
 
+#[cfg(any(feature = "xls", feature = "xlsb", feature = "xlsx"))]
 fn signed_name(file: &File, path: &str) -> String {
     file.get(path)
         .unwrap_or_else(|error| panic!("resolve {path}: {error}"))
@@ -661,6 +662,7 @@ fn signed_name(file: &File, path: &str) -> String {
 /// The signed XLS fixture intentionally contains formulas and packed numeric
 /// records, so the test must choose an authored scalar rather than assuming
 /// that A1 is writable by the coalesced value family.
+#[cfg(feature = "xls")]
 fn signed_text_cell(file: &File) -> Option<(String, String)> {
     for row in 0..12 {
         for column in 0..8 {
@@ -709,6 +711,7 @@ fn signed_text_cell(file: &File) -> Option<(String, String)> {
 /// Find a coordinate with no stored cell record.  The signed spreadsheet
 /// tests use it to distinguish an absent cell from an authored cell whose
 /// value happens to equal the native default.
+#[cfg(any(feature = "xls", feature = "xlsb", feature = "xlsx"))]
 fn signed_missing_cell(file: &File) -> Option<String> {
     for row in 0..32 {
         for column in 0..16 {

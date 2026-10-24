@@ -31,7 +31,7 @@ crate::scoped::family!("captions");
 #[derive(Clone)]
 pub struct Edit {
     base: crate::scoped::Base,
-    inner: Editor,
+    inner: Option<Editor>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -45,37 +45,60 @@ impl std::fmt::Debug for Edit {
 
 impl Edit {
     fn open(base: crate::scoped::Base) -> Result<Self> {
-        let bytes = base.to_vec();
-        let options = base.options();
-        let inner = Editor::open_with_options(bytes, options)?;
-        Ok(Self { base, inner })
+        Ok(Self { base, inner: None })
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut Editor> {
+        if self.inner.is_none() {
+            let bytes = self.base.to_vec()?;
+            let options = self.base.options();
+            self.inner = Some(Editor::open_with_options(bytes, options)?);
+        }
+        self.inner.as_mut().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "captions edit was not initialized".into(),
+            ))
+        })
+    }
+
+    fn take_inner(&mut self) -> Result<Editor> {
+        self.inner_mut()?;
+        self.inner.take().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "captions edit was not initialized".into(),
+            ))
+        })
     }
 
     /// Returns the current immutable caption snapshot.
-    #[must_use]
-    pub fn captions(&self) -> &TransactionSnapshot {
-        self.inner.captions()
+    pub fn captions(&mut self) -> Result<&TransactionSnapshot> {
+        Ok(self.inner_mut()?.captions())
     }
 
     /// Returns the current paired caption tables.
-    #[must_use]
-    pub fn tables(&self) -> &Tables {
-        self.inner.tables()
+    pub fn tables(&mut self) -> Result<&Tables> {
+        Ok(self.inner_mut()?.tables())
     }
 
     /// Sets or replaces both caption tables atomically.
     pub fn set(&mut self, tables: Tables) -> Result<()> {
-        self.inner.set(tables).map(|_| ()).map_err(Error::from)
+        self.inner_mut()?
+            .set(tables)
+            .map(|_| ())
+            .map_err(Error::from)
     }
 
     /// Replaces existing caption metadata, rejecting an absent pair.
     pub fn replace(&mut self, tables: Tables) -> Result<()> {
-        self.inner.replace(tables).map(|_| ()).map_err(Error::from)
+        self.inner_mut()?
+            .replace(tables)
+            .map(|_| ())
+            .map_err(Error::from)
     }
 
     /// Applies a semantic transaction and publishes it atomically.
     pub fn apply(&mut self, transaction: RecordEdit) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .apply(transaction)
             .map(|_| ())
             .map_err(Error::from)
@@ -83,7 +106,7 @@ impl Edit {
 
     /// Replaces the label table while retaining automatic-caption rules.
     pub fn replace_labels(&mut self, labels: LabelTable) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .replace_labels(labels)
             .map(|_| ())
             .map_err(Error::from)
@@ -91,7 +114,7 @@ impl Edit {
 
     /// Replaces automatic-caption rules while retaining labels.
     pub fn replace_auto(&mut self, auto: AutoTable) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .replace_auto(auto)
             .map(|_| ())
             .map_err(Error::from)
@@ -99,17 +122,23 @@ impl Edit {
 
     /// Removes only the label range, rejecting rules that would dangle.
     pub fn clear_labels(&mut self) -> Result<()> {
-        self.inner.clear_labels().map(|_| ()).map_err(Error::from)
+        self.inner_mut()?
+            .clear_labels()
+            .map(|_| ())
+            .map_err(Error::from)
     }
 
     /// Removes only the automatic-caption range while retaining labels.
     pub fn clear_auto(&mut self) -> Result<()> {
-        self.inner.clear_auto().map(|_| ()).map_err(Error::from)
+        self.inner_mut()?
+            .clear_auto()
+            .map(|_| ())
+            .map_err(Error::from)
     }
 
     /// Removes both caption table ranges while preserving their old bytes.
     pub fn clear(&mut self) -> Result<()> {
-        self.inner.clear().map(|_| ()).map_err(Error::from)
+        self.inner_mut()?.clear().map(|_| ()).map_err(Error::from)
     }
 
     /// Validate the staged edits and publish them as a new package.
@@ -119,8 +148,8 @@ impl Edit {
     /// Returns an error when the edited part fails validation, the package
     /// cannot be republished, or [`Error::Signed`] for a changed signed
     /// package.
-    pub fn commit(self) -> Result<Commit> {
-        let after = self.inner.finish()?;
+    pub fn commit(mut self) -> Result<Commit> {
+        let after = self.take_inner()?.finish()?;
         Ok(published(self.base.publish(after)?))
     }
 }

@@ -31,7 +31,7 @@ crate::scoped::family!("command bars");
 #[derive(Clone)]
 pub struct Edit {
     base: crate::scoped::Base,
-    inner: Editor,
+    inner: Option<Editor>,
 }
 
 impl std::fmt::Debug for Edit {
@@ -45,21 +45,39 @@ impl std::fmt::Debug for Edit {
 
 impl Edit {
     fn open(base: crate::scoped::Base) -> Result<Self> {
-        let bytes = base.to_vec();
-        let options = base.options();
-        let inner = Editor::open_with_options(bytes, options)?;
-        Ok(Self { base, inner })
+        Ok(Self { base, inner: None })
+    }
+
+    fn inner_mut(&mut self) -> Result<&mut Editor> {
+        if self.inner.is_none() {
+            let bytes = self.base.to_vec()?;
+            let options = self.base.options();
+            self.inner = Some(Editor::open_with_options(bytes, options)?);
+        }
+        self.inner.as_mut().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "command bars edit was not initialized".into(),
+            ))
+        })
+    }
+
+    fn take_inner(&mut self) -> Result<Editor> {
+        self.inner_mut()?;
+        self.inner.take().ok_or_else(|| {
+            Error::Package(crate::Error::InvalidFormat(
+                "command bars edit was not initialized".into(),
+            ))
+        })
     }
 
     /// Returns the current immutable semantic command-bar snapshot.
-    #[must_use]
-    pub fn command_bars(&self) -> &TransactionSnapshot {
-        self.inner.command_bars()
+    pub fn command_bars(&mut self) -> Result<&TransactionSnapshot> {
+        Ok(self.inner_mut()?.command_bars())
     }
 
     /// Sets or replaces the complete command-bar range atomically.
     pub fn set(&mut self, command_bars: CommandBars<'_>) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .set(command_bars)
             .map(|_| ())
             .map_err(Error::from)
@@ -67,7 +85,7 @@ impl Edit {
 
     /// Replaces existing command-bar metadata, rejecting an absent range.
     pub fn replace(&mut self, command_bars: CommandBars<'_>) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .replace(command_bars)
             .map(|_| ())
             .map_err(Error::from)
@@ -75,7 +93,7 @@ impl Edit {
 
     /// Applies and publishes a semantic transaction atomically.
     pub fn apply(&mut self, transaction: RecordEdit) -> Result<()> {
-        self.inner
+        self.inner_mut()?
             .apply(transaction)
             .map(|_| ())
             .map_err(Error::from)
@@ -83,7 +101,7 @@ impl Edit {
 
     /// Clears the command-bar FIB range while preserving its old table bytes.
     pub fn clear(&mut self) -> Result<()> {
-        self.inner.clear().map(|_| ()).map_err(Error::from)
+        self.inner_mut()?.clear().map(|_| ()).map_err(Error::from)
     }
 
     /// Validate the staged edits and publish them as a new package.
@@ -93,8 +111,8 @@ impl Edit {
     /// Returns an error when the edited part fails validation, the package
     /// cannot be republished, or [`Error::Signed`] for a changed signed
     /// package.
-    pub fn commit(self) -> Result<Commit> {
-        let after = self.inner.finish()?;
+    pub fn commit(mut self) -> Result<Commit> {
+        let after = self.take_inner()?.finish()?;
         Ok(published(self.base.publish(after)?))
     }
 }
