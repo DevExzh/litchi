@@ -4314,3 +4314,38 @@ See [0063](0063-source-pptx-modern-comments.md).
   temporary directories consistently; it has not run. The 9781 gate continues
   its ops integration chunks with bounded target retention and healthy guards.
   All remaining gate, corpus and performance requirements stay active.
+
+- Coordinator execution and cleanup update (2026-10-24):
+  The corrected five-lane compile packet passes independent review and merges
+  at `589d5d0adc`. All lanes bind distinct temporary directories; fourteen
+  build phases, twenty-seven referenced artifacts and the unchanged workloads
+  validate. Seventy-eight tooling tests pass. Execution still waits for the
+  active, unleased gate; preparation is not a build result.
+
+  The composed F3/W8 supplement passes 71 tests. Its 23 quiet-wrapper tests
+  are also rerun directly; those are overlapping coverage, not additional
+  unique cases. A source-equivalence audit reconciles the later tooling with
+  the frozen 9781 gate. The glossary definitions and production sources are
+  unchanged, but the actual remaining glossary/gate selections still need to
+  run. The separate signed and gate-helper tests retain their accepted,
+  source-identical receipts.
+
+  OPC timing guard `2732b45b61` passes independent lifecycle review and five
+  tests on the composed tree. A combined monitor-failure/escaped-child leak
+  found in its predecessor is repaired; owned children are reaped and
+  pre-existing foreign children remain untouched. The accepted build record
+  retains its earlier return history. Final command-packet review and actual
+  quiet-host timing remain separate requirements.
+
+  Cleanup wave 53 removes one unused, merged DOC author worktree without
+  force (0362ul33). Its branch and ignored lockfile are retained; a sparse
+  restore exercise and seventeen independent postchecks pass. Measurement
+  sources, binaries, failed evidence and the protected trunk probe remain
+  intact.
+
+  The DOC and Ink handoff reviews identify execution controls and receipt
+  bindings that still need repair; their accepted correctness/build evidence
+  is unchanged. The sheet and W8 final command packets are being reviewed.
+  The gate continues its ops chunks with bounded retention and healthy
+  guards. Isolated documentation, corpus replay and native performance
+  acceptance remain open; only audit 22 is deferred and nothing is pushed.
