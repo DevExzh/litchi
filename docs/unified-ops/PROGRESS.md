@@ -3523,8 +3523,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   The clean diagnostic checkout now holds frozen source
   `49c25ef67f62a8bb943e7c6a0bf464e49ae87d07`, with the dependency lock
   unchanged. The reviewed 0362uva runner is adopted from its separate path.
-  An isolated workspace documentation run is using the dedicated 4.44-GB
-  initial cache, with no other Cargo builds. Full gate completion on this
-  source, all-68 inventory, actual OfficeCLI corpus replay,
+  Isolated workspace documentation passes with warnings denied in 1,057.472
+  seconds, with no competing builds and a 4,504,969,096-byte final target.
+  The fresh all-68 library inventory is now running sequentially on the same
+  source; every row still needs semantic disposition review. Full gate
+  completion on this source, all-68 closure, actual OfficeCLI corpus replay,
   glossary closure and quiet native qualification remain required. Only
   comprehensive redaction audit 22 is deferred. Nothing is pushed.

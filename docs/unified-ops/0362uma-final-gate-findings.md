@@ -108,9 +108,18 @@ Reviewed repairs 0362umb and 0362umc are now composed at
 `49c25ef67f62a8bb943e7c6a0bf464e49ae87d07`. The coordinator advanced the
 clean diagnostic checkout to that source with its lock unchanged, and adopted
 the independently reviewed 0362uva runner from its separate directory.
-The isolated `wsdoc` selection is running with no competing Cargo builds and
-a separate 4,435,344,057-byte initial target. This is a new source freeze;
-the f6fe diagnostic results are not relabeled as its acceptance results.
+The isolated `wsdoc` selection passes with warnings denied and no competing
+Cargo builds in 1,057.472 seconds. Its empty command log, stable source/locks,
+process isolation and 4,504,969,096-byte final target are bound by the
+[reduced receipt](results/0362uma/isolated-wsdoc.json). The prepared runner
+retains all 53 steps; this selection completes only workspace documentation.
+The f6fe diagnostic results are not relabeled as acceptance on the new freeze.
+
+The fresh all-68 library inventory has now started sequentially on that same
+source, under `/home/zhuhe/.cache/litchi-api-contract/49c25ef67f62a8bb943e7c6a0bf464e49ae87d07/`.
+It uses all features, includes hidden public items, and records every package,
+source/lock/toolchain identity, JSON hash and resource log. Its output and
+per-row dispositions remain pending; the old inventories are not closure.
 
 These are required engineering corrections. No performance regression,
 capability loss or API-contract debt is accepted as an exception. Only the
