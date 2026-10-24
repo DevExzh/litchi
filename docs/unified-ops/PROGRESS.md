@@ -3947,3 +3947,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   qualification returns, full gate/corpus completion, native measurements and
   glossary performance closure remain active. Only audit 22 is deferred.
   Nothing is pushed.
+
+- Coordinator gate update (2026-10-24, CFB error layout):
+  The b4 gate passes formatting, then stops at all-feature Clippy with 45
+  `result_large_err` diagnostics for CFB's `SequentialWriteError` candidate
+  validation variant. The failed source, locks and logs remain unchanged.
+  A separate leaf is repairing the error layout while preserving its typed
+  cause, complete publication report and progress. Slot 2 is reassigned from
+  the stopped gate to that repair. A new source binding and full gate remain
+  required; prepared b4 native packets are source-only diagnostics.
