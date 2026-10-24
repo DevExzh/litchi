@@ -59,3 +59,35 @@ source commit, lock SHA, UTC interval, exit status, log size and target size.
 The target grew from 652071845 to 766803350 bytes and remained below the 20 GB
 cap. No native PPTX suite or workspace full-gate was run for this focused
 correction.
+
+## Follow-up: registry and corpus consumers
+
+Review found one remaining generated consumer: the PPTX `final-slide` row in
+`tests/golden/registry/pptx.json` still said `invalid_argument`. The row now
+matches the shared `InvalidValue` classification. The OfficeCLI capability
+delta was regenerated only for that registry digest change (one line); no
+other generated row changed. The W8 wording now distinguishes the typed
+`SoleParagraph` arm, which remains `invalid_argument`, from the PPTX
+`FinalSlide` shared-kind code, which is `invalid_value`. These corrections and
+the generated table are in `d9baa98c3188a7367b7012185ae98c01305f5e31`.
+
+The final checks ran at that commit with the same ignored 139592-byte
+`Cargo.lock` overlay and SHA-256 recorded above. Their raw logs and receipts
+are in
+`/home/zhuhe/code/litchi-worktrees/.coord/pptx-refusal-kind/validation-d9baa98c31/`:
+
+| Check | Result | Raw log (bytes; SHA-256) |
+| --- | --- | --- |
+| PPTX registry golden | 1 passed, 0 failed, 2 filtered | `ops-pptx-registry-d9baa98c31.log` (361; `a3e39565468b47cc8339eafde69f8d395d0636de91b67a33d941f04fe6de200a`) |
+| OfficeCLI capability delta (`--check`) | exit 0 | `officecli-capability-delta-check-d9baa98c31.log` (0; `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`) |
+| OfficeCLI corpus (`--check`) | exit 0 | `officecli-corpus-check-d9baa98c31.log` (0; `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`) |
+
+The registry command was the PPTX-only `registry_goldens_follow_enabled_formats`
+test with `cargo test --offline --locked -p litchi-ops --no-default-features
+--features pptx --test registry ...`. The static checks used the tracked
+`test-data/officecli`, registry/capability goldens, corpus outcomes and
+`tools/officecli_dispositions.json`; the capability command explicitly passed
+`--officecli test-data/officecli`. The final target directory was
+771402833 bytes. The first capability check at the pre-regeneration commit
+correctly reported the table stale; it was not treated as a pass, and the
+follow-up check above passed after the single-line regeneration.
