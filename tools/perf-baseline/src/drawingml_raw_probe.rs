@@ -718,7 +718,18 @@ fn parse(arguments: impl Iterator<Item = String>, expected_mode: &str) -> io::Re
 fn sha256(bytes: &[u8]) -> String {
     let mut digest = Sha256::new();
     digest.update(bytes);
-    format!("{:x}", digest.finalize())
+    hex_digest(digest.finalize())
+}
+
+fn hex_digest<D: AsRef<[u8]>>(digest: D) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let bytes = digest.as_ref();
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for &byte in bytes {
+        output.push(HEX[(byte >> 4) as usize] as char);
+        output.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    output
 }
 
 fn command_identity_sha256() -> String {
@@ -1283,11 +1294,10 @@ fn write_receipt(sink: CountingSink) -> SinkReceipt {
     SinkReceipt {
         writes: sink.writes,
         bytes: sink.bytes,
-        sha256: format!(
-            "{:x}",
+        sha256: hex_digest(
             sink.digest
                 .expect("timed sink cannot produce a receipt")
-                .finalize()
+                .finalize(),
         ),
     }
 }
@@ -1390,7 +1400,7 @@ fn diagram_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
     use dml::diagram::{DiagramType, SmartArtBuilder, generate_smartart_data_xml};
     let diagram = SmartArtBuilder::new(DiagramType::Relationship)
         .layout_name("relationship")
-        .add_items([fixture_seed(fixture), "second"])
+        .add_items([fixture_seed(fixture), "second".to_string()])
         .build();
     let source = generate_smartart_data_xml(&diagram).into_bytes();
     let outline = dml::diagram::edit::Outline::read(&source)
@@ -2015,7 +2025,8 @@ fn owner_commit(
             ))
         },
         OwnerRoute::DrawingmlInkActions => {
-            use dml::ink::actions::{ActionSelector, Edit, EditOptions};
+            use dml::ink::actions::builder::ActionSelector;
+            use dml::ink::actions::{Edit, EditOptions};
             let profile = owner_read_profile(&fixture.source)
                 .map_err(|error| owner_error(fixture.route, error))?;
             let mut edit = Edit::from_profile(&profile, EditOptions::default())
@@ -2459,7 +2470,7 @@ fn owner_proof(
         route: owner_route_name(fixture.route),
         fixture_identity_sha256: sha256(
             format!(
-                "drawingml-owner-fixture-v1\0{fixture_identity_sha256}\0{}\0{}",
+                "drawingml-owner-fixture-v1\0{fixture_identity_sha256}\0{}\0{}\0{}",
                 owner_route_name(fixture.route),
                 sha256(&fixture.source),
                 sha256(&fixture.stale),
@@ -3606,7 +3617,7 @@ pub fn run(observer: Option<&dyn AllocationObserver>) -> io::Result<()> {
     let report = Report {
         schema: "litchi.drawingml.raw.probe.v1",
         lane: arguments.lane,
-        endpoint: arguments.endpoint,
+        endpoint: arguments.endpoint.clone(),
         owner_route: arguments.owner_route,
         raw_scope: arguments.raw_scope,
         role: arguments.role,

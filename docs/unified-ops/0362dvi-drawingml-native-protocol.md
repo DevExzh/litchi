@@ -168,6 +168,27 @@ python3 tools/native_qualification/prepare_drawingml_raw_inputs.py \
   --output /external/native-final/dml-chart-preparation.json
 ```
 
+Before a native run, the probe can be compile-checked against each historical
+parent without checking out the full workspace.  The standalone
+`tools/native_qualification/drawingml_compile_driver.py` creates an external
+sparse worktree containing only the DrawingML dependency closure, records the
+source tree and driver hashes, generates its own offline `Cargo.lock`, and
+then runs `cargo check --locked --offline --bins` with one build job.  The
+generated worktree, target, lock, logs, and receipt remain outside the
+repository.  The owner-transition checks used the following feature profiles:
+
+| parent | compile features |
+| --- | --- |
+| `945eb1d6b9ef6c56fa26c82e12758d38c1b9015d` | none |
+| `2f7db7ee7fa01893e9099217fc4243687d196f63` | `drawingml-owner-current,drawingml-theme-family-current` |
+| `996651b6b19717a0192dfd4144bccd367fb2ea44` | `drawingml-owner-current,drawingml-theme-family-current` |
+| `11728db894181ffbcdbcea3ae0008d51fdd2d8af` | `drawingml-owner-current` |
+
+Each of those four source-bound checks completed with `generate_lockfile=0`
+and `check=0` in the review run.  The receipt is compile evidence only: it is
+not a fidelity, capability, or performance acceptance result, and a final
+candidate must be checked separately after source freeze.
+
 After all raw, route, and owner receipts and external targets are ready, the coordinator may
 run the guarded phases with the corresponding `DRAWINGML_*` environment
 bindings:
