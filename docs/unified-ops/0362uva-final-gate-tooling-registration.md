@@ -76,7 +76,9 @@ PASS: 53 steps, inventory tests, cap isolation, preserved child/failure receipts
 
 The verifier is 14,047 bytes with SHA-256
 `5c4583bdef66b4eda17f4fac5b3e56e98ab02223750150b9f9fef64daaa827c0`.
-The external log is 81 bytes with SHA-256
+The post-commit external log is
+`/home/zhuhe/code/litchi-worktrees/.coord/replay-integration/gate-safe-next-20261024/verification-tooling-postcommit.log`,
+81 bytes with SHA-256
 `ddeed317add455825af1593f549c74a979cb3715a4a17792b5911f770db06b11`.
 No Cargo command was run. The prepared copy is for coordinator adoption only
 after the active gate exits; this record makes no gate-pass or acceptance
