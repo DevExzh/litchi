@@ -1,8 +1,8 @@
 //! Construction/drop proof for deferred Numbers edit entries.
 //!
-//! Name selectors are caller-owned input.  Each edit copies the selector and
-//! accepts it without walking the package catalog; the first value request,
-//! mutation, or commit performs the source-dependent resolution.
+//! Name selectors are caller-owned input.  Each edit admits and copies the
+//! bounded selector without walking the package catalog; the first value
+//! request, mutation, or commit performs the source-dependent resolution.
 
 use litchi_numbers::{ChartSelector, ImageSelector, Package, SheetSelector, TableSelector};
 

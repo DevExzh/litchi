@@ -413,9 +413,21 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
     ) -> Result<Edit<'_>, TableMergesError> {
         let mut budget = Budget::new(self)?;
-        let sheet_selector = OwnedSheetSelector::try_from(sheet.into())
+        let sheet = sheet.into();
+        let maximum_sheet_name_bytes = budget.remaining_retained()?;
+        if let Some(amount) = OwnedSheetSelector::name_bytes(sheet) {
+            budget.charge_retained(amount)?;
+            budget.charge_allocations(1)?;
+        }
+        let sheet_selector = OwnedSheetSelector::try_from(sheet, maximum_sheet_name_bytes)
             .map_err(|amount| TableMergesError::Allocation { amount })?;
-        let table_selector = OwnedTableSelector::try_from(table.into())
+        let table = table.into();
+        let maximum_table_name_bytes = budget.remaining_retained()?;
+        if let Some(amount) = OwnedTableSelector::name_bytes(table) {
+            budget.charge_retained(amount)?;
+            budget.charge_allocations(1)?;
+        }
+        let table_selector = OwnedTableSelector::try_from(table, maximum_table_name_bytes)
             .map_err(|amount| TableMergesError::Allocation { amount })?;
         Ok(Edit {
             source: self,

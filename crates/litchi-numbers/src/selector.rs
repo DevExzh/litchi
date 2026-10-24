@@ -219,9 +219,22 @@ pub(crate) enum OwnedSheetSelector {
 }
 
 impl OwnedSheetSelector {
-    pub(crate) fn try_from(selector: SheetSelector<'_>) -> Result<Self, usize> {
+    pub(crate) fn name_bytes(selector: SheetSelector<'_>) -> Option<usize> {
+        match selector {
+            SheetSelector::Name(name) => Some(name.len()),
+            SheetSelector::Position(_) => None,
+        }
+    }
+
+    pub(crate) fn try_from(
+        selector: SheetSelector<'_>,
+        maximum_name_bytes: usize,
+    ) -> Result<Self, usize> {
         match selector {
             SheetSelector::Name(name) => {
+                if name.len() > maximum_name_bytes {
+                    return Err(name.len());
+                }
                 let mut owned = String::new();
                 owned
                     .try_reserve_exact(name.len())
@@ -249,9 +262,22 @@ pub(crate) enum OwnedTableSelector {
 }
 
 impl OwnedTableSelector {
-    pub(crate) fn try_from(selector: TableSelector<'_>) -> Result<Self, usize> {
+    pub(crate) fn name_bytes(selector: TableSelector<'_>) -> Option<usize> {
+        match selector {
+            TableSelector::Name(name) => Some(name.len()),
+            TableSelector::Position(_) => None,
+        }
+    }
+
+    pub(crate) fn try_from(
+        selector: TableSelector<'_>,
+        maximum_name_bytes: usize,
+    ) -> Result<Self, usize> {
         match selector {
             TableSelector::Name(name) => {
+                if name.len() > maximum_name_bytes {
+                    return Err(name.len());
+                }
                 let mut owned = String::new();
                 owned
                     .try_reserve_exact(name.len())
@@ -361,5 +387,23 @@ mod tests {
         assert_eq!(sheet, SheetSelector::Position(Position::new(7)));
         assert_eq!(table, TableSelector::Position(Position::new(7)));
         assert_eq!(chart, ChartSelector::Position(Position::new(7)));
+    }
+
+    #[test]
+    fn owned_names_require_admitted_bytes_before_copying() {
+        let sheet = SheetSelector::name("Summary");
+        let table = TableSelector::name("Revenue");
+        assert_eq!(OwnedSheetSelector::name_bytes(sheet), Some(7));
+        assert_eq!(OwnedTableSelector::name_bytes(table), Some(7));
+        assert_eq!(OwnedSheetSelector::try_from(sheet, 6), Err("Summary".len()));
+        assert_eq!(OwnedTableSelector::try_from(table, 6), Err("Revenue".len()));
+        assert!(matches!(
+            OwnedSheetSelector::try_from(sheet, 7),
+            Ok(OwnedSheetSelector::Name(_))
+        ));
+        assert!(matches!(
+            OwnedTableSelector::try_from(table, 7),
+            Ok(OwnedTableSelector::Name(_))
+        ));
     }
 }

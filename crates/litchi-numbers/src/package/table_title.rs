@@ -228,14 +228,25 @@ impl Edit<'_> {
         if self.sheet_position.is_some() && self.table_position.is_some() {
             return Ok(());
         }
-        let (sheet_position, table_position) = resolve_title_selectors(
+        let mut budget = self.budget.take().ok_or_else(invalid_source)?;
+        let selected = resolve_title_selectors(
             self.source,
             self.sheet_selector.as_selector(),
             self.table_selector.as_selector(),
-        )?;
-        self.sheet_position = Some(sheet_position);
-        self.table_position = Some(table_position);
-        Ok(())
+            Some(&mut budget),
+        );
+        match selected {
+            Ok((sheet_position, table_position)) => {
+                self.sheet_position = Some(sheet_position);
+                self.table_position = Some(table_position);
+                self.budget = Some(budget);
+                Ok(())
+            },
+            Err(error) => {
+                self.budget = Some(budget);
+                Err(error)
+            },
+        }
     }
 
     fn ensure_loaded(&mut self) -> Result<(), Error> {
@@ -486,13 +497,23 @@ impl Package {
     ) -> Result<Edit<'_>, Error> {
         let mut budget = TransactionBudget::new(self);
         budget.charge_transaction_work(self.source_bytes().len().saturating_mul(2))?;
-        let sheet_selector =
-            OwnedSheetSelector::try_from(sheet.into()).map_err(|amount| Error::Allocation {
+        let sheet = sheet.into();
+        let maximum_sheet_name_bytes = budget.remaining_transaction_work();
+        if let Some(amount) = OwnedSheetSelector::name_bytes(sheet) {
+            budget.charge_transaction_work(amount)?;
+        }
+        let sheet_selector = OwnedSheetSelector::try_from(sheet, maximum_sheet_name_bytes)
+            .map_err(|amount| Error::Allocation {
                 amount,
                 path: Path::Package,
             })?;
-        let table_selector =
-            OwnedTableSelector::try_from(table.into()).map_err(|amount| Error::Allocation {
+        let table = table.into();
+        let maximum_table_name_bytes = budget.remaining_transaction_work();
+        if let Some(amount) = OwnedTableSelector::name_bytes(table) {
+            budget.charge_transaction_work(amount)?;
+        }
+        let table_selector = OwnedTableSelector::try_from(table, maximum_table_name_bytes)
+            .map_err(|amount| Error::Allocation {
                 amount,
                 path: Path::Package,
             })?;
@@ -520,7 +541,7 @@ fn resolve_title_target<'sheet, 'table>(
     sheet: impl Into<SheetSelector<'sheet>>,
     table: impl Into<TableSelector<'table>>,
 ) -> Result<Target, Error> {
-    let (sheet_position, table_position) = resolve_title_selectors(source, sheet, table)?;
+    let (sheet_position, table_position) = resolve_title_selectors(source, sheet, table, None)?;
     resolve_title_at_positions(source, sheet_position, table_position)
 }
 
@@ -528,23 +549,70 @@ fn resolve_title_selectors<'sheet, 'table>(
     source: &Package,
     sheet: impl Into<SheetSelector<'sheet>>,
     table: impl Into<TableSelector<'table>>,
+    mut budget: Option<&mut TransactionBudget>,
 ) -> Result<(usize, usize), Error> {
-    let selected_sheet = source
-        .state
-        .document
-        .sheet(sheet)
-        .map_err(|_error| Error::InvalidSource {
-            path: Path::Package,
-        })?
-        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
+    let selected_sheet = match sheet.into() {
+        SheetSelector::Position(index) => {
+            let index = index.get();
+            if let Some(active) = budget.as_deref_mut() {
+                active.charge_transaction_work(1)?;
+            }
+            source.state.document.sheets().get(index)
+        },
+        SheetSelector::Name(name) => {
+            let mut selected = None;
+            for candidate in source.state.document.sheets() {
+                if let Some(active) = budget.as_deref_mut() {
+                    active.charge_transaction_work(
+                        candidate
+                            .name()
+                            .len()
+                            .saturating_add(name.len())
+                            .saturating_add(1),
+                    )?;
+                }
+                if candidate.name() == name {
+                    selected = Some(candidate);
+                    break;
+                }
+            }
+            selected
+        },
+    }
+    .ok_or(Error::Refused(Refusal::SheetNotFound))?;
     let table_position = match table.into() {
         TableSelector::Position(index) => {
             let index = index.get();
-            selected_sheet.tables().nth(index).map(|_| index)
+            let mut tables = selected_sheet.tables();
+            for _ in 0..=index {
+                if let Some(active) = budget.as_deref_mut() {
+                    active.charge_transaction_work(1)?;
+                }
+                if tables.next().is_none() {
+                    return Err(Error::Refused(Refusal::TableNotFound));
+                }
+            }
+            Some(index)
         },
-        TableSelector::Name(name) => selected_sheet
-            .tables()
-            .position(|candidate| candidate.name() == name),
+        TableSelector::Name(name) => {
+            let mut selected = None;
+            for (index, candidate) in selected_sheet.tables().enumerate() {
+                if let Some(active) = budget.as_deref_mut() {
+                    active.charge_transaction_work(
+                        candidate
+                            .name()
+                            .len()
+                            .saturating_add(name.len())
+                            .saturating_add(1),
+                    )?;
+                }
+                if candidate.name() == name {
+                    selected = Some(index);
+                    break;
+                }
+            }
+            selected
+        },
     }
     .ok_or(Error::Refused(Refusal::TableNotFound))?;
     Ok((selected_sheet.index(), table_position))
@@ -832,6 +900,10 @@ impl TransactionBudget {
             amount,
             LimitKind::TransactionWork,
         )
+    }
+
+    const fn remaining_transaction_work(&self) -> usize {
+        self.remaining_transaction_work
     }
 
     fn charge_index_lookup(&mut self, source: &Package) -> Result<(), Error> {

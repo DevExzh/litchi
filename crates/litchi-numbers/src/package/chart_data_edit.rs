@@ -381,14 +381,23 @@ impl Package {
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         chart_selector: impl Into<ChartSelector>,
     ) -> Result<Edit<'_>, ChartDataError> {
-        let budget = ChartBudget::for_package(self).map_err(map_arrangement_error)?;
+        let mut budget = ChartBudget::for_package(self).map_err(map_arrangement_error)?;
         let sheet_selector = sheet_selector.into();
         if matches!(sheet_selector, SheetSelector::Name(name) if name.is_empty()) {
             return Err(ChartDataError::Refused(
                 crate::sheet::chart::data::Refusal::EmptySheetName,
             ));
         }
-        let sheet_selector = OwnedSheetSelector::try_from(sheet_selector)
+        let maximum_name_bytes = budget.remaining_retained();
+        if let Some(amount) = OwnedSheetSelector::name_bytes(sheet_selector) {
+            budget
+                .preflight_retained(amount)
+                .and_then(|_| budget.preflight_allocations(1))
+                .map_err(map_arrangement_error)?;
+            budget.retained(amount).map_err(map_arrangement_error)?;
+            budget.allocations(1).map_err(map_arrangement_error)?;
+        }
+        let sheet_selector = OwnedSheetSelector::try_from(sheet_selector, maximum_name_bytes)
             .map_err(|amount| ChartDataError::Allocation { amount })?;
         let chart_position = chart_selector.into().as_position();
         Edit::new(self, sheet_selector, chart_position, budget)

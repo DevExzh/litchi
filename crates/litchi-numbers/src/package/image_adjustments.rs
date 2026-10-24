@@ -391,14 +391,21 @@ impl<'a> Edit<'a> {
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         image_selector: impl Into<ImageSelector>,
     ) -> Result<Self, Error> {
+        let mut budget = ImageBudget::for_package(source)?;
         let sheet_selector = sheet_selector.into();
         if matches!(sheet_selector, SheetSelector::Name(name) if name.is_empty()) {
             return Err(Error::Refused(Refusal::EmptySheetName));
         }
-        let sheet_selector = OwnedSheetSelector::try_from(sheet_selector)
+        let maximum_name_bytes = budget.remaining_retained();
+        if let Some(amount) = OwnedSheetSelector::name_bytes(sheet_selector) {
+            budget.preflight_retained(amount)?;
+            budget.preflight_allocations(1)?;
+            budget.retained(amount)?;
+            budget.allocations(1)?;
+        }
+        let sheet_selector = OwnedSheetSelector::try_from(sheet_selector, maximum_name_bytes)
             .map_err(|amount| Error::Allocation { amount })?;
         let image_position = image_selector.into().as_position();
-        let budget = ImageBudget::for_package(source)?;
         Ok(Self {
             source,
             sheet_selector,
@@ -900,6 +907,10 @@ impl ImageBudget {
         )
     }
 
+    const fn remaining_retained(&self) -> usize {
+        self.max_retained.saturating_sub(self.retained)
+    }
+
     fn output(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.output,
@@ -1131,7 +1142,7 @@ fn select_image_with_budget(
     require_editable: bool,
     budget: &mut ImageBudget,
 ) -> Result<ImageSelection, Error> {
-    let sheet_position = resolve_sheet_position(package, sheet_selector)?;
+    let sheet_position = resolve_sheet_position(package, sheet_selector, budget)?;
     let document = Package::root_document(&package.state.components).map_err(map_package_error)?;
     let sheet_reference = document
         .sheet_references()
@@ -1268,27 +1279,37 @@ fn decode_with_budget(payload: &[u8], budget: &mut ImageBudget) -> Result<ImageA
 fn resolve_sheet_position(
     package: &Package,
     selector: SheetSelector<'_>,
+    budget: &mut ImageBudget,
 ) -> Result<Position, Error> {
     match selector {
         SheetSelector::Name(name) => {
             if name.is_empty() {
                 return Err(Error::Refused(Refusal::EmptySheetName));
             }
-            let mut matches = package
-                .workbook_ref()
-                .sheets()
-                .iter()
-                .filter(|sheet| sheet.name() == name);
-            let Some(sheet) = matches.next() else {
-                return Err(Error::Refused(Refusal::SheetNameNotFound));
-            };
-            if matches.next().is_some() {
-                return Err(Error::Refused(Refusal::AmbiguousSelector));
+            let mut selected = None;
+            for sheet in package.workbook_ref().sheets() {
+                budget.work(
+                    sheet
+                        .name()
+                        .len()
+                        .saturating_add(name.len())
+                        .saturating_add(1),
+                )?;
+                if sheet.name() != name {
+                    continue;
+                }
+                if selected.is_some() {
+                    return Err(Error::Refused(Refusal::AmbiguousSelector));
+                }
+                selected = Some(sheet);
             }
-            Ok(Position::new(sheet.index()))
+            selected
+                .map(|sheet| Position::new(sheet.index()))
+                .ok_or(Error::Refused(Refusal::SheetNameNotFound))
         },
         SheetSelector::Position(index) => {
             let index = index.get();
+            budget.work(1)?;
             if package.workbook_ref().sheets().get(index).is_none() {
                 return Err(Error::Refused(Refusal::SheetPositionNotFound {
                     position: Position::new(index),

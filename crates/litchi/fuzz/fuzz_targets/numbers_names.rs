@@ -256,7 +256,13 @@ fn exercise_table_title(package: &Package, data: &[u8]) {
             return;
         },
     };
-    assert_eq!(no_op.path(), TitlePath::Table { sheet: 0, table: 0 });
+    match no_op.path() {
+        Ok(path) => assert_eq!(path, TitlePath::Table { sheet: 0, table: 0 }),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    }
     match no_op.settings() {
         Ok(settings) => assert_eq!(settings, before),
         Err(error) => {
@@ -299,7 +305,13 @@ fn exercise_table_title(package: &Package, data: &[u8]) {
             return;
         },
     };
-    assert_eq!(edit.path(), TitlePath::Table { sheet: 0, table: 0 });
+    match edit.path() {
+        Ok(path) => assert_eq!(path, TitlePath::Table { sheet: 0, table: 0 }),
+        Err(error) => {
+            observe_error(error);
+            return;
+        },
+    }
     let staged = match edit.settings() {
         Ok(settings) => settings,
         Err(error) => {
