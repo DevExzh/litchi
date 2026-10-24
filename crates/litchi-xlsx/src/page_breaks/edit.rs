@@ -382,7 +382,7 @@ fn owned_selector(selector: Selector<'_>) -> Result<Selector<'static>> {
 
 #[cfg(test)]
 mod lazy_tests {
-    use super::*;
+    use litchi_opc::PackURI;
 
     #[test]
     fn edit_entry_defers_page_break_xml() {

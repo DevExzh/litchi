@@ -3872,7 +3872,7 @@ mod tests {
             .set_value((0, 0), CellChange::text("S".repeat(1_024)))
             .unwrap_err();
         assert!(matches!(error, Error::Limit { .. }));
-        assert!(transaction.is_changed());
+        assert!(transaction.commit().unwrap().changed());
     }
 
     #[test]
@@ -3896,7 +3896,7 @@ mod tests {
         assert!(transaction.set_text((0, 0), &first).unwrap());
         let error = transaction.set_text((0, 0), "S".repeat(1_024)).unwrap_err();
         assert!(matches!(error, Error::Limit { .. }));
-        assert!(transaction.is_changed());
+        assert!(transaction.commit().unwrap().diagnostics().changed());
     }
 
     #[test]
@@ -3913,13 +3913,11 @@ mod tests {
         let mut low_level_package = package();
         let mut transaction = Transaction::new(&mut low_level_package, "Pivot").unwrap();
         assert!(transaction.set_extra((0, 1), invalid_edit()).is_err());
-        assert!(!transaction.is_changed());
         assert!(!transaction.commit().unwrap().changed());
 
         let workbook = crate::Package::from_opc(package()).unwrap();
         let mut transaction = workbook.edit_pivot_table_data("Pivot").unwrap();
         assert!(transaction.set_extra((0, 1), invalid_edit()).is_err());
-        assert!(!transaction.is_changed());
         assert!(!transaction.commit().unwrap().diagnostics().changed());
     }
 

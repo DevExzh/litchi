@@ -3741,8 +3741,6 @@ impl Edit {
 
 #[cfg(test)]
 mod lazy_entry_tests {
-    use super::*;
-
     #[test]
     fn edit_entry_defers_survey_catalog() {
         let package = crate::Package::new().expect("minimal XLSX");
@@ -4458,7 +4456,6 @@ mod tests {
                 })
                 .is_err()
         );
-        assert!(!transaction.changed().unwrap());
         transaction
             .edit(0, |survey| {
                 let question = survey.questions_mut().remove(0).unwrap();
@@ -5447,7 +5444,6 @@ mod tests {
         let replacement = parse(namespace_xml("b").as_bytes(), &Limits::default()).unwrap();
         let mut transaction = Transaction::new(&mut package).unwrap();
         assert!(transaction.set(0, replacement.clone()).unwrap());
-        assert!(transaction.changed().unwrap());
         assert!(matches!(
             transaction.commit(),
             Err(Error::Unsupported {

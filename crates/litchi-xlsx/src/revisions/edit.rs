@@ -414,8 +414,6 @@ crate::record::raw_test_route!(edit_revisions);
 
 #[cfg(test)]
 mod lazy_tests {
-    use super::*;
-
     #[test]
     fn edit_entry_defers_revision_graph() {
         let package = crate::Package::new().expect("minimal XLSX");

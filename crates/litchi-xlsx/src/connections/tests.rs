@@ -585,7 +585,6 @@ fn extension_owner_transaction_projection_handles_compact_pi_mce_and_foreign_con
         let extension = reopened
             .connections()
             .unwrap()
-            .unwrap()
             .connections[0]
             .extension_xml
             .as_deref()
@@ -713,7 +712,6 @@ fn large_transaction_scalar_commit_reopens_with_stable_ids() {
         reopened
             .connections()
             .unwrap()
-            .unwrap()
             .connections
             .len(),
         COUNT as usize
@@ -749,7 +747,7 @@ fn large_transaction_reorder_publishes_the_requested_order() {
     assert!(transaction.replace(Some(reordered)).unwrap());
     assert!(transaction.commit().unwrap().changed());
     let reopened = snapshot(&package).unwrap();
-    let connections = &reopened.connections().unwrap().unwrap().connections;
+    let connections = &reopened.connections().unwrap().connections;
     assert_eq!(connections.first().unwrap().id, COUNT);
     assert_eq!(connections.last().unwrap().id, 1);
 }

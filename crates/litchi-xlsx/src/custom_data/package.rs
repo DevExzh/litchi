@@ -4052,8 +4052,8 @@ mod tests {
                 Ok(())
             })
             .unwrap();
-        assert!(!no_op.is_changed());
-        no_op.commit().unwrap();
+        let no_op_commit = no_op.commit().unwrap();
+        assert!(!no_op_commit.changed());
         assert_eq!(package.get_part(&properties).unwrap().blob(), before_bytes);
 
         let replacement = format!(
