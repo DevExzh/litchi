@@ -467,14 +467,15 @@ fn empty_edit_is_an_exact_noop_and_stale_inverse_writes_nothing() {
 
     let foreign = open(bytes(&fixture(MAIN, document(&["foreign"]))));
     let mut inverse_output = Vec::new();
+    let result = foreign
+        .apply_plain_paragraph_copy(&publication.patch().inverse())
+        .and_then(|committed| {
+            committed.package().write_to(&mut inverse_output)?;
+            Ok(committed)
+        });
     assert!(matches!(
-        foreign
-            .apply_plain_paragraph_copy(&publication.patch().inverse())
-            .and_then(|committed| {
-                committed.package().write_to(&mut inverse_output)?;
-                Ok(committed)
-            }),
-        Err(Error::PatchConflict)
+        result,
+        Err(Error::Document(litchi_docx::Error::PatchConflict { .. }))
     ));
     assert!(inverse_output.is_empty());
 }

@@ -746,14 +746,15 @@ fn secondary_noop_is_exact_and_inverse_restores_the_source() {
         .and_then(|committed| Ok(committed.package().write_to(&mut restored)?))
         .unwrap();
     assert_eq!(restored, source);
+    let result = open(&source)
+        .apply_story_text(&publication.patch().inverse())
+        .and_then(|committed| {
+            committed.package().write_to(Vec::new())?;
+            Ok(committed)
+        });
     assert!(matches!(
-        open(&source)
-            .apply_story_text(&publication.patch().inverse())
-            .and_then(|committed| {
-                committed.package().write_to(Vec::new())?;
-                Ok(committed)
-            }),
-        Err(story_text::Error::PatchConflict)
+        result,
+        Err(story_text::Error::Document(Error::PatchConflict { .. }))
     ));
 }
 

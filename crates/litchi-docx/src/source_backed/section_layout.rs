@@ -38,6 +38,13 @@ impl Change for LayoutChange {
         }
     }
 
+    fn preflight_foreign(&self, package: &Package) -> Result<()> {
+        if self.patch.is_noop() {
+            return Ok(());
+        }
+        package.section_layout_snapshot().map(|_| ())
+    }
+
     fn publish(&self, package: &Package) -> Result<Package> {
         let (main, target, fingerprint) = package.section_layout_target(
             &self.patch,

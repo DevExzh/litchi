@@ -652,8 +652,11 @@ fn managed_batch_cancellation_work_and_memory_failures_are_typed_and_release_own
 
     let (probe_budget, _probe_cancel, probe_package) = managed(source_bytes());
     let probe_snapshot = probe_package.document_snapshot().unwrap();
+    let probe_edit = probe_package.edit().unwrap();
+    let _ = probe_edit.projected().unwrap();
     let baseline_work = probe_budget.used(Resource::Work);
     assert!(baseline_work > 0);
+    drop(probe_edit);
     drop(probe_snapshot);
     drop(probe_package);
     assert_eq!(probe_budget.used(Resource::Memory), 0);

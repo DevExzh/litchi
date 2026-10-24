@@ -1346,38 +1346,12 @@ fn retained_semantic_apply_preserves_graph_edits_and_effective_protection() {
         let mut edit = owner.edit().unwrap();
         edit.replace_paragraph_text(litchi_core::Position::new(0), "after")
             .unwrap();
-        let committed = edit.commit().unwrap();
-        if policy.is_empty() {
-            let mut canonical = owner.edit().unwrap();
-            canonical
-                .replace_paragraph_text(litchi_core::Position::new(0), "after")
-                .unwrap();
-            let next = canonical.commit().unwrap().into_package();
-            let mut bytes = Vec::new();
-            next.write_to(&mut bytes).unwrap();
-            let package = SourceBackedPackage::from_vec(
-                bytes,
-                litchi_opc::SourceLimits::default(),
-                litchi_opc::SourceCacheLimits::default(),
-                None,
-            )
-            .unwrap();
-            assert!(package.part(&settings).is_ok());
-            assert!(
-                package
-                    .main_document_part()
-                    .unwrap()
-                    .rels()
-                    .get("rSettings")
-                    .is_some()
-            );
-            assert!(
-                package
-                    .part(&PackURI::new("/word/unrelated.bin").unwrap())
-                    .is_err()
-            );
-            assert_eq!(next.document().unwrap().extract_text().unwrap(), "after");
-        } else {
+        let result = edit.commit();
+        if !policy.is_empty() {
+            assert!(matches!(
+                result,
+                Err(litchi_docx::document::Error::Document(Error::Refused(_)))
+            ));
             let mut canonical = owner.edit().unwrap();
             canonical
                 .replace_paragraph_text(litchi_core::Position::new(0), "after")
@@ -1386,11 +1360,39 @@ fn retained_semantic_apply_preserves_graph_edits_and_effective_protection() {
                 canonical.commit(),
                 Err(litchi_docx::document::Error::Document(Error::Refused(_)))
             ));
-            assert!(matches!(
-                owner.apply(committed.patch()),
-                Err(litchi_docx::document::Error::Document(Error::Refused(_)))
-            ));
+            assert_eq!(owner.document().unwrap().extract_text().unwrap(), "before");
+            continue;
         }
+        assert!(result.is_ok());
+        let mut canonical = owner.edit().unwrap();
+        canonical
+            .replace_paragraph_text(litchi_core::Position::new(0), "after")
+            .unwrap();
+        let next = canonical.commit().unwrap().into_package();
+        let mut bytes = Vec::new();
+        next.write_to(&mut bytes).unwrap();
+        let package = SourceBackedPackage::from_vec(
+            bytes,
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
+        assert!(package.part(&settings).is_ok());
+        assert!(
+            package
+                .main_document_part()
+                .unwrap()
+                .rels()
+                .get("rSettings")
+                .is_some()
+        );
+        assert!(
+            package
+                .part(&PackURI::new("/word/unrelated.bin").unwrap())
+                .is_err()
+        );
+        assert_eq!(next.document().unwrap().extract_text().unwrap(), "after");
         assert_eq!(owner.document().unwrap().extract_text().unwrap(), "before");
     }
 }

@@ -1704,7 +1704,9 @@ impl Package {
             .main_document_part()?
             .partname()
             .clone();
-        let current = self.external_hyperlink_sanitization_snapshot_bounded(patch.limits())?;
+        let current = self.external_hyperlink_sanitization_snapshot_bounded(
+            self.semantic_limits.hyperlinks_value(),
+        )?;
         let target = patch.apply(&current)?;
         Ok((main, target.shared_xml()))
     }
@@ -1721,7 +1723,9 @@ impl Package {
             .main_document_part()?
             .partname()
             .clone();
-        let current = self.external_hyperlink_redaction_snapshot_bounded(patch.limits())?;
+        let current = self.external_hyperlink_redaction_snapshot_bounded(
+            self.semantic_limits.hyperlinks_value(),
+        )?;
         patch.validate_source(&current)?;
         Ok(main)
     }

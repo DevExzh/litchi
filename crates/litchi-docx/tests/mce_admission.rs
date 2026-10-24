@@ -217,12 +217,13 @@ fn source_backed_edits_publish_what_the_eager_owner_publishes() {
             .edit()
             .unwrap_or_else(|error| panic!("{name}: {error}"));
         first_edit(&mut edit);
-        let commit = edit.commit().unwrap();
         let mut published = Vec::new();
-        let source_result = package.apply(commit.patch()).and_then(|committed| {
-            let committed = committed.into_package();
-            committed.write_to(&mut published)?;
-            committed.document_snapshot()
+        let source_result = edit.commit().and_then(|commit| {
+            package.apply(commit.patch()).and_then(|committed| {
+                let committed = committed.into_package();
+                committed.write_to(&mut published)?;
+                committed.document_snapshot()
+            })
         });
 
         let owner = eager(&original);
@@ -629,6 +630,14 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
                 assert!(text.contains("edited"), "{label}: {text}");
             },
             Expect::Refused => {
+                let source_edit = source_edit.and_then(|mut edit| {
+                    edit.replace_paragraph_text(Position::new(1), "edited")?;
+                    edit.commit().map(|_| ())
+                });
+                let eager_edit = eager_edit.and_then(|mut edit| {
+                    edit.replace_paragraph_text(Position::new(1), "edited")?;
+                    edit.commit().map(|_| ())
+                });
                 assert!(
                     matches!(
                                             source_edit,
@@ -646,7 +655,15 @@ fn witness_matrix_on_both_owners_and_the_managed_route() {
                 );
             },
             Expect::MustUnderstand => {
-                for result in [source_edit.map(drop), eager_edit.map(drop)] {
+                let source_result = source_edit.and_then(|mut edit| {
+                    edit.replace_paragraph_text(Position::new(1), "edited")?;
+                    edit.commit().map(drop)
+                });
+                let eager_result = eager_edit.and_then(|mut edit| {
+                    edit.replace_paragraph_text(Position::new(1), "edited")?;
+                    edit.commit().map(drop)
+                });
+                for result in [source_result, eager_result] {
                     assert!(
                         matches!(
                             result,

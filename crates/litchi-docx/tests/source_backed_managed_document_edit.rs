@@ -2197,6 +2197,7 @@ fn managed_cancellation_refuses_edit_and_publication_without_output() {
 fn managed_cancellation_after_capture_refuses_empty_commit_and_releases_memory() {
     let (budget, cancellation_source, package) = managed(fixture("before", "second"), 1 << 20);
     let edit = package.edit().unwrap();
+    let _ = edit.projected().unwrap();
     assert!(budget.used(Resource::Memory) > 0);
     cancellation_source.cancel();
 
@@ -2211,6 +2212,7 @@ fn managed_empty_text_slots_refuse_low_scan_memory_before_projection_change() {
     let source = fixture_with_document(empty_text_slot_document(4096), 37, 13);
     let (probe_budget, _cancellation_source, probe_package) = managed(source.clone(), 1 << 24);
     let probe_edit = probe_package.edit().unwrap();
+    let _ = probe_edit.projected().unwrap();
     let baseline_memory = probe_budget.used(Resource::Memory);
     assert!(baseline_memory > 0);
     drop(probe_edit);
@@ -2234,6 +2236,7 @@ fn managed_candidate_budget_failure_happens_before_publication_output() {
     let source = fixture("before", "second");
     let (budget, _cancellation_source, package) = managed(source, 1 << 20);
     let mut edit = package.edit().unwrap();
+    let _ = edit.projected().unwrap();
     let baseline_memory = budget.used(Resource::Memory);
     assert!(baseline_memory > 0);
     let remaining = budget

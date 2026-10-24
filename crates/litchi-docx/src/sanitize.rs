@@ -622,10 +622,6 @@ impl Patch {
             self.limits,
         )
     }
-
-    pub(crate) const fn limits(&self) -> Limits {
-        self.limits
-    }
 }
 
 impl std::fmt::Debug for Patch {

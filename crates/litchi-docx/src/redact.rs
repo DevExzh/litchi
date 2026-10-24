@@ -415,10 +415,6 @@ impl IrreversibleRedactionPatch {
             ))
         }
     }
-
-    pub(crate) const fn limits(&self) -> sanitize::Limits {
-        self.source.limits()
-    }
 }
 
 pub(crate) fn publication_parts(patch: &IrreversibleRedactionPatch) -> (Vec<u8>, Vec<String>) {
