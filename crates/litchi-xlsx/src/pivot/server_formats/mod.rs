@@ -1028,12 +1028,57 @@ impl SourceCommit {
 /// The package owner and its source-bound ranges stay private.  Callers stage
 /// only typed server-format values and receive a new package through
 /// [`Commit::package`] after commit.
+/// Construction retains only the workbook owner and a bounded semantic
+/// selector; graph and staged-value materialization begins at the first
+/// fallible getter or edit operation and remains retryable after failure.
 pub struct Edit {
     source: Workbook,
+    selector: OwnedPivotTableSelector,
+    materialized: Option<MaterializedEdit>,
+}
+
+#[derive(Debug)]
+struct MaterializedEdit {
     before: Snapshot,
     staged: Vec<ServerFormat>,
     staged_sources: Vec<Option<usize>>,
     selection: usize,
+}
+
+#[derive(Debug)]
+enum OwnedPivotTableSelector {
+    Name(String),
+    Position(usize),
+}
+
+impl OwnedPivotTableSelector {
+    fn new<'a>(selector: PivotTableSelector<'a>, limits: SourceLimits) -> Result<Self> {
+        match selector {
+            PivotTableSelector::Position(position) => Ok(Self::Position(position)),
+            PivotTableSelector::Name(name) => {
+                let maximum = MAX_NAME_BYTES.min(caller_attribute_limit(limits));
+                if name.len() > maximum {
+                    return Err(Error::limit(LimitKind::NameBytes, name.len(), maximum));
+                }
+                let mut owned = String::new();
+                owned
+                    .try_reserve_exact(name.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "PivotTable server-format selector",
+                        source,
+                    })?;
+                owned.push_str(name);
+                Ok(Self::Name(owned))
+            },
+        }
+    }
+
+    fn borrowed(&self) -> PivotTableSelector<'_> {
+        match self {
+            Self::Name(name) => PivotTableSelector::Name(name),
+            Self::Position(position) => PivotTableSelector::Position(*position),
+        }
+    }
 }
 
 impl Edit {
@@ -1041,7 +1086,20 @@ impl Edit {
         source: &Workbook,
         selector: impl Into<PivotTableSelector<'selector>>,
     ) -> Result<Self> {
-        let before = Snapshot::load(source.pivot_package(), selector)?;
+        let selector =
+            OwnedPivotTableSelector::new(selector.into(), source.pivot_package().read_limits())?;
+        Ok(Self {
+            source: source.clone(),
+            selector,
+            materialized: None,
+        })
+    }
+
+    fn materialize(&mut self) -> Result<()> {
+        if self.materialized.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::load(self.source.pivot_package(), self.selector.borrowed())?;
         ensure_editable(&before)?;
         let mut staged = Vec::new();
         staged
@@ -1050,7 +1108,9 @@ impl Edit {
                 resource: "Workbook staged pivot server-format values",
                 source,
             })?;
-        staged.extend_from_slice(before.server_formats().formats());
+        for value in before.server_formats().formats() {
+            staged.push(clone_server_format(value)?);
+        }
         let mut staged_sources = Vec::new();
         staged_sources
             .try_reserve_exact(before.server_formats().formats().len())
@@ -1059,30 +1119,44 @@ impl Edit {
                 source,
             })?;
         staged_sources.extend((0..before.server_formats().formats().len()).map(Some));
-        Ok(Self {
-            source: source.clone(),
+        self.materialized = Some(MaterializedEdit {
             selection: before.selection,
             before,
             staged,
             staged_sources,
-        })
+        });
+        Ok(())
+    }
+
+    fn state(&self) -> Result<&MaterializedEdit> {
+        self.materialized
+            .as_ref()
+            .ok_or_else(|| invalid("PivotTable server-format edit is not materialized"))
+    }
+
+    fn state_mut(&mut self) -> Result<&mut MaterializedEdit> {
+        self.materialized
+            .as_mut()
+            .ok_or_else(|| invalid("PivotTable server-format edit is not materialized"))
     }
 
     /// Exact typed state captured at transaction start.
-    #[must_use]
-    pub fn before(&self) -> &PivotTableServerFormats {
-        self.before.server_formats()
+    pub fn before(&mut self) -> Result<&PivotTableServerFormats> {
+        self.materialize()?;
+        Ok(self.state()?.before.server_formats())
     }
 
     /// Currently staged ordered server-format values.
-    #[must_use]
-    pub fn server_formats(&self) -> &[ServerFormat] {
-        &self.staged
+    pub fn server_formats(&mut self) -> Result<&[ServerFormat]> {
+        self.materialize()?;
+        Ok(&self.state()?.staged)
     }
 
     /// Set, replace, or clear both optional attributes explicitly.
     pub fn set_server_format(&mut self, index: usize, value: ServerFormat) -> Result<bool> {
+        self.materialize()?;
         let slot = self
+            .state_mut()?
             .staged
             .get_mut(index)
             .ok_or_else(|| invalid("server-format index is out of range"))?;
@@ -1098,69 +1172,77 @@ impl Edit {
 
     /// Insert one ordered `serverFormat` leaf before `index`.
     pub fn insert_server_format(&mut self, index: usize, value: ServerFormat) -> Result<()> {
-        if index > self.staged.len() {
+        self.materialize()?;
+        if index > self.state()?.staged.len() {
             return Err(invalid("server-format insertion index is out of range"));
         }
-        if self.staged.len() >= MAX_SERVER_FORMATS {
+        if self.state()?.staged.len() >= MAX_SERVER_FORMATS {
             return Err(invalid("server-format collection exceeds its count limit"));
         }
         let text_limit = caller_attribute_limit(self.source.pivot_package().read_limits());
         validate_text(&value.culture, text_limit)?;
         validate_text(&value.format, text_limit)?;
-        self.staged
+        self.state_mut()?
+            .staged
             .try_reserve(1)
             .map_err(|source| Error::Allocation {
                 resource: "Workbook staged pivot server-format values",
                 source,
             })?;
-        self.staged_sources
+        self.state_mut()?
+            .staged_sources
             .try_reserve(1)
             .map_err(|source| Error::Allocation {
                 resource: "Workbook staged pivot server-format source order",
                 source,
             })?;
-        self.staged.insert(index, value);
-        self.staged_sources.insert(index, None);
+        self.state_mut()?.staged.insert(index, value);
+        self.state_mut()?.staged_sources.insert(index, None);
         Ok(())
     }
 
     /// Append one ordered `serverFormat` leaf.
     pub fn push_server_format(&mut self, value: ServerFormat) -> Result<()> {
-        self.insert_server_format(self.staged.len(), value)
+        self.materialize()?;
+        let index = self.state()?.staged.len();
+        self.insert_server_format(index, value)
     }
 
     /// Remove one ordered `serverFormat` leaf while retaining the required
     /// non-empty collection.
     pub fn remove_server_format(&mut self, index: usize) -> Result<ServerFormat> {
-        if self.staged.len() == 1 {
+        self.materialize()?;
+        if self.state()?.staged.len() == 1 {
             return Err(invalid(
                 "pivotTableServerFormats must retain one server-format child",
             ));
         }
-        if index >= self.staged.len() {
+        if index >= self.state()?.staged.len() {
             return Err(invalid("server-format removal index is out of range"));
         }
-        self.staged_sources.remove(index);
-        Ok(self.staged.remove(index))
+        self.state_mut()?.staged_sources.remove(index);
+        Ok(self.state_mut()?.staged.remove(index))
     }
 
     /// Move one leaf, interpreting `to` in the final ordered sequence.
     pub fn move_server_format(&mut self, from: usize, to: usize) -> Result<()> {
-        if from >= self.staged.len() || to >= self.staged.len() {
+        self.materialize()?;
+        if from >= self.state()?.staged.len() || to >= self.state()?.staged.len() {
             return Err(invalid("server-format move index is out of range"));
         }
         if from != to {
-            let value = self.staged.remove(from);
-            let source = self.staged_sources.remove(from);
-            self.staged.insert(to, value);
-            self.staged_sources.insert(to, source);
+            let value = self.state_mut()?.staged.remove(from);
+            let source = self.state_mut()?.staged_sources.remove(from);
+            self.state_mut()?.staged.insert(to, value);
+            self.state_mut()?.staged_sources.insert(to, source);
         }
         Ok(())
     }
 
     /// Reorder the leaves using a final-position-to-old-position permutation.
     pub fn reorder_server_formats(&mut self, order: &[usize]) -> Result<()> {
-        let len = self.staged.len();
+        self.materialize()?;
+        let len = self.state()?.staged.len();
         validate_permutation(order, len)?;
         let mut values = Vec::new();
         values
@@ -1170,7 +1252,7 @@ impl Edit {
                 source,
             })?;
         for &index in order {
-            values.push(clone_server_format(&self.staged[index])?);
+            values.push(clone_server_format(&self.state()?.staged[index])?);
         }
         let mut sources = Vec::new();
         sources
@@ -1180,16 +1262,19 @@ impl Edit {
                 source,
             })?;
         for &index in order {
-            sources.push(self.staged_sources[index]);
+            sources.push(self.state()?.staged_sources[index]);
         }
-        self.staged = values;
-        self.staged_sources = sources;
+        let state = self.state_mut()?;
+        state.staged = values;
+        state.staged_sources = sources;
         Ok(())
     }
 
     /// Apply explicit `Keep`/`Set`/`Clear` operations to one server format.
     pub fn update_server_format(&mut self, index: usize, edit: Format) -> Result<bool> {
+        self.materialize()?;
         let current = self
+            .state()?
             .staged
             .get(index)
             .cloned()
@@ -1246,13 +1331,25 @@ impl Edit {
     }
 
     /// Discard every staged change.
-    pub fn reset(&mut self) {
-        self.staged.clear();
-        self.staged
-            .extend_from_slice(self.before.server_formats().formats());
-        self.staged_sources.clear();
-        self.staged_sources
-            .extend((0..self.before.server_formats().formats().len()).map(Some));
+    pub fn reset(&mut self) -> Result<()> {
+        self.materialize()?;
+        let state = self.state_mut()?;
+        state.staged.clear();
+        state
+            .staged
+            .try_reserve_exact(state.before.server_formats().formats().len())
+            .map_err(|source| Error::Allocation {
+                resource: "Workbook reset pivot server-format values",
+                source,
+            })?;
+        for value in state.before.server_formats().formats() {
+            state.staged.push(clone_server_format(value)?);
+        }
+        state.staged_sources.clear();
+        state
+            .staged_sources
+            .extend((0..state.before.server_formats().formats().len()).map(Some));
+        Ok(())
     }
 
     /// Validate, reopen, and publish a new immutable package. An unchanged
@@ -1262,11 +1359,16 @@ impl Edit {
     ///
     /// Returns [`Error::Signed`] for a changed edit of a signed workbook and
     /// the rewrite and validation errors of the publication.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
+        self.materialize()?;
+        let state = self
+            .materialized
+            .take()
+            .ok_or_else(|| invalid("PivotTable server-format edit is not materialized"))?;
         let source = self.source;
-        let staged = self.staged;
-        let staged_sources = self.staged_sources;
-        let selection = self.selection;
+        let staged = state.staged;
+        let staged_sources = state.staged_sources;
+        let selection = state.selection;
         let mut candidate = source.pivot_package().clone();
         let mut transaction =
             Transaction::new(&mut candidate, PivotTableSelector::Position(selection))?;

@@ -869,11 +869,57 @@ impl SourceCommit {
 
 /// A staged cached unique-name edit of one PivotCache field of a
 /// [`crate::Package`], started by [`crate::Package::edit_pivot_cache`].
-/// Dropping it discards it.
+/// Construction retains only the workbook owner and bounded semantic
+/// selectors.  The source graph and staged values are materialized by the
+/// first fallible getter or edit operation; a failed materialization remains
+/// retryable.  Dropping it discards it.
 pub struct Edit {
     source: Workbook,
+    cache_selector: PivotCacheSelector,
+    field_selector: OwnedFieldSelector,
+    materialized: Option<MaterializedEdit>,
+}
+
+#[derive(Debug)]
+struct MaterializedEdit {
     before: Snapshot,
     staged: Vec<String>,
+}
+
+#[derive(Debug)]
+enum OwnedFieldSelector {
+    Ordinal(usize),
+    Name(String),
+}
+
+impl OwnedFieldSelector {
+    fn new<'a>(selector: PivotCacheFieldSelector<'a>, limits: SourceLimits) -> Result<Self> {
+        match selector {
+            PivotCacheFieldSelector::Ordinal(ordinal) => Ok(Self::Ordinal(ordinal)),
+            PivotCacheFieldSelector::Name(name) => {
+                let maximum = caller_attribute_limit(limits);
+                if name.len() > maximum {
+                    return Err(Error::limit(LimitKind::AttributeBytes, name.len(), maximum));
+                }
+                let mut owned = String::new();
+                owned
+                    .try_reserve_exact(name.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "cached unique-name field selector",
+                        source,
+                    })?;
+                owned.push_str(name);
+                Ok(Self::Name(owned))
+            },
+        }
+    }
+
+    fn borrowed(&self) -> PivotCacheFieldSelector<'_> {
+        match self {
+            Self::Ordinal(ordinal) => PivotCacheFieldSelector::Ordinal(*ordinal),
+            Self::Name(name) => PivotCacheFieldSelector::Name(name),
+        }
+    }
 }
 
 impl Edit {
@@ -882,7 +928,26 @@ impl Edit {
         cache_selector: impl Into<PivotCacheSelector>,
         field_selector: PivotCacheFieldSelector<'selector>,
     ) -> Result<Self> {
-        let before = Snapshot::load(source.pivot_package(), cache_selector, field_selector)?;
+        let cache_selector = cache_selector.into();
+        let field_selector =
+            OwnedFieldSelector::new(field_selector, source.pivot_package().read_limits())?;
+        Ok(Self {
+            source: source.clone(),
+            cache_selector,
+            field_selector,
+            materialized: None,
+        })
+    }
+
+    fn materialize(&mut self) -> Result<()> {
+        if self.materialized.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::load(
+            self.source.pivot_package(),
+            self.cache_selector,
+            self.field_selector.borrowed(),
+        )?;
         let mut staged = Vec::new();
         staged
             .try_reserve_exact(before.cached_unique_names().names().len())
@@ -900,17 +965,26 @@ impl Edit {
             copy.push_str(&name.name);
             staged.push(copy);
         }
-        Ok(Self {
-            source: source.clone(),
-            before,
-            staged,
-        })
+        self.materialized = Some(MaterializedEdit { before, staged });
+        Ok(())
+    }
+
+    fn state(&self) -> Result<&MaterializedEdit> {
+        self.materialized
+            .as_ref()
+            .ok_or_else(|| invalid("cached unique-name edit is not materialized"))
+    }
+
+    fn state_mut(&mut self) -> Result<&mut MaterializedEdit> {
+        self.materialized
+            .as_mut()
+            .ok_or_else(|| invalid("cached unique-name edit is not materialized"))
     }
 
     /// Typed source state at transaction start.
-    #[must_use]
-    pub fn before(&self) -> &CachedUniqueNames {
-        self.before.cached_unique_names()
+    pub fn before(&mut self) -> Result<&CachedUniqueNames> {
+        self.materialize()?;
+        Ok(self.state()?.before.cached_unique_names())
     }
 
     /// Replace one existing unique name.
@@ -919,9 +993,11 @@ impl Edit {
         item_index: u32,
         value: impl AsRef<str>,
     ) -> Result<bool> {
+        self.materialize()?;
         let value = value.as_ref();
         validate_name_value(value, self.source.pivot_package().read_limits())?;
         let position = self
+            .state()?
             .before
             .cached_unique_names()
             .names()
@@ -929,6 +1005,7 @@ impl Edit {
             .position(|entry| entry.index == item_index)
             .ok_or_else(|| invalid("cached unique-name index is out of range"))?;
         let slot = self
+            .state_mut()?
             .staged
             .get_mut(position)
             .ok_or_else(|| invalid("cached unique-name source order is incomplete"))?;
@@ -954,6 +1031,7 @@ impl Edit {
         _index: usize,
         _value: CachedUniqueName,
     ) -> Result<()> {
+        self.materialize()?;
         Err(invalid(
             "cachedUniqueNames structural insertion requires the unresolved CT_Items bound",
         ))
@@ -962,6 +1040,7 @@ impl Edit {
     /// Structural operations remain unavailable until the item-count anchor
     /// is resolved.
     pub fn remove_cached_unique_name(&mut self, _item_index: u32) -> Result<CachedUniqueName> {
+        self.materialize()?;
         Err(invalid(
             "cachedUniqueNames structural removal requires the unresolved CT_Items bound",
         ))
@@ -970,26 +1049,21 @@ impl Edit {
     /// Structural operations remain unavailable until the item-count anchor
     /// is resolved.
     pub fn set_cached_unique_name_index(&mut self, _old: u32, _new: u32) -> Result<()> {
+        self.materialize()?;
         Err(invalid(
             "cachedUniqueNames index edits require the unresolved CT_Items bound",
         ))
     }
 
-    fn changed(&self) -> bool {
-        self.before
-            .cached_unique_names()
-            .names()
-            .iter()
-            .zip(&self.staged)
-            .any(|(before, after)| before.name != *after)
-    }
-
     /// Discard every staged change.
     pub fn reset(&mut self) {
-        for (slot, before) in self
+        let Some(state) = self.materialized.as_mut() else {
+            return;
+        };
+        for (slot, before) in state
             .staged
             .iter_mut()
-            .zip(self.before.cached_unique_names().names())
+            .zip(state.before.cached_unique_names().names())
         {
             slot.clone_from(&before.name);
         }
@@ -1002,11 +1076,21 @@ impl Edit {
     ///
     /// Returns [`Error::Signed`] for a changed edit of a signed workbook and
     /// the rewrite and validation errors of the publication.
-    pub fn commit(self) -> Result<Commit> {
-        let changed = self.changed();
+    pub fn commit(mut self) -> Result<Commit> {
+        self.materialize()?;
+        let state = self
+            .materialized
+            .take()
+            .ok_or_else(|| invalid("cached unique-name edit is not materialized"))?;
+        let before = state.before;
+        let staged = state.staged;
+        let changed = before
+            .cached_unique_names()
+            .names()
+            .iter()
+            .zip(&staged)
+            .any(|(before, after)| before.name != *after);
         let source = self.source;
-        let before = self.before;
-        let staged = self.staged;
         if !changed {
             let workbook = source.clone();
             let low_patch = SourcePatch::new(before.clone(), before);

@@ -3329,14 +3329,60 @@ pub(crate) fn edit_workbook_with_limits<'a>(
 
 /// A staged scalar edit of one PivotTable's `pivotTableData` owner of a
 /// [`crate::Package`], started by [`crate::Package::edit_pivot_table_data`].
-/// Dropping it discards it.
+/// Construction retains only the workbook owner, bounded selector and
+/// semantic policy.  The source graph and staged cells are materialized by
+/// the first fallible getter or edit operation; failed admission leaves the
+/// edit retryable.  Dropping it discards it.
 pub struct Edit {
     source: Workbook,
+    selector: OwnedPivotTableSelector,
+    limits: Limits,
+    materialized: Option<MaterializedEdit>,
+}
+
+#[derive(Debug)]
+struct MaterializedEdit {
     before: Snapshot,
     staged: Vec<CellState>,
     positions: HashMap<PivotCellAddress, CellPosition>,
     staged_text_ledger: Vec<usize>,
     staged_text_bytes: usize,
+}
+
+#[derive(Debug)]
+enum OwnedPivotTableSelector {
+    Name(String),
+    Position(usize),
+}
+
+impl OwnedPivotTableSelector {
+    fn new<'a>(selector: PivotTableSelector<'a>, limits: SourceLimits) -> Result<Self> {
+        match selector {
+            PivotTableSelector::Position(position) => Ok(Self::Position(position)),
+            PivotTableSelector::Name(name) => {
+                let maximum = MAX_NAME_BYTES.min(caller_attribute_limit(limits));
+                if name.len() > maximum {
+                    return Err(Error::limit(LimitKind::NameBytes, name.len(), maximum));
+                }
+                let mut owned = String::new();
+                owned
+                    .try_reserve_exact(name.len())
+                    .map_err(|source| Error::Allocation {
+                        resource: "pivotTableData selector",
+                        source,
+                    })?;
+                owned.push_str(name);
+                Ok(Self::Name(owned))
+            },
+        }
+    }
+
+    fn borrowed(&self) -> PivotTableSelector<'_> {
+        match self {
+            Self::Name(name) => PivotTableSelector::Name(name),
+            Self::Position(position) => PivotTableSelector::Position(*position),
+        }
+    }
 }
 
 impl Edit {
@@ -3345,14 +3391,32 @@ impl Edit {
         selector: impl Into<PivotTableSelector<'a>>,
         limits: &Limits,
     ) -> Result<Self> {
-        let before = Snapshot::load_with_limits(source.pivot_package(), selector, limits)?;
+        let selector =
+            OwnedPivotTableSelector::new(selector.into(), source.pivot_package().read_limits())?;
+        Ok(Self {
+            source: source.clone(),
+            selector,
+            limits: *limits,
+            materialized: None,
+        })
+    }
+
+    fn materialize(&mut self) -> Result<()> {
+        if self.materialized.is_some() {
+            return Ok(());
+        }
+        let before = Snapshot::load_with_limits(
+            self.source.pivot_package(),
+            self.selector.borrowed(),
+            &self.limits,
+        )?;
         ensure_editable(&before)?;
         let staging_bytes = staging_retained_bytes(before.cells.len())?;
         let retained_with_staging = before
             .retained_bytes
             .checked_add(staging_bytes)
             .ok_or_else(|| invalid("Workbook pivotTableData staged bytes overflow"))?;
-        enforce_retained_limit(retained_with_staging, limits.max_retained_bytes)?;
+        enforce_retained_limit(retained_with_staging, self.limits.max_retained_bytes)?;
         let mut staged = Vec::new();
         staged
             .try_reserve_exact(before.cells.len())
@@ -3372,19 +3436,31 @@ impl Edit {
                 source,
             })?;
         staged_text_ledger.extend(std::iter::repeat_n(0, before.cells.len()));
-        Ok(Self {
-            source: source.clone(),
+        self.materialized = Some(MaterializedEdit {
             before,
             staged,
             positions,
             staged_text_ledger,
             staged_text_bytes: 0,
-        })
+        });
+        Ok(())
     }
 
-    #[must_use]
-    pub fn before(&self) -> &PivotTableDataView {
-        &self.before.value
+    fn state(&self) -> Result<&MaterializedEdit> {
+        self.materialized
+            .as_ref()
+            .ok_or_else(|| invalid("pivotTableData edit is not materialized"))
+    }
+
+    fn state_mut(&mut self) -> Result<&mut MaterializedEdit> {
+        self.materialized
+            .as_mut()
+            .ok_or_else(|| invalid("pivotTableData edit is not materialized"))
+    }
+
+    pub fn before(&mut self) -> Result<&PivotTableDataView> {
+        self.materialize()?;
+        Ok(&self.state()?.before.value)
     }
 
     pub fn set_value(
@@ -3392,15 +3468,18 @@ impl Edit {
         address: impl Into<PivotCellAddress>,
         value: CellChange,
     ) -> Result<bool> {
+        self.materialize()?;
+        let read_limits = self.source.pivot_package().read_limits();
+        let state = self.state_mut()?;
         stage_set_value(
-            &mut self.staged,
-            &self.before,
-            &self.positions,
-            &mut self.staged_text_ledger,
-            &mut self.staged_text_bytes,
+            &mut state.staged,
+            &state.before,
+            &state.positions,
+            &mut state.staged_text_ledger,
+            &mut state.staged_text_bytes,
             address.into(),
             value,
-            self.source.pivot_package().read_limits(),
+            read_limits,
         )
     }
 
@@ -3414,16 +3493,19 @@ impl Edit {
         address: impl Into<PivotCellAddress>,
         value: impl AsRef<str>,
     ) -> Result<bool> {
+        self.materialize()?;
+        let read_limits = self.source.pivot_package().read_limits();
+        let state = self.state_mut()?;
         stage_set_borrowed_value(
-            &mut self.staged,
-            &self.before,
-            &self.positions,
-            &mut self.staged_text_ledger,
-            &mut self.staged_text_bytes,
+            &mut state.staged,
+            &state.before,
+            &state.positions,
+            &mut state.staged_text_ledger,
+            &mut state.staged_text_bytes,
             address.into(),
             PivotCellType::Text,
             value.as_ref(),
-            self.source.pivot_package().read_limits(),
+            read_limits,
         )
     }
 
@@ -3437,16 +3519,19 @@ impl Edit {
         address: impl Into<PivotCellAddress>,
         value: impl AsRef<str>,
     ) -> Result<bool> {
+        self.materialize()?;
+        let read_limits = self.source.pivot_package().read_limits();
+        let state = self.state_mut()?;
         stage_set_borrowed_value(
-            &mut self.staged,
-            &self.before,
-            &self.positions,
-            &mut self.staged_text_ledger,
-            &mut self.staged_text_bytes,
+            &mut state.staged,
+            &state.before,
+            &state.positions,
+            &mut state.staged_text_ledger,
+            &mut state.staged_text_bytes,
             address.into(),
             PivotCellType::Error,
             value.as_ref(),
-            self.source.pivot_package().read_limits(),
+            read_limits,
         )
     }
 
@@ -3459,17 +3544,22 @@ impl Edit {
         address: impl Into<PivotCellAddress>,
         edit: CellExtra,
     ) -> Result<bool> {
+        self.materialize()?;
+        let read_limits = self.source.pivot_package().read_limits();
+        let state = self.state_mut()?;
         stage_set_extra(
-            &mut self.staged,
-            &self.positions,
+            &mut state.staged,
+            &state.positions,
             address.into(),
             edit,
-            self.source.pivot_package().read_limits(),
+            read_limits,
         )
     }
 
     fn changed(&self) -> bool {
-        !states_equal(&self.before, &self.staged)
+        self.materialized
+            .as_ref()
+            .is_some_and(|state| !states_equal(&state.before, &state.staged))
     }
 
     #[cfg(test)]
@@ -3479,11 +3569,15 @@ impl Edit {
 
     /// Discard every staged change.
     pub fn reset(&mut self) {
-        self.staged.clear();
-        self.staged
-            .extend(self.before.cells.iter().map(|record| record.state.clone()));
-        self.staged_text_ledger.fill(0);
-        self.staged_text_bytes = 0;
+        let Some(state) = self.materialized.as_mut() else {
+            return;
+        };
+        state.staged.clear();
+        state
+            .staged
+            .extend(state.before.cells.iter().map(|record| record.state.clone()));
+        state.staged_text_ledger.fill(0);
+        state.staged_text_bytes = 0;
     }
 
     /// Validate and publish the staged cells as a new package. An unchanged
@@ -3493,11 +3587,16 @@ impl Edit {
     ///
     /// Returns [`Error::Signed`] for a changed edit of a signed workbook and
     /// the rewrite and validation errors of the publication.
-    pub fn commit(self) -> Result<Commit> {
-        let changed = self.changed();
+    pub fn commit(mut self) -> Result<Commit> {
+        self.materialize()?;
+        let state = self
+            .materialized
+            .take()
+            .ok_or_else(|| invalid("pivotTableData edit is not materialized"))?;
+        let changed = !states_equal(&state.before, &state.staged);
         let source = self.source;
-        let before = self.before;
-        let staged = self.staged;
+        let before = state.before;
+        let staged = state.staged;
         if !changed {
             let workbook = source.clone();
             let low_patch = SourcePatch::new(before.clone(), before);
