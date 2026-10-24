@@ -89,7 +89,7 @@ struct LazySource {
 #[derive(Clone)]
 enum Working {
     Deferred(Arc<OpcPackage>),
-    Owned(OpcPackage),
+    Owned(Box<OpcPackage>),
 }
 
 impl Working {
@@ -99,7 +99,7 @@ impl Working {
 
     fn into_owned(self) -> OpcPackage {
         match self {
-            Self::Owned(package) => package,
+            Self::Owned(package) => *package,
             Self::Deferred(package) => match Arc::try_unwrap(package) {
                 Ok(package) => package,
                 Err(package) => package.as_ref().clone(),
@@ -126,7 +126,7 @@ impl std::ops::DerefMut for Working {
                 Self::Owned(package) => return package,
                 Self::Deferred(package) => {
                     let package = package.as_ref().clone();
-                    *self = Self::Owned(package);
+                    *self = Self::Owned(Box::new(package));
                 },
             }
         }
@@ -274,14 +274,14 @@ impl Edit {
     }
 
     /// Immutable source root for this transaction.
-    #[must_use]
+    #[must_use = "use the source snapshot or handle its error"]
     pub fn source(&mut self) -> Result<&Snapshot> {
         self.ensure_ready()?;
         self.source_ref()
     }
 
     /// Slides in the transaction's currently staged order.
-    #[must_use]
+    #[must_use = "use the staged slides or handle its error"]
     pub fn slides(&mut self) -> Result<&[Slide]> {
         self.ensure_ready()?;
         Ok(&self.slides)
@@ -290,7 +290,7 @@ impl Edit {
     /// Aggregate charged bytes held by the source snapshot's optional MCE
     /// projection table. Cloned snapshots may report the same shared charge,
     /// so per-owner values are not additive physical-memory measurements.
-    #[must_use]
+    #[must_use = "use the retained byte count or handle its error"]
     pub fn retained_mce_bytes(&mut self) -> Result<usize> {
         self.ensure_ready()?;
         Ok(self.source_ref()?.retained_mce_bytes())
@@ -350,7 +350,7 @@ impl Edit {
             .get(position.get())
             .cloned()
             .ok_or_else(|| invalid("slide insertion lost its checked position"))?;
-        self.working = Working::Owned(working);
+        self.working = Working::Owned(Box::new(working));
         self.slides = published.slides.as_ref().clone();
         self.slide_name_index = Some(published.slide_name_index.as_ref().clone());
         Ok(selected)
