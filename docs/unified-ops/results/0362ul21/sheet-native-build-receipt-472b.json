@@ -105,7 +105,7 @@
       "failure": {
         "exit_code": 101,
         "diagnostics": [
-          "pinned F3 overlay has eight OleFile::open calls missing the required OleFileLimits argument",
+          "pinned F3 overlay has seven OleFile::open call sites missing the required litchi_cfb::OleFileLimits argument; together with the missing fixture this accounts for eight compile errors",
           "include_bytes!(../../../test-data/poi/test-data/spreadsheet/54016.xls) is missing from the candidate source tree"
         ],
         "qualification_run": "not run",
