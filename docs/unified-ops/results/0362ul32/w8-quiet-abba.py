@@ -251,7 +251,7 @@ def reap_zombie(identity: dict[str, object]) -> bool:
     return waited == pid
 
 
-def reap_process_group_zombies(pgid: int) -> None:
+def reap_process_group_zombies(pgid: int, protected_pids: set[int] | frozenset[int] = frozenset()) -> None:
     """Reap adopted zombies in one owned process group, if possible."""
     try:
         candidates = list(Path("/proc").iterdir())
@@ -261,7 +261,8 @@ def reap_process_group_zombies(pgid: int) -> None:
         if not candidate.name.isdigit():
             continue
         identity = proc_identity(int(candidate.name))
-        if identity is not None and identity["pgrp"] == pgid:
+        if (identity is not None and identity["pid"] not in protected_pids
+                and identity["pgrp"] == pgid):
             reap_zombie(identity)
 
 
@@ -398,7 +399,10 @@ def terminate_process_group(process: subprocess.Popen[Any] | None, grace_seconds
     if process is None:
         return None
     def group_exists() -> bool:
-        reap_process_group_zombies(process.pid)
+        # Keep the top-level Popen child for its owner to wait: an external
+        # waitpid would discard its real return code.  Only adopted
+        # descendants in this owned process group are eligible for reaping.
+        reap_process_group_zombies(process.pid, {process.pid})
         try:
             os.killpg(process.pid, 0)
             return True
@@ -471,8 +475,13 @@ def cleanup_owned(
     reported_cgroup_errors: set[str] = set()
 
     def observed_alive() -> list[dict[str, object]]:
+        popen_pids = {
+            process.pid for process in (systemd_process, analyzer_process)
+            if process is not None
+        }
         for identity in seen.values():
-            reap_zombie(identity)
+            if int(identity["pid"]) not in popen_pids:
+                reap_zombie(identity)
         return [identity for identity in seen.values() if alive(identity)] if isinstance(seen, dict) else []
 
     def current_cgroup_pids() -> list[int]:
