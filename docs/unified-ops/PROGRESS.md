@@ -3481,7 +3481,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   unchanged wrappers, process/cap checks and active runner hash. Adoption
   waits until the currently running diagnostic gate exits.
 
-  Cleanups twenty-eight through thirty-three remove eleven merged leaves after
+  Cleanups twenty-eight through thirty-four remove thirteen merged leaves after
   independent payload/ref/ancestry/restore-layout verification. Branches,
   ignored locks, targets and validation evidence remain, including the
   rejected corpus leaf's local cache. The external corpus target's historical
@@ -3516,7 +3516,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   ignored. Strict all-target Clippy passes. Initial sparse-checkout failures
   were resolved by restoring tracked fixtures. The configured read-ahead path
   needs its own matched native ABBA comparison under 0362umc; the exact-policy
-  path performs no weak upgrade. A fresh composed
-  source freeze, full gate, all-68 inventory, actual OfficeCLI corpus replay,
+  path performs no weak upgrade. The completed f6fe native selection records
+  201 chunks, with only those 13 repaired failures; its 83 ignored cases stay
+  explicit. No later step is claimed as run.
+
+  The clean diagnostic checkout now holds frozen source
+  `49c25ef67f62a8bb943e7c6a0bf464e49ae87d07`, with the dependency lock
+  unchanged. The reviewed 0362uva runner is adopted from its separate path.
+  An isolated workspace documentation run is using the dedicated 4.44-GB
+  initial cache, with no other Cargo builds. Full gate completion on this
+  source, all-68 inventory, actual OfficeCLI corpus replay,
   glossary closure and quiet native qualification remain required. Only
   comprehensive redaction audit 22 is deferred. Nothing is pushed.

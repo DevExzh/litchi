@@ -1230,3 +1230,29 @@ the 18,748-byte receipt has SHA-256
 the 3,961-byte restore helper has SHA-256
 `19983979ab7d1780fd09aee8ed4ebc91e2d794bca89d0c312eef76c8986c970a`.
 Recreate the two retained branch worktrees before running `restore.py`.
+
+
+## Thirty-fourth cleanup, 2026-10-24
+
+The merged ODP doctest and OPC retention leaves were removed without force.
+Their retained tips are `21c47647afec3f8c3278f427f8eb2d68beb83735` and
+`42e3f2314c944cb3e5aca00725bd732c4cb537fb`, merged at `26ab39411e` and
+`49c25ef67f`. Both ignored lockfiles remain quarantined: 139,591 bytes each,
+SHA-256 `52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6`.
+The coordinator verified both payloads, modes, refs, ancestry and removed
+paths. External targets, raw validation logs and native artifacts remain
+intact. No source holder was found and no signal was sent.
+
+External directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave34/`.
+The 13,435-byte manifest has SHA-256
+`1491b4cba410e2dcecff97cb809e26bfcb7c38f0c05de7c88bad1d0ec314a61a`.
+The final 21,562-byte `receipt.json` has SHA-256
+`d83420ee926d36df16f81980db5bf88e85127de97b4361ecde2a138c9d6fd50c`.
+Per-leaf receipts are `final-odp-doctests-receipt.json` (21,042 bytes,
+`13f1c98d234ac1b991041ca94ef0d516cd729e05911dc7e87a050d3279aaffe8`)
+and `final-opc-retention-receipt.json` (21,045 bytes,
+`4c637b32091a4a190314c6a6acd744e8647841d69d8fdb5e5dc712fd9ad8e86f`).
+The 4,007-byte restore helper has SHA-256
+`c591173d61b7543a7d7490d60292c39a5a76932b18ffacb08c3565367325f8a6`.
+Recreate the retained branch worktrees before running `restore.py`.

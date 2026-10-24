@@ -71,8 +71,8 @@ reviewed local graph changes. The existing equal-projection mode remains
 unchanged; no native result is accepted through a bypass.
 
 A subsequent native diagnostic selection passes strict all-target/all-feature
-Clippy for all 19 native packages and ODS. Its continuing test chunks expose
-one real retention failure and twelve stale doctest consumers. The OPC source
+Clippy for all 19 native packages and ODS. Its completed 201 test/build chunks
+expose one real retention failure and twelve stale doctest consumers. The OPC source
 artifact retains its read-ahead allocation after the package is dropped
 (`retained_source_artifact_does_not_pin_the_read_ahead_window`: 1,603 bytes
 instead of zero). Four OPC doctests use missing or external-invalid limit
@@ -94,8 +94,23 @@ The external command/source-bound log is
 `.coord/final-acceptance-2026-10-24/composed-tooling-885cdc82af.log`,
 634,360 bytes, SHA-256
 `b54f9fbdc25056c61317af08bde26517fc0d9d7246fda8c3db5d762b55b3f2e8`.
-This is a composed tooling pass; native diagnostics are still running, and
-the new complete source gate remains required.
+This is a composed tooling pass, not the complete source gate.
+
+[The completed native diagnostic receipt](results/0362uma/native-diagnostics.json)
+binds all 201 chunks, the three finalized gate rows and all external
+plan/state/log hashes. Cargo test-result summaries total 21,589 passed,
+13 failed and 83 ignored cases. The only failed chunks are 33, 36 and 83,
+covering the retention check and twelve doctests above. The final target is
+19,005,423,149 bytes; stable post-exit samples show no remaining builders.
+The process exits 1, and all later steps in this selection remain unrun.
+
+Reviewed repairs 0362umb and 0362umc are now composed at
+`49c25ef67f62a8bb943e7c6a0bf464e49ae87d07`. The coordinator advanced the
+clean diagnostic checkout to that source with its lock unchanged, and adopted
+the independently reviewed 0362uva runner from its separate directory.
+The isolated `wsdoc` selection is running with no competing Cargo builds and
+a separate 4,435,344,057-byte initial target. This is a new source freeze;
+the f6fe diagnostic results are not relabeled as its acceptance results.
 
 These are required engineering corrections. No performance regression,
 capability loss or API-contract debt is accepted as an exception. Only the
