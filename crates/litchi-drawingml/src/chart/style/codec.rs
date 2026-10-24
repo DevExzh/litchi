@@ -6,6 +6,7 @@ use super::model::{
     Transform, TransformKind, Variation,
 };
 use crate::chart::Limits;
+use crate::chart::limits::decoded_attribute_value_bytes;
 use crate::{Error, LimitKind, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::XmlVersion;
@@ -636,6 +637,12 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                 stack.push(node);
             },
             Event::Empty(element) => {
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    Error::limit(LimitKind::XmlDepth, usize::MAX, limits.max_style_depth)
+                })?;
+                if depth > limits.max_style_depth {
+                    return limit(LimitKind::XmlDepth, depth, limits.max_style_depth);
+                }
                 nodes = nodes.checked_add(1).ok_or_else(|| {
                     Error::limit(LimitKind::XmlNodes, usize::MAX, limits.max_style_nodes)
                 })?;
@@ -736,9 +743,18 @@ fn make_node(
     for item in element.checked_attributes() {
         let item = item.map_err(xml_error)?;
         let raw_name = item.key.as_ref();
+        let value_length = decoded_attribute_value_bytes(item.value.as_ref(), reader.decoder())
+            .map_err(xml_error)?;
+        if value_length > limits.max_attribute_value_bytes {
+            return limit(
+                LimitKind::AttributeValueBytes,
+                value_length,
+                limits.max_attribute_value_bytes,
+            );
+        }
         preflight_strings(
             *strings,
-            raw_name.len().saturating_add(item.value.len()),
+            raw_name.len().saturating_add(value_length),
             limits.max_style_string_bytes,
         )?;
         let value = item

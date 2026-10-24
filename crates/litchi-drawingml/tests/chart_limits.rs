@@ -186,6 +186,117 @@ fn chartex_limits_bound_series_and_total_points_before_vectors() {
     );
 }
 
+#[test]
+fn empty_nodes_admit_their_actual_depth() {
+    let classic = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart/></c:chartSpace>"#;
+    let mut limits = Limits::DEFAULT;
+    limits.max_xml_depth = 1;
+    assert_limit(
+        reader::read(Cursor::new(classic), &limits).unwrap_err(),
+        LimitKind::XmlDepth,
+    );
+
+    let chartex = br#"<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"><cx:chart/></cx:chartSpace>"#;
+    let mut limits = Limits::DEFAULT;
+    limits.max_chartex_depth = 1;
+    assert_limit(
+        chartex::read(chartex, &limits).unwrap_err(),
+        LimitKind::ChartexXmlDepth,
+    );
+
+    let style_xml = br#"<cs:chartStyle xmlns:cs="http://schemas.microsoft.com/office/drawing/2012/chartStyle"><cs:axisTitle/></cs:chartStyle>"#;
+    let mut limits = Limits::DEFAULT;
+    limits.max_style_depth = 1;
+    assert_limit(
+        style::parse(style_xml, &limits).unwrap_err(),
+        LimitKind::XmlDepth,
+    );
+}
+
+#[test]
+fn escaped_attribute_values_are_admitted_by_decoded_length() {
+    let escaped = |length: usize| {
+        let mut value = "x".repeat(length - 1);
+        value.push_str("&#49;");
+        value
+    };
+
+    let classic_limit = 54;
+    let classic_exact = format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" junk="{}"></c:chartSpace>"#,
+        escaped(classic_limit)
+    );
+    let mut limits = Limits::DEFAULT;
+    limits.max_attribute_value_bytes = classic_limit;
+    let exact = reader::read(Cursor::new(classic_exact.as_bytes()), &limits).unwrap_err();
+    assert!(!matches!(
+        exact,
+        Error::Limit {
+            kind: LimitKind::AttributeValueBytes,
+            ..
+        }
+    ));
+
+    let classic_over = format!(
+        r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" junk="{}"></c:chartSpace>"#,
+        escaped(classic_limit + 1)
+    );
+    assert_limit(
+        reader::read(Cursor::new(classic_over.as_bytes()), &limits).unwrap_err(),
+        LimitKind::AttributeValueBytes,
+    );
+
+    let chartex_limit = 56;
+    let chartex_exact = format!(
+        r#"<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex" junk="{}"></cx:chartSpace>"#,
+        escaped(chartex_limit)
+    );
+    let mut limits = Limits::DEFAULT;
+    limits.max_attribute_value_bytes = chartex_limit;
+    let exact = chartex::read(chartex_exact.as_bytes(), &limits).unwrap_err();
+    assert!(!matches!(
+        exact,
+        Error::Limit {
+            kind: LimitKind::AttributeValueBytes,
+            ..
+        }
+    ));
+
+    let chartex_over = format!(
+        r#"<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex" junk="{}"></cx:chartSpace>"#,
+        escaped(chartex_limit + 1)
+    );
+    assert_limit(
+        chartex::read(chartex_over.as_bytes(), &limits).unwrap_err(),
+        LimitKind::AttributeValueBytes,
+    );
+
+    let style_limit = 59;
+    let style_exact = format!(
+        r#"<cs:colorStyle xmlns:cs="http://schemas.microsoft.com/office/drawing/2012/chartStyle" junk="{}" meth="cycle"><a:srgbClr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" val="FF0000"/></cs:colorStyle>"#,
+        escaped(style_limit)
+    );
+    let mut limits = Limits::DEFAULT;
+    limits.max_attribute_value_bytes = style_limit;
+    let exact = style::parse_color(style_exact.as_bytes(), &limits).unwrap_err();
+    assert!(!matches!(
+        exact,
+        Error::Limit {
+            kind: LimitKind::AttributeValueBytes,
+            ..
+        }
+    ));
+
+    let style_over = format!(
+        r#"<cs:colorStyle xmlns:cs="http://schemas.microsoft.com/office/drawing/2012/chartStyle" junk="{}" meth="cycle"><a:srgbClr xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" val="FF0000"/></cs:colorStyle>"#,
+        escaped(style_limit + 1)
+    );
+    assert_limit(
+        style::parse_color(style_over.as_bytes(), &limits).unwrap_err(),
+        LimitKind::AttributeValueBytes,
+    );
+}
+
 #[derive(Default)]
 struct RecordingSink {
     calls: usize,

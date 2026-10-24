@@ -44,6 +44,7 @@ use crate::chart::authoring::{
     Appearance, Binding, Bins, Kind, Labels, ParentLabels, Parsed, QuartileMethod, Series, Spec,
     Variant, column_name,
 };
+use crate::chart::limits::decoded_attribute_value_bytes;
 use crate::chart::types::{DataLabelPosition, LegendPosition};
 use crate::{Error, Result};
 
@@ -813,7 +814,7 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
             _ => Vec::new(),
         };
         let mut attribute_count = 0usize;
-        // Admit the complete raw attribute budget before decoding values into
+        // Admit the complete attribute budget before decoding values into
         // owned strings. The checked iterator below retains the codec's
         // duplicate/namespace validation behavior.
         for item in element.unchecked_attributes() {
@@ -832,10 +833,12 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                     limits.max_xml_attributes,
                 ));
             }
-            if item.value.len() > limits.max_attribute_value_bytes {
+            let value_length = decoded_attribute_value_bytes(item.value.as_ref(), reader.decoder())
+                .map_err(Error::Xml)?;
+            if value_length > limits.max_attribute_value_bytes {
                 return Err(Error::limit(
                     crate::LimitKind::AttributeValueBytes,
-                    item.value.len(),
+                    value_length,
                     limits.max_attribute_value_bytes,
                 ));
             }
@@ -914,6 +917,20 @@ fn parse_tree(xml: &[u8], limits: Limits) -> Result<Node> {
                         crate::LimitKind::ChartexXmlNodes,
                         nodes,
                         limits.max_chartex_nodes,
+                    ));
+                }
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    Error::limit(
+                        crate::LimitKind::ChartexXmlDepth,
+                        usize::MAX,
+                        limits.max_chartex_depth,
+                    )
+                })?;
+                if depth > limits.max_chartex_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::ChartexXmlDepth,
+                        depth,
+                        limits.max_chartex_depth,
                     ));
                 }
                 let node = open(&reader, &element)?;

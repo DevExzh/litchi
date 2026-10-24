@@ -5,6 +5,7 @@
 //! without changing the public chart model.
 
 use crate::chart::Limits;
+use crate::chart::limits::decoded_attribute_value_bytes;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::{SeenNames, first_wins};
@@ -257,7 +258,7 @@ impl<R: BufRead> ChartXmlReader<R> {
                 .map_err(|error| Error::Xml(error.to_string()))?;
             match event {
                 Event::Start(ref element) => {
-                    validate_attributes(element, self.limits)?;
+                    validate_attributes(element, self.limits, self.decoder())?;
                     let limits = self.limits;
                     count_node_values(&mut self.nodes, limits)?;
                     self.depth = self.depth.checked_add(1).ok_or_else(|| {
@@ -284,9 +285,23 @@ impl<R: BufRead> ChartXmlReader<R> {
                     return Err(Error::Invalid(format!("unterminated {description}")));
                 },
                 Event::Empty(ref element) => {
-                    validate_attributes(element, self.limits)?;
+                    validate_attributes(element, self.limits, self.decoder())?;
                     let limits = self.limits;
                     count_node_values(&mut self.nodes, limits)?;
+                    let depth = self.depth.checked_add(1).ok_or_else(|| {
+                        Error::limit(
+                            crate::LimitKind::XmlDepth,
+                            usize::MAX,
+                            self.limits.max_xml_depth,
+                        )
+                    })?;
+                    if depth > self.limits.max_xml_depth {
+                        return Err(Error::limit(
+                            crate::LimitKind::XmlDepth,
+                            depth,
+                            self.limits.max_xml_depth,
+                        ));
+                    }
                 },
                 Event::DocType(_) => {
                     return Err(Error::Invalid(format!(
@@ -323,7 +338,7 @@ impl<R: BufRead> ChartXmlReader<R> {
 
         match event {
             Event::Start(mut element) => {
-                validate_attributes(&element, self.limits)?;
+                validate_attributes(&element, self.limits, self.decoder())?;
                 let limits = self.limits;
                 count_node_values(&mut self.nodes, limits)?;
                 let is_chart = is_chart_namespace(&namespace, &element);
@@ -406,12 +421,26 @@ impl<R: BufRead> ChartXmlReader<R> {
                 Ok(Event::Start(element))
             },
             Event::Empty(mut element) => {
-                validate_attributes(&element, self.limits)?;
+                validate_attributes(&element, self.limits, self.decoder())?;
                 let limits = self.limits;
                 count_node_values(&mut self.nodes, limits)?;
                 if self.depth == 0 {
                     return Err(Error::Invalid(
                         "chart XML must have one non-empty DrawingML chartSpace root".to_string(),
+                    ));
+                }
+                let depth = self.depth.checked_add(1).ok_or_else(|| {
+                    Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        usize::MAX,
+                        self.limits.max_xml_depth,
+                    )
+                })?;
+                if depth > self.limits.max_xml_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        depth,
+                        self.limits.max_xml_depth,
                     ));
                 }
                 let is_chart = is_chart_namespace(&namespace, &element);
@@ -510,7 +539,7 @@ fn count_node_values(nodes: &mut usize, limits: Limits) -> Result<()> {
     Ok(())
 }
 
-fn validate_attributes(element: &BytesStart<'_>, limits: Limits) -> Result<()> {
+fn validate_attributes(element: &BytesStart<'_>, limits: Limits, decoder: Decoder) -> Result<()> {
     // The chart reader intentionally keeps the legacy first-wins behavior for
     // duplicate attributes.  The checked iterator rejects those duplicates,
     // so use the raw iterator here and only enforce resource budgets.
@@ -531,10 +560,12 @@ fn validate_attributes(element: &BytesStart<'_>, limits: Limits) -> Result<()> {
                 limits.max_xml_attributes,
             ));
         }
-        if attribute.value.len() > limits.max_attribute_value_bytes {
+        let value_length =
+            decoded_attribute_value_bytes(attribute.value.as_ref(), decoder).map_err(Error::Xml)?;
+        if value_length > limits.max_attribute_value_bytes {
             return Err(Error::limit(
                 crate::LimitKind::AttributeValueBytes,
-                attribute.value.len(),
+                value_length,
                 limits.max_attribute_value_bytes,
             ));
         }

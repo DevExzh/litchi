@@ -12,6 +12,88 @@ use crate::chart::data::{NumericData, StringData, TitleText};
 use crate::chart::model::Chart;
 use crate::chart::style::{ColorDocument, Document};
 use crate::{Error, LimitKind, Result};
+use quick_xml::encoding::Decoder;
+
+/// Count the bytes quick-xml will retain for one normalized attribute value.
+///
+/// `Attribute::decoded_and_normalized_value` allocates when an entity or an
+/// XML-whitespace normalization is present.  Calling it merely to discover
+/// the length would therefore allocate before the caller can enforce its
+/// policy.  This scanner follows quick-xml's XML 1.0 normalization rules for
+/// predefined and numeric character references, but retains no decoded
+/// string.  The actual decoder is still called by the owner after this
+/// admission succeeds, preserving its normal error and value semantics.
+pub(crate) fn decoded_attribute_value_bytes(
+    raw: &[u8],
+    decoder: Decoder,
+) -> std::result::Result<usize, String> {
+    let decoded = decoder.decode(raw).map_err(|error| error.to_string())?;
+    let value = decoded.as_ref();
+    let bytes = value.as_bytes();
+    let mut length = 0usize;
+    let mut index = 0usize;
+    while index < bytes.len() {
+        let amount = match bytes[index] {
+            b'&' => {
+                let end = bytes
+                    .get(index + 1..)
+                    .and_then(|rest| rest.iter().position(|byte| *byte == b';'))
+                    .map(|offset| index + 1 + offset)
+                    .ok_or_else(|| "unterminated XML entity reference".to_owned())?;
+                let entity = value
+                    .get(index + 1..end)
+                    .ok_or_else(|| "invalid XML entity reference".to_owned())?;
+                let amount = if let Some(number) = entity.strip_prefix('#') {
+                    character_reference_bytes(number)
+                        .ok_or_else(|| "invalid XML character reference".to_owned())?
+                } else {
+                    quick_xml::escape::resolve_predefined_entity(entity)
+                        .map(str::len)
+                        .ok_or_else(|| "unrecognized XML entity reference".to_owned())?
+                };
+                index = end + 1;
+                amount
+            },
+            b'\t' => {
+                index += 1;
+                1
+            },
+            b'\r' => {
+                index += 1;
+                if bytes.get(index) == Some(&b'\n') {
+                    index += 1;
+                }
+                1
+            },
+            b'\n' => {
+                index += 1;
+                1
+            },
+            _ => {
+                index += 1;
+                1
+            },
+        };
+        length = length
+            .checked_add(amount)
+            .ok_or_else(|| "decoded XML attribute value length overflow".to_owned())?;
+    }
+    Ok(length)
+}
+
+fn character_reference_bytes(number: &str) -> Option<usize> {
+    let (number, radix) = number
+        .strip_prefix('x')
+        .map_or((number, 10), |number| (number, 16));
+    if number.is_empty() || matches!(number.as_bytes().first(), Some(b'+' | b'-')) {
+        return None;
+    }
+    let codepoint = u32::from_str_radix(number, radix).ok()?;
+    if codepoint == 0 {
+        return None;
+    }
+    char::from_u32(codepoint).map(char::len_utf8)
+}
 
 /// Historical maximum accepted by the MCE-backed classic chart reader.
 const MAX_INPUT_BYTES: usize = 256 * 1024 * 1024;
