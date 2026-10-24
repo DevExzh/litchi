@@ -63,6 +63,66 @@ ALIASES = {
 }
 
 
+class InventoryError(ValueError):
+    """The rustdoc surface cannot prove a policy requirement."""
+
+
+def policy_immutable_owners(crate: str, profiles=None) -> frozenset[tuple[str, ...]]:
+    """Return policy-declared immutable owners for one rustdoc crate.
+
+    A package can have more than one glossary profile (for example minimal and
+    full feature sets), so the paths are deliberately de-duplicated here. The
+    inventory's historical name heuristic remains the fast path; these policy
+    paths close the gap for owners whose names are not in ``OWNERS``.
+    """
+    if profiles is None:
+        profiles = gate.checked_policy(gate.read_json(gate.POLICY))
+    return frozenset(
+        tuple(owner.split("::"))
+        for profile in profiles
+        if profile["package"].replace("-", "_") == crate
+        for owner in profile.get("immutable_owners", [])
+    )
+
+
+def policy_owner_paths(surface: Inventory, crate: str,
+                       immutable_owners=None) -> frozenset[tuple[str, ...]]:
+    """Resolve policy owners and their public aliases by nominal identity.
+
+    ``Surface`` retains every public spelling while ``ReturnTypes`` resolves
+    local aliases and reexports to rustdoc's nominal item identity. Matching
+    identities makes an alias count as the same immutable owner without
+    guessing from a spelling or emitting duplicate rows.
+    """
+    if immutable_owners is None:
+        immutable_owners = policy_immutable_owners(crate)
+    owner_paths = {
+        tuple(path.split("::")) if isinstance(path, str) else tuple(path)
+        for path in immutable_owners
+    }
+    return_types = gate.ReturnTypes(surface)
+    identities = set()
+    for path in sorted(owner_paths):
+        kind = surface.exports.get(path)
+        if kind not in gate.TYPE_KINDS:
+            state = "missing" if kind is None else f"has non-nominal kind {kind!r}"
+            raise InventoryError(
+                f"{crate}: policy immutable owner {'::'.join(path)} {state}"
+            )
+        identity = return_types.nominal_identity(path)
+        if identity is None:
+            raise InventoryError(
+                f"{crate}: policy immutable owner {'::'.join(path)} has a "
+                "missing or ambiguous nominal identity"
+            )
+        identities.add(identity)
+    for path, kind in surface.exports.items():
+        if (kind in gate.TYPE_KINDS
+                and return_types.nominal_identity(path) in identities):
+            owner_paths.add(path)
+    return frozenset(owner_paths)
+
+
 class Inventory(gate.Surface):
     """The gate's surface, plus the shortest public path of every item."""
 
@@ -103,9 +163,10 @@ def target_family(method: str) -> str:
     return f"{name}::Edit via Package::edit_{name}() / apply_{name}(&Patch)"
 
 
-def rows(document, crate: str, result_rules=None):
+def rows(document, crate: str, result_rules=None, immutable_owners=None):
     surface = Inventory(document, crate)
     return_types = gate.ReturnTypes(surface)
+    owners = policy_owner_paths(surface, crate, immutable_owners)
     if result_rules is None:
         result_rules = [rule for profile in gate.checked_policy(gate.read_json(gate.POLICY))
                         if profile["package"].replace("-", "_") == crate
@@ -126,7 +187,8 @@ def rows(document, crate: str, result_rules=None):
             methods.setdefault(path[:-1], set()).add(path[-1])
     replay_paths = {}
     for path, kind in surface.exports.items():
-        if (kind == "function" and len(path) > 1 and path[-2] in OWNERS
+        if (kind == "function" and len(path) > 1
+                and (path[-2] in OWNERS or path[:-1] in owners)
                 and (path[-1] == "apply" or path[-1].startswith("apply_"))
                 and "builder" not in path[:-1]):
             item_id = surface.item_ids[path]
@@ -141,7 +203,8 @@ def rows(document, crate: str, result_rules=None):
         if kind == "function":
             receiver = gate.self_receiver(item["inner"]["function"]) or "fn"
             draft = "builder" in path[:-1]
-            if receiver == "&mut self" and owner in OWNERS and not draft:
+            if (receiver == "&mut self"
+                    and (owner in OWNERS or path[:-1] in owners) and not draft):
                 if owner == "MutableDocument":
                     target = "primary Edit (opened) / Builder (fresh)"
                 else:
@@ -217,13 +280,17 @@ def main(argv=None) -> int:
     parser.add_argument("json", nargs="+", type=Path, help="rustdoc JSON, one per crate")
     args = parser.parse_args(argv)
     print("crate\tcategory\tpath\tdetail\ttarget")
-    for path in args.json:
-        document = gate.read_json(path)
-        # Captures may be renamed by profile or source revision. The crate
-        # identity belongs to the rustdoc graph, not the artifact filename.
-        crate = document["index"][str(document["root"])]["name"]
-        for row in rows(document, crate):
-            print(crate.replace("_", "-"), *row, sep="\t")
+    try:
+        for path in args.json:
+            document = gate.read_json(path)
+            # Captures may be renamed by profile or source revision. The crate
+            # identity belongs to the rustdoc graph, not the artifact filename.
+            crate = document["index"][str(document["root"])]["name"]
+            for row in rows(document, crate):
+                print(crate.replace("_", "-"), *row, sep="\t")
+    except InventoryError as error:
+        print(f"inventory error: {error}", file=sys.stderr)
+        return 2
     return 0
 
 
