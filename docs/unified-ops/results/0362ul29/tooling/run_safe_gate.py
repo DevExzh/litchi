@@ -167,6 +167,14 @@ def enable_child_subreaper() -> None:
     _SUBREAPER_ERROR = None
 
 
+def disable_child_subreaper() -> None:
+    """Keep the hermetic Python row from adopting its test grandchildren."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(PR_SET_CHILD_SUBREAPER, 0, 0, 0, 0) != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error))
+
+
 def builders(exclude: set[int], root: Path, target: Path) -> list[dict]:
     rows = []
     info = process_table()
@@ -829,7 +837,8 @@ def run_step(step: dict, root: Path, target: Path, state_dir: Path, source: dict
     pre = preflight(root, target, source, bool(step.get("isolated")))
     started = time.time()
     env = cargo_env(root, target, state_dir)
-    if not step.get("target_guard", True):
+    target_guard = step.get("target_guard", True)
+    if not target_guard:
         env.pop("CARGO_TARGET_DIR", None)
         env.pop("LITCHI_GATE_TARGET_ROOT", None)
     env.update(step.get("env", {}))
@@ -842,10 +851,10 @@ def run_step(step: dict, root: Path, target: Path, state_dir: Path, source: dict
     enable_child_subreaper()
     if step["kind"] == "argv":
         command = step["argv"]
-        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True, pass_fds=tuple(step.get("pass_fds", ())))
+        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True, pass_fds=tuple(step.get("pass_fds", ())), preexec_fn=None if target_guard else disable_child_subreaper)
     else:
         command = ["bash", "-c", step["command"]]
-        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True, pass_fds=tuple(step.get("pass_fds", ())))
+        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True, pass_fds=tuple(step.get("pass_fds", ())), preexec_fn=None if target_guard else disable_child_subreaper)
     ownership = new_ownership(process.pid, root, target, prelaunch, process_table())
     monitor = threading.Thread(target=capture_step_identities, args=(process, ownership), name=f"gate-owner-{process.pid}")
     monitor.start()

@@ -227,6 +227,44 @@ def proc_identity(pid: int) -> dict[str, object] | None:
         return None
 
 
+def proc_state(pid: int) -> str | None:
+    """Return the Linux process state without changing identity evidence."""
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text()
+        close = stat.rfind(")")
+        fields = stat[close + 2 :].split()
+        return fields[0]
+    except (OSError, IndexError, ValueError):
+        return None
+
+
+def reap_zombie(identity: dict[str, object]) -> bool:
+    """Reap an owned orphan adopted by this process when it is a zombie."""
+    pid = int(identity["pid"])
+    current = proc_identity(pid)
+    if current is None or current["starttime"] != identity["starttime"] or proc_state(pid) != "Z":
+        return False
+    try:
+        waited, _status = os.waitpid(pid, os.WNOHANG)
+    except (ChildProcessError, OSError):
+        return False
+    return waited == pid
+
+
+def reap_process_group_zombies(pgid: int) -> None:
+    """Reap adopted zombies in one owned process group, if possible."""
+    try:
+        candidates = list(Path("/proc").iterdir())
+    except OSError:
+        return
+    for candidate in candidates:
+        if not candidate.name.isdigit():
+            continue
+        identity = proc_identity(int(candidate.name))
+        if identity is not None and identity["pgrp"] == pgid:
+            reap_zombie(identity)
+
+
 def alive(identity: dict[str, object]) -> bool:
     current = proc_identity(int(identity["pid"]))
     return current is not None and current["starttime"] == identity["starttime"]
@@ -360,6 +398,7 @@ def terminate_process_group(process: subprocess.Popen[Any] | None, grace_seconds
     if process is None:
         return None
     def group_exists() -> bool:
+        reap_process_group_zombies(process.pid)
         try:
             os.killpg(process.pid, 0)
             return True
@@ -432,6 +471,8 @@ def cleanup_owned(
     reported_cgroup_errors: set[str] = set()
 
     def observed_alive() -> list[dict[str, object]]:
+        for identity in seen.values():
+            reap_zombie(identity)
         return [identity for identity in seen.values() if alive(identity)] if isinstance(seen, dict) else []
 
     def current_cgroup_pids() -> list[int]:
