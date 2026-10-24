@@ -1426,22 +1426,24 @@ fn replacement_semantic_open(
         if semantics.palette_values[index] != 0 {
             return Err(invalid("color scheme replacement slot has multiple values"));
         }
-        let value = match local {
+        match local {
             b"srgbClr" => {
                 let value = attr(element, b"val", decoder, limits)?
                     .ok_or_else(|| invalid("replacement srgbClr lacks val"))?;
-                Color::rgb(&value)?
+                validate_replacement_hex(&value)?;
             },
             b"sysClr" => {
                 let kind = attr(element, b"val", decoder, limits)?
                     .and_then(|value| System::from_token(&value))
                     .ok_or_else(|| invalid("replacement sysClr has an unknown val"))?;
                 let last = attr(element, b"lastClr", decoder, limits)?;
-                Color::system(kind, last.as_deref())?
+                if let Some(last) = last {
+                    validate_replacement_hex(&last)?;
+                }
+                let _ = kind;
             },
             _ => return Ok(()),
-        };
-        let _ = value;
+        }
         semantics.palette_values[index] = 1;
     } else if target == b"fontScheme" {
         if parent.local.as_slice() == b"fontScheme" {
@@ -1498,6 +1500,15 @@ fn replacement_semantic_open(
                 return Err(invalid("replacement typeface exceeds 256 characters"));
             }
         }
+    }
+    Ok(())
+}
+
+fn validate_replacement_hex(value: &str) -> Result<()> {
+    if value.len() != 6 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(invalid(
+            "replacement color must contain six hexadecimal digits",
+        ));
     }
     Ok(())
 }
