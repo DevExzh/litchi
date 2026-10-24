@@ -1188,3 +1188,45 @@ the 4,269-byte receipt has SHA-256
 the 3,978-byte restore helper has SHA-256
 `9fd26f2ba511a08d61666459616b24641f3bd2dafada88c45b5882e6de977a7f`.
 Recreate the two retained branch worktrees before running `restore.py`.
+
+
+## Thirty-second cleanup, 2026-10-24
+
+The merged gate-registration leaf was removed without force. Its retained
+branch tip is `8a795fb7692198fe1ae50e44e4bcafa461479456`, merged at
+`8220f809b928fac57ec6048f28079cc45c421adf`. It had no ignored files. The
+coordinator independently verified the retained ref, ancestry, absent path
+and empty payload container. The active and prepared gate runners remain
+intact; no holder was found or signal sent.
+
+External directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave32/`.
+The 3,208-byte manifest has SHA-256
+`dd48c9878503bb108a17e002a1444459e0ed7f3fca6b0f76b6b82cc577a50eea`;
+the 3,185-byte receipt has SHA-256
+`5c301768005e32314ca47717f0694da656544c0488e59dd6dbfc5d27f1c69288`;
+the 3,961-byte restore helper has SHA-256
+`ec17d03d7e052188affc75ba6b60dc71aacd7617deb49ee0d5bdcb9d3fa30f8b`.
+
+## Thirty-third cleanup, 2026-10-24
+
+The reviewed boundary and corrected corpus-receipt leaves were removed
+without force after their merges. Their retained tips are
+`5a8cfa93c13352808baa825742a17e50f68696a4` and
+`36cf4e3dadfb8e29f78df50d9d07bd00ede10c15`, merged at `b7968d4814` and
+`885cdc82af`. Three ignored records totaling 6,309,808 bytes remain
+quarantined: two Python caches and the corpus lock. The coordinator verified
+every payload's size, hash, mode and directory layout, retained refs,
+ancestry and removed paths. External corpus caches and receipts, both gate
+runners, the earlier oversized-target quarantine and active OPC/ODP repair
+leaves remain intact. No live holder was found and no signal was sent.
+
+External directory:
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/wave33/`.
+The 12,211-byte manifest has SHA-256
+`e9dfafa2dad22e01e421ee46a5a5418b86f765928c2fe036af5fe6592f2bf63b`;
+the 18,748-byte receipt has SHA-256
+`2f2183e0cce371e47ab124d17bd327fd292d19371b6c46252b40f20861c90e73`;
+the 3,961-byte restore helper has SHA-256
+`19983979ab7d1780fd09aee8ed4ebc91e2d794bca89d0c312eef76c8986c970a`.
+Recreate the two retained branch worktrees before running `restore.py`.

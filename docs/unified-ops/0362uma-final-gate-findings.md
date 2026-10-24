@@ -65,10 +65,37 @@ reviewed probe/consumer adapter and historical dependency resolution. Copying
 the candidate's manifests onto f2 would change the baseline build graph and
 could hide a cost introduced by the API work. That proposed overlay is not
 accepted as the official baseline. A separate explicit comparison policy is
-being implemented and reviewed to bind the real original/final projections,
+reviewed under record 0362yh to bind the real original/final projections,
 match external dependencies and build settings, and allow only the exact
 reviewed local graph changes. The existing equal-projection mode remains
 unchanged; no native result is accepted through a bypass.
+
+A subsequent native diagnostic selection passes strict all-target/all-feature
+Clippy for all 19 native packages and ODS. Its continuing test chunks expose
+one real retention failure and twelve stale doctest consumers. The OPC source
+artifact retains its read-ahead allocation after the package is dropped
+(`retained_source_artifact_does_not_pin_the_read_ahead_window`: 1,603 bytes
+instead of zero). Four OPC doctests use missing or external-invalid limit
+paths; eight ODP doctests use the previous projection/error spellings.
+Dedicated repairs preserve the retention assertion and every example.
+
+The completed failing chunks remain at
+`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/remaining-leaves-f6fe430a4d/leaf-tests/`:
+
+| Log | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `0033.log` | 135574 | `9393f3c06794f68ae1028e6c956568f0f088e7e22843e844039fc46377b69f24` |
+| `0036.log` | 123357 | `8c8f6398f51e95481570cc4f3e28214a0aee8c2099fb317f74188af611e815de` |
+| `0083.log` | 150365 | `7c6b3149b81dca4c00724fb3f768fd1f124b58b716e00b948cefbe7c73bb1538` |
+
+After the reviewed boundary and corpus-receipt merges, all 14 final tooling
+modules pass together: 1,413 tests in 45.816 seconds at `885cdc82af`.
+The external command/source-bound log is
+`.coord/final-acceptance-2026-10-24/composed-tooling-885cdc82af.log`,
+634,360 bytes, SHA-256
+`b54f9fbdc25056c61317af08bde26517fc0d9d7246fda8c3db5d762b55b3f2e8`.
+This is a composed tooling pass; native diagnostics are still running, and
+the new complete source gate remains required.
 
 These are required engineering corrections. No performance regression,
 capability loss or API-contract debt is accepted as an exception. Only the

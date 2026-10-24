@@ -3481,7 +3481,7 @@ See [0063](0063-source-pptx-modern-comments.md).
   unchanged wrappers, process/cap checks and active runner hash. Adoption
   waits until the currently running diagnostic gate exits.
 
-  Cleanups twenty-eight through thirty-one remove eight merged leaves after
+  Cleanups twenty-eight through thirty-three remove eleven merged leaves after
   independent payload/ref/ancestry/restore-layout verification. Branches,
   ignored locks, targets and validation evidence remain, including the
   rejected corpus leaf's local cache. The external corpus target's historical
@@ -3497,9 +3497,17 @@ See [0063](0063-source-pptx-modern-comments.md).
   §16.5 that rustdoc gates cover only iWork. Final qualification and inventory
   requirements remain explicit.
 
+  All 14 final tooling modules pass together at `885cdc82af`: 1,413 tests.
+  The boundary's 11 legacy-host edges are not item-24 naming exceptions:
+  0352 explicitly requires renaming rather than deleting the host, and
+  ADR 0028 separately controls its eventual retirement. No supported facade
+  or semantic leaf depends on that unpublished host.
+
   Source integration remains staging. Strict all-target/all-feature checks
-  for the 19 native gate packages and ODS pass on f6fe; the remaining native
-  tests are running while required repairs finish. A fresh composed
+  for the 19 native gate packages and ODS pass on f6fe; ongoing native tests
+  found a real OPC read-ahead retention failure plus four OPC and eight ODP
+  stale doctest consumers. These have dedicated repair leaves; assertions
+  and examples remain required. A fresh composed
   source freeze, full gate, all-68 inventory, actual OfficeCLI corpus replay,
   glossary closure and quiet native qualification remain required. Only
   comprehensive redaction audit 22 is deferred. Nothing is pushed.
