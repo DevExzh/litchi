@@ -33,13 +33,15 @@ changed and signed publication paths still use the same owner checks and
 deferred source-backed write path.
 
 The package archive retains its validated index at open. Resource admission is
-deferred to the first caller-selected operation that needs the count and is
-then cached, so opening does not allocate a file-name census while unified
-`Package::edit` still validates the count before retaining a staged edit. Flat
-ODS edits stage only touched sheets in a sparse `BTreeMap`; the full aligned
-staging vector is materialized only for a changed commit. No eager output
-buffer is created by any of these entries. The follow-up correction is recorded
-in `0362ugca`.
+deferred to the first operation on an `Edit` (or to commit/replay validation)
+and is then cached, so opening, shared handoff, and edit construction do not
+allocate a file-name census. Staging validates both the source and candidate
+before retaining changed edit state; an untouched edit validates at commit
+before publishing even a no-op snapshot. Flat ODS edits stage only touched
+sheets in a sparse `BTreeMap`; the full aligned staging vector is materialized
+only for a changed commit. No eager output buffer is created by any of these
+entries. The resource-admission boundary correction is recorded in
+`0362ugca`.
 
 The focused regressions cover both DDE and sheet metadata construction/drop,
 invalid finite limits and canceled contexts before parsing, exact no-op
@@ -50,7 +52,10 @@ the unchanged owner after dropping an edit. The named construction proofs are
 `no_op_commit_preserves_deferred_source_publication` in each source-backed
 module, plus
 `source_edit_protection_is_lazy_and_shared_across_sequential_edits` in the
-facade tests.
+facade tests. The resource proof
+`resource_admission_stays_cold_until_edit_operation_or_commit` verifies an
+empty cache after open and edit drop, first-operation population, no staged
+state after an over-limit refusal, and first-commit admission.
 
 ## Fixture and sparse-checkout audit
 

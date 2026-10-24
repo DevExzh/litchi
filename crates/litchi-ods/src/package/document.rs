@@ -215,6 +215,11 @@ impl Archive {
         Ok(self.resource_count.get().copied().unwrap_or(count))
     }
 
+    #[cfg(test)]
+    pub(crate) fn resource_count_cached(&self) -> Option<usize> {
+        self.resource_count.get().copied()
+    }
+
     /// Everything a tolerant read repaired while this package was opened.
     ///
     /// An empty report means the package conformed; see
