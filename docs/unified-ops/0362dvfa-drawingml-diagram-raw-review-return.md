@@ -1,8 +1,10 @@
 # 0362dvfa — DrawingML diagram raw review return
 
-- Status: returned to the coordinator after the `e980` repair; focused source
-  validation passed. ABBA measurement, native builds and the final coordinator
-  gate remain intentionally unclaimed.
+- Status: historical return for the `e980` repair; its focused source checks
+  passed, but their root-lock provenance was not captured and they are not
+  final acceptance evidence. The superseding `9786`/52ed packet is recorded in
+  `0362dvfb`. ABBA measurement, native builds and the final coordinator gate
+  remain intentionally unclaimed.
 - This is a docs-only receipt. It makes no source change after
   `e98076db975242b74e0653f06d6094a1e63bb6cb`.
 - Base: `2f7db7ee7fa01893e9099217fc4243687d196f63`.
@@ -11,6 +13,21 @@
   `c4b83818c24063c562403e3e461eb525b8e04001`.
 - `tools/perf-baseline/unified-smartart/Cargo.lock` SHA-256:
   `7e80d6b7256ae348253671373934172c9139cece5b9c7ff14a20d20367e938d9`.
+
+## Superseded qualification status
+
+The source checked here was `e98076db975242b74e0653f06d6094a1e63bb6cb` and
+the historical focused run reported 245 `litchi-drawingml` tests, consumer
+library checks and a standalone harness check. The commands used an external
+target, but no root-lock pre/post receipt or persisted command logs were made;
+the lock was therefore unknown/old (`6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`
+is only the later preserved
+diagnostic lock hash, not evidence that this historical run used it). These
+results remain diagnostic context for the review and must not be treated as
+52ed acceptance. The final source correction at
+`9786dcf45056009768f66579eb1e90faac8145c3` passed the 52ed-locked focused
+packet, with logs and exact lock provenance, in
+`0362dvfb-drawingml-diagram-raw-review-return.md`.
 
 ## Review returns and dispositions
 

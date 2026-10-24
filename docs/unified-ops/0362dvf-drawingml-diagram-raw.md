@@ -1,8 +1,9 @@
 # 0362dvf — DrawingML diagram raw limits
 
 - Status: follow-up grammar, fidelity and authoring-limit repair source and
-  focused capped qualification are complete; ABBA measurement remains
-  coordinator work.
+  historical focused capped qualification are complete; ABBA measurement
+  remains coordinator work. The root-lock-less qualification recorded here is
+  diagnostic only; final 52ed acceptance is recorded in `0362dvfb`.
 - Base: `2f7db7ee7fa01893e9099217fc4243687d196f63`.
 
 ## Policy
@@ -80,21 +81,26 @@ grammar/fidelity findings:
   harness use the new authoring signatures, with custom graphic-frame and
   parser-boundary regressions.
 
-Focused validation for this repair passed with one build job, offline locked
-dependencies, the memory-capped cargo shim, and an external target below
-20 GB: all 245 `litchi-drawingml` unit tests and integration tests passed;
+The historical focused validation for this repair passed with one build job,
+offline locked dependencies, the memory-capped cargo shim, and an external
+target below 20 GB: all 245 `litchi-drawingml` unit tests and integration tests
+passed;
 all-feature library checks passed for `litchi-docx`, `litchi-pptx`, and
 `litchi-ops`; and the standalone unified SmartArt harness passed its locked
 check after its tracked lockfile was refreshed for the current workspace
 dependencies. The earlier 8f49 qualification is not used as evidence for
-these source changes. No new fixtures, binaries, or measurement artifacts are
-included.
+these source changes. This run has no root-lock pre/post receipt or persisted
+logs, so it is not 52ed acceptance evidence. The superseding `9786` source
+correction passed 252 tests and the affected consumer/harness checks under the
+verified 52ed root lock; see `0362dvfb`. No new fixtures, binaries, or
+measurement artifacts are included.
 
 No fixture or performance artifact is added by this source migration. The
-focused qualification used one build job, offline locked dependencies, the
-repository memory-capped cargo shim, and an external target below 20 GB. The
-DrawingML all-feature library/integration run passed 245 unit tests and all
-integration suites. All-feature library checks passed for `litchi-docx`,
+historical focused qualification used one build job, offline locked
+dependencies, the repository memory-capped cargo shim, and an external target
+below 20 GB. The DrawingML all-feature library/integration run passed 245 unit
+tests and all integration suites. All-feature library checks passed for
+`litchi-docx`,
 `litchi-pptx`, and `litchi-ops`; the four changed `litchi` SmartArt examples,
 the DOCX residue benchmark example, and the standalone unified SmartArt
 performance harness also compiled. `rustfmt --check` and `git diff --check`
