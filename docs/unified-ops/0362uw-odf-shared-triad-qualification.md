@@ -46,7 +46,12 @@ name. The manifest member's listing order necessarily changes its
 content/CRC/compressed size; the two physical orders and the corresponding
 manifest entry orders differ. All other member records remain exact.
 The audit proves each manifest lists its own physical order and rejects any
-other content or archive-metadata difference. In the observed pair the native
+other content or archive-metadata difference. For the order-only decision, the
+only permitted member-level differences are the manifest member's XML text,
+content hash/length, compressed length and CRC; raw names, flags, compression
+options, version fields, attributes, extra fields, timestamps, comments,
+permissions, encryption and archive records must remain equal. The runner
+checks these nested identities instead of trusting the summary booleans. In the observed pair the native
 order is `mimetype,content.xml,meta.xml,META-INF/manifest.xml` and the facade
 order is `mimetype,meta.xml,content.xml,META-INF/manifest.xml`. The member
 audit also compares raw names, decompressed bytes and hashes, CRC/compressed
@@ -78,9 +83,11 @@ facade's `snapshot_bytes` is reported as the available retained-snapshot
 observation. `--mode allocator` runs the same real commit, diagnostics and
 publication closures with the paired runner's
 `odf_shared_triad_allocator` system allocator observer. It reports
-operation-scoped allocation/deallocation counters for every phase and marks
-allocator-instrumented elapsed time non-claimable; it is not a timing or
-acceptance result.
+operation-scoped allocation/deallocation counters for every phase. The
+observer is disabled and its counters snapshotted before constructing each
+JSON sample, so receipt serialization is not charged to the operation.
+Allocator-instrumented elapsed time remains non-claimable; it is not a timing
+or acceptance result.
 
 The generic W4b/W5 native runner is not reused for this lane: it intentionally
 rejects unknown historical lanes and hard-codes their workload argv. The
@@ -163,7 +170,14 @@ the historical `15ab` tip, verifies the baseline's exact two-file overlay and
 unchanged production tree, verifies the candidate's clean source tree and
 package/probe/lock identities, rejects overlapping artifacts, captures
 stdout/stderr and live resource samples outside the checkout, and validates
-all four rows before writing a receipt. These commands are a future execution
+all four rows before writing a receipt. Source closure validation rejects
+sparse/skip-worktree/assume-unchanged entries, tracked symlinks and missing
+HEAD paths, and hashes repository plus Cargo configuration inputs. The build
+handoff journal binds the role-specific command, environment, cwd, target and
+binary path/hash, toolchain, exit status, output streams and live resource
+samples; probe execution never trusts a substituted receipt binary. All fresh
+files reject symlink ancestors and exclusive-create existing destinations.
+These commands are a future execution
 recipe; this source-only slice ran no Cargo build, native probe, timing or
 allocator phase.
 

@@ -16,12 +16,11 @@
 #[cfg(odf_shared_triad_allocator)]
 mod allocation {
     use std::alloc::{GlobalAlloc, Layout, System};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    use serde_json::{Value, json};
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
     pub const ENABLED: bool = true;
 
+    static ACTIVE: AtomicBool = AtomicBool::new(false);
     static ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
     static DEALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
     static ALLOCATED_BYTES: AtomicUsize = AtomicUsize::new(0);
@@ -36,7 +35,7 @@ mod allocation {
         unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
             // SAFETY: the caller upholds GlobalAlloc's layout contract.
             let pointer = unsafe { System.alloc(layout) };
-            if !pointer.is_null() {
+            if !pointer.is_null() && ACTIVE.load(Ordering::Relaxed) {
                 ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
                 ALLOCATED_BYTES.fetch_add(layout.size(), Ordering::Relaxed);
             }
@@ -46,14 +45,16 @@ mod allocation {
         unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
             // SAFETY: the caller upholds GlobalAlloc's pointer/layout contract.
             unsafe { System.dealloc(pointer, layout) };
-            DEALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-            DEALLOCATED_BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+            if ACTIVE.load(Ordering::Relaxed) {
+                DEALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+                DEALLOCATED_BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+            }
         }
 
         unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, new_size: usize) -> *mut u8 {
             // SAFETY: the caller upholds GlobalAlloc's pointer/layout contract.
             let replacement = unsafe { System.realloc(pointer, layout, new_size) };
-            if !replacement.is_null() {
+            if !replacement.is_null() && ACTIVE.load(Ordering::Relaxed) {
                 REALLOCATIONS.fetch_add(1, Ordering::Relaxed);
                 if new_size >= layout.size() {
                     ALLOCATED_BYTES.fetch_add(new_size - layout.size(), Ordering::Relaxed);
@@ -69,34 +70,38 @@ mod allocation {
     static GLOBAL: CountingAllocator = CountingAllocator;
 
     pub fn begin() {
+        ACTIVE.store(false, Ordering::Relaxed);
         ALLOCATIONS.store(0, Ordering::Relaxed);
         DEALLOCATIONS.store(0, Ordering::Relaxed);
         ALLOCATED_BYTES.store(0, Ordering::Relaxed);
         DEALLOCATED_BYTES.store(0, Ordering::Relaxed);
         REALLOCATIONS.store(0, Ordering::Relaxed);
+        ACTIVE.store(true, Ordering::Relaxed);
     }
 
-    pub fn end() -> Value {
-        json!({
-            "allocations": ALLOCATIONS.load(Ordering::Relaxed),
-            "deallocations": DEALLOCATIONS.load(Ordering::Relaxed),
-            "allocated_bytes": ALLOCATED_BYTES.load(Ordering::Relaxed),
-            "deallocated_bytes": DEALLOCATED_BYTES.load(Ordering::Relaxed),
-            "reallocations": REALLOCATIONS.load(Ordering::Relaxed),
-        })
+    pub fn end() -> [usize; 5] {
+        // Stop observing before loading the counters.  The caller may now
+        // construct receipt JSON without charging that bookkeeping to the
+        // operation that was measured.
+        ACTIVE.store(false, Ordering::Relaxed);
+        [
+            ALLOCATIONS.load(Ordering::Relaxed),
+            DEALLOCATIONS.load(Ordering::Relaxed),
+            ALLOCATED_BYTES.load(Ordering::Relaxed),
+            DEALLOCATED_BYTES.load(Ordering::Relaxed),
+            REALLOCATIONS.load(Ordering::Relaxed),
+        ]
     }
 }
 
 #[cfg(not(odf_shared_triad_allocator))]
 mod allocation {
-    use serde_json::{Value, json};
-
     pub const ENABLED: bool = false;
 
     pub fn begin() {}
 
-    pub fn end() -> Value {
-        json!(null)
+    pub fn end() -> [usize; 5] {
+        [0; 5]
     }
 }
 
@@ -114,7 +119,7 @@ mod probe {
     use quick_xml::events::Event;
     use serde_json::{Value, json};
     use sha2::{Digest as _, Sha256};
-    use zip::ZipArchive;
+    use zip::{HasZipMetadata, ZipArchive};
 
     const MAX_ITERATIONS: usize = 128;
     const CHANGED_TEXT: &str = "shared-triad qualification";
@@ -145,6 +150,14 @@ mod probe {
         compression: String,
         compressed_bytes: u64,
         crc32: u32,
+        version_needed: u16,
+        flags: u16,
+        compression_options: String,
+        external_attributes: u32,
+        is_utf8: bool,
+        using_data_descriptor: bool,
+        large_file: bool,
+        central_extra_sha256: Option<String>,
         last_modified: Option<String>,
         extra_sha256: Option<String>,
         comment: String,
@@ -154,9 +167,9 @@ mod probe {
         content_text: Option<String>,
     }
 
-    fn archive_members(bytes: &[u8]) -> (String, Vec<ArchiveMember>) {
+    fn archive_members(bytes: &[u8]) -> (Vec<u8>, Vec<ArchiveMember>) {
         let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("ODF ZIP archive");
-        let archive_comment = digest(archive.comment());
+        let archive_comment = archive.comment().to_vec();
         let mut members = Vec::with_capacity(archive.len());
         for index in 0..archive.len() {
             let mut member = archive.by_index(index).expect("ODF ZIP member");
@@ -165,6 +178,15 @@ mod probe {
             let compression = format!("{:?}", member.compression());
             let compressed_bytes = member.compressed_size();
             let crc32 = member.crc32();
+            let metadata = member.get_metadata();
+            let version_needed = metadata.version_needed();
+            let flags = metadata.flags;
+            let compression_options = format!("{:?}", member.options());
+            let external_attributes = metadata.external_attributes;
+            let is_utf8 = metadata.is_utf8;
+            let using_data_descriptor = metadata.using_data_descriptor;
+            let large_file = metadata.large_file;
+            let central_extra_sha256 = metadata.central_extra_field.as_deref().map(digest);
             let last_modified = member.last_modified().map(|value| format!("{value:?}"));
             let extra_sha256 = member.extra_data().map(digest);
             let comment = member.comment().to_owned();
@@ -190,6 +212,14 @@ mod probe {
                 compression,
                 compressed_bytes,
                 crc32,
+                version_needed,
+                flags,
+                compression_options,
+                external_attributes,
+                is_utf8,
+                using_data_descriptor,
+                large_file,
+                central_extra_sha256,
                 last_modified,
                 extra_sha256,
                 comment,
@@ -211,6 +241,14 @@ mod probe {
             "compression": member.compression,
             "compressed_bytes": member.compressed_bytes,
             "crc32": format!("{:08x}", member.crc32),
+            "version_needed": member.version_needed,
+            "flags": member.flags,
+            "compression_options": member.compression_options,
+            "external_attributes": member.external_attributes,
+            "is_utf8": member.is_utf8,
+            "using_data_descriptor": member.using_data_descriptor,
+            "large_file": member.large_file,
+            "central_extra_sha256": member.central_extra_sha256,
             "last_modified": member.last_modified,
             "extra_sha256": member.extra_sha256,
             "comment": member.comment,
@@ -370,6 +408,8 @@ mod probe {
             "ODM archive member count differs"
         );
         assert_eq!(leaf_comment, facade_comment, "ODM archive comments differ");
+        let leaf_comment_sha256 = digest(&leaf_comment);
+        let facade_comment_sha256 = digest(&facade_comment);
 
         let mut member_rows = Vec::with_capacity(leaf_members.len());
         let mut member_order_exact = true;
@@ -413,6 +453,14 @@ mod probe {
                 && leaf_member.name_raw_sha256 == facade_member.name_raw_sha256
                 && leaf_member.compressed_bytes == facade_member.compressed_bytes
                 && leaf_member.crc32 == facade_member.crc32
+                && leaf_member.version_needed == facade_member.version_needed
+                && leaf_member.flags == facade_member.flags
+                && leaf_member.compression_options == facade_member.compression_options
+                && leaf_member.external_attributes == facade_member.external_attributes
+                && leaf_member.is_utf8 == facade_member.is_utf8
+                && leaf_member.using_data_descriptor == facade_member.using_data_descriptor
+                && leaf_member.large_file == facade_member.large_file
+                && leaf_member.central_extra_sha256 == facade_member.central_extra_sha256
                 && leaf_member.last_modified == facade_member.last_modified
                 && leaf_member.extra_sha256 == facade_member.extra_sha256
                 && leaf_member.comment == facade_member.comment
@@ -506,7 +554,9 @@ mod probe {
             "status": "audited",
             "decision": decision,
             "allowed": allowed,
-            "archive_comment_equal": leaf_comment == facade_comment,
+            "archive_comment_equal": true,
+            "leaf_archive_comment_sha256": leaf_comment_sha256,
+            "facade_archive_comment_sha256": facade_comment_sha256,
             "manifest_semantics_equal": manifest_semantics_equal,
             "leaf_manifest_semantics": manifest_semantics_json(&leaf_manifest_semantics),
             "facade_manifest_semantics": manifest_semantics_json(&facade_manifest_semantics),
@@ -617,6 +667,16 @@ mod probe {
         mut commit_plus_diagnostics: impl FnMut(),
         mut publication: impl FnMut(),
     ) -> Value {
+        fn allocation_json(sample: [usize; 5]) -> Value {
+            json!({
+                "allocations": sample[0],
+                "deallocations": sample[1],
+                "allocated_bytes": sample[2],
+                "deallocated_bytes": sample[3],
+                "reallocations": sample[4],
+            })
+        }
+
         fn measure(
             iterations: usize,
             collect_allocations: bool,
@@ -632,7 +692,10 @@ mod probe {
                 allocation::begin();
                 operation();
                 if collect_allocations {
-                    allocation_samples.push(allocation::end());
+                    // Snapshot counters before constructing the JSON value;
+                    // serialization bookkeeping must not be attributed to the
+                    // operation that was just measured.
+                    allocation_samples.push(allocation_json(allocation::end()));
                 }
             }
             (
@@ -949,6 +1012,7 @@ mod probe {
             "deterministic_builder",
             "litchi_odc::Package::new",
             &source,
+            &file_source,
             &changed_output,
             &file_changed_output,
             leaf_title.as_deref() == Some(CHANGED_TEXT)
@@ -1137,6 +1201,7 @@ mod probe {
             "deterministic_builder",
             "litchi_odi::Package::new",
             &source,
+            &file_source,
             &changed_output,
             &file_changed_output,
             leaf_geometry == geometry
@@ -1328,6 +1393,7 @@ mod probe {
             "deterministic_builder",
             "litchi_oth::Builder::paragraph(before)",
             &source,
+            &file_source,
             &changed_output,
             &file_changed_output,
             leaf_text == CHANGED_TEXT && facade_text == CHANGED_TEXT && leaf_text == facade_text,
@@ -1528,6 +1594,7 @@ mod probe {
             "deterministic_builder",
             "litchi_odm::Builder::new + timestamp-free Structure::default_meta_xml",
             &source,
+            &file_source,
             &changed_output,
             &file_changed_output,
             leaf_title.as_deref() == Some(CHANGED_TEXT)
@@ -1547,6 +1614,7 @@ mod probe {
         source_kind: &str,
         source: &str,
         source_bytes: &[u8],
+        facade_source_bytes: &[u8],
         leaf_output: &[u8],
         facade_output: &[u8],
         semantic_equal: bool,
@@ -1556,6 +1624,10 @@ mod probe {
         facade: Value,
         timing: Value,
     ) -> Value {
+        assert_eq!(
+            source_bytes, facade_source_bytes,
+            "{family} native/facade source bytes differ"
+        );
         let changed_output_exact = leaf_output == facade_output;
         assert!(
             semantic_equal,
@@ -1610,6 +1682,8 @@ mod probe {
             "source": source,
             "source_bytes": source_bytes.len(),
             "source_sha256": digest(source_bytes),
+            "facade_source_bytes": facade_source_bytes.len(),
+            "facade_source_sha256": digest(facade_source_bytes),
             "source_pair_exact": true,
             "leaf": leaf,
             "facade": facade,
@@ -1687,6 +1761,7 @@ mod probe {
             serde_json::to_string_pretty(&json!({
                 "schema": "litchi.odf.shared-triad-qualification.v1",
                 "mode": mode,
+                "iterations": iterations,
                 "families": rows,
                 "claim_scope": "correctness only unless mode=timed; no acceptance claim",
             }))

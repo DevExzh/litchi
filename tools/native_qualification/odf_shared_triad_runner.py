@@ -141,6 +141,19 @@ def _ensure_external(path: Path, source: Path, label: str) -> None:
         raise RunnerError(f"{label} must be outside the source worktree: {path}")
 
 
+def _reject_symlink_ancestors(path: Path, label: str) -> None:
+    current = path.parent
+    ancestors = []
+    while True:
+        ancestors.append(current)
+        if current == current.parent:
+            break
+        current = current.parent
+    for ancestor in reversed(ancestors):
+        if ancestor.is_symlink():
+            raise RunnerError(f"{label} ancestor may not be a symlink: {ancestor}")
+
+
 def _directory_size(path: Path) -> int:
     if not path.exists():
         return 0
@@ -399,12 +412,14 @@ def _validate_timing(timing: Mapping[str, Any], mode: str, label: str) -> None:
             raise RunnerError(f"{label}.timing allocator elapsed/enablement contract is invalid")
     elif timing.get("status") != "measured":
         raise RunnerError(f"{label}.timing status must be measured in timed mode")
+    elif timing.get("elapsed_claimable") is not True or timing.get("allocator_enabled") is not False:
+        raise RunnerError(f"{label}.timing normal elapsed/allocator contract is invalid")
     for side_name in ("leaf", "facade"):
         measured = timing.get(side_name)
         if not isinstance(measured, Mapping) or not isinstance(measured.get("iterations"), int):
             raise RunnerError(f"{label}.timing.{side_name} is incomplete")
-        if measured["iterations"] <= 0 or measured["iterations"] > 128:
-            raise RunnerError(f"{label}.timing.{side_name} iteration count is invalid")
+        if measured["iterations"] != 128:
+            raise RunnerError(f"{label}.timing.{side_name} iteration count must be exactly 128")
         phases = measured.get("ns_per_operation")
         if not isinstance(phases, Mapping) or tuple(phases) != PHASES:
             raise RunnerError(f"{label}.timing.{side_name} phases differ")
@@ -440,6 +455,142 @@ def _validate_timing(timing: Mapping[str, Any], mode: str, label: str) -> None:
             raise RunnerError(f"{label}.timing.{side_name} unexpectedly contains allocator samples")
 
 
+_MANIFEST_SEMANTIC_KEYS = {
+    "root_attributes",
+    "ordered_entries",
+    "normalized_entries",
+    "other_events",
+}
+_ARCHIVE_MEMBER_KEYS = {
+    "name",
+    "name_raw_sha256",
+    "content_sha256",
+    "content_bytes",
+    "compression",
+    "compressed_bytes",
+    "crc32",
+    "version_needed",
+    "flags",
+    "compression_options",
+    "external_attributes",
+    "is_utf8",
+    "using_data_descriptor",
+    "large_file",
+    "central_extra_sha256",
+    "last_modified",
+    "extra_sha256",
+    "comment",
+    "unix_mode",
+    "version_made_by",
+    "encrypted",
+    "content_text",
+}
+
+
+def _validate_manifest_semantics(value: Any, label: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping) or set(value) != _MANIFEST_SEMANTIC_KEYS:
+        raise RunnerError(f"{label} has an incomplete normalized manifest schema")
+    root = value["root_attributes"]
+    if not isinstance(root, list) or not root:
+        raise RunnerError(f"{label}.root_attributes must be non-empty")
+
+    def attributes(items: Any, location: str) -> None:
+        if not isinstance(items, list) or not items:
+            raise RunnerError(f"{location} must be a non-empty attribute list")
+        keys: set[str] = set()
+        for pair in items:
+            if not isinstance(pair, list) or len(pair) != 2 or not all(isinstance(item, str) for item in pair):
+                raise RunnerError(f"{location} contains a malformed attribute")
+            if pair[0] in keys:
+                raise RunnerError(f"{location} contains a duplicate attribute")
+            keys.add(pair[0])
+
+    attributes(root, f"{label}.root_attributes")
+    ordered = value["ordered_entries"]
+    normalized = value["normalized_entries"]
+    if not isinstance(ordered, list) or not ordered:
+        raise RunnerError(f"{label}.ordered_entries must be non-empty")
+    if not isinstance(normalized, list) or normalized != sorted(ordered):
+        raise RunnerError(f"{label}.normalized_entries is not the complete sorted entry set")
+    paths: list[str] = []
+    for index, entry in enumerate(ordered):
+        attributes(entry, f"{label}.ordered_entries[{index}]")
+        full_paths = [value for key, value in entry if key == "manifest:full-path"]
+        if len(full_paths) != 1:
+            raise RunnerError(f"{label}.ordered_entries[{index}] has no manifest:full-path")
+        paths.append(full_paths[0])
+    if len(set(paths)) != len(paths):
+        raise RunnerError(f"{label}.ordered_entries contains duplicate manifest:full-path values")
+    other = value["other_events"]
+    if not isinstance(other, list) or any(not isinstance(item, str) for item in other):
+        raise RunnerError(f"{label}.other_events is malformed")
+    return value
+
+
+def _validate_archive_member_identity(value: Any, label: str, expected_name: str) -> None:
+    if not isinstance(value, Mapping) or set(value) != _ARCHIVE_MEMBER_KEYS:
+        raise RunnerError(f"{label} has an incomplete ZIP member identity")
+    if value.get("name") != expected_name or not isinstance(value.get("name"), str):
+        raise RunnerError(f"{label}.name differs from the audited member")
+    for key in ("name_raw_sha256", "content_sha256"):
+        _require_hash(value.get(key), f"{label}.{key}")
+    for key in ("content_bytes", "compressed_bytes", "version_needed", "flags", "external_attributes"):
+        if not isinstance(value.get(key), int) or value[key] < 0:
+            raise RunnerError(f"{label}.{key} is invalid")
+    if not isinstance(value.get("compression"), str) or not isinstance(value.get("compression_options"), str):
+        raise RunnerError(f"{label} compression identity is incomplete")
+    if not isinstance(value.get("crc32"), str) or not re.fullmatch(r"[0-9a-f]{8}", value["crc32"]):
+        raise RunnerError(f"{label}.crc32 is invalid")
+    if not isinstance(value.get("comment"), str):
+        raise RunnerError(f"{label}.comment is invalid")
+    if value.get("last_modified") is not None and not isinstance(value.get("last_modified"), str):
+        raise RunnerError(f"{label}.last_modified is invalid")
+    for key in ("extra_sha256", "central_extra_sha256"):
+        if value.get(key) is not None:
+            _require_hash(value.get(key), f"{label}.{key}")
+    if value.get("unix_mode") is not None and not isinstance(value.get("unix_mode"), int):
+        raise RunnerError(f"{label}.unix_mode is invalid")
+    version = value.get("version_made_by")
+    if not isinstance(version, list) or len(version) != 2 or any(not isinstance(item, int) or item < 0 for item in version):
+        raise RunnerError(f"{label}.version_made_by is invalid")
+    for key in ("is_utf8", "using_data_descriptor", "large_file", "encrypted"):
+        if not isinstance(value.get(key), bool):
+            raise RunnerError(f"{label}.{key} is invalid")
+    if value.get("content_text") is not None and not isinstance(value.get("content_text"), str):
+        raise RunnerError(f"{label}.content_text is invalid")
+
+
+def _validate_archive_member_pair(
+    leaf: Mapping[str, Any],
+    facade: Mapping[str, Any],
+    *,
+    name: str,
+    decision: str,
+    label: str,
+) -> None:
+    differences = {key for key in _ARCHIVE_MEMBER_KEYS if leaf[key] != facade[key]}
+    if decision == "byte_exact":
+        allowed: set[str] = set()
+    elif name == "META-INF/manifest.xml":
+        # Reordering manifest entries necessarily changes the XML payload and
+        # its derived CRC/size fields.  Every other ZIP identity must remain
+        # exactly equal; this is the only admitted order-only delta.
+        allowed = {
+            "content_sha256",
+            "content_bytes",
+            "compressed_bytes",
+            "crc32",
+            "content_text",
+        }
+        if not {"content_sha256", "content_text"}.issubset(differences):
+            raise RunnerError(f"{label} manifest payload difference is not proven")
+    else:
+        allowed = set()
+    unexpected = differences - allowed
+    if unexpected:
+        raise RunnerError(f"{label} ZIP identity differs in unadmitted fields: {sorted(unexpected)}")
+
+
 def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
     if audit.get("status") != "audited" or audit.get("allowed") is not True:
         raise RunnerError(f"{label}.archive_audit is not an allowed audit")
@@ -457,6 +608,10 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
         "non_manifest_archive_record_exact",
     ):
         _require_bool(audit, key, True, f"{label}.archive_audit")
+    for key in ("leaf_archive_comment_sha256", "facade_archive_comment_sha256"):
+        _require_hash(audit.get(key), f"{label}.archive_audit.{key}")
+    if audit["leaf_archive_comment_sha256"] != audit["facade_archive_comment_sha256"]:
+        raise RunnerError(f"{label}.archive_audit archive comments differ")
     _require_bool(
         audit,
         "non_meta_stored_metadata_exact",
@@ -470,12 +625,23 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
         f"{label}.archive_audit",
     )
     _require_bool(audit, "manifest_semantics_equal", True, f"{label}.archive_audit")
-    leaf_semantics = audit.get("leaf_manifest_semantics")
-    facade_semantics = audit.get("facade_manifest_semantics")
-    if not isinstance(leaf_semantics, Mapping) or not isinstance(facade_semantics, Mapping):
-        raise RunnerError(f"{label}.archive_audit normalized manifest semantics are missing")
-    if leaf_semantics != facade_semantics:
-        raise RunnerError(f"{label}.archive_audit normalized manifest semantics differ")
+    leaf_semantics = _validate_manifest_semantics(
+        audit.get("leaf_manifest_semantics"), f"{label}.archive_audit.leaf_manifest_semantics"
+    )
+    facade_semantics = _validate_manifest_semantics(
+        audit.get("facade_manifest_semantics"), f"{label}.archive_audit.facade_manifest_semantics"
+    )
+    for key in ("root_attributes", "normalized_entries", "other_events"):
+        if leaf_semantics[key] != facade_semantics[key]:
+            raise RunnerError(f"{label}.archive_audit manifest {key} differs")
+    ordered_equal = leaf_semantics["ordered_entries"] == facade_semantics["ordered_entries"]
+    for key, expected in (
+        ("manifest_listing_tracks_order", decision != "archive_member_order_and_manifest_listing"),
+        ("leaf_manifest_tracks_order", True),
+        ("facade_manifest_tracks_order", True),
+        ("archive_member_order_and_manifest_listing", decision == "archive_member_order_and_manifest_listing"),
+    ):
+        _require_bool(audit, key, expected, f"{label}.archive_audit")
     _require_bool(audit, "member_order_exact", decision != "archive_member_order_and_manifest_listing", f"{label}.archive_audit")
     _require_bool(audit, "non_meta_content_exact", decision != "archive_member_order_and_manifest_listing", f"{label}.archive_audit")
     differences = audit.get("content_differences")
@@ -486,13 +652,10 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
     if differences != expected_differences:
         raise RunnerError(f"{label}.archive_audit content difference decision is inconsistent")
     if decision == "archive_member_order_and_manifest_listing":
-        for key, expected in (
-            ("manifest_listing_tracks_order", False),
-            ("leaf_manifest_tracks_order", True),
-            ("facade_manifest_tracks_order", True),
-            ("archive_member_order_and_manifest_listing", True),
-        ):
-            _require_bool(audit, key, expected, f"{label}.archive_audit")
+        if ordered_equal:
+            raise RunnerError(f"{label}.archive_audit order-only manifest entries did not differ")
+    elif not ordered_equal:
+        raise RunnerError(f"{label}.archive_audit byte-exact manifest entries differ")
     if audit.get("leaf_member_count") != audit.get("facade_member_count"):
         raise RunnerError(f"{label}.archive_audit member counts differ")
     leaf_order = audit.get("leaf_order")
@@ -524,6 +687,17 @@ def _validate_archive_audit(audit: Mapping[str, Any], label: str) -> None:
             raise RunnerError(f"{label}.archive_audit member row is malformed")
         if item.get("name") != item.get("facade_name"):
             raise RunnerError(f"{label}.archive_audit member order/name differs")
+        if not isinstance(item.get("name"), str):
+            raise RunnerError(f"{label}.archive_audit member name is malformed")
+        _validate_archive_member_identity(item.get("leaf"), f"{label}.archive_audit.member.leaf", item["name"])
+        _validate_archive_member_identity(item.get("facade"), f"{label}.archive_audit.member.facade", item["name"])
+        _validate_archive_member_pair(
+            item["leaf"],
+            item["facade"],
+            name=item["name"],
+            decision=decision,
+            label=f"{label}.archive_audit.member[{item['name']}]",
+        )
         expected_content = {
             "byte_exact": True,
             "archive_member_order_and_manifest_listing": item["name"] != "META-INF/manifest.xml",
@@ -553,6 +727,11 @@ def validate_probe_output(
         raise RunnerError("probe output mode is invalid")
     if expected_mode is not None and mode != expected_mode:
         raise RunnerError(f"probe output mode {mode!r} differs from requested mode {expected_mode!r}")
+    iterations = payload.get("iterations")
+    if not isinstance(iterations, int) or not 1 <= iterations <= 128:
+        raise RunnerError("probe output iterations must be an integer in 1..=128")
+    if mode in ("timed", "allocator") and iterations != 128:
+        raise RunnerError("timed and allocator probe outputs must use exactly 128 iterations")
     if payload.get("claim_scope") != CLAIM_SCOPE:
         raise RunnerError("probe output claim scope is not non-acceptance")
     rows = payload.get("families")
@@ -573,6 +752,15 @@ def validate_probe_output(
         _require_hash(row.get("source_sha256"), f"{family}.source_sha256")
         if not isinstance(row.get("source_bytes"), int) or row["source_bytes"] <= 0:
             raise RunnerError(f"{family}.source_bytes is invalid")
+        _require_hash(row.get("facade_source_sha256"), f"{family}.facade_source_sha256")
+        if not isinstance(row.get("facade_source_bytes"), int) or row["facade_source_bytes"] <= 0:
+            raise RunnerError(f"{family}.facade_source_bytes is invalid")
+        source_pair_exact = (
+            row["source_sha256"] == row["facade_source_sha256"]
+            and row["source_bytes"] == row["facade_source_bytes"]
+        )
+        if row.get("source_pair_exact") is not source_pair_exact:
+            raise RunnerError(f"{family} source_pair_exact is not bound to both source identities")
         for side_name in ("leaf", "facade"):
             side = row.get(side_name)
             if not isinstance(side, Mapping):
@@ -587,12 +775,22 @@ def validate_probe_output(
         if not isinstance(paired, Mapping):
             raise RunnerError(f"{family}.paired is missing")
         _require_bool(paired, "semantic_equality", True, f"{family}.paired")
-        if family != "odm":
-            _require_bool(paired, "changed_output_exact", True, f"{family}.paired")
-        elif not isinstance(paired.get("changed_output_exact"), bool):
-            raise RunnerError("ODM paired.changed_output_exact must be a boolean")
+        leaf_changed = row["leaf"]["changed"]
+        facade_changed = row["facade"]["changed"]
         _require_hash(paired.get("changed_output_sha256"), f"{family}.paired.changed_output_sha256")
         _require_hash(paired.get("facade_changed_output_sha256"), f"{family}.paired.facade_changed_output_sha256")
+        if paired["changed_output_sha256"] != leaf_changed["output_sha256"]:
+            raise RunnerError(f"{family}.paired.changed_output_sha256 is not the leaf changed output")
+        if paired["facade_changed_output_sha256"] != facade_changed["output_sha256"]:
+            raise RunnerError(f"{family}.paired.facade_changed_output_sha256 is not the facade changed output")
+        changed_output_exact = (
+            leaf_changed["output_sha256"] == facade_changed["output_sha256"]
+            and leaf_changed["output_bytes"] == facade_changed["output_bytes"]
+        )
+        if paired.get("changed_output_exact") is not changed_output_exact:
+            raise RunnerError(f"{family}.paired.changed_output_exact is not bound to output identities")
+        if family != "odm" and not changed_output_exact:
+            raise RunnerError(f"{family} changed outputs are not byte-identical")
         if family == "odm":
             audit = paired.get("archive_audit")
             if not isinstance(audit, Mapping):
@@ -605,12 +803,25 @@ def validate_probe_output(
 
 def _fresh_external(path: Path, source: Path, label: str) -> None:
     _ensure_external(path, source, label)
+    _reject_symlink_ancestors(path, label)
     if path.exists():
         if path.is_symlink() or (path.is_dir() and any(path.iterdir())):
             raise RunnerError(f"{label} must be absent or empty: {path}")
         if path.is_file():
             raise RunnerError(f"{label} must be a fresh directory: {path}")
     path.mkdir(parents=True, exist_ok=True)
+
+
+def _write_new_text(path: Path, text: str, source: Path, label: str) -> None:
+    _ensure_external(path, source, label)
+    _reject_symlink_ancestors(path, label)
+    if path.is_symlink() or path.exists():
+        raise RunnerError(f"{label} already exists: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("x", encoding="utf-8") as stream:
+        stream.write(text)
+        stream.flush()
+        os.fsync(stream.fileno())
 
 
 def _assert_disjoint(paths: Sequence[tuple[Path, str]]) -> None:
@@ -662,6 +873,7 @@ def run_probe(
     _fresh_external(tmpdir, root, "temporary directory")
     for path, label in ((output_path, "probe output"), (stderr_path, "probe stderr")):
         _ensure_external(path, root, label)
+        _reject_symlink_ancestors(path, label)
         if path.exists():
             raise RunnerError(f"{label} already exists: {path}")
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -684,8 +896,14 @@ def run_probe(
         check=False,
         preexec_fn=_limited_child,
     )
-    stderr_path.write_bytes(completed.stderr)
-    output_path.write_bytes(completed.stdout)
+    with stderr_path.open("xb") as stream:
+        stream.write(completed.stderr)
+        stream.flush()
+        os.fsync(stream.fileno())
+    with output_path.open("xb") as stream:
+        stream.write(completed.stdout)
+        stream.flush()
+        os.fsync(stream.fileno())
     if completed.returncode:
         raise RunnerError(f"probe exited {completed.returncode}; see {stderr_path}")
     if len(completed.stdout) == 0 or len(completed.stdout) > MAX_OUTPUT_BYTES:
@@ -867,8 +1085,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         receipt = make_receipt(manifest_bytes, source, run)
         validate_receipt_bindings(manifest, receipt, manifest_bytes)
         _ensure_external(receipt_path, Path(source["root"]), "receipt")
-        receipt_path.parent.mkdir(parents=True, exist_ok=True)
-        receipt_path.write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+        _write_new_text(receipt_path, json.dumps(receipt, indent=2) + "\n", Path(source["root"]), "receipt")
         return 0
     except (RunnerError, OSError, json.JSONDecodeError) as error:
         print(f"error: {error}", file=sys.stderr)

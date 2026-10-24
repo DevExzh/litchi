@@ -125,6 +125,19 @@ def _assert_disjoint(paths: Mapping[str, Path]) -> None:
                 )
 
 
+def _reject_symlink_ancestors(path: Path, label: str) -> None:
+    current = path.parent
+    ancestors = []
+    while True:
+        ancestors.append(current)
+        if current == current.parent:
+            break
+        current = current.parent
+    for ancestor in reversed(ancestors):
+        if ancestor.is_symlink():
+            raise RunnerError(f"{label} ancestor may not be a symlink: {ancestor}")
+
+
 def _directory_size(path: Path) -> int:
     return generic._directory_size(path)
 
@@ -236,7 +249,106 @@ def _production_tree(root: Path) -> str:
     return _sha256_bytes(_git(root, "ls-tree", "-r", "--full-tree", "HEAD").encode())
 
 
+def _cargo_config_identity(root: Path) -> dict[str, Any]:
+    try:
+        config_paths = list(generic._cargo_config_files(root))
+    except generic.RunnerError as error:
+        raise RunnerError(str(error)) from error
+    home_cargo = Path.home() / ".cargo"
+    for name in ("config.toml", "config"):
+        candidate = home_cargo / name
+        if candidate.exists() or candidate.is_symlink():
+            config_paths.append(candidate)
+    unique_paths = []
+    for path in config_paths:
+        path = _resolve(path)
+        if path not in unique_paths:
+            unique_paths.append(path)
+    files = []
+    digest = hashlib.sha256()
+    for path in sorted(unique_paths):
+        file_hash, file_bytes = _sha256_file(path)
+        digest.update(str(path).encode())
+        digest.update(b"\0")
+        digest.update(file_hash.encode())
+        digest.update(b"\0")
+        digest.update(str(file_bytes).encode())
+        files.append({"path": str(path), "sha256": file_hash, "bytes": file_bytes})
+    return {"sha256": digest.hexdigest(), "files": files}
+
+
+def _tracked_closure(root: Path) -> dict[str, Any]:
+    sparse_config = subprocess.run(
+        ["git", "-C", str(root), "config", "--bool", "core.sparseCheckout"],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if sparse_config.returncode not in (0, 1) or sparse_config.stderr.strip():
+        raise RunnerError(f"cannot inspect sparse-checkout configuration: {sparse_config.stderr.strip()}")
+    sparse = sparse_config.stdout.strip().lower()
+    if sparse == "true":
+        raise RunnerError(f"sparse-checkout is enabled for source endpoint: {root}")
+    head_records = _git(root, "ls-tree", "-r", "-z", "--full-tree", "HEAD").split("\0")
+    head_paths: set[str] = set()
+    for record in head_records:
+        if not record:
+            continue
+        header, separator, relative = record.partition("\t")
+        if not separator:
+            raise RunnerError(f"malformed HEAD tree record: {record!r}")
+        mode = header.split(" ", 1)[0]
+        if mode not in {"100644", "100755"}:
+            raise RunnerError(f"source closure contains unsupported tracked mode {mode}: {relative}")
+        head_paths.add(relative)
+    status_records = _git(root, "ls-files", "-v", "-z").split("\0")
+    tracked_records = _git(root, "ls-files", "--stage", "-z").split("\0")
+    files = []
+    digest = hashlib.sha256()
+    seen = set()
+    for record in status_records:
+        if not record:
+            continue
+        marker, separator, relative = record.partition(" ")
+        if not separator or marker != "H":
+            raise RunnerError(f"source endpoint has sparse/skip-worktree/assume-unchanged entry: {record!r}")
+        seen.add(relative)
+    for record in tracked_records:
+        if not record:
+            continue
+        head, separator, relative = record.partition("\t")
+        if not separator:
+            raise RunnerError(f"malformed tracked-file record: {record!r}")
+        mode = head.split(" ", 1)[0]
+        if mode not in {"100644", "100755"}:
+            raise RunnerError(f"source closure contains unsupported tracked mode {mode}: {relative}")
+        if relative not in seen:
+            raise RunnerError(f"tracked file is missing from full worktree status: {relative}")
+        path = _resolve(relative, base=root)
+        if path.is_symlink() or not path.is_file():
+            raise RunnerError(f"tracked source file is absent or symlinked: {path}")
+        file_hash, file_bytes = _sha256_file(path)
+        digest.update(relative.encode())
+        digest.update(b"\0")
+        digest.update(mode.encode())
+        digest.update(b"\0")
+        digest.update(file_hash.encode())
+        digest.update(b"\0")
+        digest.update(str(file_bytes).encode())
+        files.append({"path": relative, "mode": mode, "sha256": file_hash, "bytes": file_bytes})
+    if seen != head_paths:
+        missing = sorted(head_paths - seen)
+        extra = sorted(seen - head_paths)
+        raise RunnerError(f"source worktree is not a materialized full HEAD tree: missing={missing}, extra={extra}")
+    if len(files) != len(seen):
+        raise RunnerError("source worktree tracked-file closure is incomplete")
+    return {"sha256": digest.hexdigest(), "file_count": len(files)}
+
+
 def _source_state(root: Path) -> dict[str, Any]:
+    closure = _tracked_closure(root)
+    configs = _cargo_config_identity(root)
     status = _git(root, "status", "--porcelain=v1", "--untracked-files=all")
     diff = _git(root, "diff", "HEAD", "--no-ext-diff", "--binary")
     head = _git(root, "rev-parse", "HEAD").strip()
@@ -249,8 +361,12 @@ def _source_state(root: Path) -> dict[str, Any]:
         "status": status,
         "status_sha256": _sha256_bytes(status.encode()),
         "diff_sha256": _sha256_bytes(diff.encode()),
-        "source_tree_sha256": _sha256_bytes((tree + "\0" + status + "\0" + diff).encode()),
+        "source_tree_sha256": _sha256_bytes(
+            (tree + "\0" + status + "\0" + diff + "\0" + closure["sha256"] + "\0" + configs["sha256"]).encode()
+        ),
         "status_paths": _status_paths(status),
+        "tracked_closure": closure,
+        "cargo_configs": configs,
     }
 
 
@@ -426,6 +542,8 @@ def _endpoint_identity(
         "status_sha256": state["status_sha256"],
         "diff_sha256": state["diff_sha256"],
         "status_paths": state["status_paths"],
+        "tracked_closure": state["tracked_closure"],
+        "cargo_configs": state["cargo_configs"],
         "clean": clean,
         "package_manifest": package,
         "probe": probe,
@@ -561,6 +679,7 @@ class PairedRunner:
     def _fresh_dir(self, path: Path, label: str) -> None:
         if _under(path, self.baseline_root) or _under(path, self.candidate_root):
             raise RunnerError(f"{label} must be outside source worktrees: {path}")
+        _reject_symlink_ancestors(path, label)
         if path.exists():
             if path.is_symlink() or not path.is_dir() or any(path.iterdir()):
                 raise RunnerError(f"{label} must be absent or empty: {path}")
@@ -571,9 +690,8 @@ class PairedRunner:
             raise RunnerError(f"{label} must be outside source worktrees: {path}")
         if path.is_symlink() or path.exists():
             raise RunnerError(f"{label} must not overwrite an existing path: {path}")
+        _reject_symlink_ancestors(path, label)
         path.parent.mkdir(parents=True, exist_ok=True)
-        if path.parent.is_symlink():
-            raise RunnerError(f"{label} parent may not be a symlink: {path.parent}")
 
     def _target_path(self, role: str, variant: str) -> Path:
         return self.target_root / f"{role}-{variant}"
@@ -582,11 +700,33 @@ class PairedRunner:
         return self.tmp_root / f"{role}-{variant}"
 
     def _environment(self, role: str, variant: str, target: Path, tmpdir: Path) -> dict[str, str]:
-        env = os.environ.copy()
-        env.pop("CARGO_HOME", None)
-        env.pop("CARGO_CONFIG", None)
-        env.pop("RUSTFLAGS", None)
-        env.pop("CARGO_ENCODED_RUSTFLAGS", None)
+        allowed = {
+            "AR",
+            "CC",
+            "CFLAGS",
+            "CXX",
+            "CXXFLAGS",
+            "HOME",
+            "LANG",
+            "LD_LIBRARY_PATH",
+            "LOGNAME",
+            "MAKEFLAGS",
+            "PATH",
+            "PKG_CONFIG_PATH",
+            "PKG_CONFIG_SYSROOT_DIR",
+            "RANLIB",
+            "RUSTUP_HOME",
+            "RUSTUP_TOOLCHAIN",
+            "SOURCE_DATE_EPOCH",
+            "TEMP",
+            "TMP",
+            "USER",
+        }
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if key in allowed or key.startswith("LC_")
+        }
         env.update(
             {
                 "CARGO_TARGET_DIR": str(target),
@@ -604,21 +744,10 @@ class PairedRunner:
 
     @staticmethod
     def _recorded_environment(env: Mapping[str, str]) -> dict[str, str]:
-        return {
-            key: env[key]
-            for key in (
-                "PATH",
-                "CARGO_TARGET_DIR",
-                "CARGO_BUILD_JOBS",
-                "CARGO_INCREMENTAL",
-                "TMPDIR",
-                "LITCHI_MEM_MAX",
-                "RUSTFLAGS",
-                "LITCHI_QUALIFICATION_ROLE",
-                "LITCHI_QUALIFICATION_VARIANT",
-            )
-            if key in env
-        }
+        # ``_environment`` deliberately constructs a minimal child
+        # environment.  Record every value passed to the child so a receipt
+        # cannot be replayed under a different linker, toolchain or locale.
+        return {key: env[key] for key in sorted(env)}
 
     def _preexec(self) -> Any:
         cpu = self.cpu
@@ -768,6 +897,8 @@ class PairedRunner:
             "source_tree_sha256",
             "status_sha256",
             "diff_sha256",
+            "tracked_closure",
+            "cargo_configs",
             "probe",
             "lock",
             "features",
@@ -778,16 +909,9 @@ class PairedRunner:
                 raise RunnerError(f"{role} endpoint identity changed: {key}")
         return actual
 
-    def _build(self, role: str, variant: str, toolchain: Mapping[str, str]) -> dict[str, Any]:
-        root = self.baseline_root if role == "baseline" else self.candidate_root
-        target = self._target_path(role, variant)
-        tmpdir = self._tmp_path(role, variant)
-        self._fresh_dir(target, f"{role}/{variant} target")
-        self._fresh_dir(tmpdir, f"{role}/{variant} tmpdir")
-        endpoint = self._endpoint(role)
-        env = self._environment(role, variant, target, tmpdir)
-        binary = target / "debug" / "examples" / "odf_shared_triad_qualification"
-        command = [
+    @staticmethod
+    def _build_command() -> list[str]:
+        return [
             "cargo",
             "build",
             "--offline",
@@ -799,6 +923,20 @@ class PairedRunner:
             "--features",
             ",".join(FEATURES),
         ]
+
+    def _binary_path(self, role: str, variant: str) -> Path:
+        return self._target_path(role, variant) / "debug" / "examples" / PROBE_PATH.stem
+
+    def _build(self, role: str, variant: str, toolchain: Mapping[str, str]) -> dict[str, Any]:
+        root = self.baseline_root if role == "baseline" else self.candidate_root
+        target = self._target_path(role, variant)
+        tmpdir = self._tmp_path(role, variant)
+        self._fresh_dir(target, f"{role}/{variant} target")
+        self._fresh_dir(tmpdir, f"{role}/{variant} tmpdir")
+        endpoint = self._endpoint(role)
+        env = self._environment(role, variant, target, tmpdir)
+        binary = self._binary_path(role, variant)
+        command = self._build_command()
         stdout = self.output / "build" / f"{role}-{variant}.stdout"
         stderr = self.output / "build" / f"{role}-{variant}.stderr"
         event = self._run_process(
@@ -815,6 +953,11 @@ class PairedRunner:
         if binary.is_symlink() or not binary.is_file() or not os.access(binary, os.X_OK):
             raise RunnerError(f"built probe binary is missing or not executable: {binary}")
         binary_hash, binary_bytes = _sha256_file(binary)
+        event["binary"] = {
+            "path": str(binary),
+            "sha256": binary_hash,
+            "bytes": binary_bytes,
+        }
         endpoint_after = self._assert_endpoint_unchanged(role, endpoint)
         if _directory_size(target) > TARGET_PREFLIGHT_BYTES:
             raise RunnerError(f"{role}/{variant} target exceeded the 19.2 GB preflight limit")
@@ -843,6 +986,11 @@ class PairedRunner:
             for variant in ("normal", "allocator"):
                 for role in ROLES:
                     builds[f"{role}/{variant}"] = self._build(role, variant, toolchain)
+            journal_events = [
+                builds[f"{role}/{variant}"]["event"]
+                for role in ROLES
+                for variant in ("normal", "allocator")
+            ]
             receipt = {
                 "schema": SCHEMA,
                 "phase": "build",
@@ -857,6 +1005,13 @@ class PairedRunner:
                 "phases": dict(self.manifest["paired"]),
                 "endpoints": endpoints,
                 "builds": builds,
+                "event_journal": {
+                    "count": len(journal_events),
+                    "sha256": _sha256_bytes(
+                        json.dumps(journal_events, sort_keys=True, separators=(",", ":")).encode()
+                    ),
+                    "events": journal_events,
+                },
                 "claim_scope": "build identity only; no native acceptance claim",
             }
             self._write_receipt(receipt_path, receipt)
@@ -882,11 +1037,14 @@ class PairedRunner:
         receipt, receipt_hash, _ = _load_json(receipt_path, "build receipt")
         if receipt.get("schema") != SCHEMA or receipt.get("phase") != "build" or receipt.get("status") != "passed":
             raise RunnerError("build receipt is not a passed paired build")
-        if receipt.get("manifest", {}).get("sha256") != self.manifest_sha256:
+        manifest_record = receipt.get("manifest")
+        preparation_record = receipt.get("preparation")
+        runner_record = receipt.get("runner")
+        if not isinstance(manifest_record, Mapping) or manifest_record.get("sha256") != self.manifest_sha256:
             raise RunnerError("build receipt manifest identity differs")
-        if receipt.get("preparation", {}).get("sha256") != self.preparation["sha256"]:
+        if not isinstance(preparation_record, Mapping) or preparation_record.get("sha256") != self.preparation["sha256"]:
             raise RunnerError("build receipt preparation identity differs")
-        if receipt.get("runner", {}).get("sha256") != self.runner_hash:
+        if not isinstance(runner_record, Mapping) or runner_record.get("sha256") != self.runner_hash:
             raise RunnerError("paired runner changed after build")
         if receipt.get("cpu_affinity") != self.cpu or receipt.get("features") != list(FEATURES):
             raise RunnerError("build receipt CPU/features differ")
@@ -894,10 +1052,125 @@ class PairedRunner:
             raise RunnerError("build receipt route descriptors differ")
         if receipt.get("phases") != dict(self.manifest["paired"]):
             raise RunnerError("build receipt paired protocol differs")
+        if receipt.get("claim_scope") != "build identity only; no native acceptance claim":
+            raise RunnerError("build receipt claim scope is not non-acceptance")
+        builds = receipt.get("builds")
+        expected_keys = {f"{role}/{variant}" for role in ROLES for variant in ("normal", "allocator")}
+        if not isinstance(builds, Mapping) or set(builds) != expected_keys:
+            raise RunnerError("build receipt does not contain exactly four role/variant builds")
+        endpoints = receipt.get("endpoints")
+        if not isinstance(endpoints, Mapping) or set(endpoints) != set(ROLES):
+            raise RunnerError("build receipt endpoint identities are incomplete")
+        current_toolchain = self._toolchain()
+        if receipt.get("toolchain") != current_toolchain:
+            raise RunnerError("build receipt toolchain identity differs from the current toolchain")
+        journal = receipt.get("event_journal")
+        if not isinstance(journal, Mapping) or journal.get("count") != len(expected_keys):
+            raise RunnerError("build receipt event journal is incomplete")
+        events = journal.get("events")
+        if not isinstance(events, list) or len(events) != len(expected_keys):
+            raise RunnerError("build receipt event journal events are incomplete")
+        journal_hash = _sha256_bytes(json.dumps(events, sort_keys=True, separators=(",", ":")).encode())
+        if journal.get("sha256") != journal_hash:
+            raise RunnerError("build receipt event journal hash differs")
+        expected_event_ids = [
+            f"build-{role}-{variant}"
+            for variant in ("normal", "allocator")
+            for role in ROLES
+        ]
+        if [event.get("event_id") for event in events if isinstance(event, Mapping)] != expected_event_ids:
+            raise RunnerError("build receipt event journal order differs")
+        events_by_id = {event.get("event_id"): event for event in events if isinstance(event, Mapping)}
+        if len(events_by_id) != len(expected_keys):
+            raise RunnerError("build receipt event journal has duplicate or malformed event IDs")
+        for role in ROLES:
+            current = self._endpoint(role)
+            if endpoints[role] != current:
+                raise RunnerError(f"build receipt endpoint identity changed for {role}")
+            for variant in ("normal", "allocator"):
+                key = f"{role}/{variant}"
+                build = builds[key]
+                if not isinstance(build, Mapping) or build.get("role") != role or build.get("variant") != variant:
+                    raise RunnerError(f"build receipt role/variant identity is malformed for {key}")
+                if build.get("source") != current:
+                    raise RunnerError(f"build receipt source endpoint differs for {key}")
+                target = self._target_path(role, variant)
+                tmpdir = self._tmp_path(role, variant)
+                expected_binary = self._binary_path(role, variant)
+                expected_command = self._build_command()
+                expected_env = self._recorded_environment(
+                    self._environment(role, variant, target, tmpdir)
+                )
+                if build.get("command") != expected_command:
+                    raise RunnerError(f"build command differs for {key}")
+                if build.get("environment") != expected_env:
+                    raise RunnerError(f"build environment differs for {key}")
+                if build.get("toolchain") != current_toolchain:
+                    raise RunnerError(f"build toolchain differs for {key}")
+                if _resolve(str(build.get("tmpdir"))) != tmpdir:
+                    raise RunnerError(f"build temporary directory differs for {key}")
+                target_record = build.get("target")
+                if not isinstance(target_record, Mapping) or _resolve(str(target_record.get("path"))) != target:
+                    raise RunnerError(f"build target path differs for {key}")
+                if target_record.get("bytes") != _directory_size(target) or target_record.get("bytes", 0) > TARGET_PREFLIGHT_BYTES:
+                    raise RunnerError(f"build target identity differs for {key}")
+                binary = build.get("binary")
+                if not isinstance(binary, Mapping) or _resolve(str(binary.get("path"))) != expected_binary:
+                    raise RunnerError(f"build binary path differs for {key}")
+                if expected_binary.is_symlink() or not expected_binary.is_file() or not os.access(expected_binary, os.X_OK):
+                    raise RunnerError(f"build binary is missing or not executable for {key}")
+                binary_hash, binary_bytes = _sha256_file(expected_binary)
+                if binary.get("sha256") != binary_hash or binary.get("bytes") != binary_bytes:
+                    raise RunnerError(f"build binary hash differs for {key}")
+                event = build.get("event")
+                event_id = f"build-{role}-{variant}"
+                if not isinstance(event, Mapping) or events_by_id.get(event_id) != event:
+                    raise RunnerError(f"build event is missing or not journal-bound for {key}")
+                if (
+                    event.get("schema") != SCHEMA
+                    or event.get("event_id") != event_id
+                    or event.get("role") != role
+                    or event.get("variant") != variant
+                ):
+                    raise RunnerError(f"build event role/variant differs for {key}")
+                if event.get("argv") != expected_command or _resolve(str(event.get("cwd"))) != (self.baseline_root if role == "baseline" else self.candidate_root):
+                    raise RunnerError(f"build event command/cwd differs for {key}")
+                if event.get("environment") != expected_env or event.get("cpu_affinity") != self.cpu:
+                    raise RunnerError(f"build event environment differs for {key}")
+                if event.get("returncode") != 0 or event.get("error") is not None:
+                    raise RunnerError(f"build event did not complete successfully for {key}")
+                if event.get("process_guard_violations") or event.get("post_exit_descendants") or event.get("post_exit_offenders"):
+                    raise RunnerError(f"build event has quiet-host violations for {key}")
+                event_target = event.get("target")
+                if not isinstance(event_target, Mapping) or _resolve(str(event_target.get("path"))) != target:
+                    raise RunnerError(f"build event target differs for {key}")
+                if event_target.get("bytes_before") != 0 or event_target.get("bytes_after") != target_record["bytes"]:
+                    raise RunnerError(f"build event target freshness differs for {key}")
+                if not isinstance(event.get("monitor"), list) or not event["monitor"]:
+                    raise RunnerError(f"build event lacks live resource monitor samples for {key}")
+                event_binary = event.get("binary")
+                if not isinstance(event_binary, Mapping) or _resolve(str(event_binary.get("path"))) != expected_binary:
+                    raise RunnerError(f"build event binary path differs for {key}")
+                if (
+                    event_binary.get("sha256") != binary_hash
+                    or event_binary.get("bytes") != binary_bytes
+                ):
+                    raise RunnerError(f"build event binary hash differs for {key}")
+                for stream_name in ("stdout", "stderr"):
+                    stream = event.get(stream_name)
+                    if not isinstance(stream, Mapping):
+                        raise RunnerError(f"build event {stream_name} identity is missing for {key}")
+                    stream_path = _resolve(str(stream.get("path")))
+                    expected_stream = self.output / "build" / f"{role}-{variant}.{stream_name}"
+                    if stream_path != expected_stream:
+                        raise RunnerError(f"build event {stream_name} path differs for {key}")
+                    stream_hash, stream_bytes = _sha256_file(expected_stream)
+                    if stream.get("sha256") != stream_hash or stream.get("bytes") != stream_bytes:
+                        raise RunnerError(f"build event {stream_name} hash differs for {key}")
         receipt["receipt_sha256"] = receipt_hash
         return receipt
 
-    def _validate_probe_payload(self, path: Path, mode: str) -> dict[str, Any]:
+    def _validate_probe_payload(self, path: Path, mode: str, expected_iterations: int) -> dict[str, Any]:
         raw = path.read_bytes()
         if not raw or len(raw) > PROBE_MAX_BYTES:
             raise RunnerError(f"probe output is empty or exceeds {PROBE_MAX_BYTES} bytes: {path}")
@@ -907,6 +1180,10 @@ class PairedRunner:
             raise RunnerError(f"probe output is not JSON: {path}: {error}") from error
         if not isinstance(payload, Mapping):
             raise RunnerError("probe output root must be an object")
+        if payload.get("iterations") != expected_iterations:
+            raise RunnerError(
+                f"probe output iterations {payload.get('iterations')!r} differ from requested {expected_iterations}"
+            )
         try:
             shared.validate_probe_output(self.manifest, payload, mode)
         except shared.RunnerError as error:
@@ -936,13 +1213,19 @@ class PairedRunner:
             "allocator": ALLOCATOR_MODE,
         }[phase]
         root = self.baseline_root if role == "baseline" else self.candidate_root
-        target = _resolve(str(build["target"]))
-        tmpdir = _resolve(str(build["tmpdir"]))
-        binary = _resolve(str(build["binary"]["path"]))
+        variant = "allocator" if phase == "allocator" else "normal"
+        if build.get("role") != role or build.get("variant") != variant:
+            raise RunnerError(f"build handoff role/variant differs for {role}/{phase}")
+        target = self._target_path(role, variant)
+        tmpdir = self._tmp_path(role, variant)
+        binary = self._binary_path(role, variant)
+        handoff_binary = build.get("binary")
+        if not isinstance(handoff_binary, Mapping) or _resolve(str(handoff_binary.get("path"))) != binary:
+            raise RunnerError(f"{role}/{phase} build handoff binary path is not the fixed endpoint binary")
         binary_hash, binary_bytes = _sha256_file(binary)
-        if binary_hash != build["binary"]["sha256"] or binary_bytes != build["binary"]["bytes"]:
+        if binary_hash != handoff_binary.get("sha256") or binary_bytes != handoff_binary.get("bytes"):
             raise RunnerError(f"{role}/{phase} binary changed before {kind} {index}")
-        env = self._environment(role, build["variant"], target, tmpdir)
+        env = self._environment(role, variant, target, tmpdir)
         base = self.output / "probe" / phase / role
         output = base / f"{kind}-{index:03d}.json"
         stderr = base / f"{kind}-{index:03d}.stderr"
@@ -958,7 +1241,7 @@ class PairedRunner:
         event = self._run_process(
             event_id=f"probe-{phase}-{role}-{kind}-{index:03d}",
             role=role,
-            variant=build["variant"],
+            variant=variant,
             argv=command,
             cwd=root,
             env=env,
@@ -966,7 +1249,7 @@ class PairedRunner:
             stdout_path=output,
             stderr_path=stderr,
         )
-        payload = self._validate_probe_payload(output, mode)
+        payload = self._validate_probe_payload(output, mode, iterations)
         endpoint = self._assert_endpoint_unchanged(role, build["source"])
         output_hash, output_bytes = _sha256_file(output)
         return {
@@ -1053,7 +1336,10 @@ class PairedRunner:
 
     def _write_receipt(self, path: Path, receipt: Mapping[str, Any]) -> None:
         self._fresh_file(path, "receipt")
-        path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        with path.open("x", encoding="utf-8") as stream:
+            stream.write(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+            stream.flush()
+            os.fsync(stream.fileno())
 
     def abba(self) -> None:
         receipt_path = self.output / "abba-receipt.json"

@@ -10,7 +10,7 @@
   },
   "probe": {
     "path": "crates/litchi-ops/examples/odf_shared_triad_qualification.rs",
-    "sha256": "96e7dc0b66e44d24b7073a11f31cf6d52b31cf1ce26ce30303d71074762b0147",
+    "sha256": "13ca425e61ce5aaacde3b84acc5f8d5a1c1fc7deeb19bb882e229d11843ee790",
     "features": ["odc", "odi", "oth", "odm"],
     "modes": ["validate", "timed", "allocator"],
     "max_iterations": 128

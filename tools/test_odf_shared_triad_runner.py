@@ -32,7 +32,34 @@ def _side(changed: bool) -> dict[str, object]:
         "inverse_replay_restores_source": True,
         "source_bytes": 1,
         "output_bytes": 2 if changed else 1,
-        "output_sha256": "0" * 64,
+        "output_sha256": ("2" if changed else "1") * 64,
+    }
+
+
+def _member_identity(name: str = "meta.xml") -> dict[str, object]:
+    return {
+        "name": name,
+        "name_raw_sha256": "b" * 64,
+        "content_sha256": "a" * 64,
+        "content_bytes": 1,
+        "compression": "Stored",
+        "compressed_bytes": 1,
+        "crc32": "00000000",
+        "version_needed": 10,
+        "flags": 0,
+        "compression_options": "Stored",
+        "external_attributes": 0,
+        "is_utf8": False,
+        "using_data_descriptor": False,
+        "large_file": False,
+        "central_extra_sha256": None,
+        "last_modified": None,
+        "extra_sha256": None,
+        "comment": "",
+        "unix_mode": None,
+        "version_made_by": [0, 0],
+        "encrypted": False,
+        "content_text": "<meta />",
     }
 
 
@@ -48,20 +75,38 @@ def _output(manifest: dict[str, object]) -> dict[str, object]:
                 "decision": "byte_exact",
                 "allowed": True,
                 "archive_comment_equal": True,
+                "leaf_archive_comment_sha256": "c" * 64,
+                "facade_archive_comment_sha256": "c" * 64,
                 "manifest_semantics_equal": True,
                 "leaf_manifest_semantics": {
-                    "root_attributes": [],
-                    "ordered_entries": [],
-                    "normalized_entries": [],
+                    "root_attributes": [["manifest:version", "1.0"]],
+                    "ordered_entries": [[
+                        ["manifest:full-path", "/"],
+                        ["manifest:media-type", "application/vnd.oasis.opendocument.text"],
+                    ]],
+                    "normalized_entries": [[
+                        ["manifest:full-path", "/"],
+                        ["manifest:media-type", "application/vnd.oasis.opendocument.text"],
+                    ]],
                     "other_events": [],
                 },
                 "facade_manifest_semantics": {
-                    "root_attributes": [],
-                    "ordered_entries": [],
-                    "normalized_entries": [],
+                    "root_attributes": [["manifest:version", "1.0"]],
+                    "ordered_entries": [[
+                        ["manifest:full-path", "/"],
+                        ["manifest:media-type", "application/vnd.oasis.opendocument.text"],
+                    ]],
+                    "normalized_entries": [[
+                        ["manifest:full-path", "/"],
+                        ["manifest:media-type", "application/vnd.oasis.opendocument.text"],
+                    ]],
                     "other_events": [],
                 },
                 "member_order_exact": True,
+                "manifest_listing_tracks_order": True,
+                "leaf_manifest_tracks_order": True,
+                "facade_manifest_tracks_order": True,
+                "archive_member_order_and_manifest_listing": False,
                 "non_meta_content_exact": True,
                 "non_manifest_content_exact": True,
                 "non_meta_stored_metadata_exact": True,
@@ -81,6 +126,8 @@ def _output(manifest: dict[str, object]) -> dict[str, object]:
                         "content_equal": True,
                         "stored_metadata_equal": True,
                         "archive_record_equal": True,
+                        "leaf": _member_identity(),
+                        "facade": _member_identity(),
                     }
                 ],
             }
@@ -92,13 +139,15 @@ def _output(manifest: dict[str, object]) -> dict[str, object]:
                 "descriptor": route,
                 "source_bytes": 1,
                 "source_sha256": "1" * 64,
+                "facade_source_bytes": 1,
+                "facade_source_sha256": "1" * 64,
                 "source_pair_exact": True,
                 "leaf": {"changed": _side(True), "no_op": _side(False)},
                 "facade": {"changed": _side(True), "no_op": _side(False)},
                 "paired": {
-                    "changed_output_exact": not odm,
+                    "changed_output_exact": True,
                     "changed_output_sha256": "2" * 64,
-                    "facade_changed_output_sha256": "3" * 64,
+                    "facade_changed_output_sha256": "2" * 64,
                     "semantic_equality": True,
                     "archive_audit": audit,
                 },
@@ -113,6 +162,7 @@ def _output(manifest: dict[str, object]) -> dict[str, object]:
     return {
         "schema": runner.OUTPUT_SCHEMA,
         "mode": "validate",
+        "iterations": 1,
         "families": rows,
         "claim_scope": runner.CLAIM_SCOPE,
     }
@@ -160,6 +210,11 @@ class OdfSharedTriadRunnerTests(unittest.TestCase):
             runner.validate_probe_output(self.manifest, broken)
 
         broken = copy.deepcopy(payload)
+        broken["families"][1]["facade_source_sha256"] = "f" * 64
+        with self.assertRaisesRegex(runner.RunnerError, "source_pair_exact"):
+            runner.validate_probe_output(self.manifest, broken)
+
+        broken = copy.deepcopy(payload)
         broken["families"][2]["paired"]["semantic_equality"] = False
         with self.assertRaisesRegex(runner.RunnerError, "semantic_equality"):
             runner.validate_probe_output(self.manifest, broken)
@@ -188,7 +243,22 @@ class OdfSharedTriadRunnerTests(unittest.TestCase):
         broken["families"][3]["paired"]["archive_audit"]["facade_manifest_semantics"]["root_attributes"] = [
             ["manifest:version", "9.9"]
         ]
-        with self.assertRaisesRegex(runner.RunnerError, "normalized manifest semantics differ"):
+        with self.assertRaisesRegex(runner.RunnerError, "manifest root_attributes differs"):
+            runner.validate_probe_output(self.manifest, broken)
+
+        broken = copy.deepcopy(payload)
+        broken["families"][3]["paired"]["archive_audit"]["members"][0]["facade"]["external_attributes"] = 1
+        with self.assertRaisesRegex(runner.RunnerError, "unadmitted fields"):
+            runner.validate_probe_output(self.manifest, broken)
+
+        broken = copy.deepcopy(payload)
+        broken["families"][3]["paired"]["archive_audit"]["facade_archive_comment_sha256"] = "f" * 64
+        with self.assertRaisesRegex(runner.RunnerError, "archive comments differ"):
+            runner.validate_probe_output(self.manifest, broken)
+
+        broken = copy.deepcopy(payload)
+        broken["families"][0]["paired"]["changed_output_exact"] = False
+        with self.assertRaisesRegex(runner.RunnerError, "changed_output_exact"):
             runner.validate_probe_output(self.manifest, broken)
 
     def test_source_tree_probe_and_lock_are_bound(self) -> None:
@@ -228,6 +298,100 @@ class OdfSharedTriadRunnerTests(unittest.TestCase):
                     source_commit=None,
                     lock_sha256="f" * 64,
                 )
+
+    def test_order_only_odm_audit_requires_exact_manifest_delta(self) -> None:
+        payload = _output(self.manifest)
+        row = payload["families"][3]
+        audit = row["paired"]["archive_audit"]
+        manifest_leaf = _member_identity("META-INF/manifest.xml")
+        manifest_facade = copy.deepcopy(manifest_leaf)
+        manifest_facade.update(
+            {
+                "content_sha256": "d" * 64,
+                "content_bytes": 2,
+                "compressed_bytes": 2,
+                "crc32": "11111111",
+                "content_text": "<manifest><file-entry /></manifest>",
+            }
+        )
+        audit.update(
+            {
+                "decision": "archive_member_order_and_manifest_listing",
+                "non_meta_content_exact": False,
+                "non_meta_stored_metadata_exact": False,
+                "member_order_exact": False,
+                "manifest_listing_tracks_order": False,
+                "archive_member_order_and_manifest_listing": True,
+                "leaf_order": ["meta.xml", "content.xml", "META-INF/manifest.xml"],
+                "facade_order": ["content.xml", "meta.xml", "META-INF/manifest.xml"],
+                "content_differences": ["META-INF/manifest.xml"],
+                "leaf_member_count": 3,
+                "facade_member_count": 3,
+                "leaf_manifest_semantics": {
+                    "root_attributes": [["manifest:version", "1.0"]],
+                    "ordered_entries": [
+                        [["manifest:full-path", "/"]],
+                        [["manifest:full-path", "content.xml"]],
+                    ],
+                    "normalized_entries": [
+                        [["manifest:full-path", "/"]],
+                        [["manifest:full-path", "content.xml"]],
+                    ],
+                    "other_events": [],
+                },
+                "facade_manifest_semantics": {
+                    "root_attributes": [["manifest:version", "1.0"]],
+                    "ordered_entries": [
+                        [["manifest:full-path", "content.xml"]],
+                        [["manifest:full-path", "/"]],
+                    ],
+                    "normalized_entries": [
+                        [["manifest:full-path", "/"]],
+                        [["manifest:full-path", "content.xml"]],
+                    ],
+                    "other_events": [],
+                },
+                "members": [
+                    {
+                        "name": "meta.xml",
+                        "facade_name": "meta.xml",
+                        "content_equal": True,
+                        "stored_metadata_equal": True,
+                        "archive_record_equal": True,
+                        "leaf": _member_identity("meta.xml"),
+                        "facade": _member_identity("meta.xml"),
+                    },
+                    {
+                        "name": "content.xml",
+                        "facade_name": "content.xml",
+                        "content_equal": True,
+                        "stored_metadata_equal": True,
+                        "archive_record_equal": True,
+                        "leaf": _member_identity("content.xml"),
+                        "facade": _member_identity("content.xml"),
+                    },
+                    {
+                        "name": "META-INF/manifest.xml",
+                        "facade_name": "META-INF/manifest.xml",
+                        "content_equal": False,
+                        "stored_metadata_equal": False,
+                        "archive_record_equal": False,
+                        "leaf": manifest_leaf,
+                        "facade": manifest_facade,
+                    },
+                ],
+            }
+        )
+        row["leaf"]["changed"]["output_sha256"] = "4" * 64
+        row["facade"]["changed"]["output_sha256"] = "5" * 64
+        row["paired"]["changed_output_exact"] = False
+        row["paired"]["changed_output_sha256"] = "4" * 64
+        row["paired"]["facade_changed_output_sha256"] = "5" * 64
+        runner.validate_probe_output(self.manifest, payload)
+
+        audit["members"][2]["facade"]["flags"] = 1
+        with self.assertRaisesRegex(runner.RunnerError, "unadmitted fields"):
+            runner.validate_probe_output(self.manifest, payload)
 
     def test_receipt_tree_identity_is_a_git_tree_sha(self) -> None:
         receipt = runner.make_receipt(
