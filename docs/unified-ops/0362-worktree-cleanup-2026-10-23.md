@@ -714,3 +714,26 @@ python3 /home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/qua
 External `.coord/docx-runtime` and all `.coord/odg-joined*` targets and evidence
 remain untouched. Active sparse correction leaves and protected measurement
 worktrees were excluded from this cleanup.
+
+## Fifteenth cleanup, 2026-10-24
+
+After reviewed source integration at `3676e21cfa`, the clean, inactive DOC
+lazy-entry worktree was removed without force. Branch `uo2/doc-lazy-entry`
+remains at `2a5a7c3facebf8b7d7598170953353e83caee5e8`. Its apparent checkout
+size was 314,138,078 bytes. The ignored 139,591-byte Cargo.lock was moved to
+external quarantine; SHA-256 is
+`76340b069df633ff1c63c98e93e8b10c1e7711164ca2515f490872142ab46c72`.
+The external DOC target and logs remain unchanged. The coordinator verified
+ancestry, retained ref, removed path, receipt identities and quarantined bytes.
+
+The receipt is
+`/home/zhuhe/code/litchi-worktrees/.coord/worktree-cleanup-2026-10-23/quarantine/fifteenth-wave/receipt.md`
+(SHA-256 `9daa8a99f905b8d4372146d3038f4d8755c58e167d68e1023eb13d8a5589480c`).
+The adjacent manifest has SHA-256
+`6793d485b5dfacc3f0e184a83cc7509d1d722a746785f053181af5a6634a6772`;
+`restore.py` recreates the ignored file after restoring the retained branch.
+
+ODB/ODM was rechecked as clean and merged, but a live search still held its
+evidence files. That worktree was left intact pending the search owner's
+confirmation and a fresh handle audit. No measurement artifacts, targets,
+branch refs or incomplete source worktrees were deleted.
