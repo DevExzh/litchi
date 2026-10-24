@@ -7,7 +7,7 @@
 
 use std::io::Cursor;
 use std::mem::size_of;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_cfb::OleFile;
 use litchi_core::sheet::WorkbookTrait;
@@ -56,6 +56,10 @@ pub struct Xls(Arc<Opened<XlsState>>);
 /// were filled from: a write invalidates them by construction.
 pub(crate) struct XlsState {
     package: Package,
+    /// The package's immutable tab catalog, retained only after the first
+    /// checked read. Warm unified reads clone this `Arc` under their outer
+    /// source fence instead of repeating the package metadata probe.
+    sheet_catalog: OnceLock<Arc<[litchi_xls::SheetMetadata]>>,
     /// The sheet step of the last cell `get` ([`nav::SheetStep`]).
     sheet_step: nav::SheetStep,
 }
@@ -64,6 +68,7 @@ impl XlsState {
     fn new(package: Package) -> Self {
         Self {
             package,
+            sheet_catalog: OnceLock::new(),
             sheet_step: nav::SheetStep::default(),
         }
     }
@@ -406,6 +411,20 @@ impl Xls {
     /// The handle's sheet-step cache (record 0315).
     pub(super) fn sheet_step(&self) -> &nav::SheetStep {
         &self.0.sheet_step
+    }
+
+    /// Return the adapter-local catalog after the package has captured it.
+    /// This is used only inside an active read fence; callers outside that
+    /// scope must use the checked package projection.
+    pub(super) fn cached_sheet_catalog(&self) -> Option<Arc<[litchi_xls::SheetMetadata]>> {
+        self.0.sheet_catalog.get().cloned()
+    }
+
+    /// Capture and retain the package catalog on the first checked read.
+    pub(super) fn sheet_catalog(&self) -> Result<Arc<[litchi_xls::SheetMetadata]>> {
+        let catalog = self.owner().sheet_catalog()?;
+        let _ = self.0.sheet_catalog.set(Arc::clone(&catalog));
+        Ok(self.cached_sheet_catalog().unwrap_or(catalog))
     }
 
     /// Run one read against the retained native owner, fencing both the
@@ -943,6 +962,18 @@ mod tests {
         inner: litchi_core::OwnedSource,
         revision: std::sync::atomic::AtomicU64,
         versions: std::sync::atomic::AtomicUsize,
+        bump_before_version: std::sync::atomic::AtomicUsize,
+    }
+
+    impl Changing {
+        fn bump_before_next_version(&self) {
+            let next = self
+                .versions
+                .load(std::sync::atomic::Ordering::SeqCst)
+                .saturating_add(1);
+            self.bump_before_version
+                .store(next, std::sync::atomic::Ordering::SeqCst);
+        }
     }
 
     impl litchi_core::ReadAt for Changing {
@@ -956,7 +987,11 @@ mod tests {
 
         fn version(&self) -> std::io::Result<litchi_core::SourceVersion> {
             use std::sync::atomic::Ordering;
-            self.versions.fetch_add(1, Ordering::SeqCst);
+            let ordinal = self.versions.fetch_add(1, Ordering::SeqCst) + 1;
+            if self.bump_before_version.load(Ordering::SeqCst) == ordinal {
+                self.bump_before_version.store(0, Ordering::SeqCst);
+                self.revision.fetch_add(1, Ordering::SeqCst);
+            }
             Ok(litchi_core::SourceVersion::new(
                 0x584c_5331_3533_3135,
                 self.revision.load(Ordering::SeqCst),
@@ -1052,6 +1087,7 @@ mod tests {
             inner: litchi_core::OwnedSource::new(fixture("Simple.xls")),
             revision: std::sync::atomic::AtomicU64::new(0),
             versions: std::sync::atomic::AtomicUsize::new(0),
+            bump_before_version: std::sync::atomic::AtomicUsize::new(0),
         });
         let workbook = SourceBackedWorkbook::from_read_at(changing.clone()).unwrap();
         let file = crate::File::Xls(Xls::from_source(workbook).unwrap());
@@ -1109,6 +1145,47 @@ mod tests {
         assert!(outcome(renamed.get("/Renamed/A1")).starts_with("ok "));
         // The old handle keeps its snapshot and its cache.
         assert_eq!(outcome(eager.get(by_name.as_str())), before);
+    }
+
+    /// A stale source wins both when the first catalog read is fenced and
+    /// when the source changes between resolution and the required trailing
+    /// fence.  The latter also keeps a path miss from masking SourceChanged.
+    #[test]
+    fn source_change_precedes_cold_catalog_and_mid_resolve_results() {
+        use std::sync::atomic::Ordering;
+
+        let cold_source = Arc::new(Changing {
+            inner: litchi_core::OwnedSource::new(fixture("Simple.xls")),
+            revision: std::sync::atomic::AtomicU64::new(0),
+            versions: std::sync::atomic::AtomicUsize::new(0),
+            bump_before_version: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let cold_workbook = SourceBackedWorkbook::from_read_at(cold_source.clone()).unwrap();
+        let cold = crate::File::Xls(Xls::from_source(cold_workbook).unwrap());
+        cold_source.revision.store(1, Ordering::SeqCst);
+        let cold_error = cold.get("/sheet[999]").unwrap_err();
+        assert_eq!(cold_error.code(), Code::IoError);
+        assert!(matches!(
+            cold_error.leaf(),
+            crate::error::Source::XlsSource(SourceBackedError::SourceChanged { .. })
+        ));
+
+        let mid_source = Arc::new(Changing {
+            inner: litchi_core::OwnedSource::new(fixture("Simple.xls")),
+            revision: std::sync::atomic::AtomicU64::new(0),
+            versions: std::sync::atomic::AtomicUsize::new(0),
+            bump_before_version: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let mid_workbook = SourceBackedWorkbook::from_read_at(mid_source.clone()).unwrap();
+        let mid = crate::File::Xls(Xls::from_source(mid_workbook).unwrap());
+        assert!(mid.get("/sheet[1]").is_ok(), "warm the adapter catalog");
+        mid_source.bump_before_next_version();
+        let mid_error = mid.get("/sheet[999]").unwrap_err();
+        assert_eq!(mid_error.code(), Code::IoError);
+        assert!(matches!(
+            mid_error.leaf(),
+            crate::error::Source::XlsSource(SourceBackedError::SourceChanged { .. })
+        ));
     }
 
     /// Record 0291: a read nested in another fenced read of the same handle

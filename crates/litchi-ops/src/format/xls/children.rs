@@ -337,7 +337,7 @@ impl<'f> Children<'f> {
                 node.file(),
                 State::Stream(Box::new(Stream {
                     sheet: node.sheet_position(),
-                    handle: sheet.handle,
+                    handle: sheet.handle.clone(),
                     cursor,
                     worksheet,
                     last: None,
