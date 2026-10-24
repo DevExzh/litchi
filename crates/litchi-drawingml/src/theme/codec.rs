@@ -1,6 +1,6 @@
 //! Bounded `DrawingML` theme XML codecs.
 
-use std::ops::Range;
+use std::{borrow::Cow, collections::BTreeSet, ops::Range};
 
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::process_ooxml;
@@ -1666,6 +1666,14 @@ fn validate_replacement_fragment(
                     stack.last().is_some_and(|frame| frame.opaque),
                 )?;
                 validate_replacement_attributes(&element, &reader, limits)?;
+                validate_modeled_namespace_binding(
+                    &element,
+                    !root_seen,
+                    target,
+                    &namespace,
+                    source_namespace,
+                    reader.decoder(),
+                )?;
                 let local = element.local_name().as_ref().to_vec();
                 if !root_seen && local.as_slice() != target {
                     return Err(invalid("theme replacement root does not match target"));
@@ -1756,6 +1764,14 @@ fn validate_replacement_fragment(
                     stack.last().is_some_and(|frame| frame.opaque),
                 )?;
                 validate_replacement_attributes(&element, &reader, limits)?;
+                validate_modeled_namespace_binding(
+                    &element,
+                    !root_seen,
+                    target,
+                    &namespace,
+                    source_namespace,
+                    reader.decoder(),
+                )?;
                 if !root_seen && element.local_name().as_ref() != target {
                     return Err(invalid("theme replacement root does not match target"));
                 }
@@ -2175,17 +2191,6 @@ fn ensure_replacement_attributes(
     Ok(())
 }
 
-fn resolved_names_equal(left: &ResolveResult<'_>, right: &ResolveResult<'_>) -> bool {
-    match (left, right) {
-        (ResolveResult::Bound(Namespace(left)), ResolveResult::Bound(Namespace(right))) => {
-            left == right
-        },
-        (ResolveResult::Unbound, ResolveResult::Unbound) => true,
-        (ResolveResult::Unknown(left), ResolveResult::Unknown(right)) => left == right,
-        _ => false,
-    }
-}
-
 fn validate_theme_namespace_binding(prefix: &[u8], value: &str) -> Result<()> {
     if prefix == b"xmlns" {
         return Err(invalid(
@@ -2209,6 +2214,61 @@ fn validate_theme_namespace_binding(prefix: &[u8], value: &str) -> Result<()> {
     }
     if prefix == b"xml" && value != XML_NAMESPACE {
         return Err(invalid("theme replacement rebinds the xml namespace"));
+    }
+    Ok(())
+}
+
+/// Reject a local namespace declaration that leaves a modeled child in the
+/// opposite DrawingML conformance namespace. The root binding is normalized
+/// before output, but a nested declaration would survive that rewrite.
+fn validate_modeled_namespace_binding(
+    element: &BytesStart<'_>,
+    root: bool,
+    target: &[u8],
+    namespace: &ResolveResult<'_>,
+    source_namespace: &[u8],
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<()> {
+    if root || !is_known_replacement_local(element.local_name().as_ref(), target) {
+        return Ok(());
+    }
+    let counterpart = if source_namespace == NAMESPACE.as_bytes() {
+        STRICT_NAMESPACE.as_bytes()
+    } else if source_namespace == STRICT_NAMESPACE.as_bytes() {
+        NAMESPACE.as_bytes()
+    } else {
+        return Err(invalid("theme source has an unsupported namespace"));
+    };
+    if !matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == counterpart) {
+        return Ok(());
+    }
+    let element_prefix = element.name().prefix().map(|prefix| prefix.into_inner());
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        let key = attribute.key.as_ref();
+        let binding_prefix = if key == b"xmlns" {
+            Some(&[][..])
+        } else {
+            key.strip_prefix(b"xmlns:")
+        };
+        let Some(binding_prefix) = binding_prefix else {
+            continue;
+        };
+        let applies_to_element = match element_prefix {
+            Some(prefix) => binding_prefix == prefix,
+            None => binding_prefix.is_empty(),
+        };
+        if !applies_to_element {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
+            .map_err(xml_error)?;
+        if value.as_bytes() == counterpart {
+            return Err(invalid(
+                "theme replacement modeled child locally rebinds a cross-conformance namespace",
+            ));
+        }
     }
     Ok(())
 }
@@ -2264,7 +2324,7 @@ fn validate_replacement_attributes(
     limits: Limits,
 ) -> Result<()> {
     let mut count = 0usize;
-    let mut expanded = Vec::new();
+    let mut expanded = BTreeSet::new();
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
         count = count
@@ -2305,22 +2365,27 @@ fn validate_replacement_attributes(
                 .unwrap_or(&[]);
             validate_theme_namespace_binding(prefix, &value)?;
         } else {
-            let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+            let (namespace, _local) = reader.resolver().resolve_attribute(attribute.key);
             if matches!(namespace, ResolveResult::Unknown(_)) {
                 return Err(invalid(
                     "theme replacement attribute uses an undeclared namespace prefix",
                 ));
             }
-            if expanded.iter().copied().any(|seen| {
-                let (seen_namespace, seen_local) = reader.resolver().resolve_attribute(seen);
-                resolved_names_equal(&seen_namespace, &namespace)
-                    && seen_local.as_ref() == local.as_ref()
+            let namespace = match namespace {
+                ResolveResult::Bound(Namespace(value)) => {
+                    Some(normalized_namespace_name(value, reader.decoder())?)
+                },
+                ResolveResult::Unbound => None,
+                ResolveResult::Unknown(_) => unreachable!("unknown namespace was rejected"),
+            };
+            if !expanded.insert(ExpandedAttributeName {
+                namespace,
+                local: attribute.key.local_name().into_inner(),
             }) {
                 return Err(invalid(
                     "theme replacement has duplicate expanded attributes",
                 ));
             }
-            expanded.push(attribute.key);
         }
         if !is_namespace && value.len() > limits.max_attribute_value_bytes {
             return Err(limit(
@@ -2331,6 +2396,25 @@ fn validate_replacement_attributes(
         }
     }
     Ok(())
+}
+
+#[derive(Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct ExpandedAttributeName<'a> {
+    namespace: Option<Cow<'a, [u8]>>,
+    local: &'a [u8],
+}
+
+fn normalized_namespace_name<'a>(
+    value: &'a [u8],
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<Cow<'a, [u8]>> {
+    let decoded = decoder.decode(value).map_err(xml_error)?;
+    let unescaped = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
+    if unescaped.as_ref().as_bytes() == value {
+        Ok(Cow::Borrowed(value))
+    } else {
+        Ok(Cow::Owned(unescaped.into_owned().into_bytes()))
+    }
 }
 
 fn optional_attribute_value_range(raw: &[u8], wanted: &[u8]) -> Result<Option<Range<usize>>> {
@@ -3087,7 +3171,7 @@ mod tests {
         assert!(replace_scheme(&original, b"clrScheme", undeclared_attribute.as_bytes(),).is_err());
         let duplicate_expanded = with_opaque.replace(
             "<x:ext xmlns:x=\"urn:foreign\">",
-            "<x:ext xmlns:x=\"urn:foreign\" xmlns:y=\"urn:foreign\" x:flag=\"1\" y:flag=\"2\">",
+            "<x:ext xmlns:x=\"urn:foreign\" xmlns:y=\"urn&#x3A;foreign\" x:flag=\"1\" y:flag=\"2\">",
         );
         assert!(replace_scheme(&original, b"clrScheme", duplicate_expanded.as_bytes(),).is_err());
         assert!(
@@ -3471,5 +3555,31 @@ mod tests {
                 .windows(b"xmlns=\"http://purl.oclc.org/ooxml/drawingml/main\"".len())
                 .any(|window| { window == b"xmlns=\"http://purl.oclc.org/ooxml/drawingml/main\"" })
         );
+
+        let nested_default = generated
+            .replacen(
+                "<a:dk1>",
+                "<dk1 xmlns=\"http://schemas.openxmlformats.org/drawingml/2006/main\">",
+                1,
+            )
+            .replacen("</a:dk1>", "</dk1>", 1);
+        assert!(matches!(
+            replace_scheme(strict.as_bytes(), b"clrScheme", nested_default.as_bytes()),
+            Err(Error::Invalid(message))
+                if message.contains("locally rebinds a cross-conformance namespace")
+        ));
+
+        let nested_alias = generated
+            .replacen(
+                "<a:dk1>",
+                "<d:dk1 xmlns:d=\"http://schemas.openxmlformats.org/drawingml/2006/main\">",
+                1,
+            )
+            .replacen("</a:dk1>", "</d:dk1>", 1);
+        assert!(matches!(
+            replace_scheme(strict.as_bytes(), b"clrScheme", nested_alias.as_bytes()),
+            Err(Error::Invalid(message))
+                if message.contains("locally rebinds a cross-conformance namespace")
+        ));
     }
 }
