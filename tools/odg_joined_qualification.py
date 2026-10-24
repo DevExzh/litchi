@@ -48,6 +48,14 @@ try:
         binary_identity,
         quiet_guard,
     )
+    from odg_joined_qualification_bindings import (
+        REVIEWED_FIXTURE_IDENTITY,
+        REVIEWED_FIXTURE_PROVENANCE,
+        REVIEWED_FIXTURE_RELATIVE,
+        REVIEWED_PROBE_IDENTITIES,
+        REVIEWED_PROBE_RELATIVES,
+        REVIEWED_REPO_ROOT,
+    )
 except ImportError:  # pragma: no cover - supports direct test-module loading.
     from tools.odp_native_qualification import (  # type: ignore[no-redef]
         MAX_CHILD_OUTPUT,
@@ -68,12 +76,20 @@ except ImportError:  # pragma: no cover - supports direct test-module loading.
         binary_identity,
         quiet_guard,
     )
+    from tools.odg_joined_qualification_bindings import (  # type: ignore[no-redef]
+        REVIEWED_FIXTURE_IDENTITY,
+        REVIEWED_FIXTURE_PROVENANCE,
+        REVIEWED_FIXTURE_RELATIVE,
+        REVIEWED_PROBE_IDENTITIES,
+        REVIEWED_PROBE_RELATIVES,
+        REVIEWED_REPO_ROOT,
+    )
 
 
-INPUT_SCHEMA = "litchi.odg.joined-native-qualification.input.v1"
-REPORT_SCHEMA = "litchi.odg.joined-native-qualification.v1"
-BASELINE_SCHEMA = "litchi.odg.joined-native-qualification.legacy-probe.v1"
-CANDIDATE_SCHEMA = "litchi.odg.joined-native-qualification.probe.v1"
+INPUT_SCHEMA = "litchi.odg.joined-native-qualification.input.v2"
+REPORT_SCHEMA = "litchi.odg.joined-native-qualification.v2"
+BASELINE_SCHEMA = "litchi.odg.joined-native-qualification.legacy-probe.v2"
+CANDIDATE_SCHEMA = "litchi.odg.joined-native-qualification.probe.v2"
 BASELINE_PROFILE = "legacy-apply-joined"
 CANDIDATE_PROFILE = "current-edit-join-commit"
 ROUTES = ("package_replace_one", "semantic_two_disjoint", "semantic_four_disjoint", "empty_join")
@@ -84,6 +100,7 @@ REVISION = re.compile(r"[0-9a-f]{40}\Z")
 REQUIRED_BLOCKS = 2
 REQUIRED_WARMUPS = 20
 REQUIRED_SAMPLES = 1
+CALIBRATION_POLICY = "adaptive-doubling-v1"
 MAX_MANIFEST_BYTES = 256 * 1024
 MAX_FIXTURE_BYTES = 4 * 1024 * 1024
 TARGET_PREFLIGHT_BYTES = 19_200_000_000
@@ -120,6 +137,31 @@ def _tree_identity(value: Any, label: str) -> dict[str, Any]:
     return {"entries": entries, "bytes": bytes_value, "sha256": _digest(item.get("sha256"), f"{label}.sha256")}
 
 
+def _digest_binding(value: Any, label: str) -> dict[str, Any]:
+    item = _object(value, label)
+    _exact_keys(item, {"bytes", "sha256"}, label)
+    return {"bytes": _positive_int(item.get("bytes"), f"{label}.bytes"),
+            "sha256": _digest(item.get("sha256"), f"{label}.sha256")}
+
+
+def _reviewed_file(path: Path, relative: Path, expected: Mapping[str, Any], label: str) -> dict[str, Any]:
+    approved = (REVIEWED_REPO_ROOT / relative).absolute()
+    if path.absolute() != approved:
+        raise RunFailure(f"{label} must use reviewed repository path {relative}")
+    if path.is_symlink() or not path.is_file():
+        raise RunFailure(f"{label} is not a regular reviewed file")
+    try:
+        status = _run_git(REVIEWED_REPO_ROOT, "ls-files", "-v", "--", str(relative))
+    except RunFailure as error:
+        raise RunFailure(f"{label} is not tracked by the reviewed repository") from error
+    if status != f"H {relative}":
+        raise RunFailure(f"{label} is not an ordinary tracked worktree file")
+    actual_sha, actual_bytes = _sha256_file(path)
+    if (actual_bytes, actual_sha) != (expected["bytes"], expected["sha256"]):
+        raise RunFailure(f"{label} differs from the fixed reviewed bytes")
+    return {"path": str(path), "bytes": actual_bytes, "sha256": actual_sha}
+
+
 @dataclass(frozen=True)
 class Fixture:
     path: Path
@@ -147,16 +189,20 @@ class Endpoint:
     lock: IdentityFile
     toolchain: IdentityFile
     cargo_config: IdentityFile
+    cargo_manifest: IdentityFile
     source_manifest: dict[str, Any]
     features: tuple[str, ...]
     allocator_binary: Path
     allocator_target_dir: Path
+    binary_identity: dict[str, Any]
+    allocator_binary_identity: dict[str, Any]
 
 
 @dataclass(frozen=True)
 class BuildPaths:
     prepare_receipt: Path
     receipt: Path
+    receipt_identity: IdentityFile
     final_candidate_ref: str
     cpu: int
 
@@ -194,6 +240,7 @@ class ResolvedEndpoint:
     lock: dict[str, Any]
     toolchain: dict[str, Any]
     cargo_config: dict[str, Any]
+    cargo_manifest: dict[str, Any]
 
 
 def _sha256_file(path: Path) -> tuple[str, int]:
@@ -211,37 +258,96 @@ def _sha256_file(path: Path) -> tuple[str, int]:
     return digest.hexdigest(), total
 
 
+def _no_follow_path(path: Path, label: str) -> Path:
+    path = path.absolute()
+    current = Path(path.anchor)
+    for component in path.parts[1:]:
+        current /= component
+        try:
+            current.lstat()
+        except FileNotFoundError:
+            raise RunFailure(f"{label} disappeared: {current}")
+        except OSError as error:
+            raise RunFailure(f"cannot inspect {label} {current}: {error}") from error
+        if current.is_symlink():
+            raise RunFailure(f"{label} contains a symlink component: {current}")
+        if current != path and not current.is_dir():
+            raise RunFailure(f"{label} has a non-directory component: {current}")
+    return path
+
+
 def _directory_bytes(path: Path) -> int:
-    if not path.exists():
-        raise RunFailure(f"directory does not exist: {path}")
-    if path.is_symlink():
-        raise RunFailure(f"directory must not be a symlink: {path}")
-    if path.is_file():
-        return path.stat().st_size
-    total = 0
     try:
-        for item in path.rglob("*"):
-            if not item.is_symlink() and item.is_file():
-                total += item.stat().st_size
+        path = _no_follow_path(path, "target directory")
+        if path.is_symlink() or not path.exists():
+            raise RunFailure(f"target directory is missing or symlinked: {path}")
+        if not path.is_dir():
+            raise RunFailure(f"target path is not a directory: {path}")
     except OSError as error:
-        raise RunFailure(f"cannot measure directory {path}: {error}") from error
+        raise RunFailure(f"cannot inspect target directory {path}: {error}") from error
+    total = 0
+    pending = [path]
+    while pending:
+        current = pending.pop()
+        try:
+            entries = list(os.scandir(current))
+        except OSError as error:
+            raise RunFailure(f"cannot inspect target directory {current}: {error}") from error
+        for entry in entries:
+            try:
+                if entry.is_symlink():
+                    raise RunFailure(f"target contains a symlink: {entry.path}")
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False):
+                    total += entry.stat(follow_symlinks=False).st_size
+                else:
+                    raise RunFailure(f"target contains a non-regular entry: {entry.path}")
+            except FileNotFoundError as error:
+                raise RunFailure(f"target entry disappeared during inspection: {entry.path}") from error
+            except OSError as error:
+                raise RunFailure(f"cannot inspect target entry {entry.path}: {error}") from error
     return total
 
 
 def _target_guard(endpoints: Mapping[str, ResolvedEndpoint], phase: str) -> dict[str, Any]:
     result: dict[str, Any] = {"phase": phase, "checked_unix_ns": time.time_ns(), "targets": {}}
     for name, resolved in endpoints.items():
-        observed = _directory_bytes(resolved.endpoint.target_dir)
-        if phase == "before-correctness" and observed > TARGET_PREFLIGHT_BYTES:
-            raise RunFailure(f"{phase}: {name} target starts above preflight limit: {observed}")
-        if observed > TARGET_HARD_LIMIT_BYTES:
-            raise RunFailure(f"{phase}: {name} target exceeds hard limit: {observed}")
-        result["targets"][name] = {
-            "path": str(resolved.endpoint.target_dir),
-            "bytes": observed,
-            "preflight_limit": TARGET_PREFLIGHT_BYTES,
-            "hard_limit": TARGET_HARD_LIMIT_BYTES,
-        }
+        seen: set[Path] = set()
+        for kind, target in (
+            ("normal", resolved.endpoint.target_dir),
+            ("allocator", resolved.endpoint.allocator_target_dir),
+        ):
+            if target in seen:
+                continue
+            seen.add(target)
+            observed = _directory_bytes(target)
+            if phase.startswith("before-") and observed > TARGET_PREFLIGHT_BYTES:
+                raise RunFailure(f"{phase}: {name}/{kind} target starts above preflight limit: {observed}")
+            if observed > TARGET_HARD_LIMIT_BYTES:
+                raise RunFailure(f"{phase}: {name}/{kind} target exceeds hard limit: {observed}")
+            result["targets"][f"{name}/{kind}"] = {
+                "path": str(target),
+                "bytes": observed,
+                "preflight_limit": TARGET_PREFLIGHT_BYTES,
+                "hard_limit": TARGET_HARD_LIMIT_BYTES,
+            }
+    return result
+
+
+def _resource_guard(manifest: Manifest, endpoints: Mapping[str, ResolvedEndpoint], phase: str) -> dict[str, Any]:
+    result = _target_guard(endpoints, phase)
+    observed = _directory_bytes(manifest.tmpdir)
+    if phase.startswith("before-") and observed > TARGET_PREFLIGHT_BYTES:
+        raise RunFailure(f"{phase}: temporary directory starts above preflight limit: {observed}")
+    if observed > TARGET_HARD_LIMIT_BYTES:
+        raise RunFailure(f"{phase}: temporary directory exceeds hard limit: {observed}")
+    result["temporary"] = {
+        "path": str(manifest.tmpdir),
+        "bytes": observed,
+        "preflight_limit": TARGET_PREFLIGHT_BYTES,
+        "hard_limit": TARGET_HARD_LIMIT_BYTES,
+    }
     return result
 
 
@@ -287,7 +393,8 @@ def load_manifest(path: Path) -> Manifest:
         item = _object(value.get(name), f"manifest.{name}")
         _exact_keys(item, {
             "root", "ref", "tree", "profile", "binary", "target_dir", "lock", "toolchain",
-            "cargo_config", "source_manifest", "allocator_binary", "allocator_target_dir", "features",
+            "cargo_config", "cargo_manifest", "source_manifest", "allocator_binary", "allocator_target_dir",
+            "features", "binary_identity", "allocator_binary_identity",
         }, f"manifest.{name}")
         requested_ref = _string(item.get("ref"), f"manifest.{name}.ref")
         expected_tree = _string(item.get("tree"), f"manifest.{name}.tree")
@@ -312,10 +419,15 @@ def load_manifest(path: Path) -> Manifest:
             lock=_identity_file(item.get("lock"), f"manifest.{name}.lock", base),
             toolchain=_identity_file(item.get("toolchain"), f"manifest.{name}.toolchain", base),
             cargo_config=_identity_file(item.get("cargo_config"), f"manifest.{name}.cargo_config", base),
+            cargo_manifest=_identity_file(item.get("cargo_manifest"), f"manifest.{name}.cargo_manifest", base),
             source_manifest=_tree_identity(item.get("source_manifest"), f"manifest.{name}.source_manifest"),
             features=tuple(features_value),
             allocator_binary=_path(item.get("allocator_binary"), f"manifest.{name}.allocator_binary", base),
             allocator_target_dir=_path(item.get("allocator_target_dir"), f"manifest.{name}.allocator_target_dir", base),
+            binary_identity=_digest_binding(item.get("binary_identity"), f"manifest.{name}.binary_identity"),
+            allocator_binary_identity=_digest_binding(
+                item.get("allocator_binary_identity"), f"manifest.{name}.allocator_binary_identity"
+            ),
         )
 
     baseline = endpoint("baseline", BASELINE_PROFILE)
@@ -377,13 +489,20 @@ def load_manifest(path: Path) -> Manifest:
     if limits != EXPECTED_LIMITS:
         raise RunFailure(f"composition_limits must equal {EXPECTED_LIMITS!r}")
     build_value = _object(value.get("build"), "manifest.build")
-    _exact_keys(build_value, {"prepare_receipt", "receipt", "final_candidate_ref", "cpu"}, "manifest.build")
+    _exact_keys(build_value, {"prepare_receipt", "receipt", "receipt_identity", "final_candidate_ref", "cpu"}, "manifest.build")
     final_candidate_ref = _string(build_value.get("final_candidate_ref"), "manifest.build.final_candidate_ref")
     if REVISION.fullmatch(final_candidate_ref) is None or final_candidate_ref != candidate.requested_ref:
         raise RunFailure("manifest.build.final_candidate_ref must equal the immutable candidate ref")
+    receipt = _path(build_value.get("receipt"), "manifest.build.receipt", base)
+    receipt_identity = _identity_file(
+        build_value.get("receipt_identity"), "manifest.build.receipt_identity", base
+    )
+    if receipt_identity.path != receipt:
+        raise RunFailure("manifest.build.receipt_identity.path must equal manifest.build.receipt")
     build = BuildPaths(
         prepare_receipt=_path(build_value.get("prepare_receipt"), "manifest.build.prepare_receipt", base),
-        receipt=_path(build_value.get("receipt"), "manifest.build.receipt", base),
+        receipt=receipt,
+        receipt_identity=receipt_identity,
         final_candidate_ref=final_candidate_ref,
         cpu=_nonnegative_int(build_value.get("cpu"), "manifest.build.cpu"),
     )
@@ -393,10 +512,16 @@ def load_manifest(path: Path) -> Manifest:
 
 
 def validate_fixture(fixture: Fixture) -> dict[str, Any]:
-    if not fixture.path.is_file():
-        raise RunFailure(f"fixture is not a regular file: {fixture.path}")
+    if fixture.path.absolute() != (REVIEWED_REPO_ROOT / REVIEWED_FIXTURE_RELATIVE).absolute():
+        raise RunFailure("fixture path is not the fixed reviewed repository fixture")
+    if fixture.provenance != REVIEWED_FIXTURE_PROVENANCE:
+        raise RunFailure("fixture provenance is not the fixed reviewed provenance")
+    if not fixture.path.is_file() or fixture.path.is_symlink():
+        raise RunFailure(f"fixture is not a regular reviewed file: {fixture.path}")
     actual_sha, actual_bytes = _sha256_file(fixture.path)
-    if (actual_bytes, actual_sha) != (fixture.bytes, fixture.sha256):
+    if (actual_bytes, actual_sha) != (fixture.bytes, fixture.sha256) or {
+        "bytes": actual_bytes, "sha256": actual_sha
+    } != REVIEWED_FIXTURE_IDENTITY:
         raise RunFailure("fixture identity differs from its manifest")
     content = fixture.path.read_bytes()
     if b"<office:document-content" not in content or b"<draw:page" not in content:
@@ -409,8 +534,18 @@ def validate_probe_sources(sources: tuple[ProbeSource, ...]) -> dict[str, Any]:
         raise RunFailure("probe source overlays must be separate files")
     records = {}
     for source in sources:
+        relative = REVIEWED_PROBE_RELATIVES.get(source.name)
+        if relative is None or source.path.absolute() != (REVIEWED_REPO_ROOT / relative).absolute():
+            raise RunFailure(f"probe source {source.name} is not the fixed reviewed repository adapter")
+        if source.path.is_symlink() or not source.path.is_file():
+            raise RunFailure(f"probe source {source.name} is not a regular reviewed file")
+        status = _run_git(REVIEWED_REPO_ROOT, "ls-files", "-v", "--", str(relative))
+        if status != f"H {relative}":
+            raise RunFailure(f"probe source {source.name} is not an ordinary tracked worktree file")
         actual_sha, actual_bytes = _sha256_file(source.path)
-        if (actual_bytes, actual_sha) != (source.bytes, source.sha256):
+        expected = REVIEWED_PROBE_IDENTITIES[source.name]
+        if ((actual_bytes, actual_sha) != (source.bytes, source.sha256)
+                or (actual_bytes, actual_sha) != (expected["bytes"], expected["sha256"])):
             raise RunFailure(f"probe source {source.name} identity differs from its manifest")
         records[source.name] = {"path": str(source.path), "bytes": actual_bytes, "sha256": actual_sha,
                                 "destination": source.destination}
@@ -420,6 +555,11 @@ def validate_probe_sources(sources: tuple[ProbeSource, ...]) -> dict[str, Any]:
 def _resolve_endpoint(endpoint: Endpoint, roots: tuple[Path, ...]) -> ResolvedEndpoint:
     if not endpoint.root.is_dir():
         raise RunFailure(f"{endpoint.name}.root is not a directory: {endpoint.root}")
+    try:
+        from odg_joined_qualification_builder import _check_worktree_shape
+    except ImportError:  # pragma: no cover
+        from tools.odg_joined_qualification_builder import _check_worktree_shape  # type: ignore[no-redef]
+    _check_worktree_shape(endpoint.root, endpoint.name)
     status = _run_git(endpoint.root, "status", "--porcelain", "--untracked-files=all")
     if status:
         raise RunFailure(f"{endpoint.name}.root is dirty")
@@ -431,7 +571,15 @@ def _resolve_endpoint(endpoint: Endpoint, roots: tuple[Path, ...]) -> ResolvedEn
     tree = _run_git(endpoint.root, "rev-parse", "--verify", f"{resolved}^{{tree}}")
     if REVISION.fullmatch(tree) is None or tree != endpoint.expected_tree:
         raise RunFailure(f"{endpoint.name}: resolved tree differs from the manifest")
-    if not endpoint.binary.is_file() or not endpoint.binary.stat().st_mode & 0o111:
+    expected_binary = endpoint.target_dir / "release" / "examples" / "litchi-perf-odg-joined-qualification"
+    expected_allocator_binary = (
+        endpoint.allocator_target_dir / "release" / "examples" / "litchi-perf-odg-joined-qualification"
+    )
+    if endpoint.binary != expected_binary:
+        raise RunFailure(f"{endpoint.name}.binary must be the release example artifact")
+    if endpoint.allocator_binary != expected_allocator_binary:
+        raise RunFailure(f"{endpoint.name}.allocator_binary must be the release example artifact")
+    if not endpoint.binary.is_file() or endpoint.binary.is_symlink() or not endpoint.binary.stat().st_mode & 0o111:
         raise RunFailure(f"{endpoint.name}.binary is not executable")
     if endpoint.binary.name != "litchi-perf-odg-joined-qualification":
         raise RunFailure(
@@ -439,7 +587,7 @@ def _resolve_endpoint(endpoint: Endpoint, roots: tuple[Path, ...]) -> ResolvedEn
         )
     if not endpoint.target_dir.is_dir():
         raise RunFailure(f"{endpoint.name}.target_dir is not a directory")
-    if not endpoint.allocator_binary.is_file() or not endpoint.allocator_binary.stat().st_mode & 0o111:
+    if not endpoint.allocator_binary.is_file() or endpoint.allocator_binary.is_symlink() or not endpoint.allocator_binary.stat().st_mode & 0o111:
         raise RunFailure(f"{endpoint.name}.allocator_binary is not executable")
     if endpoint.allocator_binary.name != "litchi-perf-odg-joined-qualification":
         raise RunFailure(f"{endpoint.name}.allocator_binary has an unexpected basename")
@@ -467,8 +615,19 @@ def _resolve_endpoint(endpoint: Endpoint, roots: tuple[Path, ...]) -> ResolvedEn
     lock = identity_file(endpoint.lock, f"{endpoint.name}.lock")
     toolchain = identity_file(endpoint.toolchain, f"{endpoint.name}.toolchain")
     cargo_config = identity_file(endpoint.cargo_config, f"{endpoint.name}.cargo_config")
-    return ResolvedEndpoint(endpoint, resolved, tree, binary_identity(endpoint.binary),
-                            binary_identity(endpoint.allocator_binary), lock, toolchain, cargo_config)
+    cargo_manifest = identity_file(endpoint.cargo_manifest, f"{endpoint.name}.cargo_manifest")
+    actual_binary = binary_identity(endpoint.binary)
+    actual_allocator = binary_identity(endpoint.allocator_binary)
+    if (actual_binary["bytes"], actual_binary["sha256"]) != (
+        endpoint.binary_identity["bytes"], endpoint.binary_identity["sha256"]
+    ):
+        raise RunFailure(f"{endpoint.name}.binary differs from its external binding")
+    if (actual_allocator["bytes"], actual_allocator["sha256"]) != (
+        endpoint.allocator_binary_identity["bytes"], endpoint.allocator_binary_identity["sha256"]
+    ):
+        raise RunFailure(f"{endpoint.name}.allocator_binary differs from its external binding")
+    return ResolvedEndpoint(endpoint, resolved, tree, actual_binary, actual_allocator,
+                            lock, toolchain, cargo_config, cargo_manifest)
 
 
 def _under(left: Path, right: Path) -> bool:
@@ -490,6 +649,7 @@ def _validate_layout(manifest: Manifest, out_dir: Path) -> None:
     _validate_external_target(manifest.tmpdir, roots, "temporary directory")
     _validate_external_target(manifest.build.prepare_receipt, roots, "prepare receipt")
     _validate_external_target(manifest.build.receipt, roots, "build receipt")
+    _validate_external_target(manifest.build.receipt_identity.path, roots, "build receipt identity")
     if "3rdparty" in manifest.build.receipt.parts or "3rdparty" in manifest.build.prepare_receipt.parts:
         raise RunFailure("build receipts must not reference 3rdparty")
     if _under(out_dir, manifest.tmpdir) or _under(manifest.tmpdir, out_dir):
@@ -536,7 +696,7 @@ def runtime_identity(manifest: Manifest, out_dir: Path, *, require_build_receipt
                      "resolved_ref": baseline.resolved_ref, "tree": baseline.tree,
                      "profile": baseline.endpoint.profile, "features": list(baseline.endpoint.features),
                      "lock": baseline.lock, "toolchain": baseline.toolchain,
-                     "cargo_config": baseline.cargo_config,
+                     "cargo_config": baseline.cargo_config, "cargo_manifest": baseline.cargo_manifest,
                      "binary": baseline.binary, "allocator_binary": baseline.allocator_binary,
                      "target_dir": str(baseline.endpoint.target_dir),
                      "allocator_target_dir": str(baseline.endpoint.allocator_target_dir)},
@@ -544,7 +704,7 @@ def runtime_identity(manifest: Manifest, out_dir: Path, *, require_build_receipt
                       "resolved_ref": candidate.resolved_ref, "tree": candidate.tree,
                       "profile": candidate.endpoint.profile, "features": list(candidate.endpoint.features),
                       "lock": candidate.lock, "toolchain": candidate.toolchain,
-                      "cargo_config": candidate.cargo_config,
+                      "cargo_config": candidate.cargo_config, "cargo_manifest": candidate.cargo_manifest,
                       "binary": candidate.binary, "allocator_binary": candidate.allocator_binary,
                       "target_dir": str(candidate.endpoint.target_dir),
                       "allocator_target_dir": str(candidate.endpoint.allocator_target_dir)},
@@ -582,6 +742,7 @@ def _assert_unchanged(manifest: Manifest, endpoints: Mapping[str, ResolvedEndpoi
             ("lock", resolved.endpoint.lock, resolved.lock),
             ("toolchain", resolved.endpoint.toolchain, resolved.toolchain),
             ("cargo_config", resolved.endpoint.cargo_config, resolved.cargo_config),
+            ("cargo_manifest", resolved.endpoint.cargo_manifest, resolved.cargo_manifest),
         ):
             actual_sha, actual_bytes = _sha256_file(value.path)
             if (actual_bytes, actual_sha) != (value.bytes, value.sha256) or {
@@ -592,7 +753,7 @@ def _assert_unchanged(manifest: Manifest, endpoints: Mapping[str, ResolvedEndpoi
                         "features": list(resolved.endpoint.features), "binary": actual,
                         "allocator_binary": actual_allocator,
                         "lock": resolved.lock, "toolchain": resolved.toolchain,
-                        "cargo_config": resolved.cargo_config}
+                        "cargo_config": resolved.cargo_config, "cargo_manifest": resolved.cargo_manifest}
     result["checked_unix_ns"] = time.time_ns()
     return result
 
@@ -684,6 +845,9 @@ def _validate_log_binding(logs: Mapping[str, Any], endpoint: ResolvedEndpoint, m
                     f"{label}.guard.{phase}")
         if not isinstance(value["heavy_processes"], list):
             raise RunFailure(f"{label}.guard.{phase}: process list is malformed")
+        if (type(value["load_1m"]) not in (int, float) or value["load_1m"] < 0
+                or value["load_1m"] > guard["max_load"]):
+            raise RunFailure(f"{label}.guard.{phase}: load bound failed")
         if value["max_load"] != guard["max_load"]:
             raise RunFailure(f"{label}.guard.{phase}: load ceiling identity differs")
     live = guard["live"]
@@ -691,18 +855,36 @@ def _validate_log_binding(logs: Mapping[str, Any], endpoint: ResolvedEndpoint, m
         raise RunFailure(f"{label}.guard.live is incomplete")
     for index, value in enumerate(live):
         sample = _object(value, f"{label}.guard.live[{index}]")
-        _exact_keys(sample, {"checked_unix_ns", "output_bytes", "rss_bytes", "load_1m", "outside_processes"},
+        _exact_keys(sample, {"checked_unix_ns", "output_bytes", "rss_bytes", "load_1m",
+                             "outside_processes", "owned_processes"},
                     f"{label}.guard.live[{index}]")
         _positive_int(sample["checked_unix_ns"], f"{label}.guard.live[{index}].checked_unix_ns")
         if type(sample["output_bytes"]) is not int or sample["output_bytes"] < 0 or sample["output_bytes"] > MAX_CHILD_OUTPUT:
             raise RunFailure(f"{label}.guard.live[{index}]: output bound failed")
         if type(sample["rss_bytes"]) is not int or sample["rss_bytes"] < 0 or sample["rss_bytes"] > TARGET_HARD_LIMIT_BYTES:
             raise RunFailure(f"{label}.guard.live[{index}]: memory bound failed")
+        if (type(sample["load_1m"]) not in (int, float)
+                or sample["load_1m"] < 0 or sample["load_1m"] > guard["max_load"]):
+            raise RunFailure(f"{label}.guard.live[{index}]: load bound failed")
         if sample["outside_processes"] != []:
             raise RunFailure(f"{label}.guard.live[{index}]: unrelated process observed")
+        if not isinstance(sample["owned_processes"], list):
+            raise RunFailure(f"{label}.guard.live[{index}]: owned process identity is malformed")
+        for process in sample["owned_processes"]:
+            item = _object(process, f"{label}.guard.live[{index}].owned_process")
+            _exact_keys(item, {"pid", "start_time", "process_group"},
+                        f"{label}.guard.live[{index}].owned_process")
+            _positive_int(item["pid"], f"{label}.guard.live[{index}].owned_process.pid")
+            _positive_int(item["start_time"], f"{label}.guard.live[{index}].owned_process.start_time")
+            _positive_int(item["process_group"], f"{label}.guard.live[{index}].owned_process.process_group")
+    if live[-1].get("owned_processes") != []:
+        raise RunFailure(f"{label}.guard.live: owned descendants remained after child exit")
     target = _object(logs.get("target"), f"{label}.target")
     _exact_keys(target, {"path", "bytes_before", "bytes_after", "hard_limit_bytes"}, f"{label}.target")
-    if type(target["bytes_before"]) is not int or type(target["bytes_after"]) is not int:
+    if (type(target["bytes_before"]) is not int or type(target["bytes_after"]) is not int
+            or target["bytes_before"] < 0 or target["bytes_after"] < 0
+            or target["bytes_before"] > TARGET_HARD_LIMIT_BYTES
+            or target["bytes_after"] > TARGET_HARD_LIMIT_BYTES):
         raise RunFailure(f"{label}.target byte accounting is malformed")
     if target["hard_limit_bytes"] != TARGET_HARD_LIMIT_BYTES:
         raise RunFailure(f"{label}.target hard limit identity differs")
@@ -829,13 +1011,18 @@ def validate_calibration(report: Mapping[str, Any], endpoint: str, route: str, s
     schema = CANDIDATE_SCHEMA if endpoint == "candidate" else BASELINE_SCHEMA
     expected_endpoint = "candidate-edit-join-commit" if endpoint == "candidate" else "baseline-apply-joined"
     _exact_keys(report, {"schema", "endpoint", "mode", "route", "scope", "target_ns", "iterations",
-                         "elapsed_ns", "attempts"}, f"{endpoint}/{route}/{scope}.calibration")
+                         "elapsed_ns", "attempts", "iteration_policy", "initial_iterations",
+                         "max_iterations"}, f"{endpoint}/{route}/{scope}.calibration")
     if (report.get("schema") != schema or report.get("endpoint") != expected_endpoint
             or report.get("mode") != "calibrate" or report.get("route") != route
             or report.get("scope") != scope):
         raise RunFailure(f"{endpoint}/{route}/{scope}: calibration identity mismatch")
     if report.get("target_ns") != protocol.target_ns:
         raise RunFailure(f"{endpoint}/{route}/{scope}: calibration target mismatch")
+    if (report.get("iteration_policy") != CALIBRATION_POLICY
+            or report.get("initial_iterations") != 1
+            or report.get("max_iterations") != protocol.max_iterations):
+        raise RunFailure(f"{endpoint}/{route}/{scope}: calibration iteration contract mismatch")
     iterations = _positive_int(report.get("iterations"), "calibration.iterations")
     elapsed = _positive_int(report.get("elapsed_ns"), "calibration.elapsed_ns")
     if iterations > protocol.max_iterations or elapsed < protocol.target_ns:
@@ -850,7 +1037,9 @@ def validate_calibration(report: Mapping[str, Any], endpoint: str, route: str, s
                     f"{endpoint}/{route}/{scope}.attempts[{index}]")
         count = _positive_int(attempt.get("iterations"), "calibration attempt iterations")
         duration = _positive_int(attempt.get("elapsed_ns"), "calibration attempt elapsed_ns")
-        if count <= previous or count > protocol.max_iterations or duration <= 0 or attempt.get("proof") != expected:
+        expected_count = 1 if index == 0 else min(previous * 2, protocol.max_iterations)
+        if (count != expected_count or count > protocol.max_iterations or duration <= 0
+                or attempt.get("proof") != expected):
             raise RunFailure(f"{endpoint}/{route}/{scope}: malformed calibration attempt")
         previous = count
         if index == len(attempts) - 1 and (count != iterations or duration != elapsed):
@@ -915,19 +1104,29 @@ def validate_allocation(report: Mapping[str, Any], endpoint: str, route: str, sc
     fields = {"status", "scope", "allocation_calls", "deallocation_calls", "reallocation_calls",
               "failed_allocation_calls", "allocated_bytes", "deallocated_bytes", "live_bytes_before",
               "live_bytes_after", "peak_live_bytes_before", "peak_live_bytes_after", "region_peak_live_bytes"}
+    fields.add("live_underflow")
     _exact_keys(allocation, fields, f"{endpoint}/{route}/{scope}.allocation.allocation")
     if allocation["status"] != "measured" or allocation["scope"] != "operation_global_system_allocator":
         raise RunFailure(f"{endpoint}/{route}/{scope}: allocation observation is not measured")
     numbers: dict[str, int] = {}
     for field in fields - {"status", "scope"}:
-        numbers[field] = _nonnegative_int(allocation.get(field), f"allocation.{field}")
+        if field == "live_underflow":
+            if type(allocation.get(field)) is not bool:
+                raise RunFailure(f"{endpoint}/{route}/{scope}: allocator underflow flag is malformed")
+        else:
+            numbers[field] = _nonnegative_int(allocation.get(field), f"allocation.{field}")
+    if allocation["live_underflow"]:
+        raise RunFailure(f"{endpoint}/{route}/{scope}: allocator live-byte underflow was observed")
     if (numbers["live_bytes_after"] - numbers["live_bytes_before"]
             != numbers["allocated_bytes"] - numbers["deallocated_bytes"]):
         raise RunFailure(f"{endpoint}/{route}/{scope}: allocation live-byte conservation failed")
     if (numbers["peak_live_bytes_before"] < numbers["live_bytes_before"]
+            or numbers["peak_live_bytes_after"] < numbers["peak_live_bytes_before"]
             or numbers["peak_live_bytes_after"] < numbers["live_bytes_after"]
+            or numbers["region_peak_live_bytes"] > numbers["peak_live_bytes_after"]
             or numbers["region_peak_live_bytes"] < numbers["live_bytes_before"]
-            or numbers["region_peak_live_bytes"] < numbers["live_bytes_after"]):
+            or numbers["region_peak_live_bytes"] < numbers["live_bytes_after"]
+            or numbers["reallocation_calls"] > numbers["allocation_calls"]):
         raise RunFailure(f"{endpoint}/{route}/{scope}: allocation peak bounds failed")
     return {"metrics": metrics, "proof": expected}
 
@@ -969,7 +1168,25 @@ def validate_abba_rows(rows: Any, key: str) -> list[dict[str, Any]]:
         _exact_keys(guard, {"phase", "load_1m", "max_load", "heavy_processes", "checked_unix_ns"},
                     f"{key}.rows[{index}].guard")
         target = _object(row.get("target"), f"{key}.rows[{index}].target")
-        _exact_keys(target, {"targets", "phase", "checked_unix_ns"}, f"{key}.rows[{index}].target")
+        _exact_keys(target, {"targets", "temporary", "phase", "checked_unix_ns"}, f"{key}.rows[{index}].target")
+        targets = target["targets"]
+        if not isinstance(targets, dict) or not targets:
+            raise RunFailure(f"{key}.rows[{index}].target target set is malformed")
+        for target_name, target_value in targets.items():
+            target_item = _object(target_value, f"{key}.rows[{index}].target.targets[{target_name}]")
+            _exact_keys(target_item, {"path", "bytes", "preflight_limit", "hard_limit"},
+                        f"{key}.rows[{index}].target.targets[{target_name}]")
+            if (type(target_item["bytes"]) is not int or target_item["bytes"] < 0
+                    or target_item["preflight_limit"] != TARGET_PREFLIGHT_BYTES
+                    or target_item["hard_limit"] != TARGET_HARD_LIMIT_BYTES):
+                raise RunFailure(f"{key}.rows[{index}].target target identity is malformed")
+        temporary = _object(target["temporary"], f"{key}.rows[{index}].target.temporary")
+        _exact_keys(temporary, {"path", "bytes", "preflight_limit", "hard_limit"},
+                    f"{key}.rows[{index}].target.temporary")
+        if (type(temporary["bytes"]) is not int or temporary["bytes"] < 0
+                or temporary["preflight_limit"] != TARGET_PREFLIGHT_BYTES
+                or temporary["hard_limit"] != TARGET_HARD_LIMIT_BYTES):
+            raise RunFailure(f"{key}.rows[{index}].target temporary identity is malformed")
         logs = _object(row.get("logs"), f"{key}.rows[{index}].logs")
         _exact_keys(logs, {"command", "returncode", "endpoint", "profile", "resolved_ref", "binary",
                            "binding", "stdout", "stderr", "guard", "target"},
@@ -1012,7 +1229,8 @@ def _plan(manifest: Manifest, out_dir: Path) -> dict[str, Any]:
             "composition_limits": manifest.limits,
             "protocol": {"cpu": manifest.protocol.cpu, "blocks": manifest.protocol.blocks,
                           "warmups": manifest.protocol.warmups, "target_ns": manifest.protocol.target_ns,
-                          "minimum_ns": manifest.protocol.minimum_ns, "max_iterations": manifest.protocol.max_iterations}}
+                          "minimum_ns": manifest.protocol.minimum_ns, "max_iterations": manifest.protocol.max_iterations,
+                          "calibration_policy": CALIBRATION_POLICY}}
 
 
 def _allocator_endpoints(endpoints: Mapping[str, ResolvedEndpoint]) -> dict[str, ResolvedEndpoint]:
@@ -1039,7 +1257,7 @@ def _execute(manifest: Manifest, out_dir: Path, correctness_only: bool, allocati
     manifest.tmpdir.mkdir(parents=True, exist_ok=False)
     identity = runtime_identity(manifest, out_dir)
     endpoints: Mapping[str, ResolvedEndpoint] = identity["endpoints"]
-    target_before = _target_guard(endpoints, "before-correctness")
+    target_before = _resource_guard(manifest, endpoints, "before-correctness")
     correctness_dir = out_dir / "correctness"
     correctness_dir.mkdir()
     baseline_report, baseline_logs = _run_probe(endpoints["baseline"], manifest, correctness_dir, "verify", "baseline-verify")
@@ -1054,7 +1272,7 @@ def _execute(manifest: Manifest, out_dir: Path, correctness_only: bool, allocati
     for route in ROUTES:
         if baseline["routes"][route] != candidate["routes"][route]:
             raise RunFailure(f"{route}: output or semantic proof differs between endpoints")
-    target_after = _target_guard(endpoints, "after-correctness")
+    target_after = _resource_guard(manifest, endpoints, "after-correctness")
     result: dict[str, Any] = {
         "schema": REPORT_SCHEMA,
         "claim_scope": "correctness-only" if correctness_only else "correctness-calibration-abba",
@@ -1064,7 +1282,8 @@ def _execute(manifest: Manifest, out_dir: Path, correctness_only: bool, allocati
         "protocol": {"cpu": manifest.protocol.cpu, "blocks": manifest.protocol.blocks,
                       "warmups": manifest.protocol.warmups, "target_ns": manifest.protocol.target_ns,
                       "minimum_ns": manifest.protocol.minimum_ns,
-                      "max_iterations": manifest.protocol.max_iterations},
+                      "max_iterations": manifest.protocol.max_iterations,
+                      "calibration_policy": CALIBRATION_POLICY},
         "identity": {key: value for key, value in identity.items() if key != "endpoints"},
         "target_guards": [target_before, target_after],
         "correctness": {"baseline": baseline, "candidate": candidate,
@@ -1089,7 +1308,7 @@ def _execute(manifest: Manifest, out_dir: Path, correctness_only: bool, allocati
                     for role in ABBA_ORDER:
                         endpoint_name = ROLE_ENDPOINT[role]
                         guard = quiet_guard(manifest.protocol, f"before-allocation-{block}-{role}-{key}")
-                        target = _target_guard(allocation_endpoints, f"before-allocation-{block}-{role}-{key}")
+                        target = _resource_guard(manifest, allocation_endpoints, f"before-allocation-{block}-{role}-{key}")
                         report, logs = _run_probe(
                             allocation_endpoints[endpoint_name], manifest, allocation_dir, "allocation",
                             f"allocation-block-{block}-{role}-{route}-{scope}",
@@ -1121,7 +1340,7 @@ def _execute(manifest: Manifest, out_dir: Path, correctness_only: bool, allocati
             calibrations[key] = {}
             for endpoint_name in ("baseline", "candidate"):
                 guard = quiet_guard(manifest.protocol, f"before-calibration-{endpoint_name}-{key}")
-                target = _target_guard(endpoints, f"before-calibration-{endpoint_name}-{key}")
+                target = _resource_guard(manifest, endpoints, f"before-calibration-{endpoint_name}-{key}")
                 report, logs = _run_probe(endpoints[endpoint_name], manifest, calibration_dir, "calibrate",
                                           f"{endpoint_name}-{route}-{scope}", route=route, scope=scope,
                                           warmups=manifest.protocol.warmups, target_ns=manifest.protocol.target_ns)
@@ -1147,7 +1366,7 @@ def _execute(manifest: Manifest, out_dir: Path, correctness_only: bool, allocati
                 for role in ABBA_ORDER:
                     endpoint_name = ROLE_ENDPOINT[role]
                     guard = quiet_guard(manifest.protocol, f"before-abba-{block}-{role}-{key}")
-                    target = _target_guard(endpoints, f"before-abba-{block}-{role}-{key}")
+                    target = _resource_guard(manifest, endpoints, f"before-abba-{block}-{role}-{key}")
                     iterations = calibrations[key][endpoint_name]["iterations"]
                     report, logs = _run_probe(
                         endpoints[endpoint_name], manifest, abba_dir, "timed",

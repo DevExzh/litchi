@@ -38,7 +38,21 @@ streams each Cargo child into exclusive bounded logs with live RSS, output,
 load, process, and target guards, then removes the temporary example files
 and verifies both source worktrees are clean before the execution manifest is
 resolved. Preparation and build receipts, targets, logs, and runtime output
-must all be fresh; receipt validation rehashes every log and artifact.
+must all be fresh; receipt validation rehashes every log and artifact. The
+builder invokes the virtual workspace with the bound
+--package litchi-odg --release --example
+litchi-perf-odg-joined-qualification command and admits only the corresponding
+target/release/examples/ artifact. The manifest carries external identities
+for the normal and allocator binaries and the completed build receipt; a
+self-edited receipt cannot establish those identities.
+
+The adapter and fixture paths are fixed to the reviewed repository files and
+their approved bytes, rather than being caller-selected look-alikes. Both
+git ls-files -v and git ls-files --debug are checked, so assume-unchanged,
+skip-worktree, extended-index, sparse, missing, or symlinked inputs fail
+closed. Cargo.toml is admitted alongside Cargo.lock, rust-toolchain.toml, and
+.cargo/config.toml, and its actual bytes are recorded before and after each
+build event.
 
 ## Routes and clocks
 
@@ -76,6 +90,16 @@ target, and a 150 ms minimum accepted sample. Each child report and log is
 bound to endpoint, resolved ref, binary digest, route, scope, phase, live
 guard, target, and rehashed stream identities; malformed, extra, stale, or
 incomplete rows fail closed.
+
+Calibration uses the explicit reviewed adaptive-doubling-v1 policy: the
+reported attempts must start at one iteration, double up to the declared
+maximum, and bind the final count and elapsed time. Before every build,
+allocator launch, calibration, ABBA leg, and temporary-directory use, the
+runner applies the 19.2 GB preflight and 20 GB hard bounds. Directory scans
+are no-follow scans which reject missing entries, symlinks, and disappearing
+files. The child guard installs a parent-death signal and a Linux child
+subreaper, records owned PID/start-time/process-group identities, streams
+bounded output, and rejects detached descendants after the child exits.
 
 `--allocation-only` runs the same routes/scopes and ABBA order against a
 separate allocator-instrumented build. The overlay allocator publishes
@@ -123,7 +147,8 @@ Static validation for this source-only commit is:
 
 ```text
 python3 -m py_compile tools/odg_joined_qualification.py \
-  tools/odg_joined_qualification_builder.py tools/test_odg_joined_qualification.py
+  tools/odg_joined_qualification_builder.py \
+  tools/odg_joined_qualification_bindings.py tools/test_odg_joined_qualification.py
 python3 -m unittest -v tools.test_odg_joined_qualification
 rustfmt --check tools/perf-baseline/odg_joined_qualification_common.rs \
   tools/perf-baseline/odg_joined_qualification_allocator.rs \

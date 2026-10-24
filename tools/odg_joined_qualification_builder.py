@@ -42,6 +42,14 @@ try:
         load_average,
         process_scan,
     )
+    from odg_joined_qualification_bindings import (
+        REVIEWED_FIXTURE_IDENTITY,
+        REVIEWED_FIXTURE_PROVENANCE,
+        REVIEWED_FIXTURE_RELATIVE,
+        REVIEWED_PROBE_IDENTITIES,
+        REVIEWED_PROBE_RELATIVES,
+        REVIEWED_REPO_ROOT,
+    )
 except ImportError:  # pragma: no cover - direct tools import.
     from tools.odp_native_qualification import (  # type: ignore[no-redef]
         MAX_CHILD_OUTPUT,
@@ -57,13 +65,23 @@ except ImportError:  # pragma: no cover - direct tools import.
         load_average,
         process_scan,
     )
+    from tools.odg_joined_qualification_bindings import (  # type: ignore[no-redef]
+        REVIEWED_FIXTURE_IDENTITY,
+        REVIEWED_FIXTURE_PROVENANCE,
+        REVIEWED_FIXTURE_RELATIVE,
+        REVIEWED_PROBE_IDENTITIES,
+        REVIEWED_PROBE_RELATIVES,
+        REVIEWED_REPO_ROOT,
+    )
 
 
-PREPARE_SCHEMA = "litchi.odg.joined-native-qualification.prepare.v2"
-BUILD_SCHEMA = "litchi.odg.joined-native-qualification.build.v2"
-BUILDER_REVISION = "odg-joined-builder-v2-streamed-receipt"
+PREPARE_SCHEMA = "litchi.odg.joined-native-qualification.prepare.v3"
+BUILD_SCHEMA = "litchi.odg.joined-native-qualification.build.v3"
+BUILDER_REVISION = "odg-joined-builder-v3-bound-release-streamed-receipt"
 PRISTINE_BASELINE_REF = "ad52437f5e5e2c71ea476eedd5ddcf61aee2021d"
 EXPECTED_EXAMPLE = "litchi-perf-odg-joined-qualification"
+EXPECTED_PACKAGE = "litchi-odg"
+EXPECTED_CARGO_PROFILE = "release"
 EXPECTED_OVERLAY_DESTINATION = "crates/litchi-odg/examples/litchi-perf-odg-joined-qualification.rs"
 EXPECTED_COMMON_DESTINATION = "crates/litchi-odg/examples/odg_joined_qualification_common.rs"
 EXPECTED_SOURCE_NAMES = {
@@ -74,6 +92,7 @@ EXPECTED_SOURCE_NAMES = {
 }
 MAX_BUILD_OUTPUT = 64 * 1024 * 1024
 MEMORY_LIMIT_BYTES = 20_000_000_000
+TARGET_PREFLIGHT_BYTES = 19_200_000_000
 DESCENDANT_GRACE_S = 2.0
 
 
@@ -168,8 +187,8 @@ def _endpoint_value(raw: Mapping[str, Any], name: str) -> dict[str, Any]:
     value = _object(raw.get(name), f"manifest.{name}")
     expected = {
         "root", "ref", "tree", "profile", "binary", "target_dir", "lock",
-        "toolchain", "cargo_config", "source_manifest", "allocator_binary",
-        "allocator_target_dir", "features",
+        "toolchain", "cargo_config", "cargo_manifest", "source_manifest", "allocator_binary",
+        "allocator_target_dir", "features", "binary_identity", "allocator_binary_identity",
     }
     _exact_keys(value, expected, f"manifest.{name}")
     return value
@@ -177,7 +196,7 @@ def _endpoint_value(raw: Mapping[str, Any], name: str) -> dict[str, Any]:
 
 def _build_value(raw: Mapping[str, Any]) -> dict[str, Any]:
     value = _object(raw.get("build"), "manifest.build")
-    _exact_keys(value, {"prepare_receipt", "receipt", "final_candidate_ref", "cpu"}, "manifest.build")
+    _exact_keys(value, {"prepare_receipt", "receipt", "receipt_identity", "final_candidate_ref", "cpu"}, "manifest.build")
     return value
 
 
@@ -199,6 +218,47 @@ def _identity_value(value: Any, label: str, base: Path) -> tuple[Path, int, str]
 def _identity(path: Path) -> dict[str, Any]:
     sha, size = _sha256_file(path)
     return {"path": str(path), "bytes": size, "sha256": sha}
+
+
+def _digest_binding(value: Any, label: str) -> dict[str, Any]:
+    item = _object(value, label)
+    _exact_keys(item, {"bytes", "sha256"}, label)
+    return {
+        "bytes": _positive_int(item.get("bytes"), f"{label}.bytes"),
+        "sha256": _digest(item.get("sha256"), f"{label}.sha256"),
+    }
+
+
+def _receipt_binding(value: Any, label: str, base: Path, expected_path: Path) -> dict[str, Any]:
+    item = _object(value, label)
+    _exact_keys(item, {"path", "bytes", "sha256"}, label)
+    path = _safe_path(_raw_path(item.get("path"), f"{label}.path", base), f"{label}.path")
+    if path != expected_path:
+        raise RunFailure(f"{label}.path must equal the manifest build receipt path")
+    return {
+        "path": str(path),
+        "bytes": _positive_int(item.get("bytes"), f"{label}.bytes"),
+        "sha256": _digest(item.get("sha256"), f"{label}.sha256"),
+    }
+
+
+def _reviewed_file(path: Path, relative: Path, expected: Mapping[str, Any], label: str) -> dict[str, Any]:
+    """Bind an overlay/fixture to the reviewed repository input itself."""
+
+    path = _safe_path(path, label, must_exist=True)
+    approved = _safe_path(REVIEWED_REPO_ROOT / relative, f"approved {label}", must_exist=True)
+    if path != approved:
+        raise RunFailure(f"{label} must use the reviewed repository path {relative}")
+    status = _run_git_bytes(REVIEWED_REPO_ROOT, "ls-files", "-v", "-z", "--", str(relative))
+    records = [item for item in status.split(b"\0") if item]
+    if records != [b"H " + str(relative).encode()]:
+        raise RunFailure(f"approved {label} is not an ordinary tracked worktree file")
+    actual = _identity(path)
+    binding = {"bytes": _positive_int(expected.get("bytes"), f"approved {label}.bytes"),
+               "sha256": _digest(expected.get("sha256"), f"approved {label}.sha256")}
+    if actual["bytes"] != binding["bytes"] or actual["sha256"] != binding["sha256"]:
+        raise RunFailure(f"approved {label} bytes differ from the reviewed source binding")
+    return actual
 
 
 def _check_identity(value: Any, label: str, base: Path, root: Path | None = None) -> dict[str, Any]:
@@ -237,7 +297,10 @@ def _check_worktree_shape(root: Path, name: str) -> dict[str, Any]:
         sparse = ""
     if sparse.lower() in {"true", "1", "yes", "on"}:
         raise RunFailure(f"{name}.root uses sparse checkout")
-    indexed = _run_git_bytes(root, "ls-files", "-t", "-z")
+    # ``-t`` does not expose assume-unchanged entries.  The verbose status
+    # and debug flags are both checked so a clean-looking index cannot hide
+    # bytes which Cargo will actually compile.
+    indexed = _run_git_bytes(root, "ls-files", "-v", "-z")
     entries: list[str] = []
     for item in indexed.split(b"\0"):
         if not item:
@@ -247,11 +310,30 @@ def _check_worktree_shape(root: Path, name: str) -> dict[str, Any]:
         status, raw_path = item[0:1], item[2:]
         path = root / os.fsdecode(raw_path)
         _safe_path(path, f"{name} tracked path", must_exist=False)
-        if status == b"S":
-            raise RunFailure(f"{name}.root contains skip-worktree entry {raw_path!r}")
+        if status != b"H":
+            raise RunFailure(f"{name}.root contains non-ordinary index entry {raw_path!r}: {status!r}")
         if not path.exists():
             raise RunFailure(f"{name}.root omits tracked file {raw_path!r}")
         entries.append(os.fsdecode(raw_path))
+    debug = _run_git_bytes(root, "ls-files", "--debug")
+    current_path: bytes | None = None
+    current_flags: int | None = None
+    for line in debug.splitlines():
+        if line.startswith(b" "):
+            if b"\tflags:" not in line:
+                continue
+            flags_line = line
+            try:
+                current_flags = int(flags_line.rsplit(b"flags:", 1)[1].strip(), 0)
+            except ValueError as error:
+                raise RunFailure(f"{name}.root returned malformed index flags") from error
+            continue
+        if current_path is not None and current_flags != 0:
+            raise RunFailure(f"{name}.root contains extended index flags: {current_flags}")
+        current_path = line
+        current_flags = None
+    if current_path is not None and current_flags != 0:
+        raise RunFailure(f"{name}.root contains extended index flags: {current_flags}")
     status = _git_output(root, "status", "--porcelain", "--untracked-files=all")
     if status:
         raise RunFailure(f"{name}.root is dirty")
@@ -323,10 +405,12 @@ def _endpoint_identity(raw: Mapping[str, Any], name: str, base: Path, build: Map
     lock = _check_identity(value["lock"], f"{name}.lock", base, root)
     toolchain = _check_identity(value["toolchain"], f"{name}.toolchain", base, root)
     cargo_config = _check_identity(value["cargo_config"], f"{name}.cargo_config", base, root)
+    cargo_manifest = _check_identity(value["cargo_manifest"], f"{name}.cargo_manifest", base, root)
     for field, expected_relative in (
         ("lock", Path("Cargo.lock")),
         ("toolchain", Path("rust-toolchain.toml")),
         ("cargo_config", Path(".cargo/config.toml")),
+        ("cargo_manifest", Path("Cargo.toml")),
     ):
         declared, _, _ = _identity_value(value[field], f"{name}.{field}", base)
         if declared != root / expected_relative:
@@ -347,6 +431,14 @@ def _endpoint_identity(raw: Mapping[str, Any], name: str, base: Path, build: Map
         raise RunFailure(f"{name}: normal and allocator target directories must differ")
     _outside(target_dir, root, f"{name}.target_dir")
     _outside(allocator_target_dir, root, f"{name}.allocator_target_dir")
+    binary_binding = _digest_binding(value["binary_identity"], f"{name}.binary_identity")
+    allocator_binary_binding = _digest_binding(
+        value["allocator_binary_identity"], f"{name}.allocator_binary_identity"
+    )
+    expected_artifacts = {
+        "binary": target_dir / EXPECTED_CARGO_PROFILE / "examples" / EXPECTED_EXAMPLE,
+        "allocator_binary": allocator_target_dir / EXPECTED_CARGO_PROFILE / "examples" / EXPECTED_EXAMPLE,
+    }
     for artifact, label, target in (
         (binary, "binary", target_dir),
         (allocator_binary, "allocator_binary", allocator_target_dir),
@@ -359,6 +451,17 @@ def _endpoint_identity(raw: Mapping[str, Any], name: str, base: Path, build: Map
             artifact.relative_to(target)
         except ValueError as error:
             raise RunFailure(f"{name}.{label} must be below its target directory") from error
+        if artifact != expected_artifacts[label]:
+            raise RunFailure(
+                f"{name}.{label} must be the release example artifact at {expected_artifacts[label]}"
+            )
+        binding = binary_binding if label == "binary" else allocator_binary_binding
+        if artifact.exists():
+            if not allow_built_artifacts:
+                raise RunFailure(f"{name}.{label} must not exist before the fresh build")
+            actual = _identity(artifact)
+            if actual["bytes"] != binding["bytes"] or actual["sha256"] != binding["sha256"]:
+                raise RunFailure(f"{name}.{label} differs from its externally bound artifact identity")
     return {
         "name": name,
         "root": str(root),
@@ -370,11 +473,14 @@ def _endpoint_identity(raw: Mapping[str, Any], name: str, base: Path, build: Map
         "lock": lock,
         "toolchain": toolchain,
         "cargo_config": cargo_config,
+        "cargo_manifest": cargo_manifest,
         "source_manifest": source_manifest,
         "binary": str(binary),
         "allocator_binary": str(allocator_binary),
         "target_dir": str(target_dir),
         "allocator_target_dir": str(allocator_target_dir),
+        "binary_identity": binary_binding,
+        "allocator_binary_identity": allocator_binary_binding,
     }
 
 
@@ -391,15 +497,14 @@ def _probe_plan(raw: Mapping[str, Any], base: Path, roots: tuple[Path, Path]) ->
         item = _object(sources.get(name), f"manifest.probe_sources.{name}")
         _exact_keys(item, {"path", "bytes", "sha256", "destination"}, f"manifest.probe_sources.{name}")
         path = _safe_path(_raw_path(item["path"], f"manifest.probe_sources.{name}.path", base), f"probe {name}", must_exist=True)
-        if (path.name != EXPECTED_SOURCE_NAMES[name] or path.parent.name != "perf-baseline"
-                or path.parent.parent.name != "tools"):
-            raise RunFailure(f"probe {name} is not the reviewed source adapter")
+        if path != REVIEWED_REPO_ROOT / REVIEWED_PROBE_RELATIVES[name]:
+            raise RunFailure(f"probe {name} is not the reviewed repository adapter")
         if item["destination"] != expected_destinations[name]:
             raise RunFailure(f"probe {name} has an unreviewed destination")
         for root in roots:
             if path == root or root in path.parents:
                 raise RunFailure(f"probe {name} must not come from an endpoint worktree")
-        actual = _identity(path)
+        actual = _reviewed_file(path, REVIEWED_PROBE_RELATIVES[name], REVIEWED_PROBE_IDENTITIES[name], f"probe {name}")
         if actual["bytes"] != _positive_int(item["bytes"], f"probe {name}.bytes") or actual["sha256"] != _digest(item["sha256"], f"probe {name}.sha256"):
             raise RunFailure(f"probe {name} identity differs from the manifest")
         result.append({"name": name, **actual, "destination": item["destination"]})
@@ -410,16 +515,18 @@ def _fixture_plan(raw: Mapping[str, Any], base: Path) -> dict[str, Any]:
     item = _object(raw.get("fixture"), "manifest.fixture")
     _exact_keys(item, {"path", "bytes", "sha256", "provenance"}, "manifest.fixture")
     path = _safe_path(_raw_path(item["path"], "manifest.fixture.path", base), "fixture", must_exist=True)
-    if (path.name != "joined-content.xml" or path.parent.name != "odg"
-            or path.parent.parent.name != "test-data"):
-        raise RunFailure("fixture is not the reviewed test-data/odg/joined-content.xml")
-    actual = _identity(path)
+    if path != REVIEWED_REPO_ROOT / REVIEWED_FIXTURE_RELATIVE:
+        raise RunFailure("fixture is not the reviewed repository test-data/odg/joined-content.xml")
+    actual = _reviewed_file(path, REVIEWED_FIXTURE_RELATIVE, REVIEWED_FIXTURE_IDENTITY, "fixture")
     if actual["bytes"] != _positive_int(item["bytes"], "manifest.fixture.bytes") or actual["sha256"] != _digest(item["sha256"], "manifest.fixture.sha256"):
         raise RunFailure("fixture identity differs from the manifest")
     content = path.read_bytes()
     if b"<office:document-content" not in content or b"<draw:page" not in content:
         raise RunFailure("fixture is not the reviewed ODG content XML")
-    return {**actual, "path": str(path), "provenance": _string(item["provenance"], "manifest.fixture.provenance")}
+    provenance = _string(item["provenance"], "manifest.fixture.provenance")
+    if provenance != REVIEWED_FIXTURE_PROVENANCE:
+        raise RunFailure("fixture provenance is not the reviewed fixed provenance")
+    return {**actual, "path": str(path), "provenance": provenance}
 
 
 def _command(endpoint: Mapping[str, Any], *, allocator: bool, cpu: int) -> dict[str, Any]:
@@ -428,7 +535,8 @@ def _command(endpoint: Mapping[str, Any], *, allocator: bool, cpu: int) -> dict[
     command = [
         "taskset", "--cpu-list", str(cpu), "cargo", "build", "--offline", "--locked",
         "--jobs", "1", "--manifest-path", str(Path(endpoint["root"]) / "Cargo.toml"),
-        "--target-dir", target, "--example", EXPECTED_EXAMPLE,
+        "--target-dir", target, "--package", EXPECTED_PACKAGE, "--release",
+        "--example", EXPECTED_EXAMPLE,
     ]
     if features:
         command.extend(("--features", ",".join(features)))
@@ -458,6 +566,7 @@ def prepare_plan(manifest_path: Path, *, allow_built_artifacts: bool = False) ->
     probes = _probe_plan(raw, base, (Path(baseline["root"]), Path(candidate["root"])))
     prepare_receipt = _safe_path(_raw_path(build["prepare_receipt"], "manifest.build.prepare_receipt", base), "prepare receipt")
     receipt = _safe_path(_raw_path(build["receipt"], "manifest.build.receipt", base), "build receipt")
+    receipt_binding = _receipt_binding(build["receipt_identity"], "manifest.build.receipt_identity", base, receipt)
     if prepare_receipt == receipt:
         raise RunFailure("prepare and build receipts must be distinct")
     for root in (Path(baseline["root"]), Path(candidate["root"])):
@@ -484,7 +593,7 @@ def prepare_plan(manifest_path: Path, *, allow_built_artifacts: bool = False) ->
             "baseline": {"normal": _command(baseline, allocator=False, cpu=cpu), "allocator": _command(baseline, allocator=True, cpu=cpu)},
             "candidate": {"normal": _command(candidate, allocator=False, cpu=cpu), "allocator": _command(candidate, allocator=True, cpu=cpu)},
         },
-        "receipts": {"prepare": str(prepare_receipt), "build": str(receipt)},
+        "receipts": {"prepare": str(prepare_receipt), "build": receipt_binding},
     }
     return plan
 
@@ -563,6 +672,103 @@ def _descendants(pid: int) -> set[int]:
     return result
 
 
+def _process_identity(pid: int) -> tuple[int, int] | None:
+    """Return Linux start-time and process-group identity without following pid reuse."""
+
+    stat_path = Path("/proc") / str(pid) / "stat"
+    try:
+        value = stat_path.read_text(encoding="ascii")
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise RunFailure(f"cannot inspect process {pid}: {error}") from error
+    closing = value.rfind(")")
+    if closing < 0:
+        raise RunFailure(f"process {pid} has malformed stat data")
+    fields = value[closing + 2 :].split()
+    # The suffix starts at field 3: state, ppid, pgrp, ... starttime(field 22).
+    if len(fields) <= 19:
+        raise RunFailure(f"process {pid} has incomplete stat data")
+    try:
+        return int(fields[19]), int(fields[2])
+    except ValueError as error:
+        raise RunFailure(f"process {pid} has malformed process-group identity") from error
+
+
+def _set_child_subreaper(enabled: bool) -> int:
+    """Adopt detached descendants so they remain attributable after the child exits."""
+
+    try:
+        import ctypes
+
+        prctl = ctypes.CDLL(None, use_errno=True).prctl
+        prctl.argtypes = [ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong]
+        prctl.restype = ctypes.c_int
+        previous = ctypes.c_int()
+        if prctl(37, ctypes.addressof(previous), 0, 0, 0) != 0:  # PR_GET_CHILD_SUBREAPER
+            raise OSError(ctypes.get_errno(), "PR_GET_CHILD_SUBREAPER failed")
+        if prctl(36, 1 if enabled else 0, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER
+            raise OSError(ctypes.get_errno(), "PR_SET_CHILD_SUBREAPER failed")
+        return previous.value
+    except (AttributeError, OSError) as error:
+        raise RunFailure(f"cannot configure child subreaper: {error}") from error
+
+
+def _owned_snapshot(root_pid: int) -> dict[int, tuple[int, int]]:
+    owned: dict[int, tuple[int, int]] = {}
+    for pid in {root_pid, *_descendants(root_pid)}:
+        identity = _process_identity(pid)
+        if identity is not None:
+            owned[pid] = identity
+    return owned
+
+
+def _live_owned(owned: Mapping[int, tuple[int, int]]) -> dict[int, tuple[int, int]]:
+    live: dict[int, tuple[int, int]] = {}
+    for pid, expected in owned.items():
+        actual = _process_identity(pid)
+        if actual is None:
+            continue
+        if actual != expected:
+            raise RunFailure(f"owned child pid {pid} changed identity while guarded")
+        live[pid] = actual
+    return live
+
+
+def _kill_owned(owned: Mapping[int, tuple[int, int]]) -> None:
+    for pid, expected in owned.items():
+        actual = _process_identity(pid)
+        if actual is None:
+            continue
+        if actual != expected:
+            raise RunFailure(f"refusing to kill reused owned child pid {pid}")
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            continue
+        except OSError as error:
+            raise RunFailure(f"cannot terminate owned child {pid}: {error}") from error
+    deadline = time.monotonic() + 1.0
+    while time.monotonic() < deadline:
+        remaining: dict[int, tuple[int, int]] = {}
+        for pid, expected in owned.items():
+            try:
+                waited, _ = os.waitpid(pid, os.WNOHANG)
+                if waited:
+                    continue
+            except ChildProcessError:
+                pass
+            actual = _process_identity(pid)
+            if actual is not None:
+                if actual != expected:
+                    raise RunFailure(f"refusing to reap reused owned child pid {pid}")
+                remaining[pid] = actual
+        if not remaining:
+            return
+        time.sleep(0.02)
+    raise RunFailure(f"owned child processes did not exit after termination: {sorted(remaining)}")
+
+
 def _quiet_guard(max_load: float, phase: str) -> dict[str, Any]:
     load = load_average()
     processes = process_scan()
@@ -632,11 +838,33 @@ def _stream_command(
         env.update(environment)
     if "allocator" in label:
         env["RUSTFLAGS"] = "--cfg odg_joined_allocator"
+    parent_pid = os.getpid()
+    # A double-forked/setsid child is otherwise reparented to init as soon as
+    # the direct child exits.  Keep it owned by this runner so the final
+    # identity check can still find and terminate it.
+    _set_child_subreaper(True)
+    preexisting_children = set(_descendants(parent_pid))
+
     def child_setup() -> None:
+        if os.getppid() != parent_pid:
+            os._exit(127)
         os.setsid()
+        try:
+            import ctypes
+
+            prctl = ctypes.CDLL(None, use_errno=True).prctl
+            prctl.argtypes = [ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong]
+            prctl.restype = ctypes.c_int
+            if prctl(1, signal.SIGKILL, 0, 0, 0) != 0:  # PR_SET_PDEATHSIG
+                os._exit(127)
+        except (AttributeError, OSError):
+            os._exit(127)
         if hasattr(os, "sched_setaffinity"):
             os.sched_setaffinity(0, {cpu})
         resource.setrlimit(resource.RLIMIT_AS, (MEMORY_LIMIT_BYTES, MEMORY_LIMIT_BYTES))
+    target_before = _directory_bytes(target_dir)
+    if target_before > TARGET_PREFLIGHT_BYTES:
+        raise RunFailure(f"{label}: target starts above preflight limit: {target_before}")
     try:
         stdout = stdout_path.open("xb")
         stderr = stderr_path.open("xb")
@@ -656,14 +884,20 @@ def _stream_command(
     started_monotonic = time.monotonic()
     violation: str | None = None
     samples: list[dict[str, Any]] = []
-    target_before = _directory_bytes(target_dir)
+    owned: dict[int, tuple[int, int]] = {}
     try:
         while process.poll() is None:
             stdout.flush()
             stderr.flush()
             output_bytes = stdout_path.stat().st_size + stderr_path.stat().st_size
             load = load_average()
-            descendants = _descendants(process.pid)
+            current_owned = _owned_snapshot(process.pid)
+            owned.update(current_owned)
+            for pid in _descendants(parent_pid) - preexisting_children:
+                identity = _process_identity(pid)
+                if identity is not None:
+                    owned[pid] = identity
+            descendants = set(current_owned) - {process.pid}
             rss = sum(_proc_rss(pid) for pid in {process.pid, *descendants})
             outside = [item for item in process_scan() if item["pid"] not in {process.pid, *descendants}]
             if output_bytes > max_output_bytes:
@@ -681,12 +915,27 @@ def _stream_command(
             if violation:
                 _kill_group(process)
                 break
-            samples.append({"checked_unix_ns": time.time_ns(), "output_bytes": output_bytes, "rss_bytes": rss,
-                            "load_1m": load, "outside_processes": outside})
+            samples.append({
+                "checked_unix_ns": time.time_ns(), "output_bytes": output_bytes, "rss_bytes": rss,
+                "load_1m": load, "outside_processes": outside,
+                "owned_processes": [
+                    {"pid": pid, "start_time": identity[0], "process_group": identity[1]}
+                    for pid, identity in sorted(owned.items())
+                ],
+            })
             time.sleep(0.05)
         return_code = process.wait(timeout=5)
+    except RunFailure as error:
+        _kill_group(process)
+        live = _live_owned(owned)
+        if live:
+            _kill_owned(live)
+        raise error
     except (OSError, subprocess.SubprocessError) as error:
         _kill_group(process)
+        live = _live_owned(owned)
+        if live:
+            _kill_owned(live)
         raise RunFailure(f"{label}: streamed child wait failed: {error}") from error
     finally:
         stdout.flush()
@@ -696,22 +945,31 @@ def _stream_command(
     if violation:
         raise RunFailure(f"{label}: {violation}")
     deadline = time.monotonic() + DESCENDANT_GRACE_S
-    descendants = _descendants(process.pid)
+    for pid in _descendants(parent_pid) - preexisting_children:
+        identity = _process_identity(pid)
+        if identity is not None:
+            owned[pid] = identity
+    live_owned = _live_owned(owned)
+    descendants = set(live_owned)
+    descendants.discard(process.pid)
     group_alive = _group_alive(process.pid)
-    while (descendants or group_alive) and time.monotonic() < deadline:
+    while (live_owned or group_alive) and time.monotonic() < deadline:
         time.sleep(0.05)
-        descendants = _descendants(process.pid)
+        live_owned = _live_owned(owned)
+        descendants = set(live_owned)
+        descendants.discard(process.pid)
         group_alive = _group_alive(process.pid)
-    if descendants or group_alive:
+    if live_owned or group_alive:
         try:
             os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
         except OSError as error:
             raise RunFailure(f"{label}: cannot terminate orphaned child group: {error}") from error
+        _kill_owned(live_owned)
         raise RunFailure(
             f"{label}: child left descendants/process group running after recheck: "
-            f"{sorted(descendants)} group_alive={group_alive}"
+            f"{sorted(live_owned)} group_alive={group_alive}"
         )
     target_after = _directory_bytes(target_dir)
     final_output_bytes = stdout_path.stat().st_size + stderr_path.stat().st_size
@@ -721,6 +979,7 @@ def _stream_command(
         "rss_bytes": 0,
         "load_1m": load_average(),
         "outside_processes": process_scan(),
+        "owned_processes": [],
     })
     stdout_sha, stdout_bytes = _sha256_file(stdout_path)
     stderr_sha, stderr_bytes = _sha256_file(stderr_path)
@@ -737,16 +996,38 @@ def _stream_command(
         "stdout": {"path": str(stdout_path), "bytes": stdout_bytes, "sha256": stdout_sha},
         "stderr": {"path": str(stderr_path), "bytes": stderr_bytes, "sha256": stderr_sha},
         "monitor": {"samples": samples, "memory_limit_bytes": MEMORY_LIMIT_BYTES,
-                     "max_output_bytes": max_output_bytes, "max_load": max_load},
+                     "max_output_bytes": max_output_bytes, "max_load": max_load,
+                     "owned_processes": []},
     }
 
 
 def _directory_bytes(path: Path) -> int:
-    if not path.exists() or path.is_symlink():
-        return 0
-    if path.is_file():
-        return path.stat().st_size
-    return sum(item.stat().st_size for item in path.rglob("*") if item.is_file() and not item.is_symlink())
+    path = _safe_path(path, "target directory", must_exist=True)
+    if not path.is_dir():
+        raise RunFailure(f"target path is not a directory: {path}")
+    total = 0
+    pending = [path]
+    while pending:
+        current = pending.pop()
+        try:
+            entries = list(os.scandir(current))
+        except OSError as error:
+            raise RunFailure(f"cannot inspect target directory {current}: {error}") from error
+        for entry in entries:
+            try:
+                if entry.is_symlink():
+                    raise RunFailure(f"target contains a symlink: {entry.path}")
+                if entry.is_dir(follow_symlinks=False):
+                    pending.append(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False):
+                    total += entry.stat(follow_symlinks=False).st_size
+                else:
+                    raise RunFailure(f"target contains a non-regular entry: {entry.path}")
+            except FileNotFoundError as error:
+                raise RunFailure(f"target entry disappeared during inspection: {entry.path}") from error
+            except OSError as error:
+                raise RunFailure(f"cannot inspect target entry {entry.path}: {error}") from error
+    return total
 
 
 def _remove_overlay(root: Path, relative: str) -> None:
@@ -777,6 +1058,17 @@ def build(manifest_path: Path) -> dict[str, Any]:
             overlay_paths: list[str] = []
             event: dict[str, Any] | None = None
             try:
+                source_before = {
+                    "ref": _git_output(root, "rev-parse", "--verify", "HEAD"),
+                    "tree": _git_output(root, "rev-parse", "--verify", "HEAD^{tree}"),
+                    "source_manifest": _tree_manifest(root, endpoint["ref"]),
+                    "lock": _identity(Path(endpoint["lock"]["path"])),
+                    "toolchain": _identity(Path(endpoint["toolchain"]["path"])),
+                    "cargo_config": _identity(Path(endpoint["cargo_config"]["path"])),
+                    "cargo_manifest": _identity(Path(endpoint["cargo_manifest"]["path"])),
+                }
+                if source_before["ref"] != endpoint["ref"] or source_before["tree"] != endpoint["tree"]:
+                    raise RunFailure(f"{name}/{kind}: source changed before overlay")
                 for overlay in plan["overlays"]:
                     if overlay.get("endpoint") not in (None, name):
                         continue
@@ -799,7 +1091,13 @@ def build(manifest_path: Path) -> dict[str, Any]:
                 if binary.is_symlink() or not binary.is_file() or not os.access(binary, os.X_OK):
                     raise RunFailure(f"{name}/{kind}: expected executable was not produced: {binary}")
                 event["artifact"] = binary_identity(binary)
-                event["source_before"] = {"ref": endpoint["ref"], "tree": endpoint["tree"]}
+                expected_artifact = endpoint[
+                    "allocator_binary_identity" if kind == "allocator" else "binary_identity"
+                ]
+                if (event["artifact"]["bytes"] != expected_artifact["bytes"]
+                        or event["artifact"]["sha256"] != expected_artifact["sha256"]):
+                    raise RunFailure(f"{name}/{kind}: artifact differs from the externally bound identity")
+                event["source_before"] = source_before
             finally:
                 for relative in reversed(overlay_paths):
                     _remove_overlay(root, relative)
@@ -814,6 +1112,7 @@ def build(manifest_path: Path) -> dict[str, Any]:
                         "lock": _identity(Path(endpoint["lock"]["path"])),
                         "toolchain": _identity(Path(endpoint["toolchain"]["path"])),
                         "cargo_config": _identity(Path(endpoint["cargo_config"]["path"])),
+                        "cargo_manifest": _identity(Path(endpoint["cargo_manifest"]["path"])),
                     }
                     events.append(event)
     receipt = {
@@ -829,6 +1128,10 @@ def build(manifest_path: Path) -> dict[str, Any]:
         "completed_unix_ns": time.time_ns(),
     }
     _write_fresh_json(build_receipt, receipt, "build receipt")
+    actual_receipt = _identity(build_receipt)
+    expected_receipt = plan["receipts"]["build"]
+    if actual_receipt != expected_receipt:
+        raise RunFailure("build receipt differs from its externally bound receipt identity")
     return receipt
 
 
@@ -850,6 +1153,11 @@ def validate_build_receipt(manifest_path: Path) -> dict[str, Any]:
     raw = _raw_manifest(manifest_path)
     build = _build_value(raw)
     receipt_path = _safe_path(_raw_path(build["receipt"], "manifest.build.receipt", manifest_path.parent), "build receipt", must_exist=True)
+    expected_receipt = _receipt_binding(
+        build["receipt_identity"], "manifest.build.receipt_identity", manifest_path.parent, receipt_path
+    )
+    if _identity(receipt_path) != expected_receipt:
+        raise RunFailure("build receipt bytes differ from the externally bound receipt identity")
     receipt = _load_receipt(receipt_path, BUILD_SCHEMA)
     plan = validate_prepare_receipt(manifest_path)
     if receipt.get("status") != "passed" or receipt.get("builder_revision") != BUILDER_REVISION:
@@ -888,23 +1196,40 @@ def validate_build_receipt(manifest_path: Path) -> dict[str, Any]:
         _validate_log_identity(item["stdout"], f"{label}.stdout", receipt_path.parent / "logs")
         _validate_log_identity(item["stderr"], f"{label}.stderr", receipt_path.parent / "logs")
         monitor = _object(item["monitor"], f"{label}.monitor")
-        _exact_keys(monitor, {"samples", "memory_limit_bytes", "max_output_bytes", "max_load"}, f"{label}.monitor")
+        _exact_keys(monitor, {"samples", "memory_limit_bytes", "max_output_bytes", "max_load", "owned_processes"},
+                    f"{label}.monitor")
         if not isinstance(monitor["samples"], list) or not monitor["samples"]:
             raise RunFailure(f"{label}: live monitor samples are missing")
         for sample in monitor["samples"]:
             row = _object(sample, f"{label}.monitor.sample")
-            _exact_keys(row, {"checked_unix_ns", "output_bytes", "rss_bytes", "load_1m", "outside_processes"}, f"{label}.monitor.sample")
+            _exact_keys(row, {"checked_unix_ns", "output_bytes", "rss_bytes", "load_1m",
+                              "outside_processes", "owned_processes"}, f"{label}.monitor.sample")
             _positive_int(row["checked_unix_ns"], "monitor.checked_unix_ns")
             if type(row["output_bytes"]) is not int or row["output_bytes"] < 0 or row["output_bytes"] > MAX_BUILD_OUTPUT:
                 raise RunFailure(f"{label}: output monitor exceeded its bound")
             if type(row["rss_bytes"]) is not int or row["rss_bytes"] < 0 or row["rss_bytes"] > MEMORY_LIMIT_BYTES:
                 raise RunFailure(f"{label}: RSS monitor exceeded its bound")
+            if (type(row["load_1m"]) not in (int, float)
+                    or row["load_1m"] < 0 or row["load_1m"] > monitor["max_load"]):
+                raise RunFailure(f"{label}: load monitor exceeded its bound")
             if row["outside_processes"] != []:
                 raise RunFailure(f"{label}: unrelated process appeared in monitor")
+            owned = row["owned_processes"]
+            if not isinstance(owned, list):
+                raise RunFailure(f"{label}: owned process monitor is malformed")
+            for process in owned:
+                process_value = _object(process, f"{label}.monitor.owned_process")
+                _exact_keys(process_value, {"pid", "start_time", "process_group"},
+                            f"{label}.monitor.owned_process")
+                _positive_int(process_value["pid"], f"{label}.monitor.owned_process.pid")
+                _positive_int(process_value["start_time"], f"{label}.monitor.owned_process.start_time")
+                _positive_int(process_value["process_group"], f"{label}.monitor.owned_process.process_group")
         if (monitor["memory_limit_bytes"] != MEMORY_LIMIT_BYTES
                 or monitor["max_output_bytes"] != MAX_BUILD_OUTPUT
                 or monitor["max_load"] != plan["max_load"]):
             raise RunFailure(f"{label}: monitor limits differ from the fixed builder limits")
+        if not isinstance(monitor["owned_processes"], list) or monitor["owned_processes"]:
+            raise RunFailure(f"{label}: child-owned process group was not empty at receipt validation")
         for guard_label in ("guard_before", "guard_after"):
             guard = _object(item[guard_label], f"{label}.{guard_label}")
             _exact_keys(guard, {"phase", "load_1m", "max_load", "heavy_processes", "checked_unix_ns"},
@@ -931,6 +1256,12 @@ def validate_build_receipt(manifest_path: Path) -> dict[str, Any]:
             raise RunFailure(f"{label}: artifact path differs from the prepared command")
         if _identity(artifact_path) != artifact:
             raise RunFailure(f"{label}: built artifact bytes changed")
+        expected_artifact_identity = plan[identity[0]][
+            "allocator_binary_identity" if identity[1] == "allocator" else "binary_identity"
+        ]
+        if (artifact["bytes"] != expected_artifact_identity["bytes"]
+                or artifact["sha256"] != expected_artifact_identity["sha256"]):
+            raise RunFailure(f"{label}: artifact is not the externally bound binary")
         expected_command = plan[identity[0]]["commands"][identity[0]][identity[1]]
         if item["command"] != expected_command["argv"]:
             raise RunFailure(f"{label}: command differs from the prepared command")
@@ -939,18 +1270,24 @@ def validate_build_receipt(manifest_path: Path) -> dict[str, Any]:
         if item["cwd"] != plan[identity[0]]["root"]:
             raise RunFailure(f"{label}: command cwd differs from the endpoint root")
         source_before = _object(item["source_before"], f"{label}.source_before")
-        _exact_keys(source_before, {"ref", "tree"}, f"{label}.source_before")
-        if source_before != {"ref": plan[identity[0]]["ref"], "tree": plan[identity[0]]["tree"]}:
-            raise RunFailure(f"{label}: source identity is not bound to its endpoint")
-        source_after = _object(item["source_after"], f"{label}.source_after")
-        _exact_keys(source_after, {"ref", "tree", "source_manifest", "lock", "toolchain", "cargo_config"},
-                    f"{label}.source_after")
+        _exact_keys(source_before, {"ref", "tree", "source_manifest", "lock", "toolchain", "cargo_config", "cargo_manifest"},
+                    f"{label}.source_before")
         endpoint = plan[identity[0]]
+        if source_before["ref"] != endpoint["ref"] or source_before["tree"] != endpoint["tree"]:
+            raise RunFailure(f"{label}: source identity is not bound to its endpoint")
+        if source_before["source_manifest"] != endpoint["source_manifest"]:
+            raise RunFailure(f"{label}: source manifest before build differs from its endpoint")
+        for field in ("lock", "toolchain", "cargo_config", "cargo_manifest"):
+            if source_before[field] != endpoint[field]:
+                raise RunFailure(f"{label}: {field} before build differs from its endpoint")
+        source_after = _object(item["source_after"], f"{label}.source_after")
+        _exact_keys(source_after, {"ref", "tree", "source_manifest", "lock", "toolchain", "cargo_config", "cargo_manifest"},
+                    f"{label}.source_after")
         if source_after["ref"] != endpoint["ref"] or source_after["tree"] != endpoint["tree"]:
             raise RunFailure(f"{label}: source changed during the build")
         if source_after["source_manifest"] != endpoint["source_manifest"]:
             raise RunFailure(f"{label}: complete source manifest changed during the build")
-        for field in ("lock", "toolchain", "cargo_config"):
+        for field in ("lock", "toolchain", "cargo_config", "cargo_manifest"):
             if source_after[field] != endpoint[field]:
                 raise RunFailure(f"{label}: {field} changed during the build")
     if observed_order != expected:

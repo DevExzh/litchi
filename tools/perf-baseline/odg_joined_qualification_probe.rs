@@ -21,7 +21,7 @@ use common::{
 use litchi_odg::{Package, edit};
 use serde_json::{Value, json};
 
-const SCHEMA: &str = "litchi.odg.joined-native-qualification.probe.v1";
+const SCHEMA: &str = "litchi.odg.joined-native-qualification.probe.v2";
 const ENDPOINT: &str = "candidate-edit-join-commit";
 
 fn apply_plan(source: &Package, plan: edit::JoinedEdits) -> Result<Package> {
@@ -237,6 +237,8 @@ fn timed(args: &Args, mode: Mode) -> Result<Value> {
                     "schema": SCHEMA, "endpoint": ENDPOINT, "mode": Mode::Calibrate.as_str(),
                     "route": route_name, "scope": scope.as_str(), "target_ns": args.target_ns,
                     "iterations": current, "elapsed_ns": elapsed_ns, "attempts": attempts,
+                    "iteration_policy": "adaptive-doubling-v1", "initial_iterations": 1,
+                    "max_iterations": args.max_iterations,
                 }));
             }
             if current >= args.max_iterations {

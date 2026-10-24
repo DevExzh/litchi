@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+from dataclasses import replace
 from pathlib import Path
 import subprocess
 import tempfile
@@ -36,14 +37,15 @@ CONTENT = (
 
 
 def write_manifest(root: Path, *, limits: dict[str, int] | None = None, target_ms: int = 500) -> Path:
-    fixture = root / "fixture.xml"
-    fixture.write_bytes(CONTENT)
-    common = root / "odg_joined_qualification_common.rs"
-    allocator = root / "odg_joined_qualification_allocator.rs"
-    baseline_probe = root / "odg_joined_qualification_ad524_probe.rs"
-    candidate_probe = root / "odg_joined_qualification_probe.rs"
-    for path in (common, allocator, baseline_probe, candidate_probe):
-        path.write_bytes(path.name.encode("ascii"))
+    fixture = RUNNER.REVIEWED_REPO_ROOT / RUNNER.REVIEWED_FIXTURE_RELATIVE
+    reviewed = {
+        name: RUNNER.REVIEWED_REPO_ROOT / relative
+        for name, relative in RUNNER.REVIEWED_PROBE_RELATIVES.items()
+    }
+    common = reviewed["common"]
+    allocator = reviewed["allocator"]
+    baseline_probe = reviewed["baseline"]
+    candidate_probe = reviewed["candidate"]
     baseline_root = root / "baseline"
     candidate_root = root / "candidate"
     baseline_root.mkdir()
@@ -53,13 +55,16 @@ def write_manifest(root: Path, *, limits: dict[str, int] | None = None, target_m
         subprocess.run(["git", "-C", str(source), "config", "user.email", "test@example.invalid"], check=True)
         subprocess.run(["git", "-C", str(source), "config", "user.name", "Test"], check=True)
         (source / "tracked").write_text(f"source-{index}", encoding="utf-8")
+        (source / "Cargo.toml").write_text(
+            "[workspace]\nmembers = [\"crates/litchi-odg\"]\n", encoding="utf-8"
+        )
         (source / "Cargo.lock").write_text(f"# lock-{index}\n", encoding="utf-8")
         (source / "rust-toolchain.toml").write_text(
             f"[toolchain]\nchannel = \"test-{index}\"\n", encoding="utf-8"
         )
         (source / ".cargo").mkdir()
         (source / ".cargo" / "config.toml").write_text("[build]\njobs = 1\n", encoding="utf-8")
-        subprocess.run(["git", "-C", str(source), "add", "tracked", "Cargo.lock", "rust-toolchain.toml", ".cargo/config.toml"], check=True)
+        subprocess.run(["git", "-C", str(source), "add", "tracked", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".cargo/config.toml"], check=True)
         subprocess.run(["git", "-C", str(source), "commit", "-q", "-m", "source"], check=True)
     baseline_ref = subprocess.check_output(
         ["git", "-C", str(baseline_root), "rev-parse", "HEAD"], text=True
@@ -83,7 +88,8 @@ def write_manifest(root: Path, *, limits: dict[str, int] | None = None, target_m
     candidate_allocator_target.mkdir()
     binary_name = "litchi-perf-odg-joined-qualification"
     for target in (baseline_target, candidate_target, baseline_allocator_target, candidate_allocator_target):
-        binary = target / binary_name
+        binary = target / "release" / "examples" / binary_name
+        binary.parent.mkdir(parents=True)
         binary.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
         binary.chmod(0o755)
     tmpdir = root / "tmp"
@@ -100,25 +106,32 @@ def write_manifest(root: Path, *, limits: dict[str, int] | None = None, target_m
 
     values = {
         "schema": RUNNER.INPUT_SCHEMA,
-        "fixture": {"path": str(fixture), **digest(CONTENT), "provenance": "generated test fixture"},
+        "fixture": {"path": str(fixture), **RUNNER.REVIEWED_FIXTURE_IDENTITY,
+                    "provenance": RUNNER.REVIEWED_FIXTURE_PROVENANCE},
         "baseline": {"root": str(baseline_root), "ref": baseline_ref, "tree": baseline_tree,
                       "profile": RUNNER.BASELINE_PROFILE,
-                      "binary": str(baseline_target / binary_name), "target_dir": str(baseline_target),
+                      "binary": str(baseline_target / "release" / "examples" / binary_name), "target_dir": str(baseline_target),
                       "lock": identity(baseline_root / "Cargo.lock"),
                       "toolchain": identity(baseline_root / "rust-toolchain.toml"),
                       "cargo_config": identity(baseline_root / ".cargo/config.toml"),
+                      "cargo_manifest": identity(baseline_root / "Cargo.toml"),
                       "source_manifest": tree_identity(baseline_root),
-                      "allocator_binary": str(baseline_allocator_target / binary_name),
-                      "allocator_target_dir": str(baseline_allocator_target), "features": ["odg"]},
+                      "allocator_binary": str(baseline_allocator_target / "release" / "examples" / binary_name),
+                      "allocator_target_dir": str(baseline_allocator_target), "features": ["odg"],
+                      "binary_identity": digest((baseline_target / "release" / "examples" / binary_name).read_bytes()),
+                      "allocator_binary_identity": digest((baseline_allocator_target / "release" / "examples" / binary_name).read_bytes())},
         "candidate": {"root": str(candidate_root), "ref": candidate_ref, "tree": candidate_tree,
                        "profile": RUNNER.CANDIDATE_PROFILE,
-                       "binary": str(candidate_target / binary_name), "target_dir": str(candidate_target),
+                       "binary": str(candidate_target / "release" / "examples" / binary_name), "target_dir": str(candidate_target),
                        "lock": identity(candidate_root / "Cargo.lock"),
                        "toolchain": identity(candidate_root / "rust-toolchain.toml"),
                        "cargo_config": identity(candidate_root / ".cargo/config.toml"),
+                       "cargo_manifest": identity(candidate_root / "Cargo.toml"),
                        "source_manifest": tree_identity(candidate_root),
-                       "allocator_binary": str(candidate_allocator_target / binary_name),
-                       "allocator_target_dir": str(candidate_allocator_target), "features": ["odg"]},
+                       "allocator_binary": str(candidate_allocator_target / "release" / "examples" / binary_name),
+                       "allocator_target_dir": str(candidate_allocator_target), "features": ["odg"],
+                       "binary_identity": digest((candidate_target / "release" / "examples" / binary_name).read_bytes()),
+                       "allocator_binary_identity": digest((candidate_allocator_target / "release" / "examples" / binary_name).read_bytes())},
         "probe_sources": {
             name: {"path": str(path), **digest(path.read_bytes()),
                    "destination": RUNNER.EXPECTED_PROBE_DESTINATIONS[name]}
@@ -129,6 +142,7 @@ def write_manifest(root: Path, *, limits: dict[str, int] | None = None, target_m
                       "minimum_ms": 150, "max_load": 1000, "max_iterations": 1000, "timeout_s": 2},
         "runtime": {"tmpdir": str(tmpdir)},
         "build": {"prepare_receipt": str(root / "prepare.json"), "receipt": str(root / "build.json"),
+                  "receipt_identity": {"path": str(root / "build.json"), "bytes": 1, "sha256": "0" * 64},
                   "final_candidate_ref": candidate_ref, "cpu": 0},
         "composition_limits": limits or RUNNER.EXPECTED_LIMITS,
     }
@@ -184,13 +198,14 @@ class ODGJoinedQualificationTests(unittest.TestCase):
             root = Path(directory)
             manifest = write_manifest(root)
             parsed = RUNNER.load_manifest(manifest)
-            parsed.fixture.path.write_bytes(CONTENT + b"tampered")
+            tampered_fixture = replace(parsed.fixture, sha256="0" * 64)
             with self.assertRaises(RUNNER.RunFailure):
-                RUNNER.validate_fixture(parsed.fixture)
+                RUNNER.validate_fixture(tampered_fixture)
             parsed = RUNNER.load_manifest(manifest)
-            parsed.probe_sources[0].path.write_bytes(b"tampered")
+            tampered_probe = replace(parsed.probe_sources[0], sha256="0" * 64)
+            tampered_sources = (tampered_probe, *parsed.probe_sources[1:])
             with self.assertRaises(RUNNER.RunFailure):
-                RUNNER.validate_probe_sources(parsed.probe_sources)
+                RUNNER.validate_probe_sources(tampered_sources)
 
     def test_stale_requested_ref_and_binary_changes_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -342,6 +357,31 @@ class ODGJoinedQualificationTests(unittest.TestCase):
         with self.assertRaises(RUNNER.RunFailure):
             RUNNER.validate_timed(report, "baseline", "empty_join", "join_apply", 1, protocol, expected)
 
+    def test_calibration_binds_reviewed_adaptive_iteration_contract(self) -> None:
+        protocol = RUNNER.Protocol(0, 1, RUNNER.REQUIRED_WARMUPS,
+                                   500_000_000, 150_000_000, 1000, 8, 2)
+        expected = {"output": digest(b"out"), "semantic": {"pages": []}}
+        report = {
+            "schema": RUNNER.BASELINE_SCHEMA, "endpoint": "baseline-apply-joined",
+            "mode": "calibrate", "route": "empty_join", "scope": "join_apply",
+            "target_ns": protocol.target_ns, "iterations": 4, "elapsed_ns": protocol.target_ns,
+            "iteration_policy": RUNNER.CALIBRATION_POLICY, "initial_iterations": 1,
+            "max_iterations": protocol.max_iterations,
+            "attempts": [
+                {"iterations": 1, "elapsed_ns": 100, "proof": expected},
+                {"iterations": 2, "elapsed_ns": 200, "proof": expected},
+                {"iterations": 4, "elapsed_ns": protocol.target_ns, "proof": expected},
+            ],
+        }
+        self.assertEqual(
+            RUNNER.validate_calibration(report, "baseline", "empty_join", "join_apply", protocol, expected),
+            4,
+        )
+        altered = json.loads(json.dumps(report))
+        altered["attempts"][1]["iterations"] = 3
+        with self.assertRaises(RUNNER.RunFailure):
+            RUNNER.validate_calibration(altered, "baseline", "empty_join", "join_apply", protocol, expected)
+
     def test_manifest_report_endpoint_and_extra_fields_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             manifest = write_manifest(Path(directory))
@@ -357,6 +397,24 @@ class ODGJoinedQualificationTests(unittest.TestCase):
         }
         with self.assertRaises(RUNNER.RunFailure):
             RUNNER.validate_verify_report(base, "baseline", digest(CONTENT))
+
+    def test_manifest_requires_external_receipt_and_binary_bindings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = write_manifest(root)
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+            del data["baseline"]["binary_identity"]
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaises(RUNNER.RunFailure):
+                RUNNER.load_manifest(manifest)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = write_manifest(root)
+            data = json.loads(manifest.read_text(encoding="utf-8"))
+            del data["build"]["receipt_identity"]
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaises(RUNNER.RunFailure):
+                RUNNER.load_manifest(manifest)
 
     def test_child_log_binding_rejects_binary_or_phase_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -383,7 +441,7 @@ class ODGJoinedQualificationTests(unittest.TestCase):
                             "sha256": hashlib.sha256(b"x").hexdigest()},
                 "guard": {"before": quiet, "live": [{"checked_unix_ns": 1, "output_bytes": 4,
                                                          "rss_bytes": 0, "load_1m": 0.0,
-                                                         "outside_processes": []}], "after": quiet,
+                                                         "outside_processes": [], "owned_processes": []}], "after": quiet,
                            "memory_limit_bytes": 20_000_000_000,
                            "max_output_bytes": RUNNER.MAX_CHILD_OUTPUT,
                            "max_load": 1000.0},
@@ -420,6 +478,101 @@ class ODGJoinedQualificationTests(unittest.TestCase):
                 0,
             )
 
+    def test_builder_binds_release_package_command_and_reviewed_inputs(self) -> None:
+        from tools import odg_joined_qualification_builder as builder
+
+        command = builder._command(
+            {
+                "root": "/source",
+                "target_dir": "/target",
+                "allocator_target_dir": "/allocator-target",
+                "features": [],
+            },
+            allocator=False,
+            cpu=3,
+        )
+        self.assertIn("--package", command["argv"])
+        self.assertIn("litchi-odg", command["argv"])
+        self.assertIn("--release", command["argv"])
+        self.assertEqual(
+            command["argv"][-2:],
+            ["--example", "litchi-perf-odg-joined-qualification"],
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            fake = Path(directory) / "odg_joined_qualification_common.rs"
+            fake.write_bytes(b"not reviewed")
+            with self.assertRaises(RUNNER.RunFailure):
+                builder._reviewed_file(
+                    fake,
+                    RUNNER.REVIEWED_PROBE_RELATIVES["common"],
+                    RUNNER.REVIEWED_PROBE_IDENTITIES["common"],
+                    "fake probe",
+                )
+            self.assertEqual(
+                builder._reviewed_file(
+                    RUNNER.REVIEWED_REPO_ROOT / RUNNER.REVIEWED_PROBE_RELATIVES["common"],
+                    RUNNER.REVIEWED_PROBE_RELATIVES["common"],
+                    RUNNER.REVIEWED_PROBE_IDENTITIES["common"],
+                    "reviewed probe",
+                )["sha256"],
+                RUNNER.REVIEWED_PROBE_IDENTITIES["common"]["sha256"],
+            )
+
+    def test_builder_rejects_assume_unchanged_and_skip_worktree(self) -> None:
+        from tools import odg_joined_qualification_builder as builder
+
+        for flag in ("--assume-unchanged", "--skip-worktree"):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                subprocess.run(["git", "-C", str(root), "init", "-q"], check=True)
+                subprocess.run(["git", "-C", str(root), "config", "user.email", "test@example.invalid"], check=True)
+                subprocess.run(["git", "-C", str(root), "config", "user.name", "Test"], check=True)
+                tracked = root / "tracked"
+                tracked.write_text("tracked", encoding="utf-8")
+                subprocess.run(["git", "-C", str(root), "add", "tracked"], check=True)
+                subprocess.run(["git", "-C", str(root), "commit", "-q", "-m", "tracked"], check=True)
+                subprocess.run(["git", "-C", str(root), "update-index", flag, "tracked"], check=True)
+                with self.assertRaises(RUNNER.RunFailure):
+                    builder._check_worktree_shape(root, flag)
+
+    def test_directory_guard_rejects_missing_and_symlinked_targets(self) -> None:
+        from tools import odg_joined_qualification_builder as builder
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "target"
+            target.mkdir()
+            with self.assertRaises(RUNNER.RunFailure):
+                builder._directory_bytes(root / "missing")
+            (target / "link").symlink_to(root)
+            with self.assertRaises(RUNNER.RunFailure):
+                builder._directory_bytes(target)
+
+    def test_stream_guard_catches_detached_owned_descendant(self) -> None:
+        from tools import odg_joined_qualification_builder as builder
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "target"
+            target.mkdir()
+            logs = root / "logs"
+            logs.mkdir()
+            command = [
+                sys.executable,
+                "-c",
+                (
+                    "import ctypes, subprocess\n"
+                    "def clear():\n"
+                    "    p=ctypes.CDLL(None, use_errno=True).prctl\n"
+                    "    p(1, 0, 0, 0, 0)\n"
+                    "subprocess.Popen(['sleep', '5'], start_new_session=True, preexec_fn=clear)\n"
+                ),
+            ]
+            with mock.patch.object(builder, "process_scan", return_value=[]), \
+                    mock.patch.object(builder, "load_average", return_value=0.0):
+                with self.assertRaises(RUNNER.RunFailure):
+                    builder._stream_command(command, root, logs, "detached", target, 0, timeout_s=5)
+
     def test_builder_requires_pristine_baseline_and_final_candidate_binding(self) -> None:
         from tools import odg_joined_qualification_builder as builder
 
@@ -448,7 +601,7 @@ class ODGJoinedQualificationTests(unittest.TestCase):
             "failed_allocation_calls": 0, "allocated_bytes": 16, "deallocated_bytes": 8,
             "live_bytes_before": 4, "live_bytes_after": 12,
             "peak_live_bytes_before": 4, "peak_live_bytes_after": 12,
-            "region_peak_live_bytes": 12,
+            "region_peak_live_bytes": 12, "live_underflow": False,
         }
         report = {"schema": RUNNER.BASELINE_SCHEMA, "endpoint": "baseline-apply-joined",
                   "mode": "allocation", "route": "empty_join", "scope": "join_apply",
@@ -464,6 +617,18 @@ class ODGJoinedQualificationTests(unittest.TestCase):
                                                      protocol, expected)["proof"], expected)
         broken = json.loads(json.dumps(report))
         broken["samples"][0]["metrics"]["allocation"]["deallocated_bytes"] = 0
+        with self.assertRaises(RUNNER.RunFailure):
+            RUNNER.validate_allocation(broken, "baseline", "empty_join", "join_apply", protocol, expected)
+        broken = json.loads(json.dumps(report))
+        broken["samples"][0]["metrics"]["allocation"]["live_underflow"] = True
+        with self.assertRaises(RUNNER.RunFailure):
+            RUNNER.validate_allocation(broken, "baseline", "empty_join", "join_apply", protocol, expected)
+        broken = json.loads(json.dumps(report))
+        broken["samples"][0]["metrics"]["allocation"]["peak_live_bytes_after"] = 3
+        with self.assertRaises(RUNNER.RunFailure):
+            RUNNER.validate_allocation(broken, "baseline", "empty_join", "join_apply", protocol, expected)
+        broken = json.loads(json.dumps(report))
+        broken["samples"][0]["metrics"]["allocation"]["reallocation_calls"] = 3
         with self.assertRaises(RUNNER.RunFailure):
             RUNNER.validate_allocation(broken, "baseline", "empty_join", "join_apply", protocol, expected)
             altered = dict(logs)

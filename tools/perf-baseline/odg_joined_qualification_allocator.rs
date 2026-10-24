@@ -19,6 +19,7 @@ static ALLOCATED_BYTES: AtomicU64 = AtomicU64::new(0);
 static DEALLOCATED_BYTES: AtomicU64 = AtomicU64::new(0);
 static LIVE_BYTES: AtomicU64 = AtomicU64::new(0);
 static PEAK_LIVE_BYTES: AtomicU64 = AtomicU64::new(0);
+static LIVE_UNDERFLOW: AtomicBool = AtomicBool::new(false);
 static REGION_ACTIVE: AtomicBool = AtomicBool::new(false);
 static REGION_PEAK_LIVE_BYTES: AtomicU64 = AtomicU64::new(0);
 
@@ -59,7 +60,7 @@ unsafe impl GlobalAlloc for CountingSystemAllocator {
         unsafe { System.dealloc(pointer, layout) };
         if ENABLED.load(Ordering::Relaxed) {
             DEALLOCATION_CALLS.fetch_add(1, Ordering::Relaxed);
-            let observed = decrement_live(layout.size() as u64);
+            let observed = decrement_live(layout.size() as u64).unwrap_or(0);
             DEALLOCATED_BYTES.fetch_add(observed, Ordering::Relaxed);
         }
     }
@@ -73,8 +74,12 @@ unsafe impl GlobalAlloc for CountingSystemAllocator {
             }
         } else if ENABLED.load(Ordering::Relaxed) {
             REALLOCATION_CALLS.fetch_add(1, Ordering::Relaxed);
+            // A successful realloc replaces one allocation with another.  It
+            // is therefore also an allocation call for conservation and the
+            // reallocation count is a subset of allocation calls.
+            ALLOCATION_CALLS.fetch_add(1, Ordering::Relaxed);
             ALLOCATED_BYTES.fetch_add(new_size as u64, Ordering::Relaxed);
-            let old_size = decrement_live(layout.size() as u64);
+            let old_size = decrement_live(layout.size() as u64).unwrap_or(0);
             DEALLOCATED_BYTES.fetch_add(old_size, Ordering::Relaxed);
             let new_size = new_size as u64;
             // The old observed allocation was removed above; account for the
@@ -98,6 +103,7 @@ struct Snapshot {
     deallocated_bytes: u64,
     live_bytes: u64,
     peak_live_bytes: u64,
+    live_underflow: bool,
 }
 
 fn snapshot() -> Snapshot {
@@ -110,6 +116,7 @@ fn snapshot() -> Snapshot {
         deallocated_bytes: DEALLOCATED_BYTES.load(Ordering::Acquire),
         live_bytes: LIVE_BYTES.load(Ordering::Acquire),
         peak_live_bytes: PEAK_LIVE_BYTES.load(Ordering::Acquire),
+        live_underflow: LIVE_UNDERFLOW.load(Ordering::Acquire),
     }
 }
 
@@ -141,12 +148,16 @@ fn record_live_delta(delta: u64) {
     }
 }
 
-fn decrement_live(delta: u64) -> u64 {
+fn decrement_live(delta: u64) -> Option<u64> {
     let mut current = LIVE_BYTES.load(Ordering::Acquire);
     loop {
-        let next = current.saturating_sub(delta);
+        if current < delta {
+            LIVE_UNDERFLOW.store(true, Ordering::Release);
+            return None;
+        }
+        let next = current - delta;
         match LIVE_BYTES.compare_exchange_weak(current, next, Ordering::AcqRel, Ordering::Acquire) {
-            Ok(_) => return current - next,
+            Ok(_) => return Some(delta),
             Err(observed) => current = observed,
         }
     }
@@ -189,9 +200,17 @@ impl Region {
             .is_some()
             && measured(self.before.allocated_bytes, after.allocated_bytes).is_some()
             && measured(self.before.deallocated_bytes, after.deallocated_bytes).is_some()
+            && after
+                .reallocation_calls
+                .saturating_sub(self.before.reallocation_calls)
+                <= after
+                    .allocation_calls
+                    .saturating_sub(self.before.allocation_calls)
             && after.peak_live_bytes >= self.before.peak_live_bytes
+            && region_peak_live_bytes <= after.peak_live_bytes
             && region_peak_live_bytes >= self.before.live_bytes
             && region_peak_live_bytes >= after.live_bytes
+            && !after.live_underflow
         {
             "measured"
         } else {
@@ -214,6 +233,7 @@ impl Region {
             "peak_live_bytes_before": self.before.peak_live_bytes,
             "peak_live_bytes_after": after.peak_live_bytes,
             "region_peak_live_bytes": region_peak_live_bytes,
+            "live_underflow": after.live_underflow,
         });
         serde_json::json!({
             "tool": {
