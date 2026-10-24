@@ -3923,3 +3923,27 @@ See [0063](0063-source-pptx-modern-comments.md).
   corpus verification. Final source binding, native qualification and glossary
   performance closure remain required. No new deferral or performance waiver
   is accepted; only redaction audit 22 remains deferred. Nothing is pushed.
+
+- Coordinator continuation (2026-10-24, gate restart and two-leaf cleanup):
+  The current 691 full gate stops at formatting in DrawingML's diagram model.
+  Repair `f1d166b9c4` changes layout only, and the full workspace format check
+  passes. Record 0362dvl retains the failed gate and focused repair. A fresh
+  full 53-step gate starts from frozen `b4c18f2ede`, with a separately rebound
+  OfficeCLI postchecker and the unchanged pinned locks. Isolated documentation
+  steps still require a window without other builders.
+
+  RTF qualification pins were stale after the harness feature migration.
+  Reviewed repair `d9d7abab4e` merges at `b4c18f2ede`; independent review and
+  all 44 build-free protocol tests pass. Record 0362ul8d preserves the exact
+  baseline, routes and fidelity requirements. Fresh RTF and OLE packets bind
+  b4 and await actual build and quiet measurement slots; neither preparation
+  is performance acceptance.
+
+  Cleanup wave 47 removes two more merged leaves, ODG native protocol and the
+  legacy safe runner. Both branches and all fourteen ignored files (706,737
+  bytes) remain available; restore exercises and independent hash, mode,
+  ancestry and worktree-absence checks pass. Record 0362ul15 binds the receipts.
+  Native endpoints and the protected trunk probe remain unchanged. DrawingML
+  qualification returns, full gate/corpus completion, native measurements and
+  glossary performance closure remain active. Only audit 22 is deferred.
+  Nothing is pushed.
