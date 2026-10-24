@@ -64,3 +64,30 @@ older resource and ops-gate failures likewise remain separate evidence.
 Row 36 (core/ops/facade documentation), the remaining gate rows, actual corpus
 replay and native performance qualification retain their own acceptance
 requirements.
+
+## Separate core/ops/facade documentation result
+
+Row 36 also passes on unchanged 9781 after row 34's processes terminate.
+Its command is `cargo doc --offline --locked -q --no-deps --all-features
+-p litchi-core -p litchi-ops -p litchi`, using the same f5 runner, warnings
+policy, memory cap and single-job environment. The isolated run exits zero
+in 612.126 seconds with no diagnostics. All three generated crate indexes
+exist. All six locks remain unchanged and the source remains clean.
+
+Endpoint:
+`/home/zhuhe/code/litchi-worktrees/.coord/final-acceptance-2026-10-24/full-gate-9781-isolated-rustdoc-f5f3/`.
+
+| Artifact | Bytes | SHA-256 |
+| --- | ---: | --- |
+| `plan.json` | 24,683 | `d35fd6f91ff6a7c830f1a369262633049399a6acc20fb5a175752c10ed202673` |
+| `state.json` | 7,786 | `318300698b440815aabd16584c42a2cddb486c86059b8cdd4da58578b8d8e07e` |
+| `36-rustdoc-core-ops-facade-attempt-1792880788406988113-2531775.log` | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `36-rustdoc-core-ops-facade-attempt-1792880788406988113-2531775-cargo-targets.tsv` | 125 | `0a86bf35163cc805efed1b999730076f605f54b04e504086319f20fa52a30402` |
+
+Final and maximum sampled target storage are 1,915,267,412 bytes across
+23,415 live samples. No guard errors occurred. Three post-exit samples show
+stable target size, no owned processes and no builders. Runner PID 2531775
+and Cargo PID 2531997 have exited. The coordinator independently verifies
+the receipts, passing row, source/lock equality, generated indexes and
+terminated runner. Rows 34 and 36 are complete for their recorded source;
+no other row or performance result is inferred from them.
