@@ -651,7 +651,9 @@ fn run_sample(
             let mut edit = original.edit();
             edit.set_name(CHANGED_NAME)?;
             let commit = edit.commit()?;
-            let restored = commit.patch().clone().inverse().apply(&result)?;
+            let restored = result
+                .apply(&commit.patch().clone().inverse())?
+                .package();
             inverse_ok = restored.xml_bytes() == original.xml_bytes();
             if !changed_ok || !inverse_ok {
                 return Err("changed edit failed its source-preservation or inverse gate".into());
