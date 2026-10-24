@@ -23,5 +23,17 @@ cargo check --offline --all-targets -p litchi-pptx
 ```
 
 All three commands passed under the 20 GiB memory cap with one build job and
-the locked offline dependency set. No native workload or ABBA run was
-performed.
+offline resolution. These commands did **not** pass `--locked`, so this is
+not a pinned-lock receipt. The ignored leaf `Cargo.lock` observed after the
+validation sequence was 139,592 bytes with SHA-256
+`6d7895e6056c931fc19780ff4d0a031230e2ac79b9b30a9060bc8b6fad6747da`;
+the pre-run lock hash and per-command post hashes were not captured.
+
+No external raw command log was retained; the output was observed in the
+interactive validation session. The shared external target was
+`/home/zhuhe/code/litchi-worktrees/.coord/drawingml-fragments-raw-target`;
+its current post-inspection apparent size is 777,184,046 bytes. Command-time
+pre/post target measurements and log byte/hash receipts were not captured.
+This is diagnostic leaf validation only (`6d`); assembled `4100` workspace
+validation remains coordinator-owned and required. No native workload or
+ABBA run was performed.
