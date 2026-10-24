@@ -348,6 +348,21 @@ class SafeInkCommand:
                 if process.poll() is None:
                     cleanup = self._stop_owned(process)
                 returncode = process.returncode
+                final_output_bytes = tree_bytes(self.output)
+                final_tmp_bytes = tree_bytes(self.tmp)
+                if violation is None:
+                    if final_output_bytes > self.limits.output_bytes:
+                        violation = (
+                            f"output cap exceeded: {final_output_bytes} > "
+                            f"{self.limits.output_bytes}"
+                        )
+                    elif final_tmp_bytes > self.limits.tmp_bytes:
+                        violation = (
+                            f"TMP cap exceeded: {final_tmp_bytes} > "
+                            f"{self.limits.tmp_bytes}"
+                        )
+                if violation is not None and cleanup is None:
+                    cleanup = self._stop_owned(process)
         except BaseException:
             if process is not None and process.poll() is None:
                 cleanup = self._stop_owned(process)
