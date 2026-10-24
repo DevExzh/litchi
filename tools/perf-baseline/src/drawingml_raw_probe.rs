@@ -2392,6 +2392,11 @@ fn diagram_parts(fixture: &FixtureLane) -> Result<Vec<Part>, ProbeFailure> {
         .layout_name("relationship")
         .add_items([fixture_seed(fixture), "second".to_string()])
         .build();
+    #[cfg(feature = "drawingml-raw-current")]
+    let source = generate_smartart_data_xml(&diagram, &dml::diagram::Limits::DEFAULT)
+        .map_err(|error| classify(error, 0))?
+        .into_bytes();
+    #[cfg(not(feature = "drawingml-raw-current"))]
     let source = generate_smartart_data_xml(&diagram).into_bytes();
     let outline = read_diagram_value(&source)?;
     let entry = outline
@@ -3567,9 +3572,8 @@ fn semantic_key(kind: PartKind, bytes: &[u8]) -> Result<String, ProbeFailure> {
         PartKind::SvgBlip => {
             let value = read_svg_value(bytes)?;
             format!(
-                "reference={:?};prefix={:?};namespaces={:?};attributes={:?};children={:?}",
+                "reference={:?};namespaces={:?};attributes={:?};children={:?}",
                 value.reference(),
-                value.prefix(),
                 value.namespaces(),
                 value.attributes(),
                 value.children(),
