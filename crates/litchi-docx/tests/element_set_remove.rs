@@ -260,7 +260,7 @@ fn comments_take_new_authors_initials_dates_and_text() {
 
 fn with_smartart() -> (Package, String) {
     let mut edit = source().edit().unwrap();
-    let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild").unwrap();
+    let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild", &Limits::default()).unwrap();
     let id = edit
         .insert_smartart_at(&paragraph(1), None, &NewSmartArt::new(spec))
         .unwrap();
@@ -281,8 +281,8 @@ fn smartart_parts_are_replaced_and_their_drawing_kept_consistent() {
     // Identical parts are a no-op.
     assert!(!edit.set_smartart(&id, parts.clone()).unwrap());
     // A new outline with its regenerated drawing.
-    let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\nShip").unwrap();
     let limits = Limits::default();
+    let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\nShip", &limits).unwrap();
     let mut next = parts.clone();
     next.data = spec.data_xml(Some("rId0"), &limits).unwrap().into_bytes();
     next.drawing = Some(

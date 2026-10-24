@@ -9,8 +9,15 @@
 use crate::diagram::Limits;
 use crate::{Error, LimitKind, Result};
 use litchi_core::xml::escape_xml;
-use quick_xml::Reader;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+use std::collections::HashMap;
+
+const DGM_NAMESPACE_BYTES: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/diagram";
+const DGM_NAMESPACE_STRICT_BYTES: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/diagram";
+const DML_NAMESPACE_BYTES: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
+const DML_NAMESPACE_STRICT_BYTES: &[u8] = b"http://purl.oclc.org/ooxml/drawingml/main";
 
 /// `SmartArt` diagram type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,88 +178,414 @@ impl SmartArt {
                 max_input,
             ));
         }
-        let mut reader = Reader::from_str(xml.as_ref());
-        reader.config_mut().trim_text(true);
+        let mut reader = NsReader::from_reader(xml.as_ref().as_bytes());
+        reader.config_mut().trim_text(false);
 
-        let mut nodes = Vec::new();
+        let mut buffer = Vec::new();
+        let mut points = Vec::new();
+        let mut connections = Vec::new();
+        let mut current_point = None;
         let mut current_text = String::new();
-        let mut in_text = false;
-        let mut depth = 0usize;
-        let mut xml_nodes = 0usize;
+        let mut in_text_body = false;
+        let mut in_text_run = false;
+        let mut text_bytes = 0_usize;
+        let mut depth = 0_usize;
+        let mut xml_nodes = 0_usize;
+        let mut stack: Vec<(bool, Vec<u8>)> = Vec::new();
+        let mut root_seen = false;
+        let mut root_closed = false;
         let max_depth = limits.xml_depth_value().min(128);
         let max_xml_nodes = limits.xml_nodes_value().min(200_000);
         let max_nodes = limits.nodes_value().min(200_000);
         let max_text = limits.node_text_bytes_value().min(1024 * 1024);
 
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(e)) => {
-                    xml_nodes = xml_nodes.saturating_add(1);
+            buffer.clear();
+            let (resolved, event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            match event {
+                Event::Start(ref element) => {
+                    xml_nodes = xml_nodes.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("SmartArt XML node count overflows".to_owned())
+                    })?;
                     if xml_nodes > max_xml_nodes {
                         return Err(Error::limit(LimitKind::XmlNodes, xml_nodes, max_xml_nodes));
                     }
-                    depth = depth.saturating_add(1);
+                    if root_closed {
+                        return Err(Error::Invalid(
+                            "trailing markup follows the SmartArt data model".to_owned(),
+                        ));
+                    }
+                    let event_depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| Error::Invalid("SmartArt XML depth overflows".to_owned()))?;
+                    depth = event_depth;
                     if depth > max_depth {
                         return Err(Error::limit(LimitKind::XmlDepth, depth, max_depth));
                     }
-                    let local = e.local_name();
-                    if local.as_ref() == b"t" {
-                        in_text = true;
-                        current_text.clear();
-                    }
-                },
-                Ok(Event::End(e)) => {
-                    let local = e.local_name();
-                    if local.as_ref() == b"t" {
-                        in_text = false;
-                        if !current_text.trim().is_empty() {
-                            if nodes.len() >= max_nodes {
-                                return Err(Error::limit(
-                                    LimitKind::DiagramNodes,
-                                    nodes.len() + 1,
-                                    max_nodes,
-                                ));
-                            }
-                            nodes.push(DiagramNode::new(current_text.trim()));
+                    let dgm = is_dgm_namespace(&resolved);
+                    let dml = is_dml_namespace(&resolved);
+                    let local = element.local_name().as_ref().to_vec();
+                    if depth == 1 {
+                        if root_seen {
+                            return Err(Error::Invalid(
+                                "the SmartArt data model has multiple roots".to_owned(),
+                            ));
                         }
+                        if !dgm || local != b"dataModel" {
+                            return Err(Error::Invalid(
+                                "the SmartArt data model root is invalid".to_owned(),
+                            ));
+                        }
+                        root_seen = true;
+                    } else if dgm && local == b"dataModel" {
+                        return Err(Error::Invalid(
+                            "the SmartArt data model has a nested root".to_owned(),
+                        ));
                     }
-                    depth = depth.saturating_sub(1);
+                    let parent = stack
+                        .last()
+                        .filter(|(is_dgm, _)| *is_dgm)
+                        .map(|(_, name)| name.as_slice());
+                    if dgm && local == b"pt" && parent == Some(b"ptLst".as_slice()) {
+                        if current_point.is_some() {
+                            return Err(Error::Invalid(
+                                "nested SmartArt points are invalid".to_owned(),
+                            ));
+                        }
+                        if points.len() >= max_nodes {
+                            return Err(Error::limit(
+                                LimitKind::DiagramNodes,
+                                points.len() + 1,
+                                max_nodes,
+                            ));
+                        }
+                        let id = attribute_value(element, b"modelId")?
+                            .unwrap_or_else(|| format!("__point_{}", points.len()));
+                        let kind =
+                            attribute_value(element, b"type")?.unwrap_or_else(|| "node".to_owned());
+                        points.push(RawPoint {
+                            id,
+                            kind,
+                            text: None,
+                        });
+                        current_point = Some(points.len() - 1);
+                    } else if dgm && local == b"cxn" && parent == Some(b"cxnLst".as_slice()) {
+                        connections.push(RawConnection {
+                            kind: attribute_value(element, b"type")?
+                                .unwrap_or_else(|| "parOf".to_owned()),
+                            source: attribute_value(element, b"srcId")?.unwrap_or_default(),
+                            destination: attribute_value(element, b"destId")?.unwrap_or_default(),
+                        });
+                    } else if dgm && local == b"t" && current_point.is_some() {
+                        in_text_body = true;
+                        in_text_run = false;
+                        current_text.clear();
+                        text_bytes = 0;
+                    } else if dml && local == b"t" && in_text_body {
+                        in_text_run = true;
+                    }
+                    stack.push((dgm, local));
                 },
-                Ok(Event::Empty(_)) => {
-                    xml_nodes = xml_nodes.saturating_add(1);
+                Event::Empty(ref element) => {
+                    xml_nodes = xml_nodes.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("SmartArt XML node count overflows".to_owned())
+                    })?;
                     if xml_nodes > max_xml_nodes {
                         return Err(Error::limit(LimitKind::XmlNodes, xml_nodes, max_xml_nodes));
                     }
-                    let child_depth = depth.saturating_add(1);
+                    if root_closed {
+                        return Err(Error::Invalid(
+                            "trailing markup follows the SmartArt data model".to_owned(),
+                        ));
+                    }
+                    let child_depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| Error::Invalid("SmartArt XML depth overflows".to_owned()))?;
                     if child_depth > max_depth {
                         return Err(Error::limit(LimitKind::XmlDepth, child_depth, max_depth));
                     }
-                },
-                Ok(Event::Text(e)) => {
-                    if in_text && let Ok(text) = std::str::from_utf8(e.as_ref()) {
-                        let observed = current_text.len().saturating_add(text.len());
-                        if observed > max_text {
-                            return Err(Error::limit(
-                                LimitKind::DiagramNodeTextBytes,
-                                observed,
-                                max_text,
+                    let dgm = is_dgm_namespace(&resolved);
+                    let local = element.local_name().as_ref().to_vec();
+                    if depth == 0 {
+                        if root_seen {
+                            return Err(Error::Invalid(
+                                "the SmartArt data model has multiple roots".to_owned(),
                             ));
                         }
-                        current_text.push_str(text);
+                        if !dgm || local != b"dataModel" {
+                            return Err(Error::Invalid(
+                                "the SmartArt data model root is invalid".to_owned(),
+                            ));
+                        }
+                        return Err(Error::Invalid(
+                            "the SmartArt data model root is empty".to_owned(),
+                        ));
+                    }
+                    let parent = stack
+                        .last()
+                        .filter(|(is_dgm, _)| *is_dgm)
+                        .map(|(_, name)| name.as_slice());
+                    if dgm && local == b"pt" && parent == Some(b"ptLst".as_slice()) {
+                        if points.len() >= max_nodes {
+                            return Err(Error::limit(
+                                LimitKind::DiagramNodes,
+                                points.len() + 1,
+                                max_nodes,
+                            ));
+                        }
+                        let id = attribute_value(element, b"modelId")?
+                            .unwrap_or_else(|| format!("__point_{}", points.len()));
+                        let kind =
+                            attribute_value(element, b"type")?.unwrap_or_else(|| "node".to_owned());
+                        points.push(RawPoint {
+                            id,
+                            kind,
+                            text: None,
+                        });
+                    } else if dgm && local == b"cxn" && parent == Some(b"cxnLst".as_slice()) {
+                        connections.push(RawConnection {
+                            kind: attribute_value(element, b"type")?
+                                .unwrap_or_else(|| "parOf".to_owned()),
+                            source: attribute_value(element, b"srcId")?.unwrap_or_default(),
+                            destination: attribute_value(element, b"destId")?.unwrap_or_default(),
+                        });
                     }
                 },
-                Ok(Event::Eof) => break,
-                Err(e) => return Err(Error::Xml(e.to_string())),
-                _ => {},
+                Event::End(ref element) => {
+                    if depth == 0 || stack.is_empty() {
+                        return Err(Error::Invalid(
+                            "unexpected SmartArt data-model closing element".to_owned(),
+                        ));
+                    }
+                    let dgm = is_dgm_namespace(&resolved);
+                    let local = element.local_name();
+                    if depth == 1 && (!dgm || local.as_ref() != b"dataModel") {
+                        return Err(Error::Invalid(
+                            "the SmartArt data model root is not closed".to_owned(),
+                        ));
+                    }
+                    if dgm && local.as_ref() == b"pt" {
+                        current_point = None;
+                    } else if dgm && local.as_ref() == b"t" && in_text_body {
+                        if let Some(index) = current_point {
+                            points[index].text = Some(current_text.trim().to_owned());
+                        }
+                        in_text_body = false;
+                        in_text_run = false;
+                    } else if is_dml_namespace(&resolved) && local.as_ref() == b"t" && in_text_run {
+                        in_text_run = false;
+                    }
+                    stack.pop();
+                    depth -= 1;
+                    if depth == 0 {
+                        root_closed = true;
+                    }
+                },
+                Event::Text(text) => {
+                    if in_text_body {
+                        let decoded = text
+                            .decode()
+                            .map_err(|error| Error::Xml(error.to_string()))?;
+                        let decoded = quick_xml::escape::unescape(&decoded)
+                            .map_err(|error| Error::Xml(error.to_string()))?;
+                        append_text(
+                            &mut current_text,
+                            &mut text_bytes,
+                            decoded.as_ref(),
+                            max_text,
+                        )?;
+                    } else if text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace()) {
+                        return Err(Error::Invalid(
+                            "non-whitespace text is outside the SmartArt data model".to_owned(),
+                        ));
+                    }
+                },
+                Event::CData(data) if in_text_body => {
+                    let text = String::from_utf8_lossy(data.as_ref());
+                    append_text(&mut current_text, &mut text_bytes, &text, max_text)?;
+                },
+                Event::CData(_) => {
+                    return Err(Error::Invalid("CDATA is outside SmartArt text".to_owned()));
+                },
+                Event::GeneralRef(reference) if in_text_body => {
+                    let name = reference
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    let entity = format!("&{name};");
+                    let text = quick_xml::escape::unescape(&entity)
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    append_text(&mut current_text, &mut text_bytes, &text, max_text)?;
+                },
+                Event::GeneralRef(_) => {
+                    return Err(Error::Invalid(
+                        "entity reference is outside the SmartArt data model".to_owned(),
+                    ));
+                },
+                Event::Eof => break,
+                Event::DocType(_) => return Err(Error::Invalid("DTDs are rejected".to_owned())),
+                Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
             }
         }
 
-        if depth != 0 {
+        if !root_seen || !root_closed || depth != 0 || !stack.is_empty() || in_text_body {
             return Err(Error::Invalid("unterminated SmartArt data XML".to_owned()));
         }
-
+        let mut content = Vec::new();
+        let mut index_by_id = HashMap::new();
+        for point in points.into_iter().filter(|point| {
+            point.kind != "doc" && point.text.as_deref().is_some_and(|text| !text.is_empty())
+        }) {
+            if index_by_id
+                .insert(point.id.clone(), content.len())
+                .is_some()
+            {
+                return Err(Error::Invalid(
+                    "duplicate SmartArt point identifier".to_owned(),
+                ));
+            }
+            content.push(point);
+        }
+        let mut parents = vec![None; content.len()];
+        for connection in connections
+            .into_iter()
+            .filter(|connection| connection.kind == "parOf")
+        {
+            let Some(&child) = index_by_id.get(&connection.destination) else {
+                continue;
+            };
+            let parent = index_by_id.get(&connection.source).copied();
+            if let Some(previous) = parents[child]
+                && Some(previous) != parent
+            {
+                return Err(Error::Invalid(
+                    "a SmartArt point has multiple parents".to_owned(),
+                ));
+            }
+            parents[child] = parent;
+        }
+        let mut children = vec![Vec::new(); content.len()];
+        let mut roots = Vec::new();
+        for (index, parent) in parents.iter().copied().enumerate() {
+            if let Some(parent) = parent {
+                children[parent].push(index);
+            } else {
+                roots.push(index);
+            }
+        }
+        let mut visiting = vec![false; content.len()];
+        let mut visited = vec![false; content.len()];
+        fn build(
+            index: usize,
+            depth: u32,
+            content: &[RawPoint],
+            children: &[Vec<usize>],
+            visiting: &mut [bool],
+            visited: &mut [bool],
+        ) -> Result<DiagramNode> {
+            if visiting[index] {
+                return Err(Error::Invalid(
+                    "the SmartArt point graph contains a cycle".to_owned(),
+                ));
+            }
+            visiting[index] = true;
+            let mut node = DiagramNode::new(content[index].text.as_deref().unwrap_or_default());
+            node.depth = depth;
+            for &child in &children[index] {
+                node.children.push(build(
+                    child,
+                    depth.saturating_add(1),
+                    content,
+                    children,
+                    visiting,
+                    visited,
+                )?);
+            }
+            visiting[index] = false;
+            visited[index] = true;
+            Ok(node)
+        }
+        let mut nodes = Vec::with_capacity(roots.len());
+        for index in roots {
+            nodes.push(build(
+                index,
+                0,
+                &content,
+                &children,
+                &mut visiting,
+                &mut visited,
+            )?);
+        }
+        if visited.iter().any(|visited| !visited) {
+            return Err(Error::Invalid(
+                "the SmartArt point graph contains an unreachable cycle".to_owned(),
+            ));
+        }
         Ok(nodes)
     }
+}
+
+#[derive(Debug)]
+struct RawPoint {
+    id: String,
+    kind: String,
+    text: Option<String>,
+}
+
+#[derive(Debug)]
+struct RawConnection {
+    kind: String,
+    source: String,
+    destination: String,
+}
+
+fn is_dgm_namespace(resolved: &ResolveResult<'_>) -> bool {
+    matches!(
+        resolved,
+        ResolveResult::Bound(Namespace(namespace))
+            if *namespace == DGM_NAMESPACE_BYTES || *namespace == DGM_NAMESPACE_STRICT_BYTES
+    )
+}
+
+fn is_dml_namespace(resolved: &ResolveResult<'_>) -> bool {
+    matches!(
+        resolved,
+        ResolveResult::Bound(Namespace(namespace))
+            if *namespace == DML_NAMESPACE_BYTES || *namespace == DML_NAMESPACE_STRICT_BYTES
+    )
+}
+
+fn attribute_value(element: &BytesStart<'_>, name: &[u8]) -> Result<Option<String>> {
+    for attribute in element.attributes().with_checks(true) {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() == name {
+            let value = std::str::from_utf8(attribute.value.as_ref())
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            return Ok(Some(
+                quick_xml::escape::unescape(value)
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                    .into_owned(),
+            ));
+        }
+    }
+    Ok(None)
+}
+
+fn append_text(output: &mut String, bytes: &mut usize, text: &str, maximum: usize) -> Result<()> {
+    let observed = bytes
+        .checked_add(text.len())
+        .ok_or_else(|| Error::Invalid("SmartArt text length overflows".to_owned()))?;
+    if observed > maximum {
+        return Err(Error::limit(
+            LimitKind::DiagramNodeTextBytes,
+            observed,
+            maximum,
+        ));
+    }
+    *bytes = observed;
+    output.push_str(text);
+    Ok(())
 }
 
 /// Builder for creating `SmartArt` diagrams.
@@ -444,18 +777,18 @@ fn generate_smartart_data_xml_unchecked(
     if has_presentation_model && node_count > 0 {
         let base_pres_id = 1000_i32;
         let diagram_pres_id = base_pres_id;
-        let first_node_pres_id = base_pres_id + 1;
 
         // Diagram-level presentation point associated with the document root.
         xml.push_str(&format!(
             r#"<dgm:pt modelId="{diagram_pres_id}" type="pres"><dgm:prSet presAssocID="0" presName="diagram" presStyleCnt="0"><dgm:presLayoutVars><dgm:dir/><dgm:resizeHandles val="exact"/></dgm:presLayoutVars></dgm:prSet><dgm:spPr/></dgm:pt>"#,
         ));
 
-        // One presentation point per logical node, each associated with that
-        // node and using a simple bullet-enabled layout.
-        for (idx, _) in smartart.nodes.iter().enumerate() {
-            let node_id = index_i32(idx.saturating_add(1));
-            let pres_id = first_node_pres_id.saturating_add(index_i32(idx));
+        // One presentation point per logical node, including descendants,
+        // each associated with that node and using a simple bullet-enabled
+        // layout. Keeping the complete flattened graph avoids dangling
+        // `presOf` connections for nested content points.
+        for (node_id, _, _) in &flat_nodes {
+            let pres_id = base_pres_id.saturating_add(*node_id);
             xml.push_str(&format!(
                 r#"<dgm:pt modelId="{pres_id}" type="pres"><dgm:prSet presAssocID="{node_id}" presName="node" presStyleLbl="node0" presStyleIdx="0" presStyleCnt="1"><dgm:presLayoutVars><dgm:bulletEnabled val="1"/></dgm:presLayoutVars></dgm:prSet><dgm:spPr/></dgm:pt>"#,
             ));
@@ -522,7 +855,6 @@ fn generate_smartart_data_xml_unchecked(
     if has_presentation_model && node_count > 0 {
         let base_pres_id = 1000_i32;
         let diagram_pres_id = base_pres_id;
-        let first_node_pres_id = base_pres_id + 1;
         let pres_layout_id = lo_type_id;
 
         // presOf connection: document root -> diagram presentation node. This
@@ -537,20 +869,30 @@ fn generate_smartart_data_xml_unchecked(
 
         // presOf connections: each logical node -> its presentation node.
         for (idx, (node_id, _, _)) in flat_nodes.iter().enumerate() {
-            let pres_id = first_node_pres_id.saturating_add(index_i32(idx));
+            let pres_id = base_pres_id.saturating_add(*node_id);
             let cxn_id = 300_i32.saturating_add(index_i32(idx));
             xml.push_str(&format!(
                 r#"<dgm:cxn modelId="{cxn_id}" type="presOf" srcId="{node_id}" destId="{pres_id}" srcOrd="0" destOrd="0" presId="{pres_layout_id}"/>"#,
             ));
         }
 
-        // presParOf connections: diagram presentation node -> each
-        // presentation node for simple linear ordering.
-        for (idx, _) in flat_nodes.iter().enumerate() {
-            let pres_id = first_node_pres_id.saturating_add(index_i32(idx));
+        // presParOf connections preserve the same parent/child relationship
+        // as the content graph, with top-level nodes attached to the diagram
+        // presentation point.
+        for (idx, (node_id, parent_id, _)) in flat_nodes.iter().enumerate() {
+            let pres_id = base_pres_id.saturating_add(*node_id);
+            let source = if *parent_id == 0 {
+                diagram_pres_id
+            } else {
+                base_pres_id.saturating_add(*parent_id)
+            };
+            let src_ord = flat_nodes[..idx]
+                .iter()
+                .filter(|(_, parent, _)| parent == parent_id)
+                .count();
             let cxn_id = 500_i32.saturating_add(index_i32(idx));
             xml.push_str(&format!(
-                r#"<dgm:cxn modelId="{cxn_id}" type="presParOf" srcId="{diagram_pres_id}" destId="{pres_id}" srcOrd="{idx}" destOrd="0" presId="{pres_layout_id}"/>"#,
+                r#"<dgm:cxn modelId="{cxn_id}" type="presParOf" srcId="{source}" destId="{pres_id}" srcOrd="{src_ord}" destOrd="0" presId="{pres_layout_id}"/>"#,
             ));
         }
     }
@@ -846,14 +1188,41 @@ fn generate_smartart_drawing_xml_unchecked(
     xml.push_str("</dsp:nvGrpSpPr>");
     xml.push_str("<dsp:grpSpPr/>");
 
-    // Generate shapes for each node
-    let node_count = smartart.nodes.len().max(1);
+    // Generate one shape for every flattened node, including descendants.
+    // The previous top-level-only loop left nested data points without a
+    // corresponding cached shape and made valid nested graphics lose content.
+    let mut flat_nodes: Vec<(i32, u32, &DiagramNode)> = Vec::new();
+    fn flatten_nodes<'a>(
+        output: &mut Vec<(i32, u32, &'a DiagramNode)>,
+        next_id: &mut i32,
+        node: &'a DiagramNode,
+        depth: u32,
+    ) {
+        let id = *next_id;
+        *next_id = (*next_id).saturating_add(1);
+        output.push((id, depth, node));
+        for child in &node.children {
+            flatten_nodes(output, next_id, child, depth.saturating_add(1));
+        }
+    }
+    let mut next_id = 1_i32;
+    for node in &smartart.nodes {
+        flatten_nodes(&mut flat_nodes, &mut next_id, node, 0);
+    }
+    let node_count = flat_nodes.len().max(1);
     let node_width = width / index_i64(node_count);
-    let node_height = height * 8 / 10; // 80% height
+    let max_depth = flat_nodes
+        .iter()
+        .map(|(_, depth, _)| *depth as i64)
+        .max()
+        .unwrap_or(0);
+    let row_height = height / (max_depth + 1).max(1);
+    let node_height = row_height * 8 / 10;
 
-    for (idx, node) in smartart.nodes.iter().enumerate() {
+    for (idx, (node_id, depth, node)) in flat_nodes.iter().enumerate() {
         let node_x = x + index_i64(idx).saturating_mul(node_width);
-        let node_y = y + (height - node_height) / 2;
+        let node_y =
+            y + i64::from(*depth).saturating_mul(row_height) + (row_height - node_height) / 2;
 
         // Use a numeric modelId per shape. ST_ModelId is a union of xsd:int and
         // GUID; using integers keeps us schema-valid. For diagram types with a
@@ -873,10 +1242,9 @@ fn generate_smartart_drawing_xml_unchecked(
         );
         let model_id: i32 = if has_presentation_model {
             let base_pres_id = 1000_i32;
-            let first_node_pres_id = base_pres_id + 1;
-            first_node_pres_id.saturating_add(index_i32(idx))
+            base_pres_id.saturating_add(*node_id)
         } else {
-            index_i32(idx.saturating_add(1))
+            *node_id
         };
 
         xml.push_str(&format!("<dsp:sp modelId=\"{model_id}\">"));
@@ -1180,6 +1548,27 @@ mod tests {
                 .collect::<Vec<_>>(),
             ["A B"]
         );
+        assert!(matches!(
+            SmartArt::parse_data_xml(
+                "<dgm:wrongRoot xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>",
+                &defaults,
+            ),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            SmartArt::parse_data_xml(
+                "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">text</dgm:dataModel>",
+                &defaults,
+            ),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            SmartArt::parse_data_xml(
+                "<dgm:dataModel xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>",
+                &defaults,
+            ),
+            Err(Error::Invalid(_))
+        ));
 
         let smartart = SmartArtBuilder::new(DiagramType::Process)
             .add_item("A & B")
@@ -1251,5 +1640,39 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn nested_nodes_round_trip_through_data_and_drawing_generators() {
+        let limits = Limits::default();
+        let mut root = DiagramNode::new("root &");
+        let mut child = DiagramNode::new("child <one>");
+        child.add_child(DiagramNode::new("grandchild"));
+        root.add_child(child);
+        let smartart = SmartArt {
+            diagram_type: DiagramType::Hierarchy,
+            nodes: vec![root],
+            layout_name: None,
+            id: None,
+        };
+
+        let data = generate_smartart_data_xml(&smartart, &limits).unwrap();
+        let parsed = SmartArt::parse_data_xml(&data, &limits).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].text, "root &");
+        assert_eq!(parsed[0].children.len(), 1);
+        assert_eq!(parsed[0].children[0].text, "child <one>");
+        assert_eq!(parsed[0].children[0].depth, 1);
+        assert_eq!(parsed[0].children[0].children[0].text, "grandchild");
+        assert_eq!(parsed[0].children[0].children[0].depth, 2);
+
+        let drawing = generate_smartart_drawing_xml(&smartart, 0, 0, 900, 600, &limits).unwrap();
+        assert!(drawing.contains("root &amp;"));
+        assert!(drawing.contains("child &lt;one&gt;"));
+        assert!(drawing.contains("grandchild"));
+        assert_eq!(drawing.matches("<dsp:sp modelId=").count(), 3);
+        assert!(drawing.contains("modelId=\"1001\""));
+        assert!(drawing.contains("modelId=\"1002\""));
+        assert!(drawing.contains("modelId=\"1003\""));
     }
 }

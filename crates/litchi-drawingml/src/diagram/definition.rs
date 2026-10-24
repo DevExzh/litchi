@@ -92,39 +92,68 @@ impl DiagramDefinition {
         };
         let mut buffer = Vec::new();
         let mut depth = 0usize;
+        let mut root_closed = false;
 
         loop {
             match reader.read_event_into(&mut buffer).map_err(xml_error)? {
                 Event::Start(element) => {
+                    if root_closed {
+                        return Err(invalid("trailing markup follows the diagram definition"));
+                    }
+                    if depth == 0 && scan.root_seen {
+                        return Err(invalid("the diagram definition has multiple roots"));
+                    }
                     depth = depth
                         .checked_add(1)
                         .ok_or_else(|| invalid("definition XML depth overflows"))?;
                     scan.visit(&reader, &element, depth)?;
                 },
                 Event::Empty(element) => {
+                    if root_closed {
+                        return Err(invalid("trailing markup follows the diagram definition"));
+                    }
                     let child_depth = depth
                         .checked_add(1)
                         .ok_or_else(|| invalid("definition XML depth overflows"))?;
+                    if depth == 0 && scan.root_seen {
+                        return Err(invalid("the diagram definition has multiple roots"));
+                    }
                     scan.visit(&reader, &element, child_depth)?;
+                    if depth == 0 {
+                        root_closed = true;
+                    }
                 },
                 Event::End(_) => {
-                    if depth == 0 {
+                    if depth == 0 || !scan.root_seen {
                         return Err(invalid("unexpected definition closing element"));
                     }
                     depth -= 1;
+                    if depth == 0 {
+                        root_closed = true;
+                    }
                 },
                 Event::DocType(_) => return Err(invalid("DTDs are rejected")),
                 Event::CData(_) => return Err(invalid("CDATA is rejected")),
                 Event::Eof => break,
-                Event::Text(_)
-                | Event::Comment(_)
-                | Event::Decl(_)
-                | Event::PI(_)
-                | Event::GeneralRef(_) => {},
+                Event::Text(text) => {
+                    if (!scan.root_seen || root_closed)
+                        && text.as_ref().iter().any(|byte| !byte.is_ascii_whitespace())
+                    {
+                        return Err(invalid(
+                            "non-whitespace text is outside the diagram definition",
+                        ));
+                    }
+                },
+                Event::GeneralRef(_) if !scan.root_seen || root_closed => {
+                    return Err(invalid(
+                        "entity reference is outside the diagram definition",
+                    ));
+                },
+                Event::Comment(_) | Event::Decl(_) | Event::PI(_) | Event::GeneralRef(_) => {},
             }
             buffer.clear();
         }
-        if !scan.root_seen || depth != 0 {
+        if !scan.root_seen || !root_closed || depth != 0 {
             return Err(invalid("missing or unterminated definition root"));
         }
         Ok(scan.definition)
@@ -167,6 +196,9 @@ impl DefinitionScan<'_> {
             self.root_seen = true;
             self.definition.unique_id = attribute(element, "uniqueId")?;
             return Ok(());
+        }
+        if is_dgm(&namespace) && local == self.root_name {
+            return Err(invalid("the diagram definition has a nested root"));
         }
         if !is_dgm(&namespace) {
             return Ok(());
@@ -341,5 +373,33 @@ mod tests {
         let xml = "<dgm:colorsDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>";
         assert!(parse_layout(xml).is_err());
         assert!(parse_colors(xml).is_ok());
+    }
+
+    #[test]
+    fn rejects_duplicate_or_trailing_layout_roots() {
+        let duplicate = concat!(
+            "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>",
+            "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>"
+        );
+        assert!(matches!(parse_layout(duplicate), Err(Error::Invalid(_))));
+
+        let trailing = concat!(
+            "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\"/>",
+            "trailing"
+        );
+        assert!(matches!(parse_layout(trailing), Err(Error::Invalid(_))));
+    }
+
+    #[test]
+    fn rejects_unterminated_or_nested_layout_root() {
+        let unterminated = "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">";
+        assert!(matches!(parse_layout(unterminated), Err(Error::Invalid(_))));
+
+        let nested = concat!(
+            "<dgm:layoutDef xmlns:dgm=\"http://schemas.openxmlformats.org/drawingml/2006/diagram\">",
+            "<dgm:layoutDef/>",
+            "</dgm:layoutDef>"
+        );
+        assert!(matches!(parse_layout(nested), Err(Error::Invalid(_))));
     }
 }

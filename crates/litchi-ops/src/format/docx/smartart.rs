@@ -495,7 +495,7 @@ impl Docx {
                 .with_property("text")
                 .with_suggestion("give the outline: one node per line, one tab per level")
         })?;
-        let spec = Spec::parse_outline(layout, &outline).map_err(|source| {
+        let spec = Spec::parse_outline(layout, &outline, &Limits::default()).map_err(|source| {
             error(Code::InvalidValue, "the SmartArt outline is not valid")
                 .with_property("text")
                 .with_suggestion(source.to_string())
@@ -552,7 +552,7 @@ fn parse_layout(value: &str) -> Result<Layout> {
 }
 
 fn parse_outline(layout: Layout, value: &str) -> Result<Spec> {
-    let spec = Spec::parse_outline(layout, value)
+    let spec = Spec::parse_outline(layout, value, &Limits::default())
         .map_err(|source| leaf_error(Code::InvalidValue, source).with_property("text"))?;
     if spec.nodes().is_empty() {
         return Err(

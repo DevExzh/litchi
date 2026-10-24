@@ -100,7 +100,9 @@ pub(super) fn outline(file: &Pptx, tree: &TreeItem) -> Result<Option<Arc<Outline
 
 /// The outline text of a data model: one line per node, one tab per level.
 pub(super) fn outline_text(outline: &Outline) -> String {
-    Spec::from_outline(Layout::List, outline).outline()
+    Spec::from_outline(Layout::List, outline)
+        .outline(&Limits::default())
+        .unwrap_or_default()
 }
 
 /// The `layout` value of a data model: Litchi's token for a layout it
@@ -122,7 +124,7 @@ fn parse_layout(value: &str) -> Result<Layout> {
 }
 
 fn parse_outline(layout: Layout, value: &str) -> Result<Spec> {
-    let spec = Spec::parse_outline(layout, value)
+    let spec = Spec::parse_outline(layout, value, &Limits::default())
         .map_err(|error| leaf_error(Code::InvalidValue, error).with_property("text"))?;
     if spec.nodes().is_empty() {
         return Err(

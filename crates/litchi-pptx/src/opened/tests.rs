@@ -5748,8 +5748,12 @@ fn smartart_add_replace_and_remove_keep_the_part_graph_consistent() -> Result<()
 
     let package = opened_two_slide_package()?;
     let before = part_states(&package);
-    let spec = Spec::parse_outline(Layout::Process, "Plan\n\tScope\nBuild\nShip")
-        .map_err(|error| Error::Invalid(error.to_string()))?;
+    let spec = Spec::parse_outline(
+        Layout::Process,
+        "Plan\n\tScope\nBuild\nShip",
+        &DiagramLimits::default(),
+    )
+    .map_err(|error| Error::Invalid(error.to_string()))?;
     let mut edit = package.opened_presentation()?.edit();
     let id = edit.add_smartart(
         0_usize,

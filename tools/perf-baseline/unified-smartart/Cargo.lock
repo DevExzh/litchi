@@ -511,6 +511,7 @@ dependencies = [
  "base64",
  "chrono",
  "fast-float2",
+ "libc",
  "once_cell",
  "rand",
  "serde",
@@ -573,15 +574,18 @@ version = "0.0.1"
 dependencies = [
  "base64",
  "caseless",
- "litchi-biff",
+ "chrono",
  "litchi-core",
  "litchi-drawingml",
- "litchi-ograph",
  "litchi-ooxml-common",
  "litchi-opc",
  "litchi-pptx",
+ "litchi-sheet-text",
+ "memchr",
+ "quick-xml",
  "serde",
  "serde_json",
+ "sha2 0.11.0",
  "unicode-normalization",
 ]
 
@@ -597,12 +601,30 @@ dependencies = [
  "litchi-drawingml",
  "litchi-ooxml-common",
  "litchi-opc",
+ "memchr",
  "quick-xml",
  "rand",
  "sha2 0.11.0",
  "thiserror",
  "unicode-normalization",
  "zeroize",
+]
+
+[[package]]
+name = "litchi-sheet"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "thiserror",
+]
+
+[[package]]
+name = "litchi-sheet-text"
+version = "0.0.1"
+dependencies = [
+ "litchi-core",
+ "litchi-sheet",
+ "thiserror",
 ]
 
 [[package]]

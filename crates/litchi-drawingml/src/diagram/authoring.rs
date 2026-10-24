@@ -20,11 +20,12 @@
 //! ```
 //! use litchi_drawingml::diagram::{Limits, authoring::{Layout, Spec}};
 //!
-//! let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\n\tTest\nShip").unwrap();
+//! let limits = Limits::default();
+//! let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\n\tTest\nShip", &limits).unwrap();
 //! assert_eq!(spec.nodes().len(), 3);
-//! let data = spec.data_xml(Some("rId9"), &Limits::default()).unwrap();
+//! let data = spec.data_xml(Some("rId9"), &limits).unwrap();
 //! assert!(data.contains("layout/process1"));
-//! assert_eq!(spec.outline(), "Plan\nBuild\n\tTest\nShip");
+//! assert_eq!(spec.outline(&limits).unwrap(), "Plan\nBuild\n\tTest\nShip");
 //! ```
 
 mod drawing;
@@ -316,12 +317,34 @@ impl Spec {
     ///
     /// Returns [`Error::Invalid`] for a line indented more than one level
     /// below the previous one, or a graphic [`Self::validate`] refuses.
-    pub fn parse_outline(layout: Layout, text: &str) -> Result<Self> {
-        let text = text.replace("\\n", "\n").replace("\\t", "\t");
+    pub fn parse_outline(layout: Layout, text: &str, limits: &Limits) -> Result<Self> {
+        limits.validate()?;
+        ensure_input(text.len(), limits, crate::LimitKind::InputBytes)?;
+        let mut normalized = String::with_capacity(text.len());
+        let mut chars = text.chars().peekable();
+        while let Some(character) = chars.next() {
+            if character == '\\' {
+                match chars.peek().copied() {
+                    Some('n') => {
+                        chars.next();
+                        normalized.push('\n');
+                        continue;
+                    },
+                    Some('t') => {
+                        chars.next();
+                        normalized.push('\t');
+                        continue;
+                    },
+                    _ => {},
+                }
+            }
+            normalized.push(character);
+        }
         let mut spec = Self::new(layout);
         // The path of child indexes to the last node at each depth.
-        let mut path: Vec<usize> = Vec::new();
-        for line in text.split('\n') {
+        let path_capacity = limits.node_depth_value().min(MAX_DEPTH as usize);
+        let mut path: Vec<usize> = Vec::with_capacity(path_capacity);
+        for line in normalized.split('\n') {
             let line = line.strip_suffix('\r').unwrap_or(line);
             if line.trim().is_empty() {
                 continue;
@@ -352,14 +375,42 @@ impl Spec {
             siblings.push(Node::new(rest));
             path.push(siblings.len() - 1);
         }
-        spec.validate()?;
+        spec.validate_for_limits(limits)?;
         Ok(spec)
     }
 
     /// The text outline of the graphic: one line per node, indented by one
     /// tab per level; a node's own line breaks become spaces.
     #[must_use]
-    pub fn outline(&self) -> String {
+    pub fn outline(&self, limits: &Limits) -> Result<String> {
+        self.validate_for_limits(limits)?;
+        let mut capacity = 0_usize;
+        let mut first = true;
+        fn measure(
+            nodes: &[Node],
+            depth: usize,
+            capacity: &mut usize,
+            first: &mut bool,
+        ) -> Result<()> {
+            for node in nodes {
+                if !*first {
+                    *capacity = capacity.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("SmartArt outline length overflows".to_owned())
+                    })?;
+                }
+                *first = false;
+                *capacity = capacity
+                    .checked_add(node.text.len())
+                    .and_then(|value| value.checked_add(depth))
+                    .ok_or_else(|| {
+                        Error::Invalid("SmartArt outline length overflows".to_owned())
+                    })?;
+                measure(&node.children, depth + 1, capacity, first)?;
+            }
+            Ok(())
+        }
+        measure(&self.nodes, 0, &mut capacity, &mut first)?;
+        ensure_output(capacity, limits, crate::LimitKind::OutputBytes)?;
         fn walk(out: &mut String, nodes: &[Node], depth: usize) {
             for node in nodes {
                 if !out.is_empty() {
@@ -372,9 +423,10 @@ impl Spec {
                 walk(out, &node.children, depth + 1);
             }
         }
-        let mut out = String::new();
+        let mut out = String::with_capacity(capacity);
         walk(&mut out, &self.nodes, 0);
-        out
+        ensure_output(out.len(), limits, crate::LimitKind::OutputBytes)?;
+        Ok(out)
     }
 
     /// Check the node count, depth and text against the module's bounds.

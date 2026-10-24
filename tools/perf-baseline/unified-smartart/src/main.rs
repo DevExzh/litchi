@@ -48,7 +48,11 @@ impl Route {
 }
 
 fn spec() -> Result<Spec> {
-    Ok(Spec::parse_outline(Layout::Process, OUTLINE)?)
+    Ok(Spec::parse_outline(
+        Layout::Process,
+        OUTLINE,
+        &litchi_drawingml::diagram::Limits::default(),
+    )?)
 }
 
 /// A deck with one blank slide holding `count` SmartArt graphics (at least

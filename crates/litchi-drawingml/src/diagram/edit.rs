@@ -1488,8 +1488,10 @@ fn read_drawing(xml: &[u8], limits: &Limits) -> Result<(Vec<DrawnShape>, bool)> 
                     if !drawing || local.as_ref() != b"drawing" {
                         return Err(invalid("the part is not a diagram drawing"));
                     }
-                    root_seen = true;
                     return Err(invalid("the diagram drawing root is empty"));
+                }
+                if drawing && local.as_ref() == b"drawing" {
+                    return Err(invalid("the diagram drawing has a nested root"));
                 }
                 if drawing && local.as_ref() == b"sp" {
                     let max_shapes = limits.nodes_value().min(MAX_NODES);
@@ -1812,4 +1814,46 @@ pub fn set_drawing_reference(
         return Err(invalid("the drawing reference did not read back"));
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn limits_with_nodes(nodes: usize) -> Limits {
+        let defaults = Limits::default();
+        Limits::new(
+            defaults.input_bytes_value(),
+            defaults.output_bytes_value(),
+            defaults.xml_nodes_value(),
+            defaults.xml_depth_value(),
+            defaults.points_value(),
+            defaults.connections_value(),
+            defaults.data_text_bytes_value(),
+            nodes,
+            defaults.node_depth_value(),
+            defaults.node_text_bytes_value(),
+        )
+    }
+
+    #[test]
+    fn drawing_shape_limit_counts_sibling_shapes() {
+        let drawing = br#"<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram"><dsp:spTree><dsp:sp/><dsp:sp/></dsp:spTree></dsp:drawing>"#;
+        assert!(matches!(
+            read_drawing(drawing, &limits_with_nodes(1)),
+            Err(Error::Limit {
+                kind: crate::LimitKind::DiagramNodes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn drawing_rejects_nested_empty_root() {
+        let drawing = br#"<dsp:drawing xmlns:dsp="http://schemas.microsoft.com/office/drawing/2008/diagram"><dsp:drawing/></dsp:drawing>"#;
+        assert!(matches!(
+            read_drawing(drawing, &Limits::default()),
+            Err(Error::Invalid(_))
+        ));
+    }
 }

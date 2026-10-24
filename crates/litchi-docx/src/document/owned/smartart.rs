@@ -63,7 +63,11 @@ fn drawing_error(error: litchi_drawingml::Error) -> Error {
 /// use litchi_docx::document::NewSmartArt;
 /// use litchi_drawingml::diagram::authoring::{Layout, Spec};
 ///
-/// let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\nShip")?;
+/// let spec = Spec::parse_outline(
+///     Layout::Process,
+///     "Plan\nBuild\nShip",
+///     &litchi_drawingml::diagram::Limits::default(),
+/// )?;
 /// let smartart = NewSmartArt::new(spec).with_size(Some(5_400_000), None).with_name("Flow");
 /// assert_eq!(smartart.size(), (5_400_000, 3_240_000));
 /// # Ok::<(), litchi_drawingml::Error>(())
@@ -207,12 +211,20 @@ impl Edit<Package> {
     /// let package = builder.build()?;
     /// let mut edit = package.edit()?;
     /// let paragraph = ElementPath::new([ElementStep::Paragraph(Position::new(0))]);
-    /// let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild")?;
+    /// let spec = Spec::parse_outline(
+    ///     Layout::Process,
+    ///     "Plan\nBuild",
+    ///     &Limits::default(),
+    /// )?;
     /// let id = edit.insert_smartart_at(&paragraph, None, &NewSmartArt::new(spec))?;
     /// let package = edit.commit()?.into_package();
     /// let mut edit = package.edit()?;
     /// let mut parts = edit.smartart_parts(&id)?.expect("the graphic");
-    /// let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\nShip")?;
+    /// let spec = Spec::parse_outline(
+    ///     Layout::Process,
+    ///     "Plan\nBuild\nShip",
+    ///     &Limits::default(),
+    /// )?;
     /// let drawing = parts.drawing.take().expect("a cached drawing");
     /// let limits = Limits::default();
     /// parts.data = spec.data_xml(Some("rId0"), &limits)?.into_bytes();
@@ -507,7 +519,11 @@ impl Edit<Package> {
     /// let package = builder.build()?;
     /// let mut edit = package.edit()?;
     /// let paragraph = ElementPath::new([ElementStep::Paragraph(Position::new(0))]);
-    /// let spec = Spec::parse_outline(Layout::Process, "Plan\nBuild\nShip")?;
+    /// let spec = Spec::parse_outline(
+    ///     Layout::Process,
+    ///     "Plan\nBuild\nShip",
+    ///     &litchi_drawingml::diagram::Limits::default(),
+    /// )?;
     /// let id = edit.insert_smartart_at(&paragraph, None, &NewSmartArt::new(spec))?;
     /// let mut next = edit.commit()?.into_package();
     /// let reopened = Package::from_bytes(&next.to_bytes()?)?;

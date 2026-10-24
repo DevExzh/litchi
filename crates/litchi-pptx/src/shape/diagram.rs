@@ -152,4 +152,34 @@ mod tests {
         let xml = graphic_frame(1, 0, 0, 1, 1, "r&Id", &Limits::default()).unwrap();
         assert!(xml.contains("r:dm=\"r&amp;Id\""));
     }
+
+    #[test]
+    fn custom_frame_values_are_preserved_and_output_is_bounded() {
+        let xml = graphic_frame(77, -10, 20, 300, 400, "rId42", &Limits::default()).unwrap();
+        assert!(xml.contains("id=\"77\""));
+        assert!(xml.contains("x=\"-10\" y=\"20\""));
+        assert!(xml.contains("cx=\"300\" cy=\"400\""));
+        assert!(xml.contains("r:lo=\"rIdlo\""));
+
+        let defaults = Limits::default();
+        let tiny = Limits::new(
+            defaults.input_bytes_value(),
+            1,
+            defaults.xml_nodes_value(),
+            defaults.xml_depth_value(),
+            defaults.points_value(),
+            defaults.connections_value(),
+            defaults.data_text_bytes_value(),
+            defaults.nodes_value(),
+            defaults.node_depth_value(),
+            defaults.node_text_bytes_value(),
+        );
+        assert!(matches!(
+            graphic_frame(77, 0, 0, 1, 1, "rId1", &tiny),
+            Err(litchi_drawingml::Error::Limit {
+                kind: litchi_drawingml::LimitKind::DiagramDrawingBytes,
+                ..
+            })
+        ));
+    }
 }

@@ -1,7 +1,8 @@
 # 0362dvf — DrawingML diagram raw limits
 
-- Status: source and consumer migration plus the coordinator repair pass
-  complete; focused capped qualification is pending a granted Cargo slot.
+- Status: follow-up grammar, fidelity and authoring-limit repair source and
+  focused capped qualification are complete; ABBA measurement remains
+  coordinator work.
 - Base: `2f7db7ee7fa01893e9099217fc4243687d196f63`.
 
 ## Policy
@@ -18,7 +19,10 @@ The bounded raw APIs are:
 * `DiagramDataModel::{parse,to_xml,write_xml}`;
 * `DiagramDefinition::{parse_layout,parse_quick_style,parse_colors}`;
 * `SmartArt::parse_data_xml` and all five `generate_smartart_*` producers; and
-* `diagram::edit::{Outline::read,set_text,drawing_text,set_drawing_reference}`.
+* `diagram::edit::{Outline::read,set_text,drawing_text,set_drawing_reference}`;
+* `diagram::authoring::{Spec::{parse_outline,outline,data_xml,layout_xml,
+  drawing_xml},quick_style_xml,colors_xml}`; and
+* `litchi_pptx::shape::diagram::graphic_frame`.
 
 There are no limit-less twins or compatibility aliases. Writers preflight the
 selected output budget before reserving their sink or replacement buffer, and
@@ -54,8 +58,37 @@ The follow-up pass closes the five review findings from the first packet:
 * PPTX `shape::diagram::graphic_frame` now uses the canonical `&Limits`
   policy, bounded relationship/output sizing, and migrated tests/examples.
 
-The repair is source-only pending the coordinator's requested focused Cargo
-slot; no new fixtures, binaries, or measurement artifacts are included.
+## Follow-up review repair
+
+The second review pass adds behavior coverage and closes the remaining
+grammar/fidelity findings:
+
+* `edit::read_drawing` rejects nested empty `dsp:drawing` roots and counts
+  sibling shapes against the global node budget;
+* `DiagramDefinition` rejects nested or duplicate roots, unterminated roots,
+  and non-whitespace markup after a closed root;
+* `SmartArt::parse_data_xml` requires the DrawingML data-model root, rejects
+  wrong roots, plaintext and empty roots, and rebuilds the complete parent
+  graph for nested points;
+* the generic SmartArt data and cached-drawing generators emit presentation
+  points, parent connections and cached shapes for every nested node, with a
+  nested round-trip regression proving that no descendants or references are
+  lost;
+* `Spec::parse_outline` and `Spec::outline` enforce caller input/output
+  policies before their resource-scaled buffers are reserved; and
+* live DOCX/PPTX/ops consumers and the standalone SmartArt performance
+  harness use the new authoring signatures, with custom graphic-frame and
+  parser-boundary regressions.
+
+Focused validation for this repair passed with one build job, offline locked
+dependencies, the memory-capped cargo shim, and an external target below
+20 GB: all 245 `litchi-drawingml` unit tests and integration tests passed;
+all-feature library checks passed for `litchi-docx`, `litchi-pptx`, and
+`litchi-ops`; and the standalone unified SmartArt harness passed its locked
+check after its tracked lockfile was refreshed for the current workspace
+dependencies. The earlier 8f49 qualification is not used as evidence for
+these source changes. No new fixtures, binaries, or measurement artifacts are
+included.
 
 No fixture or performance artifact is added by this source migration. The
 focused qualification used one build job, offline locked dependencies, the

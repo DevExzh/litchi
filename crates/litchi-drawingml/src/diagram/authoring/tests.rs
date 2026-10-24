@@ -10,7 +10,12 @@ use crate::diagram::Limits;
 use crate::diagram::edit::{self, Outline};
 
 fn sample(layout: Layout) -> Spec {
-    Spec::parse_outline(layout, "Plan\n\tScope\n\tBudget\nBuild & test\nShip <now>").unwrap()
+    Spec::parse_outline(
+        layout,
+        "Plan\n\tScope\n\tBudget\nBuild & test\nShip <now>",
+        &Limits::default(),
+    )
+    .unwrap()
 }
 
 #[test]
@@ -19,13 +24,14 @@ fn outline_round_trips_and_nests() {
     assert_eq!(spec.nodes().len(), 3);
     assert_eq!(spec.nodes()[0].children.len(), 2);
     assert_eq!(
-        spec.outline(),
+        spec.outline(&Limits::default()).unwrap(),
         "Plan\n\tScope\n\tBudget\nBuild & test\nShip <now>"
     );
-    let spaced = Spec::parse_outline(Layout::List, "A\n  B\n    C\\nD\\tE").unwrap();
-    assert_eq!(spaced.outline(), "A\n\tB\n\t\tC\nD\tE");
-    assert!(Spec::parse_outline(Layout::List, "A\n\t\tB").is_err());
-    assert!(Spec::parse_outline(Layout::List, "\tA").is_err());
+    let limits = Limits::default();
+    let spaced = Spec::parse_outline(Layout::List, "A\n  B\n    C\\nD\\tE", &limits).unwrap();
+    assert_eq!(spaced.outline(&limits).unwrap(), "A\n\tB\n\t\tC\nD\tE");
+    assert!(Spec::parse_outline(Layout::List, "A\n\t\tB", &limits).is_err());
+    assert!(Spec::parse_outline(Layout::List, "\tA", &limits).is_err());
 }
 
 #[test]
@@ -125,6 +131,35 @@ fn bounds_are_enforced() {
     assert!(matches!(
         Spec::new(Layout::List).data_xml(None, &tiny_output),
         Err(Error::Limit { .. })
+    ));
+
+    let tiny_input = Limits::new(
+        1,
+        defaults.output_bytes_value(),
+        defaults.xml_nodes_value(),
+        defaults.xml_depth_value(),
+        defaults.points_value(),
+        defaults.connections_value(),
+        defaults.data_text_bytes_value(),
+        defaults.nodes_value(),
+        defaults.node_depth_value(),
+        defaults.node_text_bytes_value(),
+    );
+    assert!(matches!(
+        Spec::parse_outline(Layout::List, "Plan", &tiny_input),
+        Err(Error::Limit {
+            kind: crate::LimitKind::InputBytes,
+            ..
+        })
+    ));
+    assert!(matches!(
+        Spec::new(Layout::List)
+            .with_node(Node::new("Plan"))
+            .outline(&tiny_output),
+        Err(Error::Limit {
+            kind: crate::LimitKind::OutputBytes,
+            ..
+        })
     ));
 }
 
