@@ -63,6 +63,11 @@ probe is byte-identical to the adapter generated from the d39 probe:
   translations and three XLSB removals), while the d39 receipt has the four
   result-field translations only.
 
+The direct d39 object comparison was performed before the portability
+correction.  The unit test now pins this reviewed adapter identity directly,
+without requiring historical Git objects, so it also works in shallow and
+source-archive test environments.
+
 The adapter test suite also rejects an accidental fourth `.resolve()` call.
 
 ## Frozen failure and validation
@@ -95,6 +100,13 @@ translation was added.  Its raw log is outside the repository at
 `0a113676e195f019566954d16bb39a8e1a169620c6de687ee1ca57ed7099b930`.
 All 20 tests passed, with zero failures, errors or skips, including the
 byte-identity and extra-resolution fail-closed checks.
+
+The portability successor reran the same 20-test command with the Git-object
+lookup removed from the unit test.  Its raw log is outside the repository at
+`/home/zhuhe/code/litchi-worktrees/.coord/final-w8-probe-binding/w8-binding-tests-portable.log`:
+3,467 bytes, SHA-256
+`2ca4faa697bf42f1ddbfeeea3efb347a51ca5b77cc28ae43f7f00ef28e274e06`.
+All 20 tests passed, with zero failures, errors or skips.
 
 No Cargo command, native build, native execution, timing run or qualification
 claim was made for this repair.

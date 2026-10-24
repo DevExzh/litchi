@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import collections
+import hashlib
 from pathlib import Path
-import subprocess
 import tarfile
 import tempfile
 import unittest
@@ -46,21 +46,14 @@ class AdapterSource(unittest.TestCase):
         # its only accepted API spelling is the old public result field.
         self.assertEqual(adapted.decode("utf-8").count(".file"), source.count(".file") + 4)
 
-    def test_baseline_adapter_matches_the_d39_adapter_byte_for_byte(self):
+    def test_baseline_adapter_matches_pinned_d39_adapter_identity(self):
         source = PROBE.read_text(encoding="utf-8")
         adapted, _records = overlay.consumer_adapter(source)
-        result = subprocess.run(
-            [
-                "git",
-                "show",
-                "d39d179353b5fd1ce82ca479b16cee2fc4dc8ffb:"
-                + overlay.PROBE_RELATIVE.as_posix(),
-            ],
-            check=True,
-            capture_output=True,
+        self.assertEqual(len(adapted), 74_719)
+        self.assertEqual(
+            hashlib.sha256(adapted).hexdigest(),
+            "3e14376c366fa911025212d7e7081ab5c3b5aaac804c1e01a1415fd5cd826ca0",
         )
-        legacy_adapted, _legacy_records = overlay.consumer_adapter(result.stdout.decode("utf-8"))
-        self.assertEqual(adapted, legacy_adapted)
 
     def test_accidental_extra_xlsb_resolution_is_rejected(self):
         source = PROBE.read_text(encoding="utf-8")
