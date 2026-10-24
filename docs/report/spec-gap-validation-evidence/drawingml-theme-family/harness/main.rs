@@ -477,7 +477,7 @@ impl Fixture {
             opaque: kind == FixtureKind::Opaque,
             shape_ok: false,
         };
-        let snapshot = Package::from_xml(fixture.bytes.clone())?;
+        let snapshot = Package::from_xml(fixture.bytes.clone(), family::Limits::DEFAULT)?;
         if fixture.opaque {
             validate_opaque_shape(&fixture.bytes)?;
         }
@@ -587,7 +587,7 @@ fn run_sample(
     let mut changed_ok = true;
     let mut inverse_ok = true;
     let result = match operation {
-        Operation::Read => Package::from_xml(&fixture.bytes),
+        Operation::Read => Package::from_xml(&fixture.bytes, family::Limits::DEFAULT),
         Operation::Clone => Ok(black_box(
             prepared
                 .ok_or("clone operation lacks prepared snapshot")?
@@ -675,7 +675,10 @@ fn main() -> Result<(), BoxError> {
     let prepared = if args.operation == Operation::Read {
         None
     } else {
-        Some(Package::from_xml(fixture.bytes.clone())?)
+        Some(Package::from_xml(
+            fixture.bytes.clone(),
+            family::Limits::DEFAULT,
+        )?)
     };
     for _ in 0..args.warmup {
         let _ = run_sample(&fixture, args.operation, prepared.as_ref())?;

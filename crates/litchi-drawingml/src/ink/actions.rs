@@ -937,6 +937,213 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Actions> {
     })
 }
 
+/// Validate a source-backed action part without reconstructing its action
+/// vectors.  Replay writers only need the bounded admission facts: the
+/// visitor therefore retains its XML stack and counters, while typed action
+/// attributes are checked and immediately discarded.
+fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
+    if xml.len() > limits.max_source_bytes {
+        return Err(limit(
+            LimitKind::SourceBytes,
+            xml.len(),
+            limits.max_source_bytes,
+        ));
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    reader
+        .resolver_mut()
+        .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
+    let mut stack = Vec::new();
+    let mut root_seen = false;
+    let mut root_closed = false;
+    let mut nodes = 0usize;
+    let mut groups = 0usize;
+    let mut declaration_seen = false;
+    let mut preamble_content_seen = false;
+    let mut legacy_fragment = false;
+
+    loop {
+        let start = pos(&reader, origin)?;
+        let event = reader.read_event().map_err(xml_error)?;
+        let (resolved, event) = reader.resolver().resolve_event(event);
+        let end = pos(&reader, origin)?;
+        let is_declaration = matches!(&event, Event::Decl(_));
+        match event {
+            Event::Decl(declaration)
+                if !root_seen && !declaration_seen && !preamble_content_seen =>
+            {
+                validate_declaration(&declaration)?;
+                declaration_seen = true;
+            },
+            Event::Start(element) if !root_seen => {
+                validate_element(&element, &reader, false, limits)?;
+                legacy_fragment = require_root(&element, &resolved, &reader)?;
+                root_seen = true;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(1, limits.max_depth)?;
+                let length = required_attr(&element, b"lengthUnit", &reader, limits)?;
+                let time = required_attr(&element, b"timeUnit", &reader, limits)?;
+                validate_unit(&length, "lengthUnit", limits.max_scalar_bytes)?;
+                validate_unit(&time, "timeUnit", limits.max_scalar_bytes)?;
+                reserve_one(&mut stack, "ink actions XML stack")?;
+                stack.push(Frame {
+                    namespace: namespace_id(&resolved, &reader)?,
+                    action: None,
+                    action_group: false,
+                    direct_actions: 0,
+                    payload_start: None,
+                });
+            },
+            Event::Empty(element) if !root_seen => {
+                validate_element(&element, &reader, false, limits)?;
+                legacy_fragment = require_root(&element, &resolved, &reader)?;
+                root_seen = true;
+                root_closed = true;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(1, limits.max_depth)?;
+                let length = required_attr(&element, b"lengthUnit", &reader, limits)?;
+                let time = required_attr(&element, b"timeUnit", &reader, limits)?;
+                validate_unit(&length, "lengthUnit", limits.max_scalar_bytes)?;
+                validate_unit(&time, "timeUnit", limits.max_scalar_bytes)?;
+            },
+            Event::Start(element) if root_seen && !root_closed => {
+                validate_element(&element, &reader, false, limits)?;
+                validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
+                let local = element.name().local_name();
+                let payload_start =
+                    is_payload_element(&resolved, &element, &reader)?.then_some(start);
+                let action_group =
+                    is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
+                        && local.as_ref() == b"actionGroup";
+                let action_element =
+                    is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
+                        && local.as_ref() == b"action";
+                if action_group {
+                    increment_groups(&mut groups, limits.max_action_groups)?;
+                    validate_action_attrs(&element, &reader, limits)?;
+                } else if action_element {
+                    record_group_action(&mut stack);
+                    validate_action_attrs(&element, &reader, limits)?;
+                }
+                reserve_one(&mut stack, "ink actions XML stack")?;
+                stack.push(Frame {
+                    namespace: namespace_id(&resolved, &reader)?,
+                    action: None,
+                    action_group,
+                    direct_actions: 0,
+                    payload_start,
+                });
+            },
+            Event::Empty(element) if root_seen && !root_closed => {
+                validate_element(&element, &reader, false, limits)?;
+                validate_unknown_prefix(&resolved, &element, legacy_fragment)?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
+                let local = element.name().local_name();
+                if is_payload_element(&resolved, &element, &reader)? {
+                    enforce_payload_span(start, end, limits.max_payload_bytes)?;
+                }
+                if is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
+                    && local.as_ref() == b"actionGroup"
+                {
+                    increment_groups(&mut groups, limits.max_action_groups)?;
+                    validate_action_attrs(&element, &reader, limits)?;
+                    return Err(invalid("ink actionGroup requires an action child"));
+                } else if is_action_namespace(&resolved, &element, legacy_fragment, &reader)?
+                    && local.as_ref() == b"action"
+                {
+                    record_group_action(&mut stack);
+                    validate_action_attrs(&element, &reader, limits)?;
+                }
+            },
+            Event::End(element) if root_seen && !root_closed => {
+                let frame = stack
+                    .pop()
+                    .ok_or_else(|| invalid("ink actions has an unexpected closing element"))?;
+                if frame.action_group && frame.direct_actions == 0 {
+                    return Err(invalid("ink actionGroup requires an action child"));
+                }
+                validate_end_name(&element, &resolved, legacy_fragment)?;
+                if frame.namespace != namespace_id(&resolved, &reader)? {
+                    return Err(invalid("ink actions has mismatched closing elements"));
+                }
+                if let Some(payload_start) = frame.payload_start {
+                    enforce_payload_span(payload_start, end, limits.max_payload_bytes)?;
+                }
+                if stack.is_empty() {
+                    root_closed = true;
+                }
+            },
+            Event::Start(_) | Event::Empty(_) | Event::End(_) if root_closed => {
+                return Err(invalid("ink actions has content after its root"));
+            },
+            Event::Start(_) | Event::Empty(_) | Event::End(_) => {
+                return Err(invalid("ink actions has an invalid root transition"));
+            },
+            Event::Text(text)
+                if (!root_seen || root_closed)
+                    && !validate_text(&text, "ink actions text")?
+                        .bytes()
+                        .all(|byte| byte.is_ascii_whitespace()) =>
+            {
+                return Err(invalid("ink actions has text outside its root"));
+            },
+            Event::Text(text) => {
+                validate_text(&text, "ink actions text")?;
+            },
+            Event::CData(data) => {
+                validate_text(&data, "ink actions CDATA")?;
+                if !root_seen || root_closed {
+                    return Err(invalid("ink actions CDATA is not allowed outside its root"));
+                }
+            },
+            Event::GeneralRef(reference) => {
+                validate_reference(&reference)?;
+                if !root_seen || root_closed {
+                    return Err(invalid("ink actions has a reference outside its root"));
+                }
+            },
+            Event::Comment(comment) => {
+                validate_text(&comment, "ink actions comment")?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid(
+                    "ink actions rejects DTDs and processing instructions",
+                ));
+            },
+            Event::Decl(_) => {
+                return Err(invalid(
+                    "ink actions has a duplicate or late XML declaration",
+                ));
+            },
+            Event::Eof => break,
+        }
+        if !is_declaration {
+            preamble_content_seen = true;
+        }
+    }
+
+    if !root_seen || !root_closed || !stack.is_empty() {
+        return Err(invalid("ink actions root is absent or unterminated"));
+    }
+    Ok(())
+}
+
+fn validate_action_attrs<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    reader: &NsReader<R>,
+    limits: Limits,
+) -> Result<()> {
+    let _ = optional_xml_id(element, reader, limits)?;
+    require_action_attrs(element, reader, limits)
+}
+
 /// Read a namespace-bound CT_Actions value using the strict §2.21 structural
 /// profile.
 ///
@@ -1180,7 +1387,7 @@ pub fn write_profile(profile: &Profile, limits: Limits) -> Result<Vec<u8>> {
     // Re-scan source-backed profiles under the caller's complete policy
     // before reserving output; a profile admitted under a wider policy must
     // not bypass structural, payload, or decoded-value bounds on replay.
-    let _ = read_profile(profile.source(), limits)?;
+    validate_profile_source(profile.source(), limits)?;
     if profile.source.len() > limits.max_output_bytes {
         return Err(limit(
             LimitKind::OutputBytes,
@@ -1199,7 +1406,7 @@ pub fn write_profile(profile: &Profile, limits: Limits) -> Result<Vec<u8>> {
 /// Write a strict profile to a caller-provided sink.
 pub fn write_profile_to<W: Write>(writer: &mut W, profile: &Profile, limits: Limits) -> Result<()> {
     let limits = limits.validate()?;
-    let _ = read_profile(profile.source(), limits)?;
+    validate_profile_source(profile.source(), limits)?;
     if profile.source.len() > limits.max_output_bytes {
         return Err(limit(
             LimitKind::OutputBytes,
@@ -1218,7 +1425,7 @@ pub fn write_profile_to<W: Write>(writer: &mut W, profile: &Profile, limits: Lim
 /// Returns an error only when the caller-provided sink fails.
 pub fn write_to<W: Write>(writer: &mut W, actions: &Actions, limits: Limits) -> Result<()> {
     let limits = limits.validate()?;
-    let _ = read(actions.source(), limits)?;
+    validate_source(actions.source(), limits)?;
     if actions.source().len() > limits.max_output_bytes {
         return Err(limit(
             LimitKind::OutputBytes,
@@ -1237,7 +1444,7 @@ pub fn write_to<W: Write>(writer: &mut W, actions: &Actions, limits: Limits) -> 
 /// Returns an error when source validation fails.
 pub fn write(actions: &Actions, limits: Limits) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
-    let _ = read(actions.source(), limits)?;
+    validate_source(actions.source(), limits)?;
     if actions.source().len() > limits.max_output_bytes {
         return Err(limit(
             LimitKind::OutputBytes,
@@ -1431,6 +1638,595 @@ fn validate_profile_element<R: std::io::BufRead>(
 ) -> Result<()> {
     validate_element(element, reader, true, limits)?;
     validate_unknown_prefix(resolved, element, false)
+}
+
+#[derive(Debug, Default)]
+struct ValidationRoot {
+    definitions_seen: bool,
+    action_seen: bool,
+    action_count: usize,
+    group_count: usize,
+}
+
+#[derive(Debug)]
+struct ValidationFrame {
+    namespace: NamespaceId,
+    kind: ValidationFrameKind,
+}
+
+#[derive(Debug)]
+enum ValidationFrameKind {
+    Root,
+    Definitions {
+        source_start: usize,
+    },
+    ActionGroup {
+        actions: usize,
+    },
+    Action {
+        data_seen: bool,
+    },
+    Property,
+    DataGroup {
+        data: usize,
+    },
+    Data {
+        transform_seen: bool,
+        trace_seen: bool,
+    },
+    DataChild {
+        source_start: usize,
+    },
+    Opaque,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ValidationValue {
+    Definitions,
+    ActionGroup,
+    Action,
+    Property,
+    DataGroup,
+    Data,
+    DataChild,
+    None,
+}
+
+/// Validate the strict action profile without constructing its retained
+/// vectors or copying its source.  This is intentionally a structural visitor:
+/// typed attributes are decoded and checked, while only grammar state and
+/// bounded child counts survive between events.
+fn validate_profile_source(xml: &[u8], limits: Limits) -> Result<()> {
+    if xml.len() > limits.max_source_bytes {
+        return Err(limit(
+            LimitKind::SourceBytes,
+            xml.len(),
+            limits.max_source_bytes,
+        ));
+    }
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    reader
+        .resolver_mut()
+        .set_max_declarations_per_element(MAX_NAMESPACE_DECLARATIONS);
+    let mut stack = Vec::new();
+    let mut root = None;
+    let mut root_closed = false;
+    let mut nodes = 0usize;
+    let mut declaration_seen = false;
+    let mut preamble_content_seen = false;
+
+    loop {
+        let start = pos(&reader, origin)?;
+        let event = reader.read_event().map_err(xml_error)?;
+        let (resolved, event) = reader.resolver().resolve_event(event);
+        let end = pos(&reader, origin)?;
+        let is_declaration = matches!(&event, Event::Decl(_));
+        match event {
+            Event::Decl(declaration)
+                if root.is_none() && !declaration_seen && !preamble_content_seen =>
+            {
+                validate_declaration(&declaration)?;
+                declaration_seen = true;
+            },
+            Event::Start(element) if root.is_none() => {
+                validate_profile_element(&element, &resolved, &reader, limits)?;
+                let root_state = validation_profile_root(&element, &resolved, &reader, limits)?;
+                root = Some(root_state);
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(1, limits.max_depth)?;
+                reserve_one(&mut stack, "ink actions profile XML stack")?;
+                stack.push(ValidationFrame {
+                    namespace: NamespaceId::Action,
+                    kind: ValidationFrameKind::Root,
+                });
+            },
+            Event::Empty(element) if root.is_none() => {
+                validate_profile_element(&element, &resolved, &reader, limits)?;
+                let _ = validation_profile_root(&element, &resolved, &reader, limits)?;
+                root = Some(ValidationRoot::default());
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(1, limits.max_depth)?;
+                root_closed = true;
+            },
+            Event::Start(element) if root.is_some() && !root_closed => {
+                validate_profile_element(&element, &resolved, &reader, limits)?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
+                let kind = validation_profile_start_kind(
+                    &mut stack,
+                    root.as_mut()
+                        .ok_or_else(|| invalid("ink actions profile root is missing"))?,
+                    &element,
+                    &resolved,
+                    start,
+                    &reader,
+                    limits,
+                )?;
+                let namespace = namespace_id(&resolved, &reader)?;
+                reserve_one(&mut stack, "ink actions profile XML stack")?;
+                stack.push(ValidationFrame { namespace, kind });
+            },
+            Event::Empty(element) if root.is_some() && !root_closed => {
+                validate_profile_element(&element, &resolved, &reader, limits)?;
+                increment_nodes(&mut nodes, limits.max_nodes)?;
+                enforce_depth(stack.len().saturating_add(1), limits.max_depth)?;
+                let kind = validation_profile_start_kind(
+                    &mut stack,
+                    root.as_mut()
+                        .ok_or_else(|| invalid("ink actions profile root is missing"))?,
+                    &element,
+                    &resolved,
+                    start,
+                    &reader,
+                    limits,
+                )?;
+                let value = validation_profile_finish(kind, end, limits)?;
+                validation_profile_attach(stack.last_mut(), value)?;
+            },
+            Event::End(element) if root.is_some() && !root_closed => {
+                let frame = stack
+                    .pop()
+                    .ok_or_else(|| invalid("ink actions profile has an unexpected end"))?;
+                validate_end_name(&element, &resolved, false)?;
+                if frame.namespace != namespace_id(&resolved, &reader)? {
+                    return Err(invalid(
+                        "ink actions profile has mismatched closing namespaces",
+                    ));
+                }
+                if stack.is_empty() {
+                    if !matches!(frame.kind, ValidationFrameKind::Root) {
+                        return Err(invalid("ink actions profile root frame is invalid"));
+                    }
+                    root_closed = true;
+                } else {
+                    let value = validation_profile_finish(frame.kind, end, limits)?;
+                    validation_profile_attach(stack.last_mut(), value)?;
+                }
+            },
+            Event::Start(_) | Event::Empty(_) | Event::End(_) if root_closed => {
+                return Err(invalid("ink actions profile has content after its root"));
+            },
+            Event::Start(_) | Event::Empty(_) | Event::End(_) => {
+                return Err(invalid(
+                    "ink actions profile has an invalid root transition",
+                ));
+            },
+            Event::Text(text) => {
+                let text = validate_text(&text, "ink actions profile text")?;
+                if text.contains("]]>") {
+                    return Err(invalid(
+                        "ink actions profile text contains a raw CDATA terminator",
+                    ));
+                }
+                if (root.is_none() || root_closed) && !text.bytes().all(is_xml_whitespace) {
+                    return Err(invalid("ink actions profile has text outside its root"));
+                }
+                if root.is_some() && !root_closed && !text.is_empty() {
+                    ensure_validation_character_content(
+                        &stack,
+                        text.bytes().all(is_xml_whitespace),
+                    )?;
+                }
+            },
+            Event::CData(data) => {
+                let data = validate_text(&data, "ink actions profile CDATA")?;
+                if root.is_none() || root_closed {
+                    return Err(invalid("ink actions profile has CDATA outside its root"));
+                }
+                if !data.is_empty() {
+                    ensure_validation_character_content(
+                        &stack,
+                        data.bytes().all(is_xml_whitespace),
+                    )?;
+                }
+            },
+            Event::GeneralRef(reference) => {
+                validate_reference(&reference)?;
+                if root.is_none() || root_closed {
+                    return Err(invalid(
+                        "ink actions profile has a reference outside its root",
+                    ));
+                }
+                let whitespace = reference
+                    .resolve_char_ref()
+                    .map_err(xml_error)?
+                    .is_some_and(|character| matches!(character, ' ' | '\t' | '\r' | '\n'));
+                ensure_validation_character_content(&stack, whitespace)?;
+            },
+            Event::Comment(comment) => {
+                validate_text(&comment, "ink actions profile comment")?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid(
+                    "ink actions profile rejects DTDs and processing instructions",
+                ));
+            },
+            Event::Decl(_) => {
+                return Err(invalid(
+                    "ink actions profile has a duplicate or late XML declaration",
+                ));
+            },
+            Event::Eof => break,
+        }
+        if !is_declaration {
+            preamble_content_seen = true;
+        }
+    }
+
+    if root.is_none() || !root_closed || !stack.is_empty() {
+        return Err(invalid(
+            "ink actions profile root is absent or unterminated",
+        ));
+    }
+    Ok(())
+}
+
+fn validation_profile_root<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    resolved: &ResolveResult<'_>,
+    reader: &NsReader<R>,
+    limits: Limits,
+) -> Result<ValidationRoot> {
+    if !namespace_matches(resolved, ACTION_NAMESPACE.as_bytes(), reader)?
+        || element.name().local_name().as_ref() != b"actions"
+    {
+        return Err(invalid(
+            "ink actions profile root must be bound iact:actions",
+        ));
+    }
+    validate_profile_attributes(element, ProfileAttributeSet::Root)?;
+    let length = required_attr(element, b"lengthUnit", reader, limits)?;
+    let time = required_attr(element, b"timeUnit", reader, limits)?;
+    let _ = optional_xml_id(element, reader, limits)?;
+    LengthUnit::parse(&length)?;
+    TimeUnit::parse(&time)?;
+    Ok(ValidationRoot::default())
+}
+
+fn validation_profile_action_attrs<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    reader: &NsReader<R>,
+    limits: Limits,
+) -> Result<()> {
+    validate_profile_attributes(element, ProfileAttributeSet::Action)?;
+    let _ = profile_action_attributes(element, reader, limits)?;
+    Ok(())
+}
+
+fn validation_profile_data_attrs<R: std::io::BufRead>(
+    element: &BytesStart<'_>,
+    reader: &NsReader<R>,
+    limits: Limits,
+    group: bool,
+) -> Result<()> {
+    validate_profile_attributes(
+        element,
+        if group {
+            ProfileAttributeSet::ActionDataGroup
+        } else {
+            ProfileAttributeSet::ActionData
+        },
+    )?;
+    if group {
+        let _ = optional_xml_id(element, reader, limits)?;
+        let _ = strict_token(
+            optional_attr(element, b"name", reader, limits)?.unwrap_or_else(|| "stroke".to_owned()),
+            "action data-group name",
+            limits.max_scalar_bytes,
+        )?;
+    } else {
+        let _ = profile_data_attributes(element, reader, limits)?;
+    }
+    Ok(())
+}
+
+fn validation_profile_start_kind<R: std::io::BufRead>(
+    stack: &mut [ValidationFrame],
+    root: &mut ValidationRoot,
+    element: &BytesStart<'_>,
+    resolved: &ResolveResult<'_>,
+    start: usize,
+    reader: &NsReader<R>,
+    limits: Limits,
+) -> Result<ValidationFrameKind> {
+    let local = element.name().local_name();
+    let action = namespace_matches(resolved, ACTION_NAMESPACE.as_bytes(), reader)?;
+    let inkml = namespace_matches(resolved, INKML_NAMESPACE.as_bytes(), reader)?;
+    let local = local.as_ref();
+    let known_action = is_known_action_local(local);
+    let parent = stack
+        .last_mut()
+        .ok_or_else(|| invalid("ink actions profile has no parent frame"))?;
+    match &mut parent.kind {
+        ValidationFrameKind::Root => {
+            if inkml && local == b"definitions" {
+                if root.definitions_seen || root.action_seen {
+                    return Err(invalid(
+                        "ink actions profile definitions must precede actions and be unique",
+                    ));
+                }
+                root.definitions_seen = true;
+                return Ok(ValidationFrameKind::Definitions {
+                    source_start: start,
+                });
+            }
+            if action && local == b"actionGroup" {
+                increment_validation_group(root, limits.max_action_groups)?;
+                validation_profile_action_attrs(element, reader, limits)?;
+                root.action_seen = true;
+                return Ok(ValidationFrameKind::ActionGroup { actions: 0 });
+            }
+            if action && local == b"action" {
+                increment_validation_action(root, limits.max_actions)?;
+                validation_profile_action_attrs(element, reader, limits)?;
+                root.action_seen = true;
+                return Ok(ValidationFrameKind::Action { data_seen: false });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid root ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile root contains an unknown direct child",
+            ));
+        },
+        ValidationFrameKind::Definitions { .. } => {
+            return Ok(ValidationFrameKind::Opaque);
+        },
+        ValidationFrameKind::ActionGroup { actions: count } => {
+            if action && local == b"action" {
+                increment_validation_action(root, limits.max_actions)?;
+                validation_profile_action_attrs(element, reader, limits)?;
+                *count = (*count)
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("ink actions profile action count overflow"))?;
+                return Ok(ValidationFrameKind::Action { data_seen: false });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid action-group ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile actionGroup contains an unknown direct child",
+            ));
+        },
+        ValidationFrameKind::Action { data_seen } => {
+            if action && local == b"property" {
+                validate_profile_attributes(element, ProfileAttributeSet::Property)?;
+                if *data_seen {
+                    return Err(invalid(
+                        "ink actions profile property must precede action data",
+                    ));
+                }
+                let _ = strict_token(
+                    required_attr(element, b"name", reader, limits)?,
+                    "property name",
+                    limits.max_scalar_bytes,
+                )?;
+                let _ = strict_token(
+                    optional_attr(element, b"value", reader, limits)?
+                        .unwrap_or_else(|| "ink".to_owned()),
+                    "property value",
+                    limits.max_scalar_bytes,
+                )?;
+                return Ok(ValidationFrameKind::Property);
+            }
+            if action && (local == b"actionData" || local == b"actionDataGroup") {
+                *data_seen = true;
+                let group = local == b"actionDataGroup";
+                validation_profile_data_attrs(element, reader, limits, group)?;
+                return Ok(if group {
+                    ValidationFrameKind::DataGroup { data: 0 }
+                } else {
+                    ValidationFrameKind::Data {
+                        transform_seen: false,
+                        trace_seen: false,
+                    }
+                });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid action ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile action contains an unknown direct child",
+            ));
+        },
+        ValidationFrameKind::DataGroup { data: count } => {
+            if action && local == b"actionData" {
+                validation_profile_data_attrs(element, reader, limits, false)?;
+                *count = (*count)
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("ink actions profile data count overflow"))?;
+                return Ok(ValidationFrameKind::Data {
+                    transform_seen: false,
+                    trace_seen: false,
+                });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid data-group ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile actionDataGroup contains an unknown direct child",
+            ));
+        },
+        ValidationFrameKind::Data {
+            transform_seen,
+            trace_seen,
+        } => {
+            if action && local == b"transform" {
+                if *transform_seen || *trace_seen {
+                    return Err(invalid(
+                        "ink actions profile transform must be first and unique",
+                    ));
+                }
+                *transform_seen = true;
+                return Ok(ValidationFrameKind::DataChild {
+                    source_start: start,
+                });
+            }
+            if inkml && (local == b"trace" || local == b"traceView") {
+                *trace_seen = true;
+                return Ok(ValidationFrameKind::DataChild {
+                    source_start: start,
+                });
+            }
+            if action && known_action {
+                return Err(invalid(
+                    "ink actions profile recognized child has invalid data ancestry",
+                ));
+            }
+            return Err(invalid(
+                "ink actions profile actionData contains an unknown direct child",
+            ));
+        },
+        ValidationFrameKind::Property
+        | ValidationFrameKind::DataChild { .. }
+        | ValidationFrameKind::Opaque => {
+            return Ok(ValidationFrameKind::Opaque);
+        },
+    }
+}
+
+fn validation_profile_finish(
+    kind: ValidationFrameKind,
+    end: usize,
+    limits: Limits,
+) -> Result<ValidationValue> {
+    match kind {
+        ValidationFrameKind::Root => Err(invalid("ink actions profile root cannot be nested")),
+        ValidationFrameKind::Definitions { source_start } => {
+            enforce_payload_span(source_start, end, limits.max_payload_bytes)?;
+            Ok(ValidationValue::Definitions)
+        },
+        ValidationFrameKind::ActionGroup { actions } => {
+            if actions == 0 {
+                return Err(invalid(
+                    "ink actions profile actionGroup requires an action child",
+                ));
+            }
+            Ok(ValidationValue::ActionGroup)
+        },
+        ValidationFrameKind::Action { .. } => Ok(ValidationValue::Action),
+        ValidationFrameKind::Property => Ok(ValidationValue::Property),
+        ValidationFrameKind::DataGroup { data } => {
+            if data == 0 {
+                return Err(invalid(
+                    "ink actions profile actionDataGroup requires actionData",
+                ));
+            }
+            Ok(ValidationValue::DataGroup)
+        },
+        ValidationFrameKind::Data { .. } => Ok(ValidationValue::Data),
+        ValidationFrameKind::DataChild { source_start } => {
+            enforce_payload_span(source_start, end, limits.max_payload_bytes)?;
+            Ok(ValidationValue::DataChild)
+        },
+        ValidationFrameKind::Opaque => Ok(ValidationValue::None),
+    }
+}
+
+fn validation_profile_attach(
+    frame: Option<&mut ValidationFrame>,
+    value: ValidationValue,
+) -> Result<()> {
+    let Some(frame) = frame else {
+        return Err(invalid("ink actions profile value has no parent"));
+    };
+    let valid = match (&frame.kind, value) {
+        (ValidationFrameKind::Root, ValidationValue::Definitions)
+        | (ValidationFrameKind::Root, ValidationValue::ActionGroup)
+        | (ValidationFrameKind::Root, ValidationValue::Action)
+        | (ValidationFrameKind::ActionGroup { .. }, ValidationValue::Action)
+        | (ValidationFrameKind::Action { .. }, ValidationValue::Property)
+        | (ValidationFrameKind::Action { .. }, ValidationValue::Data)
+        | (ValidationFrameKind::Action { .. }, ValidationValue::DataGroup)
+        | (ValidationFrameKind::DataGroup { .. }, ValidationValue::Data)
+        | (ValidationFrameKind::Data { .. }, ValidationValue::DataChild)
+        | (_, ValidationValue::None) => true,
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(invalid(
+            "ink actions profile recognized child has invalid ancestry",
+        ))
+    }
+}
+
+fn ensure_validation_character_content(stack: &[ValidationFrame], whitespace: bool) -> Result<()> {
+    if matches!(
+        stack.last().map(|frame| &frame.kind),
+        Some(ValidationFrameKind::Property)
+    ) {
+        return Err(invalid("ink action property has character content"));
+    }
+    if whitespace {
+        return Ok(());
+    }
+    match stack.last().map(|frame| &frame.kind) {
+        Some(ValidationFrameKind::Definitions { .. })
+        | Some(ValidationFrameKind::DataChild { .. })
+        | Some(ValidationFrameKind::Opaque)
+        | None => Ok(()),
+        _ => Err(invalid(
+            "ink actions profile recognized element-only content contains text",
+        )),
+    }
+}
+
+fn increment_validation_action(root: &mut ValidationRoot, maximum: usize) -> Result<()> {
+    let next = root
+        .action_count
+        .checked_add(1)
+        .ok_or_else(|| invalid("ink action count overflow"))?;
+    if next > maximum {
+        return Err(limit(LimitKind::Actions, next, maximum));
+    }
+    root.action_count = next;
+    Ok(())
+}
+
+fn increment_validation_group(root: &mut ValidationRoot, maximum: usize) -> Result<()> {
+    let next = root
+        .group_count
+        .checked_add(1)
+        .ok_or_else(|| invalid("ink action-group count overflow"))?;
+    if next > maximum {
+        return Err(limit(LimitKind::ActionGroups, next, maximum));
+    }
+    root.group_count = next;
+    Ok(())
 }
 
 fn profile_start_kind<R: std::io::BufRead>(

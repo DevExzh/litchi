@@ -141,6 +141,7 @@ pub fn encode_part(
     validate_name("theme", name)?;
     validate_palette(colors)?;
     validate_fonts(fonts)?;
+    preflight_part(name, colors, fonts, limits)?;
     let output_len = serialized_part_len(name, colors, fonts)?;
     let mut xml = output_string(output_len, limits)?;
     write_part(&mut xml, name, colors, fonts);
@@ -176,6 +177,7 @@ pub fn encode_override(value: &Override, limits: Limits) -> Result<Vec<u8>> {
     if let Some(fonts) = &value.fonts {
         validate_fonts(fonts)?;
     }
+    preflight_override(value, limits)?;
     let output_len = serialized_override_len(value)?;
     let mut xml = output_string(output_len, limits)?;
     write_override(&mut xml, value);
@@ -248,7 +250,25 @@ pub fn replace_scheme(
     let limits = limits.validate()?;
     let range = scheme_replacement_range(xml, local, limits)?;
     let source_namespace = theme_root_namespace(xml, limits)?;
-    validate_replacement_fragment(replacement, local, limits)?;
+    let replacement_stats =
+        validate_replacement_fragment(replacement, local, source_namespace, limits)?;
+    let source_stats = source_stats(xml, &range, limits)?;
+    let result_nodes = source_stats
+        .nodes
+        .checked_sub(source_stats.target_nodes)
+        .and_then(|nodes| nodes.checked_add(replacement_stats.nodes))
+        .ok_or_else(|| invalid("patched theme XML node count overflows"))?;
+    if result_nodes > limits.max_nodes {
+        return Err(limit(LimitKind::XmlNodes, result_nodes, limits.max_nodes));
+    }
+    let result_depth = source_stats.outside_max_depth.max(
+        source_stats
+            .target_parent_depth
+            .saturating_add(replacement_stats.max_depth),
+    );
+    if result_depth > limits.max_depth {
+        return Err(limit(LimitKind::XmlDepth, result_depth, limits.max_depth));
+    }
     let adjusted_len = adjusted_replacement_len(replacement, source_namespace)?;
     let output_len = range
         .start
@@ -297,6 +317,7 @@ pub fn scheme_replacement_range(xml: &[u8], local: &[u8], limits: Limits) -> Res
 pub fn encode_palette_fragment(value: &Palette, limits: Limits) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
     validate_palette(value)?;
+    preflight_palette(value, true, limits)?;
     let output_len = serialized_palette_len(value, true)?;
     let mut output = output_string(output_len, limits)?;
     push_palette(&mut output, value, true);
@@ -310,6 +331,7 @@ pub fn encode_palette_fragment(value: &Palette, limits: Limits) -> Result<Vec<u8
 pub fn encode_fonts_fragment(value: &FontSet, limits: Limits) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
     validate_fonts(value)?;
+    preflight_fonts(value, true, limits)?;
     let output_len = serialized_fonts_len(value, true)?;
     let mut output = output_string(output_len, limits)?;
     push_fonts(&mut output, value, true);
@@ -421,6 +443,233 @@ impl XmlSink for LengthSink {
     fn push(&mut self, value: char) {
         self.length += value.len_utf8() as u128;
     }
+}
+
+/// Admission facts for authored theme output.  The writer computes these
+/// counts from the actual model values before reserving its output string, so
+/// narrow node/depth/attribute policies cannot be bypassed by a large
+/// `with_capacity` followed by a late byte check.
+#[derive(Clone, Copy)]
+struct OutputBudget {
+    limits: Limits,
+    nodes: usize,
+    namespaces: usize,
+}
+
+impl OutputBudget {
+    fn new(limits: Limits) -> Self {
+        Self {
+            limits,
+            nodes: 0,
+            namespaces: 0,
+        }
+    }
+
+    fn element(&mut self, depth: usize, attributes: usize) -> Result<()> {
+        self.nodes = self
+            .nodes
+            .checked_add(1)
+            .ok_or_else(|| invalid("theme authored node count overflows"))?;
+        if self.nodes > self.limits.max_nodes {
+            return Err(limit(
+                LimitKind::XmlNodes,
+                self.nodes,
+                self.limits.max_nodes,
+            ));
+        }
+        if depth > self.limits.max_depth {
+            return Err(limit(LimitKind::XmlDepth, depth, self.limits.max_depth));
+        }
+        if attributes > self.limits.max_attributes_per_element {
+            return Err(limit(
+                LimitKind::XmlAttributes,
+                attributes,
+                self.limits.max_attributes_per_element,
+            ));
+        }
+        Ok(())
+    }
+
+    fn namespace(&mut self, value: &str) -> Result<()> {
+        self.namespaces = self
+            .namespaces
+            .checked_add(1)
+            .ok_or_else(|| invalid("theme namespace declaration count overflows"))?;
+        if self.namespaces > self.limits.max_namespace_declarations {
+            return Err(limit(
+                LimitKind::NamespaceDeclarations,
+                self.namespaces,
+                self.limits.max_namespace_declarations,
+            ));
+        }
+        self.attribute(value)
+    }
+
+    fn attribute(&self, value: &str) -> Result<()> {
+        if value.len() > self.limits.max_attribute_value_bytes {
+            return Err(limit(
+                LimitKind::AttributeValueBytes,
+                value.len(),
+                self.limits.max_attribute_value_bytes,
+            ));
+        }
+        Ok(())
+    }
+}
+
+fn preflight_part(name: &str, colors: &Palette, fonts: &FontSet, limits: Limits) -> Result<()> {
+    let mut budget = OutputBudget::new(limits);
+    budget.element(1, 2)?;
+    budget.namespace(NAMESPACE)?;
+    budget.attribute(name)?;
+    budget.element(2, 0)?;
+    preflight_palette_with_depth(colors, false, 3, &mut budget)?;
+    preflight_fonts_with_depth(fonts, false, 3, &mut budget)?;
+    preflight_fixed_scheme(2, &mut budget)?;
+    budget.element(3, 0)?;
+    budget.element(3, 0)?;
+    Ok(())
+}
+
+fn preflight_override(value: &Override, limits: Limits) -> Result<()> {
+    let mut budget = OutputBudget::new(limits);
+    budget.element(1, 1)?;
+    budget.namespace(NAMESPACE)?;
+    if let Some(colors) = &value.colors {
+        preflight_palette_with_depth(colors, false, 2, &mut budget)?;
+    }
+    if let Some(fonts) = &value.fonts {
+        preflight_fonts_with_depth(fonts, false, 2, &mut budget)?;
+    }
+    Ok(())
+}
+
+fn preflight_palette(value: &Palette, declare_namespace: bool, limits: Limits) -> Result<()> {
+    let mut budget = OutputBudget::new(limits);
+    preflight_palette_with_depth(value, declare_namespace, 1, &mut budget)
+}
+
+fn preflight_palette_with_depth(
+    value: &Palette,
+    declare_namespace: bool,
+    depth: usize,
+    budget: &mut OutputBudget,
+) -> Result<()> {
+    budget.element(depth, usize::from(declare_namespace) + 1)?;
+    if declare_namespace {
+        budget.namespace(NAMESPACE)?;
+    }
+    budget.attribute(value.name())?;
+    for slot in Slot::ALL {
+        budget.element(depth + 1, 0)?;
+        let Some(color) = value.color(slot) else {
+            continue;
+        };
+        match color {
+            Color::Rgb(value) => {
+                budget.element(depth + 2, 1)?;
+                budget.attribute(value)?;
+            },
+            Color::System { kind, last } => {
+                budget.element(depth + 2, usize::from(last.is_some()) + 1)?;
+                budget.attribute(kind.token())?;
+                if let Some(last) = last {
+                    budget.attribute(last)?;
+                }
+            },
+        }
+    }
+    Ok(())
+}
+
+fn preflight_fonts(value: &FontSet, declare_namespace: bool, limits: Limits) -> Result<()> {
+    let mut budget = OutputBudget::new(limits);
+    preflight_fonts_with_depth(value, declare_namespace, 1, &mut budget)
+}
+
+fn preflight_fonts_with_depth(
+    value: &FontSet,
+    declare_namespace: bool,
+    depth: usize,
+    budget: &mut OutputBudget,
+) -> Result<()> {
+    budget.element(depth, usize::from(declare_namespace) + 1)?;
+    if declare_namespace {
+        budget.namespace(NAMESPACE)?;
+    }
+    budget.attribute(value.name())?;
+    preflight_face(value.major(), depth + 1, budget)?;
+    preflight_face(value.minor(), depth + 1, budget)?;
+    Ok(())
+}
+
+fn preflight_face(face: &Face, depth: usize, budget: &mut OutputBudget) -> Result<()> {
+    budget.element(depth, 0)?;
+    budget.element(depth + 1, 1)?;
+    budget.attribute(&face.latin)?;
+    budget.element(depth + 1, 1)?;
+    budget.attribute(&face.east_asian)?;
+    budget.element(depth + 1, 1)?;
+    budget.attribute(&face.complex_script)?;
+    for script in &face.scripts {
+        budget.element(depth + 1, 2)?;
+        budget.attribute(&script.code)?;
+        budget.attribute(&script.typeface)?;
+    }
+    Ok(())
+}
+
+fn preflight_fixed_scheme(base_depth: usize, budget: &mut OutputBudget) -> Result<()> {
+    let mut reader = Reader::from_str(FORMAT_SCHEME);
+    reader.config_mut().trim_text(false);
+    let mut stack = 0usize;
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) => {
+                let attributes = preflight_fixed_attributes(&element, reader.decoder(), budget)?;
+                budget.element(base_depth + stack + 1, attributes)?;
+                stack += 1;
+            },
+            Event::Empty(element) => {
+                let attributes = preflight_fixed_attributes(&element, reader.decoder(), budget)?;
+                budget.element(base_depth + stack + 1, attributes)?;
+            },
+            Event::End(_) => {
+                stack = stack
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("theme fixed scheme stack underflow"))?;
+            },
+            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
+            Event::Eof => break,
+            _ => return Err(invalid("theme fixed scheme contains unsupported markup")),
+        }
+    }
+    if stack != 0 {
+        return Err(invalid("theme fixed scheme is unterminated"));
+    }
+    Ok(())
+}
+
+fn preflight_fixed_attributes(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    budget: &mut OutputBudget,
+) -> Result<usize> {
+    let mut count = 0usize;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| invalid("theme fixed attribute count overflows"))?;
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        budget.attribute(&value)?;
+    }
+    Ok(count)
 }
 
 fn serialized_part_len(name: &str, colors: &Palette, fonts: &FontSet) -> Result<usize> {
@@ -1029,7 +1278,26 @@ fn adjusted_replacement_len(replacement: &[u8], source_namespace: &[u8]) -> Resu
 /// output allocation. The source scheme checker validates the existing
 /// modeled scheme; this pass applies the caller's generic XML/resource
 /// policy to arbitrary replacement markup while retaining opaque children.
-fn validate_replacement_fragment(replacement: &[u8], target: &[u8], limits: Limits) -> Result<()> {
+#[derive(Clone, Copy, Debug, Default)]
+struct XmlStats {
+    nodes: usize,
+    max_depth: usize,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct SourceStats {
+    nodes: usize,
+    target_nodes: usize,
+    outside_max_depth: usize,
+    target_parent_depth: usize,
+}
+
+fn validate_replacement_fragment(
+    replacement: &[u8],
+    target: &[u8],
+    source_namespace: &[u8],
+    limits: Limits,
+) -> Result<XmlStats> {
     if replacement.len() > limits.max_xml_bytes {
         return Err(limit(
             LimitKind::XmlBytes,
@@ -1048,6 +1316,7 @@ fn validate_replacement_fragment(replacement: &[u8], target: &[u8], limits: Limi
     let mut root_seen = false;
     let mut root_closed = false;
     let mut nodes = 0usize;
+    let mut max_depth = 0usize;
     let mut buffer = Vec::new();
     loop {
         let event = reader
@@ -1072,7 +1341,13 @@ fn validate_replacement_fragment(replacement: &[u8], target: &[u8], limits: Limi
                 if root_closed || (root_seen && stack.is_empty()) {
                     return Err(invalid("theme replacement has more than one root"));
                 }
-                validate_replacement_namespace(&namespace, &element, !root_seen)?;
+                validate_replacement_namespace(
+                    &namespace,
+                    &element,
+                    !root_seen,
+                    target,
+                    source_namespace,
+                )?;
                 validate_replacement_attributes(&element, &reader, limits)?;
                 let local = element.local_name().as_ref().to_vec();
                 if !root_seen && local.as_slice() != target {
@@ -1085,6 +1360,7 @@ fn validate_replacement_fragment(replacement: &[u8], target: &[u8], limits: Limi
                         limits.max_depth,
                     ));
                 }
+                max_depth = max_depth.max(stack.len() + 1);
                 root_seen = true;
                 stack.push(local);
             },
@@ -1098,7 +1374,13 @@ fn validate_replacement_fragment(replacement: &[u8], target: &[u8], limits: Limi
                 if root_closed || (root_seen && stack.is_empty()) {
                     return Err(invalid("theme replacement has more than one root"));
                 }
-                validate_replacement_namespace(&namespace, &element, !root_seen)?;
+                validate_replacement_namespace(
+                    &namespace,
+                    &element,
+                    !root_seen,
+                    target,
+                    source_namespace,
+                )?;
                 validate_replacement_attributes(&element, &reader, limits)?;
                 if !root_seen && element.local_name().as_ref() != target {
                     return Err(invalid("theme replacement root does not match target"));
@@ -1106,6 +1388,7 @@ fn validate_replacement_fragment(replacement: &[u8], target: &[u8], limits: Limi
                 if 1 > limits.max_depth {
                     return Err(limit(LimitKind::XmlDepth, 1, limits.max_depth));
                 }
+                max_depth = max_depth.max(stack.len() + 1);
                 if !root_seen {
                     root_seen = true;
                     root_closed = true;
@@ -1150,16 +1433,160 @@ fn validate_replacement_fragment(replacement: &[u8], target: &[u8], limits: Limi
     if !root_seen || !root_closed || !stack.is_empty() {
         return Err(invalid("theme replacement is unterminated"));
     }
-    Ok(())
+    Ok(XmlStats { nodes, max_depth })
+}
+
+fn source_stats(xml: &[u8], target: &Range<usize>, limits: Limits) -> Result<SourceStats> {
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    reader.config_mut().check_end_names = true;
+    reader
+        .resolver_mut()
+        .set_max_declarations_per_element(limits.max_namespace_declarations);
+    let mut stack = Vec::<Vec<u8>>::new();
+    let mut stats = SourceStats::default();
+    let mut root_seen = false;
+    let mut root_closed = false;
+    loop {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("theme XML offset exceeds usize"))?;
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("theme XML offset exceeds usize"))?;
+        let (namespace, event) = reader.resolver().resolve_event(event);
+        reject_unknown_namespace(&namespace)?;
+        match event {
+            Event::Start(element) => {
+                if root_closed || (root_seen && stack.is_empty()) {
+                    return Err(invalid("theme XML has multiple root elements"));
+                }
+                validate_replacement_attributes(&element, &reader, limits)?;
+                stats.nodes = stats
+                    .nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("theme node count overflows"))?;
+                if stats.nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, stats.nodes, limits.max_nodes));
+                }
+                let depth = stack.len() + 1;
+                if depth > limits.max_depth {
+                    return Err(limit(LimitKind::XmlDepth, depth, limits.max_depth));
+                }
+                let in_target = start >= target.start && start < target.end;
+                if in_target {
+                    if stats.target_nodes == 0 {
+                        stats.target_parent_depth = stack.len();
+                    }
+                    stats.target_nodes += 1;
+                } else {
+                    stats.outside_max_depth = stats.outside_max_depth.max(depth);
+                }
+                root_seen = true;
+                stack.push(element.local_name().as_ref().to_vec());
+            },
+            Event::Empty(element) => {
+                if root_closed || (root_seen && stack.is_empty()) {
+                    return Err(invalid("theme XML has multiple root elements"));
+                }
+                validate_replacement_attributes(&element, &reader, limits)?;
+                stats.nodes = stats
+                    .nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("theme node count overflows"))?;
+                if stats.nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, stats.nodes, limits.max_nodes));
+                }
+                let depth = stack.len() + 1;
+                if depth > limits.max_depth {
+                    return Err(limit(LimitKind::XmlDepth, depth, limits.max_depth));
+                }
+                let in_target = start >= target.start && start < target.end;
+                if in_target {
+                    if stats.target_nodes == 0 {
+                        stats.target_parent_depth = stack.len();
+                    }
+                    stats.target_nodes += 1;
+                } else {
+                    stats.outside_max_depth = stats.outside_max_depth.max(depth);
+                }
+                if !root_seen {
+                    root_seen = true;
+                    root_closed = true;
+                }
+            },
+            Event::End(element) => {
+                let Some(local) = stack.pop() else {
+                    return Err(invalid("theme XML nesting underflow"));
+                };
+                if local.as_slice() != element.local_name().as_ref() {
+                    return Err(invalid("theme XML closing element does not match"));
+                }
+                if stack.is_empty() {
+                    root_closed = true;
+                }
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("theme XML contains forbidden markup"));
+            },
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
+        }
+        let _ = end;
+    }
+    if !root_seen || !root_closed || !stack.is_empty() {
+        return Err(invalid("theme XML is unterminated"));
+    }
+    if stats.target_nodes == 0 {
+        return Err(invalid("theme replacement range has no source nodes"));
+    }
+    Ok(stats)
 }
 
 fn validate_replacement_namespace(
     namespace: &ResolveResult<'_>,
     element: &BytesStart<'_>,
     root: bool,
+    target: &[u8],
+    source_namespace: &[u8],
 ) -> Result<()> {
+    let local = element.local_name();
+    let known = is_known_replacement_local(local.as_ref(), target);
     match namespace {
-        ResolveResult::Bound(_) => Ok(()),
+        ResolveResult::Bound(Namespace(value))
+            if root
+                && (*value == source_namespace
+                    || (*value == NAMESPACE.as_bytes()
+                        && source_namespace == STRICT_NAMESPACE.as_bytes())
+                    || (*value == STRICT_NAMESPACE.as_bytes()
+                        && source_namespace == NAMESPACE.as_bytes())) =>
+        {
+            Ok(())
+        },
+        ResolveResult::Bound(Namespace(value)) if root => {
+            Err(invalid("theme replacement root has a foreign namespace"))
+        },
+        ResolveResult::Bound(Namespace(value))
+            if known
+                && (*value == source_namespace
+                    || (*value == NAMESPACE.as_bytes()
+                        && source_namespace == STRICT_NAMESPACE.as_bytes())
+                    || (*value == STRICT_NAMESPACE.as_bytes()
+                        && source_namespace == NAMESPACE.as_bytes())) =>
+        {
+            Ok(())
+        },
+        ResolveResult::Bound(Namespace(_)) if known => Err(invalid(
+            "theme replacement modeled child has a cross-family namespace",
+        )),
+        ResolveResult::Bound(_) if !root => Ok(()),
         ResolveResult::Unknown(prefix) if prefix.as_slice() == b"a" => Ok(()),
         ResolveResult::Unbound if !root && element.name().prefix().is_none() => Ok(()),
         ResolveResult::Unbound if root && element.name().prefix().is_none() => {
@@ -1170,6 +1597,51 @@ fn validate_replacement_namespace(
         )),
         ResolveResult::Unbound => Err(invalid("theme replacement has an unbound namespace")),
     }
+}
+
+fn is_known_replacement_local(local: &[u8], target: &[u8]) -> bool {
+    if local == target {
+        return true;
+    }
+    matches!(
+        local,
+        b"dk1"
+            | b"lt1"
+            | b"dk2"
+            | b"lt2"
+            | b"accent1"
+            | b"accent2"
+            | b"accent3"
+            | b"accent4"
+            | b"accent5"
+            | b"accent6"
+            | b"hlink"
+            | b"folHlink"
+            | b"srgbClr"
+            | b"sysClr"
+            | b"schemeClr"
+            | b"scrgbClr"
+            | b"prstClr"
+            | b"tint"
+            | b"shade"
+            | b"alpha"
+            | b"red"
+            | b"green"
+            | b"blue"
+            | b"hue"
+            | b"sat"
+            | b"lum"
+            | b"gamma"
+            | b"invGamma"
+            | b"fontScheme"
+            | b"majorFont"
+            | b"minorFont"
+            | b"latin"
+            | b"ea"
+            | b"cs"
+            | b"font"
+            | b"clrScheme"
+    )
 }
 
 fn validate_replacement_attributes(
@@ -1343,14 +1815,15 @@ fn direct_scheme_range(xml: &[u8], target: &[u8], limits: Limits) -> Result<Opti
             .ok_or_else(|| invalid("theme XML offset exceeds usize"))?;
         let (namespace, event) = reader.resolver().resolve_event(event);
         reject_unknown_namespace(&namespace)?;
-        nodes = nodes
-            .checked_add(1)
-            .ok_or_else(|| invalid("theme node count overflow"))?;
-        if nodes > limits.max_nodes {
-            return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
-        }
         match event {
             Event::Start(element) => {
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("theme node count overflow"))?;
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
+                }
+                validate_replacement_attributes(&element, &reader, limits)?;
                 let local = element.local_name().as_ref().to_vec();
                 let current_namespace = drawingml_namespace(&namespace);
                 let drawingml = current_namespace.is_some();
@@ -1405,6 +1878,13 @@ fn direct_scheme_range(xml: &[u8], target: &[u8], limits: Limits) -> Result<Opti
                 stack.push((start, Frame { local, drawingml }));
             },
             Event::Empty(element) => {
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("theme node count overflow"))?;
+                if nodes > limits.max_nodes {
+                    return Err(limit(LimitKind::XmlNodes, nodes, limits.max_nodes));
+                }
+                validate_replacement_attributes(&element, &reader, limits)?;
                 let local = element.local_name().as_ref().to_vec();
                 let current_namespace = drawingml_namespace(&namespace);
                 let drawingml = current_namespace.is_some();
@@ -1443,6 +1923,13 @@ fn direct_scheme_range(xml: &[u8], target: &[u8], limits: Limits) -> Result<Opti
                         return Err(invalid("theme contains multiple replacement schemes"));
                     }
                     found = Some(start..end);
+                }
+                if stack.len() >= limits.max_depth {
+                    return Err(limit(
+                        LimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_depth,
+                    ));
                 }
             },
             Event::End(element) => {
@@ -1827,6 +2314,55 @@ mod tests {
     }
 
     #[test]
+    fn authored_outputs_preflight_all_selected_structure_dimensions() {
+        let colors = palette();
+        let fonts = FontSet::new("Office", Face::new("Aptos"), Face::new("Aptos"));
+        let mut nodes = Limits::DEFAULT;
+        nodes.max_nodes = 1;
+        assert!(matches!(
+            super::encode_part("Office", &colors, &fonts, nodes),
+            Err(Error::Limit {
+                kind: LimitKind::XmlNodes,
+                ..
+            })
+        ));
+
+        let mut depth = Limits::DEFAULT;
+        depth.max_depth = 1;
+        assert!(matches!(
+            super::encode_part("Office", &colors, &fonts, depth),
+            Err(Error::Limit {
+                kind: LimitKind::XmlDepth,
+                ..
+            })
+        ));
+
+        let mut attributes = Limits::DEFAULT;
+        attributes.max_attributes_per_element = 1;
+        assert!(matches!(
+            super::encode_part("Office", &colors, &fonts, attributes),
+            Err(Error::Limit {
+                kind: LimitKind::XmlAttributes,
+                ..
+            })
+        ));
+
+        let mut values = Limits::DEFAULT;
+        values.max_attribute_value_bytes = 1;
+        assert!(matches!(
+            super::encode_part("Office", &colors, &fonts, values),
+            Err(Error::Limit {
+                kind: LimitKind::AttributeValueBytes,
+                ..
+            })
+        ));
+
+        let mut namespaces = Limits::DEFAULT;
+        namespaces.max_namespace_declarations = 1;
+        assert!(super::encode_part("Office", &colors, &fonts, namespaces).is_ok());
+    }
+
+    #[test]
     fn all_system_color_tokens_round_trip() {
         assert_eq!(System::ALL.len(), 30);
         for kind in System::ALL {
@@ -1902,6 +2438,34 @@ mod tests {
 
         let undeclared = br#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:themeElements><x:clrScheme/></a:themeElements></a:theme>"#;
         assert!(read(undeclared).is_err());
+    }
+
+    #[test]
+    fn replacement_rejects_foreign_roots_but_keeps_opaque_extensions() {
+        let fonts = FontSet::new("Office", Face::new("Aptos"), Face::new("Aptos"));
+        let original = encode_part("Office", &palette(), &fonts).unwrap();
+        assert!(
+            replace_scheme(
+                &original,
+                b"clrScheme",
+                br#"<x:clrScheme xmlns:x="urn:foreign"/>"#
+            )
+            .is_err()
+        );
+        assert!(replace_scheme(
+            &original,
+            b"clrScheme",
+            br#"<a:clrScheme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><x:ext xmlns:x="urn:foreign"><x:item/></x:ext></a:clrScheme>"#
+        )
+        .is_ok());
+        assert!(
+            replace_scheme(
+                &original,
+                b"clrScheme",
+                br#"<a:clrScheme><x:dk1 xmlns:x="urn:foreign"/></a:clrScheme>"#
+            )
+            .is_err()
+        );
     }
 
     #[test]

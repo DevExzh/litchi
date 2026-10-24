@@ -3,7 +3,6 @@
 use std::{fmt, io::Write, sync::Arc};
 
 use litchi_core::xml::ReaderOrigin;
-use litchi_core::xml::escape_xml;
 use litchi_ooxml_common::xml_name::is_qualified_name;
 use quick_xml::{
     XmlVersion,
@@ -191,9 +190,10 @@ pub fn write_to<W: Write>(writer: &mut W, value: &Family, limits: Limits) -> Res
             return Ok(());
         }
     } else if let Some(source) = value.source_state() {
-        writer.write_all(&rewrite_source(source, value, limits)?)?;
+        let rewrite = source_rewrite(source, value, limits)?;
+        write_source_rewrite_to(writer, source, &rewrite)?;
     } else {
-        writer.write_all(&write_detached(value, limits)?)?;
+        write_detached_to(writer, value, limits)?;
     }
     Ok(())
 }
@@ -1037,23 +1037,31 @@ fn write_detached(value: &Family, limits: Limits) -> Result<Vec<u8>> {
         escaped_xml_len(value.variant_id().as_str())?,
         limits,
     )?;
-    let name = escape_attribute(value.name());
-    let id = escape_xml(value.id().as_str());
-    let variant_id = escape_xml(value.variant_id().as_str());
-    let mut output = String::new();
+    let mut output = Vec::new();
     output
         .try_reserve_exact(output_len)
         .map_err(|_| invalid("theme family output allocation failed"))?;
-    output.push_str("<thm15:themeFamily xmlns:thm15=\"");
-    output.push_str(NAMESPACE);
-    output.push_str("\" name=\"");
-    output.push_str(&name);
-    output.push_str("\" id=\"");
-    output.push_str(&id);
-    output.push_str("\" vid=\"");
-    output.push_str(&variant_id);
-    output.push_str("\"/>");
-    bounded_output(output.into_bytes(), limits)
+    write_detached_to(&mut output, value, limits)?;
+    bounded_output(output, limits)
+}
+
+fn write_detached_to<W: Write>(writer: &mut W, value: &Family, limits: Limits) -> Result<()> {
+    let _output_len = detached_len(
+        escaped_attribute_len(value.name())?,
+        escaped_xml_len(value.id().as_str())?,
+        escaped_xml_len(value.variant_id().as_str())?,
+        limits,
+    )?;
+    writer.write_all(b"<thm15:themeFamily xmlns:thm15=\"")?;
+    writer.write_all(NAMESPACE.as_bytes())?;
+    writer.write_all(b"\" name=\"")?;
+    write_escaped_attribute(writer, value.name())?;
+    writer.write_all(b"\" id=\"")?;
+    write_escaped_xml(writer, value.id().as_str())?;
+    writer.write_all(b"\" vid=\"")?;
+    write_escaped_xml(writer, value.variant_id().as_str())?;
+    writer.write_all(b"\"/>")?;
+    Ok(())
 }
 
 fn escaped_attribute_len(value: &str) -> Result<usize> {
@@ -1080,12 +1088,22 @@ fn escaped_len(value: &str, attribute: bool) -> Result<usize> {
     })
 }
 
-struct SourceRewrite {
+struct SourceRewrite<'a> {
     output_len: usize,
-    replacements: Vec<(std::ops::Range<usize>, String)>,
+    replacements: Vec<SourceReplacement<'a>>,
 }
 
-fn source_rewrite(source: &Source, value: &Family, limits: Limits) -> Result<SourceRewrite> {
+struct SourceReplacement<'a> {
+    range: std::ops::Range<usize>,
+    kind: u8,
+    value: &'a str,
+}
+
+fn source_rewrite<'a>(
+    source: &Source,
+    value: &'a Family,
+    limits: Limits,
+) -> Result<SourceRewrite<'a>> {
     let root = source
         .xml
         .get(source.root_start..source.root_end)
@@ -1133,17 +1151,18 @@ fn source_rewrite(source: &Source, value: &Family, limits: Limits) -> Result<Sou
         .into_iter()
         .map(|(range, _, kind)| {
             let replacement = match kind {
-                0 => escape_attribute(value.name()),
-                1 => escape_xml(value.id().as_str()),
-                _ => escape_xml(value.variant_id().as_str()),
+                0 => value.name(),
+                1 => value.id().as_str(),
+                _ => value.variant_id().as_str(),
             };
-            (
-                (source.root_start + range.start)..(source.root_start + range.end),
-                replacement,
-            )
+            SourceReplacement {
+                range: (source.root_start + range.start)..(source.root_start + range.end),
+                kind,
+                value: replacement,
+            }
         })
         .collect::<Vec<_>>();
-    absolute.sort_by_key(|(range, _)| range.start);
+    absolute.sort_by_key(|replacement| replacement.range.start);
     Ok(SourceRewrite {
         output_len,
         replacements: absolute,
@@ -1159,24 +1178,41 @@ fn rewrite_source(source: &Source, value: &Family, limits: Limits) -> Result<Vec
     output
         .try_reserve_exact(output_len)
         .map_err(|_| invalid("theme family output allocation failed"))?;
+    let rewrite = SourceRewrite {
+        output_len,
+        replacements: absolute,
+    };
+    write_source_rewrite_to(&mut output, source, &rewrite)?;
+    bounded_output(output, limits)
+}
+
+fn write_source_rewrite_to<W: Write>(
+    writer: &mut W,
+    source: &Source,
+    rewrite: &SourceRewrite<'_>,
+) -> Result<()> {
     let mut cursor = 0usize;
-    for (range, replacement) in absolute {
-        output.extend_from_slice(
+    for replacement in &rewrite.replacements {
+        writer.write_all(
             source
                 .xml
-                .get(cursor..range.start)
+                .get(cursor..replacement.range.start)
                 .ok_or_else(|| invalid("theme family replacement range is invalid"))?,
-        );
-        output.extend_from_slice(replacement.as_bytes());
-        cursor = range.end;
+        )?;
+        match replacement.kind {
+            0 => write_escaped_attribute(writer, replacement.value)?,
+            1 | 2 => write_escaped_xml(writer, replacement.value)?,
+            _ => return Err(invalid("theme family replacement kind is invalid")),
+        }
+        cursor = replacement.range.end;
     }
-    output.extend_from_slice(
+    writer.write_all(
         source
             .xml
             .get(cursor..)
             .ok_or_else(|| invalid("theme family source suffix range is invalid"))?,
-    );
-    bounded_output(output, limits)
+    )?;
+    Ok(())
 }
 
 struct RootAttributeRanges {
@@ -1383,24 +1419,47 @@ fn bounded_output(output: Vec<u8>, limits: Limits) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn escape_attribute(value: &str) -> String {
-    let mut output = String::with_capacity(value.len());
+fn write_escaped_attribute<W: Write>(writer: &mut W, value: &str) -> Result<()> {
+    write_escaped_with(writer, value, |character| match character {
+        '\t' => Some("&#9;"),
+        '\n' => Some("&#10;"),
+        '\r' => Some("&#13;"),
+        '&' => Some("&amp;"),
+        '<' => Some("&lt;"),
+        '>' => Some("&gt;"),
+        '"' => Some("&quot;"),
+        '\'' => Some("&apos;"),
+        _ => None,
+    })
+}
+
+fn write_escaped_xml<W: Write>(writer: &mut W, value: &str) -> Result<()> {
+    write_escaped_with(writer, value, |character| match character {
+        '&' => Some("&amp;"),
+        '<' => Some("&lt;"),
+        '>' => Some("&gt;"),
+        '"' => Some("&quot;"),
+        '\'' => Some("&apos;"),
+        _ => None,
+    })
+}
+
+fn write_escaped_with<W, F>(writer: &mut W, value: &str, replacement: F) -> Result<()>
+where
+    W: Write,
+    F: Fn(char) -> Option<&'static str>,
+{
     let mut cursor = 0usize;
     for (index, character) in value.char_indices() {
-        let replacement = match character {
-            '\t' => Some("&#9;"),
-            '\n' => Some("&#10;"),
-            '\r' => Some("&#13;"),
-            _ => None,
+        let Some(replacement) = replacement(character) else {
+            continue;
         };
-        if let Some(replacement) = replacement {
-            output.push_str(&escape_xml(&value[cursor..index]));
-            output.push_str(replacement);
-            cursor = index + character.len_utf8();
-        }
+        writer.write_all(value[cursor..index].as_bytes())?;
+        writer.write_all(replacement.as_bytes())?;
+        cursor = index + character.len_utf8();
     }
-    output.push_str(&escape_xml(&value[cursor..]));
-    output
+    writer.write_all(value[cursor..].as_bytes())?;
+    Ok(())
 }
 
 fn position<R: std::io::BufRead>(

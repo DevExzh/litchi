@@ -222,6 +222,16 @@ pub fn read_metadata(xml: &[u8], limits: Limits) -> Result<Metadata> {
     Ok(scan(xml, Projection::all(), limits)?.into_metadata())
 }
 
+/// Validate source-backed InkML for a replay policy without rebuilding the
+/// retained metadata projection.  The visitor still decodes every recognized
+/// typed element and applies all structural, lexical, and resource bounds,
+/// but it retains only bounded counters needed for the admission decision.
+fn validate_source(xml: &[u8], limits: Limits) -> Result<()> {
+    enforce_source_limit(xml.len(), limits.max_source_bytes)?;
+    let _ = scan(xml, Projection::validation(), limits)?;
+    Ok(())
+}
+
 /// Read a source-backed document while retaining only the semantic elements
 /// selected by the owning package profile.
 ///
@@ -297,11 +307,19 @@ struct SelectedSpan {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ProjectionToken {
     All,
+    Validate(SemanticKind),
     Selected(SelectedSpan),
+}
+
+impl ProjectionToken {
+    fn is_validation(self) -> bool {
+        matches!(self, Self::Validate(_))
+    }
 }
 
 struct Projection<'a> {
     all: bool,
+    validate_only: bool,
     contexts: &'a [SourceSpan],
     traces: &'a [SourceSpan],
     brush_properties: &'a [SourceSpan],
@@ -310,12 +328,16 @@ struct Projection<'a> {
     matched_traces: usize,
     matched_brush_properties: usize,
     matched_links: usize,
+    validated_contexts: usize,
+    validated_traces: usize,
+    validated_brush_properties: usize,
 }
 
 impl<'a> Projection<'a> {
     fn all() -> Self {
         Self {
             all: true,
+            validate_only: false,
             contexts: &[],
             traces: &[],
             brush_properties: &[],
@@ -324,6 +346,27 @@ impl<'a> Projection<'a> {
             matched_traces: 0,
             matched_brush_properties: 0,
             matched_links: 0,
+            validated_contexts: 0,
+            validated_traces: 0,
+            validated_brush_properties: 0,
+        }
+    }
+
+    fn validation() -> Self {
+        Self {
+            all: true,
+            validate_only: true,
+            contexts: &[],
+            traces: &[],
+            brush_properties: &[],
+            links: &[],
+            matched_contexts: 0,
+            matched_traces: 0,
+            matched_brush_properties: 0,
+            matched_links: 0,
+            validated_contexts: 0,
+            validated_traces: 0,
+            validated_brush_properties: 0,
         }
     }
 
@@ -344,6 +387,7 @@ impl<'a> Projection<'a> {
         validate_selected_spans(source_len, "InkML link projection", links)?;
         Ok(Self {
             all: false,
+            validate_only: false,
             contexts,
             traces,
             brush_properties,
@@ -352,10 +396,16 @@ impl<'a> Projection<'a> {
             matched_traces: 0,
             matched_brush_properties: 0,
             matched_links: 0,
+            validated_contexts: 0,
+            validated_traces: 0,
+            validated_brush_properties: 0,
         })
     }
 
     fn select(&self, kind: SemanticKind, start: usize) -> Option<ProjectionToken> {
+        if self.validate_only {
+            return Some(ProjectionToken::Validate(kind));
+        }
         if self.all {
             return Some(ProjectionToken::All);
         }
@@ -377,6 +427,18 @@ impl<'a> Projection<'a> {
     }
 
     fn complete(&mut self, token: ProjectionToken, actual: SourceSpan) -> Result<()> {
+        if let ProjectionToken::Validate(kind) = token {
+            let matched = match kind {
+                SemanticKind::Context => &mut self.validated_contexts,
+                SemanticKind::Trace => &mut self.validated_traces,
+                SemanticKind::BrushProperty => &mut self.validated_brush_properties,
+                SemanticKind::Link => return Ok(()),
+            };
+            *matched = matched
+                .checked_add(1)
+                .ok_or_else(|| invalid("InkML validation count overflowed"))?;
+            return Ok(());
+        }
         let ProjectionToken::Selected(selected) = token else {
             return Ok(());
         };
@@ -410,6 +472,14 @@ impl<'a> Projection<'a> {
                 "InkML semantic projection contains an unmatched source span",
             ))
         }
+    }
+
+    fn validation_counts(&self) -> (usize, usize, usize) {
+        (
+            self.validated_contexts,
+            self.validated_traces,
+            self.validated_brush_properties,
+        )
     }
 }
 
@@ -630,24 +700,41 @@ fn scan(xml: &[u8], mut projection: Projection<'_>, limits: Limits) -> Result<Pa
     if !root_seen || !root_closed || !stack.is_empty() {
         return Err(invalid("InkML document root is absent or unterminated"));
     }
-    if contexts.len() > limits.max_contexts {
+    let (validated_contexts, validated_traces, validated_brush_properties) =
+        projection.validation_counts();
+    let context_count = if projection.validate_only {
+        validated_contexts
+    } else {
+        contexts.len()
+    };
+    let trace_count = if projection.validate_only {
+        validated_traces
+    } else {
+        traces.len()
+    };
+    let brush_property_count = if projection.validate_only {
+        validated_brush_properties
+    } else {
+        brush_properties.len()
+    };
+    if context_count > limits.max_contexts {
         return Err(limit(
             crate::LimitKind::InkMlContextNodes,
-            contexts.len(),
+            context_count,
             limits.max_contexts,
         ));
     }
-    if traces.len() > limits.max_traces {
+    if trace_count > limits.max_traces {
         return Err(limit(
             crate::LimitKind::InkMlTraces,
-            traces.len(),
+            trace_count,
             limits.max_traces,
         ));
     }
-    if brush_properties.len() > limits.max_brush_properties {
+    if brush_property_count > limits.max_brush_properties {
         return Err(limit(
             crate::LimitKind::InkMlBrushProperties,
-            brush_properties.len(),
+            brush_property_count,
             limits.max_brush_properties,
         ));
     }
@@ -671,7 +758,7 @@ pub fn write(document: &Document, limits: Limits) -> Result<Vec<u8>> {
     // bounded scanner before reserving the output so every selected source,
     // structural, decoded-value, and typed-payload dimension applies to this
     // writer call rather than only the output-byte cap.
-    let _ = read_metadata(document.source(), limits)?;
+    validate_source(document.source(), limits)?;
     if document.source().len() > limits.max_output_bytes {
         return Err(limit(
             crate::LimitKind::InkMlOutputBytes,
@@ -695,7 +782,7 @@ pub fn write(document: &Document, limits: Limits) -> Result<Vec<u8>> {
 pub fn write_to<W: Write>(writer: &mut W, document: &Document, limits: Limits) -> Result<()> {
     let limits = limits.validate()?;
     super::validation::validate(document).map_err(value_error)?;
-    let _ = read_metadata(document.source(), limits)?;
+    validate_source(document.source(), limits)?;
     if document.source().len() > limits.max_output_bytes {
         return Err(limit(
             crate::LimitKind::InkMlOutputBytes,
@@ -756,6 +843,19 @@ fn frame_for_start<R: std::io::BufRead>(
     {
         let token = projection.select(SemanticKind::Context, start);
         if let Some(token) = token {
+            if token.is_validation() {
+                let _ = parse_context(element, start, reader, limits)?;
+                projection_token = Some(token);
+                return Ok(Frame {
+                    namespace: namespace_id(resolved)?,
+                    start,
+                    data_start,
+                    context: None,
+                    trace: None,
+                    brush_property: None,
+                    projection: projection_token,
+                });
+            }
             if contexts.len() >= limits.max_contexts {
                 return Err(limit(
                     crate::LimitKind::InkMlContextNodes,
@@ -784,6 +884,19 @@ fn frame_for_start<R: std::io::BufRead>(
     {
         let token = projection.select(SemanticKind::Trace, start);
         if let Some(token) = token {
+            if token.is_validation() {
+                let _ = parse_trace(element, start, data_start, false, reader, limits)?;
+                projection_token = Some(token);
+                return Ok(Frame {
+                    namespace: namespace_id(resolved)?,
+                    start,
+                    data_start,
+                    context: None,
+                    trace: None,
+                    brush_property: None,
+                    projection: projection_token,
+                });
+            }
             if traces.len() >= limits.max_traces {
                 return Err(limit(
                     crate::LimitKind::InkMlTraces,
@@ -814,6 +927,19 @@ fn frame_for_start<R: std::io::BufRead>(
     {
         let token = projection.select(SemanticKind::BrushProperty, start);
         if let Some(token) = token {
+            if token.is_validation() {
+                let _ = parse_brush_property(element, start, data_start, false, reader, limits)?;
+                projection_token = Some(token);
+                return Ok(Frame {
+                    namespace: namespace_id(resolved)?,
+                    start,
+                    data_start,
+                    context: None,
+                    trace: None,
+                    brush_property: None,
+                    projection: projection_token,
+                });
+            }
             if brush_properties.len() >= limits.max_brush_properties {
                 return Err(limit(
                     crate::LimitKind::InkMlBrushProperties,
@@ -875,6 +1001,11 @@ fn parse_empty<R: std::io::BufRead>(
     ) && local.as_ref() == b"context"
     {
         if let Some(token) = projection.select(SemanticKind::Context, start) {
+            if token.is_validation() {
+                let _ = parse_context(element, start, reader, limits)?;
+                projection.complete(token, SourceSpan::new(start, end))?;
+                return Ok(());
+            }
             if contexts.len() >= limits.max_contexts {
                 return Err(limit(
                     crate::LimitKind::InkMlContextNodes,
@@ -902,6 +1033,11 @@ fn parse_empty<R: std::io::BufRead>(
     ) && local.as_ref() == b"trace"
     {
         if let Some(token) = projection.select(SemanticKind::Trace, start) {
+            if token.is_validation() {
+                let _ = parse_trace(element, start, end, true, reader, limits)?;
+                projection.complete(token, SourceSpan::new(start, end))?;
+                return Ok(());
+            }
             if traces.len() >= limits.max_traces {
                 return Err(limit(
                     crate::LimitKind::InkMlTraces,
@@ -925,6 +1061,11 @@ fn parse_empty<R: std::io::BufRead>(
     ) && local.as_ref() == b"brushProperty"
     {
         if let Some(token) = projection.select(SemanticKind::BrushProperty, start) {
+            if token.is_validation() {
+                let _ = parse_brush_property(element, start, end, true, reader, limits)?;
+                projection.complete(token, SourceSpan::new(start, end))?;
+                return Ok(());
+            }
             if brush_properties.len() >= limits.max_brush_properties {
                 return Err(limit(
                     crate::LimitKind::InkMlBrushProperties,
