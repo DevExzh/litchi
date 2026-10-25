@@ -370,32 +370,65 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
 }
 
 /// Validate the ordinary comment grammar after MCE has selected the semantic
-/// branches.  The processed parser admits each borrowed event's aggregate
-/// decoded-string bytes before it owns that event's attribute or text value,
-/// then checks the complete comment grammar and stores only values that have
-/// already passed those bounds.
-///
-/// The aggregate includes every selected attribute name/value and text byte,
-/// including extension and namespace markup, while the per-field checks cover
-/// author names/initials, comment text, and `dt`.  MCE-inactive bytes are not
-/// in `source` here and therefore do not consume this semantic budget.  The
-/// raw source scan still charges those bytes against the independent physical
-/// input, event, depth, node, and per-attribute ceilings.
+/// branches.  The processed parser admits every selected borrowed event under
+/// the already-bounded physical input ceiling before it owns an attribute or
+/// text value.  The selected semantic budget is then applied to the ordinary
+/// model fields (`name`/`initials`, comment text, and `dt`) and to the typed
+/// collaboration payload by the caller below.  MCE-inactive bytes therefore
+/// do not consume recipient-owned semantic values, while the raw source scan
+/// still charges them against the independent physical input, event, depth,
+/// node, and per-attribute ceilings.
 fn validate_processed_part(
     source: &[u8],
     kind: Kind,
     limits: Limits,
     strict_threading: bool,
 ) -> Result<()> {
+    // Replay's selected semantic budget applies to values exposed by the
+    // ordinary comment model and to the typed collaboration payload below.
+    // Namespace declarations and opaque extension attributes are structural
+    // source bytes, not recipient-owned values; charging them here would let
+    // an active root exhaust a tight budget even when the large typed branch
+    // was discarded by MCE.  The processed source is already bounded by the
+    // physical input/MCE limits, so this one parser pass remains bounded while
+    // the selected fields are checked immediately after ownership.
+    let mut parse_limits = limits;
+    parse_limits.max_string_bytes = parse_limits.max_input_bytes;
     match kind {
         Kind::Presence => {
-            crate::comments::parse_comment_authors_processed(source, limits).map(drop)
+            let authors = crate::comments::parse_comment_authors_processed(source, parse_limits)?;
+            for author in authors {
+                validate_string_with_limit(
+                    &author.name,
+                    "comment author name",
+                    limits.max_string_bytes,
+                )?;
+                validate_string_with_limit(
+                    &author.initials,
+                    "comment author initials",
+                    limits.max_string_bytes,
+                )?;
+            }
         },
         Kind::Threading => {
-            crate::comments::parse_slide_comments_processed(source, limits, strict_threading)
-                .map(drop)
+            let comments = crate::comments::parse_slide_comments_processed(
+                source,
+                parse_limits,
+                strict_threading,
+            )?;
+            for comment in comments {
+                validate_string_with_limit(&comment.text, "comment text", limits.max_string_bytes)?;
+                if let Some(date_time) = &comment.date_time {
+                    validate_string_with_limit(
+                        date_time,
+                        "comment date time",
+                        limits.max_string_bytes,
+                    )?;
+                }
+            }
         },
     }
+    Ok(())
 }
 
 #[cfg(test)]
