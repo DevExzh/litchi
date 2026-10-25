@@ -5407,3 +5407,11 @@ See [0063](0063-source-pptx-modern-comments.md).
   binds this checkpoint. Final gate/docs, inventories/dispositions,
   corpus/native and quiet ABBA remain open. Only audit22 is deferred.
   Nothing is pushed.
+
+  Subsequent actual compiler checks now pass: PPTX `02b2489ead` clears
+  all-features/all-targets after 89v/89w repairs; OOXML common `5ec78a4858`
+  clears all-features/all-targets after 94e/94f. Root verifies complete
+  receipts and terminal ownership for both. Runtime, strict Clippy, glossary,
+  downstream-consumer and performance qualification remain open. Custom XML
+  94cb remains returned for paired-element indexing, typed limits and bounded
+  MCE/attribute handling; 94cc is active and uncomposed.

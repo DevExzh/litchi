@@ -79,3 +79,56 @@ Final full formatting, 53-row gate including isolated documentation, fresh
 84-profile raw census and separate 68-package inventory with dispositions,
 corpus/native qualification and quiet ABBA remain open. Only redaction
 audit 22 is deferred. Nothing is pushed.
+
+## Compiler passes after follow-up repairs
+
+PPTX `096422a20a` first exposes 15 remaining test qualifiers/borrowed-field
+errors, fixed at `919a772ec3` (record 89v). That check then exposes eleven
+unused private test wrappers. Independently reviewed 89w removes only
+proven definition-only wrappers and retains their selected-limit
+implementations. Root composition is
+`02b2489eada2bfcd3d1b9bc285b0ea0d3c7ae0d6`, tree
+`05942a20a7599b39d23b407831dac81b600a61cd`.
+
+The actual check on that source passes both rows: formatting on 393 changed
+Rust paths (2.890 seconds), then
+`cargo check --keep-going --offline --locked -p litchi-pptx --all-targets --all-features`
+(exit 0, 73.614 seconds, target 226,054,600 bytes).
+State: `/home/zhuhe/code/litchi-worktrees/.coord/pptx-combined-0362ul89-f5-actual-02b2489ead`.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `rows.json` | 31,847 | `9906e8048993a00eeab6b9c6e927943a8a54fcfde29a048f461a5d3653bb189b` |
+| `result.json` | 33,534 | `cbf2912804f12fc38b01c9bb04c69b8e54b76c44f4ff00037d84c0f22f68cd06` |
+| `01-pptx-all-features-check-attempt-actual-f5-01.log` | 24,966 | `64ce8e560437a30e20f94f28822d3626a0cf6a4a94543f7150e0364109f30b93` |
+
+OOXML `0395ca40f4` exposes ten common-crate diagnostics. The first 94e
+proposal misses two recipient builders and is returned before composition;
+`88fdcafa89` completes all ten fixes and passes fresh source review. Root
+composes it at `6d95f193c5`, then gates a helper with its sole test-only
+consumer at `5ec78a48589c7ab4396ee90cb1f6d41cf7f1aaa6` (record 94f),
+tree `58027fafbab47c6bce6e35c37b6881886db5adf3`.
+
+The actual check on that source passes formatting on 90 Rust paths (2.117
+seconds), then
+`cargo check --keep-going --offline --locked -q -p litchi-ooxml-common --all-targets --all-features`
+(exit 0, 36.236 seconds, target 162,771,185 bytes).
+State: `/home/zhuhe/code/litchi-worktrees/.coord/ooxml-combined-0362ul94-f5-actual-5ec78a4858`.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `rows.json` | 12,087 | `baceb39715b05e741182368a377b406b41111a1c82e6e48d041a8f0c8531e2d4` |
+| `result.json` | 13,171 | `c83b785beca4dd80a7788b9a4b084016f817b457f2aa53dd1ab37dd11d2ba587` |
+| `01-check-common-attempt-actual-f5-01.log` | 16,817 | `d4dcaef4f172c66fbd95ecf6cb44502e23b799796c31a1776977edb4a4fe80d2` |
+
+Root independently verifies both exact command lists, source/three-lock
+fences, logs/traces, empty preflight builders, live target guards, terminal
+ownership samples and absent traced Cargo PIDs. Both persistent sessions
+terminate with exit 0. Earlier failed captures remain retained. Runtime,
+Clippy, glossary, downstream consumers and performance remain unqualified.
+
+Custom XML 94cb (`e1e7817bd0`, doc follow-up `4f82d42a8c`) is returned:
+a paired-schemaRef frame stores a source offset where a vector index is
+required, selected limits take the wrong error route, and MCE/attribute
+admission and staging still need repair. Required follow-up 94cc is active;
+none of this unaccepted source is in the passing OOXML candidate.
