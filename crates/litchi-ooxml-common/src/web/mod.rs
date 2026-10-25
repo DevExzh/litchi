@@ -25,7 +25,8 @@ pub(in crate::web) use semantic::{
     WEB_EXTENSION_NAMESPACE,
 };
 
-use crate::{Error, Result};
+pub use crate::Error;
+use crate::Result;
 #[cfg(test)]
 use litchi_opc::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};

@@ -7,6 +7,7 @@ use super::super::{
     STANDARD_XML_BYTES, STRICT_IMAGE_RELATIONSHIP_TYPE, STRICT_RELATIONSHIPS_NAMESPACE,
     TRANSITIONAL_RELATIONSHIPS_NAMESPACE,
 };
+use litchi_opc::SourceLimits;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Limits {
     /// Maximum bytes in one source or authored XML part.
@@ -57,6 +58,45 @@ impl Limits {
             part_deletions: STANDARD_PART_DELETIONS,
         }
     }
+
+    /// Intersect this semantic policy with the retained OPC admission policy.
+    ///
+    /// A format edit must not widen the limits under which its source package
+    /// was admitted.  Keeping this conversion here makes the package editor's
+    /// default and caller-selected options obey that rule without an eager
+    /// package scan.
+    #[must_use]
+    pub(crate) const fn bounded_by_source(self, source: SourceLimits) -> Self {
+        Self {
+            xml_bytes: self.xml_bytes.min(as_usize(source.max_part_bytes())),
+            total_xml_bytes: self
+                .total_xml_bytes
+                .min(as_usize(source.max_total_part_bytes())),
+            depth: self.depth.min(source.max_depth()),
+            nodes: self.nodes.min(source.max_events()),
+            items: self.items.min(source.max_parts()),
+            string_bytes: self
+                .string_bytes
+                .min(as_usize(source.max_total_part_bytes())),
+            total_string_bytes: self
+                .total_string_bytes
+                .min(as_usize(source.max_total_part_bytes())),
+            image_bytes: self.image_bytes.min(as_usize(source.max_part_bytes())),
+            total_image_bytes: self
+                .total_image_bytes
+                .min(as_usize(source.max_total_part_bytes())),
+            package_parts: self.package_parts.min(source.max_parts()),
+            package_relationships: self
+                .package_relationships
+                .min(source.max_total_relationships()),
+            part_allocations: self.part_allocations.min(source.max_parts()),
+            part_deletions: self.part_deletions.min(source.max_parts()),
+        }
+    }
+}
+
+const fn as_usize(value: u64) -> usize {
+    value.min(usize::MAX as u64) as usize
 }
 
 impl Default for Limits {

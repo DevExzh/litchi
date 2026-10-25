@@ -567,17 +567,52 @@ fn relationship_attributes_use_namespace(
     )?;
     let root = effective.root()?;
     let mut opposite_seen = false;
-    inspect_relationship_attributes(root, expected, &mut opposite_seen);
-    // A source with no relationship attributes has no conformance profile to
-    // rewrite.  Only an actual expanded-name attribute from the opposite
-    // profile requires canonicalization.
-    Ok(!opposite_seen)
+    let mut expected_seen = false;
+    inspect_relationship_attributes(root, expected, &mut opposite_seen, &mut expected_seen);
+    // Preserve the declared profile even when a graph happens to contain no
+    // relationship-valued attributes.  Without this check a strict request
+    // could be reported as a signed no-op for a transitional source (and
+    // vice versa), losing the caller's explicit conformance intent.
+    Ok(expected_seen && !opposite_seen)
 }
 
-fn inspect_relationship_attributes(node: &Node, expected: &str, opposite_seen: &mut bool) {
+fn inspect_relationship_attributes(
+    node: &Node,
+    expected: &str,
+    opposite_seen: &mut bool,
+    expected_seen: &mut bool,
+) {
+    if let Some(fragment) = &node.raw_fragment {
+        let mut scope = Some(fragment.namespaces.as_ref());
+        while let Some(current) = scope {
+            if current
+                .local
+                .values()
+                .any(|namespace| namespace == expected)
+            {
+                *expected_seen = true;
+            }
+            let opposite = if expected == TRANSITIONAL_RELATIONSHIPS_NAMESPACE {
+                STRICT_RELATIONSHIPS_NAMESPACE
+            } else {
+                TRANSITIONAL_RELATIONSHIPS_NAMESPACE
+            };
+            if current
+                .local
+                .values()
+                .any(|namespace| namespace == opposite)
+            {
+                *opposite_seen = true;
+            }
+            scope = current.parent.as_deref();
+        }
+    }
     for attribute in &node.attributes {
         if !matches!(attribute.local_name.as_str(), "id" | "embed" | "link") {
             continue;
+        }
+        if attribute.namespace == expected {
+            *expected_seen = true;
         }
         if attribute.namespace != expected
             && ((expected == TRANSITIONAL_RELATIONSHIPS_NAMESPACE
@@ -589,7 +624,7 @@ fn inspect_relationship_attributes(node: &Node, expected: &str, opposite_seen: &
         }
     }
     for child in &node.children {
-        inspect_relationship_attributes(child, expected, opposite_seen);
+        inspect_relationship_attributes(child, expected, opposite_seen, expected_seen);
     }
 }
 
@@ -614,14 +649,14 @@ impl Default for EditOptions {
 
 /// A staged Web Extensions edit over one OPC package.
 #[derive(Clone)]
-pub struct Edit {
-    source: OpcPackage,
-    working: OpcPackage,
+pub struct Edit<'a> {
+    source: &'a OpcPackage,
+    working: Option<OpcPackage>,
     limits: Limits,
     conformance: Option<Conformance>,
 }
 
-impl std::fmt::Debug for Edit {
+impl std::fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Edit")
@@ -630,72 +665,97 @@ impl std::fmt::Debug for Edit {
     }
 }
 
-impl Edit {
+impl<'a> Edit<'a> {
     /// Start an edit over `package` using the standard graph limits.
-    pub fn new(package: &OpcPackage) -> Result<Self> {
+    pub fn new(package: &'a OpcPackage) -> Result<Self> {
         Self::new_with_options(package, EditOptions::default())
     }
 
     /// Start an edit with caller-selected graph limits.
-    pub fn new_with_options(package: &OpcPackage, options: EditOptions) -> Result<Self> {
+    pub fn new_with_options(package: &'a OpcPackage, options: EditOptions) -> Result<Self> {
         Ok(Self {
-            source: package.clone(),
-            working: package.clone(),
-            limits: options.limits,
+            source: package,
+            working: None,
+            limits: options.limits.bounded_by_source(package.read_limits()),
             conformance: None,
         })
     }
 
+    fn current(&self) -> &OpcPackage {
+        self.working.as_ref().unwrap_or(self.source)
+    }
+
     /// Replace the complete task-pane graph.
     pub fn put(&mut self, panes: Panes, conformance: Conformance) -> Result<bool> {
-        let patch = plan_put(&self.working, panes, conformance, &self.limits)?;
-        let commit = patch.apply(&self.working)?;
+        let patch = plan_put(self.current(), panes, conformance, &self.limits)?;
+        let commit = patch.apply(self.current())?;
         let changed = commit.diagnostics().changed();
-        self.working = commit.into_package();
+        if changed {
+            self.working = Some(commit.into_package());
+        }
         self.conformance = Some(conformance);
         Ok(changed)
     }
 
     /// Remove the complete task-pane graph.
     pub fn remove(&mut self) -> Result<bool> {
-        let patch = plan_remove(&self.working, &self.limits)?;
-        let commit = patch.apply(&self.working)?;
+        let patch = plan_remove(self.current(), &self.limits)?;
+        let commit = patch.apply(self.current())?;
         let changed = commit.diagnostics().changed();
-        self.working = commit.into_package();
+        if changed {
+            self.working = Some(commit.into_package());
+        }
+        self.conformance = None;
         Ok(changed)
     }
 
     /// Discard all staged operations.
     pub fn reset(&mut self) {
-        self.working = self.source.clone();
+        self.working = None;
         self.conformance = None;
     }
 
     /// Publish the final graph as a shared commit triad.
     pub fn commit(self) -> Result<super::Commit> {
-        let before = load(&self.source, &self.limits)?;
-        let after = load(&self.working, &self.limits)?;
-        if before == after {
-            let mut budget = OperationBudget::default();
-            let index = PackageGraphIndex::build(&self.source, &self.limits, &mut budget)?;
-            if let Some(graph) =
-                existing_web_extension_graph(&self.source, &self.limits, &index, &mut budget)?
-            {
-                return source_bound_noop_patch(&self.source, &graph, &self.limits)?
-                    .apply(&self.source);
+        let Some(working) = self.working else {
+            if self.conformance.is_none() {
+                let mut budget = OperationBudget::default();
+                let index = PackageGraphIndex::build(self.source, &self.limits, &mut budget)?;
+                if let Some(graph) =
+                    existing_web_extension_graph(self.source, &self.limits, &index, &mut budget)?
+                {
+                    return source_bound_noop_patch(self.source, &graph, &self.limits)?
+                        .apply(self.source);
+                }
+                return empty_source_bound_noop_patch(self.source, &self.limits)?
+                    .apply(self.source);
             }
-            return empty_source_bound_noop_patch(&self.source, &self.limits)?.apply(&self.source);
-        }
-        let patch = match after {
-            Some(panes) => plan_put(
-                &self.source,
+            let panes = load(self.source, &self.limits)?.ok_or_else(|| {
+                Error::Invalid("Web Extensions edit lost its staged panes".into())
+            })?;
+            return plan_put(
+                self.source,
                 panes,
                 self.conformance.unwrap_or(Conformance::Transitional),
                 &self.limits,
-            )?,
-            None => plan_remove(&self.source, &self.limits)?,
+            )?
+            .apply(self.source);
         };
-        patch.apply(&self.source)
+
+        let after = load(&working, &self.limits)?;
+        if after.is_none() {
+            return plan_remove(self.source, &self.limits)?.apply(self.source);
+        }
+        if let Some(panes) = after {
+            return plan_put(
+                self.source,
+                panes,
+                self.conformance.unwrap_or(Conformance::Transitional),
+                &self.limits,
+            )?
+            .apply(self.source);
+        }
+        unreachable!("the Web Extensions edit's final graph was checked above")
     }
 }
 

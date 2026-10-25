@@ -1,7 +1,7 @@
 //! Focused regression coverage for the Ribbon model, codec, and package graph.
 
 use super::model::{Family, LEGACY_RELATIONSHIP, Limits, Version};
-use super::package::{CONTENT_TYPE, load, put as publish_put, remove as publish_remove};
+use super::package::{CONTENT_TYPE, Edit, load};
 use crate::{Error, Result};
 use litchi_opc::BlobPart;
 use litchi_opc::constants::relationship_type as rt;
@@ -16,15 +16,17 @@ const XML_UI2: &[u8] =
     br#"<customUI xmlns="http://schemas.microsoft.com/office/2007/10/customui"/>"#;
 
 fn put(package: &mut OpcPackage, version: Version, xml: Vec<u8>, limits: &Limits) -> Result<()> {
-    let commit = publish_put(package, version, xml, limits)?;
-    *package = commit.into_package();
+    let mut edit =
+        Edit::new_with_options(package, super::package::EditOptions { limits: *limits })?;
+    edit.put(version, xml)?;
+    *package = edit.commit()?.into_package();
     Ok(())
 }
 
 fn remove(package: &mut OpcPackage, family: Family) -> Result<bool> {
-    let commit = publish_remove(package, family)?;
-    let changed = commit.diagnostics().changed();
-    *package = commit.into_package();
+    let mut edit = Edit::new(package)?;
+    let changed = edit.remove(family)?;
+    *package = edit.commit()?.into_package();
     Ok(changed)
 }
 

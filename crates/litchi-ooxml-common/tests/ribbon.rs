@@ -1,21 +1,21 @@
 use litchi_ooxml_common::ribbon::{self, Version};
-use litchi_opc::{OpcPackage, PackURI, PackageWriter, XmlPart};
+use litchi_opc::constants::relationship_type as rt;
+use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, XmlPart};
 
 const OFFICE_2007_XML: &[u8] = include_bytes!("../../../test-data/ooxml/ribbonx/office2007.xml");
 const OFFICE_2010_XML: &[u8] = include_bytes!("../../../test-data/ooxml/ribbonx/office2010.xml");
 const CUSTOM_UI2_XML: &[u8] = include_bytes!("../../../test-data/ooxml/ribbonx/customui2.xml");
 
+fn put(package: &mut OpcPackage, version: Version, xml: Vec<u8>) {
+    let mut edit = ribbon::Edit::new(package).unwrap();
+    edit.put(version, xml).unwrap();
+    *package = edit.commit().unwrap().into_package();
+}
+
 #[test]
 fn stores_borrows_and_roundtrips_local_ribbon_xml() {
     let mut package = OpcPackage::new();
-    package = ribbon::put(
-        &package,
-        Version::V2007,
-        OFFICE_2007_XML.to_vec(),
-        &ribbon::Limits::standard(),
-    )
-    .unwrap()
-    .into_package();
+    put(&mut package, Version::V2007, OFFICE_2007_XML.to_vec());
 
     let ribbons = ribbon::load(&package, &ribbon::Limits::standard()).unwrap();
     let stored = ribbons.effective().unwrap();
@@ -39,14 +39,7 @@ fn stores_borrows_and_roundtrips_local_ribbon_xml() {
 #[test]
 fn updates_the_modern_family_in_place() {
     let mut package = OpcPackage::new();
-    package = ribbon::put(
-        &package,
-        Version::Ui2,
-        CUSTOM_UI2_XML.to_vec(),
-        &ribbon::Limits::standard(),
-    )
-    .unwrap()
-    .into_package();
+    put(&mut package, Version::Ui2, CUSTOM_UI2_XML.to_vec());
     let first_part = ribbon::load(&package, &ribbon::Limits::standard())
         .unwrap()
         .modern()
@@ -54,14 +47,7 @@ fn updates_the_modern_family_in_place() {
         .part()
         .clone();
 
-    package = ribbon::put(
-        &package,
-        Version::V2010,
-        OFFICE_2010_XML.to_vec(),
-        &ribbon::Limits::standard(),
-    )
-    .unwrap()
-    .into_package();
+    put(&mut package, Version::V2010, OFFICE_2010_XML.to_vec());
 
     let updated = ribbon::load(&package, &ribbon::Limits::standard()).unwrap();
     let updated = updated.modern().unwrap();
@@ -77,22 +63,8 @@ fn updates_the_modern_family_in_place() {
 #[test]
 fn keeps_fixed_family_slots_with_modern_precedence() {
     let mut package = OpcPackage::new();
-    package = ribbon::put(
-        &package,
-        Version::V2007,
-        OFFICE_2007_XML.to_vec(),
-        &ribbon::Limits::standard(),
-    )
-    .unwrap()
-    .into_package();
-    package = ribbon::put(
-        &package,
-        Version::V2010,
-        OFFICE_2010_XML.to_vec(),
-        &ribbon::Limits::standard(),
-    )
-    .unwrap()
-    .into_package();
+    put(&mut package, Version::V2007, OFFICE_2007_XML.to_vec());
+    put(&mut package, Version::V2010, OFFICE_2010_XML.to_vec());
 
     let ribbons = ribbon::load(&package, &ribbon::Limits::standard()).unwrap();
     assert_eq!(ribbons.legacy().unwrap().version(), Version::V2007);
@@ -130,6 +102,56 @@ fn staged_edit_publishes_both_families_and_replays_without_mutating_source() {
             .next()
             .is_none()
     );
+}
+
+#[test]
+fn ribbon_patch_checks_root_content_types_and_opaque_closure() {
+    let mut source = OpcPackage::new();
+    put(&mut source, Version::V2007, OFFICE_2007_XML.to_vec());
+    let ribbon_part = ribbon::load(&source, &ribbon::Limits::standard())
+        .unwrap()
+        .legacy()
+        .unwrap()
+        .part()
+        .clone();
+    let image = PackURI::new("/customUI/icon.png").unwrap();
+    source.add_part(Box::new(BlobPart::new(
+        image.clone(),
+        "image/png".into(),
+        vec![1, 2, 3],
+    )));
+    source
+        .get_part_mut(&ribbon_part)
+        .unwrap()
+        .relate_to("icon.png", rt::IMAGE);
+
+    let mut edit = ribbon::Edit::new(&source).unwrap();
+    edit.put(
+        Version::V2007,
+        br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"><ribbon/></customUI>"#
+            .to_vec(),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+
+    let independent = commit.patch().apply(&source).unwrap();
+    assert_eq!(
+        ribbon::load(independent.package(), &ribbon::Limits::standard()).unwrap(),
+        ribbon::load(commit.package(), &ribbon::Limits::standard()).unwrap()
+    );
+    assert!(independent.package().get_part(&image).is_ok());
+
+    let mut root_conflict = source.clone();
+    root_conflict.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+    assert!(commit.patch().apply(&root_conflict).is_err());
+
+    let mut content_types_conflict = source.clone();
+    content_types_conflict.add_part(Box::new(BlobPart::new(
+        PackURI::new("/opaque.bin").unwrap(),
+        "application/octet-stream".into(),
+        vec![9],
+    )));
+    assert!(commit.patch().apply(&content_types_conflict).is_err());
 }
 
 #[test]

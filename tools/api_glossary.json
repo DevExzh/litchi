@@ -2249,6 +2249,18 @@
           "inputs": ["xml", "source_limits"],
           "limits_argument": "source_limits",
           "limits_type": "litchi_opc::SourceLimits"
+        },
+        {
+          "method": "litchi_ooxml_common::web::load",
+          "inputs": ["package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::web::Limits"
+        },
+        {
+          "method": "litchi_ooxml_common::ribbon::load",
+          "inputs": ["package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::ribbon::Limits"
         }
       ],
       "banned_names": [
@@ -2507,7 +2519,37 @@
       ],
       "families": [
         "litchi_ooxml_common::custom_xml",
-        "litchi_ooxml_common::properties"
+        "litchi_ooxml_common::properties",
+        "litchi_ooxml_common::web",
+        "litchi_ooxml_common::ribbon"
+      ],
+      "shared_types": [
+        {
+          "path": "litchi_ooxml_common::web::Commit",
+          "target": "litchi_core::edit::Commit"
+        },
+        {
+          "path": "litchi_ooxml_common::web::Diagnostics",
+          "target": "litchi_core::edit::Diagnostics"
+        },
+        {
+          "path": "litchi_ooxml_common::ribbon::Commit",
+          "target": "litchi_core::edit::Commit"
+        },
+        {
+          "path": "litchi_ooxml_common::ribbon::Diagnostics",
+          "target": "litchi_core::edit::Diagnostics"
+        }
+      ],
+      "result_methods": [
+        {
+          "method": "litchi_ooxml_common::web::Patch::apply",
+          "ok": "litchi_ooxml_common::web::Commit"
+        },
+        {
+          "method": "litchi_ooxml_common::ribbon::Patch::apply",
+          "ok": "litchi_ooxml_common::ribbon::Commit"
+        }
       ],
       "family_methods": true
     },
@@ -2543,6 +2585,18 @@
           "inputs": ["xml", "source_limits"],
           "limits_argument": "source_limits",
           "limits_type": "litchi_opc::SourceLimits"
+        },
+        {
+          "method": "litchi_ooxml_common::web::load",
+          "inputs": ["package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::web::Limits"
+        },
+        {
+          "method": "litchi_ooxml_common::ribbon::load",
+          "inputs": ["package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::ribbon::Limits"
         }
       ],
       "banned_names": [
@@ -2801,7 +2855,37 @@
       ],
       "families": [
         "litchi_ooxml_common::custom_xml",
-        "litchi_ooxml_common::properties"
+        "litchi_ooxml_common::properties",
+        "litchi_ooxml_common::web",
+        "litchi_ooxml_common::ribbon"
+      ],
+      "shared_types": [
+        {
+          "path": "litchi_ooxml_common::web::Commit",
+          "target": "litchi_core::edit::Commit"
+        },
+        {
+          "path": "litchi_ooxml_common::web::Diagnostics",
+          "target": "litchi_core::edit::Diagnostics"
+        },
+        {
+          "path": "litchi_ooxml_common::ribbon::Commit",
+          "target": "litchi_core::edit::Commit"
+        },
+        {
+          "path": "litchi_ooxml_common::ribbon::Diagnostics",
+          "target": "litchi_core::edit::Diagnostics"
+        }
+      ],
+      "result_methods": [
+        {
+          "method": "litchi_ooxml_common::web::Patch::apply",
+          "ok": "litchi_ooxml_common::web::Commit"
+        },
+        {
+          "method": "litchi_ooxml_common::ribbon::Patch::apply",
+          "ok": "litchi_ooxml_common::ribbon::Commit"
+        }
       ],
       "family_methods": true
     },

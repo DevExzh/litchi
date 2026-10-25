@@ -5,6 +5,7 @@ use litchi_ooxml_common::web::{
         ADD_IN_CONTENT_TYPE, ADD_IN_RELATIONSHIP, TASK_PANES_CONTENT_TYPE, TASK_PANES_RELATIONSHIP,
     },
 };
+use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, PackURI, PackageWriter, Part, XmlPart};
 use std::sync::Arc;
 
@@ -53,6 +54,43 @@ fn package_authoring_and_removal_round_trip_inert_task_panes() {
             .unwrap()
             .is_none()
     );
+}
+
+#[test]
+fn conformance_profile_is_part_of_web_edit_intent() {
+    let mut package = OpcPackage::new();
+    let panes = authored_task_panes();
+    let mut edit = web::Edit::new(&package).unwrap();
+    edit.put(panes.clone(), Conformance::Transitional).unwrap();
+    package = edit.commit().unwrap().into_package();
+
+    // A strict request over the same semantic panes is a real publication,
+    // even when the source graph has no images whose relationship type would
+    // otherwise expose the profile. A signed source must not be mistaken for
+    // a no-op.
+    package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+    let mut signed_edit = web::Edit::new(&package).unwrap();
+    assert!(signed_edit.put(panes.clone(), Conformance::Strict).is_err());
+    assert!(package.is_signed());
+
+    package.unsign();
+    let mut strict_edit = web::Edit::new(&package).unwrap();
+    assert!(strict_edit.put(panes, Conformance::Strict).unwrap());
+    let package = strict_edit.commit().unwrap().into_package();
+    let strict_xml = web::load(&package, &web::Limits::standard())
+        .unwrap()
+        .unwrap();
+    assert_eq!(strict_xml.panes.len(), 1);
+    let task_panes_name = package
+        .rels()
+        .iter()
+        .find(|relationship| relationship.reltype() == TASK_PANES_RELATIONSHIP)
+        .unwrap()
+        .target_partname()
+        .unwrap();
+    let task_panes_xml =
+        std::str::from_utf8(package.get_part(&task_panes_name).unwrap().blob()).unwrap();
+    assert!(task_panes_xml.contains("http://purl.oclc.org/ooxml/officeDocument/relationships"));
 }
 
 #[test]

@@ -2,6 +2,7 @@
 
 use crate::{Error, Result};
 use litchi_opc::PackURI;
+use litchi_opc::SourceLimits;
 
 pub(super) const V2007_NAMESPACE: &str = "http://schemas.microsoft.com/office/2006/01/customui";
 pub(super) const V2010_NAMESPACE: &str = "http://schemas.microsoft.com/office/2009/07/customui";
@@ -120,7 +121,7 @@ impl<'a> Ui<'a> {
 
     /// Low-level package relationship ID.
     ///
-    /// Prefer [`Set::effective`] and [`crate::ribbon::remove`] for semantic operations.
+    /// Prefer [`Set::effective`] and [`crate::ribbon::Edit`] for semantic operations.
     #[must_use]
     #[inline]
     pub const fn id(self) -> &'a str {
@@ -229,6 +230,28 @@ impl Limits {
             images: 4_096,
         }
     }
+
+    /// Intersect this semantic policy with the retained OPC admission policy.
+    ///
+    /// The conversion is intentionally conservative: an edit cannot admit a
+    /// Ribbon payload, XML event stream, or image closure beyond the policy
+    /// that admitted its source package.
+    #[must_use]
+    pub(crate) const fn bounded_by_source(self, source: SourceLimits) -> Self {
+        Self {
+            xml_bytes: self.xml_bytes.min(as_usize(source.max_part_bytes())),
+            depth: self.depth.min(source.max_depth()),
+            nodes: self.nodes.min(source.max_events()),
+            images: self
+                .images
+                .min(source.max_total_relationships())
+                .min(source.max_parts()),
+        }
+    }
+}
+
+const fn as_usize(value: u64) -> usize {
+    value.min(usize::MAX as u64) as usize
 }
 
 impl Default for Limits {

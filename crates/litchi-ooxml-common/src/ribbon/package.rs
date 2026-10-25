@@ -4,7 +4,8 @@ use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
 use super::limit::LimitKind;
-use litchi_opc::{OpcPackage, PackURI, Part, XmlPart};
+use litchi_opc::TargetMode;
+use litchi_opc::{OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, Part, XmlPart};
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -126,24 +127,44 @@ fn put_mut(
             )?;
         }
     }
-    let relationship_id = existing.map(|(_, id, _)| id);
+    let relationship_id = match existing.as_ref() {
+        Some((_, id, _)) => id.clone(),
+        None => next_relationship_id(package)?,
+    };
     refuse_signed_change(package)?;
-    if let Some(id) = relationship_id.as_deref()
-        && package.rels_mut().remove(id).is_none()
-    {
-        return Err(Error::Relationship(format!(
-            "Ribbon relationship '{id}' disappeared before commit"
-        )));
-    }
     package.add_part(Box::new(replacement));
-    if let Some(id) = relationship_id {
-        package
-            .rels_mut()
-            .add_relationship(version.relationship().to_owned(), target, id, false);
-    } else {
-        package.relate_to(&target, version.relationship());
-    }
+    replace_root_relationship(package, &relationship_id, version.relationship(), &target)?;
     settle_unsigned_change(package)?;
+    Ok(())
+}
+
+fn next_relationship_id(package: &OpcPackage) -> Result<String> {
+    for number in 1..=MAX_GRAPH_LINKS {
+        let candidate = format!("rId{number}");
+        if package.rels().get(&candidate).is_none() {
+            return Ok(candidate);
+        }
+    }
+    Err(Error::Limit {
+        kind: crate::LimitKind::Ribbon(LimitKind::PackageGraphRelationships),
+        maximum: MAX_GRAPH_LINKS,
+        observed: package.rels().len(),
+    })
+}
+
+fn replace_root_relationship(
+    package: &mut OpcPackage,
+    id: &str,
+    relationship_type: &str,
+    target: &str,
+) -> Result<()> {
+    let root = root_uri()?;
+    let expected = package.source_relationships(&root, package.read_limits())?;
+    let maximum = package.read_limits().max_relationship_xml_bytes();
+    let replacement = expected
+        .without_relationship(id, maximum)?
+        .with_relationship(relationship_type, target, id, TargetMode::Internal, maximum)?;
+    package.try_replace_relationships(&expected, &replacement, package.read_limits())?;
     Ok(())
 }
 
@@ -182,15 +203,41 @@ fn remove_mut(package: &mut OpcPackage, family: Family, limits: &Limits) -> Resu
     };
 
     refuse_signed_change(package)?;
-    if package.rels_mut().remove(&relationship_id).is_none() {
-        return Err(Error::Relationship(format!(
-            "Ribbon relationship '{relationship_id}' disappeared before commit"
-        )));
-    }
+    let removed_parts = ribbon_part
+        .iter()
+        .chain(images.iter())
+        .cloned()
+        .collect::<Vec<_>>();
+    let preserved_content_types = if removed_parts.is_empty() {
+        None
+    } else {
+        let source = package.source_content_types(package.read_limits())?;
+        Some(source.without_parts(
+            &removed_parts,
+            package.read_limits().max_content_types_bytes(),
+        )?)
+    };
+    let root = root_uri()?;
+    let expected = package.source_relationships(&root, package.read_limits())?;
+    let replacement = expected.without_relationship(
+        &relationship_id,
+        package.read_limits().max_relationship_xml_bytes(),
+    )?;
+    package.try_replace_relationships(&expected, &replacement, package.read_limits())?;
     if let Some(part) = ribbon_part {
         let _ = package.remove_part(&part);
         for image in images {
             let _ = package.remove_part(&image);
+        }
+    }
+    if let Some(replacement) = preserved_content_types {
+        let current = package.source_content_types(package.read_limits())?;
+        if current != replacement {
+            package.try_replace_content_types(
+                current.bytes(),
+                &replacement,
+                package.read_limits(),
+            )?;
         }
     }
     settle_unsigned_change(package)?;
@@ -208,23 +255,44 @@ struct OwnedUi {
 impl OwnedUi {
     fn capture(package: &OpcPackage, family: Family, limits: &Limits) -> Result<Option<Self>> {
         let ribbons = load(package, limits)?;
-        let Some(ui) = ribbons.get(family) else {
-            return Ok(None);
-        };
-        Ok(Some(Self {
+        ribbons
+            .get(family)
+            .map(|ui| Self::from_ui(package, ui))
+            .transpose()
+    }
+
+    fn from_ui(package: &OpcPackage, ui: Ui<'_>) -> Result<Self> {
+        Ok(Self {
             part: ui.part().clone(),
             id: ui.id().to_owned(),
             version: ui.version(),
             xml: package.get_part(ui.part())?.blob_arc(),
-        }))
+        })
     }
 }
 
+/// One exact part in the Ribbon dependency closure.
+///
+/// The payload and relationship token retain their source allocations.  That
+/// lets a replay use the OPC preservation APIs rather than rebuilding an
+/// otherwise unrelated XML member or relationship file.
 #[derive(Clone, PartialEq, Eq)]
-struct FamilyChange {
-    family: Family,
-    before: Option<OwnedUi>,
-    after: Option<OwnedUi>,
+struct PartState {
+    name: PackURI,
+    content_type: String,
+    bytes: Arc<Vec<u8>>,
+    relationships: OwnedRelationships,
+    retained_relationships: Option<(Arc<Vec<u8>>, bool)>,
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct GraphState {
+    families: [Option<OwnedUi>; 2],
+    root: OwnedRelationships,
+    retained_root: Option<(Arc<Vec<u8>>, bool)>,
+    content_types: OwnedContentTypes,
+    retained_content_types: Option<Arc<Vec<u8>>>,
+    parts: Box<[PartState]>,
 }
 
 /// A source-checked Ribbon publication.
@@ -234,7 +302,8 @@ struct FamilyChange {
 /// commit even when it changes both legacy and modern slots.
 #[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
-    changes: Box<[FamilyChange]>,
+    before: GraphState,
+    after: GraphState,
     limits: Limits,
 }
 
@@ -245,9 +314,11 @@ impl std::fmt::Debug for Patch {
             .field(
                 "families",
                 &self
-                    .changes
+                    .before
+                    .families
                     .iter()
-                    .filter(|change| change.before != change.after)
+                    .zip(&self.after.families)
+                    .filter(|(before, after)| before != after)
                     .count(),
             )
             .finish_non_exhaustive()
@@ -258,40 +329,29 @@ impl Patch {
     /// Whether this patch preserves every Ribbon family exactly.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.changes
-            .iter()
-            .all(|change| same_content(change.before.as_ref(), change.after.as_ref()))
+        self.before == self.after
     }
 
     /// Return the exact inverse publication.
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {
-            changes: self
-                .changes
-                .iter()
-                .rev()
-                .map(|change| FamilyChange {
-                    family: change.family,
-                    before: change.after.clone(),
-                    after: change.before.clone(),
-                })
-                .collect(),
+            before: self.after.clone(),
+            after: self.before.clone(),
             limits: self.limits,
         }
     }
 
-    /// Apply this patch to a Ribbon source with matching family content and
+    /// Apply this patch to a Ribbon source with matching graph content and
     /// publish a new package.
     ///
     /// The receiver is unchanged. Unrelated package parts remain owned by the
     /// receiver; only the selected Ribbon families are planned and published.
     pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
-        for change in &self.changes {
-            let current = OwnedUi::capture(package, change.family, &self.limits)?;
-            if !same_content(current.as_ref(), change.before.as_ref()) {
-                return Err(Error::Relationship("Ribbon patch source changed".into()));
-            }
+        let hints = part_names(&self.before);
+        let current = capture_state(package, &self.limits, &hints)?;
+        if current != self.before {
+            return Err(Error::Relationship("Ribbon patch source changed".into()));
         }
         if self.is_noop() {
             return Ok(Commit::new(
@@ -300,28 +360,16 @@ impl Patch {
                 litchi_core::edit::Diagnostics::UNCHANGED,
             ));
         }
+        refuse_signed_change(package)?;
         let mut candidate = package.clone();
-        for change in &self.changes {
-            match &change.after {
-                Some(after) => put_mut(
-                    &mut candidate,
-                    after.version,
-                    Arc::clone(&after.xml),
-                    &self.limits,
-                )?,
-                None => {
-                    remove_mut(&mut candidate, change.family, &self.limits)?;
-                },
-            }
+        apply_graph_state(&mut candidate, &self.before, &self.after)?;
+        let resulting = capture_state(&candidate, &self.limits, &part_names(&self.after))?;
+        if !destination_matches(&resulting, &self.after) {
+            return Err(Error::Relationship(
+                "Ribbon patch publication changed the selected graph".into(),
+            ));
         }
-        for change in &self.changes {
-            let resulting = OwnedUi::capture(&candidate, change.family, &self.limits)?;
-            if !same_content(resulting.as_ref(), change.after.as_ref()) {
-                return Err(Error::Relationship(
-                    "Ribbon patch publication changed the selected graph".into(),
-                ));
-            }
-        }
+        settle_unsigned_change(&mut candidate)?;
         Ok(Commit::new(
             candidate,
             self.clone(),
@@ -329,86 +377,13 @@ impl Patch {
         ))
     }
 
-    fn single(
-        family: Family,
-        before: Option<OwnedUi>,
-        after: Option<OwnedUi>,
-        limits: Limits,
-    ) -> Self {
+    fn new(before: GraphState, after: GraphState, limits: Limits) -> Self {
         Self {
-            changes: vec![FamilyChange {
-                family,
-                before,
-                after,
-            }]
-            .into_boxed_slice(),
+            before,
+            after,
             limits,
         }
     }
-
-    fn from_families(
-        before: [Option<OwnedUi>; 2],
-        after: [Option<OwnedUi>; 2],
-        limits: Limits,
-    ) -> Self {
-        let changes = [Family::Legacy, Family::Modern]
-            .into_iter()
-            .zip(before.into_iter().zip(after))
-            .map(|(family, (before, after))| FamilyChange {
-                family,
-                before,
-                after,
-            })
-            .collect();
-        Self { changes, limits }
-    }
-}
-
-fn same_content(left: Option<&OwnedUi>, right: Option<&OwnedUi>) -> bool {
-    match (left, right) {
-        (None, None) => true,
-        (Some(left), Some(right)) => {
-            left.version == right.version && left.xml.as_slice() == right.xml.as_slice()
-        },
-        _ => false,
-    }
-}
-
-/// Publish one Ribbon family without mutating the source package.
-pub fn put(
-    package: &OpcPackage,
-    version: Version,
-    xml: Vec<u8>,
-    limits: &Limits,
-) -> Result<Commit> {
-    let family = version.family();
-    let before = OwnedUi::capture(package, family, limits)?;
-    let mut candidate = package.clone();
-    put_mut(&mut candidate, version, Arc::new(xml), limits)?;
-    let after = OwnedUi::capture(&candidate, family, limits)?;
-    let patch = Patch::single(family, before, after, *limits);
-    let changed = !patch.is_noop();
-    Ok(Commit::new(
-        candidate,
-        patch,
-        litchi_core::edit::Diagnostics::new(changed),
-    ))
-}
-
-/// Remove one Ribbon family without mutating the source package.
-pub fn remove(package: &OpcPackage, family: Family) -> Result<Commit> {
-    let limits = Limits::standard();
-    let before = OwnedUi::capture(package, family, &limits)?;
-    let mut candidate = package.clone();
-    remove_mut(&mut candidate, family, &limits)?;
-    let after = OwnedUi::capture(&candidate, family, &limits)?;
-    let patch = Patch::single(family, before, after, limits);
-    let changed = !patch.is_noop();
-    Ok(Commit::new(
-        candidate,
-        patch,
-        litchi_core::edit::Diagnostics::new(changed),
-    ))
 }
 
 /// Limits selected before a staged Ribbon edit starts.
@@ -431,13 +406,13 @@ impl Default for EditOptions {
 /// The source and untouched package parts remain shared until publication.
 /// Dropping the edit discards its working package.
 #[derive(Clone)]
-pub struct Edit {
-    source: OpcPackage,
-    working: OpcPackage,
+pub struct Edit<'a> {
+    source: &'a OpcPackage,
+    working: Option<OpcPackage>,
     options: EditOptions,
 }
 
-impl std::fmt::Debug for Edit {
+impl std::fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Edit")
@@ -446,74 +421,318 @@ impl std::fmt::Debug for Edit {
     }
 }
 
-impl Edit {
+impl<'a> Edit<'a> {
     /// Start a staged edit with standard Ribbon limits.
     pub fn new(package: &OpcPackage) -> Result<Self> {
         Self::new_with_options(package, EditOptions::default())
     }
 
     /// Start a staged edit with caller-selected Ribbon limits.
-    pub fn new_with_options(package: &OpcPackage, options: EditOptions) -> Result<Self> {
+    pub fn new_with_options(package: &'a OpcPackage, options: EditOptions) -> Result<Self> {
         Ok(Self {
-            source: package.clone(),
-            working: package.clone(),
-            options,
+            source: package,
+            working: None,
+            options: EditOptions {
+                limits: options.limits.bounded_by_source(package.read_limits()),
+            },
         })
+    }
+
+    fn current(&self) -> &OpcPackage {
+        self.working.as_ref().unwrap_or(self.source)
     }
 
     /// Read one staged Ribbon family as owned, inert data.
     pub fn get(&self, family: Family) -> Result<Option<(Version, Vec<u8>)>> {
         Ok(
-            OwnedUi::capture(&self.working, family, &self.options.limits)?
+            OwnedUi::capture(self.current(), family, &self.options.limits)?
                 .map(|ui| (ui.version, ui.xml.as_ref().clone())),
         )
     }
 
     /// Create or replace one staged Ribbon family.
     pub fn put(&mut self, version: Version, xml: Vec<u8>) -> Result<bool> {
-        let commit = put(&self.working, version, xml, &self.options.limits)?;
-        let changed = commit.diagnostics().changed();
-        self.working = commit.into_package();
-        Ok(changed)
+        let family = version.family();
+        if let Some(current) = OwnedUi::capture(self.current(), family, &self.options.limits)?
+            && current.version == version
+            && current.xml.as_slice() == xml.as_slice()
+        {
+            return Ok(false);
+        }
+        let mut candidate = self.current().clone();
+        put_mut(&mut candidate, version, Arc::new(xml), &self.options.limits)?;
+        self.working = Some(candidate);
+        Ok(true)
     }
 
     /// Remove one staged Ribbon family.
     pub fn remove(&mut self, family: Family) -> Result<bool> {
         let limits = self.options.limits;
-        let before = OwnedUi::capture(&self.working, family, &limits)?;
-        let mut candidate = self.working.clone();
+        if OwnedUi::capture(self.current(), family, &limits)?.is_none() {
+            return Ok(false);
+        }
+        let mut candidate = self.current().clone();
         remove_mut(&mut candidate, family, &limits)?;
-        let after = OwnedUi::capture(&candidate, family, &limits)?;
-        let patch = Patch::single(family, before, after, limits);
-        let changed = !patch.is_noop();
-        self.working = candidate;
-        Ok(changed)
+        self.working = Some(candidate);
+        Ok(true)
     }
 
     /// Discard all staged operations.
     pub fn reset(&mut self) {
-        self.working = self.source.clone();
+        self.working = None;
     }
 
     /// Publish all staged Ribbon families as one commit triad.
     pub fn commit(self) -> Result<Commit> {
-        let before = capture_families(&self.source, &self.options.limits)?;
-        let after = capture_families(&self.working, &self.options.limits)?;
-        let patch = Patch::from_families(before, after, self.options.limits);
-        let changed = !patch.is_noop();
-        Ok(Commit::new(
-            self.working,
-            patch,
-            litchi_core::edit::Diagnostics::new(changed),
-        ))
+        let before = capture_state(self.source, &self.options.limits, &[])?;
+        let working = self.working.as_ref().unwrap_or(self.source);
+        let after = capture_state(working, &self.options.limits, &part_names(&before))?;
+        Patch::new(before, after, self.options.limits).apply(self.source)
     }
 }
 
-fn capture_families(package: &OpcPackage, limits: &Limits) -> Result<[Option<OwnedUi>; 2]> {
-    Ok([
-        OwnedUi::capture(package, Family::Legacy, limits)?,
-        OwnedUi::capture(package, Family::Modern, limits)?,
-    ])
+fn root_uri() -> Result<PackURI> {
+    PackURI::new("/").map_err(|error| Error::Uri(format!("package root URI: {error}")))
+}
+
+fn part_names(state: &GraphState) -> Vec<PackURI> {
+    state.parts.iter().map(|part| part.name.clone()).collect()
+}
+
+fn push_name(names: &mut Vec<PackURI>, name: PackURI) {
+    if !names.iter().any(|existing| same_name(existing, &name)) {
+        names.push(name);
+    }
+}
+
+fn capture_state(package: &OpcPackage, limits: &Limits, hints: &[PackURI]) -> Result<GraphState> {
+    let ribbons = load(package, limits)?;
+    let families = [
+        ribbons
+            .legacy()
+            .map(|ui| OwnedUi::from_ui(package, ui))
+            .transpose()?,
+        ribbons
+            .modern()
+            .map(|ui| OwnedUi::from_ui(package, ui))
+            .transpose()?,
+    ];
+
+    let mut names = Vec::new();
+    for hint in hints {
+        if package.get_part(hint).is_ok() {
+            push_name(&mut names, hint.clone());
+        }
+    }
+    for ui in families.iter().flatten() {
+        push_name(&mut names, ui.part.clone());
+    }
+
+    // Capture the complete opaque dependency closure of both family parts.
+    // The traversal is bounded by the package's admitted graph; `load` has
+    // already checked the Ribbon image edges, while get_part reports a
+    // malformed missing internal target before any state is published.
+    let mut index = 0usize;
+    while index < names.len() {
+        let name = names[index].clone();
+        index += 1;
+        let part = package.get_part(&name)?;
+        for relationship in part.rels().iter() {
+            if relationship.is_external() {
+                continue;
+            }
+            let target = relationship.target_partname().map_err(|error| {
+                Error::Relationship(format!("invalid Ribbon dependency target: {error}"))
+            })?;
+            package.get_part(&target)?;
+            push_name(&mut names, target);
+        }
+    }
+    names.sort_unstable_by(compare_names);
+
+    let source_limits = package.read_limits();
+    let root_uri = root_uri()?;
+    let root = package.source_relationships(&root_uri, source_limits)?;
+    let retained_root = package.retained_relationships_xml(&root_uri)?;
+    let content_types = package.source_content_types(source_limits)?;
+    let retained_content_types = package.retained_content_types_xml()?;
+    let mut parts = Vec::with_capacity(names.len());
+    for name in names {
+        let part = package.get_part(&name)?;
+        let relationships = package.source_relationships(&name, source_limits)?;
+        parts.push(PartState {
+            name: name.clone(),
+            content_type: part.content_type().to_owned(),
+            bytes: part.blob_arc(),
+            retained_relationships: package.retained_relationships_xml(&name)?,
+            relationships,
+        });
+    }
+    Ok(GraphState {
+        families,
+        root,
+        retained_root,
+        content_types,
+        retained_content_types,
+        parts: parts.into_boxed_slice(),
+    })
+}
+
+fn find_part<'a>(parts: &'a [PartState], wanted: &PackURI) -> Option<&'a PartState> {
+    parts.iter().find(|part| same_name(&part.name, wanted))
+}
+
+fn retained_destination_matches(
+    actual: &Option<(Arc<Vec<u8>>, bool)>,
+    expected: &Option<(Arc<Vec<u8>>, bool)>,
+) -> bool {
+    // A destination token that was authored by the staged edit has no source
+    // provenance to retain. Replay installs it through the checked OPC token
+    // API, which intentionally records the validated bytes as provenance;
+    // that stronger proof is equivalent for publication. A retained source
+    // token, however, must remain byte-identical.
+    expected.is_none() || actual == expected
+}
+
+fn destination_matches(actual: &GraphState, expected: &GraphState) -> bool {
+    if actual.families != expected.families
+        || actual.root != expected.root
+        || actual.content_types != expected.content_types
+        || !retained_destination_matches(&actual.retained_root, &expected.retained_root)
+        || !retained_destination_matches(
+            &actual.retained_content_types,
+            &expected.retained_content_types,
+        )
+        || actual.parts.len() != expected.parts.len()
+    {
+        return false;
+    }
+    actual
+        .parts
+        .iter()
+        .zip(&expected.parts)
+        .all(|(actual, expected)| {
+            actual.name == expected.name
+                && actual.content_type == expected.content_type
+                && actual.bytes == expected.bytes
+                && actual.relationships == expected.relationships
+                && retained_destination_matches(
+                    &actual.retained_relationships,
+                    &expected.retained_relationships,
+                )
+        })
+}
+
+fn remove_part_state(package: &OpcPackage, before: &GraphState, after: &GraphState) -> Result<()> {
+    let removed: Vec<&PackURI> = before
+        .parts
+        .iter()
+        .filter(|part| find_part(&after.parts, &part.name).is_none())
+        .map(|part| &part.name)
+        .collect();
+    for part in before.parts.iter() {
+        if find_part(&after.parts, &part.name).is_some() {
+            continue;
+        }
+        let root_inbound = package.rels().iter().any(|relationship| {
+            !relationship.is_external()
+                && relationship
+                    .target_partname()
+                    .is_ok_and(|target| same_name(&target, &part.name))
+        });
+        let part_inbound = package.iter_parts().any(|source| {
+            if removed
+                .iter()
+                .any(|removed_name| same_name(removed_name, source.partname()))
+            {
+                return false;
+            }
+            source.rels().iter().any(|relationship| {
+                !relationship.is_external()
+                    && relationship
+                        .target_partname()
+                        .is_ok_and(|target| same_name(&target, &part.name))
+            })
+        });
+        if root_inbound || part_inbound {
+            return Err(Error::Relationship(
+                "Ribbon patch leaves an opaque dependency on a removed part".into(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn apply_graph_state(
+    package: &mut OpcPackage,
+    before: &GraphState,
+    after: &GraphState,
+) -> Result<()> {
+    let source_limits = package.read_limits();
+
+    // Add and replace payloads through the source-preserving OPC APIs.  A
+    // Ribbon operation never changes an existing part's content type; a
+    // mismatch is a stale or malformed patch, not an implicit codec rewrite.
+    for target in after.parts.iter() {
+        match find_part(&before.parts, &target.name) {
+            None => package.try_add_owned_xml_part_bytes(
+                target.name.clone(),
+                target.content_type.clone(),
+                Arc::clone(&target.bytes),
+            )?,
+            Some(source) => {
+                if source.content_type != target.content_type {
+                    return Err(Error::Invalid(
+                        "Ribbon patch changes an existing part content type".into(),
+                    ));
+                }
+                if source.bytes.as_slice() != target.bytes.as_slice() {
+                    package.try_replace_owned_xml_part_bytes(
+                        &target.name,
+                        source.bytes.as_slice(),
+                        Arc::clone(&target.bytes),
+                    )?;
+                }
+            },
+        }
+    }
+
+    // Restore each relationship member exactly, including member presence and
+    // retained comments/ordering.  This is deliberately done before removing
+    // parts so newly-added targets are available to the final graph audit.
+    for target in after.parts.iter() {
+        let current = package.source_relationships(&target.name, source_limits)?;
+        let retained = package.retained_relationships_xml(&target.name)?;
+        if current != target.relationships || retained != target.retained_relationships {
+            package.try_replace_relationships(&current, &target.relationships, source_limits)?;
+        }
+    }
+    let current_root = package.source_relationships(&root_uri()?, source_limits)?;
+    let retained_root = package.retained_relationships_xml(&root_uri()?)?;
+    if current_root != after.root || retained_root != after.retained_root {
+        package.try_replace_relationships(&current_root, &after.root, source_limits)?;
+    }
+
+    // The root and retained closure owners now describe the destination graph,
+    // so only an inbound edge outside the captured Ribbon closure can keep an
+    // otherwise removed part alive.
+    remove_part_state(package, before, after)?;
+    for source in before.parts.iter() {
+        if find_part(&after.parts, &source.name).is_none() {
+            let _ = package.remove_part(&source.name);
+        }
+    }
+
+    let current_types = package.source_content_types(source_limits)?;
+    let retained_types = package.retained_content_types_xml()?;
+    if current_types != after.content_types || retained_types != after.retained_content_types {
+        package.try_replace_content_types(
+            current_types.bytes(),
+            &after.content_types,
+            source_limits,
+        )?;
+    }
+    Ok(())
 }
 
 /// A published Ribbon change.
