@@ -81,6 +81,7 @@ class SourceAnchor:
     blob: str
     line: int
     symbol: str
+    symbol_kind: str
 
 
 def _nonempty_string(value: Any, label: str) -> str:
@@ -100,8 +101,9 @@ def _path_string(value: Any, label: str) -> str:
 
 
 def _source_anchor(value: Any, label: str) -> SourceAnchor:
-    if not isinstance(value, dict) or set(value) != {"path", "blob", "line", "symbol"}:
-        raise CoverageError(f"{label} requires path, blob, line and symbol")
+    required = {"path", "blob", "line", "symbol", "symbol_kind"}
+    if not isinstance(value, dict) or set(value) != required:
+        raise CoverageError(f"{label} requires path, blob, line, symbol and symbol_kind")
     path = _path_string(value["path"], f"{label}.path")
     blob = _nonempty_string(value["blob"], f"{label}.blob").lower()
     if not HEX40.fullmatch(blob):
@@ -110,7 +112,14 @@ def _source_anchor(value: Any, label: str) -> SourceAnchor:
     if type(line) is not int or line < 1:
         raise CoverageError(f"{label}.line must be a positive integer")
     symbol = _nonempty_string(value["symbol"], f"{label}.symbol")
-    return SourceAnchor(path, blob, line, symbol)
+    symbol_kind = value["symbol_kind"]
+    if symbol_kind not in {"rust_item", "descriptive"}:
+        raise CoverageError(f"{label}.symbol_kind must be rust_item or descriptive")
+    if symbol_kind == "rust_item":
+        leaf = symbol.rsplit("::", 1)[-1]
+        if not IDENTIFIER.fullmatch(leaf):
+            raise CoverageError(f"{label}.symbol must end in a Rust identifier for rust_item")
+    return SourceAnchor(path, blob, line, symbol, symbol_kind)
 
 
 def _profile(value: Any, index: int) -> Profile:
@@ -261,21 +270,87 @@ def load_manifest(path: Path) -> dict[str, Any]:
     if not isinstance(lanes, list):
         raise CoverageError("lanes must be an array")
     [_lane(value, index) for index, value in enumerate(lanes)]
+    lane_ids = {lane["id"] for lane in lanes}
+    if len(lane_ids) != len(lanes):
+        raise CoverageError("lanes contain duplicate ids")
+    for index, entry in enumerate(parsed_entries):
+        if entry["disposition"] == "active_lane" and entry["lane"] not in lane_ids:
+            raise CoverageError(
+                f"entries[{index}] active lane {entry['lane']!r} is not declared in lanes"
+            )
     manifest["source_commit"] = source_commit
     manifest["_profiles"] = {profile.profile_id: profile for profile in parsed_profiles}
     manifest["_entries"] = {(entry["profile"], entry["path"]): entry for entry in parsed_entries}
     return manifest
 
 
-def _git_blob(root: Path, commit: str, relative_path: str) -> str | None:
+def _git_object(root: Path, commit: str, relative_path: str) -> tuple[str, str] | None:
     result = subprocess.run(
         ["git", "rev-parse", "--verify", f"{commit}:{relative_path}"],
         cwd=root, check=False, capture_output=True, text=True,
     )
     if result.returncode != 0:
         return None
-    blob = result.stdout.strip()
-    return blob if HEX40.fullmatch(blob) else None
+    object_id = result.stdout.strip()
+    if not HEX40.fullmatch(object_id):
+        return None
+    kind = subprocess.run(
+        ["git", "cat-file", "-t", object_id],
+        cwd=root, check=False, capture_output=True, text=True,
+    )
+    object_type = kind.stdout.strip()
+    return (object_id, object_type) if object_type else None
+
+
+def _git_blob(root: Path, commit: str, relative_path: str) -> str | None:
+    resolved = _git_object(root, commit, relative_path)
+    if resolved is None or resolved[1] != "blob":
+        return None
+    return resolved[0]
+
+
+def _git_blob_bytes(root: Path, blob: str) -> bytes | None:
+    result = subprocess.run(
+        ["git", "cat-file", "blob", blob],
+        cwd=root, check=False, capture_output=True,
+    )
+    return result.stdout if result.returncode == 0 else None
+
+
+def _anchor_failure(root: Path, commit: str, label: str, anchor: Mapping[str, Any]) -> str | None:
+    resolved = _git_object(root, commit, anchor["path"])
+    if resolved is None:
+        return f"{label} source {anchor['path']} is missing at {commit}"
+    object_id, object_type = resolved
+    if object_type != "blob":
+        return f"{label} source {anchor['path']} resolves to {object_type}, not a blob"
+    if object_id != anchor["blob"]:
+        return (
+            f"{label} source {anchor['path']} blob {anchor['blob']} != "
+            f"{object_id} at {commit}"
+        )
+    content = _git_blob_bytes(root, object_id)
+    if content is None:
+        return f"{label} source {anchor['path']} blob {object_id} cannot be read"
+    lines = content.splitlines()
+    if anchor["line"] > len(lines):
+        return (
+            f"{label} source {anchor['path']} line {anchor['line']} exceeds "
+            f"the {len(lines)}-line blob at {commit}"
+        )
+    if anchor["symbol_kind"] == "rust_item":
+        line = lines[anchor["line"] - 1].decode("utf-8", errors="replace")
+        leaf = anchor["symbol"].rsplit("::", 1)[-1]
+        declaration = (
+            rf"\b(?:fn|struct|enum|trait|type|const|static|mod)\s+"
+            rf"{re.escape(leaf)}\b"
+        )
+        if not re.search(declaration, line):
+            return (
+                f"{label} source {anchor['path']} line {anchor['line']} does not "
+                f"contain rust item {anchor['symbol']!r}"
+            )
+    return None
 
 
 def _git_head(root: Path) -> str | None:
@@ -294,20 +369,14 @@ def verify_source_anchors(manifest: Mapping[str, Any], root: Path, *, current: b
         return ["cannot resolve a current HEAD for source-anchor verification"]
     for index, entry in enumerate(manifest["entries"]):
         anchor = entry["source"]
-        actual = _git_blob(root, commit, anchor["path"])
-        if actual != anchor["blob"]:
-            failures.append(
-                f"entries[{index}] {entry['path']} source {anchor['path']} blob "
-                f"{anchor['blob']} != {actual or 'missing'} at {commit}"
-            )
+        failure = _anchor_failure(root, commit, f"entries[{index}] {entry['path']}", anchor)
+        if failure:
+            failures.append(failure)
     for index, lane in enumerate(manifest["lanes"]):
         anchor = lane["source"]
-        actual = _git_blob(root, commit, anchor["path"])
-        if actual != anchor["blob"]:
-            failures.append(
-                f"lanes[{index}] {lane['id']} source {anchor['path']} blob "
-                f"{anchor['blob']} != {actual or 'missing'} at {commit}"
-            )
+        failure = _anchor_failure(root, commit, f"lanes[{index}] {lane['id']}", anchor)
+        if failure:
+            failures.append(failure)
     return failures
 
 
@@ -477,6 +546,7 @@ def validate_manifest(manifest: Mapping[str, Any], *, root: Path,
         "profile_mismatches": [],
         "missing_workspace_packages": [],
         "missing_inputs": [],
+        "extra_inputs": sorted(set(rustdoc) - set(declared)),
         "loaded_profiles": [],
         "callable_counts": {},
         "unclassified": [],
@@ -556,7 +626,7 @@ def validate_manifest(manifest: Mapping[str, Any], *, root: Path,
     report["complete"] = not any(
         report[key] for key in (
             "missing_profiles", "missing_workspace_packages",
-            "profile_mismatches", "missing_inputs", "unclassified", "stale_entries", "signature_failures",
+            "profile_mismatches", "missing_inputs", "extra_inputs", "unclassified", "stale_entries", "signature_failures",
             "source_failures", "current_source_failures", "active_entries", "active_lanes",
         )
     ) and manifest["coverage"]["state"] == "complete"

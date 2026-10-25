@@ -82,6 +82,7 @@ def entry(path: str, kind: str, disposition: str, *, signature=None) -> dict:
             "blob": "a" * 40,
             "line": 1,
             "symbol": path.rsplit("::", 1)[-1],
+            "symbol_kind": "rust_item",
         },
         "evidence": "synthetic rustdoc fixture evidence",
     }
@@ -109,6 +110,23 @@ def manifest(entries: list[dict], *, state: str = "complete") -> dict:
         "entries": entries,
         "lanes": [],
     }
+    for item in entries:
+        if item["disposition"] != "active_lane":
+            continue
+        value["lanes"].append({
+            "id": item["lane"],
+            "package": "fixture",
+            "scope": "fixture",
+            "disposition": "active_lane",
+            "source": {
+                "path": "crates/fixture/src/lib.rs",
+                "blob": "a" * 40,
+                "line": 1,
+                "symbol": "lane-anchor",
+                "symbol_kind": "descriptive",
+            },
+            "evidence": "synthetic active lane",
+        })
     return value
 
 
@@ -122,28 +140,34 @@ class RawApiCoverageTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def loaded(self, value: dict, *, require_complete: bool = False) -> dict:
-        path = self.root / "manifest.json"
-        path.write_text(json.dumps(value), encoding="utf-8")
-        loaded = coverage.load_manifest(path)
+    def loaded(self, value: dict, *, require_complete: bool = False,
+               extra_rustdoc: bool = False) -> dict:
+        manifest_path = self.root / "manifest.json"
+        manifest_path.write_text(json.dumps(value), encoding="utf-8")
+        loaded = coverage.load_manifest(manifest_path)
         rustdoc = self.root / "fixture.json"
         rustdoc.write_text(json.dumps(rustdoc_fixture()), encoding="utf-8")
+        bindings = {"fixture-profile": rustdoc}
+        if extra_rustdoc:
+            bindings["extra-profile"] = rustdoc
         return coverage.validate_manifest(
             loaded, root=self.root, glossary_path=self.glossary,
-            rustdoc={"fixture-profile": rustdoc},
-            require_complete=require_complete, verify_sources=False,
+            rustdoc=bindings, require_complete=require_complete,
+            verify_sources=False,
         )
+
+    @staticmethod
+    def raw_signature(limits_type: str = "fixture::SourceLimits") -> dict:
+        return {
+            "inputs": ["data", "limits"],
+            "limits_argument": "limits",
+            "limits_type": limits_type,
+        }
 
     def test_exact_census_accepts_registered_raw_signature_and_semantic_anchor(self) -> None:
         value = manifest([
-            entry(
-                "fixture::parse", "raw_function", "required_raw_limits",
-                signature={
-                    "inputs": ["data", "limits"],
-                    "limits_argument": "limits",
-                    "limits_type": "fixture::SourceLimits",
-                },
-            ),
+            entry("fixture::parse", "raw_function", "required_raw_limits",
+                  signature=self.raw_signature()),
             entry("fixture::describe", "semantic_method", "semantic_value"),
         ])
         report = self.loaded(value, require_complete=True)
@@ -154,11 +178,7 @@ class RawApiCoverageTests(unittest.TestCase):
     def test_missing_callable_is_unclassified_even_when_name_is_not_raw(self) -> None:
         value = manifest([entry(
             "fixture::parse", "raw_function", "required_raw_limits",
-            signature={
-                "inputs": ["data", "limits"],
-                "limits_argument": "limits",
-                "limits_type": "fixture::SourceLimits",
-            },
+            signature=self.raw_signature(),
         )])
         report = self.loaded(value)
         self.assertEqual(report["unclassified"], ["fixture-profile::fixture::describe"])
@@ -166,14 +186,8 @@ class RawApiCoverageTests(unittest.TestCase):
 
     def test_raw_signature_type_mismatch_fails_closed(self) -> None:
         value = manifest([
-            entry(
-                "fixture::parse", "raw_function", "required_raw_limits",
-                signature={
-                    "inputs": ["data", "limits"],
-                    "limits_argument": "limits",
-                    "limits_type": "fixture::WrongLimits",
-                },
-            ),
+            entry("fixture::parse", "raw_function", "required_raw_limits",
+                  signature=self.raw_signature("fixture::WrongLimits")),
             entry("fixture::describe", "semantic_method", "semantic_value"),
         ])
         report = self.loaded(value)
@@ -181,26 +195,30 @@ class RawApiCoverageTests(unittest.TestCase):
         self.assertIn("limits type identity", report["signature_failures"][0])
 
     def test_active_lane_and_incomplete_state_fail_final_mode(self) -> None:
-        active = entry("fixture::describe", "raw_function", "active_lane")
+        active = entry("fixture::describe", "semantic_method", "active_lane")
         active["lane"] = "0362ul-test"
-        value = manifest([active], state="incomplete")
+        value = manifest([active])
+        value["lanes"] = []
+        value["lanes"].append({
+            "id": "0362ul-test", "package": "fixture", "scope": "fixture",
+            "disposition": "active_lane",
+            "source": {
+                "path": "crates/fixture/src/lib.rs", "blob": "a" * 40,
+                "line": 1, "symbol": "lane-anchor", "symbol_kind": "descriptive",
+            },
+            "evidence": "synthetic active lane",
+        })
+        value["coverage"]["state"] = "incomplete"
         report = self.loaded(value, require_complete=True)
         self.assertFalse(report["complete"])
         self.assertEqual(report["active_entries"], ["fixture-profile::fixture::describe"])
         self.assertIn("failure", report)
 
     def test_private_removed_is_stale_if_rustdoc_still_exports_it(self) -> None:
-        removed = entry("fixture::describe", "removed_callable", "private_removed")
         value = manifest([
-            entry(
-                "fixture::parse", "raw_function", "required_raw_limits",
-                signature={
-                    "inputs": ["data", "limits"],
-                    "limits_argument": "limits",
-                    "limits_type": "fixture::SourceLimits",
-                },
-            ),
-            removed,
+            entry("fixture::parse", "raw_function", "required_raw_limits",
+                  signature=self.raw_signature()),
+            entry("fixture::describe", "removed_callable", "private_removed"),
         ])
         report = self.loaded(value)
         self.assertEqual(report["stale_entries"], [
@@ -214,10 +232,27 @@ class RawApiCoverageTests(unittest.TestCase):
             path.write_text(json.dumps(value), encoding="utf-8")
             coverage.load_manifest(path)
 
-    def test_source_identity_checker_detects_tampering(self) -> None:
-        # The repository source check is exercised against this checkout's
-        # immutable HEAD; the manifest fixture remains source-disabled above
-        # so the callable tests do not depend on a complete checkout.
+    def test_extra_rustdoc_binding_cannot_make_final_mode_pass(self) -> None:
+        value = manifest([
+            entry("fixture::parse", "raw_function", "required_raw_limits",
+                  signature=self.raw_signature()),
+            entry("fixture::describe", "semantic_method", "semantic_value"),
+        ])
+        report = self.loaded(value, require_complete=True, extra_rustdoc=True)
+        self.assertEqual(report["extra_inputs"], ["extra-profile"])
+        self.assertFalse(report["complete"])
+
+    def test_undeclared_active_lane_is_rejected(self) -> None:
+        active = entry("fixture::describe", "semantic_method", "active_lane")
+        active["lane"] = "0362ul-missing"
+        value = manifest([active])
+        value["lanes"] = []
+        path = self.root / "manifest.json"
+        path.write_text(json.dumps(value), encoding="utf-8")
+        with self.assertRaises(coverage.CoverageError):
+            coverage.load_manifest(path)
+
+    def test_source_anchor_requires_blob_bounds_and_verified_symbol(self) -> None:
         root = Path(__file__).resolve().parents[1]
         head = coverage._git_head(root)
         self.assertIsNotNone(head)
@@ -226,27 +261,44 @@ class RawApiCoverageTests(unittest.TestCase):
         value = manifest([])
         value["source_commit"] = head
         value["lanes"] = [{
-            "id": "test-source",
-            "package": "fixture",
-            "scope": "fixture",
+            "id": "test-source", "package": "fixture", "scope": "fixture",
             "disposition": "active_lane",
             "source": {
-                "path": "tools/check_api_glossary.py",
-                "blob": blob,
-                "line": 1,
-                "symbol": "module",
+                "path": "tools/check_api_glossary.py", "blob": blob,
+                "line": 1, "symbol": "module", "symbol_kind": "descriptive",
             },
             "evidence": "source identity test",
         }]
         path = self.root / "manifest.json"
         path.write_text(json.dumps(value), encoding="utf-8")
         loaded = coverage.load_manifest(path)
-        failures = coverage.verify_source_anchors(loaded, root)
-        self.assertEqual(failures, [])
+        self.assertEqual(coverage.verify_source_anchors(loaded, root), [])
+
         loaded["lanes"][0]["source"]["blob"] = "c" * 40
-        failures = coverage.verify_source_anchors(loaded, root)
-        self.assertEqual(len(failures), 1)
-        self.assertIn("source tools/check_api_glossary.py blob", failures[0])
+        self.assertIn("blob", coverage.verify_source_anchors(loaded, root)[0])
+        loaded["lanes"][0]["source"]["blob"] = blob
+        loaded["lanes"][0]["source"]["line"] = 999999
+        self.assertIn("exceeds", coverage.verify_source_anchors(loaded, root)[0])
+
+        loaded["lanes"][0]["source"]["line"] = 1
+        loaded["lanes"][0]["source"]["symbol"] = "not_the_function"
+        loaded["lanes"][0]["source"]["symbol_kind"] = "rust_item"
+        self.assertIn("does not contain rust item", coverage.verify_source_anchors(loaded, root)[0])
+
+        tree = coverage._git_object(root, head, "tools")
+        self.assertIsNotNone(tree)
+        loaded["lanes"][0]["source"]["path"] = "tools"
+        loaded["lanes"][0]["source"]["blob"] = tree[0]
+        loaded["lanes"][0]["source"]["symbol_kind"] = "descriptive"
+        self.assertIn("not a blob", coverage.verify_source_anchors(loaded, root)[0])
+
+    def test_source_anchor_schema_requires_symbol_kind(self) -> None:
+        value = manifest([entry("fixture::describe", "semantic_method", "semantic_value")])
+        value["entries"][0]["source"].pop("symbol_kind")
+        path = self.root / "manifest.json"
+        path.write_text(json.dumps(value), encoding="utf-8")
+        with self.assertRaises(coverage.CoverageError):
+            coverage.load_manifest(path)
 
 
 if __name__ == "__main__":
