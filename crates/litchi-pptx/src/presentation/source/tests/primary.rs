@@ -216,20 +216,21 @@ fn removal_dependent_then_insertion_respects_exact_selected_part_limit() {
         .unwrap()
         .to_owned();
 
-    // The removed slide contributes one exclusive notes Part.  Removal and
-    // insertion therefore finish at source_parts - 1, while the selected
-    // ingress policy still legitimately admits the original source_parts.
+    // The removed slide contributes one exclusive notes Part.  Two inserted
+    // dependency-free slides exactly replace the removed slide and dependent,
+    // so the final catalog remains at the selected original source_parts.
     let mut edit = source.edit().unwrap();
     assert!(edit.remove_slide(Position::new(0)).unwrap());
     edit.insert_slide(Position::new(0), &layout_name).unwrap();
+    edit.insert_slide(Position::new(1), &layout_name).unwrap();
     let candidate = edit.commit().unwrap().into_package();
     let output = candidate.to_bytes().unwrap();
     let output_catalog =
         litchi_opc::OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
-    assert_eq!(output_catalog.iter_parts().count(), source_parts - 1);
+    assert_eq!(output_catalog.iter_parts().count(), source_parts);
 
     let final_limits = SourceLimits::builder()
-        .max_parts(source_parts - 1)
+        .max_parts(source_parts)
         .unwrap()
         .build()
         .unwrap();
@@ -256,7 +257,7 @@ fn removal_dependent_then_insertion_respects_exact_selected_part_limit() {
         Err(crate::Error::EditLimit {
             kind: crate::opened::LimitKind::Parts,
             maximum,
-        }) if maximum == source_parts - 1
+        }) if maximum == source_parts
     ));
     assert!(rejected.commit().unwrap().patch().is_noop());
     assert_eq!(reopened.to_bytes().unwrap(), output);

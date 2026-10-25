@@ -22,12 +22,13 @@ than charging an exclusive notes/media Part that has already left the output.
 
 The source integration regression builds a slide with an exclusive notes Part,
 opens it under the exact original Part ceiling, removes that slide and inserts
-a dependency-free replacement, serializes and reopens the result, and checks
-the final catalog count.  It then reopens under the adjacent exact final
-ceiling and verifies the next insertion is refused atomically.  A policy below
-the original physical catalog is not used for ingress: source admission itself
-must accept every original Part, so the tighter adjacent policy is selected
-only after the first output is reopened.
+two dependency-free replacements in the same topology revision, serializes
+and reopens the result, and checks the final catalog count.  This exact-bound
+case is rejected by the former slide-only estimate on the second insertion.
+The reopened final catalog is then tested at its exact original ceiling and a
+third insertion is refused atomically.  A policy below the original physical
+catalog is not used for ingress: source admission itself must accept every
+original Part.
 
 No Cargo, native tools, or performance capture were run in this source-only
 return.
