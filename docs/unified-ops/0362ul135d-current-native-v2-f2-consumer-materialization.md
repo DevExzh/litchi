@@ -88,7 +88,7 @@ cargo build --offline --locked --target x86_64-unknown-linux-gnu --release \
   --features rtf-legacy-api --example refusal_contract_bench
 
 cargo build --offline --locked --target x86_64-unknown-linux-gnu --release \
-  --example scoped_patch_probe --example scoped_patch_correctness \
+  -p litchi-ppt --example scoped_patch_probe --example scoped_patch_correctness \
   --all-features
 ```
 
