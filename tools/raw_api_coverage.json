@@ -29,7 +29,8 @@
         "CARGO_TERM_COLOR": "never",
         "LITCHI_CAPPED": "",
         "LITCHI_GATE_ATTEMPT": "f5",
-        "RUSTDOCFLAGS": ""
+        "RUSTDOCFLAGS": "",
+        "PYTHONDONTWRITEBYTECODE": "1"
       },
       "guards": {
         "target_pre_max_bytes": 18000000000,

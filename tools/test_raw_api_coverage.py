@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import json
 import hashlib
+import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -440,6 +442,26 @@ class RawApiCoverageTests(unittest.TestCase):
     def test_receipt_argument_rejects_duplicate_profiles(self) -> None:
         with self.assertRaises(coverage.CoverageError):
             coverage.parse_receipt_args(["fixture-profile=a", "fixture-profile=b"])
+
+    def test_direct_cli_does_not_create_bytecode_before_overlay_scan(self) -> None:
+        source = Path(self.tmp.name) / "cli-source"
+        tools = source / "tools"
+        tools.mkdir(parents=True)
+        for name in ("raw_api_coverage.py", "check_api_glossary.py", "rustdoc_return_types.py",
+                     "raw_api_coverage.json", "api_glossary.json"):
+            shutil.copyfile(Path(__file__).with_name(name), tools / name)
+        environment = os.environ.copy()
+        environment.pop("PYTHONDONTWRITEBYTECODE", None)
+        result = subprocess.run(
+            [
+                sys.executable, os.fspath(tools / "raw_api_coverage.py"),
+                "--root", os.fspath(source), "--manifest", os.fspath(tools / "raw_api_coverage.json"),
+                "--glossary", os.fspath(tools / "api_glossary.json"), "--json",
+            ], cwd=source, env=environment, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((tools / "__pycache__").exists())
+        self.assertEqual(coverage.CAPTURE_POLICY_ENV["PYTHONDONTWRITEBYTECODE"], "1")
 
     def test_exact_census_accepts_registered_raw_signature_and_semantic_anchor(self) -> None:
         value = manifest([

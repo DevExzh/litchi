@@ -31,8 +31,13 @@ import re
 from pathlib import Path
 import stat
 import subprocess
+import sys
 import tomllib
 from typing import Any, Iterable, Mapping
+
+# The source-overlay validator must not create an ignored pyc while importing
+# its local policy modules.  Final capture receipts also bind this setting.
+sys.dont_write_bytecode = True
 
 try:
     from . import check_api_glossary as glossary_gate
@@ -58,6 +63,7 @@ CAPTURE_POLICY_ENV = {
     "LITCHI_CAPPED": "",
     "LITCHI_GATE_ATTEMPT": "f5",
     "RUSTDOCFLAGS": "",
+    "PYTHONDONTWRITEBYTECODE": "1",
 }
 CAPTURE_POLICY_GUARDS = {
     "target_pre_max_bytes": 18_000_000_000,
