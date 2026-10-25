@@ -7276,7 +7276,6 @@ mod tests {
         let commit = edit.commit_checked().unwrap();
         assert!(commit.is_changed());
         drop(commit);
-        drop(edit);
         drop(editor);
         assert_eq!(budget.used(Resource::Memory), 0);
     }
