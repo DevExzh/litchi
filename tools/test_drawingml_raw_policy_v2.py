@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 import sys
 
@@ -51,6 +52,54 @@ class DrawingMlRawPolicyV2Tests(unittest.TestCase):
                 hashlib.sha256(destination.read_bytes()).hexdigest(),
                 policy.HISTORICAL_SOURCE_SHA256,
             )
+
+    def test_prepare_validates_trusted_blob_before_copying_routes(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="dml-policy-v2-order-") as name:
+            root = Path(name)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            untrusted = root / "untrusted"
+            self._git_repo(baseline, {"README": b"baseline\n"})
+            self._git_repo(candidate, {"README": b"candidate\n"})
+            self._git_repo(untrusted, {"README": b"not the trusted source\n"})
+            candidate_revision = subprocess.check_output(
+                ["git", "-C", str(candidate), "rev-parse", "HEAD"], text=True
+            ).strip()
+            fake_binding = {
+                "status": "bound",
+                "revision": candidate_revision,
+                "manifests": dict.fromkeys(policy.CANDIDATE_MANIFEST_PATHS, {}),
+                "vendor_tree": {"sha256": "a" * 64, "files": 1, "bytes": 1},
+            }
+            with (
+                mock.patch.object(policy, "CANDIDATE_BINDING", fake_binding),
+                mock.patch.object(policy, "_candidate_identity", return_value={}),
+                mock.patch.object(policy, "_baseline_identity", return_value={}),
+                mock.patch.object(policy, "_copy_probe_paths") as copy_routes,
+            ):
+                with self.assertRaises(policy.PreparationError):
+                    policy.prepare(
+                        baseline,
+                        candidate,
+                        next(iter(policy.APPROVED_BASELINE_REVISIONS)),
+                        candidate_revision,
+                        untrusted,
+                        root / "receipt.json",
+                    )
+            copy_routes.assert_not_called()
+            self.assertFalse((baseline / policy.HISTORICAL_SOURCE_PATH).exists())
+
+    def test_tampered_historical_library_is_rejected_at_identity_validation(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="dml-policy-v2-tampered-") as name:
+            root = Path(name)
+            self._git_repo(
+                root,
+                {policy.HISTORICAL_SOURCE_PATH: b"tampered historical source\n"},
+            )
+            with self.assertRaisesRegex(
+                policy.PreparationError, "materialized historical library SHA-256 differs"
+            ):
+                policy._historical_library_identity(root)
 
     def test_candidate_policy_is_honestly_incomplete_and_fails_before_mutation(self) -> None:
         self.assertIsNone(policy.CANDIDATE_BINDING)

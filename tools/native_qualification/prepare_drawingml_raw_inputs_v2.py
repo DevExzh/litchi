@@ -245,6 +245,26 @@ def _file_identity(root: Path, relative: str) -> dict[str, Any]:
     }
 
 
+def _historical_library_identity(root: Path) -> dict[str, Any]:
+    """Require the materialized historical file to match the fixed blob."""
+
+    identity = _file_identity(root, HISTORICAL_SOURCE_PATH)
+    payload = (root / HISTORICAL_SOURCE_PATH).read_bytes()
+    _expect(
+        identity["sha256"] == HISTORICAL_SOURCE_SHA256,
+        "materialized historical library SHA-256 differs",
+    )
+    _expect(
+        identity["bytes"] == HISTORICAL_SOURCE_BYTES,
+        "materialized historical library byte count differs",
+    )
+    _expect(
+        _git_blob_sha1(payload) == HISTORICAL_SOURCE_BLOB_SHA1,
+        "materialized historical library Git blob differs",
+    )
+    return identity
+
+
 def _lock_identities(root: Path, role: str) -> dict[str, dict[str, Any]]:
     _expect(role in {"baseline", "candidate"}, f"unknown lock role: {role}")
     result: dict[str, dict[str, Any]] = {}
@@ -355,21 +375,42 @@ def _trusted_historical_payload(trusted_root: Path) -> tuple[bytes, dict[str, An
     }
 
 
-def materialize_historical_library(trusted_root: Path, baseline_root: Path) -> dict[str, Any]:
+def materialize_historical_library(
+    trusted_root: Path,
+    baseline_root: Path,
+    *,
+    payload: bytes | None = None,
+    source: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Write the fixed historical blob and return its source-bound receipt."""
 
     baseline_root = _root(baseline_root)
-    payload, source = _trusted_historical_payload(trusted_root)
+    if payload is None:
+        payload, trusted_source = _trusted_historical_payload(trusted_root)
+    else:
+        trusted_source = dict(source or {})
+        _expect(
+            trusted_source
+            == {
+                "ref": HISTORICAL_SOURCE_REF,
+                "path": HISTORICAL_SOURCE_PATH,
+                "blob_sha1": HISTORICAL_SOURCE_BLOB_SHA1,
+                "sha256": HISTORICAL_SOURCE_SHA256,
+                "bytes": HISTORICAL_SOURCE_BYTES,
+            },
+            "preflight historical source identity differs",
+        )
+        _expect(len(payload) == HISTORICAL_SOURCE_BYTES, "preflight historical library byte count differs")
+        _expect(_sha256_bytes(payload) == HISTORICAL_SOURCE_SHA256, "preflight historical library SHA-256 differs")
+        _expect(_git_blob_sha1(payload) == HISTORICAL_SOURCE_BLOB_SHA1, "preflight historical library Git blob differs")
     target = baseline_root / HISTORICAL_SOURCE_PATH
     _reject_symlink_components(target, "historical library destination")
     _expect(not target.is_symlink(), f"historical library destination is a symlink: {target}")
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(payload)
-    observed = _file_identity(baseline_root, HISTORICAL_SOURCE_PATH)
-    _expect(observed["sha256"] == HISTORICAL_SOURCE_SHA256, "materialized historical library changed")
-    _expect(observed["bytes"] == HISTORICAL_SOURCE_BYTES, "materialized historical library size changed")
+    observed = _historical_library_identity(baseline_root)
     return {
-        "trusted": source,
+        "trusted": trusted_source,
         "destination": observed,
     }
 
@@ -419,19 +460,33 @@ def _candidate_identity(root: Path, binding: Mapping[str, Any]) -> dict[str, Any
     }
 
 
-def _baseline_identity(root: Path, baseline_revision: str) -> dict[str, Any]:
+def _baseline_identity(
+    root: Path,
+    baseline_revision: str,
+    *,
+    require_historical_library: bool = True,
+) -> dict[str, Any]:
     root = _root(root)
     _expect(baseline_revision in APPROVED_BASELINE_REVISIONS, "baseline revision is not an approved DrawingML source fence")
     _expect(_head(root) == baseline_revision, "baseline HEAD differs from the selected source fence")
     status = _status_paths(root)
     _expect(set(status).issubset(ALLOWED_BASELINE_DIRTY_PATHS), f"baseline changed outside v2 adapter paths: {status!r}")
     locks = _lock_identities(root, "baseline")
+    if require_historical_library:
+        historical_library = _historical_library_identity(root)
+    else:
+        historical_path = root / HISTORICAL_SOURCE_PATH
+        historical_library = (
+            _file_identity(root, HISTORICAL_SOURCE_PATH)
+            if historical_path.is_file() and not historical_path.is_symlink()
+            else {"path": HISTORICAL_SOURCE_PATH, "missing": True}
+        )
     return {
         "root": str(root),
         "head": baseline_revision,
         "status_paths": list(status),
         "locks": locks,
-        "historical_library": _file_identity(root, HISTORICAL_SOURCE_PATH),
+        "historical_library": historical_library,
         "probe_paths": {path: _file_identity(root, path) for path in PROBE_COPY_PATHS},
     }
 
@@ -474,9 +529,21 @@ def prepare(
     baseline_root = _root(baseline_root)
     _expect(candidate_root != baseline_root, "baseline and candidate roots must differ")
     _candidate_identity(candidate_root, binding)
-    _baseline_identity(baseline_root, baseline_revision)
+    _baseline_identity(
+        baseline_root,
+        baseline_revision,
+        require_historical_library=False,
+    )
+    # Verify the trusted object before copying even one candidate route file.
+    # A missing ref/blob must leave the baseline worktree untouched.
+    historical_payload, historical_source = _trusted_historical_payload(trusted_root)
     _copy_probe_paths(candidate_root, baseline_root)
-    historical = materialize_historical_library(trusted_root, baseline_root)
+    historical = materialize_historical_library(
+        trusted_root,
+        baseline_root,
+        payload=historical_payload,
+        source=historical_source,
+    )
     baseline = _baseline_identity(baseline_root, baseline_revision)
     _expect(
         set(baseline["status_paths"]).issubset(ALLOWED_BASELINE_DIRTY_PATHS),
@@ -514,6 +581,7 @@ def validate_preparation_receipt(
     candidate_root: Path,
     baseline_revision: str,
     candidate_revision: str,
+    trusted_root: Path,
 ) -> dict[str, Any]:
     """Validate a v2 receipt against the still-bound source pair."""
 
@@ -531,6 +599,7 @@ def validate_preparation_receipt(
     _expect(receipt.get("candidate_policy") == _receipt_policy(binding), "candidate policy receipt differs")
     _expect(receipt.get("baseline_revision") == baseline_revision, "baseline revision receipt differs")
     _expect(receipt.get("candidate_revision") == candidate_revision, "candidate revision receipt differs")
+    _, trusted_source = _trusted_historical_payload(trusted_root)
     expected_trusted = {
         "ref": HISTORICAL_SOURCE_REF,
         "path": HISTORICAL_SOURCE_PATH,
@@ -539,7 +608,8 @@ def validate_preparation_receipt(
         "bytes": HISTORICAL_SOURCE_BYTES,
     }
     _expect(
-        receipt.get("historical_source", {}).get("trusted") == expected_trusted,
+        receipt.get("historical_source", {}).get("trusted") == expected_trusted
+        and trusted_source == expected_trusted,
         "historical trusted source receipt differs",
     )
     destination = receipt.get("historical_source", {}).get("destination")
