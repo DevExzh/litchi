@@ -5137,3 +5137,34 @@ See [0063](0063-source-pptx-modern-comments.md).
   validation. Cleanup wave 60 reclaimed 7,873,409,024 allocated bytes after
   final quarantine overhead; wave 61 is read-only preflight for the merged
   ODF, VBA and RTF leaves. Integration has no hold. Nothing is pushed.
+
+- Coordinator XLDM integration and cleanup wave 61 (2026-10-25):
+  XLDM atomic `c2495b728f` merges at `11d14a661d`. Root verifies the full
+  31-path change set and all 29 non-shared leaf blobs; the package/glossary
+  merges retain sibling changes and all 67 profiles. All 89 selected
+  glossary, inventory, census and fixture-guard tests pass. A fresh detached
+  composed compiler capture is being prepared; native and performance
+  acceptance remain open.
+
+  Formula's missing row receipts are confirmed. Three fresh actual guarded
+  rows on `c937149a3b` now pass with saved manifests and per-row receipts:
+  Formula tests, affected DOC/DOCX/ops/facade consumers, and strict Clippy.
+  Root verifies source, locks, runner, every log and trace, target guards and
+  empty terminal ownership. Peak target usage is 5,479,852,530 bytes. The
+  earlier child logs remain historical evidence without reconstructed state;
+  the complete atomic Formula proposal is being prepared.
+
+  Cleanup wave 61 removes the merged ODF, VBA and RTF worktrees non-forced,
+  retaining their source/tested/receipt/atomic refs and external validation
+  evidence. Thirteen ignored files pass same-device sparse restoration with
+  hashes, modes and inodes preserved. Root independently verifies the receipt;
+  conservative net reclamation is 15,193,243,648 allocated bytes after all
+  final quarantine overhead. Record 0362ul83 retains the exact evidence.
+  The temporary integration and trunk holds are released.
+
+  PPTX structural metadata 81 is committed and undergoing independent source
+  review. Returns 61e/62c and history metadata 82 remain active. Review found
+  processing-instruction offset and repeated-node-scan issues in collaboration
+  replay; notes/media aggregates also still need affected-scope accounting.
+  Those findings remain required engineering work. No complete gate, census,
+  native or performance acceptance is claimed. Nothing is pushed.
