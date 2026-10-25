@@ -85,9 +85,19 @@ pub fn load_math_from_package(
 /// Validate one presentation-properties payload changed by a typed patch
 /// under the recipient's selected policy. The replay engine already checks
 /// the exact before image and relationship graph; only the changed XML part
-/// is parsed here.
-pub(crate) fn validate_replay_part(part: &dyn Part, limits: Limits) -> Result<()> {
+/// is physically scanned and parsed here.
+pub(crate) fn validate_replay_part(
+    part: &dyn Part,
+    limits: Limits,
+    source_limits: litchi_opc::SourceLimits,
+) -> Result<()> {
     if part.content_type() == CONTENT_TYPE {
+        // `Limits` carries the presentation-properties semantic ceilings, but
+        // the retained source profile's event budget is physical: it counts
+        // every XML parser event, including the extension branch that a
+        // typed edit may add. Keep this scan before the vocabulary parser so
+        // MCE or opaque extension content cannot hide that charge.
+        crate::source_limits::validate_xml_limits(part.blob(), source_limits)?;
         Properties::parse_strict(part.blob(), limits).map(drop)
     } else {
         Ok(())

@@ -61,11 +61,15 @@ impl Package {
             self,
             "apply_read_only_recommended",
             |_, target, patch| {
-                let limits = crate::presentation_properties::Limits::from_source_limits(
-                    target.read_limits(),
-                );
+                let source_limits = target.read_limits();
+                let limits =
+                    crate::presentation_properties::Limits::from_source_limits(source_limits);
                 patch.validate_changed_parts(target, |_, part| {
-                    crate::presentation_properties::validate_replay_part(part, limits)
+                    crate::presentation_properties::validate_replay_part(
+                        part,
+                        limits,
+                        source_limits,
+                    )
                 })
             },
         )?;
