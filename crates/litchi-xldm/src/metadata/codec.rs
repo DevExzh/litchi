@@ -16,7 +16,7 @@ use super::super::native::{
     DictionaryBody, DictionaryType, NativeData, NativeFile, StringPageData,
 };
 use super::super::seen_names::SeenNames;
-use super::super::{GeneratedNameKind, Storage, classify_generated_path};
+use super::super::{GeneratedNameKind, Limits, Storage, classify_generated_path};
 use super::model::{
     ColumnPolicy, DictionaryPolicy, HierarchyPolicy, MetadataClass, MetadataCollection,
     MetadataDataObject, MetadataError, MetadataFile, MetadataFileKind, MetadataMember,
@@ -26,13 +26,13 @@ use super::model::{
 use super::model::{hybrid_width, no_split_width};
 use crate::xml_attributes::BytesStartExt as _;
 
-const MAX_METADATA_BYTES: usize = 16 * 1024 * 1024;
-const MAX_XML_NODES: usize = 500_000;
-const MAX_XML_DEPTH: usize = 128;
-const MAX_TEXT_BYTES: usize = 32 * 1024 * 1024;
-const MAX_METADATA_FILES: usize = 65_536;
+pub(crate) const MAX_METADATA_BYTES: usize = 16 * 1024 * 1024;
+pub(crate) const MAX_XML_NODES: usize = 500_000;
+pub(crate) const MAX_XML_DEPTH: usize = 128;
+pub(crate) const MAX_TEXT_BYTES: usize = 32 * 1024 * 1024;
+pub(crate) const MAX_METADATA_FILES: usize = 65_536;
 #[derive(Clone, Debug)]
-struct XmlNode {
+pub(super) struct XmlNode {
     name: String,
     attributes: Vec<(String, String)>,
     children: Vec<XmlNode>,
@@ -40,7 +40,19 @@ struct XmlNode {
 }
 
 /// Parse and validate one section 2.5 `.tbl.xml` member.
-pub fn parse_file<'a>(storage_path: &'a str, bytes: &'a [u8]) -> MetadataResult<MetadataFile<'a>> {
+pub fn parse_file<'a>(
+    storage_path: &'a str,
+    bytes: &'a [u8],
+    limits: &Limits,
+) -> MetadataResult<MetadataFile<'a>> {
+    let limits = limits.validate().map_err(MetadataError::from_error)?;
+    if storage_path.len() > limits.max_path_bytes {
+        return Err(MetadataError::limit(
+            crate::LimitKind::PathBytes,
+            storage_path.len(),
+            limits.max_path_bytes,
+        ));
+    }
     let generated = classify_generated_path(storage_path).map_err(|error| {
         MetadataError::new(format!(
             "invalid generated metadata path {storage_path}: {error}"
@@ -77,7 +89,7 @@ pub fn parse_file<'a>(storage_path: &'a str, bytes: &'a [u8]) -> MetadataResult<
             ));
         },
     };
-    let node = parse_xml(bytes)?;
+    let node = parse_xml(bytes, &limits)?;
     let table = project_object(node)?;
     if table.class.as_str() != "XMSimpleTable" {
         return Err(MetadataError::new("a .tbl.xml root MUST be XMSimpleTable"));
@@ -88,18 +100,36 @@ pub fn parse_file<'a>(storage_path: &'a str, bytes: &'a [u8]) -> MetadataResult<
         bytes,
         kind,
         table,
+        limits,
     })
 }
 
 /// Discover every logged `.tbl.xml` member and derive its section 2.3 policy.
-pub fn inspect<'a>(storage: &'a Storage<'a>) -> MetadataResult<MetadataModel<'a>> {
+pub fn inspect<'a>(storage: &'a Storage<'a>, limits: &Limits) -> MetadataResult<MetadataModel<'a>> {
+    let limits = limits
+        .validate()
+        .map_err(MetadataError::from_error)?
+        .min(storage.limits_value());
     if storage.profile() != super::super::StorageProfile::Xldm140 {
         return Err(MetadataError::new(
             "version-150 compressed logical members require owned inner-model decoding",
         ));
     }
+    let file_hint = storage
+        .backup_log
+        .file_groups
+        .iter()
+        .flat_map(|group| group.files.iter())
+        .filter(|file| file.storage_path.ends_with(".tbl.xml"))
+        .count()
+        .min(limits.max_metadata_files);
     let mut files = Vec::new();
+    files
+        .try_reserve(file_hint)
+        .map_err(|error| MetadataError::allocation("metadata files", error))?;
     let mut seen = HashSet::new();
+    seen.try_reserve(file_hint)
+        .map_err(|error| MetadataError::allocation("metadata paths", error))?;
     for group in &storage.backup_log.file_groups {
         for logged in &group.files {
             let path = logged.storage_path.as_str();
@@ -111,8 +141,12 @@ pub fn inspect<'a>(storage: &'a Storage<'a>) -> MetadataResult<MetadataModel<'a>
                     "duplicate logged metadata member {path}"
                 )));
             }
-            if files.len() == MAX_METADATA_FILES {
-                return Err(MetadataError::new("too many table metadata files"));
+            if files.len() == limits.max_metadata_files {
+                return Err(MetadataError::limit(
+                    crate::LimitKind::MetadataFiles,
+                    files.len() + 1,
+                    limits.max_metadata_files,
+                ));
             }
             let index = storage
                 .files
@@ -126,7 +160,7 @@ pub fn inspect<'a>(storage: &'a Storage<'a>) -> MetadataResult<MetadataModel<'a>
             let bytes = storage.file_payload(index).ok_or_else(|| {
                 MetadataError::new(format!("cannot resolve metadata member {path}"))
             })?;
-            files.push(parse_file(path, bytes)?);
+            files.push(parse_file(path, bytes, &limits)?);
         }
     }
     let (columns, relationships, hierarchies) = derive_policies(&files)?;
@@ -139,17 +173,37 @@ pub fn inspect<'a>(storage: &'a Storage<'a>) -> MetadataResult<MetadataModel<'a>
 }
 
 /// Revalidate an inspected file and return its exact original XML bytes.
-pub fn write_file(file: &MetadataFile<'_>) -> MetadataResult<Vec<u8>> {
-    let reparsed = parse_file(file.storage_path, file.bytes)?;
+pub fn write_file(file: &MetadataFile<'_>, limits: &Limits) -> MetadataResult<Vec<u8>> {
+    let limits = limits
+        .validate()
+        .map_err(MetadataError::from_error)?
+        .min(file.limits_value());
+    if file.bytes.len() > limits.max_output_bytes {
+        return Err(MetadataError::limit(
+            crate::LimitKind::XldmOutputBytes,
+            file.bytes.len(),
+            limits.max_output_bytes,
+        ));
+    }
+    let reparsed = parse_file(file.storage_path, file.bytes, &limits)?;
     if reparsed.kind != file.kind || reparsed.table != file.table {
         return Err(MetadataError::new("metadata object graph was mutated"));
     }
-    Ok(file.bytes.to_vec())
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(file.bytes.len())
+        .map_err(|error| MetadataError::allocation("metadata output", error))?;
+    output.extend_from_slice(file.bytes);
+    Ok(output)
 }
 
-fn parse_xml(bytes: &[u8]) -> MetadataResult<XmlNode> {
-    if bytes.len() > MAX_METADATA_BYTES {
-        return Err(MetadataError::new("metadata XML is too large"));
+pub(super) fn parse_xml(bytes: &[u8], limits: &Limits) -> MetadataResult<XmlNode> {
+    if bytes.len() > limits.max_metadata_bytes {
+        return Err(MetadataError::limit(
+            crate::LimitKind::MetadataBytes,
+            bytes.len(),
+            limits.max_metadata_bytes,
+        ));
     }
     let mut reader = Reader::from_reader(bytes);
     reader.config_mut().check_end_names = true;
@@ -167,14 +221,28 @@ fn parse_xml(bytes: &[u8]) -> MetadataResult<XmlNode> {
                 nodes = nodes
                     .checked_add(1)
                     .ok_or_else(|| MetadataError::new("XML node count overflow"))?;
-                if nodes > MAX_XML_NODES || stack.len() >= MAX_XML_DEPTH {
-                    return Err(MetadataError::new("metadata XML structure limit exceeded"));
+                if nodes > limits.max_metadata_nodes {
+                    return Err(MetadataError::limit(
+                        crate::LimitKind::MetadataNodes,
+                        nodes,
+                        limits.max_metadata_nodes,
+                    ));
+                }
+                if stack.len() >= limits.max_metadata_depth {
+                    return Err(MetadataError::limit(
+                        crate::LimitKind::MetadataDepth,
+                        stack.len() + 1,
+                        limits.max_metadata_depth,
+                    ));
                 }
                 let empty = matches!(event, Event::Empty(_));
                 let node = make_xml_node(element, decoder)?;
                 if empty {
                     attach_node(node, &mut stack, &mut root)?;
                 } else {
+                    stack.try_reserve(1).map_err(|source| {
+                        MetadataError::allocation("metadata XML stack", source)
+                    })?;
                     stack.push(node);
                 }
             },
@@ -190,10 +258,17 @@ fn parse_xml(bytes: &[u8]) -> MetadataResult<XmlNode> {
                 text_bytes = text_bytes
                     .checked_add(decoded.len())
                     .ok_or_else(|| MetadataError::new("XML text size overflow"))?;
-                if text_bytes > MAX_TEXT_BYTES {
-                    return Err(MetadataError::new("metadata XML text limit exceeded"));
+                if text_bytes > limits.max_metadata_text_bytes {
+                    return Err(MetadataError::limit(
+                        crate::LimitKind::MetadataTextBytes,
+                        text_bytes,
+                        limits.max_metadata_text_bytes,
+                    ));
                 }
                 if let Some(node) = stack.last_mut() {
+                    node.text
+                        .try_reserve(decoded.len())
+                        .map_err(|source| MetadataError::allocation("metadata XML text", source))?;
                     node.text.push_str(&decoded);
                 } else if !decoded.trim().is_empty() {
                     return Err(MetadataError::new("text outside metadata root"));
@@ -204,14 +279,20 @@ fn parse_xml(bytes: &[u8]) -> MetadataResult<XmlNode> {
                 text_bytes = text_bytes
                     .checked_add(decoded.len())
                     .ok_or_else(|| MetadataError::new("XML text size overflow"))?;
-                if text_bytes > MAX_TEXT_BYTES {
-                    return Err(MetadataError::new("metadata XML text limit exceeded"));
+                if text_bytes > limits.max_metadata_text_bytes {
+                    return Err(MetadataError::limit(
+                        crate::LimitKind::MetadataTextBytes,
+                        text_bytes,
+                        limits.max_metadata_text_bytes,
+                    ));
                 }
-                stack
+                let node = stack
                     .last_mut()
-                    .ok_or_else(|| MetadataError::new("CDATA outside metadata root"))?
-                    .text
-                    .push_str(&decoded);
+                    .ok_or_else(|| MetadataError::new("CDATA outside metadata root"))?;
+                node.text
+                    .try_reserve(decoded.len())
+                    .map_err(|source| MetadataError::allocation("metadata XML text", source))?;
+                node.text.push_str(&decoded);
             },
             Event::GeneralRef(reference) => {
                 let name = reference.decode().map_err(xml_error)?;
@@ -228,11 +309,23 @@ fn parse_xml(bytes: &[u8]) -> MetadataResult<XmlNode> {
                         _ => None,
                     })
                     .ok_or_else(|| MetadataError::new("custom XML entities are rejected"))?;
-                stack
+                text_bytes = text_bytes
+                    .checked_add(value.len())
+                    .ok_or_else(|| MetadataError::new("XML text size overflow"))?;
+                if text_bytes > limits.max_metadata_text_bytes {
+                    return Err(MetadataError::limit(
+                        crate::LimitKind::MetadataTextBytes,
+                        text_bytes,
+                        limits.max_metadata_text_bytes,
+                    ));
+                }
+                let node = stack
                     .last_mut()
-                    .ok_or_else(|| MetadataError::new("entity outside metadata root"))?
-                    .text
-                    .push_str(&value);
+                    .ok_or_else(|| MetadataError::new("entity outside metadata root"))?;
+                node.text
+                    .try_reserve(value.len())
+                    .map_err(|source| MetadataError::allocation("metadata XML text", source))?;
+                node.text.push_str(&value);
             },
             Event::DocType(_) | Event::PI(_) => {
                 return Err(MetadataError::new(
@@ -262,6 +355,9 @@ fn make_xml_node(
         ));
     }
     let mut attributes = Vec::new();
+    attributes
+        .try_reserve(element.unchecked_attributes().count())
+        .map_err(|source| MetadataError::allocation("metadata XML attributes", source))?;
     // Names borrowed from the tag: checking each one costs O(log n), where
     // scanning `attributes` would cost O(n).
     let mut seen = SeenNames::default();
@@ -296,6 +392,10 @@ fn attach_node(
     root: &mut Option<XmlNode>,
 ) -> MetadataResult<()> {
     if let Some(parent) = stack.last_mut() {
+        parent
+            .children
+            .try_reserve(1)
+            .map_err(|source| MetadataError::allocation("metadata XML children", source))?;
         parent.children.push(node);
     } else if root.replace(node).is_some() {
         return Err(MetadataError::new("multiple metadata XML roots"));
@@ -1622,7 +1722,7 @@ mod tests {
 
     #[test]
     fn duplicate_attribute_names_are_refused_as_before() {
-        let node = parse_xml(b"<e a='1' b='2'/>").unwrap();
+        let node = parse_xml(b"<e a='1' b='2'/>", &Limits::DEFAULT).unwrap();
         assert_eq!(
             node.attributes,
             [
@@ -1630,7 +1730,7 @@ mod tests {
                 ("b".to_owned(), "2".to_owned())
             ]
         );
-        let error = parse_xml(b"<e a='1' b='2' a='3'/>")
+        let error = parse_xml(b"<e a='1' b='2' a='3'/>", &Limits::DEFAULT)
             .unwrap_err()
             .to_string();
         assert!(
@@ -1638,7 +1738,9 @@ mod tests {
             "{error}"
         );
         assert_eq!(
-            parse_xml(b"<e a='1' p:b='2'/>").unwrap_err().to_string(),
+            parse_xml(b"<e a='1' p:b='2'/>", &Limits::DEFAULT)
+                .unwrap_err()
+                .to_string(),
             "metadata namespaces are not allowed"
         );
     }
@@ -1647,7 +1749,7 @@ mod tests {
     fn many_distinct_attribute_names_are_read_in_order() {
         // Scanning the attributes read so far compared ~1.25e9 pairs here.
         let xml = format!("<e{}/>", distinct_attributes(50_000));
-        let node = parse_xml(xml.as_bytes()).unwrap();
+        let node = parse_xml(xml.as_bytes(), &Limits::DEFAULT).unwrap();
         assert_eq!(node.attributes.len(), 50_000);
         for (index, (name, value)) in node.attributes.iter().enumerate() {
             assert_eq!(*name, format!("a{index:05}"));

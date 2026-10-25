@@ -15,7 +15,10 @@ fn unknown_model_profile_is_retained_on_package_write() {
     raw.get_part_mut(&name).unwrap().set_blob(unknown);
     let source = raw.get_part(&name).unwrap();
     assert!(matches!(
-        litchi_xlsx::package::xldm::inspect(source.blob()),
+        litchi_xlsx::package::xldm::inspect(
+            source.blob(),
+            &litchi_xlsx::package::xldm::Limits::DEFAULT,
+        ),
         Err(Error::Unsupported {
             feature: "XLDM header version"
         })
@@ -619,7 +622,7 @@ fn check_native_model_descriptor_round_trip(raw: OpcPackage) {
     use litchi_xlsx::package::xldm::{self, GeneratedNameKind, StorageProfile};
     let name = PackURI::new("/xl/model/item.data").unwrap();
     let source = raw.get_part(&name).unwrap();
-    let storage = xldm::inspect(source.blob()).unwrap();
+    let storage = xldm::inspect(source.blob(), &xldm::Limits::DEFAULT).unwrap();
     assert_eq!(storage.profile(), StorageProfile::Tabular150);
     assert_eq!(storage.files.len(), 48);
     assert_eq!(storage.partition_marker.partition_count, 1);
@@ -643,12 +646,15 @@ fn check_native_model_descriptor_round_trip(raw: OpcPackage) {
             .iter()
             .any(|file| file.generated.normalized_path.contains("Tage heute"))
     );
-    assert_eq!(xldm::write(&storage).unwrap(), source.blob());
+    assert_eq!(
+        xldm::write(&storage, &xldm::Limits::DEFAULT).unwrap(),
+        source.blob()
+    );
     // The borrowed inner codecs cannot decode native compressed members yet.
     // They must not silently classify the hashed storage names as an empty model.
     assert!(xldm::native::inspect(&storage, &Default::default()).is_err());
     assert!(xldm::generated::inspect_system_generated(&storage).is_err());
-    assert!(xldm::metadata::inspect(&storage).is_err());
+    assert!(xldm::metadata::inspect(&storage, &xldm::Limits::DEFAULT).is_err());
     let empty = xldm::metadata::MetadataModel {
         files: vec![],
         columns: vec![],
@@ -853,16 +859,22 @@ fn native_profile_rejects_corrupt_boundaries_frames_and_log_bindings() {
         let mut changed = bytes.to_vec();
         changed[start] = 0;
         repair_native_crc(&mut changed, start, end);
-        assert!(xldm::inspect(&changed).is_err(), "missing owned marker BOM");
+        assert!(
+            xldm::inspect(&changed, &xldm::Limits::DEFAULT).is_err(),
+            "missing owned marker BOM"
+        );
     }
     let mut changed = bytes.to_vec();
     replace_utf16(&mut changed[90112..116674], ">4584<", ">4585<");
-    assert!(xldm::inspect(&changed).is_err(), "overlapping allocations");
+    assert!(
+        xldm::inspect(&changed, &xldm::Limits::DEFAULT).is_err(),
+        "overlapping allocations"
+    );
     let mut changed = bytes.to_vec();
     changed[4584..4586].copy_from_slice(&3878u16.to_le_bytes());
     repair_native_crc(&mut changed, 4584, 5665);
     assert!(
-        xldm::inspect(&changed).is_err(),
+        xldm::inspect(&changed, &xldm::Limits::DEFAULT).is_err(),
         "frame/log size disagreement"
     );
     for (before, after) in [
@@ -881,14 +893,14 @@ fn native_profile_rejects_corrupt_boundaries_frames_and_log_bindings() {
         replace_utf16(&mut changed[51593..88223], before, after);
         repair_native_crc(&mut changed, 51593, 88227);
         assert!(
-            xldm::inspect(&changed).is_err(),
+            xldm::inspect(&changed, &xldm::Limits::DEFAULT).is_err(),
             "invalid native log: {after}"
         );
     }
     let mut changed = bytes.to_vec();
     replace_utf16(&mut changed[..4096], ">150<", ">140<");
     assert!(
-        xldm::inspect(&changed).is_err(),
+        xldm::inspect(&changed, &xldm::Limits::DEFAULT).is_err(),
         "native layout cannot enter canonical profile"
     );
 }

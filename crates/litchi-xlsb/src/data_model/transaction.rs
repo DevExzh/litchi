@@ -168,7 +168,11 @@ impl Edit {
         // The existing typed grouping records are part of the source identity
         // closure.  Refuse an already-invalid source before the inner writer
         // has a chance to produce a repaired-looking candidate.
-        validate_time_groupings(payload.as_slice(), &current.time_groupings)?;
+        validate_time_groupings(
+            payload.as_slice(),
+            &current.time_groupings,
+            self.limits.max_part_bytes,
+        )?;
 
         // Prove and materialize the inner candidate only after the cheap
         // outer name checks above.  The neutral writer validates the XML name
@@ -204,7 +208,11 @@ impl Edit {
         }
         validate_definition(&definition, self.limits)?;
         self.validate_connection_closure(&definition)?;
-        validate_time_groupings(&renamed_payload, &definition.time_groupings)?;
+        validate_time_groupings(
+            &renamed_payload,
+            &definition.time_groupings,
+            self.limits.max_part_bytes,
+        )?;
 
         self.definition = Some(definition.clone());
         self.identity_baseline = Some(definition);
@@ -316,7 +324,11 @@ impl Edit {
                 "cannot edit Data Model time groupings without a model payload",
             ));
         };
-        validate_time_groupings(payload, &definition.time_groupings)
+        validate_time_groupings(
+            payload,
+            &definition.time_groupings,
+            self.limits.max_part_bytes,
+        )
     }
 
     /// Replace the inert payload while retaining typed workbook metadata.
@@ -355,7 +367,11 @@ impl Edit {
                 "cannot replace an opaque XLDM payload after a staged table-identity rename; use the closure-aware table rename or replace the complete model first",
             ));
         }
-        validate_time_groupings(part.bytes(), &definition.time_groupings)?;
+        validate_time_groupings(
+            part.bytes(),
+            &definition.time_groupings,
+            self.limits.max_part_bytes,
+        )?;
         self.payload = Some(Arc::clone(&part.bytes));
         self.payload_edit_kind = PayloadEditKind::OpaqueReplacement;
         Ok(true)
@@ -377,7 +393,11 @@ impl Edit {
                         self.limits.max_part_bytes,
                     ));
                 }
-                validate_time_groupings(model.part.bytes(), &model.definition.time_groupings)?;
+                validate_time_groupings(
+                    model.part.bytes(),
+                    &model.definition.time_groupings,
+                    self.limits.max_part_bytes,
+                )?;
                 ensure_opaque_identity_compatible(
                     self.identity_baseline.as_ref(),
                     &model.definition,
@@ -512,7 +532,11 @@ impl Edit {
                 )?;
             }
             if let Some(after_payload) = self.payload.as_ref() {
-                validate_time_groupings(after_payload, &after_definition.time_groupings)?;
+                validate_time_groupings(
+                    after_payload,
+                    &after_definition.time_groupings,
+                    self.limits.max_part_bytes,
+                )?;
             }
         }
         if before.package().is_signed() || before.package().requires_signature_edit_policy() {
@@ -553,9 +577,13 @@ impl Edit {
     }
 }
 
-fn validate_time_groupings(payload: &[u8], groupings: &[TimeGrouping]) -> Result<()> {
+fn validate_time_groupings(
+    payload: &[u8],
+    groupings: &[TimeGrouping],
+    max_part_bytes: usize,
+) -> Result<()> {
     for grouping in groupings {
-        super::proof::prove_time_grouping(payload, grouping)?;
+        super::proof::prove_time_grouping(payload, grouping, max_part_bytes)?;
     }
     Ok(())
 }
@@ -583,8 +611,9 @@ fn rename_xldm_table_payload(
     new_name: &str,
     max_part_bytes: usize,
 ) -> Result<Vec<u8>> {
-    let storage = litchi_xldm::inspect_shared(payload)
-        .map_err(|error| map_xldm_error("XLDM outer identity proof failed", error))?;
+    let limits = litchi_xldm::Limits::new(max_part_bytes, max_part_bytes);
+    let storage =
+        litchi_xldm::inspect_shared(payload, &limits).map_err(super::proof::map_xldm_error)?;
     if storage.profile() != StorageProfile::Xldm140 {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -592,8 +621,8 @@ fn rename_xldm_table_payload(
             "Data Model table rename requires a complete Xldm140 payload",
         ));
     }
-    let metadata = litchi_xldm::metadata::inspect(&storage)
-        .map_err(|_error| invalid("XLDM metadata identity proof failed"))?;
+    let metadata = litchi_xldm::metadata::inspect(&storage, &limits)
+        .map_err(super::proof::map_xldm_metadata_error)?;
     let native = litchi_xldm::native::inspect(&storage, &metadata.native_parse_options())
         .map_err(|_error| invalid("XLDM native identity proof failed"))?;
     let generated = litchi_xldm::generated::inspect_system_generated(&storage)
@@ -601,7 +630,7 @@ fn rename_xldm_table_payload(
     let olap = litchi_xldm::olap::inspect(&storage, &metadata)
         .map_err(|_error| invalid("XLDM OLAP identity proof failed"))?;
     let olap_proof = prove_xldm140_olap(&storage, &metadata, &olap, OlapProofLimits::default())
-        .map_err(|error| map_xldm_olap_proof_error("XLDM complete OLAP identity proof", error))?;
+        .map_err(super::proof::map_xldm_olap_proof_error)?;
     if !olap_proof.is_complete() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -813,23 +842,6 @@ fn invalid(message: &'static str) -> Error {
     Error::InvalidFormat(message)
 }
 
-fn map_xldm_error(_context: &str, error: litchi_xldm::Error) -> Error {
-    match error {
-        litchi_xldm::Error::Unsupported { feature: _ } => Error::refused(
-            litchi_core::edit::RefusalKind::UnsupportedContent,
-            "edit_data_model",
-            "invalid value",
-        ),
-        litchi_xldm::Error::Allocation { resource, source } => {
-            Error::Allocation { resource, source }
-        },
-        litchi_xldm::Error::Invalid(_message) | litchi_xldm::Error::Xml(_message) => {
-            invalid("invalid value")
-        },
-        _ => invalid("invalid value"),
-    }
-}
-
 fn map_xldm_rename_error(_context: &str, error: Xldm140RenameError) -> Error {
     match error.kind() {
         Xldm140RenameErrorKind::InvalidSource => {
@@ -862,35 +874,6 @@ fn map_xldm_rename_error(_context: &str, error: Xldm140RenameError) -> Error {
             }
         },
         _ => invalid("the Data Model rename source is not valid"),
-    }
-}
-
-fn map_xldm_olap_proof_error(_context: &str, error: litchi_xldm::OlapProofError) -> Error {
-    match error {
-        litchi_xldm::OlapProofError::UnsupportedProfile => Error::refused(
-            litchi_core::edit::RefusalKind::UnsupportedContent,
-            "edit_data_model",
-            "the XLDM OLAP profile is unsupported",
-        ),
-        litchi_xldm::OlapProofError::Limit {
-            kind,
-            observed,
-            maximum,
-        } => Error::limit(super::LimitKind::Model(kind), observed, maximum),
-        litchi_xldm::OlapProofError::Invalid { path: _, detail: _ }
-        | litchi_xldm::OlapProofError::Unproven { path: _, detail: _ } => {
-            invalid("the XLDM OLAP source is invalid or unproven")
-        },
-        litchi_xldm::OlapProofError::Allocation {
-            resource: _,
-            detail: _,
-        } => {
-            // OlapProofError carries only a textual allocation detail, not a
-            // TryReserveError. Preserve that detail without fabricating an
-            // XLSB allocator source; caller-limited rename errors do carry
-            // the real source and are mapped above.
-            invalid("could not reserve XLDM OLAP proof")
-        },
     }
 }
 
@@ -946,8 +929,7 @@ mod integration_limit_tests {
             LimitKind::OutputBytes,
             LimitKind::PathTextBytes,
         ] {
-            let error = map_xldm_olap_proof_error(
-                "proof",
+            let error = crate::data_model::proof::map_xldm_olap_proof_error(
                 litchi_xldm::OlapProofError::Limit {
                     kind,
                     observed: 17,

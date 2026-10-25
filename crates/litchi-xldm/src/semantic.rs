@@ -1,12 +1,13 @@
 //! MS-XLDM semantic projection for backup-log metadata and generated paths.
 
+use super::Limits;
 use super::codec::{
-    bool_value, bounded_leaf, exact_children, i32_value, i64_value, invalid, leaf_text, limit,
+    bool_value, bounded_leaf, exact_children, i32_value, i64_value, invalid, leaf_text,
     valid_upper_guid,
 };
 use super::model::{
-    BackupLog, FileGroup, FileGroupClass, GeneratedPath, LoggedFile, MAX_FILES, MAX_PARTITIONS,
-    Node, StorageProfile, WriteAccess, XmlEncoding,
+    BackupLog, FileGroup, FileGroupClass, GeneratedPath, LoggedFile, Node, StorageProfile,
+    WriteAccess, XmlEncoding,
 };
 use super::tabular_paths::{classify_tabular_source_path, kind_allowed_for_native_group};
 use super::validation::{
@@ -37,6 +38,7 @@ pub(super) fn parse_backup_log(
     root: &Node,
     encoding: XmlEncoding,
     profile: StorageProfile,
+    limits: &Limits,
 ) -> Result<BackupLog> {
     let names = [
         "BackupRestoreSyncVersion",
@@ -56,7 +58,7 @@ pub(super) fn parse_backup_log(
     ];
     let values = exact_children(root, "BackupLog", &names)?;
     let backup_restore_sync_version = parse_backup_restore_sync_version(values[0], profile)?;
-    let server_root = bounded_leaf(values[1], "server root")?;
+    let server_root = bounded_leaf(values[1], "server root", limits.max_path_bytes)?;
     if !bool_value(values[2])? {
         return Err(invalid("backup-log SvrEncryptPwdFlag must be true"));
     }
@@ -79,8 +81,8 @@ pub(super) fn parse_backup_log(
             "backup-log compression flag must be true for the tabular version-150 profile",
         ));
     }
-    let object_name = bounded_leaf(values[7], "object name")?;
-    let object_id = bounded_leaf(values[8], "object id")?;
+    let object_name = bounded_leaf(values[7], "object name", limits.max_path_bytes)?;
+    let object_id = bounded_leaf(values[8], "object id", limits.max_path_bytes)?;
     let write_access = match leaf_text(values[9])? {
         "ReadWrite" => WriteAccess::ReadWrite,
         "ReadOnly" => WriteAccess::ReadOnly,
@@ -94,9 +96,10 @@ pub(super) fn parse_backup_log(
         "Collation",
         "collation",
         profile == StorageProfile::Tabular150,
+        limits,
     )?;
-    let languages = parse_languages(values[12])?;
-    let file_groups = parse_file_groups(values[13], profile, &server_root)?;
+    let languages = parse_languages(values[12], limits)?;
+    let file_groups = parse_file_groups(values[13], profile, &server_root, limits)?;
     Ok(BackupLog {
         backup_restore_sync_version,
         server_root,
@@ -136,6 +139,7 @@ fn parse_repeated_strings(
     child: &str,
     label: &str,
     allow_empty: bool,
+    limits: &Limits,
 ) -> Result<Vec<String>> {
     if node.name != root
         || node.attributes != 0
@@ -144,16 +148,25 @@ fn parse_repeated_strings(
     {
         return Err(invalid(format!("{root} must contain at least one {child}")));
     }
-    if node.children.len() > MAX_FILES {
-        return Err(limit(label));
+    if node.children.len() > limits.max_files {
+        return Err(crate::error::limit(
+            crate::LimitKind::Files,
+            node.children.len(),
+            limits.max_files,
+        ));
     }
     let mut seen = HashSet::new();
-    let mut output = Vec::with_capacity(node.children.len());
+    seen.try_reserve(node.children.len())
+        .map_err(|source| crate::error::allocation("MS-XLDM collation names", source))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(node.children.len())
+        .map_err(|source| crate::error::allocation("MS-XLDM collations", source))?;
     for value in &node.children {
         if value.name != child {
             return Err(invalid(format!("unexpected child in {root}")));
         }
-        let value = bounded_leaf(value, label)?;
+        let value = bounded_leaf(value, label, limits.max_path_bytes)?;
         if !seen.insert(value.to_lowercase()) {
             return Err(invalid(format!("duplicate case-insensitive {label}")));
         }
@@ -161,7 +174,7 @@ fn parse_repeated_strings(
     }
     Ok(output)
 }
-fn parse_languages(node: &Node) -> Result<Vec<i32>> {
+fn parse_languages(node: &Node, limits: &Limits) -> Result<Vec<i32>> {
     if node.name != "Languages"
         || node.attributes != 0
         || !node.text.trim().is_empty()
@@ -169,11 +182,20 @@ fn parse_languages(node: &Node) -> Result<Vec<i32>> {
     {
         return Err(invalid("Languages must contain at least one Language"));
     }
-    if node.children.len() > MAX_FILES {
-        return Err(limit("language count"));
+    if node.children.len() > limits.max_files {
+        return Err(crate::error::limit(
+            crate::LimitKind::Files,
+            node.children.len(),
+            limits.max_files,
+        ));
     }
     let mut seen = HashSet::new();
-    let mut output = Vec::with_capacity(node.children.len());
+    seen.try_reserve(node.children.len())
+        .map_err(|source| crate::error::allocation("MS-XLDM language values", source))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(node.children.len())
+        .map_err(|source| crate::error::allocation("MS-XLDM languages", source))?;
     for value in &node.children {
         if value.name != "Language" {
             return Err(invalid("unexpected child in Languages"));
@@ -191,6 +213,7 @@ fn parse_file_groups(
     node: &Node,
     profile: StorageProfile,
     server_root: &str,
+    limits: &Limits,
 ) -> Result<Vec<FileGroup>> {
     if node.name != "FileGroups"
         || node.attributes != 0
@@ -199,8 +222,12 @@ fn parse_file_groups(
     {
         return Err(invalid("FileGroups must contain at least one FileGroup"));
     }
-    if node.children.len() > MAX_PARTITIONS {
-        return Err(limit("file-group count"));
+    if node.children.len() > limits.max_partitions {
+        return Err(crate::error::limit(
+            crate::LimitKind::Partitions,
+            node.children.len(),
+            limits.max_partitions,
+        ));
     }
     let names = [
         "Class",
@@ -213,34 +240,46 @@ fn parse_file_groups(
         "ObjectID",
         "FileList",
     ];
-    let mut output = Vec::with_capacity(node.children.len());
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(node.children.len())
+        .map_err(|source| crate::error::allocation("MS-XLDM file groups", source))?;
     let mut identities = HashSet::new();
+    identities
+        .try_reserve(node.children.len())
+        .map_err(|source| crate::error::allocation("MS-XLDM file-group identities", source))?;
     let mut total_files = 0usize;
     for group in &node.children {
         let values = exact_children(group, "FileGroup", &names)?;
         let class = FileGroupClass::parse(i32_value(values[0])?)?;
-        let id = bounded_leaf(values[1], "file-group ID")?;
-        let name = bounded_leaf(values[2], "file-group name")?;
+        let id = bounded_leaf(values[1], "file-group ID", limits.max_path_bytes)?;
+        let name = bounded_leaf(values[2], "file-group name", limits.max_path_bytes)?;
         let object_version = i32_value(values[3])?;
         let persist_location = i32_value(values[4])?;
         if object_version < 0 || persist_location < 0 {
             return Err(invalid("file-group versions cannot be negative"));
         }
-        let persist_location_path = bounded_leaf(values[5], "persist location path")?;
-        let storage_location_path = bounded_leaf(values[6], "storage location path")?;
-        let object_id = bounded_leaf(values[7], "file-group ObjectID")?;
+        let persist_location_path =
+            bounded_leaf(values[5], "persist location path", limits.max_path_bytes)?;
+        let storage_location_path =
+            bounded_leaf(values[6], "storage location path", limits.max_path_bytes)?;
+        let object_id = bounded_leaf(values[7], "file-group ObjectID", limits.max_path_bytes)?;
         if !valid_upper_guid(&object_id) {
             return Err(invalid("file-group ObjectID must be an uppercase UUID"));
         }
         if !identities.insert((class, object_id.clone())) {
             return Err(invalid("duplicate file-group class and ObjectID"));
         }
-        let files = parse_logged_files(values[8], class, profile, server_root)?;
-        total_files = total_files
-            .checked_add(files.len())
-            .ok_or_else(|| limit("logged file count"))?;
-        if total_files > MAX_FILES {
-            return Err(limit("logged file count"));
+        let files = parse_logged_files(values[8], class, profile, server_root, limits)?;
+        total_files = total_files.checked_add(files.len()).ok_or_else(|| {
+            crate::error::limit(crate::LimitKind::Files, usize::MAX, limits.max_files)
+        })?;
+        if total_files > limits.max_files {
+            return Err(crate::error::limit(
+                crate::LimitKind::Files,
+                total_files,
+                limits.max_files,
+            ));
         }
         output.push(FileGroup {
             class,
@@ -262,6 +301,7 @@ fn parse_logged_files(
     class: FileGroupClass,
     profile: StorageProfile,
     server_root: &str,
+    limits: &Limits,
 ) -> Result<Vec<LoggedFile>> {
     if node.name != "FileList"
         || node.attributes != 0
@@ -270,46 +310,50 @@ fn parse_logged_files(
     {
         return Err(invalid("FileList must contain at least one BackupFile"));
     }
-    if node.children.len() > MAX_FILES {
-        return Err(limit("logged file count"));
+    if node.children.len() > limits.max_files {
+        return Err(crate::error::limit(
+            crate::LimitKind::Files,
+            node.children.len(),
+            limits.max_files,
+        ));
     }
     let names = ["Path", "StoragePath", "LastWriteTime", "Size"];
-    node.children
-        .iter()
-        .map(|file| {
-            let values = exact_children(file, "BackupFile", &names)?;
-            let source_path = bounded_leaf(values[0], "source path")?;
-            let storage_path = bounded_leaf(values[1], "storage path")?;
-            let last_write_timestamp = i64_value(values[2])?;
-            let signed_size = i32_value(values[3])?;
-            if signed_size < 0 {
-                return Err(invalid("logged file size cannot be negative"));
-            }
-            let generated = match profile {
-                StorageProfile::Xldm140 => classify_generated_path(&storage_path)?,
-                StorageProfile::Tabular150 => {
-                    classify_tabular_source_path(&source_path, server_root)?
-                },
-            };
-            let allowed = match profile {
-                StorageProfile::Xldm140 => kind_allowed_for_group(generated.kind, class),
-                StorageProfile::Tabular150 => kind_allowed_for_native_group(generated.kind, class),
-            };
-            if !allowed {
-                return Err(invalid(format!(
-                    "generated path '{}' is incompatible with file-group class {}",
-                    storage_path,
-                    class.code()
-                )));
-            }
-            Ok(LoggedFile {
-                source_path,
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(node.children.len())
+        .map_err(|source| crate::error::allocation("MS-XLDM logged files", source))?;
+    for file in &node.children {
+        let values = exact_children(file, "BackupFile", &names)?;
+        let source_path = bounded_leaf(values[0], "source path", limits.max_path_bytes)?;
+        let storage_path = bounded_leaf(values[1], "storage path", limits.max_path_bytes)?;
+        let last_write_timestamp = i64_value(values[2])?;
+        let signed_size = i32_value(values[3])?;
+        if signed_size < 0 {
+            return Err(invalid("logged file size cannot be negative"));
+        }
+        let generated = match profile {
+            StorageProfile::Xldm140 => classify_generated_path(&storage_path)?,
+            StorageProfile::Tabular150 => classify_tabular_source_path(&source_path, server_root)?,
+        };
+        let allowed = match profile {
+            StorageProfile::Xldm140 => kind_allowed_for_group(generated.kind, class),
+            StorageProfile::Tabular150 => kind_allowed_for_native_group(generated.kind, class),
+        };
+        if !allowed {
+            return Err(invalid(format!(
+                "generated path '{}' is incompatible with file-group class {}",
                 storage_path,
-                last_write_timestamp,
-                size: u32::try_from(signed_size)
-                    .map_err(|_source| invalid("file-log size exceeds u32"))?,
-                generated,
-            })
-        })
-        .collect()
+                class.code()
+            )));
+        }
+        output.push(LoggedFile {
+            source_path,
+            storage_path,
+            last_write_timestamp,
+            size: u32::try_from(signed_size)
+                .map_err(|_source| invalid("file-log size exceeds u32"))?,
+            generated,
+        });
+    }
+    Ok(output)
 }

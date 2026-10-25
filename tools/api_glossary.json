@@ -6043,6 +6043,24 @@
           ],
           "limits_argument": "caller",
           "limits_type": "litchi_xlsx::SourceLimits"
+        },
+        {
+          "method": "litchi_xlsx::package::xldm::inspect",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xlsx::package::xldm::Limits"
+        },
+        {
+          "method": "litchi_xlsx::package::xldm::inspect_shared",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xlsx::package::xldm::Limits"
+        },
+        {
+          "method": "litchi_xlsx::package::xldm::write",
+          "inputs": ["storage", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xlsx::package::xldm::Limits"
         }
       ],
       "result_methods": [
@@ -7634,6 +7652,24 @@
           ],
           "limits_argument": "caller",
           "limits_type": "litchi_xlsx::SourceLimits"
+        },
+        {
+          "method": "litchi_xlsx::package::xldm::inspect",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xlsx::package::xldm::Limits"
+        },
+        {
+          "method": "litchi_xlsx::package::xldm::inspect_shared",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xlsx::package::xldm::Limits"
+        },
+        {
+          "method": "litchi_xlsx::package::xldm::write",
+          "inputs": ["storage", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xlsx::package::xldm::Limits"
         }
       ],
       "result_methods": [
@@ -26789,6 +26825,69 @@
         }
       ],
       "families": []
+    },
+    {
+      "id": "xldm",
+      "package": "litchi-xldm",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "with_limits",
+          "scope": "litchi_xldm",
+          "replacement": "use the sole raw entry point with required Limits (record 0362ul68)"
+        },
+        {
+          "name": "_with_limits",
+          "scope": "litchi_xldm",
+          "match": "suffix",
+          "replacement": "raw XLDM APIs require Limits (record 0362ul68)"
+        }
+      ],
+      "immutable_owners": [
+        "litchi_xldm::Storage",
+        "litchi_xldm::metadata::MetadataFile",
+        "litchi_xldm::metadata::MetadataModel"
+      ],
+      "families": [],
+      "required_signatures": [
+        {
+          "method": "litchi_xldm::inspect",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xldm::Limits"
+        },
+        {
+          "method": "litchi_xldm::inspect_shared",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xldm::Limits"
+        },
+        {
+          "method": "litchi_xldm::write",
+          "inputs": ["storage", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xldm::Limits"
+        },
+        {
+          "method": "litchi_xldm::metadata::parse_file",
+          "inputs": ["storage_path", "bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xldm::Limits"
+        },
+        {
+          "method": "litchi_xldm::metadata::inspect",
+          "inputs": ["storage", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xldm::Limits"
+        },
+        {
+          "method": "litchi_xldm::metadata::write_file",
+          "inputs": ["file", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_xldm::Limits"
+        }
+      ]
     },
     {
       "id": "imgconv",

@@ -837,20 +837,20 @@ pub(crate) fn build_minimal_package() -> Result<OpcPackage> {
 
 /// Inert analytical-model package resources.
 ///
-/// The nested codecs live in the neutral [`litchi_xldm`] crate. The two
+/// The nested codecs live in the neutral [`litchi_xldm`] crate. The three
 /// package-level entry points retain the historical XLSX error type so code
 /// using `crate::package::xldm::inspect` continues to match [`crate::Error`].
 pub mod xldm {
     pub use litchi_xldm::{
         BackupLog, Compression, FileEntry, FileGroup, FileGroupClass, FileKind, GeneratedNameKind,
-        GeneratedPath, Header, LoggedFile, Offset, OlapProofLimits, PartitionMarker, Size, Storage,
-        StorageProfile, WriteAccess, XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE, Xldm140Closure,
-        Xldm140ClosureMember, Xldm140ColumnBinding, Xldm140ColumnIdentity, Xldm140FileReplacement,
-        Xldm140IdentityProjection, Xldm140InversePatch, Xldm140MemberSection, Xldm140Patch,
-        Xldm140PatchBytes, Xldm140RelationshipIdentity, Xldm140TableIdentity,
-        Xldm140TimeGroupingBinding, Xldm140TimeGroupingContentType, XmlEncoding, compression,
-        crypt, generated, identity, metadata, native, olap, olapproof, project_xldm140_identity,
-        project_xldm140_identity_with_closure, prove_xldm140_closure,
+        GeneratedPath, Header, Limits, LoggedFile, Offset, OlapProofLimits, PartitionMarker, Size,
+        Storage, StorageProfile, WriteAccess, XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE,
+        Xldm140Closure, Xldm140ClosureMember, Xldm140ColumnBinding, Xldm140ColumnIdentity,
+        Xldm140FileReplacement, Xldm140IdentityProjection, Xldm140InversePatch,
+        Xldm140MemberSection, Xldm140Patch, Xldm140PatchBytes, Xldm140RelationshipIdentity,
+        Xldm140TableIdentity, Xldm140TimeGroupingBinding, Xldm140TimeGroupingContentType,
+        XmlEncoding, compression, crypt, generated, identity, metadata, native, olap, olapproof,
+        project_xldm140_identity, project_xldm140_identity_with_closure, prove_xldm140_closure,
         validate_xldm140_identity_closure,
     };
 
@@ -860,24 +860,45 @@ pub mod xldm {
     }
 
     /// Inspect an XLDM stream while preserving the XLSX facade error type.
-    pub fn inspect(bytes: &[u8]) -> crate::error::Result<Storage<'_>> {
-        litchi_xldm::inspect(bytes).map_err(super::map_xldm_error)
+    pub fn inspect<'a>(bytes: &'a [u8], limits: &Limits) -> crate::error::Result<Storage<'a>> {
+        litchi_xldm::inspect(bytes, limits).map_err(super::map_xldm_error)
     }
 
     /// Inspect a borrowed XLDM stream through the source-sharing API.
-    pub fn inspect_shared(bytes: &[u8]) -> crate::error::Result<Storage<'_>> {
-        litchi_xldm::inspect_shared(bytes).map_err(super::map_xldm_error)
+    pub fn inspect_shared<'a>(
+        bytes: &'a [u8],
+        limits: &Limits,
+    ) -> crate::error::Result<Storage<'a>> {
+        litchi_xldm::inspect_shared(bytes, limits).map_err(super::map_xldm_error)
     }
 
     /// Write an unchanged or explicitly edited XLDM storage snapshot.
-    pub fn write(storage: &Storage<'_>) -> crate::error::Result<Vec<u8>> {
-        litchi_xldm::write(storage).map_err(super::map_xldm_error)
+    pub fn write(storage: &Storage<'_>, limits: &Limits) -> crate::error::Result<Vec<u8>> {
+        litchi_xldm::write(storage, limits).map_err(super::map_xldm_error)
     }
 }
 
 fn map_xldm_error(error: litchi_xldm::Error) -> crate::error::Error {
     match error {
         litchi_xldm::Error::Invalid(message) => crate::error::Error::Invalid(message),
+        litchi_xldm::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => crate::error::Error::Limit {
+            kind: map_xldm_limit_kind(kind),
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_xldm::Error::InvalidLimit {
+            kind,
+            value,
+            maximum,
+        } => crate::error::Error::InvalidLimit {
+            kind: map_xldm_limit_kind(kind),
+            value: value as u64,
+            maximum: maximum as u64,
+        },
         litchi_xldm::Error::Unsupported { feature } => crate::error::Error::Unsupported { feature },
         litchi_xldm::Error::Allocation { resource, source } => {
             crate::error::Error::Allocation { resource, source }
@@ -887,6 +908,34 @@ fn map_xldm_error(error: litchi_xldm::Error) -> crate::error::Error {
         },
         other => crate::error::Error::Invalid(other.to_string()),
     }
+}
+
+pub(crate) fn map_xldm_limit_kind(kind: litchi_xldm::LimitKind) -> crate::error::LimitKind {
+    use crate::workbook::data_model::LimitKind as DataModel;
+    let kind = match kind {
+        litchi_xldm::LimitKind::OutputBytes => DataModel::XldmOutputBytes,
+        litchi_xldm::LimitKind::PathTextBytes => DataModel::XldmPathTextBytes,
+        litchi_xldm::LimitKind::Items => DataModel::XldmProofItems,
+        litchi_xldm::LimitKind::StringBytes => DataModel::XldmProofStringBytes,
+        litchi_xldm::LimitKind::SourceBytes => DataModel::XldmProofSourceBytes,
+        litchi_xldm::LimitKind::Work => DataModel::XldmProofWork,
+        litchi_xldm::LimitKind::XldmSourceBytes => DataModel::XldmSourceBytes,
+        litchi_xldm::LimitKind::XldmOutputBytes => DataModel::XldmOutputBytes,
+        litchi_xldm::LimitKind::DirectoryBytes => DataModel::XldmDirectoryBytes,
+        litchi_xldm::LimitKind::Files => DataModel::XldmFiles,
+        litchi_xldm::LimitKind::Partitions => DataModel::XldmPartitions,
+        litchi_xldm::LimitKind::PathBytes => DataModel::XldmPathBytes,
+        litchi_xldm::LimitKind::XmlNodes => DataModel::XldmXmlNodes,
+        litchi_xldm::LimitKind::XmlDepth => DataModel::XldmXmlDepth,
+        litchi_xldm::LimitKind::XmlTextBytes => DataModel::XldmXmlTextBytes,
+        litchi_xldm::LimitKind::MetadataBytes => DataModel::XldmMetadataBytes,
+        litchi_xldm::LimitKind::MetadataNodes => DataModel::XldmMetadataNodes,
+        litchi_xldm::LimitKind::MetadataDepth => DataModel::XldmMetadataDepth,
+        litchi_xldm::LimitKind::MetadataTextBytes => DataModel::XldmMetadataTextBytes,
+        litchi_xldm::LimitKind::MetadataFiles => DataModel::XldmMetadataFiles,
+        _ => DataModel::PayloadBytes,
+    };
+    crate::error::LimitKind::DataModel(kind)
 }
 
 #[cfg(test)]

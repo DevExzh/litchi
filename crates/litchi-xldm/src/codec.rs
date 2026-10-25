@@ -3,21 +3,26 @@
 use super::identity::Xldm140FileReplacement;
 use super::model::{
     BOM, CRC_SIZE, Compression, FileEntry, FileKind, Header, MAX_DIRECTORY_BYTES, MAX_FILES,
-    MAX_PARTITIONS, MAX_PATH_BYTES, MAX_STORAGE_BYTES, MAX_XML_DEPTH, MAX_XML_NODES,
-    MAX_XML_TEXT_BYTES, Node, Offset, PartitionMarker, Size, Storage, StorageProfile,
+    MAX_STORAGE_BYTES, Node, Offset, PartitionMarker, Size, Storage, StorageProfile,
     XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE, XmlEncoding,
 };
 use super::semantic::parse_backup_log;
 use super::validation::{validate_allocations, validate_backup_log, validate_paths};
+use crate::Limits;
 use crate::error::{Error, Result, allocation};
 use crate::xml_attributes::BytesStartExt as _;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::reader::NsReader;
 
 /// Validate and inspect the outer MS-XLDM virtual storage.
-pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
-    if bytes.len() > MAX_STORAGE_BYTES {
-        return Err(limit("storage bytes"));
+pub fn inspect<'a>(bytes: &'a [u8], limits: &Limits) -> Result<Storage<'a>> {
+    let limits = limits.validate()?.min(Limits::DEFAULT);
+    if bytes.len() > limits.max_source_bytes {
+        return Err(crate::error::limit(
+            crate::LimitKind::XldmSourceBytes,
+            bytes.len(),
+            limits.max_source_bytes,
+        ));
     }
     if bytes.len() < XLDM_PAGE_SIZE * 3 || !bytes.len().is_multiple_of(XLDM_PAGE_SIZE) {
         return Err(invalid(
@@ -45,8 +50,9 @@ pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
     {
         return Err(invalid("MS-XLDM header padding must be zero"));
     }
-    let (header_xml, header_encoding) = decode_xml(&bytes[header_xml_start..header_xml_end], true)?;
-    let header = parse_header(&parse_xml(&header_xml)?)?;
+    let (header_xml, header_encoding) =
+        decode_xml(&bytes[header_xml_start..header_xml_end], true, &limits)?;
+    let header = parse_header(&parse_xml(&header_xml, &limits)?, &limits)?;
     let profile = if header.backup_restore_sync_version == 140 {
         StorageProfile::Xldm140
     } else {
@@ -65,8 +71,12 @@ pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
             "MS-XLDM directory offset must be page aligned after the files section",
         ));
     }
-    if directory_size == 0 || directory_size > MAX_DIRECTORY_BYTES {
-        return Err(limit("directory bytes"));
+    if directory_size == 0 || directory_size > limits.max_directory_bytes {
+        return Err(crate::error::limit(
+            crate::LimitKind::DirectoryBytes,
+            directory_size,
+            limits.max_directory_bytes,
+        ));
     }
     let directory_end = directory_offset
         .checked_add(directory_size)
@@ -86,8 +96,8 @@ pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
         ));
     }
     let (directory_xml, directory_encoding) =
-        decode_xml(&bytes[directory_offset..directory_end], false)?;
-    let mut files = parse_directory(&parse_xml(&directory_xml)?)?;
+        decode_xml(&bytes[directory_offset..directory_end], false, &limits)?;
+    let mut files = parse_directory(&parse_xml(&directory_xml, &limits)?, &limits)?;
     if files.len() != header.file_count as usize {
         return Err(invalid(format!(
             "header file count {} does not match directory count {}",
@@ -100,7 +110,7 @@ pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
             "MS-XLDM storage requires partition and backup-log allocations",
         ));
     }
-    validate_paths(&files)?;
+    validate_paths(&files, &limits)?;
     let mut order: Vec<usize> = (0..files.len()).collect();
     order.sort_by_key(|index| files[*index].offset);
     validate_allocations(
@@ -113,17 +123,24 @@ pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
     )?;
     let first = order[0];
     let partition_bytes = payload_slice(bytes, &files[first])?;
-    let (partitions_xml, partition_encoding) = decode_marker_xml(partition_bytes, profile)?;
-    let partition_count = parse_partitions(&parse_xml(&partitions_xml)?, profile)?;
+    let (partitions_xml, partition_encoding) =
+        decode_marker_xml(partition_bytes, profile, &limits)?;
+    let partition_count =
+        parse_partitions(&parse_xml(&partitions_xml, &limits)?, profile, &limits)?;
     files[first].kind = FileKind::Partitions;
     let last = *order.last().unwrap_or_else(|| {
         crate::error::panic_missing_invariant("required value was checked before extraction")
     });
     files[last].kind = FileKind::BackupLog;
     let (backup_xml, backup_encoding) =
-        decode_marker_xml(payload_slice(bytes, &files[last])?, profile)?;
-    let backup_log = parse_backup_log(&parse_xml(&backup_xml)?, backup_encoding, profile)?;
-    validate_backup_log(&backup_log, &files, first, last, bytes, profile)?;
+        decode_marker_xml(payload_slice(bytes, &files[last])?, profile, &limits)?;
+    let backup_log = parse_backup_log(
+        &parse_xml(&backup_xml, &limits)?,
+        backup_encoding,
+        profile,
+        &limits,
+    )?;
+    validate_backup_log(&backup_log, &files, first, last, bytes, profile, &limits)?;
     Ok(Storage {
         header,
         header_encoding,
@@ -137,13 +154,27 @@ pub fn inspect(bytes: &[u8]) -> Result<Storage<'_>> {
         files,
         bytes,
         profile,
+        limits,
     })
 }
 
 /// Revalidate and return the original byte stream exactly.
-pub fn write(storage: &Storage<'_>) -> Result<Vec<u8>> {
-    inspect(storage.bytes)?;
-    Ok(storage.bytes.to_vec())
+pub fn write(storage: &Storage<'_>, limits: &Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?.min(storage.limits_value());
+    if storage.bytes.len() > limits.max_output_bytes {
+        return Err(crate::error::limit(
+            crate::LimitKind::XldmOutputBytes,
+            storage.bytes.len(),
+            limits.max_output_bytes,
+        ));
+    }
+    inspect(storage.bytes, &limits)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(storage.bytes.len())
+        .map_err(|source| allocation("MS-XLDM storage output bytes", source))?;
+    output.extend_from_slice(storage.bytes);
+    Ok(output)
 }
 
 /// Rewrite already-admitted allocation payloads without changing their
@@ -159,6 +190,14 @@ pub(super) fn rewrite_same_size_payloads(
     }
     if storage.bytes.len() > MAX_STORAGE_BYTES {
         return Err(limit("storage bytes"));
+    }
+    let retained_output_bytes = storage.limits_value().max_output_bytes;
+    if storage.bytes.len() > retained_output_bytes {
+        return Err(crate::error::limit(
+            crate::LimitKind::XldmOutputBytes,
+            storage.bytes.len(),
+            retained_output_bytes,
+        ));
     }
     if replacements.len() > MAX_FILES {
         return Err(limit("replacement count"));
@@ -231,7 +270,7 @@ pub(super) fn rewrite_same_size_payloads(
     // This reparses the candidate before the caller inspects inner sections;
     // no partially modified buffer escapes if the outer CRC or directory is
     // invalid.
-    inspect(&result)?;
+    inspect(&result, &storage.limits_value())?;
     Ok(result)
 }
 
@@ -284,7 +323,14 @@ pub(super) fn preflight_variable_size_payloads(
     replacements: &[VariablePayloadLength<'_>],
     max_output_bytes: usize,
 ) -> std::result::Result<usize, VariableRewriteError> {
+    let max_output_bytes = max_output_bytes.min(storage.limits_value().max_output_bytes);
     if replacements.is_empty() {
+        if storage.bytes.len() > max_output_bytes {
+            return Err(VariableRewriteError::CallerLimit {
+                actual: storage.bytes.len(),
+                maximum: max_output_bytes,
+            });
+        }
         return Ok(storage.bytes.len());
     }
     let output_len = plan_variable_size_payloads(storage, replacements)?.output_len;
@@ -313,8 +359,21 @@ pub(super) fn rewrite_variable_size_payloads_with_limit(
     if storage.bytes.len() > MAX_STORAGE_BYTES {
         return Err(limit("storage bytes"));
     }
+    let max_output_bytes = max_output_bytes.min(storage.limits_value().max_output_bytes);
+    if storage.bytes.len() > max_output_bytes {
+        return Err(crate::error::limit(
+            crate::LimitKind::XldmOutputBytes,
+            storage.bytes.len(),
+            max_output_bytes,
+        ));
+    }
     if replacements.is_empty() {
-        return Ok(storage.bytes.to_vec());
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(storage.bytes.len())
+            .map_err(|source| allocation("MS-XLDM rewritten storage bytes", source))?;
+        output.extend_from_slice(storage.bytes);
+        return Ok(output);
     }
     if replacements.len() > MAX_FILES {
         return Err(limit("replacement count"));
@@ -332,7 +391,11 @@ pub(super) fn rewrite_variable_size_payloads_with_limit(
     }
     let plan = plan_variable_size_payloads(storage, &lengths)?;
     if plan.output_len > max_output_bytes {
-        return Err(limit("rewritten storage caller output bytes"));
+        return Err(crate::error::limit(
+            crate::LimitKind::XldmOutputBytes,
+            plan.output_len,
+            max_output_bytes,
+        ));
     }
 
     let mut replacement_paths = std::collections::HashSet::new();
@@ -465,7 +528,7 @@ pub(super) fn rewrite_variable_size_payloads_with_limit(
     result.resize(directory_offset, 0);
     result.extend_from_slice(&directory_bytes);
     result.resize(output_len, 0);
-    inspect(&result)?;
+    inspect(&result, &storage.limits_value())?;
     Ok(result)
 }
 
@@ -890,7 +953,8 @@ fn rewrite_backup_log_sizes_len(
     storage: &Storage<'_>,
     replacements: &[Option<usize>],
 ) -> Result<usize> {
-    let (xml, encoding) = decode_marker_xml(source, StorageProfile::Xldm140)?;
+    let (xml, encoding) =
+        decode_marker_xml(source, StorageProfile::Xldm140, &storage.limits_value())?;
     let mut length = xml.len();
     let mut changed = false;
     for (index, payload_len) in replacements.iter().enumerate() {
@@ -951,7 +1015,8 @@ fn rewrite_backup_log_sizes(
     storage: &Storage<'_>,
     replacements: &[Option<&[u8]>],
 ) -> Result<Vec<u8>> {
-    let (mut xml, encoding) = decode_marker_xml(source, StorageProfile::Xldm140)?;
+    let (mut xml, encoding) =
+        decode_marker_xml(source, StorageProfile::Xldm140, &storage.limits_value())?;
     let mut changed = false;
     for (index, payload) in replacements.iter().enumerate() {
         let Some(payload) = payload else {
@@ -1054,15 +1119,19 @@ fn backup_file_size_span(xml: &str, path: &str) -> Result<Option<(usize, usize)>
     Ok(Some((value_start, value_end)))
 }
 
-pub(super) fn bounded_leaf(node: &Node, label: &str) -> Result<String> {
+pub(super) fn bounded_leaf(node: &Node, _label: &str, max_path_bytes: usize) -> Result<String> {
     let value = leaf_text(node)?;
-    if value.len() > MAX_PATH_BYTES {
-        return Err(limit(label));
+    if value.len() > max_path_bytes {
+        return Err(crate::error::limit(
+            crate::LimitKind::PathBytes,
+            value.len(),
+            max_path_bytes,
+        ));
     }
     Ok(value.to_owned())
 }
 
-fn parse_header(root: &Node) -> Result<Header> {
+fn parse_header(root: &Node, limits: &Limits) -> Result<Header> {
     let names = [
         "BackupRestoreSyncVersion",
         "Fault",
@@ -1101,8 +1170,12 @@ fn parse_header(root: &Node) -> Result<Header> {
     let directory_offset = Offset(u64_value(values[7])?);
     let directory_size = Size(u64_value(values[8])?);
     let file_count = u32_value(values[9])?;
-    if file_count as usize > MAX_FILES {
-        return Err(limit("file count"));
+    if file_count as usize > limits.max_files {
+        return Err(crate::error::limit(
+            crate::LimitKind::Files,
+            file_count as usize,
+            limits.max_files,
+        ));
     }
     let object_id = leaf_text(values[10])?.to_owned();
     if !valid_upper_guid(&object_id) {
@@ -1122,12 +1195,16 @@ fn parse_header(root: &Node) -> Result<Header> {
     })
 }
 
-fn parse_directory(root: &Node) -> Result<Vec<FileEntry>> {
+fn parse_directory(root: &Node, limits: &Limits) -> Result<Vec<FileEntry>> {
     if root.name != "VirtualDirectory" || root.attributes != 0 || !root.text.trim().is_empty() {
         return Err(invalid("expected attribute-free VirtualDirectory root"));
     }
-    if root.children.len() > MAX_FILES {
-        return Err(limit("file count"));
+    if root.children.len() > limits.max_files {
+        return Err(crate::error::limit(
+            crate::LimitKind::Files,
+            root.children.len(),
+            limits.max_files,
+        ));
     }
     let names = [
         "Path",
@@ -1138,46 +1215,52 @@ fn parse_directory(root: &Node) -> Result<Vec<FileEntry>> {
         "Access",
         "LastWriteTime",
     ];
-    root.children
-        .iter()
-        .map(|child| {
-            let values = exact_children(child, "BackupFile", &names)?;
-            let path = leaf_text(values[0])?.to_owned();
-            let stored_size = Size(u64_value(values[1])?);
-            let offset = Offset(u64_value(values[2])?);
-            let delete = bool_value(values[3])?;
-            let created_timestamp = i64_value(values[4])?;
-            let access_timestamp = i64_value(values[5])?;
-            let last_write_timestamp = i64_value(values[6])?;
-            let lower = path.to_ascii_lowercase();
-            let kind = if lower.ends_with("cryptkey.bin") {
-                FileKind::CryptographicKey
-            } else if lower.ends_with(".xml") {
-                FileKind::XmlMetadata
-            } else {
-                FileKind::OpaqueBinary
-            };
-            Ok(FileEntry {
-                path,
-                kind,
-                offset,
-                stored_size,
-                crc32: 0,
-                delete,
-                created_timestamp,
-                access_timestamp,
-                last_write_timestamp,
-            })
-        })
-        .collect()
+    let mut files = Vec::new();
+    files
+        .try_reserve_exact(root.children.len())
+        .map_err(|source| allocation("MS-XLDM directory entries", source))?;
+    for child in &root.children {
+        let values = exact_children(child, "BackupFile", &names)?;
+        let path = leaf_text(values[0])?.to_owned();
+        let stored_size = Size(u64_value(values[1])?);
+        let offset = Offset(u64_value(values[2])?);
+        let delete = bool_value(values[3])?;
+        let created_timestamp = i64_value(values[4])?;
+        let access_timestamp = i64_value(values[5])?;
+        let last_write_timestamp = i64_value(values[6])?;
+        let lower = path.to_ascii_lowercase();
+        let kind = if lower.ends_with("cryptkey.bin") {
+            FileKind::CryptographicKey
+        } else if lower.ends_with(".xml") {
+            FileKind::XmlMetadata
+        } else {
+            FileKind::OpaqueBinary
+        };
+        files.push(FileEntry {
+            path,
+            kind,
+            offset,
+            stored_size,
+            crc32: 0,
+            delete,
+            created_timestamp,
+            access_timestamp,
+            last_write_timestamp,
+        });
+    }
+    Ok(files)
 }
 
-fn parse_partitions(root: &Node, profile: StorageProfile) -> Result<usize> {
+fn parse_partitions(root: &Node, profile: StorageProfile, limits: &Limits) -> Result<usize> {
     if root.name != "Partitions" || root.attributes != 0 || !root.text.trim().is_empty() {
         return Err(invalid("expected attribute-free Partitions root"));
     }
-    if root.children.len() > MAX_PARTITIONS {
-        return Err(limit("partition count"));
+    if root.children.len() > limits.max_partitions {
+        return Err(crate::error::limit(
+            crate::LimitKind::Partitions,
+            root.children.len(),
+            limits.max_partitions,
+        ));
     }
     let names: &[&str] = match profile {
         StorageProfile::Xldm140 => &[
@@ -1202,22 +1285,30 @@ fn parse_partitions(root: &Node, profile: StorageProfile) -> Result<usize> {
         let values = exact_children(partition, "Partition", names)?;
         let _ = i64_value(values[2])?;
         for value in &values {
-            if leaf_text(value)?.len() > MAX_XML_TEXT_BYTES {
-                return Err(limit("partition field bytes"));
+            if leaf_text(value)?.len() > limits.max_xml_text_bytes {
+                return Err(crate::error::limit(
+                    crate::LimitKind::XmlTextBytes,
+                    leaf_text(value)?.len(),
+                    limits.max_xml_text_bytes,
+                ));
             }
         }
     }
     Ok(root.children.len())
 }
 
-fn decode_marker_xml(bytes: &[u8], profile: StorageProfile) -> Result<(String, XmlEncoding)> {
+fn decode_marker_xml(
+    bytes: &[u8],
+    profile: StorageProfile,
+    limits: &Limits,
+) -> Result<(String, XmlEncoding)> {
     if profile == StorageProfile::Tabular150 {
         let bytes = bytes
             .strip_prefix(&BOM)
             .ok_or_else(|| invalid("tabular XML marker BOM is missing"))?;
-        decode_xml(bytes, true)
+        decode_xml(bytes, true, limits)
     } else {
-        decode_xml(bytes, false)
+        decode_xml(bytes, false, limits)
     }
 }
 
@@ -1233,9 +1324,13 @@ fn payload_slice<'a>(bytes: &'a [u8], entry: &FileEntry) -> Result<&'a [u8]> {
         .ok_or_else(|| invalid("payload range is outside storage"))
 }
 
-fn parse_xml(xml: &str) -> Result<Node> {
-    if xml.len() > MAX_DIRECTORY_BYTES {
-        return Err(limit("XML bytes"));
+fn parse_xml(xml: &str, limits: &Limits) -> Result<Node> {
+    if xml.len() > limits.max_directory_bytes {
+        return Err(crate::error::limit(
+            crate::LimitKind::DirectoryBytes,
+            xml.len(),
+            limits.max_directory_bytes,
+        ));
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut stack = Vec::new();
@@ -1247,14 +1342,28 @@ fn parse_xml(xml: &str) -> Result<Node> {
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
                 nodes += 1;
-                if nodes > MAX_XML_NODES || stack.len() >= MAX_XML_DEPTH {
-                    return Err(limit("XML structure"));
+                if nodes > limits.max_xml_nodes {
+                    return Err(crate::error::limit(
+                        crate::LimitKind::XmlNodes,
+                        nodes,
+                        limits.max_xml_nodes,
+                    ));
+                }
+                if stack.len() >= limits.max_xml_depth {
+                    return Err(crate::error::limit(
+                        crate::LimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_xml_depth,
+                    ));
                 }
                 let empty = matches!(&event, Event::Empty(_));
                 let node = make_node(element)?;
                 if empty {
                     attach(node, &mut stack, &mut root)?;
                 } else {
+                    stack
+                        .try_reserve(1)
+                        .map_err(|source| allocation("MS-XLDM XML stack", source))?;
                     stack.push(node);
                 }
             },
@@ -1270,10 +1379,17 @@ fn parse_xml(xml: &str) -> Result<Node> {
                 text_bytes = text_bytes
                     .checked_add(decoded.len())
                     .ok_or_else(|| limit("XML text bytes"))?;
-                if text_bytes > MAX_XML_TEXT_BYTES {
-                    return Err(limit("XML text bytes"));
+                if text_bytes > limits.max_xml_text_bytes {
+                    return Err(crate::error::limit(
+                        crate::LimitKind::XmlTextBytes,
+                        text_bytes,
+                        limits.max_xml_text_bytes,
+                    ));
                 }
                 if let Some(node) = stack.last_mut() {
+                    node.text
+                        .try_reserve(decoded.len())
+                        .map_err(|source| allocation("MS-XLDM XML text", source))?;
                     node.text.push_str(&decoded);
                 } else if !decoded.trim().is_empty() {
                     return Err(invalid("text outside XML root"));
@@ -1297,10 +1413,17 @@ fn parse_xml(xml: &str) -> Result<Node> {
                 text_bytes = text_bytes
                     .checked_add(value.len())
                     .ok_or_else(|| limit("XML text bytes"))?;
-                if text_bytes > MAX_XML_TEXT_BYTES {
-                    return Err(limit("XML text bytes"));
+                if text_bytes > limits.max_xml_text_bytes {
+                    return Err(crate::error::limit(
+                        crate::LimitKind::XmlTextBytes,
+                        text_bytes,
+                        limits.max_xml_text_bytes,
+                    ));
                 }
                 if let Some(node) = stack.last_mut() {
+                    node.text
+                        .try_reserve(value.len())
+                        .map_err(|source| allocation("MS-XLDM XML text", source))?;
                     node.text.push_str(&value);
                 } else {
                     return Err(invalid("entity outside XML root"));
@@ -1342,6 +1465,10 @@ fn make_node(element: &BytesStart<'_>) -> Result<Node> {
 }
 fn attach(node: Node, stack: &mut [Node], root: &mut Option<Node>) -> Result<()> {
     if let Some(parent) = stack.last_mut() {
+        parent
+            .children
+            .try_reserve(1)
+            .map_err(|source| allocation("MS-XLDM XML children", source))?;
         parent.children.push(node);
     } else if root.replace(node).is_some() {
         return Err(invalid("multiple XML roots"));
@@ -1409,7 +1536,11 @@ pub(super) fn i32_value(node: &Node) -> Result<i32> {
         .map_err(|_source| invalid(format!("{} is not a signed 32-bit integer", node.name)))
 }
 
-pub(super) fn decode_xml(bytes: &[u8], require_utf16: bool) -> Result<(String, XmlEncoding)> {
+pub(super) fn decode_xml(
+    bytes: &[u8],
+    require_utf16: bool,
+    limits: &Limits,
+) -> Result<(String, XmlEncoding)> {
     if bytes.is_empty() {
         return Err(invalid("empty XML allocation"));
     }
@@ -1418,11 +1549,16 @@ pub(super) fn decode_xml(bytes: &[u8], require_utf16: bool) -> Result<(String, X
     }
     let utf16 = require_utf16 || bytes.get(1) == Some(&0);
     if utf16 {
-        let encoded_limit = MAX_DIRECTORY_BYTES
+        let encoded_limit = limits
+            .max_directory_bytes
             .checked_mul(2)
             .ok_or_else(|| limit("XML bytes"))?;
         if bytes.len() > encoded_limit {
-            return Err(limit("XML bytes"));
+            return Err(crate::error::limit(
+                crate::LimitKind::DirectoryBytes,
+                bytes.len(),
+                encoded_limit,
+            ));
         }
         if !bytes.len().is_multiple_of(2) {
             return Err(invalid("odd-length UTF-16LE XML"));
@@ -1440,8 +1576,12 @@ pub(super) fn decode_xml(bytes: &[u8], require_utf16: bool) -> Result<(String, X
             decoded_bytes = decoded_bytes
                 .checked_add(character.len_utf8())
                 .ok_or_else(|| limit("XML bytes"))?;
-            if decoded_bytes > MAX_DIRECTORY_BYTES {
-                return Err(limit("XML bytes"));
+            if decoded_bytes > limits.max_directory_bytes {
+                return Err(crate::error::limit(
+                    crate::LimitKind::DirectoryBytes,
+                    decoded_bytes,
+                    limits.max_directory_bytes,
+                ));
             }
         }
         let mut output = String::new();
@@ -1453,8 +1593,12 @@ pub(super) fn decode_xml(bytes: &[u8], require_utf16: bool) -> Result<(String, X
         }
         Ok((output, XmlEncoding::Utf16Le))
     } else {
-        if bytes.len() > MAX_DIRECTORY_BYTES {
-            return Err(limit("XML bytes"));
+        if bytes.len() > limits.max_directory_bytes {
+            return Err(crate::error::limit(
+                crate::LimitKind::DirectoryBytes,
+                bytes.len(),
+                limits.max_directory_bytes,
+            ));
         }
         Ok((
             std::str::from_utf8(bytes).map_err(xml_error)?.to_owned(),

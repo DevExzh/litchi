@@ -3512,6 +3512,7 @@ mod tests {
             bytes: &[],
             kind: MetadataFileKind::Table,
             table,
+            limits: crate::Limits::DEFAULT,
         }
     }
 
@@ -3771,6 +3772,7 @@ mod tests {
                 }],
                 data_objects: Vec::new(),
             },
+            limits: crate::Limits::DEFAULT,
         });
         let OlapDocument::Definition(dimension) = &mut model.files[2].document else {
             panic!("fixture dimension");
