@@ -5802,3 +5802,20 @@ See [0063](0063-source-pptx-modern-comments.md).
   filesystem free-space delta. Final API census requires fresh 84-profile
   captures and the 68-package inventory with the approved current lock.
   Root remains on `feat/unified-ops-api`; no push or final acceptance.
+
+  Twenty-four further PPTX chunks pass before readonly replay exposes a real
+  physical XML event-admission gap. Reviewed126 applies the existing raw
+  scanner before semantic parsing and migrates readonly, math and metadata
+  callers atomically. Its added bounded pass still requires performance
+  qualification. Six source-reviewed leaves await composition. A guarded
+  diagnostic continuation preserves aggregate failure while examining the
+  remaining rows; primary-text-box and streaming-authoring failures are
+  returned as128/129. No repaired-source pass is claimed (127).
+
+  Cleanup97 removes three archived obsolete candidates. Root restores all
+  seven payloads and verifies absent paths/registrations, bringing totals to
+  422 refs and 256 worktrees. Process visibility limits remain explicit. The
+  conservative allocated ledger is 753,344,364,544 bytes under the recorded
+  exclusions. Raw census preparation is returned for three receipt/identity
+  defects; no census execution is authorized by a plan alone. Final gates,
+  fidelity, performance and consolidation remain open; nothing is pushed.
