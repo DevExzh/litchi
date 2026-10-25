@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 import unittest
 
@@ -99,7 +102,10 @@ def manifest(entries: list[dict], *, state: str = "complete") -> dict:
             "state": state,
             "reason": "synthetic coverage fixture",
             "expected_profile_source": "tools/api_glossary.json",
+            "expected_profile_source_blob": "c" * 40,
             "expected_workspace_source": "Cargo.toml",
+            "expected_workspace_source_blob": "d" * 40,
+            "approved_cargo_lock_sha256": "e" * 64,
         },
         "profiles": [{
             "id": "fixture-profile",
@@ -134,11 +140,90 @@ class RawApiCoverageTests(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
+        self.capture_dirs: list[Path] = []
         self.glossary = self.root / "glossary.json"
         glossary_fixture(self.glossary)
 
     def tearDown(self) -> None:
+        for path in self.capture_dirs:
+            shutil.rmtree(path, ignore_errors=True)
         self.tmp.cleanup()
+
+    @staticmethod
+    def sha256(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    def capture_fixture(self) -> tuple[Path, coverage.Profile, dict, Path, Path]:
+        external = Path(tempfile.mkdtemp(prefix="raw-api-receipt-", dir=Path.cwd().parent))
+        self.capture_dirs.append(external)
+        root = external / "source"
+        root.mkdir()
+        (root / ".gitignore").write_text(
+            "*.lock\ntarget/\nvendor/\nmanifest.json\nfixtures/\n", encoding="utf-8"
+        )
+        (root / "Cargo.toml").write_text("[workspace]\n", encoding="utf-8")
+        (root / "Cargo.lock").write_text("approved lock\n", encoding="utf-8")
+        (root / "rust-toolchain.toml").write_text(
+            "[toolchain]\nchannel = \"1.95.0\"\n", encoding="utf-8"
+        )
+        subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+        subprocess.run(["git", "config", "user.email", "fixture@example.invalid"], cwd=root, check=True)
+        subprocess.run(["git", "config", "user.name", "fixture"], cwd=root, check=True)
+        subprocess.run(["git", "add", ".gitignore", "Cargo.toml", "rust-toolchain.toml"], cwd=root, check=True)
+        subprocess.run(["git", "commit", "-qm", "fixture source"], cwd=root, check=True)
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=root, text=True
+        ).strip()
+        tree = coverage._git_tree(root, commit)
+        self.assertIsNotNone(tree)
+
+        toolchain = external / "toolchain"
+        toolchain.mkdir()
+        cargo = toolchain / "cargo-shim"
+        rustc = toolchain / "rustc"
+        cargo.write_text("cargo fixture shim\n", encoding="utf-8")
+        rustc.write_text("rustc fixture\n", encoding="utf-8")
+        target = external / "target"
+        target.mkdir()
+        artifact = external / "capture" / "fixture-profile.json"
+        artifact.parent.mkdir()
+        artifact.write_text(json.dumps(rustdoc_fixture()), encoding="utf-8")
+        receipt_path = external / "receipts" / "fixture-profile.json"
+        receipt_path.parent.mkdir()
+        profile = coverage.Profile("fixture-profile", "fixture", False, ("feature-a",))
+        lock_sha = self.sha256(root / "Cargo.lock")
+        receipt = {
+            "schema": coverage.CAPTURE_RECEIPT_SCHEMA,
+            "profile": profile.profile_id,
+            "package": profile.package,
+            "default_features": profile.default_features,
+            "features": list(profile.features),
+            "argv": [
+                str(cargo), "rustdoc", "--package", "fixture", "--lib",
+                "--target-dir", str(target), "--no-default-features", "--features", "feature-a",
+                "--offline", "--locked", "--", "-Zunstable-options", "--output-format", "json",
+                "--document-hidden-items",
+            ],
+            "source_commit": commit,
+            "source_tree": tree,
+            "source_root": str(root),
+            "target_dir": str(target),
+            "cargo_lock_path": "Cargo.lock",
+            "cargo_lock_sha256": lock_sha,
+            "rust_toolchain_path": "rust-toolchain.toml",
+            "rust_toolchain_sha256": self.sha256(root / "rust-toolchain.toml"),
+            "cargo_path": str(cargo),
+            "cargo_sha256": self.sha256(cargo),
+            "rustc_path": str(rustc),
+            "rustc_sha256": self.sha256(rustc),
+            "artifact": {
+                "path": str(artifact),
+                "bytes": artifact.stat().st_size,
+                "sha256": self.sha256(artifact),
+            },
+        }
+        receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+        return root, profile, receipt, artifact, receipt_path
 
     def loaded(self, value: dict, *, require_complete: bool = False,
                extra_rustdoc: bool = False) -> dict:
@@ -163,6 +248,79 @@ class RawApiCoverageTests(unittest.TestCase):
             "limits_argument": "limits",
             "limits_type": limits_type,
         }
+
+    def test_capture_receipt_binds_profile_source_tools_and_artifact(self) -> None:
+        root, profile, receipt, artifact, receipt_path = self.capture_fixture()
+        manifest_value = {
+            "source_commit": receipt["source_commit"],
+            "coverage": {"approved_cargo_lock_sha256": receipt["cargo_lock_sha256"]},
+        }
+        parsed = coverage._capture_receipt(receipt, "receipt[fixture-profile]")
+        overlays = coverage._source_overlay_failures(root, receipt["cargo_lock_sha256"])
+        self.assertEqual(overlays, [])
+        self.assertEqual(
+            coverage._validate_capture_receipt(
+                manifest_value, profile, artifact, receipt_path, root, parsed, overlays
+            ),
+            [],
+        )
+
+        wrong_features = dict(parsed)
+        wrong_features["features"] = []
+        self.assertTrue(
+            any("features differ" in failure for failure in coverage._validate_capture_receipt(
+                manifest_value, profile, artifact, receipt_path, root,
+                wrong_features, overlays
+            ))
+        )
+
+        wrong_artifact = dict(parsed)
+        wrong_artifact["artifact"] = dict(parsed["artifact"])
+        wrong_artifact["artifact"]["bytes"] += 1
+        self.assertTrue(
+            any("artifact bytes/SHA" in failure for failure in coverage._validate_capture_receipt(
+                manifest_value, profile, artifact, receipt_path, root,
+                wrong_artifact, overlays
+            ))
+        )
+
+        stale = dict(parsed)
+        stale["source_commit"] = "0" * 40
+        self.assertTrue(
+            any("source_commit is stale" in failure for failure in coverage._validate_capture_receipt(
+                manifest_value, profile, artifact, receipt_path, root,
+                stale, overlays
+            ))
+        )
+
+        wrong_seed = {
+            "source_commit": receipt["source_commit"],
+            "coverage": {"approved_cargo_lock_sha256": "0" * 64},
+        }
+        self.assertTrue(
+            any("approved seeded lock" in failure for failure in coverage._validate_capture_receipt(
+                wrong_seed, profile, artifact, receipt_path, root, parsed, overlays
+            ))
+        )
+
+    def test_capture_receipt_rejects_source_overlays_and_wrong_seed_lock(self) -> None:
+        root, profile, receipt, artifact, receipt_path = self.capture_fixture()
+        del profile, artifact, receipt_path
+        (root / "vendor" / "overlay").mkdir(parents=True)
+        (root / "vendor" / "overlay" / "fixture.bin").write_bytes(b"overlay")
+        (root / "manifest.json").write_text("overlay", encoding="utf-8")
+        (root / "fixtures").mkdir()
+        (root / "fixtures" / "fixture.json").write_text("overlay", encoding="utf-8")
+        failures = coverage._source_overlay_failures(root, receipt["cargo_lock_sha256"])
+        self.assertTrue(any("vendor/overlay" in failure for failure in failures), failures)
+        self.assertTrue(any("manifest.json" in failure for failure in failures), failures)
+        self.assertTrue(any("fixtures/fixture.json" in failure for failure in failures), failures)
+        wrong_lock = coverage._source_overlay_failures(root, "0" * 64)
+        self.assertTrue(any("Cargo.lock" in failure for failure in wrong_lock), wrong_lock)
+
+    def test_receipt_argument_rejects_duplicate_profiles(self) -> None:
+        with self.assertRaises(coverage.CoverageError):
+            coverage.parse_receipt_args(["fixture-profile=a", "fixture-profile=b"])
 
     def test_exact_census_accepts_registered_raw_signature_and_semantic_anchor(self) -> None:
         value = manifest([
@@ -269,6 +427,12 @@ class RawApiCoverageTests(unittest.TestCase):
         self.assertIsNotNone(blob)
         value = manifest([])
         value["source_commit"] = head
+        value["coverage"]["expected_profile_source_blob"] = coverage._git_blob(
+            root, head, "tools/api_glossary.json"
+        )
+        value["coverage"]["expected_workspace_source_blob"] = coverage._git_blob(
+            root, head, "Cargo.toml"
+        )
         value["lanes"] = [{
             "id": "test-source", "package": "fixture", "scope": "fixture",
             "disposition": "active_lane",

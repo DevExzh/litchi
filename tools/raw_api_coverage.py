@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -40,6 +41,7 @@ except ImportError:  # Direct command-line execution.
 
 
 SCHEMA_VERSION = 1
+CAPTURE_RECEIPT_SCHEMA = 1
 DISPOSITIONS = frozenset({
     "required_raw_limits",
     "configured_owner",
@@ -246,14 +248,38 @@ def load_manifest(path: Path) -> dict[str, Any]:
     if not HEX40.fullmatch(source_commit):
         raise CoverageError("source_commit must be a full lowercase commit SHA-1")
     coverage = manifest["coverage"]
-    if (not isinstance(coverage, dict)
-            or set(coverage) != {"state", "reason", "expected_profile_source", "expected_workspace_source"}):
-        raise CoverageError("coverage requires state, reason, expected_profile_source and expected_workspace_source")
+    coverage_fields = {
+        "state", "reason", "expected_profile_source", "expected_profile_source_blob",
+        "expected_workspace_source", "expected_workspace_source_blob",
+        "approved_cargo_lock_sha256",
+    }
+    if not isinstance(coverage, dict) or set(coverage) != coverage_fields:
+        raise CoverageError(
+            "coverage requires state, reason, expected source paths and trusted blobs"
+        )
     if coverage["state"] not in {"incomplete", "complete"}:
         raise CoverageError("coverage.state must be incomplete or complete")
     _nonempty_string(coverage["reason"], "coverage.reason")
     _path_string(coverage["expected_profile_source"], "coverage.expected_profile_source")
+    profile_blob = _nonempty_string(
+        coverage["expected_profile_source_blob"], "coverage.expected_profile_source_blob"
+    ).lower()
+    if not HEX40.fullmatch(profile_blob):
+        raise CoverageError("coverage.expected_profile_source_blob must be a full lowercase SHA-1")
+    coverage["expected_profile_source_blob"] = profile_blob
     _path_string(coverage["expected_workspace_source"], "coverage.expected_workspace_source")
+    workspace_blob = _nonempty_string(
+        coverage["expected_workspace_source_blob"], "coverage.expected_workspace_source_blob"
+    ).lower()
+    if not HEX40.fullmatch(workspace_blob):
+        raise CoverageError("coverage.expected_workspace_source_blob must be a full lowercase SHA-1")
+    coverage["expected_workspace_source_blob"] = workspace_blob
+    lock_blob = _nonempty_string(
+        coverage["approved_cargo_lock_sha256"], "coverage.approved_cargo_lock_sha256"
+    ).lower()
+    if not HEX64.fullmatch(lock_blob):
+        raise CoverageError("coverage.approved_cargo_lock_sha256 must be a full lowercase SHA-256")
+    coverage["approved_cargo_lock_sha256"] = lock_blob
     profiles = manifest["profiles"]
     if not isinstance(profiles, list):
         raise CoverageError("profiles must be an array")
@@ -369,6 +395,224 @@ def _git_head(root: Path) -> str | None:
     return head if HEX40.fullmatch(head) else None
 
 
+def _git_tree(root: Path, commit: str) -> str | None:
+    result = subprocess.run(
+        ["git", "rev-parse", "--verify", f"{commit}^{{tree}}"],
+        cwd=root, check=False, capture_output=True, text=True,
+    )
+    tree = result.stdout.strip()
+    return tree if HEX40.fullmatch(tree) else None
+
+
+def _sha256_file(path: Path) -> str | None:
+    try:
+        digest = hashlib.sha256()
+        with path.open("rb") as stream:
+            for block in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(block)
+        return digest.hexdigest()
+    except OSError:
+        return None
+
+
+def _source_blob_failure(root: Path, commit: str, label: str, path: str,
+                         expected_blob: str) -> str | None:
+    resolved = _git_object(root, commit, path)
+    if resolved is None:
+        return f"{label} source {path} is missing at {commit}"
+    object_id, object_type = resolved
+    if object_type != "blob":
+        return f"{label} source {path} resolves to {object_type}, not a blob"
+    if object_id != expected_blob:
+        return f"{label} source {path} blob {expected_blob} != {object_id} at {commit}"
+    return None
+
+
+def _source_overlay_failures(root: Path, cargo_lock_sha256: str | None) -> list[str]:
+    """Reject every checkout overlay except the exact seeded root lockfile."""
+    result = subprocess.run(
+        ["git", "status", "--porcelain=v1", "--untracked-files=all", "--ignored=traditional"],
+        cwd=root, check=False, capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        return [f"cannot inspect source checkout overlays: {result.stderr.strip() or 'git status failed'}"]
+    failures: list[str] = []
+    for raw in result.stdout.splitlines():
+        if len(raw) < 3:
+            continue
+        state, raw_path = raw[:2], raw[3:]
+        path = raw_path.strip()
+        if path.startswith('"') and path.endswith('"'):
+            try:
+                path = json.loads(path)
+            except json.JSONDecodeError:
+                pass
+        if path == "Cargo.lock" and cargo_lock_sha256 is not None:
+            actual = _sha256_file(root / path)
+            if actual == cargo_lock_sha256:
+                continue
+        failures.append(f"source checkout overlay {path!r} ({state})")
+        candidate = root / path.rstrip("/")
+        if candidate.is_dir() and not candidate.is_symlink():
+            try:
+                children = sorted(candidate.rglob("*"))
+            except OSError:
+                children = []
+            for child in children:
+                try:
+                    relative = child.relative_to(root)
+                except ValueError:
+                    continue
+                failures.append(f"source checkout overlay {relative!s} ({state})")
+    return failures
+
+
+def _external_path(value: str, label: str, root: Path) -> Path:
+    path = Path(value)
+    if not path.is_absolute():
+        raise CoverageError(f"{label} must be absolute")
+    resolved = path.resolve()
+    source_root = root.resolve()
+    try:
+        resolved.relative_to(source_root)
+    except ValueError:
+        pass
+    else:
+        raise CoverageError(f"{label} must be outside the source root")
+    if resolved == Path("/tmp") or Path("/tmp") in resolved.parents:
+        raise CoverageError(f"{label} must not be under /tmp")
+    return resolved
+
+
+def _capture_receipt(value: Any, label: str) -> dict[str, Any]:
+    required = {
+        "schema", "profile", "package", "default_features", "features", "argv",
+        "source_commit", "source_tree", "source_root", "target_dir",
+        "cargo_lock_path", "cargo_lock_sha256", "rust_toolchain_path",
+        "rust_toolchain_sha256", "cargo_path", "cargo_sha256", "rustc_path",
+        "rustc_sha256", "artifact",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise CoverageError(f"{label} requires exact capture identity fields")
+    if value["schema"] != CAPTURE_RECEIPT_SCHEMA:
+        raise CoverageError(f"{label}.schema is unsupported")
+    for field in ("profile", "package", "source_root", "target_dir", "cargo_path", "rustc_path"):
+        _nonempty_string(value[field], f"{label}.{field}")
+    if type(value["default_features"]) is not bool:
+        raise CoverageError(f"{label}.default_features must be boolean")
+    features = value["features"]
+    if not isinstance(features, list) or any(
+        not isinstance(feature, str) or not FEATURE.fullmatch(feature)
+        for feature in features
+    ) or len(set(features)) != len(features):
+        raise CoverageError(f"{label}.features must be unique feature identifiers")
+    argv = value["argv"]
+    if not isinstance(argv, list) or not argv or any(not isinstance(item, str) or not item for item in argv):
+        raise CoverageError(f"{label}.argv must be a nonempty string array")
+    for field in ("source_commit", "source_tree", "cargo_lock_sha256", "rust_toolchain_sha256",
+                  "cargo_sha256", "rustc_sha256"):
+        digest = _nonempty_string(value[field], f"{label}.{field}").lower()
+        pattern = HEX40 if field in {"source_commit", "source_tree"} else HEX64
+        if not pattern.fullmatch(digest):
+            raise CoverageError(f"{label}.{field} has the wrong digest shape")
+        value[field] = digest
+    if value["cargo_lock_path"] != "Cargo.lock":
+        raise CoverageError(f"{label}.cargo_lock_path must be exactly Cargo.lock")
+    if value["rust_toolchain_path"] not in {"rust-toolchain.toml", "rust-toolchain"}:
+        raise CoverageError(f"{label}.rust_toolchain_path is not an approved root toolchain path")
+    artifact = value["artifact"]
+    if not isinstance(artifact, dict) or set(artifact) != {"path", "bytes", "sha256"}:
+        raise CoverageError(f"{label}.artifact requires path, bytes and sha256")
+    _nonempty_string(artifact["path"], f"{label}.artifact.path")
+    if type(artifact["bytes"]) is not int or artifact["bytes"] < 1:
+        raise CoverageError(f"{label}.artifact.bytes must be positive")
+    artifact_hash = _nonempty_string(artifact["sha256"], f"{label}.artifact.sha256").lower()
+    if not HEX64.fullmatch(artifact_hash):
+        raise CoverageError(f"{label}.artifact.sha256 must be a full lowercase SHA-256")
+    artifact["sha256"] = artifact_hash
+    return value
+
+
+def _validate_capture_receipt(manifest: Mapping[str, Any], profile: Profile,
+                              rustdoc_path: Path, receipt_path: Path, root: Path,
+                              receipt: Mapping[str, Any],
+                              overlay_failures: list[str]) -> list[str]:
+    failures: list[str] = []
+    try:
+        source_root = Path(receipt["source_root"]).resolve()
+        if source_root != root.resolve():
+            failures.append(f"{profile.profile_id}: receipt source_root {source_root} != {root.resolve()}")
+        target = _external_path(str(receipt["target_dir"]), f"{profile.profile_id}.target_dir", root)
+        if not target.is_dir():
+            failures.append(f"{profile.profile_id}: receipt target_dir is not a directory: {target}")
+        artifact = _external_path(str(receipt["artifact"]["path"]), f"{profile.profile_id}.artifact.path", root)
+        if artifact != rustdoc_path.resolve():
+            failures.append(f"{profile.profile_id}: receipt artifact path {artifact} != {rustdoc_path.resolve()}")
+        _external_path(str(receipt_path.resolve()), f"{profile.profile_id}.receipt_path", root)
+        cargo_path = _external_path(str(receipt["cargo_path"]), f"{profile.profile_id}.cargo_path", root)
+        rustc_path = _external_path(str(receipt["rustc_path"]), f"{profile.profile_id}.rustc_path", root)
+    except CoverageError as error:
+        failures.append(f"{profile.profile_id}: {error}")
+        return failures
+    if receipt["profile"] != profile.profile_id:
+        failures.append(f"{profile.profile_id}: receipt profile is {receipt['profile']!r}")
+    if receipt["package"] != profile.package:
+        failures.append(f"{profile.profile_id}: receipt package is {receipt['package']!r}")
+    if receipt["default_features"] is not profile.default_features:
+        failures.append(f"{profile.profile_id}: receipt default_features differs from manifest")
+    if tuple(receipt["features"]) != profile.features:
+        failures.append(f"{profile.profile_id}: receipt features differ from manifest")
+    for label, path, expected in (
+        ("cargo", cargo_path, receipt["cargo_sha256"]),
+        ("rustc", rustc_path, receipt["rustc_sha256"]),
+    ):
+        actual = _sha256_file(path)
+        if actual != expected:
+            failures.append(f"{profile.profile_id}: {label} identity differs from receipt")
+    expected_argv = [
+        str(cargo_path), "rustdoc", "--package", profile.package, "--lib",
+        "--target-dir", str(Path(receipt["target_dir"]).resolve()),
+    ]
+    if not profile.default_features:
+        expected_argv.append("--no-default-features")
+    if profile.features:
+        expected_argv += ["--features", ",".join(profile.features)]
+    expected_argv += [
+        "--offline", "--locked", "--", "-Zunstable-options", "--output-format", "json",
+        "--document-hidden-items",
+    ]
+    if receipt["argv"] != expected_argv:
+        failures.append(f"{profile.profile_id}: receipt argv does not exactly match profile capture")
+    head = _git_head(root)
+    approved_lock = manifest["coverage"]["approved_cargo_lock_sha256"]
+    if receipt["cargo_lock_sha256"] != approved_lock:
+        failures.append(f"{profile.profile_id}: receipt Cargo.lock is not the approved seeded lock")
+    if receipt["source_commit"] != manifest["source_commit"] or receipt["source_commit"] != head:
+        failures.append(f"{profile.profile_id}: receipt source_commit is stale or differs from frozen HEAD")
+    tree = _git_tree(root, receipt["source_commit"])
+    if tree != receipt["source_tree"]:
+        failures.append(f"{profile.profile_id}: receipt source_tree differs from source commit")
+    lock = root / receipt["cargo_lock_path"]
+    if _sha256_file(lock) != receipt["cargo_lock_sha256"]:
+        failures.append(f"{profile.profile_id}: seeded Cargo.lock identity differs from receipt")
+    selected_toolchain = next(
+        (root / name for name in ("rust-toolchain.toml", "rust-toolchain") if (root / name).is_file()),
+        None,
+    )
+    if selected_toolchain is None or receipt["rust_toolchain_path"] != selected_toolchain.name:
+        failures.append(f"{profile.profile_id}: receipt toolchain path is not the selected root pin")
+    elif _sha256_file(selected_toolchain) != receipt["rust_toolchain_sha256"]:
+        failures.append(f"{profile.profile_id}: rust-toolchain identity differs from receipt")
+    artifact_path = rustdoc_path.resolve()
+    artifact = receipt["artifact"]
+    actual_bytes = artifact_path.stat().st_size if artifact_path.is_file() else None
+    actual_hash = _sha256_file(artifact_path)
+    if actual_bytes != artifact["bytes"] or actual_hash != artifact["sha256"]:
+        failures.append(f"{profile.profile_id}: rustdoc artifact bytes/SHA differs from receipt")
+    failures.extend(overlay_failures)
+    return failures
+
+
 def verify_source_anchors(manifest: Mapping[str, Any], root: Path, *, current: bool = False) -> list[str]:
     failures: list[str] = []
     commit = _git_head(root) if current else manifest["source_commit"]
@@ -376,6 +620,16 @@ def verify_source_anchors(manifest: Mapping[str, Any], root: Path, *, current: b
         return ["cannot resolve a current HEAD for source-anchor verification"]
     if not current and _git_type(root, commit) != "commit":
         return [f"source_commit {commit} does not resolve to a Git commit"]
+    coverage = manifest["coverage"]
+    for path_key, blob_key in (
+        ("expected_profile_source", "expected_profile_source_blob"),
+        ("expected_workspace_source", "expected_workspace_source_blob"),
+    ):
+        failure = _source_blob_failure(
+            root, commit, f"coverage.{path_key}", coverage[path_key], coverage[blob_key]
+        )
+        if failure:
+            failures.append(failure)
     for index, entry in enumerate(manifest["entries"]):
         anchor = entry["source"]
         failure = _anchor_failure(root, commit, f"entries[{index}] {entry['path']}", anchor)
@@ -453,6 +707,20 @@ def parse_rustdoc_args(values: Iterable[str]) -> dict[str, Path]:
             raise CoverageError(f"invalid --rustdoc binding {value!r}")
         if profile in result:
             raise CoverageError(f"duplicate rustdoc profile {profile}")
+        result[profile] = Path(path)
+    return result
+
+
+def parse_receipt_args(values: Iterable[str]) -> dict[str, Path]:
+    result: dict[str, Path] = {}
+    for value in values:
+        if "=" not in value:
+            raise CoverageError(f"--receipt expects PROFILE=PATH, got {value!r}")
+        profile, path = value.split("=", 1)
+        if not PROFILE_ID.fullmatch(profile) or not path:
+            raise CoverageError(f"invalid --receipt binding {value!r}")
+        if profile in result:
+            raise CoverageError(f"duplicate receipt profile {profile}")
         result[profile] = Path(path)
     return result
 
@@ -535,10 +803,12 @@ def census_profile(surface: glossary_gate.Surface) -> set[str]:
 
 def validate_manifest(manifest: Mapping[str, Any], *, root: Path,
                       glossary_path: Path, rustdoc: Mapping[str, Path] | None = None,
+                      receipts: Mapping[str, Path] | None = None,
                       require_complete: bool = False,
                       verify_sources: bool = True) -> dict[str, Any]:
     """Validate a manifest and return a machine-readable finite report."""
     rustdoc = dict(rustdoc or {})
+    receipts = dict(receipts or {})
     expected = _glossary_profiles(glossary_path)
     declared: dict[str, Profile] = manifest["_profiles"]
     report: dict[str, Any] = {
@@ -556,6 +826,10 @@ def validate_manifest(manifest: Mapping[str, Any], *, root: Path,
         "missing_workspace_packages": [],
         "missing_inputs": [],
         "extra_inputs": sorted(set(rustdoc) - set(declared)),
+        "missing_receipts": sorted(set(declared) - set(receipts)) if verify_sources else [],
+        "extra_receipts": sorted(set(receipts) - set(declared)) if verify_sources else [],
+        "receipt_failures": [],
+        "capture_overlay_failures": [],
         "loaded_profiles": [],
         "callable_counts": {},
         "unclassified": [],
@@ -571,13 +845,10 @@ def validate_manifest(manifest: Mapping[str, Any], *, root: Path,
         ),
         "active_lanes": sorted(lane["id"] for lane in manifest["lanes"]),
     }
-    if verify_sources:
-        for source_key in ("expected_profile_source", "expected_workspace_source"):
-            source_path = root / manifest["coverage"][source_key]
-            if not source_path.is_file():
-                report["source_failures"].append(
-                    f"coverage.{source_key} is missing: {manifest['coverage'][source_key]}"
-                )
+    # The coverage source paths are verified by their exact Git blob identities
+    # above.  Do not require a sparse checkout to materialize them: the source
+    # identity is the contract, and a worktree-only existence check would reject
+    # a valid capture before rustdoc inputs are even considered.
     workspace = _workspace_packages(root)
     declared_packages = {profile.package for profile in declared.values()}
     report["missing_workspace_packages"] = sorted(workspace - declared_packages)
@@ -589,6 +860,34 @@ def validate_manifest(manifest: Mapping[str, Any], *, root: Path,
                 f"{profile_id}: manifest {actual!r} != glossary {wanted!r}"
             )
     for profile_id, profile in declared.items():
+        if verify_sources:
+            receipt_path = receipts.get(profile_id)
+            rustdoc_path = rustdoc.get(profile_id)
+            if receipt_path is not None:
+                if not receipt_path.is_file():
+                    report["receipt_failures"].append(f"{profile_id}: missing receipt {receipt_path}")
+                else:
+                    try:
+                        receipt_value = json.loads(receipt_path.read_text(encoding="utf-8"))
+                        receipt = _capture_receipt(receipt_value, f"receipt[{profile_id}]")
+                    except (OSError, json.JSONDecodeError, CoverageError) as error:
+                        report["receipt_failures"].append(f"{profile_id}: invalid receipt: {error}")
+                    else:
+                        overlay_failures = _source_overlay_failures(
+                            root, manifest["coverage"]["approved_cargo_lock_sha256"]
+                        )
+                        report["capture_overlay_failures"].extend(overlay_failures)
+                        if rustdoc_path is None:
+                            report["receipt_failures"].append(
+                                f"{profile_id}: receipt has no matching rustdoc input"
+                            )
+                        else:
+                            report["receipt_failures"].extend(
+                                _validate_capture_receipt(
+                                    manifest, profile, rustdoc_path, receipt_path, root,
+                                    receipt, overlay_failures,
+                                )
+                            )
         path = rustdoc.get(profile_id)
         if path is None:
             report["missing_inputs"].append(profile_id)
@@ -632,10 +931,16 @@ def validate_manifest(manifest: Mapping[str, Any], *, root: Path,
     report["unclassified"] = sorted(report["unclassified"])
     report["stale_entries"] = sorted(report["stale_entries"])
     report["signature_failures"] = sorted(report["signature_failures"])
+    report["missing_receipts"] = sorted(report["missing_receipts"])
+    report["extra_receipts"] = sorted(report["extra_receipts"])
+    report["receipt_failures"] = sorted(set(report["receipt_failures"]))
+    report["capture_overlay_failures"] = sorted(set(report["capture_overlay_failures"]))
     report["complete"] = not any(
         report[key] for key in (
             "missing_profiles", "missing_workspace_packages",
-            "profile_mismatches", "missing_inputs", "extra_inputs", "unclassified", "stale_entries", "signature_failures",
+            "profile_mismatches", "missing_inputs", "extra_inputs", "missing_receipts",
+            "extra_receipts", "receipt_failures", "capture_overlay_failures",
+            "unclassified", "stale_entries", "signature_failures",
             "source_failures", "current_source_failures", "active_entries", "active_lanes",
         )
     ) and manifest["coverage"]["state"] == "complete"
@@ -651,6 +956,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--glossary", type=Path, default=Path("tools/api_glossary.json"))
     parser.add_argument("--rustdoc", action="append", default=[], metavar="PROFILE=PATH",
                         help="bind an existing rustdoc JSON input; repeat per profile")
+    parser.add_argument("--receipt", action="append", default=[], metavar="PROFILE=PATH",
+                        help="bind the exact capture receipt for a rustdoc input; repeat per profile")
     parser.add_argument("--require-complete", action="store_true",
                         help="fail unless every profile/callable/disposition is complete")
     parser.add_argument("--json", action="store_true", help="print the full report as JSON")
@@ -663,9 +970,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         manifest = load_manifest(args.manifest)
         rustdoc = parse_rustdoc_args(args.rustdoc)
+        receipts = parse_receipt_args(args.receipt)
         report = validate_manifest(
             manifest, root=args.root, glossary_path=args.glossary,
-            rustdoc=rustdoc, require_complete=args.require_complete,
+            rustdoc=rustdoc, receipts=receipts, require_complete=args.require_complete,
         )
     except CoverageError as error:
         parser.error(str(error))

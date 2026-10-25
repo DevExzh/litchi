@@ -5,7 +5,10 @@
     "state": "incomplete",
     "reason": "0362ul65-70 and the existing ODF/font/crypto/PPTX raw lanes are explicitly recorded, but final all-profile rustdoc inputs and callable dispositions have not yet been assembled.",
     "expected_profile_source": "tools/api_glossary.json",
-    "expected_workspace_source": "Cargo.toml"
+    "expected_profile_source_blob": "0e4ffb67ad53c8d7dff68f17fc0d5685e84f265b",
+    "expected_workspace_source": "Cargo.toml",
+    "expected_workspace_source_blob": "806bb190ca15bb53d0ec8b29c8812b338ffaca72",
+    "approved_cargo_lock_sha256": "efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811"
   },
   "profiles": [
     {
