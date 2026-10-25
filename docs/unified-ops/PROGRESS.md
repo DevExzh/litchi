@@ -5385,3 +5385,25 @@ See [0063](0063-source-pptx-modern-comments.md).
   properties/shared-error composition, including eight conflict resolutions,
   the five-variant properties bridge, source chains and typed patch errors.
   Custom XML audit 94c and actual combined validation remain required.
+
+- Coordinator all-target consumers and cleanup checkpoint (2026-10-25):
+  PPTX's actual keep-going check on `15d8d53a0c` passes formatting and
+  exposes 130 library/integration-test diagnostics. Five workers repair the
+  consumers and five independent reviews pass their scoped source changes.
+  Private composition `096422a20a` commits all 36 Rust paths with records
+  89p–89u; seven paths receive proven formatting-only normalization. Fresh
+  compiler/runtime/Clippy/glossary and performance validation remain required.
+
+  OOXML's corrected v2 packet on `0db7ff3a6a` passes formatting and fails
+  on one unused OPC binding. Private fix `0395ca40f4` preserves the same
+  generated-part predicate. Custom XML 94ca remains returned for bounded
+  allocation, opaque/MCE fidelity, selected-limit propagation and scan-cost
+  repairs; 94cb is active. The 65-row combined plan remains unexecuted.
+
+  Cleanup66 removes the merged formatting worktree without force, retaining
+  its branch, ignored lock, both captures and targets. Actual sparse restore
+  and root verification pass; net allocation reclaimed is 7,565,520,896 bytes.
+  Holds are released and the constructor probe is unchanged. Record 0362ul96
+  binds this checkpoint. Final gate/docs, inventories/dispositions,
+  corpus/native and quiet ABBA remain open. Only audit22 is deferred.
+  Nothing is pushed.
