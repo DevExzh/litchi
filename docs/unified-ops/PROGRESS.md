@@ -5168,3 +5168,26 @@ See [0063](0063-source-pptx-modern-comments.md).
   replay; notes/media aggregates also still need affected-scope accounting.
   Those findings remain required engineering work. No complete gate, census,
   native or performance acceptance is claimed. Nothing is pushed.
+
+- Coordinator Formula integration checkpoint (2026-10-25):
+  Formula atomic `20aa27d913` merges at `f14235da95`. Root verifies the
+  complete 44-path lane, exact tested Formula/consumer blobs, equivalent ops
+  error-classification changes and additive glossary composition. All 89
+  selected tooling tests pass; the glossary now has 68 profiles. Fresh
+  persisted validation remains bound to `c937149a3b`, with the earlier
+  receipt gap explicitly documented. No unrecorded rerun is treated as
+  acceptance evidence.
+
+  A partial detached compiler capture on `11d14a661d` is preserved after
+  cancellation for retargeting; it is not a completed composed result. The
+  next capture must use detached `f14235da95`, with coordinator verification
+  of its manifest before launch. Numbers wire is validating `6417a19464`
+  and its post-review compile repairs are undergoing independent review.
+
+  History metadata 82 is committed and under independent review. Structural
+  metadata 81 was returned for remaining compatibility wrappers, allocation
+  before output-limit admission and typed limit errors. Shared PPTX replay
+  accounting and no-op base matching remain under review. Those returns
+  remain active engineering work, with no exception accepted. The workspace
+  cleanup holds are released; the protected constructor probe is unchanged.
+  Final gate, census and native/performance qualification remain open.
