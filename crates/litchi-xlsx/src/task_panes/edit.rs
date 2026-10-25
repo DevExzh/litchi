@@ -142,6 +142,7 @@ impl Edit {
                 Ok(changed)
             }
         })
+        .map(|_| ())
     }
 
     /// Add one task pane, allocating a deterministic relationship ID when

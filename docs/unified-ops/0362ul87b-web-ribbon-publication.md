@@ -81,3 +81,25 @@ This follow-up changes only that consumer to the existing public
 `Panes::len()` accessor. No public field or compatibility alias is added;
 the remaining `.panes` accesses are crate-internal implementation or unit
 tests within the owning common crate.
+
+The fresh retry at source commit `85a4b3e618adb75611ee8f6004b66cf660bf2414`
+was granted the serialized validation slot and stopped at the first compiler
+failure. Its prior zero-row isolation refusal remains untouched:
+
+* retry receipt: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-85a4b3e618/result.json`
+  (SHA-256 `7802d2e8951664dc91bbf5271a3346b328cb15a09b961499f2fe5d31a92180dc`);
+* rows: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-85a4b3e618/rows.json`
+  (SHA-256 `2e8d7ceb06a2c199c30959fe0b7b86f2c31e03934d81a82697e0c561b824d5a0`);
+* failed compiler log: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-85a4b3e618/02-check-leaves-attempt-actual-f5-02.log`
+  (SHA-256 `c4661133fae0e50573eb1a84832ba67555aa129a128c3733b96d6d2ab2d47d83`);
+* `fmt-scoped` and `check-common` passed; row 2 `check-leaves` exited `101`
+  after 55.17 seconds with a 285,736,553-byte target. No later row ran.
+
+The diagnostic was an XLSX task-pane adapter return-shape mismatch at
+`crates/litchi-xlsx/src/task_panes/edit.rs:123`: the public `replace` verb
+returns `Result<()>`, while its private staging closure correctly computes the
+meaningful changed flag. The adapter now maps the successful internal result
+to unit at its public boundary. DOCX task-pane `put`/`remove` and durable
+routes, PPTX task-pane `set`/`remove`, and XLSB task-pane `replace`/`clear`
+were audited; their public boolean results and all consumers intentionally
+retain the changed signal and required no migration.
