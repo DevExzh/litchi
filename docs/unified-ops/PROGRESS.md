@@ -5653,3 +5653,13 @@ See [0063](0063-source-pptx-modern-comments.md).
   Remaining unique rows receive semantic review against their squashed
   replacements. The 14 signed-policy tests pass and the fresh eight-row
   compiler packet is running on frozen joint source `ea5c95e212`.
+
+  Joint source `ea5c95e212` passes all eight compiler/consumer rows, including
+  strict six-package/ops/facade Clippy and standalone perf/native harnesses.
+  Root verifies the complete receipt; the 34-row runtime packet is now active.
+  Cleanup73 removes eleven unused worktrees without force, preserves eight
+  locks and reclaims 62,694,273,024 bytes. Cleanup72–73 totals 72,860,655,616
+  bytes. Local ref consolidation has deleted 271 refs with exact-tip guards;
+  integrated commits remain reachable, and seven retired old reference
+  branches are deliberately discarded. Sixty-eight office-lineage siblings
+  are outside scope. Dirty payload and remaining worktree review continues.

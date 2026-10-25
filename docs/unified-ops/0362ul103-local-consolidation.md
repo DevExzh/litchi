@@ -92,3 +92,72 @@ locks, all command arguments and an empty global build slot. Joint runtime
 now has 34 rows, including the complete ops PPTX batch-equivalence target;
 13 glossary profiles/26 steps are prepared separately. These are pending
 qualification results, not acceptance.
+
+## Joint compiler passed and cleanup continued
+
+All eight compiler/consumer rows pass on frozen `ea5c95e212`; root verifies
+the terminal capture, command/log bindings, unchanged source/locks, resource
+guards and process cleanup before starting runtime.
+
+| Row | Seconds |
+|---|---:|
+| Formatting, 500 changed Rust paths | 3.739 |
+| Minimal PPTX, all targets | 57.458 |
+| Strict six primary OOXML package Clippy | 219.431 |
+| Strict unified ops OOXML Clippy | 121.309 |
+| Strict facade OOXML Clippy | 89.604 |
+| Performance harness, all targets | 159.199 |
+| Native-resave OOXML harness, all targets | 56.454 |
+| Minimal OPC/common, all targets | 21.108 |
+
+Target ends at 1,147,710,905 bytes. External packet
+`.coord/uo2-coordinator-replay-integration-f5-compiler-ea5c95e2` retains
+`rows.json` (62,232 bytes, SHA-256
+`cd588985432a04227ca1a9561d407aea28232ba6575d65320b5543e9b7cf29d2`) and
+`result.json` (65,467 bytes, SHA-256
+`329a5c70154078aa0fc3aa364122a99c1418214381d288029de595b568a41979`).
+This is compiler acceptance for this source; runtime and performance remain
+open. Root reviews the 34-row runtime packet, verifies its source/locks,
+unchanged original commands plus the signed-batch target, fresh resources and
+empty global builder slot, then starts it serially.
+
+Branch consolidation has deleted 271 local refs so far: 70 already in trunk,
+163 unattached refs whose commits remain reachable from private integration,
+six superseded refs, 21 retired references/superseded sources, and the eleven
+refs of the worktrees removed below. Every transaction uses exact-tip guards.
+The seven old M0/M1/M2 reference branches are deliberately discarded as retired
+pre-rewrite work; their original histories are neither merged nor claimed as
+accepted. Superseded source decisions compare owned changes with integrated
+replacements. The two remaining IWA branches have the same office/unified
+merge base, confirming 68 independent office siblings outside scope.
+
+The external consolidation directory retains these additional receipts:
+
+| Receipt | SHA-256 |
+|---|---|
+| `superseded-six-delete-receipt.json` | `e944ed100213605707d94890d00a9154b2ac092bb915bba1a57f80f0f62a668b` |
+| `integrated-163-delete-receipt.json` | `327465e10c43a5a654d9935d17a8d3bfe45887d56c7687512b05067e617df189` |
+| `superseded-21-delete-receipt.json` | `ab2b08e05720d1b51ccaf575e7530c4a0c7cc4f3f4c1128df6eb9e09c6e832b4` |
+| `wave73-eleven-ref-delete-receipt.json` | `89eb98f3225c1e7ab2af1dbb19f7533e33d5a896e7df83498471a506f76f3c45` |
+
+Cleanup73 removes eleven unused source/tooling/legacy/W8 intermediate
+worktrees without force. Eight Cargo.lock files retain exact bytes, modes and
+inodes with actual roundtrip proof; 33 tracked blobs are restored and checked.
+Four standard Cargo targets and 38 bytecode caches are discarded after
+confirming no evidence payload or live holder. Root independently verifies
+all exact registry paths are gone, every preserved lock and source blob,
+branch ancestry and the unchanged probe. Net reclaim is 62,694,273,024 bytes;
+cleanup72–73 totals 72,860,655,616 bytes.
+
+External `quarantine/wave73-integration-clean-11/receipt.tsv` is 2,282 bytes,
+SHA-256 `aefd80da700daccf595cbda6b3d15251cd96cebd7b166e9a5546fb3044037718`;
+`preserved-payload.tsv` is 1,780 bytes, SHA-256
+`7b8073213dd05015e05e2dcc4b53c1bc1174fdb9995cedecfcadc38ab5f8af6e`;
+`restore-proof.tsv` is 3,469 bytes, SHA-256
+`083ecaadb21f120ccba1088244e5f4b3528ad3d60c2ae56b8e34382847304123`.
+
+No missing implementation is identified in the audited older PPTX/OOXML,
+W8, formula, Markdown, font, PPT or XLS branches. Uncommitted dirty payloads
+are reviewed separately and preserved until disposition; active measurement
+baselines, current integration, runner and protected probe remain intact.
+This cleanup does not waive any final qualification obligation.
