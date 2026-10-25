@@ -35,7 +35,7 @@ fn publish(
     package: &mut OpcPackage,
     props: Props,
     host: Host,
-) -> std::result::Result<bool, crate::properties::Error> {
+) -> Result<bool, crate::properties::Error> {
     let mut edit = crate::properties::Edit::new(package, host)?;
     edit.set_custom_props(props);
     let commit = edit.commit()?;

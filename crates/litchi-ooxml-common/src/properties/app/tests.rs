@@ -172,7 +172,7 @@ fn sign(package: &mut OpcPackage) {
 fn publish(
     package: &mut OpcPackage,
     props: Option<Props>,
-) -> std::result::Result<bool, crate::properties::Error> {
+) -> Result<bool, crate::properties::Error> {
     let mut edit = crate::properties::Edit::new(package, crate::custom::Host::Word)?;
     edit.set_app_props(props);
     let commit = edit.commit()?;
