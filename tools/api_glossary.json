@@ -22032,6 +22032,44 @@
       ]
     },
     {
+      "id": "markdown",
+      "package": "litchi-markdown",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_markdown",
+          "replacement": "configure the owner through OpenOptions and read_with_options/read_bytes_with_options (record 0362ul70)",
+          "match": "suffix"
+        },
+        {
+          "name": "read_with",
+          "scope": "litchi_markdown::reader::Snapshot",
+          "replacement": "use read_with_options with the retained OpenOptions policy (record 0362ul70)"
+        }
+      ],
+      "families": [
+        "litchi_markdown::reader"
+      ],
+      "immutable_owners": [
+        "litchi_markdown::reader::Snapshot"
+      ],
+      "shared_types": [
+        {
+          "path": "litchi_markdown::reader::Commit",
+          "target": "litchi_core::edit::Commit"
+        }
+      ],
+      "family_methods": true,
+      "result_methods": [
+        {
+          "method": "litchi_markdown::reader::Snapshot::apply",
+          "ok": "litchi_markdown::reader::Commit"
+        }
+      ]
+    },
+    {
       "id": "pages",
       "package": "litchi-pages",
       "default_features": true,
