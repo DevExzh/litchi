@@ -5889,3 +5889,11 @@ See [0063](0063-source-pptx-modern-comments.md).
   gate. Root verifies the failed capture and starts the separate 26-row PPTX
   full-feature runtime tail. Readonly134a is source-reviewed and ready; C
   stays frozen during diagnostics. Final qualification remains open.
+
+  All 26 full-feature PPTX tail rows pass, including chunks32–53, six examples
+  and doctests; root verifies the terminal capture (139). The minimal profile
+  runs separately. Return138's explicit public-to-defining MCE type mapping
+  passes independent review and 75 checker tests; it and134a await composition.
+  Native135b/136a must repair actual execution/receipt paths;137a is under
+  independent review after 43 focused tests. Final gates, measurements,
+  trunk integration and leaf cleanup remain open. Nothing is pushed.
