@@ -19,9 +19,6 @@ use super::{
 };
 use crate::web::LimitKind;
 use crate::xml::attributes::BytesStartExt as _;
-use quick_xml::XmlVersion;
-use quick_xml::events::Event;
-use quick_xml::reader::Reader;
 /// Plan an exact, source-checked replacement of the persisted task-pane graph
 /// under `limits`.
 ///
@@ -571,55 +568,20 @@ fn relationship_attributes_use_namespace(
     let root = effective.root()?;
     let mut opposite_seen = false;
     let mut expected_seen = false;
-    let (root_expected, root_opposite) = root_namespace_profile(xml, expected)?;
-    expected_seen |= root_expected;
-    opposite_seen |= root_opposite;
-    inspect_relationship_attributes(root, expected, &mut opposite_seen, &mut expected_seen);
-    // Preserve the declared profile even when a graph happens to contain no
-    // relationship-valued attributes.  Without this check a strict request
-    // could be reported as a signed no-op for a transitional source (and
-    // vice versa), losing the caller's explicit conformance intent.
-    Ok(expected_seen && !opposite_seen)
-}
-
-fn root_namespace_profile(xml: &[u8], expected: &str) -> Result<(bool, bool)> {
-    let opposite = if expected == TRANSITIONAL_RELATIONSHIPS_NAMESPACE {
-        STRICT_RELATIONSHIPS_NAMESPACE
-    } else {
-        TRANSITIONAL_RELATIONSHIPS_NAMESPACE
-    };
-    let mut reader = Reader::from_reader(xml);
-    reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
-    loop {
-        match reader.read_event_into(&mut buffer)? {
-            Event::Start(element) | Event::Empty(element) => {
-                let mut expected_seen = false;
-                let mut opposite_seen = false;
-                for attribute in element.checked_attributes() {
-                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-                    let name = std::str::from_utf8(attribute.key.as_ref())
-                        .map_err(|error| Error::Xml(error.to_string()))?;
-                    if name != "xmlns" && !name.starts_with("xmlns:") {
-                        continue;
-                    }
-                    let value = attribute
-                        .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
-                        .map_err(|error| Error::Xml(error.to_string()))?;
-                    if value == expected {
-                        expected_seen = true;
-                    }
-                    if value == opposite {
-                        opposite_seen = true;
-                    }
-                }
-                return Ok((expected_seen, opposite_seen));
-            },
-            Event::Eof => return Ok((false, false)),
-            Event::DocType(_) => return invalid("DTD is forbidden in web extension XML".into()),
-            _ => buffer.clear(),
-        }
-    }
+    let mut relationship_seen = false;
+    inspect_relationship_attributes(
+        root,
+        expected,
+        &mut opposite_seen,
+        &mut expected_seen,
+        &mut relationship_seen,
+    );
+    // A source part may declare an unused relationship prefix, or carry a
+    // vendor namespace whose value happens to be the other profile's URI.
+    // Neither is a relationship token and neither justifies rewriting an
+    // otherwise equal semantic graph.  Once a relationship-valued attribute
+    // is present, however, it must use the requested namespace.
+    Ok(!opposite_seen && (!relationship_seen || expected_seen))
 }
 
 fn inspect_relationship_attributes(
@@ -627,50 +589,34 @@ fn inspect_relationship_attributes(
     expected: &str,
     opposite_seen: &mut bool,
     expected_seen: &mut bool,
+    relationship_seen: &mut bool,
 ) {
-    if let Some(fragment) = &node.raw_fragment {
-        let mut scope = Some(fragment.namespaces.as_ref());
-        while let Some(current) = scope {
-            if current
-                .local
-                .values()
-                .any(|namespace| namespace == expected)
-            {
-                *expected_seen = true;
-            }
-            let opposite = if expected == TRANSITIONAL_RELATIONSHIPS_NAMESPACE {
-                STRICT_RELATIONSHIPS_NAMESPACE
-            } else {
-                TRANSITIONAL_RELATIONSHIPS_NAMESPACE
-            };
-            if current
-                .local
-                .values()
-                .any(|namespace| namespace == opposite)
-            {
-                *opposite_seen = true;
-            }
-            scope = current.parent.as_deref();
-        }
-    }
+    let opposite = if expected == TRANSITIONAL_RELATIONSHIPS_NAMESPACE {
+        STRICT_RELATIONSHIPS_NAMESPACE
+    } else {
+        TRANSITIONAL_RELATIONSHIPS_NAMESPACE
+    };
     for attribute in &node.attributes {
         if !matches!(attribute.local_name.as_str(), "id" | "embed" | "link") {
             continue;
         }
         if attribute.namespace == expected {
+            *relationship_seen = true;
             *expected_seen = true;
         }
-        if attribute.namespace != expected
-            && ((expected == TRANSITIONAL_RELATIONSHIPS_NAMESPACE
-                && attribute.namespace == STRICT_RELATIONSHIPS_NAMESPACE)
-                || (expected == STRICT_RELATIONSHIPS_NAMESPACE
-                    && attribute.namespace == TRANSITIONAL_RELATIONSHIPS_NAMESPACE))
-        {
+        if attribute.namespace == opposite {
+            *relationship_seen = true;
             *opposite_seen = true;
         }
     }
     for child in &node.children {
-        inspect_relationship_attributes(child, expected, opposite_seen, expected_seen);
+        inspect_relationship_attributes(
+            child,
+            expected,
+            opposite_seen,
+            expected_seen,
+            relationship_seen,
+        );
     }
 }
 
