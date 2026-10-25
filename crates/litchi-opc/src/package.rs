@@ -45,52 +45,72 @@ pub use relationships::{
 /// source totals describe the original archive; admission checks below charge
 /// only source members the writer will actually copy for the package's current
 /// graph, while callers compose newly generated members separately.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RetainedArchiveMetrics {
     members: usize,
     entries: usize,
     aggregate_bytes: u64,
+    metadata_bytes: u64,
     opaque_members: usize,
     opaque_entries: usize,
     opaque_bytes: u64,
+    known_metadata: Arc<Vec<(String, u64)>>,
 }
 
 impl RetainedArchiveMetrics {
     /// Number of non-directory physical members.
     #[must_use]
-    pub const fn members(self) -> usize {
+    pub const fn members(&self) -> usize {
         self.members
     }
 
     /// Number of central-directory entries, including directory markers.
     #[must_use]
-    pub const fn entries(self) -> usize {
+    pub const fn entries(&self) -> usize {
         self.entries
     }
 
     /// Aggregate declared uncompressed bytes of non-directory members.
     #[must_use]
-    pub const fn aggregate_bytes(self) -> u64 {
+    pub const fn aggregate_bytes(&self) -> u64 {
         self.aggregate_bytes
+    }
+
+    /// Variable central-directory and archive-tail metadata emitted for the
+    /// package's current publication image. The fixed central-directory
+    /// header is intentionally excluded.
+    #[must_use]
+    pub const fn metadata_bytes(&self) -> u64 {
+        self.metadata_bytes
     }
 
     /// Number of retained non-directory members outside the OPC projection.
     #[must_use]
-    pub const fn opaque_members(self) -> usize {
+    pub const fn opaque_members(&self) -> usize {
         self.opaque_members
     }
 
     /// Number of retained opaque central-directory entries, including
     /// directory markers.
     #[must_use]
-    pub const fn opaque_entries(self) -> usize {
+    pub const fn opaque_entries(&self) -> usize {
         self.opaque_entries
     }
 
     /// Aggregate declared bytes of retained opaque non-directory members.
     #[must_use]
-    pub const fn opaque_bytes(self) -> u64 {
+    pub const fn opaque_bytes(&self) -> u64 {
         self.opaque_bytes
+    }
+
+    /// Variable metadata bytes in the retained source record for a known OPC
+    /// member. The lookup uses the physical member spelling, and returns
+    /// `None` for opaque or absent members.
+    #[must_use]
+    pub fn source_member_metadata(&self, name: &str) -> Option<u64> {
+        self.known_metadata
+            .iter()
+            .find_map(|(member, bytes)| (member == name).then_some(*bytes))
     }
 }
 
@@ -237,6 +257,44 @@ pub(crate) struct SourcePart {
     pub(crate) relationships_xml: Arc<PreservedRelationshipsXml>,
     pub(crate) member_present: bool,
     pub(crate) relationships_member_present: bool,
+}
+
+/// Apply the same source-payload decision used by targeted publication.
+///
+/// A deferred current payload is an untouched-source proof and therefore does
+/// not need to be decoded. Once a caller supplied a payload allocation, the
+/// writer compares bytes as well as provenance: equal replacement bytes are
+/// still safe to copy with the source central record and compressed stream.
+/// Metadata admission passes `false` for `force_deferred`, using the checked
+/// declared length as a conservative proof and leaving unrelated deferred
+/// members untouched. The selected writer plan passes `true` when it must make
+/// the exact copy/regenerate decision. Keeping both branches here prevents
+/// the two paths from drifting.
+pub(crate) fn source_blob_retained(
+    source_part: &SourcePart,
+    current: Option<&[u8]>,
+    force_deferred: bool,
+) -> bool {
+    let Some(current) = current else {
+        return true;
+    };
+    if let Some(source) = source_part.blob.decoded() {
+        return std::ptr::eq(source.as_slice(), current) || source.as_slice() == current;
+    }
+    if !force_deferred {
+        // Admission must not hydrate an unrelated deferred source member just
+        // to predict a writer branch. A declared-length mismatch proves the
+        // writer cannot copy it; equal lengths remain conservatively charged
+        // as retained until the selected publication plan compares bytes.
+        return source_part
+            .blob
+            .payload_len()
+            .is_ok_and(|length| length == current.len());
+    }
+    source_part
+        .blob
+        .force()
+        .is_ok_and(|source| source.as_slice() == current)
 }
 
 /// A compact semantic fingerprint for one relationship collection.
@@ -833,6 +891,13 @@ impl OpcPackage {
             });
         };
         let source_members = provenance.members.as_slice();
+        let mut known_metadata = Vec::new();
+        known_metadata
+            .try_reserve_exact(source_members.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC retained known-member metadata",
+                source,
+            })?;
         let parts_match_source = provenance.parts.len() == self.parts.len()
             && self.iter_parts_undecoded().all(|part| {
                 provenance
@@ -841,15 +906,13 @@ impl OpcPackage {
                     .is_some_and(|source| source.content_type == part.content_type())
             });
         let content_types_pristine = parts_match_source
-            && self.source_content_types_source()?.is_some()
             && self
-                .source_content_types_xml
-                .as_ref()
-                .is_some_and(|source| Arc::ptr_eq(source, &provenance.content_types_xml));
+                .source_content_types_source()?
+                .is_some_and(|(source, _)| source == provenance.content_types_xml.as_slice());
+        let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
         let package_relationships_pristine = self
-            .rels
-            .source_capture()
-            .is_some_and(|capture| Arc::ptr_eq(capture, &provenance.package_relationships_xml));
+            .source_relationships_xml(&package_uri, &self.rels)?
+            .is_some_and(|source| source == provenance.package_relationships_xml.as_bytes());
 
         // ZIP central-directory records have a fixed 46-byte header that is
         // not part of the archive metadata budget.  The variable fields are
@@ -879,20 +942,20 @@ impl OpcPackage {
                     .zip(self.parts.get(partname))
                     .is_some_and(|(source_part, current)| {
                         source_part.member_present
-                            && source_part
-                                .blob
-                                .same_allocation(current.payload_handle().payload())
+                            && source_blob_retained(source_part, current.decoded_blob(), false)
                     }),
-                SourceMemberKind::PartRelationships(partname) => provenance
-                    .parts
-                    .get(partname)
-                    .zip(self.parts.get(partname))
-                    .is_some_and(|(source_part, current)| {
-                        source_part.relationships_member_present
-                            && current.rels().source_capture().is_some_and(|capture| {
-                                Arc::ptr_eq(capture, &source_part.relationships_xml)
-                            })
-                    }),
+                SourceMemberKind::PartRelationships(partname) => {
+                    let Some((source_part, current)) =
+                        provenance.parts.get(partname).zip(self.parts.get(partname))
+                    else {
+                        false
+                    };
+                    if !source_part.relationships_member_present {
+                        false
+                    } else {
+                        self.source_relationships_retained(partname, source_part, current.rels())?
+                    }
+                },
                 // Unknown source members are copied by the targeted writer,
                 // including when the current OPC graph has a name collision.
                 SourceMemberKind::Unknown => true,
@@ -912,8 +975,42 @@ impl OpcPackage {
                     limits.max_archive_member_name_bytes(),
                 )?;
             }
-            let entry_metadata = entry.metadata_size_hint();
-            if preserved {
+            let generated = match &source_member.kind {
+                SourceMemberKind::ContentTypes | SourceMemberKind::PackageRelationships => {
+                    !preserved
+                },
+                SourceMemberKind::Part(partname) => {
+                    !preserved
+                        && self.parts.get(partname).is_some_and(|part| {
+                            provenance
+                                .parts
+                                .get(partname)
+                                .is_some_and(|source_part| source_part.member_present)
+                        })
+                },
+                SourceMemberKind::PartRelationships(partname) => {
+                    !preserved
+                        && self.parts.get(partname).is_some_and(|part| {
+                            part.rels().len() > 0
+                                || self.source_relationships_member_present(partname)
+                        })
+                },
+                SourceMemberKind::Unknown => false,
+            };
+            let source_entry_metadata = entry.metadata_size_hint();
+            if !matches!(&source_member.kind, SourceMemberKind::Unknown)
+                && let Ok(name) = std::str::from_utf8(entry.file_path().as_ref())
+            {
+                known_metadata.push((name.to_owned(), source_entry_metadata));
+            }
+            let entry_metadata = if generated {
+                // RegeneratedEntry has no extra field or comment; its name is
+                // the source name retained by the targeted writer.
+                entry.file_path().as_ref().len() as u64
+            } else {
+                source_entry_metadata
+            };
+            if preserved || generated {
                 metadata_bytes = metadata_bytes.checked_add(entry_metadata).ok_or_else(|| {
                     OpcError::ZipError("ZIP central-directory metadata overflows".to_owned())
                 })?;
@@ -997,13 +1094,59 @@ impl OpcPackage {
             preserved_members as u64,
             limits.max_members() as u64,
         )?;
+        // A targeted publication appends newly authored parts and relationship
+        // members after the retained source namespace. Their generated
+        // central records have only the member name as variable metadata, so
+        // account for them here as part of the same recipient summary.
+        for part in self.iter_parts_undecoded() {
+            if !known_metadata
+                .iter()
+                .any(|(name, _)| name == part.partname().membername())
+            {
+                metadata_bytes = metadata_bytes
+                    .checked_add(part.partname().membername().len() as u64)
+                    .ok_or_else(|| {
+                        OpcError::ZipError("ZIP central-directory metadata overflows".to_owned())
+                    })?;
+                limits.check(
+                    crate::SourceLimitKind::ArchiveMetadataBytes,
+                    metadata_bytes,
+                    limits.max_archive_metadata_bytes(),
+                )?;
+            }
+            if !part.rels().is_empty() {
+                let relationship_name = part
+                    .partname()
+                    .rels_uri()
+                    .map_err(OpcError::InvalidPackUri)?;
+                if !known_metadata
+                    .iter()
+                    .any(|(name, _)| name == relationship_name.membername())
+                {
+                    metadata_bytes = metadata_bytes
+                        .checked_add(relationship_name.membername().len() as u64)
+                        .ok_or_else(|| {
+                            OpcError::ZipError(
+                                "ZIP central-directory metadata overflows".to_owned(),
+                            )
+                        })?;
+                    limits.check(
+                        crate::SourceLimitKind::ArchiveMetadataBytes,
+                        metadata_bytes,
+                        limits.max_archive_metadata_bytes(),
+                    )?;
+                }
+            }
+        }
         Ok(Some(RetainedArchiveMetrics {
             members,
             entries,
             aggregate_bytes,
+            metadata_bytes,
             opaque_members,
             opaque_entries,
             opaque_bytes,
+            known_metadata: Arc::new(known_metadata),
         }))
     }
 
@@ -1463,6 +1606,75 @@ impl OpcPackage {
             .get(owner)
             .filter(|source| source.binding.matches(relationships))
             .map(|source| source.bytes.as_slice()))
+    }
+
+    /// Whether a current relationship collection will be copied with the
+    /// source central record by targeted publication.
+    ///
+    /// The source capture settles the untouched case without serialization.
+    /// A mutate-then-revert collection keeps its semantic source binding and
+    /// is likewise copied byte-for-byte. Only a collection with no matching
+    /// source binding needs one canonical serialization for the final byte
+    /// comparison the writer performs.
+    pub(crate) fn source_relationships_retained(
+        &self,
+        owner: &PackURI,
+        source_part: &SourcePart,
+        relationships: &Relationships,
+    ) -> Result<bool> {
+        if !source_part.relationships_member_present {
+            return Ok(false);
+        }
+        if relationships
+            .source_capture()
+            .is_some_and(|capture| Arc::ptr_eq(capture, &source_part.relationships_xml))
+        {
+            return Ok(true);
+        }
+        if let Some(source) = self.source_relationships_xml(owner, relationships)? {
+            return Ok(source_part.relationships_xml.as_bytes() == source);
+        }
+        Ok(source_part.relationships_xml.as_bytes() == relationships.try_to_xml_bytes()?)
+    }
+
+    /// Whether `part` will use the retained source member and central record
+    /// during targeted publication.
+    #[doc(hidden)]
+    pub fn source_part_member_retained(&self, part: &dyn Part) -> bool {
+        self.preservation
+            .as_deref()
+            .and_then(|provenance| provenance.parts.get(part.partname()))
+            .is_some_and(|source_part| {
+                source_part.member_present
+                    && source_blob_retained(source_part, part.decoded_blob(), true)
+            })
+    }
+
+    /// Whether the current relationship collection will use its retained
+    /// source member and central record during targeted publication.
+    #[doc(hidden)]
+    pub fn source_relationship_member_retained(
+        &self,
+        owner: &PackURI,
+        relationships: &Relationships,
+    ) -> Result<bool> {
+        let Some(source_part) = self
+            .preservation
+            .as_deref()
+            .and_then(|provenance| provenance.parts.get(owner))
+        else {
+            return Ok(false);
+        };
+        self.source_relationships_retained(owner, source_part, relationships)
+    }
+
+    /// Whether the exact source content-types bytes can be copied for a
+    /// projected publication image.
+    #[doc(hidden)]
+    pub fn source_content_types_member_retained(&self, bytes: &[u8]) -> bool {
+        self.preservation
+            .as_deref()
+            .is_some_and(|provenance| provenance.content_types_xml.as_slice() == bytes)
     }
 
     /// Compare retained content-type spelling without serializing fallback XML.
@@ -2121,9 +2333,9 @@ impl OpcPackage {
     /// bytes a caller supplied, and bytes that merely *equal* the source's are
     /// indistinguishable from authored ones by inspection, so an equality test
     /// would let a mutation escape the audit. Change 0665 replaced that
-    /// equality test with this proof; the preservation planner's own
-    /// `source_blob_retained` keeps its byte comparison, because there an
-    /// equal payload publishes equal bytes either way.
+    /// equality test with this proof; the shared `source_blob_retained`
+    /// publication predicate keeps its byte comparison, because an equal
+    /// payload publishes equal bytes either way.
     ///
     /// Publication does not decide compactness from this signal — no member is
     /// refused for spelling any more (change 0665) — only whether the member

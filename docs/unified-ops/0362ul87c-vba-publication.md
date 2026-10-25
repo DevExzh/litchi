@@ -1,7 +1,7 @@
 # 0362ul87c — shared OOXML VBA publication boundary
 
 Status: source-only implementation on `uo2/ooxml-vba-publication-0362ul87c`;
-87cc, 87cd, 87ce, and 87cf review repairs are included in the follow-up
+87cc, 87cd, 87ce, 87cf, and 87cg review repairs are included in the follow-up
 commit.
 This slice follows the boundary audit in 0362ul87. It has not run Cargo,
 rustdoc, native qualification, or performance measurements; those require a
@@ -157,3 +157,23 @@ selected graph capture. A serialized/reopened recipient regression removes a
 known unrelated part with a relationship, adds a new unrelated part with its
 own relationship, and checks exact and one-byte-under member, entry, and
 aggregate limits atomically.
+
+## 87cg review repair
+
+The retained-source admission and targeted writer now share the same
+preservation predicates. Equal decoded payloads use the source central record
+and compressed representation when the writer does; a deferred source payload
+is not hydrated merely to admit an unrelated recipient member. Selected
+publication may force the exact source comparison needed for its output plan.
+Relationship admission likewise follows the writer through source capture,
+semantic source binding, and canonical-byte comparison, so a mutate-then-revert
+`.rels` collection retains its noncanonical source bytes and central metadata.
+
+Retained metrics include the current publication image's variable metadata,
+including preserved records, regenerated known names, and the archive tail.
+Prospective checks replace the selected graph's part and relationship records
+with the target names and add newly appended generated entries, while keeping
+opaque source records and their metadata. Exact and one-byte-under metadata
+limits cover a serialized VBA replay. A compact recipient admission summary is
+carried from staging/preflight into publication validation, avoiding a second
+retained-central-directory or whole-recipient relationship scan.

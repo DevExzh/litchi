@@ -9,7 +9,8 @@ use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{
-    OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, SourceLimits, TargetMode,
+    OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, RetainedArchiveMetrics,
+    SourceLimits, TargetMode,
 };
 use litchi_vba::{Limits, project::Project};
 use sha2::{Digest, Sha256};
@@ -962,6 +963,7 @@ pub struct Edit<'a> {
     source: &'a OpcPackage,
     candidate: Option<OpcPackage>,
     before: Option<GraphSnapshot>,
+    base_admission: Option<RecipientAdmission>,
     source_part: PackURI,
     host: Host,
     options: EditOptions,
@@ -994,6 +996,7 @@ impl<'a> Edit<'a> {
             source: package,
             candidate: None,
             before: None,
+            base_admission: None,
             source_part,
             host,
             options: options.effective(package),
@@ -1047,7 +1050,10 @@ impl<'a> Edit<'a> {
             self.options,
         )?;
         let current_limits = self.options.effective(self.current()).source_limits;
-        validate_recipient_metadata_limits(self.current(), current_limits)?;
+        let admission = validate_recipient_metadata_limits(self.current(), current_limits)?;
+        if self.candidate.is_none() && self.base_admission.is_none() {
+            self.base_admission = Some(admission);
+        }
         if store_is_noop(
             self.current(),
             &self.source_part,
@@ -1109,6 +1115,7 @@ impl<'a> Edit<'a> {
     pub fn reset(&mut self) {
         self.candidate = None;
         self.before = None;
+        self.base_admission = None;
     }
 
     /// Publish the staged graph as a new package, exact patch, and diagnostics.
@@ -1173,12 +1180,16 @@ impl<'a> Edit<'a> {
             .after
             .as_ref()
             .expect("changed VBA patch has a graph target");
+        let admission = self.base_admission.ok_or_else(|| {
+            Error::Invalid("VBA edit candidate has no recipient admission summary".to_string())
+        })?;
         validate_snapshot_limits(
             self.source,
             before,
             after,
             self.options,
             &after.content_types,
+            &admission,
         )?;
         refuse_signed_change(self.source)?;
         Ok(Commit::new(candidate, patch, Diagnostics::CHANGED))
@@ -1241,7 +1252,7 @@ impl Patch {
                 .as_ref()
                 .ok_or_else(|| Error::Invalid("VBA patch has no replay base".to_string()))?;
             let recipient_limits = self.options.effective(package).source_limits;
-            validate_recipient_metadata_limits(package, recipient_limits)?;
+            let _admission = validate_recipient_metadata_limits(package, recipient_limits)?;
             let current =
                 GraphProof::capture(package, &proof.source_part, proof.host, recipient_limits)?;
             if current != *proof {
@@ -1258,7 +1269,7 @@ impl Patch {
             .as_ref()
             .ok_or_else(|| Error::Invalid("VBA patch has no target graph".to_string()))?;
         let recipient_limits = self.options.effective(package).source_limits;
-        validate_recipient_metadata_limits(package, recipient_limits)?;
+        let admission = validate_recipient_metadata_limits(package, recipient_limits)?;
         let current =
             GraphSnapshot::capture(package, &before.source.name, before.host, recipient_limits)?;
         if !current.same_selected_graph(before) {
@@ -1282,6 +1293,7 @@ impl Patch {
             after,
             self.options,
             &projected_content_types,
+            &admission,
         )?;
         if self.is_noop() {
             return Ok(Commit::new(
@@ -1316,11 +1328,28 @@ pub type Commit = litchi_core::edit::Commit<OpcPackage, Patch>;
 /// Minimal content-free commit diagnostics.
 pub use litchi_core::edit::Diagnostics;
 
+#[derive(Debug, Clone, Copy)]
 struct RelationshipTotals {
     xml_bytes: u64,
     events: u64,
     relationships: u64,
     members: usize,
+}
+
+/// Metadata-only admission calculated once for a recipient state.
+///
+/// Staging and publication both need the same physical-source, part, and
+/// relationship totals. Carrying this compact summary across that boundary
+/// avoids rescanning the retained central directory and serializing every
+/// relationship member a second time.
+#[derive(Debug, Clone)]
+struct RecipientAdmission {
+    retained: Option<RetainedArchiveMetrics>,
+    parts: usize,
+    part_bytes: u64,
+    metadata_bytes: u64,
+    relationships: RelationshipTotals,
+    physical_relationship_members: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -1414,12 +1443,41 @@ fn map_source_limit_error(error: Error) -> Error {
     }
 }
 
+fn authored_current_archive_metadata_bytes(package: &OpcPackage) -> Result<u64> {
+    let mut total = member_name_metadata("[Content_Types].xml")?
+        .checked_add(member_name_metadata("_rels/.rels")?)
+        .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+    for metadata in package.iter_parts() {
+        total = total
+            .checked_add(member_name_metadata(metadata.partname().membername())?)
+            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+        if !metadata.rels().is_empty() {
+            let relationship_name = metadata
+                .partname()
+                .rels_uri()
+                .map_err(|error| Error::Uri(error.clone()))?;
+            total = total
+                .checked_add(member_name_metadata(relationship_name.membername())?)
+                .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+        }
+    }
+    for member in package.non_part_members() {
+        total = total
+            .checked_add(member_name_metadata(member.name())?)
+            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+    }
+    Ok(total)
+}
+
 /// Re-admit the recipient's retained archive and OPC metadata before any
 /// selected VBA payload is decoded.  Patch replay may replace only a small
 /// graph, but its writer still carries every retained source member forward;
 /// checking those physical and metadata-only dimensions first prevents an
 /// unrelated oversized member from forcing selected-graph hydration.
-fn validate_recipient_metadata_limits(package: &OpcPackage, limits: SourceLimits) -> Result<()> {
+fn validate_recipient_metadata_limits(
+    package: &OpcPackage,
+    limits: SourceLimits,
+) -> Result<RecipientAdmission> {
     let retained = package
         .retained_archive_metrics(limits)
         .map_err(Error::from)?;
@@ -1487,11 +1545,6 @@ fn validate_recipient_metadata_limits(package: &OpcPackage, limits: SourceLimits
         u64::try_from("_rels/.rels".len()).unwrap_or(u64::MAX),
         limits.max_archive_member_name_bytes(),
     )?;
-    check_vba_limit(
-        LimitKind::ArchiveMemberNameBytes,
-        u64::try_from("_rels/.rels".len()).unwrap_or(u64::MAX),
-        limits.max_archive_member_name_bytes(),
-    )?;
     for member in package.non_part_members() {
         check_vba_limit(
             LimitKind::ArchiveMemberNameBytes,
@@ -1522,8 +1575,19 @@ fn validate_recipient_metadata_limits(package: &OpcPackage, limits: SourceLimits
         limits.max_total_relationships() as u64,
     )?;
 
-    if let Some(metrics) = retained {
-        let relationship_members = relationship_member_count(package)?;
+    let metadata_bytes = if let Some(metrics) = retained.as_ref() {
+        metrics.metadata_bytes()
+    } else {
+        authored_current_archive_metadata_bytes(package)?
+    };
+    check_vba_limit(
+        LimitKind::ArchiveMetadataBytes,
+        metadata_bytes,
+        limits.max_archive_metadata_bytes(),
+    )?;
+
+    if let Some(metrics) = retained.as_ref() {
+        let relationship_members = relationships.members;
         let physical_members = metrics
             .opaque_members()
             .saturating_add(2)
@@ -1583,7 +1647,14 @@ fn validate_recipient_metadata_limits(package: &OpcPackage, limits: SourceLimits
             limits.max_aggregate_bytes(),
         )?;
     }
-    Ok(())
+    Ok(RecipientAdmission {
+        retained,
+        parts,
+        part_bytes,
+        metadata_bytes,
+        relationships,
+        physical_relationship_members: relationships.members,
+    })
 }
 
 fn relationship_totals(package: &OpcPackage, limits: SourceLimits) -> Result<RelationshipTotals> {
@@ -1729,39 +1800,25 @@ fn graph_relationship_totals(
     Ok(totals)
 }
 
-/// Count the relationships members the OPC writer emits for the recipient's
-/// current known parts. The retained-source query deliberately reports empty
-/// source `.rels` members as present, while newly authored parts contribute a
-/// member only when their relationship collection is non-empty.
-fn relationship_member_count(package: &OpcPackage) -> Result<usize> {
-    package.iter_parts().try_fold(0usize, |count, metadata| {
-        let retained = package.has_retained_relationship_member(metadata.partname());
-        let present = retained || !metadata.rels().is_empty();
-        count
-            .checked_add(usize::from(present))
-            .ok_or_else(|| Error::Invalid("OPC relationship member count overflows".to_owned()))
-    })
-}
-
 fn validate_archive_structural_limits(
     package: &OpcPackage,
     current: &GraphSnapshot,
     target: &GraphSnapshot,
+    current_graph_relationships: RelationshipTotals,
+    target_graph_relationships: RelationshipTotals,
     projected_parts: usize,
     projected_part_bytes: u64,
     projected_relationship_bytes: u64,
     projected_content_types: &OwnedContentTypes,
     limits: SourceLimits,
+    admission: &RecipientAdmission,
 ) -> Result<()> {
     // Re-admit every retained physical entry first. This checks opaque ZIP
     // payloads and names that the OPC projection intentionally does not expose
     // without inflating them. The selected graph's prospective aggregate is
     // checked below after replacing its known members.
-    let retained = package.retained_archive_metrics(limits)?;
-    let current_graph_relationships = graph_relationship_totals(current, limits)?;
-    let target_graph_relationships = graph_relationship_totals(target, limits)?;
-    let current_physical_relationship_parts = relationship_member_count(package)?;
-    let projected_physical_relationship_parts = current_physical_relationship_parts
+    let projected_physical_relationship_parts = admission
+        .physical_relationship_members
         .checked_sub(current_graph_relationships.members)
         .ok_or_else(|| {
             Error::Invalid(
@@ -1772,7 +1829,7 @@ fn validate_archive_structural_limits(
         .saturating_add(target_graph_relationships.members);
     let projected_content_type_bytes =
         u64::try_from(projected_content_types.bytes().len()).unwrap_or(u64::MAX);
-    if let Some(metrics) = retained {
+    if let Some(metrics) = admission.retained.as_ref() {
         // The targeted writer always has one content-types member and one
         // package-level `.rels` member. Everything else comes from the
         // current known part map, its retained/created part `.rels` members,
@@ -1806,6 +1863,18 @@ fn validate_archive_structural_limits(
             LimitKind::AggregateBytes,
             projected_aggregate,
             limits.max_aggregate_bytes(),
+        )?;
+        check_vba_limit(
+            LimitKind::ArchiveMetadataBytes,
+            projected_archive_metadata_bytes(
+                package,
+                current,
+                target,
+                projected_content_types,
+                metrics,
+                admission.metadata_bytes,
+            )?,
+            limits.max_archive_metadata_bytes(),
         )?;
     } else {
         // Authored packages have no retained physical directory. Their
@@ -1849,6 +1918,11 @@ fn validate_archive_structural_limits(
                 .saturating_add(projected_content_type_bytes)
                 .saturating_add(projected_relationship_bytes),
             limits.max_aggregate_bytes(),
+        )?;
+        check_vba_limit(
+            LimitKind::ArchiveMetadataBytes,
+            authored_archive_metadata_bytes(package, current, target, projected_content_types)?,
+            limits.max_archive_metadata_bytes(),
         )?;
     }
     for part in graph_part_states(target) {
@@ -1899,6 +1973,168 @@ fn validate_archive_structural_limits(
         )?;
     }
     Ok(())
+}
+
+fn member_name_metadata(name: &str) -> Result<u64> {
+    u64::try_from(name.len())
+        .map_err(|_| Error::Invalid("OPC generated member-name metadata overflows".to_owned()))
+}
+
+fn source_or_generated_part_metadata(
+    package: &OpcPackage,
+    metrics: &RetainedArchiveMetrics,
+    part: &PartState,
+) -> Result<u64> {
+    let generated = member_name_metadata(part.name.membername())?;
+    if package.source_part_member_retained(part.part.as_ref()) {
+        Ok(metrics
+            .source_member_metadata(part.name.membername())
+            .unwrap_or(generated))
+    } else {
+        Ok(generated)
+    }
+}
+
+fn source_or_generated_relationship_metadata(
+    package: &OpcPackage,
+    metrics: &RetainedArchiveMetrics,
+    part: &PartState,
+) -> Result<u64> {
+    if !part.relationships_source.member_present() {
+        return Ok(0);
+    }
+    let relationship_name = part
+        .name
+        .rels_uri()
+        .map_err(|error| Error::Uri(error.clone()))?;
+    let generated = member_name_metadata(relationship_name.membername())?;
+    if package.source_relationship_member_retained(&part.name, part.part.rels())? {
+        Ok(metrics
+            .source_member_metadata(relationship_name.membername())
+            .unwrap_or(generated))
+    } else {
+        Ok(generated)
+    }
+}
+
+fn content_types_metadata(
+    package: &OpcPackage,
+    metrics: &RetainedArchiveMetrics,
+    bytes: &[u8],
+) -> Result<u64> {
+    let generated = member_name_metadata("[Content_Types].xml")?;
+    if package.source_content_types_member_retained(bytes) {
+        Ok(metrics
+            .source_member_metadata("[Content_Types].xml")
+            .unwrap_or(generated))
+    } else {
+        Ok(generated)
+    }
+}
+
+fn selected_graph_metadata(
+    package: &OpcPackage,
+    metrics: &RetainedArchiveMetrics,
+    graph: &GraphSnapshot,
+) -> Result<u64> {
+    let mut total = source_or_generated_part_metadata(package, metrics, &graph.source)?;
+    total = total
+        .checked_add(source_or_generated_relationship_metadata(
+            package,
+            metrics,
+            &graph.source,
+        )?)
+        .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+    for part in graph.project.iter().chain(graph.supplemental.iter()) {
+        total = total
+            .checked_add(source_or_generated_part_metadata(package, metrics, part)?)
+            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+        total = total
+            .checked_add(source_or_generated_relationship_metadata(
+                package, metrics, part,
+            )?)
+            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+    }
+    Ok(total)
+}
+
+fn projected_archive_metadata_bytes(
+    package: &OpcPackage,
+    current: &GraphSnapshot,
+    target: &GraphSnapshot,
+    projected_content_types: &OwnedContentTypes,
+    metrics: &RetainedArchiveMetrics,
+    current_metadata: u64,
+) -> Result<u64> {
+    let current_selected = selected_graph_metadata(package, metrics, current)?;
+    let target_selected = selected_graph_metadata(package, metrics, target)?;
+    let current_manifest = content_types_metadata(package, metrics, current.content_types.bytes())?;
+    let target_manifest =
+        content_types_metadata(package, metrics, projected_content_types.bytes())?;
+    current_metadata
+        .checked_sub(current_selected)
+        .and_then(|bytes| bytes.checked_sub(current_manifest))
+        .and_then(|bytes| bytes.checked_add(target_selected))
+        .and_then(|bytes| bytes.checked_add(target_manifest))
+        .ok_or_else(|| Error::Invalid("VBA archive metadata underflows".to_owned()))
+}
+
+fn authored_archive_metadata_bytes(
+    package: &OpcPackage,
+    current: &GraphSnapshot,
+    target: &GraphSnapshot,
+    _projected_content_types: &OwnedContentTypes,
+) -> Result<u64> {
+    let mut total = member_name_metadata("[Content_Types].xml")?
+        .checked_add(member_name_metadata("_rels/.rels")?)
+        .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+    for metadata in package.iter_parts() {
+        total = total
+            .checked_add(member_name_metadata(metadata.partname().membername())?)
+            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+        if !metadata.rels().is_empty() {
+            let relationship_name = metadata
+                .partname()
+                .rels_uri()
+                .map_err(|error| Error::Uri(error.clone()))?;
+            total = total
+                .checked_add(member_name_metadata(relationship_name.membername())?)
+                .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+        }
+    }
+    for member in package.non_part_members() {
+        total = total
+            .checked_add(member_name_metadata(member.name())?)
+            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+    }
+    let current_selected = selected_graph_metadata_authored(current)?;
+    let target_selected = selected_graph_metadata_authored(target)?;
+    let current_manifest = member_name_metadata("[Content_Types].xml")?;
+    let target_manifest = current_manifest;
+    Ok(total
+        .saturating_sub(current_selected)
+        .saturating_sub(current_manifest)
+        .saturating_add(target_selected)
+        .saturating_add(target_manifest))
+}
+
+fn selected_graph_metadata_authored(graph: &GraphSnapshot) -> Result<u64> {
+    let mut total = 0u64;
+    for part in graph_part_states(graph) {
+        total = total
+            .checked_add(member_name_metadata(part.name.membername())?)
+            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+        if part.relationships_source.member_present() {
+            let relationship_name = part
+                .name
+                .rels_uri()
+                .map_err(|error| Error::Uri(error.clone()))?;
+            total = total
+                .checked_add(member_name_metadata(relationship_name.membername())?)
+                .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+        }
+    }
+    Ok(total)
 }
 
 fn content_types_after_graph_store(
@@ -2075,6 +2311,7 @@ fn validate_snapshot_limits(
     target: &GraphSnapshot,
     options: EditOptions,
     projected_content_types: &OwnedContentTypes,
+    admission: &RecipientAdmission,
 ) -> Result<()> {
     let project_bytes = target.project.as_ref().map_or(0, |part| part.data.len());
     let supplemental_bytes = target
@@ -2140,21 +2377,14 @@ fn validate_snapshot_limits(
         .preflight_under(effective.source_limits)
         .map_err(|error| map_source_limit_error(Error::from(error)))?;
 
-    let package_part_bytes = package.iter_parts().try_fold(0u64, |total, metadata| {
-        let bytes = u64::try_from(metadata.payload_len()?).unwrap_or(u64::MAX);
-        total.checked_add(bytes).ok_or_else(|| Error::Limit {
-            kind: crate::LimitKind::Vba(LimitKind::TotalPartBytes),
-            observed: usize::MAX,
-            maximum: limit_observed(effective.source_limits.max_total_part_bytes()),
-        })
-    })?;
     let current_part_bytes = graph_part_states(current)
         .map(|part| u64::try_from(part.data.len()).unwrap_or(u64::MAX))
         .sum::<u64>();
     let target_part_bytes = graph_part_states(target)
         .map(|part| u64::try_from(part.data.len()).unwrap_or(u64::MAX))
         .sum::<u64>();
-    let projected_part_bytes = package_part_bytes
+    let projected_part_bytes = admission
+        .part_bytes
         .saturating_sub(current_part_bytes)
         .saturating_add(target_part_bytes);
     check_vba_limit(
@@ -2163,12 +2393,12 @@ fn validate_snapshot_limits(
         effective.source_limits.max_total_part_bytes(),
     )?;
 
-    let current_relationship_totals = relationship_totals(package, effective.source_limits)?;
     let current_graph_relationships = graph_relationship_totals(current, effective.source_limits)?;
     let target_graph_relationships = graph_relationship_totals(target, effective.source_limits)?;
     let removed_relationship_bytes = current_graph_relationships.xml_bytes;
     let added_relationship_bytes = target_graph_relationships.xml_bytes;
-    let projected_relationship_bytes = current_relationship_totals
+    let projected_relationship_bytes = admission
+        .relationships
         .xml_bytes
         .saturating_sub(removed_relationship_bytes)
         .saturating_add(added_relationship_bytes);
@@ -2179,7 +2409,8 @@ fn validate_snapshot_limits(
     )?;
     let removed_relationship_events = current_graph_relationships.events;
     let added_relationship_events = target_graph_relationships.events;
-    let projected_relationship_events = current_relationship_totals
+    let projected_relationship_events = admission
+        .relationships
         .events
         .saturating_sub(removed_relationship_events)
         .saturating_add(added_relationship_events);
@@ -2190,7 +2421,8 @@ fn validate_snapshot_limits(
     )?;
     let removed_relationships = current_graph_relationships.relationships;
     let added_relationships = target_graph_relationships.relationships;
-    let projected_relationships = current_relationship_totals
+    let projected_relationships = admission
+        .relationships
         .relationships
         .saturating_sub(removed_relationships)
         .saturating_add(added_relationships);
@@ -2199,7 +2431,8 @@ fn validate_snapshot_limits(
         projected_relationships,
         effective.source_limits.max_total_relationships() as u64,
     )?;
-    let projected_members = current_relationship_totals
+    let projected_members = admission
+        .relationships
         .members
         .saturating_sub(current_graph_relationships.members)
         .saturating_add(target_graph_relationships.members);
@@ -2223,8 +2456,8 @@ fn validate_snapshot_limits(
                 )
         })
         .unwrap_or(0);
-    let projected_parts = package
-        .part_count()
+    let projected_parts = admission
+        .parts
         .saturating_sub(removed)
         .saturating_add(graph_parts);
     if projected_parts > effective.source_limits.max_parts() {
@@ -2238,11 +2471,14 @@ fn validate_snapshot_limits(
         package,
         current,
         target,
+        current_graph_relationships,
+        target_graph_relationships,
         projected_parts,
         projected_part_bytes,
         projected_relationship_bytes,
         projected_content_types,
         effective.source_limits,
+        admission,
     )?;
     Ok(())
 }
@@ -3526,11 +3762,13 @@ mod tests {
         let final_members = projected.members();
         let final_entries = projected.entries();
         let final_aggregate = projected.aggregate_bytes();
+        let final_metadata = projected.metadata_bytes();
         assert!(final_members > 1);
         assert!(final_entries >= final_members);
         assert!(final_aggregate > 0);
+        assert!(final_metadata > 0);
 
-        let limits = |members, entries, aggregate| {
+        let limits = |members, entries, aggregate, metadata| {
             SourceLimits::builder()
                 .max_members(members)
                 .unwrap()
@@ -3542,17 +3780,29 @@ mod tests {
                 .unwrap()
                 .max_aggregate_bytes(aggregate)
                 .unwrap()
+                .max_archive_metadata_bytes(metadata)
+                .unwrap()
                 .build()
                 .unwrap()
         };
-        let exact_limits = limits(final_members, final_entries, final_aggregate);
+        let exact_limits = limits(
+            final_members,
+            final_entries,
+            final_aggregate,
+            final_metadata,
+        );
         let mut exact_patch = patch.clone();
         exact_patch.options = EditOptions::new().source_limits(exact_limits);
         let exact = exact_patch.apply(&recipient).unwrap();
         assert!(exact.diagnostics().changed());
 
         let before = PackageWriter::to_bytes(&recipient).unwrap();
-        let members_under = limits(final_members - 1, final_entries, final_aggregate);
+        let members_under = limits(
+            final_members - 1,
+            final_entries,
+            final_aggregate,
+            final_metadata,
+        );
         exact_patch.options = EditOptions::new().source_limits(members_under);
         assert!(matches!(
             exact_patch.apply(&recipient),
@@ -3563,7 +3813,12 @@ mod tests {
         ));
         assert_eq!(PackageWriter::to_bytes(&recipient).unwrap(), before);
 
-        let entries_under = limits(final_members, final_entries - 1, final_aggregate);
+        let entries_under = limits(
+            final_members,
+            final_entries - 1,
+            final_aggregate,
+            final_metadata,
+        );
         exact_patch.options = EditOptions::new().source_limits(entries_under);
         assert!(matches!(
             exact_patch.apply(&recipient),
@@ -3574,12 +3829,33 @@ mod tests {
         ));
         assert_eq!(PackageWriter::to_bytes(&recipient).unwrap(), before);
 
-        let aggregate_under = limits(final_members, final_entries, final_aggregate - 1);
+        let aggregate_under = limits(
+            final_members,
+            final_entries,
+            final_aggregate - 1,
+            final_metadata,
+        );
         exact_patch.options = EditOptions::new().source_limits(aggregate_under);
         assert!(matches!(
             exact_patch.apply(&recipient),
             Err(Error::Limit {
                 kind: crate::LimitKind::Vba(LimitKind::AggregateBytes),
+                ..
+            })
+        ));
+        assert_eq!(PackageWriter::to_bytes(&recipient).unwrap(), before);
+
+        let metadata_under = limits(
+            final_members,
+            final_entries,
+            final_aggregate,
+            final_metadata - 1,
+        );
+        exact_patch.options = EditOptions::new().source_limits(metadata_under);
+        assert!(matches!(
+            exact_patch.apply(&recipient),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Vba(LimitKind::ArchiveMetadataBytes),
                 ..
             })
         ));
