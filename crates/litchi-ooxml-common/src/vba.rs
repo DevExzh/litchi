@@ -3563,9 +3563,9 @@ mod tests {
         );
         assert_refused(
             SourceLimits::builder()
-                .max_parts(package.part_count())
+                .max_parts(archive_members)
                 .unwrap()
-                .max_relationship_parts(relationships.members)
+                .max_relationship_parts(archive_members)
                 .unwrap()
                 .max_members(archive_members)
                 .unwrap()
