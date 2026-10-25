@@ -12,7 +12,8 @@ main-part name; graph capture and the one structural candidate clone are
 deferred until the first real mutation. Unchanged payloads remain shared, and
 the edit publishes an `litchi_core::edit::Commit`
 containing the new `OpcPackage`, exact before/after graph patch, and
-content-free diagnostics. `Edit::store` accepts owned byte vectors only after
+content-free diagnostics (or a compact selected-graph proof for an untouched
+edit). `Edit::store` accepts owned byte vectors only after
 the selected project, supplemental, graph, part-count, and retained
 `SourceLimits` policy has admitted them. `Patch::apply(&OpcPackage)` checks
 the recipient policy before cloning or publishing, authenticates the recorded
@@ -31,7 +32,20 @@ opaque part state, and noncanonical relationship spelling/order for the
 affected source/project/supplemental closure while unrelated package parts are
 left alone. An identical store is detected before mutation, so it preserves
 source bytes, signatures, and unchanged diagnostics even when the existing
-graph uses a noncanonical relationship identifier.
+graph uses a noncanonical relationship identifier. The source-bound batch
+publication restores those captures for the source, project, and supplemental
+`.rels` members; it does not silently fall back to `try_add_part` and lose
+provenance.
+
+An untouched edit now commits a compact SHA-256 proof of only the selected
+graph instead of capturing and retaining both graph snapshots. Replay checks
+that proof against the recipient's selected source, project, and supplemental
+payloads and relationship members, so it remains content-based while leaving
+unrelated package changes outside the patch scope. Changed patches preflight
+the recipient's projected aggregate part bytes, relationship-member bytes and
+edge counts, relationship-part count, per-member ceilings, and content-types
+manifest size before cloning or publishing. A tighter recipient limit returns
+the typed VBA limit and leaves the recipient byte-identical.
 
 The DOCX, PPTX, and XLSX owner edit families continue to publish through their
 existing `Edit::commit` triads. Their private staging adapters compose the
@@ -49,7 +63,9 @@ Consumers migrated in this commit:
 * the shared graph tests, including signed refusal, dangling-target atomicity,
   late content-type rollback, equal-copy replay with unrelated edges,
   inverse replay, selected-graph patch conflict, reset/no-op diagnostics,
-  and pre-staging limit refusal.
+  pre-staging limit refusal, noncanonical relationship round-trip/inverse,
+  compact no-op proof replay, and atomic rejection under tighter recipient
+  aggregate part/relationship limits.
 
 No public semantic helper in this slice takes `&mut OpcPackage`. The physical
 OPC graph methods and explicit-limit VBA reader remain codec/substrate APIs;

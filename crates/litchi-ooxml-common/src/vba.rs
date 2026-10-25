@@ -8,8 +8,11 @@ use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
-use litchi_opc::{OpcPackage, PackURI, SourceLimits, TargetMode};
+use litchi_opc::{
+    OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, SourceLimits, TargetMode,
+};
 use litchi_vba::{Limits, project::Project};
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
 const WORD_PROJECT_PART: &str = "/word/vbaProject.bin";
@@ -45,6 +48,22 @@ pub enum LimitKind {
     GraphBytes,
     /// The number of graph parts introduced by one publication.
     GraphParts,
+    /// Aggregate materialized OPC part bytes after publication.
+    TotalPartBytes,
+    /// One materialized OPC part's bytes.
+    PartBytes,
+    /// One relationship member's serialized bytes.
+    RelationshipXmlBytes,
+    /// Aggregate relationship-member bytes after publication.
+    TotalRelationshipXmlBytes,
+    /// Relationship members in the package.
+    RelationshipParts,
+    /// One relationship member's edge count.
+    RelationshipsPerPart,
+    /// Aggregate relationship edge count after publication.
+    TotalRelationships,
+    /// The serialized content-types manifest bytes.
+    ContentTypesBytes,
 }
 
 impl LimitKind {
@@ -56,6 +75,14 @@ impl LimitKind {
             Self::SupplementalXmlBytes => "VBA supplemental XML bytes",
             Self::GraphBytes => "VBA graph bytes",
             Self::GraphParts => "VBA graph parts",
+            Self::TotalPartBytes => "VBA total part bytes",
+            Self::PartBytes => "VBA part bytes",
+            Self::RelationshipXmlBytes => "VBA relationship XML bytes",
+            Self::TotalRelationshipXmlBytes => "VBA total relationship XML bytes",
+            Self::RelationshipParts => "VBA relationship parts",
+            Self::RelationshipsPerPart => "VBA relationships per part",
+            Self::TotalRelationships => "VBA total relationships",
+            Self::ContentTypesBytes => "VBA content-types bytes",
         }
     }
 }
@@ -227,6 +254,7 @@ struct PartState {
     content_type: String,
     data: Arc<Vec<u8>>,
     relationships: Vec<RelationshipState>,
+    relationships_source: OwnedRelationships,
     /// Keep the concrete OPC part, including source relationship capture,
     /// admitted IDs, payload provenance and any format-owned opaque state.
     /// Rebuilding a `BlobPart` from the visible relationship projection would
@@ -235,20 +263,22 @@ struct PartState {
 }
 
 impl PartState {
-    fn capture(part: &dyn Part) -> Self {
+    fn capture(package: &OpcPackage, part: &dyn Part) -> Result<Self> {
         let mut relationships = part
             .rels()
             .iter()
             .map(RelationshipState::capture)
             .collect::<Vec<_>>();
         relationships.sort_unstable_by(|left, right| left.id.cmp(&right.id));
-        Self {
+        Ok(Self {
             name: part.partname().clone(),
             content_type: part.content_type().to_owned(),
             data: part.blob_arc(),
             relationships,
+            relationships_source: package
+                .source_relationships(part.partname(), package.read_limits())?,
             part: part.clone_part(),
-        }
+        })
     }
 
     fn clone_part(&self) -> Box<dyn Part + Send + Sync> {
@@ -274,6 +304,7 @@ impl PartialEq for PartState {
             && self.content_type == other.content_type
             && self.data.as_slice() == other.data.as_slice()
             && self.relationships == other.relationships
+            && self.relationships_source == other.relationships_source
     }
 }
 
@@ -288,7 +319,7 @@ struct GraphSnapshot {
     /// The current content-types publication image.  A graph patch restores
     /// it only when the recipient's selected base carried the same image;
     /// otherwise unrelated recipient overrides are left untouched.
-    content_types: Arc<Vec<u8>>,
+    content_types: OwnedContentTypes,
 }
 
 impl PartialEq for GraphSnapshot {
@@ -317,14 +348,86 @@ impl GraphSnapshot {
             .transpose()?;
         Ok(Self {
             host,
-            source: PartState::capture(source),
-            project: project.map(PartState::capture),
-            supplemental: supplemental.map(PartState::capture),
-            content_types: package
-                .source_content_types(package.read_limits())?
-                .bytes_arc(),
+            source: PartState::capture(package, source)?,
+            project: project
+                .map(|part| PartState::capture(package, part))
+                .transpose()?,
+            supplemental: supplemental
+                .map(|part| PartState::capture(package, part))
+                .transpose()?,
+            content_types: package.source_content_types(package.read_limits())?,
         })
     }
+}
+
+/// A bounded, compact proof for an untouched edit.
+///
+/// An unchanged edit must not retain the selected graph twice merely to make
+/// its replayable no-op patch.  The proof hashes only the affected source,
+/// project, and supplemental parts together with their retained relationship
+/// members; it does not retain their payload allocations. It therefore
+/// remains content-based (rather than package-object identity based), while
+/// unrelated package members and manifest overrides stay outside the replay
+/// scope.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GraphProof {
+    host: Host,
+    source_part: PackURI,
+    digest: [u8; 32],
+}
+
+impl GraphProof {
+    fn capture(package: &OpcPackage, source_part: &PackURI, host: Host) -> Result<Self> {
+        let mut digest = Sha256::new();
+        proof_field(&mut digest, host_name(host).as_bytes());
+        proof_field(&mut digest, source_part.as_str().as_bytes());
+        let source = package.get_part(source_part)?;
+        hash_proof_part(&mut digest, package, source)?;
+        let existing = inspect_existing_graph(package, source_part, host)?;
+        match existing {
+            Some(graph) => {
+                digest.update([1]);
+                let project = package.get_part(&graph.project_part)?;
+                hash_proof_part(&mut digest, package, project)?;
+                if let Some((supplemental_name, _)) = graph.supplemental {
+                    digest.update([1]);
+                    let supplemental = package.get_part(&supplemental_name)?;
+                    hash_proof_part(&mut digest, package, supplemental)?;
+                } else {
+                    digest.update([0]);
+                }
+            },
+            None => digest.update([0]),
+        }
+        Ok(Self {
+            host,
+            source_part: source_part.clone(),
+            digest: digest.finalize().into(),
+        })
+    }
+}
+
+fn host_name(host: Host) -> &'static str {
+    match host {
+        Host::Word => "word",
+        Host::Excel => "excel",
+        Host::PowerPoint => "powerpoint",
+    }
+}
+
+fn proof_field(digest: &mut Sha256, bytes: &[u8]) {
+    digest.update((bytes.len() as u64).to_le_bytes());
+    digest.update(bytes);
+}
+
+fn hash_proof_part(digest: &mut Sha256, package: &OpcPackage, part: &dyn Part) -> Result<()> {
+    proof_field(digest, part.partname().as_str().as_bytes());
+    proof_field(digest, part.content_type().as_bytes());
+    proof_field(digest, part.blob());
+    let relationships = package.source_relationships(part.partname(), package.read_limits())?;
+    digest.update([u8::from(relationships.member_present())]);
+    proof_field(digest, relationships.bytes());
+    Ok(())
 }
 
 impl Host {
@@ -415,6 +518,7 @@ fn store_project_graph_in_place(
 ) -> Result<()> {
     validate_payload_limits(
         package,
+        source_part,
         host,
         project_payload.len(),
         word_supplemental_xml.as_ref().map_or(0, Vec::len),
@@ -456,10 +560,19 @@ fn store_project_graph_in_place(
 
     refuse_signed_change(package)?;
     if let Some(graph) = existing {
-        package
-            .get_part_mut(source_part)?
-            .rels_mut()
-            .remove(&graph.relationship_id);
+        let expected = package.source_relationships(source_part, package.read_limits())?;
+        let replacement = expected.without_relationship(
+            &graph.relationship_id,
+            options
+                .effective(package)
+                .source_limits
+                .max_relationship_xml_bytes(),
+        )?;
+        package.try_replace_relationships(
+            &expected,
+            &replacement,
+            options.effective(package).source_limits,
+        )?;
         package.remove_part(&graph.project_part);
         if let Some((supplemental, _)) = graph.supplemental {
             package.remove_part(&supplemental);
@@ -485,8 +598,30 @@ fn store_project_graph_in_place(
     }
     package.try_add_part(Box::new(project))?;
 
+    let expected = package.source_relationships(source_part, package.read_limits())?;
+    let relationship_id = {
+        let mut relationships = package.get_part(source_part)?.rels().clone();
+        relationships
+            .get_or_add(rt::VBA_PROJECT, host.project_target())
+            .r_id()
+            .to_owned()
+    };
+    let replacement = expected.with_relationship(
+        rt::VBA_PROJECT,
+        host.project_target(),
+        &relationship_id,
+        TargetMode::Internal,
+        options
+            .effective(package)
+            .source_limits
+            .max_relationship_xml_bytes(),
+    )?;
+    package.try_replace_relationships(
+        &expected,
+        &replacement,
+        options.effective(package).source_limits,
+    )?;
     let source = package.get_part_mut(source_part)?;
-    source.relate_to(host.project_target(), rt::VBA_PROJECT);
     source.set_content_type(macro_content_type.to_string())?;
     settle_unsigned_change(package)?;
     Ok(())
@@ -494,6 +629,7 @@ fn store_project_graph_in_place(
 
 fn validate_payload_limits(
     package: &OpcPackage,
+    source_part: &PackURI,
     host: Host,
     project_bytes: usize,
     supplemental_bytes: usize,
@@ -530,6 +666,40 @@ fn validate_payload_limits(
             maximum: effective.max_graph_parts,
         });
     }
+    let total_part_bytes = package.iter_parts().try_fold(0u64, |total, metadata| {
+        let bytes = u64::try_from(metadata.payload_len()?).unwrap_or(u64::MAX);
+        total.checked_add(bytes).ok_or_else(|| Error::Limit {
+            kind: crate::LimitKind::Vba(LimitKind::TotalPartBytes),
+            observed: usize::MAX,
+            maximum: limit_observed(effective.source_limits.max_total_part_bytes()),
+        })
+    })?;
+    let replaced_part_bytes =
+        if let Some(graph) = inspect_existing_graph(package, source_part, host)? {
+            let project = package
+                .part_metadata(&graph.project_part)
+                .ok_or_else(|| Error::Missing(graph.project_part.to_string()))?;
+            let mut bytes = u64::try_from(project.payload_len()?).unwrap_or(u64::MAX);
+            if let Some((supplemental, _)) = graph.supplemental {
+                let supplemental = package
+                    .part_metadata(&supplemental)
+                    .ok_or_else(|| Error::Missing(supplemental.to_string()))?;
+                bytes = bytes
+                    .saturating_add(u64::try_from(supplemental.payload_len()?).unwrap_or(u64::MAX));
+            }
+            bytes
+        } else {
+            0
+        };
+    let projected_total_part_bytes = total_part_bytes
+        .saturating_sub(replaced_part_bytes)
+        .saturating_add(u64::try_from(project_bytes).unwrap_or(u64::MAX))
+        .saturating_add(u64::try_from(supplemental_bytes).unwrap_or(u64::MAX));
+    check_vba_limit(
+        LimitKind::TotalPartBytes,
+        projected_total_part_bytes,
+        effective.source_limits.max_total_part_bytes(),
+    )?;
     Ok(())
 }
 
@@ -607,8 +777,13 @@ fn remove_project_graph_in_place(
     graph: ExistingGraph,
     non_macro_content_type: &str,
 ) -> Result<()> {
+    let expected = package.source_relationships(source_part, package.read_limits())?;
+    let replacement = expected.without_relationship(
+        &graph.relationship_id,
+        package.read_limits().max_relationship_xml_bytes(),
+    )?;
+    package.try_replace_relationships(&expected, &replacement, package.read_limits())?;
     let source = package.get_part_mut(source_part)?;
-    source.rels_mut().remove(&graph.relationship_id);
     source.set_content_type(non_macro_content_type.to_string())?;
     package.remove_part(&graph.project_part);
     if let Some((supplemental, _)) = graph.supplemental {
@@ -731,6 +906,7 @@ impl<'a> Edit<'a> {
     ) -> Result<()> {
         validate_payload_limits(
             self.current(),
+            &self.source_part,
             self.host,
             project_payload.len(),
             word_supplemental_xml.as_ref().map_or(0, Vec::len),
@@ -799,10 +975,14 @@ impl<'a> Edit<'a> {
     /// Returns graph validation errors and the signed-package refusal.
     pub fn commit(self) -> Result<Commit> {
         let Some(candidate) = self.candidate else {
-            let before = GraphSnapshot::capture(self.source, &self.source_part, self.host)?;
             let patch = Patch {
-                before: before.clone(),
-                after: before,
+                before: None,
+                after: None,
+                proof: Some(GraphProof::capture(
+                    self.source,
+                    &self.source_part,
+                    self.host,
+                )?),
                 options: self.options,
             };
             return Ok(Commit::new(
@@ -816,8 +996,9 @@ impl<'a> Edit<'a> {
         })?;
         let after = GraphSnapshot::capture(&candidate, &self.source_part, self.host)?;
         let patch = Patch {
-            before,
-            after,
+            before: Some(before),
+            after: Some(after),
+            proof: None,
             options: self.options,
         };
         if patch.is_noop() {
@@ -827,6 +1008,15 @@ impl<'a> Edit<'a> {
                 Diagnostics::UNCHANGED,
             ));
         }
+        let before = patch
+            .before
+            .as_ref()
+            .expect("changed VBA patch has a graph base");
+        let after = patch
+            .after
+            .as_ref()
+            .expect("changed VBA patch has a graph target");
+        validate_snapshot_limits(self.source, before, after, self.options)?;
         refuse_signed_change(self.source)?;
         Ok(Commit::new(candidate, patch, Diagnostics::CHANGED))
     }
@@ -835,8 +1025,9 @@ impl<'a> Edit<'a> {
 /// A complete, reversible VBA-project graph patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Patch {
-    before: GraphSnapshot,
-    after: GraphSnapshot,
+    before: Option<GraphSnapshot>,
+    after: Option<GraphSnapshot>,
+    proof: Option<GraphProof>,
     options: EditOptions,
 }
 
@@ -844,15 +1035,24 @@ impl Patch {
     /// Whether this patch is an exact graph no-op.
     #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.before == self.after
+        self.proof.is_some()
+            || self
+                .before
+                .as_ref()
+                .zip(self.after.as_ref())
+                .is_some_and(|(before, after)| before == after)
     }
 
     /// Return the exact inverse patch without reinterpreting VBA bytes.
     #[must_use]
     pub fn inverse(&self) -> Self {
+        if self.proof.is_some() {
+            return self.clone();
+        }
         Self {
             before: self.after.clone(),
             after: self.before.clone(),
+            proof: None,
             options: self.options,
         }
     }
@@ -868,13 +1068,31 @@ impl Patch {
     /// Returns [`Error::PatchConflict`] when the selected graph base differs
     /// and the signed-package refusal for a changed recipient.
     pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
-        let current = GraphSnapshot::capture(package, &self.before.source.name, self.before.host)?;
-        if current != self.before {
+        let Some(before) = self.before.as_ref() else {
+            let proof = self
+                .proof
+                .as_ref()
+                .ok_or_else(|| Error::Invalid("VBA patch has no replay base".to_string()))?;
+            let current = GraphProof::capture(package, &proof.source_part, proof.host)?;
+            if current != *proof {
+                return Err(Error::PatchConflict);
+            }
+            return Ok(Commit::new(
+                package.clone(),
+                self.clone(),
+                Diagnostics::UNCHANGED,
+            ));
+        };
+        let after = self
+            .after
+            .as_ref()
+            .ok_or_else(|| Error::Invalid("VBA patch has no target graph".to_string()))?;
+        let current = GraphSnapshot::capture(package, &before.source.name, before.host)?;
+        if current != *before {
             return Err(Error::PatchConflict);
         }
-        let preserve_content_types =
-            current.content_types.as_slice() == self.before.content_types.as_slice();
-        validate_snapshot_limits(package, &self.after, self.options)?;
+        let preserve_content_types = current.content_types.bytes() == before.content_types.bytes();
+        validate_snapshot_limits(package, &current, after, self.options)?;
         if self.is_noop() {
             return Ok(Commit::new(
                 package.clone(),
@@ -884,10 +1102,9 @@ impl Patch {
         }
         refuse_signed_change(package)?;
         let mut candidate = package.clone();
-        restore_graph_in_place(&mut candidate, &self.after, preserve_content_types)?;
-        let resulting =
-            GraphSnapshot::capture(&candidate, &self.after.source.name, self.after.host)?;
-        if resulting != self.after {
+        restore_graph_in_place(&mut candidate, after, preserve_content_types)?;
+        let resulting = GraphSnapshot::capture(&candidate, &after.source.name, after.host)?;
+        if resulting != *after {
             return Err(Error::PatchConflict);
         }
         Ok(Commit::new(candidate, self.clone(), Diagnostics::CHANGED))
@@ -900,8 +1117,108 @@ pub type Commit = litchi_core::edit::Commit<OpcPackage, Patch>;
 /// Minimal content-free commit diagnostics.
 pub use litchi_core::edit::Diagnostics;
 
+struct RelationshipTotals {
+    xml_bytes: u64,
+    relationships: u64,
+    members: usize,
+}
+
+fn limit_observed(value: u64) -> usize {
+    usize::try_from(value).unwrap_or(usize::MAX)
+}
+
+fn check_vba_limit(kind: LimitKind, observed: u64, maximum: u64) -> Result<()> {
+    if observed > maximum {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::Vba(kind),
+            observed: limit_observed(observed),
+            maximum: limit_observed(maximum),
+        });
+    }
+    Ok(())
+}
+
+fn relationship_totals(package: &OpcPackage, limits: SourceLimits) -> Result<RelationshipTotals> {
+    let mut totals = RelationshipTotals {
+        xml_bytes: 0,
+        relationships: 0,
+        members: 0,
+    };
+    let root = PackURI::new("/").map_err(|error| Error::Uri(error.clone()))?;
+    add_relationship_totals(&mut totals, package, &root, package.rels(), limits)?;
+    for metadata in package.iter_parts() {
+        add_relationship_totals(
+            &mut totals,
+            package,
+            metadata.partname(),
+            metadata.rels(),
+            limits,
+        )?;
+    }
+    Ok(totals)
+}
+
+fn add_relationship_totals(
+    totals: &mut RelationshipTotals,
+    package: &OpcPackage,
+    owner: &PackURI,
+    relationships: &litchi_opc::rel::Relationships,
+    limits: SourceLimits,
+) -> Result<()> {
+    let (xml_bytes, member_present) =
+        if let Some((bytes, present)) = package.retained_relationships_xml(owner)? {
+            (bytes.len(), present)
+        } else {
+            let plan = relationships.plan_canonical(limits)?;
+            (
+                plan.final_len(),
+                owner.as_str() == "/" || !relationships.is_empty(),
+            )
+        };
+    let xml_bytes = if member_present {
+        u64::try_from(xml_bytes).unwrap_or(u64::MAX)
+    } else {
+        0
+    };
+    check_vba_limit(
+        LimitKind::RelationshipXmlBytes,
+        xml_bytes,
+        limits.max_relationship_xml_bytes() as u64,
+    )?;
+    check_vba_limit(
+        LimitKind::RelationshipXmlBytes,
+        xml_bytes,
+        limits.max_part_bytes(),
+    )?;
+    totals.xml_bytes = totals
+        .xml_bytes
+        .checked_add(xml_bytes)
+        .ok_or_else(|| Error::Limit {
+            kind: crate::LimitKind::Vba(LimitKind::TotalRelationshipXmlBytes),
+            observed: usize::MAX,
+            maximum: limits.max_total_relationship_xml_bytes(),
+        })?;
+    totals.relationships = totals
+        .relationships
+        .checked_add(u64::try_from(relationships.len()).unwrap_or(u64::MAX))
+        .ok_or_else(|| Error::Limit {
+            kind: crate::LimitKind::Vba(LimitKind::TotalRelationships),
+            observed: usize::MAX,
+            maximum: limits.max_total_relationships(),
+        })?;
+    totals.members = totals.members.saturating_add(usize::from(member_present));
+    Ok(())
+}
+
+fn graph_part_states<'a>(graph: &'a GraphSnapshot) -> impl Iterator<Item = &'a PartState> {
+    std::iter::once(&graph.source)
+        .chain(graph.project.iter())
+        .chain(graph.supplemental.iter())
+}
+
 fn validate_snapshot_limits(
     package: &OpcPackage,
+    current: &GraphSnapshot,
     target: &GraphSnapshot,
     options: EditOptions,
 ) -> Result<()> {
@@ -942,6 +1259,99 @@ fn validate_snapshot_limits(
             maximum: effective.max_graph_parts,
         });
     }
+    for part in graph_part_states(target) {
+        check_vba_limit(
+            LimitKind::PartBytes,
+            u64::try_from(part.data.len()).unwrap_or(u64::MAX),
+            effective.source_limits.max_part_bytes(),
+        )?;
+        check_vba_limit(
+            LimitKind::RelationshipXmlBytes,
+            u64::try_from(part.relationships_source.bytes().len()).unwrap_or(u64::MAX),
+            effective.source_limits.max_relationship_xml_bytes() as u64,
+        )?;
+        check_vba_limit(
+            LimitKind::RelationshipsPerPart,
+            u64::try_from(part.relationships.len()).unwrap_or(u64::MAX),
+            effective.source_limits.max_relationships_per_part() as u64,
+        )?;
+    }
+    check_vba_limit(
+        LimitKind::ContentTypesBytes,
+        u64::try_from(target.content_types.bytes().len()).unwrap_or(u64::MAX),
+        effective.source_limits.max_content_types_bytes() as u64,
+    )?;
+
+    let package_part_bytes = package.iter_parts().try_fold(0u64, |total, metadata| {
+        let bytes = u64::try_from(metadata.payload_len()?).unwrap_or(u64::MAX);
+        total.checked_add(bytes).ok_or_else(|| Error::Limit {
+            kind: crate::LimitKind::Vba(LimitKind::TotalPartBytes),
+            observed: usize::MAX,
+            maximum: limit_observed(effective.source_limits.max_total_part_bytes()),
+        })
+    })?;
+    let current_part_bytes = graph_part_states(current)
+        .map(|part| u64::try_from(part.data.len()).unwrap_or(u64::MAX))
+        .sum::<u64>();
+    let target_part_bytes = graph_part_states(target)
+        .map(|part| u64::try_from(part.data.len()).unwrap_or(u64::MAX))
+        .sum::<u64>();
+    let projected_part_bytes = package_part_bytes
+        .saturating_sub(current_part_bytes)
+        .saturating_add(target_part_bytes);
+    check_vba_limit(
+        LimitKind::TotalPartBytes,
+        projected_part_bytes,
+        effective.source_limits.max_total_part_bytes(),
+    )?;
+
+    let current_relationship_totals = relationship_totals(package, effective.source_limits)?;
+    let removed_relationship_bytes = graph_part_states(current)
+        .map(|part| u64::try_from(part.relationships_source.bytes().len()).unwrap_or(u64::MAX))
+        .sum::<u64>();
+    let added_relationship_bytes = graph_part_states(target)
+        .map(|part| u64::try_from(part.relationships_source.bytes().len()).unwrap_or(u64::MAX))
+        .sum::<u64>();
+    let projected_relationship_bytes = current_relationship_totals
+        .xml_bytes
+        .saturating_sub(removed_relationship_bytes)
+        .saturating_add(added_relationship_bytes);
+    check_vba_limit(
+        LimitKind::TotalRelationshipXmlBytes,
+        projected_relationship_bytes,
+        effective.source_limits.max_total_relationship_xml_bytes() as u64,
+    )?;
+    let removed_relationships = graph_part_states(current)
+        .map(|part| u64::try_from(part.relationships.len()).unwrap_or(u64::MAX))
+        .sum::<u64>();
+    let added_relationships = graph_part_states(target)
+        .map(|part| u64::try_from(part.relationships.len()).unwrap_or(u64::MAX))
+        .sum::<u64>();
+    let projected_relationships = current_relationship_totals
+        .relationships
+        .saturating_sub(removed_relationships)
+        .saturating_add(added_relationships);
+    check_vba_limit(
+        LimitKind::TotalRelationships,
+        projected_relationships,
+        effective.source_limits.max_total_relationships() as u64,
+    )?;
+    let removed_members = graph_part_states(current)
+        .filter(|part| part.relationships_source.member_present())
+        .count();
+    let added_members = graph_part_states(target)
+        .filter(|part| part.relationships_source.member_present())
+        .count();
+    let projected_members = current_relationship_totals
+        .members
+        .saturating_sub(removed_members)
+        .saturating_add(added_members);
+    check_vba_limit(
+        LimitKind::RelationshipParts,
+        projected_members as u64,
+        effective.source_limits.max_relationship_parts() as u64,
+    )?;
+
     // `try_add_part` checks names and reserves each map insertion.  Check the
     // recipient's bounded part budget before cloning it so a replay cannot
     // allocate a candidate that its own source policy would reject.
@@ -994,40 +1404,67 @@ fn restore_graph_in_place(
         }
     }
     refuse_signed_change(package)?;
-    if let Some(graph) = existing {
+    if let Some(graph) = &existing {
         package
             .get_part_mut(source_part)?
             .rels_mut()
             .remove(&graph.relationship_id);
         package.remove_part(&graph.project_part);
-        if let Some((supplemental, _)) = graph.supplemental {
-            package.remove_part(&supplemental);
+        if let Some((supplemental, _)) = &graph.supplemental {
+            package.remove_part(supplemental);
         }
     }
 
-    // Replace the affected parts with their captured concrete values.  This
-    // retains source relationship XML/provenance/admitted IDs and any opaque
-    // part state; reconstructing a BlobPart from `RelationshipState` would
-    // lose all of those fields.
+    // Replace the affected parts with their captured concrete values.  The
+    // source-bound batch API installs the source relationship and
+    // content-types tokens atomically; the per-part replacements below do the
+    // same for the project and supplemental `.rels` members.  Plain
+    // `try_add_part` would drop those package provenance entries even when the
+    // cloned part itself still carried a source capture.
     if let Some(supplemental) = &target.supplemental {
         ensure_no_inbound_reference(package, &supplemental.name)?;
-        package.try_add_part(supplemental.clone_part())?;
     }
     if let Some(project) = &target.project {
         ensure_no_inbound_reference(package, &project.name)?;
-        package.try_add_part(project.clone_part())?;
     }
     package.remove_part(source_part);
     package.try_add_part(target.source.clone_part())?;
 
-    if preserve_content_types {
-        let limits = package.read_limits();
-        let current = package.source_content_types(limits)?;
-        package.try_replace_content_types_bytes(
-            current.bytes(),
-            Arc::clone(&target.content_types),
-            limits,
-        )?;
+    let limits = package.read_limits();
+    let expected_content_types = package.source_content_types(limits)?;
+    let replacement_content_types = if preserve_content_types {
+        target.content_types.clone()
+    } else {
+        let mut overrides = Vec::new();
+        if let Some(project) = &target.project {
+            overrides.push((&project.name, project.content_type.as_str()));
+        }
+        if let Some(supplemental) = &target.supplemental {
+            overrides.push((&supplemental.name, supplemental.content_type.as_str()));
+        }
+        expected_content_types.with_part_overrides(&overrides, limits.max_content_types_bytes())?
+    };
+    let expected_relationships = package.source_relationships(source_part, limits)?;
+    let mut parts = Vec::new();
+    if let Some(supplemental) = &target.supplemental {
+        parts.push(supplemental.clone_part());
+    }
+    if let Some(project) = &target.project {
+        parts.push(project.clone_part());
+    }
+    package.try_add_parts_with_source_tokens(
+        expected_content_types.bytes(),
+        &replacement_content_types,
+        &expected_relationships,
+        &target.source.relationships_source,
+        parts,
+    )?;
+
+    for part in target.supplemental.iter().chain(target.project.iter()) {
+        let current = package.source_relationships(&part.name, limits)?;
+        if current != part.relationships_source {
+            package.try_replace_relationships(&current, &part.relationships_source, limits)?;
+        }
     }
 
     settle_unsigned_change(package)?;
@@ -1220,6 +1657,7 @@ fn invalid_main_content_type(host: Host, actual: &str) -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_opc::PackageWriter;
 
     #[derive(Clone)]
     struct ImmutableContentTypePart {
@@ -1517,6 +1955,154 @@ mod tests {
     }
 
     #[test]
+    fn patch_preserves_noncanonical_relationship_bytes_through_replay_and_inverse() {
+        let source_name = PackURI::new("/xl/workbook.xml").unwrap();
+        let unrelated_name = PackURI::new("/custom/unrelated.bin").unwrap();
+        let mut package = excel_package();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                unrelated_name,
+                "application/octet-stream".to_string(),
+                b"unrelated".to_vec(),
+            )))
+            .unwrap();
+        package
+            .get_part_mut(&source_name)
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                "urn:unrelated".to_string(),
+                "../custom/unrelated.bin".to_string(),
+                "legacyEdge".to_string(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        let limits = package.read_limits();
+        let expected = package.source_relationships(&source_name, limits).unwrap();
+        let mut noncanonical = expected.bytes().to_vec();
+        let marker = b"<Relationship ";
+        let offset = noncanonical
+            .windows(marker.len())
+            .position(|window| window == marker)
+            .expect("relationship element");
+        noncanonical.splice(
+            offset..offset + marker.len(),
+            b"\n  <Relationship ".iter().copied(),
+        );
+        package
+            .try_replace_relationships_bytes(
+                &expected,
+                Arc::new(noncanonical.clone()),
+                true,
+                limits,
+            )
+            .unwrap();
+
+        let mut edit = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
+        edit.store(b"project".to_vec(), None).unwrap();
+        let commit = edit.commit().unwrap();
+        let stored = commit.package().clone();
+        let replayed = commit.patch().apply(&package).unwrap();
+        let replay_source = replayed
+            .package()
+            .retained_relationships_xml(&source_name)
+            .unwrap()
+            .unwrap()
+            .0;
+        assert!(
+            replay_source
+                .windows(b"\n  <Relationship ".len())
+                .any(|window| { window == b"\n  <Relationship " })
+        );
+
+        let reverted = commit.patch().inverse().apply(&stored).unwrap();
+        let reverted_source = reverted
+            .package()
+            .retained_relationships_xml(&source_name)
+            .unwrap()
+            .unwrap()
+            .0;
+        assert_eq!(reverted_source.as_slice(), noncanonical.as_slice());
+    }
+
+    #[test]
+    fn replay_rejects_tighter_recipient_aggregate_limits_atomically() {
+        let package = excel_package();
+        let mut edit = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
+        edit.store(b"project".to_vec(), None).unwrap();
+        let patch = edit.commit().unwrap().patch().clone();
+        let bytes = PackageWriter::to_bytes(&package).unwrap();
+        let part_bytes = package
+            .iter_parts()
+            .map(|part| part.payload_len().unwrap() as u64)
+            .sum::<u64>();
+        let recipient_limits = SourceLimits::builder()
+            .max_total_part_bytes(part_bytes)
+            .unwrap();
+        let recipient = OpcPackage::from_bytes(&bytes, recipient_limits).unwrap();
+        let before = PackageWriter::to_bytes(&recipient).unwrap();
+        assert!(matches!(
+            patch.apply(&recipient),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Vba(LimitKind::TotalPartBytes),
+                ..
+            })
+        ));
+        assert_eq!(PackageWriter::to_bytes(&recipient).unwrap(), before);
+    }
+
+    #[test]
+    fn replay_rejects_tighter_recipient_relationship_budget_atomically() {
+        let package = excel_package();
+        let mut edit = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
+        edit.store(b"project".to_vec(), None).unwrap();
+        let patch = edit.commit().unwrap().patch().clone();
+        let bytes = PackageWriter::to_bytes(&package).unwrap();
+        let root = PackURI::new("/").unwrap();
+        let relationship_bytes = package
+            .source_relationships(&root, package.read_limits())
+            .unwrap()
+            .bytes()
+            .len();
+        let recipient_limits = SourceLimits::builder()
+            .max_total_relationship_xml_bytes(relationship_bytes)
+            .unwrap();
+        let recipient = OpcPackage::from_bytes(&bytes, recipient_limits).unwrap();
+        let before = PackageWriter::to_bytes(&recipient).unwrap();
+        assert!(matches!(
+            patch.apply(&recipient),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Vba(LimitKind::TotalRelationshipXmlBytes),
+                ..
+            })
+        ));
+        assert_eq!(PackageWriter::to_bytes(&recipient).unwrap(), before);
+    }
+
+    #[test]
+    fn untouched_edit_replays_its_selected_graph_proof_without_snapshot_payloads() {
+        let package = excel_package();
+        let commit = Edit::new(&package, Host::Excel, EditOptions::new())
+            .unwrap()
+            .commit()
+            .unwrap();
+        assert!(commit.patch().is_noop());
+        let replayed = commit.patch().apply(&package).unwrap();
+        assert!(!replayed.diagnostics().changed());
+
+        let source_name = PackURI::new("/xl/workbook.xml").unwrap();
+        let mut changed = package.clone();
+        changed
+            .get_part_mut(&source_name)
+            .unwrap()
+            .set_blob(b"changed".to_vec());
+        assert!(matches!(
+            commit.patch().apply(&changed),
+            Err(Error::PatchConflict)
+        ));
+    }
+
+    #[test]
     fn patch_replays_on_equal_copy_with_unrelated_changes_and_inverts() {
         let mut package = excel_package();
         package.add_part(Box::new(BlobPart::new(
@@ -1613,6 +2199,21 @@ mod tests {
         let reset = edit.commit().unwrap();
         assert!(!reset.diagnostics().changed());
         assert_eq!(reset.package().part_count(), package.part_count());
+
+        let mut retained_limits = Edit::new(
+            &package,
+            Host::Excel,
+            EditOptions::new().max_project_bytes(1),
+        )
+        .unwrap();
+        retained_limits.reset();
+        assert!(matches!(
+            retained_limits.store(b"project".to_vec(), None),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Vba(LimitKind::ProjectBytes),
+                ..
+            })
+        ));
 
         let stored = {
             let mut edit = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
