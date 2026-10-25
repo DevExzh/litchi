@@ -534,6 +534,35 @@ fn merge_laser_usage(
     Ok(())
 }
 
+/// Return the managed transient-memory ceiling without reusing the source
+/// output ceiling. Serialized output and derived scene memory are independent
+/// resource dimensions.
+#[inline]
+fn managed_memory_limit(context: &ExecutionContext) -> usize {
+    usize::try_from(context.budget().limit(litchi_core::Resource::Memory)).unwrap_or(usize::MAX)
+}
+
+fn reserve_source_memory(
+    context: &ExecutionContext,
+    amount: usize,
+    maximum: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    let amount = u64::try_from(amount).map_err(|_| Error::Limit {
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+        observed: usize::MAX,
+        maximum,
+    })?;
+    context
+        .reserve(litchi_core::Resource::Memory, amount)
+        .map(|reservation| Some(Arc::new(reservation)))
+        .map_err(|error| {
+            Error::Opc(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                error => litchi_opc::OpcError::Execution(error),
+            })
+        })
+}
+
 /// Reserve the full transient envelope of a source-backed text-box edit
 /// before parsing or authoring. The scene is indexed once before authoring and
 /// the candidate is indexed again during semantic readback, so both bounded
@@ -554,7 +583,12 @@ fn reserve_source_text_box(
     let Some(context) = context else {
         return Ok(None);
     };
-    let maximum = max_output_bytes;
+    // The caller's semantic output ceiling and the managed execution budget
+    // are independent policies.  Output admission above already ran first;
+    // use the context's memory ceiling for the transient envelope so a
+    // modest output limit does not reject a valid edit merely because its
+    // scene indexes need more bytes than the serialized candidate.
+    let maximum = managed_memory_limit(context);
     let input_scene = input_bytes
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
@@ -600,20 +634,7 @@ fn reserve_source_text_box(
             maximum,
         });
     }
-    let amount = u64::try_from(amount).map_err(|_| Error::Limit {
-        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
-        observed: usize::MAX,
-        maximum,
-    })?;
-    context
-        .reserve(litchi_core::Resource::Memory, amount)
-        .map(|reservation| Some(Arc::new(reservation)))
-        .map_err(|error| {
-            Error::Opc(match error {
-                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
-                error => litchi_opc::OpcError::Execution(error),
-            })
-        })
+    reserve_source_memory(context, amount, maximum)
 }
 
 /// Reserve the source shape-removal scene/index, candidate, and semantic
@@ -626,7 +647,10 @@ fn reserve_source_shape_removal(
     let Some(context) = context else {
         return Ok(None);
     };
-    let maximum = max_output_bytes;
+    let maximum = managed_memory_limit(context);
+    // The exact retained length is checked by the native stage before it
+    // allocates the candidate. This reservation only uses the output ceiling
+    // to bound its transient envelope, never as the memory ceiling.
     let input_scene = input_bytes
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
@@ -660,15 +684,7 @@ fn reserve_source_shape_removal(
             maximum,
         });
     }
-    context
-        .reserve(litchi_core::Resource::Memory, amount as u64)
-        .map(|reservation| Some(Arc::new(reservation)))
-        .map_err(|error| {
-            Error::Opc(match error {
-                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
-                other => litchi_opc::OpcError::Execution(other),
-            })
-        })
+    reserve_source_memory(context, amount, maximum)
 }
 
 /// Reserve the transient parse, lexical rewrite, and semantic read-back
@@ -680,22 +696,22 @@ fn reserve_source_slide_properties(
     name: Option<&str>,
     max_output_bytes: usize,
 ) -> Result<Option<Arc<litchi_core::Reservation>>> {
-    let maximum = max_output_bytes;
+    let output_maximum = max_output_bytes;
     let name_bytes = name.map_or(0, str::len);
     // Attribute escaping can expand each input byte to a six-byte entity. A
     // small fixed charge covers a newly inserted attribute; the native stage
     // still applies the exact output-byte limit before allocating the result.
     let conservative_output_bound = input_bytes
         .checked_add(name_bytes.checked_mul(6).ok_or(Error::Limit {
-            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
             observed: usize::MAX,
-            maximum,
+            maximum: output_maximum,
         })?)
         .and_then(|size| size.checked_add(16))
         .ok_or(Error::Limit {
-            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
             observed: usize::MAX,
-            maximum,
+            maximum: output_maximum,
         })?;
     // The native stage applies the exact output limit after it knows whether
     // each requested attribute is a no-op, replacement, insertion, or
@@ -705,6 +721,10 @@ fn reserve_source_slide_properties(
     let Some(context) = context else {
         return Ok(None);
     };
+    let maximum = managed_memory_limit(context);
+    // The exact attribute splice can shorten or be a no-op, so its native
+    // output check remains the authoritative output admission. This envelope
+    // uses the source ceiling only to bound candidate-shaped memory.
     let input_scene = input_bytes
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
@@ -738,15 +758,7 @@ fn reserve_source_slide_properties(
             maximum,
         });
     }
-    context
-        .reserve(litchi_core::Resource::Memory, amount as u64)
-        .map(|reservation| Some(Arc::new(reservation)))
-        .map_err(|error| {
-            Error::Opc(match error {
-                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
-                other => litchi_opc::OpcError::Execution(other),
-            })
-        })
+    reserve_source_memory(context, amount, maximum)
 }
 
 fn reserve_source_shape_properties(
@@ -755,7 +767,6 @@ fn reserve_source_shape_properties(
     replacements: &[crate::opened::ShapePropertiesReplacement<'_>],
     max_output_bytes: usize,
 ) -> Result<Option<Arc<litchi_core::Reservation>>> {
-    let maximum = max_output_bytes;
     if replacements.len() > crate::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS {
         return Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
@@ -782,6 +793,7 @@ fn reserve_source_shape_properties(
     let Some(context) = context else {
         return Ok(None);
     };
+    let maximum = managed_memory_limit(context);
     // Three simultaneously live scene indexes, replacement plans, escaped
     // text, and intermediate/output buffers fit inside this conservative
     // envelope. Geometry stages release their prior candidate before the next
@@ -791,9 +803,9 @@ fn reserve_source_shape_properties(
         .and_then(|size| size.checked_add(input_bytes))
         .and_then(|size| size.checked_add(replacements.len().checked_mul(512)?))
         .ok_or(Error::Limit {
-            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
             observed: usize::MAX,
-            maximum,
+            maximum: max_output_bytes,
         })?
         .min(max_output_bytes);
     let amount = input_bytes
@@ -813,15 +825,7 @@ fn reserve_source_shape_properties(
             maximum,
         });
     }
-    context
-        .reserve(litchi_core::Resource::Memory, amount as u64)
-        .map(|reservation| Some(Arc::new(reservation)))
-        .map_err(|error| {
-            Error::Opc(match error {
-                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
-                other => litchi_opc::OpcError::Execution(other),
-            })
-        })
+    reserve_source_memory(context, amount, maximum)
 }
 
 fn reserve_source_shape_text_chunks(
@@ -830,23 +834,25 @@ fn reserve_source_shape_text_chunks(
     admission: crate::opened::ChunkAdmission,
     max_output_bytes: usize,
 ) -> Result<Option<Arc<litchi_core::Reservation>>> {
-    let maximum = max_output_bytes;
     let replacements = admission.selections();
     let text_bytes = admission.text_bytes();
     let Some(context) = context else {
         return Ok(None);
     };
+    let maximum = managed_memory_limit(context);
+    // Chunk callers perform output admission before this reservation. The
+    // scalar output bound remains separate from the managed memory ceiling.
     let output_bound = input_bytes
         .checked_add(text_bytes.checked_mul(6).ok_or(Error::Limit {
-            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
             observed: usize::MAX,
-            maximum,
+            maximum: max_output_bytes,
         })?)
         .and_then(|size| size.checked_add(replacements.checked_mul(256)?))
         .ok_or(Error::Limit {
-            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
             observed: usize::MAX,
-            maximum,
+            maximum: max_output_bytes,
         })?
         .min(max_output_bytes);
     let input_scene = input_bytes
@@ -883,15 +889,7 @@ fn reserve_source_shape_text_chunks(
             maximum,
         });
     }
-    context
-        .reserve(litchi_core::Resource::Memory, amount as u64)
-        .map(|reservation| Some(Arc::new(reservation)))
-        .map_err(|error| {
-            Error::Opc(match error {
-                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
-                other => litchi_opc::OpcError::Execution(other),
-            })
-        })
+    reserve_source_memory(context, amount, maximum)
 }
 
 fn reserve_source_shape_property_chunks(
@@ -900,23 +898,23 @@ fn reserve_source_shape_property_chunks(
     admission: crate::opened::ChunkAdmission,
     max_output_bytes: usize,
 ) -> Result<Option<Arc<litchi_core::Reservation>>> {
-    let maximum = max_output_bytes;
     let replacements = admission.selections();
     let text_bytes = admission.text_bytes();
     let Some(context) = context else {
         return Ok(None);
     };
+    let maximum = managed_memory_limit(context);
     let output_bound = input_bytes
         .checked_add(text_bytes.checked_mul(6).ok_or(Error::Limit {
-            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
             observed: usize::MAX,
-            maximum,
+            maximum: max_output_bytes,
         })?)
         .and_then(|size| size.checked_add(replacements.checked_mul(512)?))
         .ok_or(Error::Limit {
-            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
             observed: usize::MAX,
-            maximum,
+            maximum: max_output_bytes,
         })?
         .min(max_output_bytes);
     let amount = input_bytes
@@ -937,15 +935,7 @@ fn reserve_source_shape_property_chunks(
             maximum,
         });
     }
-    context
-        .reserve(litchi_core::Resource::Memory, amount as u64)
-        .map(|reservation| Some(Arc::new(reservation)))
-        .map_err(|error| {
-            Error::Opc(match error {
-                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
-                other => litchi_opc::OpcError::Execution(other),
-            })
-        })
+    reserve_source_memory(context, amount, maximum)
 }
 
 #[cfg(any(unix, windows))]
@@ -7074,6 +7064,220 @@ mod tests {
         drop(source);
         assert_eq!(recipient_budget.used(Resource::Memory), 0);
         assert_eq!(source_budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn source_edit_reservations_keep_output_and_memory_dimensions_independent() {
+        const INPUT_BYTES: usize = 8192;
+        const TIGHT_OUTPUT: usize = 128;
+        const MEMORY: u64 = 4 * 1024 * 1024;
+        let text_replacement = [crate::opened::ShapeTextReplacement::at(0, "x")];
+        let text_chunks = [&text_replacement[..]];
+        let admission = crate::opened::admit_shape_text_chunks(
+            &text_chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            TIGHT_OUTPUT,
+        )
+        .unwrap();
+        let replacements =
+            [
+                crate::opened::ShapePropertiesReplacement::new(litchi_core::Position::new(0))
+                    .with_text("x"),
+            ];
+        let property_chunks = [&replacements[..]];
+        let property_admission = crate::opened::admit_shape_property_chunks(
+            &property_chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            TIGHT_OUTPUT,
+        )
+        .unwrap();
+        let text_box_output = INPUT_BYTES + 4096 + 6;
+
+        fn assert_admitted(result: crate::Result<Option<Arc<litchi_core::Reservation>>>) {
+            assert!(result.unwrap().is_some());
+        }
+
+        let (budget, _cancel, context) = source_backed_context(MEMORY);
+        // A small serialized-output ceiling must not become the managed
+        // transient-memory ceiling. Every source-backed reservation keeps the
+        // caller's output bound in its own arithmetic and charges the context
+        // memory budget independently.
+        assert_admitted(super::reserve_source_shape_removal(
+            Some(&context),
+            INPUT_BYTES,
+            TIGHT_OUTPUT,
+        ));
+        assert_admitted(super::reserve_source_slide_properties(
+            Some(&context),
+            INPUT_BYTES,
+            Some("name"),
+            TIGHT_OUTPUT,
+        ));
+        assert_admitted(super::reserve_source_shape_properties(
+            Some(&context),
+            INPUT_BYTES,
+            &replacements,
+            TIGHT_OUTPUT,
+        ));
+        assert_admitted(super::reserve_source_shape_text_chunks(
+            Some(&context),
+            INPUT_BYTES,
+            admission,
+            TIGHT_OUTPUT,
+        ));
+        assert_admitted(super::reserve_source_shape_property_chunks(
+            Some(&context),
+            INPUT_BYTES,
+            property_admission,
+            TIGHT_OUTPUT,
+        ));
+        assert_admitted(super::reserve_source_text_box(
+            Some(&context),
+            INPUT_BYTES,
+            1,
+            text_box_output,
+        ));
+        assert_eq!(budget.used(Resource::Memory), 0);
+
+        // Unmanaged callers do not reserve transient memory, while retaining
+        // the same checked input/output admission path.
+        assert!(
+            super::reserve_source_shape_removal(None, INPUT_BYTES, TIGHT_OUTPUT)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            super::reserve_source_slide_properties(None, INPUT_BYTES, Some("name"), TIGHT_OUTPUT,)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            super::reserve_source_shape_properties(None, INPUT_BYTES, &replacements, TIGHT_OUTPUT,)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            super::reserve_source_shape_text_chunks(None, INPUT_BYTES, admission, TIGHT_OUTPUT,)
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            super::reserve_source_shape_property_chunks(
+                None,
+                INPUT_BYTES,
+                property_admission,
+                TIGHT_OUTPUT,
+            )
+            .unwrap()
+            .is_none()
+        );
+        assert!(
+            super::reserve_source_text_box(None, INPUT_BYTES, 1, text_box_output)
+                .unwrap()
+                .is_none()
+        );
+
+        let root_budget = Budget::root(
+            "pptx-source-parent-budget",
+            Limits::new(1024, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let child_budget = root_budget.child(
+            "pptx-source-child-budget",
+            Limits::new(MEMORY, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (_cancel, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::MIN,
+            NonZeroUsize::MIN,
+            NonZeroU64::new(MEMORY).unwrap(),
+            0,
+        )
+        .unwrap();
+        let tight_context = ExecutionContext::new(child_budget, cancellation, execution_limits);
+
+        fn assert_hierarchical_limit(result: crate::Result<Option<Arc<litchi_core::Reservation>>>) {
+            assert!(matches!(
+                result,
+                Err(Error::Opc(litchi_opc::OpcError::Execution(
+                    ExecutionError::ResourceLimit(_)
+                )))
+            ));
+        }
+        assert_hierarchical_limit(super::reserve_source_shape_removal(
+            Some(&tight_context),
+            INPUT_BYTES,
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_slide_properties(
+            Some(&tight_context),
+            INPUT_BYTES,
+            Some("name"),
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_shape_properties(
+            Some(&tight_context),
+            INPUT_BYTES,
+            &replacements,
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_shape_text_chunks(
+            Some(&tight_context),
+            INPUT_BYTES,
+            admission,
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_shape_property_chunks(
+            Some(&tight_context),
+            INPUT_BYTES,
+            property_admission,
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_text_box(
+            Some(&tight_context),
+            INPUT_BYTES,
+            1,
+            text_box_output,
+        ));
+        assert_eq!(root_budget.used(Resource::Memory), 0);
+        assert_eq!(tight_context.budget().used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn source_slide_property_edit_accepts_valid_tight_output_with_managed_memory() {
+        const MEMORY: u64 = 4 * 1024 * 1024;
+        let archive = source_backed_pptx();
+        let baseline = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            archive.clone(),
+        )))
+        .unwrap();
+        let input_bytes = baseline.slide_snapshot(0).unwrap().xml.as_bytes().len();
+        drop(baseline);
+
+        let defaults = crate::shape::Limits::DEFAULT;
+        let tight_shape = crate::shape::Limits::new(
+            input_bytes,
+            input_bytes.checked_add(128).unwrap(),
+            defaults.depth(),
+            defaults.nodes(),
+            defaults.shapes(),
+            defaults.retained_text_bytes(),
+        )
+        .unwrap();
+        let (budget, _cancel, context) = source_backed_context(MEMORY);
+        let editor = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(CountingSource::new(archive)),
+            crate::OpenOptions::default()
+                .shape_limits(tight_shape)
+                .execution_context(context),
+        )
+        .unwrap();
+        let mut edit = editor.edit_slide(0).unwrap();
+        assert!(edit.set_slide_properties(Some("x"), None).unwrap());
+        let commit = edit.commit_checked().unwrap();
+        assert!(commit.is_changed());
+        drop(commit);
+        drop(editor);
+        assert_eq!(budget.used(Resource::Memory), 0);
     }
 
     fn publish_first_slide_update(editor: SourceBackedPresentationEditor) -> Vec<u8> {
