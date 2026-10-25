@@ -20,13 +20,13 @@ class RawApiCensusPreparationTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.matrix = census.build_matrix(ROOT)
 
-    def test_current_matrix_has_69_glossary_and_15_package_only_profiles(self) -> None:
+    def test_current_matrix_has_71_glossary_and_13_package_only_profiles(self) -> None:
         self.assertEqual(
             self.matrix["counts"],
             {
                 "direct_packages": 68,
-                "glossary_profiles": 69,
-                "package_only_profiles": 15,
+                "glossary_profiles": 71,
+                "package_only_profiles": 13,
                 "profiles": 84,
             },
         )
@@ -46,7 +46,7 @@ class RawApiCensusPreparationTests(unittest.TestCase):
             self.assertEqual(observed["origin"], "glossary")
 
     def test_package_only_profiles_are_the_direct_non_glossary_set(self) -> None:
-        only = self.matrix["profiles"][69:]
+        only = self.matrix["profiles"][71:]
         self.assertEqual(
             [profile["package"] for profile in only],
             [
@@ -54,8 +54,6 @@ class RawApiCensusPreparationTests(unittest.TestCase):
                 "litchi-codepage",
                 "litchi-eval",
                 "litchi-iwa-cache",
-                "litchi-iwa-graph",
-                "litchi-iwa-index",
                 "litchi-iwa-package",
                 "litchi-iwa-text",
                 "litchi-odf",
@@ -68,7 +66,7 @@ class RawApiCensusPreparationTests(unittest.TestCase):
             ],
         )
         self.assertEqual(only[2]["features"], ["web_functions"])
-        self.assertEqual(only[8]["features"], ["all"])
+        self.assertEqual(only[6]["features"], ["all"])
         self.assertTrue(all(profile["default_features"] is False for profile in only))
         self.assertTrue(all(profile["origin"] == "package_only" for profile in only))
 

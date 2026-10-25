@@ -163,7 +163,7 @@ def _glossary_profiles(value: dict[str, Any]) -> list[dict[str, Any]]:
             "features": list(features),
             "origin": "glossary",
         })
-    _expect(len(result) == 69, f"expected 69 glossary profiles, found {len(result)}")
+    _expect(len(result) == 71, f"expected 71 glossary profiles, found {len(result)}")
     return result
 
 
@@ -186,7 +186,7 @@ def _package_only_profiles(
             "features": list(features),
             "origin": "package_only",
         })
-    _expect(len(package_only) == 15, f"expected 15 package-only profiles, found {len(package_only)}")
+    _expect(len(package_only) == 13, f"expected 13 package-only profiles, found {len(package_only)}")
     return package_only
 
 
@@ -249,8 +249,8 @@ def build_matrix(root: Path, *, source_commit: str | None = None) -> dict[str, A
         "schema": SCHEMA,
         "state": "incomplete",
         "reason": (
-            "84 current profile inputs are prepared from 69 glossary profiles and "
-            "15 direct package-only profiles; rustdoc inputs, receipts, callable "
+            "84 current profile inputs are prepared from 71 glossary profiles and "
+            "13 direct package-only profiles; rustdoc inputs, receipts, callable "
             "entries, and dispositions are intentionally not supplied"
         ),
         "source": {

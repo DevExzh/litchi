@@ -39,8 +39,8 @@
   "captures": [],
   "counts": {
     "direct_packages": 68,
-    "glossary_profiles": 69,
-    "package_only_profiles": 15,
+    "glossary_profiles": 71,
+    "package_only_profiles": 13,
     "profiles": 84
   },
   "entries": [],
@@ -803,6 +803,34 @@
     {
       "default_features": true,
       "features": [],
+      "id": "iwa-graph",
+      "manifest": "crates/litchi-iwa-graph/Cargo.toml",
+      "manifest_identity": {
+        "blob": "edd07a44cbb4f562a229f67ea4decbd0638d2449",
+        "bytes": 347,
+        "path": "crates/litchi-iwa-graph/Cargo.toml",
+        "sha256": "90d3d36a39c179a1317981a372ce6f7575c71c03c53119a0f3f1b0742f10a3ee"
+      },
+      "origin": "glossary",
+      "package": "litchi-iwa-graph"
+    },
+    {
+      "default_features": true,
+      "features": [],
+      "id": "iwa-index",
+      "manifest": "crates/litchi-iwa-index/Cargo.toml",
+      "manifest_identity": {
+        "blob": "e203819524b9c4afcc5db8be64269b03d3044990",
+        "bytes": 400,
+        "path": "crates/litchi-iwa-index/Cargo.toml",
+        "sha256": "e32ca609e6eea4abf953dec18452f6b2d1ef8c002fef7234af047e219e3508ef"
+      },
+      "origin": "glossary",
+      "package": "litchi-iwa-index"
+    },
+    {
+      "default_features": true,
+      "features": [],
       "id": "iwa",
       "manifest": "crates/litchi-iwa/Cargo.toml",
       "manifest_identity": {
@@ -1184,34 +1212,6 @@
     {
       "default_features": false,
       "features": [],
-      "id": "workspace-litchi-iwa-graph",
-      "manifest": "crates/litchi-iwa-graph/Cargo.toml",
-      "manifest_identity": {
-        "blob": "edd07a44cbb4f562a229f67ea4decbd0638d2449",
-        "bytes": 347,
-        "path": "crates/litchi-iwa-graph/Cargo.toml",
-        "sha256": "90d3d36a39c179a1317981a372ce6f7575c71c03c53119a0f3f1b0742f10a3ee"
-      },
-      "origin": "package_only",
-      "package": "litchi-iwa-graph"
-    },
-    {
-      "default_features": false,
-      "features": [],
-      "id": "workspace-litchi-iwa-index",
-      "manifest": "crates/litchi-iwa-index/Cargo.toml",
-      "manifest_identity": {
-        "blob": "e203819524b9c4afcc5db8be64269b03d3044990",
-        "bytes": 400,
-        "path": "crates/litchi-iwa-index/Cargo.toml",
-        "sha256": "e32ca609e6eea4abf953dec18452f6b2d1ef8c002fef7234af047e219e3508ef"
-      },
-      "origin": "package_only",
-      "package": "litchi-iwa-index"
-    },
-    {
-      "default_features": false,
-      "features": [],
       "id": "workspace-litchi-iwa-package",
       "manifest": "crates/litchi-iwa-package/Cargo.toml",
       "manifest_identity": {
@@ -1338,15 +1338,15 @@
       "package": "xml-minifier-macros"
     }
   ],
-  "reason": "84 current profile inputs are prepared from 69 glossary profiles and 15 direct package-only profiles; rustdoc inputs, receipts, callable entries, and dispositions are intentionally not supplied",
+  "reason": "84 current profile inputs are prepared from 71 glossary profiles and 13 direct package-only profiles; rustdoc inputs, receipts, callable entries, and dispositions are intentionally not supplied",
   "schema": "litchi.raw-api-census-matrix.v1",
   "source": {
-    "commit": "035615e0de91575af2fe8872f502a7cea32e0565",
+    "commit": "f17dda6e6f13629b347bf3e290af9cc70f7dc936",
     "glossary": {
-      "blob": "b0d641cca4ffd7bd98b3b004a6b6a062b448dbb2",
-      "bytes": 1100333,
+      "blob": "32b96aa75ef0cc26cba0cf1ccf22fab9b33f3157",
+      "bytes": 1107879,
       "path": "tools/api_glossary.json",
-      "sha256": "d30620cf6575ffea61e781a5ad6679abf7f1d906789311861f40a8149eb52eed"
+      "sha256": "d15d740ee4ab9ffe39a6d6934a8d9d8af31e4b8867185651ec050b5a50cb0e7d"
     },
     "workspace": {
       "blob": "f75fa5fe8973c92ef4fd70152a07a2891c63e365",
