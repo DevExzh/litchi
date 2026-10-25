@@ -969,7 +969,7 @@ impl OpcPackage {
                 SourceMemberKind::PartRelationships(partname) => {
                     !preserved
                         && self.parts.get(partname).is_some_and(|part| {
-                            part.rels().len() > 0
+                            !part.rels().is_empty()
                                 || self.source_relationships_member_present(partname)
                         })
                 },

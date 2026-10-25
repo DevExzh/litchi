@@ -249,9 +249,9 @@ impl DeferredPayload {
                         if chunk.is_empty() {
                             break;
                         }
-                        let end = offset.checked_add(chunk.len()).ok_or_else(|| {
-                            io::Error::new(io::ErrorKind::Other, "deferred payload length overflow")
-                        })?;
+                        let end = offset
+                            .checked_add(chunk.len())
+                            .ok_or_else(|| io::Error::other("deferred payload length overflow"))?;
                         if expected.get(offset..end) != Some(chunk) {
                             equal = false;
                         }
