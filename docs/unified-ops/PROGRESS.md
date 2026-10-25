@@ -5906,3 +5906,11 @@ See [0063](0063-source-pptx-modern-comments.md).
   supplements, preserving isolated wsdoc and complete glossary coverage.
   Native135c/136b/137c still need actual execution-path repairs before final
   composition; no native pass is claimed. Trunk and cleanup work continue.
+
+  Cleanup103 removes both merged repair worktrees without force and deletes
+  their exact refs after fresh root checks (141). Cumulative totals reach270
+  worktrees and432 refs; the conservative allocated ledger is800,318,455,808
+  bytes under its existing exclusions, not a free-space measurement. All
+  source blobs, three locks and the protected root probe are preserved.
+  The68 independent office refs stay outside scope; the126 a8 baseline stays
+  available. Three protocol leaves remain active. No push or final acceptance.
