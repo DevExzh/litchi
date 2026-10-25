@@ -330,6 +330,7 @@ fn timestamp_date_time(value: Timestamp) -> Result<time::DateTime> {
 }
 
 /// Refuse a [`Metadata`] value holding a field core properties cannot store.
+#[cfg(test)]
 fn ensure_core_only(metadata: &Metadata) -> Result<()> {
     match Field::ALL
         .into_iter()
