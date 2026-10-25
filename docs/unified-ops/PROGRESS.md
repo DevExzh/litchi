@@ -5302,3 +5302,26 @@ See [0063](0063-source-pptx-modern-comments.md).
   fidelity repair. Final gate/docs, census, native/corpus and performance
   qualification remain open. Only redaction audit 22 is deferred. Nothing is
   pushed.
+
+- Coordinator typed PPTX and shared OOXML compiler checkpoint (2026-10-25):
+  Private typed composition `49f9b2fcac` and dependent-Part accounting merge
+  `2915ef1762` are committed. All 99 selected source tool tests pass; actual
+  combined compiler/tests/Clippy and performance remain pending. Review fixes
+  exact resource dimensions, empty-element depth admission and the insertion
+  capacity regression without an owner-wide allocation. Records 0362ul89c,
+  0362ul89e and 0362ul91 bind the source preparation and failed captures.
+
+  Shared properties removes obsolete publishers and migrates remaining test
+  consumers; test-only codec helpers use cfg(test). Fresh source `841d46e353`
+  follows a preserved Slot-field compile failure. Web/Ribbon's common check
+  passes; leaf checks expose XLSX return-shape and DOCX SharedOpc adoption
+  errors, repaired through `beac39a4c5`. Fresh guarded runs remain required.
+  VBA87c continues mandatory source-fidelity, exact archive accounting and
+  duplicate-scan repairs; no capability/performance exception is accepted.
+
+  Isolated captures run serially. An accidental properties glossary CLI build
+  is acknowledged and recorded, and its interference produces a retained
+  zero-row Web/Ribbon refusal. Source/review work continues in parallel.
+  Cleanup63's 15.13 GB reclamation is complete; later inventory is read-only.
+  Final full formatting, gate/docs, census and native/corpus/ABBA remain open.
+  Only audit22 is deferred. Nothing is pushed.
