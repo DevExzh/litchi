@@ -223,6 +223,12 @@ def _head(root: Path) -> str:
     return value
 
 
+def _tree(root: Path) -> str:
+    value = str(_git(root, "rev-parse", "HEAD^{tree}")).strip()
+    _expect(len(value) == 40 and value == value.lower(), f"invalid Git tree in {root}")
+    return value
+
+
 def _status_paths(root: Path) -> tuple[str, ...]:
     raw = str(_git(root, "status", "--porcelain=v1", "--untracked-files=all"))
     paths: list[str] = []
@@ -484,8 +490,9 @@ def _candidate_identity(root: Path, binding: Mapping[str, Any]) -> dict[str, Any
     for path, expected in expected_manifests.items():
         _expect(manifests[path] == {"path": path, "bytes": expected["bytes"], "sha256": expected["sha256"]}, f"candidate manifest differs: {path}")
     locks = _lock_identities(root, "candidate")
-    for relative in PROBE_COPY_PATHS:
-        _file_identity(root, relative)
+    probe_identities = {
+        relative: _file_identity(root, relative) for relative in PROBE_COPY_PATHS
+    }
     vendor = _vendor_tree_identity(root)
     _expect(vendor["sha256"] == binding["vendor_tree"]["sha256"], "candidate vendor tree differs from the bound policy")
     _expect(vendor["files"] == binding["vendor_tree"]["files"], "candidate vendor file count differs")
@@ -493,11 +500,16 @@ def _candidate_identity(root: Path, binding: Mapping[str, Any]) -> dict[str, Any
     return {
         "root": str(root),
         "head": actual_revision,
+        "tree": _tree(root),
         "status_paths": [],
         "manifests": manifests,
         "locks": locks,
         "vendor_tree": {key: value for key, value in vendor.items() if key != "entries"},
         "probe_paths": list(PROBE_COPY_PATHS),
+        # Keep the eight copied inputs independently bound.  The path list is
+        # retained for compatibility with the source policy, while this map
+        # prevents a receipt from proving only that names existed.
+        "probe_identities": probe_identities,
     }
 
 
@@ -525,6 +537,7 @@ def _baseline_identity(
     return {
         "root": str(root),
         "head": baseline_revision,
+        "tree": _tree(root),
         "status_paths": list(status),
         "locks": locks,
         "historical_library": historical_library,

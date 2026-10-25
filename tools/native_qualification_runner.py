@@ -741,6 +741,14 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
     """
 
     manifest_path = "tools/perf-baseline/Cargo.toml"
+    protocol_version = data.get("drawingml_protocol_version", 1)
+    if protocol_version not in {1, 2}:
+        raise RunnerError("DrawingML raw protocol version is not reviewed")
+    validator_relative = (
+        "tools/native_qualification/drawingml_raw_validator_v2.py"
+        if protocol_version == 2
+        else "tools/native_qualification/drawingml_raw_validator.py"
+    )
     expected_build_ids = ["drawingml_raw_native", "drawingml_raw_allocator"]
     expected_program_ids = ["raw-native", "raw-allocator"]
     expected_bins = ["drawingml-raw-native", "drawingml-raw-allocator"]
@@ -979,7 +987,7 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
         raise RunnerError("DrawingML raw validator output/cwd differs")
     expected_validator_argv = [
         "python3",
-        "{source_root}/tools/native_qualification/drawingml_raw_validator.py",
+        "{source_root}/" + validator_relative,
         "--output-dir",
         "{output_dir}",
         "--lane",
@@ -995,9 +1003,22 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
         "--source-fence",
         str(data.get("source_fence", "")),
     ]
+    if protocol_version == 2:
+        shared_receipt = data.get("shared", {}).get("preparation_receipt")
+        trusted_root = data.get("drawingml_trusted_root")
+        before_root = data["legs"]["before"].get("source_root")
+        after_root = data["legs"]["after"].get("source_root")
+        if not all(isinstance(value, str) and value for value in (shared_receipt, trusted_root, before_root, after_root)):
+            raise RunnerError("DrawingML v2 validator is missing its bound source receipt routes")
+        expected_validator_argv.extend([
+            "--preparation-receipt", shared_receipt,
+            "--baseline-root", before_root,
+            "--candidate-root", after_root,
+            "--trusted-root", trusted_root,
+        ])
     if validator.get("argv") != expected_validator_argv:
         raise RunnerError("DrawingML raw validator is not bound to both source revisions and its fence")
-    if validator.get("script") != "{source_root}/tools/native_qualification/drawingml_raw_validator.py":
+    if validator.get("script") != "{source_root}/" + validator_relative:
         raise RunnerError("DrawingML raw validator script path differs")
     if validator.get("require_stdout") is not False:
         raise RunnerError("DrawingML raw validator must write summary.json, not claim stdout")

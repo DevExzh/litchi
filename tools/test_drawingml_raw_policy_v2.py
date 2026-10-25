@@ -213,6 +213,27 @@ class DrawingMlRawPolicyV2Tests(unittest.TestCase):
         self.assertNotIn("perf_lock_sha256", policy.prepare.__annotations__)
         self.assertEqual(policy.ROLE_LOCK_PATHS, ("Cargo.lock", "tools/perf-baseline/Cargo.lock", "tools/native-resave/Cargo.lock"))
 
+    def test_versioned_consumers_use_v2_policy_without_relabeling_v1(self) -> None:
+        manifest = json.loads(
+            (ROOT / "tools/native_qualification/manifests/drawingml-raw-v2.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            manifest["runner_module"],
+            "tools/native_qualification/drawingml_raw_paired_runner_v2.py",
+        )
+        self.assertEqual(
+            manifest["validator_module"],
+            "tools/native_qualification/drawingml_raw_validator_v2.py",
+        )
+        runner = (ROOT / manifest["runner_module"]).read_text(encoding="utf-8")
+        self.assertIn("prepare_drawingml_raw_inputs_v2", runner)
+        self.assertNotIn("from native_qualification import prepare_drawingml_raw_inputs as preparation", runner)
+        validator = (ROOT / manifest["validator_module"]).read_text(encoding="utf-8")
+        self.assertIn("prepare_drawingml_raw_inputs_v2", validator)
+        self.assertIn("litchi.drawingml.raw.validation.v2", validator)
+
 
 if __name__ == "__main__":
     unittest.main()
