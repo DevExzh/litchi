@@ -81,6 +81,18 @@ fn assert_patch_conflict(error: &litchi_docx::Error, context: &str) {
     );
 }
 
+/// Malformed durable operation fields stay at the typed shared OOXML invalid
+/// boundary; do not couple the consumer to their diagnostic text.
+fn assert_common_invalid(error: &litchi_docx::Error, context: &str) {
+    assert!(
+        matches!(
+            error,
+            litchi_docx::Error::Common(litchi_ooxml_common::Error::Invalid(_))
+        ),
+        "{context}: expected a shared OOXML invalid error, got {error:?}"
+    );
+}
+
 fn replace_once(bytes: &[u8], from: &[u8], to: &[u8]) -> Vec<u8> {
     let offset = bytes
         .windows(from.len())

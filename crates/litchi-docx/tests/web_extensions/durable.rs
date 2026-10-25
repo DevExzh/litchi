@@ -502,12 +502,7 @@ fn durable_stale_and_wire_tampering_are_atomic() {
     let wire = durable.to_deterministic_json().unwrap();
     let op_tampered = decode_wire(&durable_replace_once(&wire, b"web.edit", b"web.edIt"));
     let op_error = assert_rejected_unchanged(&original, &op_tampered, "operation tamper");
-    assert!(
-        op_error
-            .to_string()
-            .to_ascii_lowercase()
-            .contains("unsupported")
-    );
+    assert_common_invalid(&op_error, "unexpected operation-tamper error");
 
     let target_tampered = {
         let target = wire_target_hash(&wire);
@@ -520,12 +515,7 @@ fn durable_stale_and_wire_tampering_are_atomic() {
     };
     let target_error =
         assert_rejected_unchanged(&original, &decode_wire(&target_tampered), "target tamper");
-    assert!(
-        target_error
-            .to_string()
-            .to_ascii_lowercase()
-            .contains("target")
-    );
+    assert_patch_conflict(&target_error, "unexpected target-tamper error");
 
     let (_, _, intent) = wire_blob(&wire, "forward_blobs");
     let altered_intent = durable_replace_once(&intent, b"runtime-public", b"runtime-stale");
@@ -536,13 +526,7 @@ fn durable_stale_and_wire_tampering_are_atomic() {
         &altered_intent,
     ));
     let blob_error = assert_rejected_unchanged(&original, &blob_tampered, "intent tamper");
-    assert!(
-        blob_error
-            .to_string()
-            .to_ascii_lowercase()
-            .contains("target"),
-        "unexpected intent-tamper error: {blob_error}"
-    );
+    assert_patch_conflict(&blob_error, "unexpected intent-tamper error");
 }
 
 #[test]
