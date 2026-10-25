@@ -4558,3 +4558,45 @@ See [0063](0063-source-pptx-modern-comments.md).
   Tooling-row and PPT qualification repairs remain under review. Final source
   capture, full gate, signed-batch contract choice and actual performance
   qualification remain open. Nothing is pushed.
+
+- Coordinator tooling, review and cleanup update (2026-10-25):
+  Reviewed tooling environment and process-lifecycle repairs merge at
+  `f86d2e90e3`. The lifecycle regression now observes child exit without
+  reaping it, preserving the actual `Popen` return code; 43 composed tests
+  pass. PPT qualification guards and the strengthened forward/inverse replay
+  oracle merge at `a10687e3b2`; 44 focused composition tests pass. The
+  unchanged timed workload remains separate from the correctness companion.
+
+  The full current tooling row then passes on clean `a10687e3b2`: 1,687 tests
+  in 110.974 seconds, with zero target bytes, empty Cargo trace, unchanged
+  source/locks and no remaining owned processes. Record 0362ul55 binds the
+  independently verified receipt and preserves the separate setup failure.
+  Both runner and external `.coord/gate.sh` now register the same 35 modules.
+  This is one row of the 53-step gate, not full acceptance.
+
+  Independent source review returns the raw-codec lanes for concrete repairs:
+  DOC/OLE output admission and opaque Custom XML fidelity (0362ul45a), XLS
+  tooltip and source-backed reader policy retention (0362ul46b), image
+  compatibility-converter policies (0362ul47a), SpreadsheetDrawing raw
+  append/rewrite budgets (0362ul51a), crypto output/typed-limit paths
+  (0362ul52a), and PPT nested aggregate/editor limits (0362ul39b). RTF chained
+  edits must retain their originating open options. ODF 0362ul44b repairs
+  are source-ready for review. DOCX 0362ul42b now passes independent source
+  review at `25ed716942`; actual corrected Cargo validation remains required.
+  Fonts' automatic-loader fix is preserved, while bounded subset planning
+  remains engineering work; unproven allocation multipliers are not accepted.
+
+  The earlier XLS clippy failures were caused by absent tracked
+  `clippy.toml` in the sparse checkout. Configured current and original-base
+  checks pass, matching the frozen gate's policy; no lint exemption is added.
+  New source-review findings still prevent accepting that lane. Four bounded
+  validation slots are assigned to DOC/OLE, image codecs, iWork and RTF;
+  PPT and DOCX source work does not launch competing builds.
+
+  Cleanup wave 56 removes the clean, merged XLSX rich-transfer checkout,
+  retains its branch and quarantines its sole ignored lockfile. Sparse
+  restoration and root postchecks pass. Record 0362ul54 reports approximately
+  7.55 GB of checkout-allocation reduction after the complete quarantine.
+  No target, source capture, foreign process or protected probe is removed.
+  Final capture, full gate, the signed-batch contract decision and actual
+  native/performance qualification remain open. Nothing is pushed.
