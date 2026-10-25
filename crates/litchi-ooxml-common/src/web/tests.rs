@@ -586,8 +586,8 @@ fn byte_identical_put_is_a_signature_preserving_no_op() {
         &Limits::standard(),
     )
     .unwrap();
-    assert!(patch.is_empty());
-    assert!(patch.inverse().is_empty());
+    assert!(patch.is_noop());
+    assert!(patch.inverse().is_noop());
     assert!(!apply_patch(&mut package, &patch).unwrap());
     assert_eq!(
         format!("{patch:?}"),
@@ -636,7 +636,7 @@ fn custom_function_metadata_package_patch_is_exact_noop_inverse_and_stale_atomic
         &Limits::standard(),
     )
     .unwrap();
-    assert!(noop.is_empty());
+    assert!(noop.is_noop());
     assert!(!apply_patch(&mut package, &noop).unwrap());
 
     let mut changed = loaded.clone();
@@ -648,7 +648,7 @@ fn custom_function_metadata_package_patch_is_exact_noop_inverse_and_stale_atomic
         &Limits::standard(),
     )
     .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     let inverse = patch.inverse();
     assert!(apply_patch(&mut package, &patch).unwrap());
     assert_eq!(
@@ -730,7 +730,7 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
         &Limits::standard(),
     )
     .unwrap();
-    assert!(!signed_patch.is_empty());
+    assert!(!signed_patch.is_noop());
     let signed_before = package.get_part(&image_name).unwrap().blob_arc();
     assert!(apply_patch(&mut package, &signed_patch).is_err());
     assert!(package.is_signed());
@@ -750,7 +750,7 @@ fn put_patch_is_exact_reversible_and_arc_shared() {
         &Limits::standard(),
     )
     .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     let image_change = patch
         .parts
         .iter()

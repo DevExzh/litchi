@@ -48,7 +48,7 @@ impl std::fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Patch")
-            .field("empty", &self.is_empty())
+            .field("empty", &self.is_noop())
             .field(
                 "affected_parts",
                 &self
@@ -160,9 +160,9 @@ impl Patch {
         Ok(patch)
     }
 
-    /// Return whether this patch makes no changes.
+    /// Return whether this patch is an exact no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         !self.has_changes()
     }
 
@@ -201,7 +201,7 @@ impl Patch {
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
     pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
-        if self.is_empty() {
+        if self.is_noop() {
             if self.is_source_bound() {
                 self.validate_source(package)?;
                 self.validate_protection(package)?;

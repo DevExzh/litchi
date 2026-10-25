@@ -71,6 +71,9 @@ pub fn parse_external(data: &[u8], limits: &litchi_core::limits::Limits) {
 pub fn parse_external_reexport(data: &[u8], limits: &PublicExternalLimits) {
     let _ = (data, limits);
 }
+pub fn parse_external_root_reexport(data: &[u8], limits: &litchi_core::Limits) {
+    let _ = (data, limits);
+}
 pub struct Limits;
 pub fn parse_unrelated(data: &[u8], limits: &Limits) {
     let _ = (data, limits);
@@ -104,7 +107,14 @@ pub mod strict {
     pub struct Edit;
     impl Edit { pub fn commit(self) -> Result<Commit, Error> { Ok(Commit) } pub fn set(&mut self) {} }
     pub struct Patch;
-    impl Patch { pub fn is_noop(&self) -> bool { true } pub fn inverse(&self) -> Self { Patch } }
+    impl Patch {
+        pub fn is_noop(&self) -> bool { true }
+        pub fn inverse(&self) -> Self { Patch }
+        pub fn apply(&self, package: &Package) -> Result<Commit, Error> {
+            let _ = package;
+            Ok(Commit)
+        }
+    }
     pub struct Commit;
     impl Commit {
         pub fn package(&self) -> &Package { &Package }
@@ -262,6 +272,7 @@ pub mod edit {
 pub mod patch { pub struct Patch<Mode>(pub Mode); }
 pub mod unrelated { pub struct Commit<P, T>(pub P, pub T); }
 pub mod limits { pub struct Limits; }
+pub use limits::Limits;
 '''
 
 
@@ -443,7 +454,14 @@ class RustdocTests(unittest.TestCase):
             "limits_argument": "limits",
             "limits_type": "fixture::PublicExternalLimits",
         }
-        rows = [associated, receiver, free, external, external_reexport]
+        external_root_reexport = {
+            "method": "fixture::parse_external_root_reexport",
+            "inputs": ["data", "limits"],
+            "limits_argument": "limits",
+            "limits_type": "litchi_core::Limits",
+        }
+        rows = [associated, receiver, free, external, external_reexport,
+                external_root_reexport]
         self.assertTrue(gate.checked_policy({
             "version": 1,
             "profiles": [profile(required_signatures=rows)],
@@ -472,6 +490,17 @@ class RustdocTests(unittest.TestCase):
             "kind": "struct",
         }
         failures = gate.violations(ambiguous, profile(required_signatures=[external]))
+        self.assertEqual(len(failures), 1, failures)
+
+        ambiguous_root = copy.deepcopy(self.document)
+        ambiguous_root["paths"]["alternate-external-limits"] = {
+            "crate_id": 89,
+            "path": ["litchi_core", "other", "Limits"],
+            "kind": "struct",
+        }
+        failures = gate.violations(
+            ambiguous_root, profile(required_signatures=[external_root_reexport])
+        )
         self.assertEqual(len(failures), 1, failures)
 
     def _namespace_collision_document(self, *, macro_first=False, conflict=False):
@@ -675,6 +704,12 @@ class RustdocTests(unittest.TestCase):
         self.assertEqual(gate.violations(self.document, profile(result_methods=[{
             "method": "fixture::returns::Package::apply_other_patch",
             "ok": "fixture::returns::Commit",
+        }])), [])
+
+    def test_registered_patch_replay_publishes_the_package_argument(self):
+        self.assertEqual(gate.violations(self.document, profile(result_methods=[{
+            "method": "fixture::strict::Patch::apply",
+            "ok": "fixture::strict::Commit",
         }])), [])
 
     def test_replay_rule_proposals_prove_owner_and_commit_identity(self):

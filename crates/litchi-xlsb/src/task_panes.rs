@@ -168,7 +168,7 @@ impl Edit {
     }
 
     fn stage(&mut self, patch: &common_web::Patch) -> Result<bool> {
-        if patch.is_empty() {
+        if patch.is_noop() {
             return Ok(false);
         }
         crate::signature_policy::ensure_unsigned(self.staged.opc())?;

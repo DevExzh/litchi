@@ -5615,7 +5615,7 @@ impl Edit {
                     conformance,
                     &common_web::Limits::standard(),
                 )?;
-                if patch.is_empty() {
+                if patch.is_noop() {
                     None
                 } else {
                     package_changes.push(PackageChange::TaskPanes {
@@ -5628,7 +5628,7 @@ impl Edit {
             Some(PanesAction::Remove) => {
                 let patch =
                     common_web::plan_remove(&base.inner.package, &common_web::Limits::standard())?;
-                if patch.is_empty() {
+                if patch.is_noop() {
                     None
                 } else {
                     package_changes.push(PackageChange::TaskPanes {

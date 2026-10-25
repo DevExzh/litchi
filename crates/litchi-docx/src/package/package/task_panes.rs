@@ -67,7 +67,7 @@ impl Package {
     /// The same entry point applies [`Patch::inverse`].
     pub(crate) fn apply_task_panes_patch(&mut self, patch: &Patch) -> Result<bool> {
         self.ensure_story_opc_current("apply_task_panes_patch")?;
-        if patch.is_empty() {
+        if patch.is_noop() {
             let commit = patch.apply(&self.opc)?;
             let changed = commit.diagnostics().changed();
             self.opc = commit.into_package().into();

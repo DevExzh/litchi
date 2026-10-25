@@ -106,8 +106,26 @@ class ReturnTypes:
                 and entry.get("crate_id") != self.surface.crate_id
                 and entry.get("kind") in NOMINAL_KINDS
             ]
+            if not candidates and len(path) == 2:
+                # A dependency's root type re-export is often absent from a
+                # caller's rustdoc paths table.  Rustdoc still records the
+                # defining item under its canonical module path, so resolve a
+                # root re-export only when exactly one external nominal item
+                # has the same crate root and final component.  Nested paths
+                # deliberately do not use this spelling fallback: accepting
+                # one merely by its name would make a missing canonical path
+                # indistinguishable from an unrelated type.
+                candidates = [
+                    item_id for item_id, entry in self.surface.paths.items()
+                    if entry.get("crate_id") != self.surface.crate_id
+                    and entry.get("kind") in NOMINAL_KINDS
+                    and len(entry.get("path", ())) >= 2
+                    and entry["path"][0] == path[0]
+                    and entry["path"][-1] == path[-1]
+                ]
             # Multiple rustdoc IDs for one canonical path are ambiguous, even
-            # when their spelling happens to match.
+            # when their spelling happens to match.  The same fail-closed rule
+            # applies to the unique root-re-export fallback above.
             if len(candidates) != 1:
                 return None
             item_id = candidates[0]
@@ -195,13 +213,26 @@ class ReturnTypes:
         return None
 
     def matches_owner(self, method, expected, args=()):
-        """A registered owner replay publishes the receiver's owner type.
+        """A registered owner replay publishes its source package type.
 
         Durable wire patches can differ from the returned family's Patch.
         Their input semantics remain Rust test obligations; this return-shape
-        check verifies the exact family Commit and its published owner.
+        check verifies the exact family Commit and its published owner.  A
+        ``Patch::apply`` method is defined on the patch but publishes the
+        package supplied as its second argument, so it must not be compared
+        with the patch receiver.
         """
         owner = self.type_at(method[:-1])
+        if len(method) >= 2 and method[-1] == "apply" and method[-2] == "Patch":
+            item_id = self.surface.item_ids.get(method)
+            function = self.surface.index.get(item_id, {}).get("inner", {}).get("function")
+            inputs = function.get("sig", {}).get("inputs", []) if isinstance(function, dict) else []
+            if (not isinstance(inputs, list) or len(inputs) < 2
+                    or any(not isinstance(item, list) or len(item) != 2 for item in inputs)):
+                return False
+            owner = self.resolve(inputs[1][1])
+            while isinstance(owner, tuple) and owner and owner[0] == "ref":
+                owner = owner[2]
         return owner is not None and self.commit_package(expected, args) == owner
 
     def resolve(self, value: Any, bindings=None, self_type=None, visiting=frozenset()):

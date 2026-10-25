@@ -302,7 +302,7 @@ fn to_durable(
         })?;
     // A no-op carries only its bounded source-scope digest.  It deliberately
     // works with zero blob allowance because no payload is retained.
-    if patch.is_empty() {
+    if patch.is_noop() {
         let source = scope_hash_from_patch_scope(patch, true, MAX_CLOSURE_BYTES)?;
         let target = scope_hash_from_patch_scope(patch, false, MAX_CLOSURE_BYTES)?;
         return reversible_noop(limits, &source, &target);

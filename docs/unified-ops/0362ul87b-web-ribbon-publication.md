@@ -148,3 +148,39 @@ removes those implementations; their `Limits` fields already implement
 `Default` as the respective standard limits. The failed receipt remains
 bound to beac39a4c5 and is not overwritten; the next F5 freeze must use this
 repair commit and a fresh empty target.
+
+## F5 glossary diagnosis and source repair
+
+The c877dee369 retry passed rows 0 through 8 and stopped at the first
+glossary row. Its evidence is preserved outside the checkout:
+
+* receipt: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-c877dee369/result.json`
+  (SHA-256 `8c1edf088c78367e3629c8e593730c2e73de5abd17db2c4de30a11babe2cf664`);
+* rows: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-c877dee369/rows.json`
+  (SHA-256 `00d3ff25df5f2bacae720d4a468498dacf65d41231879915fbc8a4387d2257ec`);
+* failed glossary log: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-c877dee369/09-glossary-ooxml-common-minimal-attempt-actual-f5-09.log`
+  (SHA-256 `fbf5a0137db3ffa210a560d040780c744ba45e0e64b6e8ff1ae011999ad896d9`);
+* row 9 exited `1` after 16.169 seconds with a 929,942,531-byte target;
+  no later row ran. The frozen rustdoc input was
+  `/home/zhuhe/code/litchi-worktrees/.coord/targets/0362ul87b-f5-retry-c877dee369/target/doc/litchi_ooxml_common.json`
+  (SHA-256 `13b3c16a395fcda07d67d0c132a7b760337fefdba2ca174640c563c85e1bd4ff`).
+
+The six findings had two checker causes and one real API migration:
+
+* `custom_xml::{read_props,validate_payload,write_props}` already use the
+  public root re-export `litchi_opc::SourceLimits`. Dependency rustdoc exposes
+  its unique nominal item only as `litchi_opc::limits::SourceLimits`; the
+  checker now resolves a unique external root re-export by crate root and
+  final component, while remaining fail-closed for ambiguity and nested-path
+  misses. No raw limit signature or public spelling was changed.
+* Ribbon and Web `Patch::apply` already return the correct core triad
+  `Result<Commit<OpcPackage, Patch>>`. The shared owner checker had compared
+  that result against the `Patch` receiver; it now checks the package source
+  argument for `Patch::apply` and retains exact nominal result matching.
+* Web `Patch::is_empty` was a real glossary violation. It is now the required
+  `is_noop`, with every common, DOCX, XLSX and XLSB consumer migrated in the
+  same change and no alias left behind. Signed no-op and source-proof
+  semantics are unchanged.
+
+The checker changes have fixture coverage for root re-export resolution,
+ambiguous fallback rejection, and `Patch::apply` package-owner publication.

@@ -268,7 +268,7 @@ fn inverse_restores_content_types_relationships_and_xml_after_reopen() {
         },
     )
     .unwrap();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
     let mut signed = package.clone();
     signed.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     assert!(apply_patch(&mut signed, &patch).is_err());
@@ -322,7 +322,7 @@ fn inverse_restores_content_types_relationships_and_xml_after_reopen() {
 fn source_bound_noop_checks_source_and_inverse_before_returning_false() {
     let (mut source_package, task, _extension, _old_image, _new_image) = package();
     let patch = task_noop_patch(&source_package, &task);
-    assert!(patch.is_empty());
+    assert!(patch.is_noop());
     assert!(!apply_patch(&mut source_package, &patch).unwrap());
 
     let (mut lexical_package, lexical_task) = lexical_source_package();
