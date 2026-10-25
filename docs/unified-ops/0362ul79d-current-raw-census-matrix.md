@@ -232,13 +232,17 @@ identities; they are not new engineering returns:
 
 The limit-closure statements above are narrower than an assertion that every
 historical alias spelling in ZIP has disappeared. The current writer.rs blob
-SHA-1 is 1787c62b5cf891af784034ada81ebf7435b7b7d0 and still contains
-documented entry-oriented start_entry_owned/start_entry_owned_zip64 methods;
-the current errors.rs blob SHA-1 is
-6ff49eada6a333e28a310c372e883df708b6712b and still contains ErrorKind::Io
-alongside ErrorKind::IO. Those are separate callable/alias surfaces for the
-final rustdoc and glossary disposition, not remaining limit-less constructors.
-This record neither waives nor closes those names.
+SHA-1 is 1787c62b5cf891af784034ada81ebf7435b7b7d0: `start_entry_owned` at
+line 1960 delegates to the canonical `start_file_owned` at line 1932, while
+`start_entry_owned_zip64` at line 2002 delegates to
+`start_file_owned_zip64` at line 1974. They are public entry-oriented
+forwarders, not limit-bearing constructors. The current errors.rs blob
+SHA-1 is 6ff49eada6a333e28a310c372e883df708b6712b: `ErrorKind::IO` at line
+159 is accompanied by the explicitly documented compatibility variant
+`ErrorKind::Io` at line 162. These exact callable and compatibility roles are
+separate surfaces for the final rustdoc and glossary disposition; their names
+alone do not make either a required limit migration or an accepted
+exemption. This record neither waives nor closes them.
 
 The OPC boundary is likewise current-source checked, not copied from the
 older scope note. package.rs blob SHA-1
@@ -250,11 +254,26 @@ OwnedPhysPkgReader::{open,from_bytes,from_reader} and PhysPkgReader::new
 with SourceLimits at lines 93–256. source_backed.rs blob SHA-1
 cc8f9cf38c7c7dd4e0c49af52bae8ec55c5275ba has the deferred source-owner
 constructors, while the remaining _with_limits helpers are crate-private.
-The public package publication methods take &OpcPackage; the &mut OpcPackage
-helpers found by the source scan are private or crate-private. 0362rl is the
-closure record for this source policy and alias migration. A fresh rustdoc
-profile is still required, but raw OpcPackage physical methods are not a
-second format owner merely because their names describe physical mutation.
+The format-facing raw wrappers actually audited here are
+`litchi_xlsx::Package::edit_opc`, `litchi_xlsb::Package::edit_opc`,
+`litchi_pptx::Package::edit_opc` and `litchi_docx::Package::edit_opc`; the
+shared OOXML staged publication paths
+`litchi_ooxml_common::custom_xml::{Edit::new,Patch::apply}` accept
+`&OpcPackage`, while `litchi_ooxml_common::custom_xml::Edit::commit`
+publishes the new package.
+This is not a claim
+that every `&mut OpcPackage` helper is private: for example, the public
+`litchi_ooxml_common::custom_xml::add(&mut OpcPackage, ...)` re-export (defined
+at package.rs line 81; package.rs blob SHA-1
+2b7ddc1819796c98cdcd1bd9e1dc4977dc9aa15b) is a public free format helper
+and must be classified from its actual rustdoc signature and 0351 boundary,
+not excused because it lives in `common`.
+Conversely, public `&mut self` methods defined on `litchi_opc::OpcPackage`
+itself—such as `get_part_mut`, `add_part`, `remove_part` and `rels_mut`—are
+raw physical-graph operations, not the format-owner wrappers listed above.
+0362rl is the closure record for the source-policy and ingress migration; it
+does not resolve those distinct raw-graph roles. A fresh rustdoc profile is
+still required, and this record schedules no new lane from a name-only match.
 The PPTX 61/62/63/81/82 aggregate/getter rows still require fresh
 profile-level census and disposition.
 
