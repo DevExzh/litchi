@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 import subprocess
+import tarfile
 import tempfile
 import unittest
 
@@ -145,8 +147,93 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
 
             (root / "vendor/zlib-rs/Cargo.toml").unlink()
             (root / "vendor/zlib-rs/Cargo.toml").symlink_to(root / "vendor/allsorts/Cargo.toml")
-            with self.assertRaisesRegex(policy.PolicyError, "path contains a symlink"):
+            with self.assertRaisesRegex(policy.PolicyError, "vendor tree contains a symlink"):
                 policy._vendor_tree_identity(root)
+
+    def test_vendor_tree_rejects_ignored_overlay_and_untracked_symlink(self) -> None:
+        files = {
+            ".gitignore": b"vendor/**/*.ignored\n",
+            "vendor/allsorts/Cargo.toml": b"a\n",
+            "vendor/flate2/Cargo.toml": b"b\n",
+            "vendor/zlib-rs/Cargo.toml": b"c\n",
+        }
+        with tempfile.TemporaryDirectory(prefix="signed-native-v2-vendor-overlay-") as name:
+            root = Path(name)
+            self._git_repo(root, files)
+            ignored = root / "vendor/allsorts/overlay.ignored"
+            ignored.write_bytes(b"ignored\n")
+            with self.assertRaisesRegex(policy.PolicyError, "untracked or ignored overlay"):
+                policy._vendor_tree_identity(root)
+
+            ignored.unlink()
+            symlink = root / "vendor/allsorts/overlay-link"
+            symlink.symlink_to(root / "vendor/allsorts/Cargo.toml")
+            with self.assertRaisesRegex(policy.PolicyError, "vendor tree contains a symlink"):
+                policy._vendor_tree_identity(root)
+
+    def _write_git_archive(self, root: Path, archive: Path, prefix: str) -> None:
+        entries = policy._tree_entries(root)
+        with tarfile.open(archive, mode="w") as stream:
+            for entry in entries:
+                source = root / entry["path"]
+                info = stream.gettarinfo(str(source), arcname=prefix + entry["path"])
+                with source.open("rb") as payload:
+                    stream.addfile(info, payload)
+
+    def test_archive_file_set_proves_selected_tree_and_rejects_different_tree(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="signed-native-v2-archive-") as name:
+            root = Path(name) / "source"
+            archive = Path(name) / "source.tar"
+            self._git_repo(root, {"src/lib.rs": b"original\n", "README": b"read me\n"})
+            self._write_git_archive(root, archive, "capture/")
+            tree = policy._tree_entries(root)
+            descriptor = {
+                "path": str(archive),
+                "bytes": archive.stat().st_size,
+                "sha256": policy._sha256_bytes(archive.read_bytes()),
+                "format": "git-tree-tar-v1",
+                "prefix": "capture/",
+                "git_tree": policy._tree_id(root, "HEAD"),
+                "tree_sha256": policy._source_tree_digest(tree),
+                "ignored_files": [],
+            }
+            verified = policy._archive_tree_identity(root, "HEAD", descriptor)
+            self.assertEqual(verified["tracked_files"], len(tree))
+
+            # The archive digest is updated to the actual different archive,
+            # so a hash-only receipt would accept it.  The Git blob proof must
+            # still reject it against the selected commit/tree.
+            (root / "src/lib.rs").write_bytes(b"different tree\n")
+            wrong = Path(name) / "different.tar"
+            self._write_git_archive(root, wrong, "capture/")
+            wrong_descriptor = dict(descriptor)
+            wrong_descriptor.update(
+                {
+                    "path": str(wrong),
+                    "bytes": wrong.stat().st_size,
+                    "sha256": hashlib.sha256(wrong.read_bytes()).hexdigest(),
+                }
+            )
+            with self.assertRaisesRegex(policy.PolicyError, "blob differs from Git tree"):
+                policy._archive_tree_identity(root, "HEAD", wrong_descriptor)
+
+    def test_source_archive_output_paths_must_be_fully_disjoint(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="signed-native-v2-paths-") as name:
+            base = Path(name)
+            source = base / "source"
+            archive = source / "capture.tar"
+            output = base / "output"
+            with self.assertRaisesRegex(policy.PolicyError, "paths must be disjoint"):
+                policy._assert_disjoint_paths(
+                    {"candidate source": source, "candidate archive": archive, "preparation output": output}
+                )
+            with self.assertRaisesRegex(policy.PolicyError, "paths must be disjoint"):
+                policy._assert_disjoint_paths(
+                    {"candidate source": source, "candidate archive": base / "archive.tar", "preparation output": base}
+                )
+            policy._assert_disjoint_paths(
+                {"candidate source": source, "candidate archive": base / "archive.tar", "preparation output": output}
+            )
 
     def test_bound_binding_requires_full_source_tree_archive_and_vendor_file_list(self) -> None:
         binding = {
@@ -162,7 +249,23 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
                 "commit": "0" * 40,
                 "git_tree": "1" * 40,
                 "tree_sha256": "2" * 64,
-                "archive": {"path": "/tmp/source.tar", "bytes": 1, "sha256": "3" * 64},
+                "archive": {
+                    "path": "/tmp/source.tar",
+                    "bytes": 1,
+                    "sha256": "3" * 64,
+                    "format": "git-tree-tar-v1",
+                    "prefix": "capture/",
+                    "git_tree": "1" * 40,
+                    "tree_sha256": "2" * 64,
+                    "ignored_files": [
+                        {
+                            "path": "Cargo.lock",
+                            "bytes": policy.ROLE_LOCKS["workspace"]["candidate"]["bytes"],
+                            "sha256": policy.ROLE_LOCKS["workspace"]["candidate"]["sha256"],
+                            "mode": "100644",
+                        }
+                    ],
+                },
             },
             "manifests": {path: {"bytes": 1, "sha256": "4" * 64} for path in policy.SOURCE_MANIFEST_PATHS},
             "vendor_tree": {"files": 1, "bytes": 1, "sha256": "5" * 64, "entries": []},

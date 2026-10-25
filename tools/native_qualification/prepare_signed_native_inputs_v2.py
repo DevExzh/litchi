@@ -23,10 +23,12 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+import tarfile
 import tomllib
 from typing import Any, Mapping
 
@@ -359,6 +361,30 @@ def _artifact_identity(path: Path, label: str) -> dict[str, Any]:
     return {"path": str(resolved), "bytes": len(payload), "sha256": _sha256_bytes(payload)}
 
 
+def _under(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
+def _assert_disjoint_paths(paths: Mapping[str, Path]) -> None:
+    """Reject equal and ancestor/descendant source, archive, and output paths."""
+
+    resolved: dict[str, Path] = {}
+    for label, path in paths.items():
+        _reject_symlink_components(path, label)
+        resolved[label] = path.resolve(strict=False)
+    items = list(resolved.items())
+    for index, (left_label, left) in enumerate(items):
+        for right_label, right in items[index + 1 :]:
+            _expect(
+                not (left == right or _under(left, right) or _under(right, left)),
+                f"paths must be disjoint: {left_label}={left}, {right_label}={right}",
+            )
+
+
 def _checked_artifact(path: Path, expected: Mapping[str, Any], label: str) -> dict[str, Any]:
     _expect(isinstance(expected.get("bytes"), int), f"{label} byte count is missing")
     expected_sha = expected.get("sha256")
@@ -385,6 +411,28 @@ def _vendor_tree_identity(root: Path, revision: str = "HEAD") -> dict[str, Any]:
         if not any(entry["path"].startswith(prefix) for prefix in prefixes)
     ]
     _expect(not unexpected, f"candidate has an unreviewed vendor path: {unexpected[:3]}")
+    tracked_paths = {entry["path"] for entry in entries}
+    # Git status omits ignored files. Walk each materialised root as well so
+    # a sparse checkout or ignored/untracked overlay cannot hide a source
+    # input from the bound tree digest.
+    for vendor_root in VENDOR_ROOTS:
+        directory = root / vendor_root
+        _reject_symlink_components(directory, f"vendor root {vendor_root}")
+        _expect(directory.is_dir() and not directory.is_symlink(), f"vendor root is missing: {directory}")
+        for current, directories, files in os.walk(directory, topdown=True, followlinks=False):
+            current_path = Path(current)
+            for name in directories:
+                child = current_path / name
+                _expect(not child.is_symlink(), f"vendor tree contains a symlink: {child}")
+            for name in files:
+                child = current_path / name
+                _expect(not child.is_symlink(), f"vendor tree contains a symlink: {child}")
+                _expect(child.is_file(), f"vendor tree contains a non-regular file: {child}")
+                relative = child.relative_to(root).as_posix()
+                _expect(
+                    relative in tracked_paths,
+                    f"vendor tree contains an untracked or ignored overlay: {relative}",
+                )
     observed: list[dict[str, Any]] = []
     counts = {name: 0 for name in VENDOR_ROOTS}
     sizes = {name: 0 for name in VENDOR_ROOTS}
@@ -419,6 +467,98 @@ def _vendor_tree_identity(root: Path, revision: str = "HEAD") -> dict[str, Any]:
 
 def _source_tree_digest(entries: tuple[dict[str, str], ...]) -> str:
     return _sha256_bytes(_canonical(list(entries)))
+
+
+def _archive_tree_identity(
+    root: Path,
+    revision: str,
+    archive: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Prove that a bound tar archive contains exactly the selected Git tree.
+
+    A digest of an archive only proves the bytes of that archive.  This
+    second check proves the archive's regular-file set, modes, and Git blob
+    ids against ``revision``.  Ignored lock files are allowed only through the
+    separately bound ``ignored_files`` list; no other extra file is admitted.
+    """
+
+    root = _root(root)
+    _expect(archive.get("format") == "git-tree-tar-v1", "source archive format is not the reviewed Git-tree format")
+    prefix = archive.get("prefix")
+    _expect(isinstance(prefix, str), "source archive prefix is missing")
+    _expect(not prefix.startswith("/") and "\\" not in prefix, "source archive prefix is unsafe")
+    if prefix:
+        _expect(prefix.endswith("/"), "source archive prefix must end with '/'")
+    expected_tree = _tree_entries(root, revision)
+    expected_by_path = {entry["path"]: entry for entry in expected_tree}
+    expected_tree_id = _tree_id(root, revision)
+    expected_tree_sha = _source_tree_digest(expected_tree)
+    _expect(archive.get("git_tree") == expected_tree_id, "source archive Git tree binding differs")
+    _expect(archive.get("tree_sha256") == expected_tree_sha, "source archive tracked-tree digest binding differs")
+
+    ignored_rows = archive.get("ignored_files")
+    _expect(isinstance(ignored_rows, list), "source archive ignored-file policy is missing")
+    ignored: dict[str, dict[str, Any]] = {}
+    for row in ignored_rows:
+        _expect(isinstance(row, dict), "source archive ignored-file row is malformed")
+        relative = _safe_relative(row.get("path"), "source archive ignored-file path")
+        _expect(relative not in expected_by_path and relative not in ignored, f"source archive ignored-file path is duplicated or tracked: {relative}")
+        _expect(isinstance(row.get("bytes"), int) and row["bytes"] >= 0, f"source archive ignored-file byte count is malformed: {relative}")
+        _expect(SHA256.fullmatch(str(row.get("sha256"))) is not None, f"source archive ignored-file digest is malformed: {relative}")
+        _expect(row.get("mode") in {"100644", "100755"}, f"source archive ignored-file mode is not regular: {relative}")
+        ignored[relative] = dict(row)
+
+    archive_path = Path(str(archive.get("path", "")))
+    _assert_disjoint_paths({"source root": root, "source archive": archive_path})
+    actual_archive = _checked_artifact(archive_path, archive, "candidate source archive")
+    seen: set[str] = set()
+    try:
+        stream = tarfile.open(archive_path, mode="r:*")
+    except (OSError, tarfile.TarError) as error:
+        raise PolicyError(f"cannot open source archive: {error}") from error
+    try:
+        for member in stream:
+            _expect(not member.issym() and not member.islnk(), f"source archive contains a link: {member.name}")
+            if member.isdir():
+                continue
+            _expect(member.isfile(), f"source archive contains a non-regular member: {member.name}")
+            name = member.name
+            if prefix:
+                _expect(name.startswith(prefix), f"source archive member is outside its prefix: {name}")
+                relative = name[len(prefix) :]
+            else:
+                relative = name
+            _safe_relative(relative, "source archive member")
+            _expect(relative not in seen, f"source archive contains a duplicate member: {relative}")
+            seen.add(relative)
+            file_stream = stream.extractfile(member)
+            _expect(file_stream is not None, f"source archive member cannot be read: {relative}")
+            payload = file_stream.read()
+            expected = expected_by_path.get(relative)
+            if expected is not None:
+                _expect(expected["mode"] in {"100644", "100755"}, f"selected Git tree contains a non-regular file: {relative}")
+                actual_mode = "100755" if member.mode & 0o111 else "100644"
+                _expect(actual_mode == expected["mode"], f"source archive mode differs from Git tree: {relative}")
+                _expect(_git_blob_sha1(payload) == expected["object"], f"source archive blob differs from Git tree: {relative}")
+            else:
+                expected_ignored = ignored.get(relative)
+                _expect(expected_ignored is not None, f"source archive contains an unbound file: {relative}")
+                actual_mode = "100755" if member.mode & 0o111 else "100644"
+                _expect(actual_mode == expected_ignored["mode"], f"source archive ignored-file mode differs: {relative}")
+                _expect(len(payload) == expected_ignored["bytes"], f"source archive ignored-file size differs: {relative}")
+                _expect(_sha256_bytes(payload) == expected_ignored["sha256"], f"source archive ignored-file digest differs: {relative}")
+    except (OSError, tarfile.TarError) as error:
+        raise PolicyError(f"cannot read source archive: {error}") from error
+    finally:
+        stream.close()
+    _expect(set(expected_by_path).issubset(seen), "source archive is missing a selected Git tree file")
+    return {
+        "archive": actual_archive,
+        "git_tree": expected_tree_id,
+        "tree_sha256": expected_tree_sha,
+        "tracked_files": len(expected_by_path),
+        "ignored_files": sorted(ignored),
+    }
 
 
 def _role_lock_identities(root: Path, role: str) -> dict[str, dict[str, Any]]:
@@ -574,6 +714,19 @@ def _validate_bound_binding(binding: Mapping[str, Any]) -> None:
         raise PolicyError("bound source archive must remain outside this checkout")
     _expect(isinstance(archive.get("bytes"), int) and archive["bytes"] > 0, "bound source archive size is missing")
     _expect(isinstance(archive.get("sha256"), str) and SHA256.fullmatch(archive["sha256"]) is not None, "bound source archive hash is malformed")
+    _expect(archive.get("format") == "git-tree-tar-v1", "bound source archive format is not the reviewed Git-tree format")
+    _expect(isinstance(archive.get("prefix"), str) and (not archive["prefix"] or archive["prefix"].endswith("/")), "bound source archive prefix is malformed")
+    _expect(archive.get("git_tree") == tree, "bound source archive is not tied to the selected Git tree")
+    _expect(archive.get("tree_sha256") == tree_sha, "bound source archive is not tied to the selected tracked-tree digest")
+    expected_ignored = [
+        {
+            "path": ROLE_LOCKS["workspace"]["path"],
+            "bytes": ROLE_LOCKS["workspace"]["candidate"]["bytes"],
+            "sha256": ROLE_LOCKS["workspace"]["candidate"]["sha256"],
+            "mode": "100644",
+        }
+    ]
+    _expect(archive.get("ignored_files") == expected_ignored, "bound source archive ignored-lock policy differs")
     manifests = binding.get("manifests")
     _expect(isinstance(manifests, dict) and set(manifests) == set(SOURCE_MANIFEST_PATHS), "bound source manifests are incomplete")
     for relative, identity in manifests.items():
@@ -674,6 +827,8 @@ def candidate_identity(root: Path) -> dict[str, Any]:
     _validate_bound_binding(trusted)
     root = _root(root)
     expected_source = trusted["source"]
+    archive_path = Path(str(expected_source["archive"]["path"]))
+    _assert_disjoint_paths({"candidate source": root, "candidate archive": archive_path})
     expected_commit = str(expected_source["commit"])
     _expect(_head(root) == expected_commit, "candidate HEAD differs from the bound source commit")
     _expect(not _status_paths(root), "candidate source must be clean")
@@ -697,7 +852,7 @@ def candidate_identity(root: Path) -> dict[str, Any]:
     vendor = _vendor_tree_identity(root)
     expected_vendor = trusted["vendor_tree"]
     _expect(vendor == expected_vendor, "candidate vendor tree differs from the bound file list")
-    _checked_artifact(Path(str(expected_source["archive"]["path"])), expected_source["archive"], "candidate source archive")
+    _archive_tree_identity(root, "HEAD", expected_source["archive"])
     return {
         "commit": expected_commit,
         "git_tree": expected_source["git_tree"],
@@ -712,6 +867,16 @@ def prepare(source_root: Path, output_root: Path) -> None:
     """Refuse preparation until the checked-in final source binding exists."""
 
     validate_policy(execution=True)
+    source_root = _root(source_root)
+    _expect(CANDIDATE_BINDING is not None, "candidate source identity is not frozen")
+    archive_path = Path(str(CANDIDATE_BINDING["source"]["archive"]["path"]))
+    _assert_disjoint_paths(
+        {
+            "candidate source": source_root,
+            "candidate archive": archive_path,
+            "preparation output": output_root,
+        }
+    )
     # This branch is unreachable in the current policy.  It intentionally
     # remains side-effect free until a later source-freeze review supplies the
     # complete binding and a separately approved build adapter.
