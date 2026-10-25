@@ -23,6 +23,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tarfile
+import tomllib
 from typing import Any, Callable, Mapping, Sequence
 
 
@@ -53,10 +54,31 @@ _REQUIRED_SOURCE_KEYS = (
     "vendor_tree",
     "toolchain",
     "probe_inputs",
+    "probe_provenance",
     "fixture",
+    "fixture_provenance",
     "archive",
     "features",
 )
+ADAPTER_PACKAGE = "signed-native-consumer"
+ADAPTER_DIRECT_DEPENDENCIES = frozenset(
+    {
+        "litchi-ops",
+        "litchi-core",
+        "litchi-opc",
+        "litchi-cfb",
+        "litchi-docx",
+        "litchi-pptx",
+        "litchi-xlsx",
+        "litchi-xlsb",
+        "litchi-doc",
+        "litchi-ppt",
+        "litchi-xls",
+        "serde_json",
+        "sha2",
+    }
+)
+ADAPTER_EXTERNAL_DEPENDENCIES = frozenset({"serde_json", "sha2"})
 
 
 class ConsumerError(ValueError):
@@ -85,6 +107,100 @@ def _canonical(value: Any) -> bytes:
 
 def _sha256(payload: bytes) -> str:
     return hashlib.sha256(payload).hexdigest()
+
+
+def _normalized_lock_rows(path: Path, label: str) -> tuple[dict[str, Any], ...]:
+    _reject_symlink_components(path, label)
+    try:
+        value = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+        raise ConsumerError(f"{label} is not valid TOML: {error}") from error
+    packages = value.get("package")
+    _expect(isinstance(packages, list), f"{label} has no package list")
+    rows: list[dict[str, Any]] = []
+    for index, package in enumerate(packages):
+        _expect(isinstance(package, Mapping), f"{label} package {index} is malformed")
+        name = package.get("name")
+        version = package.get("version")
+        _expect(isinstance(name, str) and name and isinstance(version, str) and version, f"{label} package {index} lacks identity")
+        dependencies = package.get("dependencies", [])
+        _expect(isinstance(dependencies, list) and all(isinstance(item, str) for item in dependencies), f"{label} package {name} dependencies are malformed")
+        rows.append(
+            {
+                "name": name,
+                "version": version,
+                "source": package.get("source"),
+                "checksum": package.get("checksum"),
+                "dependencies": sorted(dependencies),
+            }
+        )
+    _expect(rows, f"{label} package list is empty")
+    rows.sort(key=lambda item: (item["name"], item["version"], item["source"] or ""))
+    return tuple(rows)
+
+
+def _consumer_lock_binding(
+    project: Path,
+    source_root: Path,
+    source_closure: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind the generated standalone lock graph to the endpoint lock graph.
+
+    The generated project is allowed to select only packages already present
+    in the endpoint workspace lock.  Its own package and the two explicitly
+    reviewed adapter-only direct dependencies are called out separately; the
+    latter must still resolve to rows present in the endpoint graph.  This
+    catches a fresh or unlocked registry resolution before metadata/build can
+    be treated as endpoint evidence.
+    """
+
+    lock_path = project / "Cargo.lock"
+    lock_artifact = _artifact(lock_path, "consumer Cargo.lock")
+    source_lock_relative = "Cargo.lock"
+    source_locks = source_closure.get("locks")
+    _expect(isinstance(source_locks, Mapping), "source closure lock identities are missing")
+    source_lock_identity = source_locks.get(source_lock_relative)
+    _expect(isinstance(source_lock_identity, Mapping), "endpoint workspace lock identity is missing")
+    source_lock_path = source_root / source_lock_relative
+    _expect(source_lock_path.is_file() and not source_lock_path.is_symlink(), "endpoint workspace lock is missing")
+    source_rows = _normalized_lock_rows(source_lock_path, "endpoint workspace Cargo.lock")
+    consumer_rows = _normalized_lock_rows(lock_path, "consumer Cargo.lock")
+    source_set = {
+        (
+            row["name"],
+            row["version"],
+            row["source"],
+            row["checksum"],
+            tuple(row["dependencies"]),
+        )
+        for row in source_rows
+    }
+    adapter_rows = [row for row in consumer_rows if row["name"] == ADAPTER_PACKAGE]
+    _expect(len(adapter_rows) == 1, "consumer lock must contain exactly one adapter package")
+    adapter = adapter_rows[0]
+    _expect(adapter["version"] == "0.0.0" and adapter["source"] is None and adapter["checksum"] is None, "consumer adapter lock identity differs")
+    _expect(set(adapter["dependencies"]) == ADAPTER_DIRECT_DEPENDENCIES, "consumer adapter dependency set differs")
+    for row in consumer_rows:
+        if row["name"] == ADAPTER_PACKAGE:
+            continue
+        key = (
+            row["name"],
+            row["version"],
+            row["source"],
+            row["checksum"],
+            tuple(row["dependencies"]),
+        )
+        _expect(key in source_set, f"consumer lock selects an unreviewed package: {row['name']} {row['version']}")
+    names = {row["name"] for row in consumer_rows}
+    _expect(ADAPTER_EXTERNAL_DEPENDENCIES <= names, "consumer lock omitted an adapter-only dependency")
+    graph_sha256 = _sha256(_canonical(list(consumer_rows)))
+    return {
+        "artifact": lock_artifact,
+        "graph_sha256": graph_sha256,
+        "source_lock": dict(source_lock_identity),
+        "adapter_package": ADAPTER_PACKAGE,
+        "adapter_external_dependencies": sorted(ADAPTER_EXTERNAL_DEPENDENCIES),
+    }
 
 
 def _reject_symlink_components(path: Path, label: str) -> None:
@@ -298,10 +414,15 @@ def _project_toml(source: Path, features: Sequence[str], endpoint: str = "after"
     return "\n".join(lines) + "\n"
 
 
-def _fixture_value(source: Path) -> dict[str, Any]:
+def _fixture_value(source: Path, endpoint: str) -> dict[str, Any]:
     module = _policy()
-    manifest_path = source / module.FIXTURE_INPUT["path"]
-    module._fixture_policy(source)
+    manifest_path = module._fixture_manifest_path(source, endpoint)
+    manifest_root = module.REPOSITORY if manifest_path == module.REPOSITORY / module.FIXTURE_INPUT["path"] else source
+    module._fixture_policy(
+        source,
+        manifest_root=manifest_root,
+        allow_extracted=endpoint == "before",
+    )
     try:
         value = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as error:
@@ -311,7 +432,7 @@ def _fixture_value(source: Path) -> dict[str, Any]:
     return value
 
 
-def _stage_fixtures(source: Path, output: Path, value: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def _stage_fixtures(source: Path, output: Path, value: Mapping[str, Any], endpoint: str) -> tuple[dict[str, Any], dict[str, Any]]:
     root = output / "fixture-root"
     _expect(not root.exists() and not root.is_symlink(), f"fixture root is not fresh: {root}")
     rows = value.get("fixtures")
@@ -332,25 +453,36 @@ def _stage_fixtures(source: Path, output: Path, value: Mapping[str, Any]) -> tup
         "schema": FIXTURE_SCHEMA,
         "root": str(root.resolve()),
         "manifest": manifest_artifact,
-        "source_manifest": _policy()._file_identity(source, _policy().FIXTURE_INPUT["path"]),
+        # Keep the logical manifest identity stable even when a test or an
+        # extracted endpoint provides the reviewed manifest at its endpoint
+        # root.  The concrete bytes are bound separately below.
+        "source_manifest": dict(_policy().FIXTURE_INPUT),
+        "source_manifest_provenance": _policy()._artifact_identity(
+            _policy()._fixture_manifest_path(source, endpoint),
+            "reviewed fixture manifest",
+        ),
+        "endpoint": endpoint,
         "rows": len(rows),
         "cryptographic_verification": "not_performed",
     }
     return binding, {"path": str(root.resolve()), "manifest": manifest_artifact, "rows": len(rows)}
 
 
-def _stage_probes(source: Path, output: Path) -> dict[str, Any]:
+def _stage_probes(source: Path, output: Path, endpoint: str) -> dict[str, Any]:
     module = _policy()
     destination = output / "probe-inputs"
     destination.mkdir(parents=True)
     rows: dict[str, Any] = {}
     for name, expected in module.PROBE_INPUTS.items():
-        source_path = source / expected["path"]
+        source_path = module._probe_input_path(source, endpoint, str(expected["path"]))
         target = destination / f"{name}-{Path(expected['path']).name}"
-        source_artifact = module._file_identity(source, expected["path"])
-        _expect(source_artifact == expected, f"probe input changed: {expected['path']}")
+        source_artifact = module._artifact_identity(source_path, f"reviewed {name} probe input")
+        _expect(
+            {"path": expected["path"], "bytes": source_artifact["bytes"], "sha256": source_artifact["sha256"]} == expected,
+            f"probe input changed: {expected['path']}",
+        )
         staged = _copy_regular(source_path, target, f"staged {name} probe")
-        rows[name] = {"source": source_artifact, "staged": staged}
+        rows[name] = {"source": expected, "source_provenance": source_artifact, "staged": staged, "endpoint": endpoint}
     return {
         "schema": "litchi.signed-native.probes.v2",
         "inputs": rows,
@@ -389,7 +521,9 @@ def _source_closure(source: Path, identity: Mapping[str, Any]) -> dict[str, Any]
         "toolchain": identity.get("toolchain", binding.get("toolchain")),
         "toolchain_paths": list(module.TOOLCHAIN_PATHS),
         "fixture": identity.get("fixture", module.FIXTURE_INPUT),
+        "fixture_provenance": identity.get("fixture_provenance"),
         "probe_inputs": identity.get("probe_inputs", module.PROBE_INPUTS),
+        "probe_provenance": identity.get("probe_provenance"),
         "source_manifests": list(module.SOURCE_MANIFEST_PATHS),
         "vendor_roots": list(module.VENDOR_ROOTS),
     }
@@ -498,7 +632,7 @@ def _generated_probe(source: Path, endpoint: str = "after") -> tuple[Path, str, 
 
     module = _policy()
     _expect(endpoint in module.ENDPOINTS, "unknown signed-native endpoint")
-    probe_path = source / module.PROBE_INPUTS["probe"]["path"]
+    probe_path = module._probe_input_path(source, endpoint, str(module.PROBE_INPUTS["probe"]["path"]))
     _reject_symlink_components(probe_path, "reviewed signed probe")
     _expect(probe_path.is_file() and not probe_path.is_symlink(), f"reviewed signed probe is missing: {probe_path}")
     try:
@@ -508,6 +642,18 @@ def _generated_probe(source: Path, endpoint: str = "after") -> tuple[Path, str, 
     _expect("fn main()" in probe_text, "signed probe has no main function")
     historical_schema = 'const SCHEMA: &str = "litchi_signed_native_probe.v1";'
     _expect(probe_text.count(historical_schema) == 1, "signed probe schema is not the reviewed v1 input")
+    legacy_cfg = '#[cfg(feature = "legacy_api")]'
+    current_cfg = '#[cfg(not(feature = "legacy_api"))]'
+    _expect(probe_text.count(legacy_cfg) == 1 and probe_text.count(current_cfg) == 1, "signed probe API branch markers changed")
+    if endpoint == "before":
+        # The baseline source is the legacy API.  Select that branch in the
+        # generated project itself; no Cargo feature or cfg alias is used to
+        # make one binary claim both source graphs.
+        probe_text = probe_text.replace(legacy_cfg, "", 1)
+        probe_text = probe_text.replace(current_cfg, "#[cfg(any())]", 1)
+    else:
+        probe_text = probe_text.replace(legacy_cfg, "#[cfg(any())]", 1)
+        probe_text = probe_text.replace(current_cfg, "", 1)
     probe_text = probe_text.replace(
         historical_schema,
         f'const SCHEMA: &str = "{PROBE_SCHEMA}";',
@@ -560,7 +706,7 @@ def prepare(
     _assert_disjoint({f"{endpoint} source": source, f"{endpoint} archive": archive_path, "preparation output": output})
     _expect(not output.exists() and not output.is_symlink(), f"refusing to overwrite preparation output: {output}")
     closure = _source_closure(source, identity)
-    fixture_value = _fixture_value(source)
+    fixture_value = _fixture_value(source, endpoint)
     output.mkdir(parents=True)
     project = output / "consumer"
     (project / "src").mkdir(parents=True)
@@ -573,8 +719,8 @@ def prepare(
     features = closure.get("features", {}).get("selected", [])
     _expect(isinstance(features, list) and all(isinstance(item, str) and item for item in features), "candidate feature selection is missing")
     _write_bytes_new(manifest_path, _project_toml(source, features, endpoint).encode("utf-8"), "consumer manifest")
-    fixture_binding, fixture_summary = _stage_fixtures(source, output, fixture_value)
-    probe_receipt = _stage_probes(source, output)
+    fixture_binding, fixture_summary = _stage_fixtures(source, output, fixture_value, endpoint)
+    probe_receipt = _stage_probes(source, output, endpoint)
     policy_identity = _policy_identity()
     adapter = _adapter_receipt(adapter_path, main_path, manifest_path, endpoint)
     source_identity = dict(identity)
@@ -650,6 +796,8 @@ def prepare(
 
 def _verify_probe_binding(prepared: Path, receipt: Mapping[str, Any], source_root: Path) -> dict[str, Any]:
     module = _policy()
+    endpoint = str(receipt.get("endpoint", "after"))
+    _expect(endpoint in module.ENDPOINTS, "probe receipt endpoint is missing")
     artifact = receipt.get("probe_receipt")
     _verify_artifact(artifact, "probe receipt")
     probe_path = Path(str(artifact["path"]))
@@ -664,10 +812,17 @@ def _verify_probe_binding(prepared: Path, receipt: Mapping[str, Any], source_roo
     for name, expected in module.PROBE_INPUTS.items():
         row = inputs[name]
         _expect(isinstance(row, Mapping), f"probe input row is malformed: {name}")
-        source_identity = module._file_identity(source_root, expected["path"])
-        _expect(source_identity == expected and row.get("source") == expected, f"reviewed probe input changed: {name}")
+        source_path = module._probe_input_path(source_root, endpoint, str(expected["path"]))
+        source_identity = module._artifact_identity(source_path, f"reviewed {name} probe input")
+        _expect(
+            {"path": expected["path"], "bytes": source_identity["bytes"], "sha256": source_identity["sha256"]} == expected
+            and row.get("source") == expected
+            and row.get("source_provenance") == source_identity
+            and row.get("endpoint") == endpoint,
+            f"reviewed probe input changed: {name}",
+        )
         _verify_artifact(row.get("staged"), f"staged probe input: {name}")
-        _expect(Path(str(row["staged"]["path"])).read_bytes() == (source_root / expected["path"]).read_bytes(), f"staged probe bytes changed: {name}")
+        _expect(Path(str(row["staged"]["path"])).read_bytes() == source_path.read_bytes(), f"staged probe bytes changed: {name}")
     return probes
 
 
@@ -738,9 +893,19 @@ def _verify_fixture_binding(prepared: Path, value: Mapping[str, Any]) -> dict[st
     binding, actual = _load_canonical(path, "fixture binding")
     _expect(actual == dict(binding_artifact), "fixture binding artifact changed")
     _expect(binding.get("schema") == FIXTURE_SCHEMA, "fixture binding schema differs")
+    endpoint = str(value.get("endpoint", "after"))
+    _expect(binding.get("endpoint") == endpoint, "staged fixture endpoint differs")
     source = value.get("source")
     _expect(isinstance(source, Mapping), "fixture source identity is missing")
     _expect(binding.get("source_manifest") == source.get("fixture"), "staged fixture manifest differs from immutable source identity")
+    source_manifest_provenance = binding.get("source_manifest_provenance")
+    _expect(
+        source_manifest_provenance == module._artifact_identity(
+            module._fixture_manifest_path(Path(str(source.get("source_root", ""))), endpoint),
+            "reviewed fixture manifest",
+        ),
+        "staged fixture provenance differs from the reviewed harness",
+    )
     root = Path(str(binding.get("root", "")))
     manifest = binding.get("manifest")
     _verify_external_artifact(manifest, "staged fixture manifest")
@@ -877,6 +1042,11 @@ def build(prepared_root: Path, cargo: Path | None, *, api_branch: str | None = N
     ]
     try:
         subprocess.run(commands[0], cwd=project, env=environment, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        consumer_lock = _consumer_lock_binding(
+            project,
+            Path(str(state["source"]["source_root"])),
+            state["source"],
+        )
         metadata = subprocess.run(commands[1], cwd=project, env=environment, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout
         metadata_value = json.loads(metadata)
         _expect(isinstance(metadata_value, dict), "cargo metadata did not return an object")
@@ -911,6 +1081,13 @@ def build(prepared_root: Path, cargo: Path | None, *, api_branch: str | None = N
         "cargo": cargo_artifact,
         "binary": binary_artifact,
         "metadata": _artifact(prepared / "metadata.json", "cargo metadata"),
+        "consumer_lock": consumer_lock["artifact"],
+        "consumer_lock_graph": consumer_lock["graph_sha256"],
+        "consumer_lock_binding": {
+            "source_lock": consumer_lock["source_lock"],
+            "adapter_package": consumer_lock["adapter_package"],
+            "adapter_external_dependencies": consumer_lock["adapter_external_dependencies"],
+        },
         "command": commands[2],
         "environment": {key: environment[key] for key in (
             "CARGO_TARGET_DIR", "TMPDIR", "CARGO_BUILD_JOBS", "CARGO_INCREMENTAL",
@@ -1228,6 +1405,22 @@ def execute(
     _expect(build_value.get("endpoint") == endpoint, "build endpoint differs from preparation")
     _expect(build_value.get("preparation_receipt") == state["receipt_artifact"], "build receipt is not bound to preparation")
     _verify_artifact(build_value.get("binary"), "signed-native consumer binary", executable=True)
+    consumer_lock = _consumer_lock_binding(
+        prepared / "consumer",
+        Path(str(state["source"]["source_root"])),
+        state["source"],
+    )
+    _expect(build_value.get("consumer_lock") == consumer_lock["artifact"], "build consumer lock artifact differs")
+    _expect(build_value.get("consumer_lock_graph") == consumer_lock["graph_sha256"], "build consumer lock graph differs")
+    _expect(
+        build_value.get("consumer_lock_binding")
+        == {
+            "source_lock": consumer_lock["source_lock"],
+            "adapter_package": consumer_lock["adapter_package"],
+            "adapter_external_dependencies": consumer_lock["adapter_external_dependencies"],
+        },
+        "build consumer lock binding differs",
+    )
     _expect(build_value.get("source_identity") == _concrete_source_identity(state), "build concrete source identity differs")
     _expect(build_value.get("source_identity_receipt") == state["receipt"]["source_identity"], "build source identity receipt differs")
     _expect(build_value.get("source_archive") == state["receipt"]["source"]["archive"], "build source archive differs")

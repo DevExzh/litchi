@@ -63,6 +63,10 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
             relative = f"reviewed/{name}.input"
             payload = (
                 'const SCHEMA: &str = "litchi_signed_native_probe.v1";\n'
+                '#[cfg(feature = "legacy_api")]\n'
+                'fn legacy_api_marker() { let _ = "edit_with_limits"; }\n'
+                '#[cfg(not(feature = "legacy_api"))]\n'
+                'fn current_api_marker() {}\n'
                 'fn main() {\n'
                 '    let args: Vec<String> = std::env::args().collect();\n'
                 '}\n'
@@ -116,6 +120,11 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
                     "ignored_files": [],
                 },
             },
+            "source_assembly": {
+                "path": "/tmp/reviewed-signed-native-assembly.json",
+                "bytes": 1,
+                "sha256": "5" * 64,
+            },
             "manifests": {path: {"path": path, "bytes": 1, "sha256": str(index + 4) * 64} for index, path in enumerate(manifests)},
             "vendor_tree": {"files": 3, "bytes": 3, "sha256": "8" * 64, "entries": []},
             "lock_graph": {role: {"path": value["path"], "bytes": 1, "sha256": value["candidate"]["sha256"], "graph_sha256": str(index + 9) * 64} for index, (role, value) in enumerate(role_locks.items())},
@@ -134,7 +143,16 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
             "vendor_tree": fake_binding["vendor_tree"],
             "toolchain": fake_binding["toolchain"],
             "probe_inputs": probes,
+            "probe_provenance": {
+                name: {
+                    "path": str(value["path"]),
+                    "bytes": value["bytes"],
+                    "sha256": value["sha256"],
+                }
+                for name, value in probes.items()
+            },
             "fixture": fixture,
+            "fixture_provenance": fixture,
             "features": fake_binding["features"],
         }
         return fake_binding, identity
@@ -184,6 +202,33 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
 
     def _build_receipt(self, prepared: Path) -> tuple[Path, dict[str, object]]:
         state = consumer._revalidate_preparation(prepared)
+        source_root = Path(state["source"]["source_root"])
+        adapter_dependencies = sorted(consumer.ADAPTER_DIRECT_DEPENDENCIES)
+
+        def lock_payload(include_adapter: bool) -> str:
+            rows = []
+            for name in adapter_dependencies:
+                if name in {"serde_json", "sha2"}:
+                    rows.append(
+                        f'[[package]]\nname = "{name}"\nversion = "1.0.0"\n'
+                        'source = "registry+https://github.com/rust-lang/crates.io-index"\n'
+                        'checksum = "'
+                        + ("1" if name == "serde_json" else "2")
+                        + '"\n'
+                    )
+                else:
+                    rows.append(f'[[package]]\nname = "{name}"\nversion = "0.0.0"\n')
+            if include_adapter:
+                rows.append(
+                    '[[package]]\nname = "signed-native-consumer"\nversion = "0.0.0"\n'
+                    'dependencies = [\n'
+                    + "\n".join(f' "{name}",' for name in adapter_dependencies)
+                    + '\n]\n'
+                )
+            return "\n".join(rows)
+
+        (source_root / "Cargo.lock").write_text(lock_payload(False), encoding="utf-8")
+        (prepared / "consumer/Cargo.lock").write_text(lock_payload(True), encoding="utf-8")
         binary = prepared / "target/release/signed-native-consumer"
         binary.parent.mkdir(parents=True)
         binary.write_bytes(b"not-a-native-binary")
@@ -209,6 +254,15 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
             "binary": consumer._artifact(binary, "test binary", executable=True),
             "cargo": {"path": "/tmp/cargo", "bytes": 1, "sha256": "a" * 64},
             "metadata": {"path": "/tmp/metadata", "bytes": 1, "sha256": "b" * 64},
+            "consumer_lock": consumer._artifact(prepared / "consumer/Cargo.lock", "test consumer lock"),
+            "consumer_lock_graph": consumer._sha256(
+                consumer._canonical(list(consumer._normalized_lock_rows(prepared / "consumer/Cargo.lock", "test consumer lock")))
+            ),
+            "consumer_lock_binding": {
+                "source_lock": state["receipt"]["source"]["locks"]["Cargo.lock"],
+                "adapter_package": consumer.ADAPTER_PACKAGE,
+                "adapter_external_dependencies": sorted(consumer.ADAPTER_EXTERNAL_DEPENDENCIES),
+            },
         }
         build_path = prepared / "build-receipt.json"
         build_path.write_bytes(canonical(build))
@@ -420,6 +474,19 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
                 consumer.execute(prepared, capabilities)
         self.assertFalse((prepared / "execution-receipt.json").exists())
 
+    def test_consumer_lock_is_endpoint_bound_before_execution(self) -> None:
+        prepared, _binding, _unused = self._prepared()
+        self._build_receipt(prepared)
+        lock_path = prepared / "consumer/Cargo.lock"
+        lock_path.write_text(
+            lock_path.read_text(encoding="utf-8")
+            + '\n[[package]]\nname = "unreviewed-registry-package"\nversion = "9.9.9"\n',
+            encoding="utf-8",
+        )
+        with self.assertRaisesRegex(consumer.ConsumerError, "unreviewed package"):
+            consumer.execute(prepared)
+        self.assertFalse((prepared / "execution-receipt.json").exists())
+
     def test_route_set_mismatch_and_batch_iterator_read_are_rejected(self) -> None:
         prepared, _binding, _unused = self._prepared()
         build_path, build = self._build_receipt(prepared)
@@ -492,14 +559,34 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
         generated = (prepared / "consumer/src/main.rs").read_text()
         self.assertIn('const SCHEMA: &str = "litchi.signed-native.probe.v2";', generated)
         self.assertNotIn('const SCHEMA: &str = "litchi_signed_native_probe.v1";', generated)
+        self.assertNotIn('cfg(feature = "legacy_api")', generated)
+        self.assertIn("#[cfg(any())]", generated)
         self.assertIn("file.batch(&mut items, litchi_ops::BatchMode::Atomic)", generated)
         self.assertIn('pair[1] == "batch_refusal"', generated)
         source_identity = json.loads((prepared / "source-identity.json").read_text())
         source = Path(source_identity["source_root"])
+        _, before_probe, _ = consumer._generated_probe(source, "before")
+        self.assertNotIn('cfg(not(feature = "legacy_api"))', before_probe)
+        self.assertNotIn('cfg(feature = "legacy_api")', before_probe)
+        self.assertIn("edit_with_limits", before_probe)
         changed = copy.deepcopy(source_identity)
         changed["commit"] = "9" * 40
         with self.assertRaisesRegex(consumer.ConsumerError, "caller-supplied source identity"):
             consumer.prepare(source, prepared.parent / "second", identity=changed)
+        # A prepared test fixture must not make the real after endpoint
+        # executable while the checked-in candidate binding is pending.  The
+        # three public phases all fail before creating their next artifact.
+        pending_output = prepared.parent / "pending-after"
+        with mock.patch.object(policy, "CANDIDATE_BINDING", None):
+            with self.assertRaisesRegex(policy.IncompletePolicyError, "after endpoint is unavailable"):
+                consumer.prepare(source, pending_output)
+            self.assertFalse(pending_output.exists())
+            with self.assertRaisesRegex(policy.IncompletePolicyError, "after endpoint is unavailable"):
+                consumer.build(prepared, None)
+            self.assertFalse((prepared / "target").exists())
+            with self.assertRaisesRegex(policy.IncompletePolicyError, "after endpoint is unavailable"):
+                consumer.execute(prepared)
+            self.assertFalse((prepared / "execution-receipt.json").exists())
         (prepared / "consumer/src/main.rs").write_text("mod api_compat;\nfn main() {}\n")
         with self.assertRaisesRegex(consumer.ConsumerError, "generated signed probe"):
             consumer._revalidate_preparation(prepared)

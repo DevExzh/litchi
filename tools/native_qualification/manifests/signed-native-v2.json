@@ -33,24 +33,29 @@
     },
     "after": {
       "role": "candidate",
-      "source_kind": "472b",
-      "commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
-      "source_root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
-      "source_archive": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-472b-native.V1lU2E/candidate/472b-source.tar",
-        "bytes": 6634147840,
-        "sha256": "44c11e933974c8fa3d6a67b46739bedeef866e60fbd4360ffe7f3bb8a4dc2274"
-      },
-      "source_assembly": {
-        "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-472b-native.V1lU2E/candidate/source-assembly.json",
-        "bytes": 483,
-        "sha256": "cc9d9f67e8d4474685fa0daf4ba9054adcb508ca6dcc047f49fda39aa6b1289f"
-      },
-      "lock": {
-        "path": "Cargo.lock",
-        "bytes": 139606,
-        "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
-      }
+      "binding": "CANDIDATE_BINDING",
+      "status": "pending_final_source_freeze"
+    }
+  },
+  "historical_harness": {
+    "role": "candidate",
+    "source_kind": "472b",
+    "commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "source_root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+    "source_archive": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-472b-native.V1lU2E/candidate/472b-source.tar",
+      "bytes": 6634147840,
+      "sha256": "44c11e933974c8fa3d6a67b46739bedeef866e60fbd4360ffe7f3bb8a4dc2274"
+    },
+    "source_assembly": {
+      "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-472b-native.V1lU2E/candidate/source-assembly.json",
+      "bytes": 483,
+      "sha256": "cc9d9f67e8d4474685fa0daf4ba9054adcb508ca6dcc047f49fda39aa6b1289f"
+    },
+    "lock": {
+      "path": "Cargo.lock",
+      "bytes": 139606,
+      "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
     }
   },
   "formats": [
@@ -213,8 +218,8 @@
       "perf": {
         "path": "tools/perf-baseline/Cargo.lock",
         "baseline": {
-          "sha256": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c",
-          "bytes": 57227
+          "sha256": "57c2a19ffeff395fdea95c33f295c85b08400b00e2fd9cec94d66cff56d1583f",
+          "bytes": 57028
         },
         "candidate": {
           "sha256": "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea",
@@ -224,8 +229,8 @@
       "native": {
         "path": "tools/native-resave/Cargo.lock",
         "baseline": {
-          "sha256": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
-          "bytes": 56975
+          "sha256": "6aaa0e3800a4db72afbe8783aab382accdb4a6355d06bb97fb1c12dd78839408",
+          "bytes": 56929
         },
         "candidate": {
           "sha256": "989da70f10deab4460a77e4afa3a1b840b4697bbea2c07e134e22d9b4c5084ae",

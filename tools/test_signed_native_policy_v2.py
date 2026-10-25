@@ -59,7 +59,7 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
             root = Path(name)
             source = root / "source"
             output = root / "output"
-            with self.assertRaisesRegex(policy.PolicyError, "candidate source must be a Git worktree"):
+            with self.assertRaisesRegex(policy.IncompletePolicyError, "after endpoint is unavailable"):
                 policy.prepare(source, output)
             self.assertFalse(output.exists())
 
@@ -288,6 +288,11 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
                         }
                     ],
                 },
+            },
+            "source_assembly": {
+                "path": "/tmp/source-assembly.json",
+                "bytes": 1,
+                "sha256": "6" * 64,
             },
             "manifests": {path: {"bytes": 1, "sha256": "4" * 64} for path in policy.SOURCE_MANIFEST_PATHS},
             "vendor_tree": {"files": 1, "bytes": 1, "sha256": "5" * 64, "entries": []},

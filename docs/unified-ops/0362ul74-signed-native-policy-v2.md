@@ -10,10 +10,12 @@ rustdoc, a native process, or a timing/allocation workload.  The historical
 The final candidate source commit was not frozen at this checkpoint.  The
 checked-in policy therefore has status `pending_final_source_freeze`, and its
 candidate binding is deliberately `None` in
-`tools/native_qualification/prepare_signed_native_inputs_v2.py`.  Both
-`prepare` and `execute` fail before creating output or reading a source tree.
-There is no command-line digest, commit, archive, or JSON override that can
-turn this incomplete policy into qualification evidence.
+`tools/native_qualification/prepare_signed_native_inputs_v2.py`.  The
+`after` preparation/build/execute path fails before creating output or
+reading a candidate source tree; the independently pinned `before` f2
+assembly remains available for its compatibility preparation.  There is no
+command-line digest, commit, archive, or JSON override that can turn this
+incomplete candidate policy into qualification evidence.
 
 The three known candidate lock identities are recorded as role-specific
 inputs, not as source commit identities:
@@ -23,6 +25,14 @@ inputs, not as source commit identities:
 | workspace `Cargo.lock` | `02fda2543226f28c2ded9bbf7e18618f8b0aab1c4d02c7b2c4fdd73511e4ff7a` | 139,207 |
 | perf `tools/perf-baseline/Cargo.lock` | `de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea` | 56,941 |
 | native `tools/native-resave/Cargo.lock` | `989da70f10deab4460a77e4afa3a1b840b4697bbea2c07e134e22d9b4c5084ae` | 56,689 |
+
+The f2 baseline role locks are also pinned: workspace
+`Cargo.lock` is `1b9b10ae7a9fd65db3b8b29a5bedad1aa560473c10b462f8a7d654c169335b2c`
+(139,441 bytes), perf `tools/perf-baseline/Cargo.lock` is
+`57c2a19ffeff395fdea95c33f295c85b08400b00e2fd9cec94d66cff56d1583f`
+(57,028 bytes), and native `tools/native-resave/Cargo.lock` is
+`6aaa0e3800a4db72afbe8783aab382accdb4a6355d06bb97fb1c12dd78839408`
+(56,929 bytes).
 
 The root lock is currently absent from the sparse candidate leaf.  A later
 freeze must materialise it and prove all three role locks, source manifests,
