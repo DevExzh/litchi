@@ -21,6 +21,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -245,6 +246,25 @@ def _file_identity(root: Path, relative: str) -> dict[str, Any]:
     }
 
 
+def _under(path: Path, parent: Path) -> bool:
+    try:
+        path.relative_to(parent)
+    except ValueError:
+        return False
+    return True
+
+
+def _assert_disjoint_paths(paths: Mapping[str, Path]) -> None:
+    resolved = {label: path.resolve(strict=False) for label, path in paths.items()}
+    items = list(resolved.items())
+    for index, (left_label, left) in enumerate(items):
+        for right_label, right in items[index + 1 :]:
+            _expect(
+                not (left == right or _under(left, right) or _under(right, left)),
+                f"paths must be disjoint: {left_label}={left}, {right_label}={right}",
+            )
+
+
 def _historical_library_identity(root: Path) -> dict[str, Any]:
     """Require the materialized historical file to match the fixed blob."""
 
@@ -312,6 +332,27 @@ def _vendor_tree_identity(root: Path) -> dict[str, Any]:
         if not any(entry["path"].startswith(prefix) for prefix in allowed)
     ]
     _expect(not unexpected, f"candidate has an unreviewed vendor tree: {unexpected[:3]}")
+    tracked_paths = {entry["path"] for entry in entries}
+    # Git status intentionally omits ignored files. Walk the materialized
+    # vendor roots as well, so a sparse checkout or ignored overlay cannot
+    # hide an input from the bound tree digest.
+    for vendor_root in VENDOR_ROOTS:
+        directory = root / vendor_root
+        _reject_symlink_components(directory, f"vendor root {vendor_root}")
+        _expect(directory.is_dir() and not directory.is_symlink(), f"vendor root is missing: {directory}")
+        for current, directories, files in os.walk(directory, topdown=True, followlinks=False):
+            current_path = Path(current)
+            for name in directories:
+                child = current_path / name
+                _expect(not child.is_symlink(), f"vendor tree contains a symlink: {child}")
+            for name in files:
+                child = current_path / name
+                _expect(not child.is_symlink(), f"vendor tree contains a symlink: {child}")
+                relative = child.relative_to(root).as_posix()
+                _expect(
+                    relative in tracked_paths,
+                    f"vendor tree contains an untracked or ignored overlay: {relative}",
+                )
     observed: list[dict[str, Any]] = []
     root_counts = {name: 0 for name in VENDOR_ROOTS}
     root_bytes = {name: 0 for name in VENDOR_ROOTS}
@@ -527,7 +568,14 @@ def prepare(
     _expect(baseline_revision in APPROVED_BASELINE_REVISIONS, "baseline revision is not approved")
     candidate_root = _root(candidate_root)
     baseline_root = _root(baseline_root)
-    _expect(candidate_root != baseline_root, "baseline and candidate roots must differ")
+    receipt_path = receipt_path.resolve(strict=False)
+    _assert_disjoint_paths(
+        {
+            "candidate source": candidate_root,
+            "baseline source": baseline_root,
+            "preparation receipt": receipt_path,
+        }
+    )
     _candidate_identity(candidate_root, binding)
     _baseline_identity(
         baseline_root,
@@ -550,7 +598,6 @@ def prepare(
         "baseline contains an unapproved post-materialization change",
     )
     candidate = _candidate_identity(candidate_root, binding)
-    receipt_path = receipt_path.resolve(strict=False)
     _reject_symlink_components(receipt_path, "preparation receipt")
     _expect(not receipt_path.exists() and not receipt_path.is_symlink(), f"refusing to overwrite receipt: {receipt_path}")
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
@@ -587,6 +634,15 @@ def validate_preparation_receipt(
 
     binding = _require_candidate_binding()
     receipt_path = receipt_path.resolve(strict=False)
+    baseline_root = _root(baseline_root)
+    candidate_root = _root(candidate_root)
+    _assert_disjoint_paths(
+        {
+            "candidate source": candidate_root,
+            "baseline source": baseline_root,
+            "preparation receipt": receipt_path,
+        }
+    )
     _reject_symlink_components(receipt_path, "preparation receipt")
     _expect(receipt_path.is_file() and not receipt_path.is_symlink(), f"preparation receipt is missing: {receipt_path}")
     try:
@@ -623,8 +679,8 @@ def validate_preparation_receipt(
     _expect(receipt.get("candidate_manifests") == list(CANDIDATE_MANIFEST_PATHS), "candidate manifest policy receipt differs")
     _expect(receipt.get("vendor_roots") == list(VENDOR_ROOTS), "vendor root policy receipt differs")
     _expect(receipt.get("probe_copy_paths") == list(PROBE_COPY_PATHS), "probe path policy receipt differs")
-    current_candidate = _candidate_identity(_root(candidate_root), binding)
-    current_baseline = _baseline_identity(_root(baseline_root), baseline_revision)
+    current_candidate = _candidate_identity(candidate_root, binding)
+    current_baseline = _baseline_identity(baseline_root, baseline_revision)
     _expect(receipt.get("candidate") == current_candidate, "candidate source identity changed")
     _expect(receipt.get("baseline") == current_baseline, "baseline source identity changed")
     return receipt

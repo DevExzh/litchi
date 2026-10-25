@@ -150,6 +150,22 @@ class DrawingMlRawPolicyV2Tests(unittest.TestCase):
             with self.assertRaisesRegex(policy.PreparationError, "required file is missing"):
                 policy._vendor_tree_identity(root)
 
+    def test_ignored_vendor_overlay_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="dml-policy-v2-ignored-vendor-") as name:
+            root = Path(name)
+            self._git_repo(
+                root,
+                {
+                    "vendor/allsorts/Cargo.toml": b"a\n",
+                    "vendor/flate2/Cargo.toml": b"b\n",
+                    "vendor/zlib-rs/Cargo.toml": b"c\n",
+                    ".gitignore": b"vendor/flate2/ignored.txt\n",
+                },
+            )
+            (root / "vendor/flate2/ignored.txt").write_bytes(b"ignored overlay\n")
+            with self.assertRaisesRegex(policy.PreparationError, "untracked or ignored overlay"):
+                policy._vendor_tree_identity(root)
+
     def test_vendor_tree_rejects_modified_tracked_blob(self) -> None:
         with tempfile.TemporaryDirectory(prefix="dml-policy-v2-vendor-mutated-") as name:
             root = Path(name)
@@ -164,6 +180,18 @@ class DrawingMlRawPolicyV2Tests(unittest.TestCase):
             (root / "vendor/zlib-rs/Cargo.toml").write_bytes(b"changed\n")
             with self.assertRaisesRegex(policy.PreparationError, "tracked vendor blob differs"):
                 policy._vendor_tree_identity(root)
+
+    def test_endpoint_and_receipt_paths_must_be_disjoint(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="dml-policy-v2-paths-") as name:
+            root = Path(name)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            baseline.mkdir()
+            candidate.mkdir()
+            with self.assertRaisesRegex(policy.PreparationError, "paths must be disjoint"):
+                policy._assert_disjoint_paths({"baseline": baseline, "candidate": baseline / "nested"})
+            with self.assertRaisesRegex(policy.PreparationError, "paths must be disjoint"):
+                policy._assert_disjoint_paths({"candidate": candidate, "receipt": candidate / "receipt.json"})
 
     def test_manifest_declares_pending_v2_policy_without_candidate_hash_claim(self) -> None:
         manifest = json.loads(
