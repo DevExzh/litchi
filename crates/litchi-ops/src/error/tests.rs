@@ -335,6 +335,29 @@ fn row_other_io_and_source_changes_are_io_error() {
 
 #[cfg(feature = "docx")]
 #[test]
+fn docx_nested_metadata_refusal_and_source_change_keep_classification() {
+    let refusal = litchi_core::edit::Refusal::new(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "set_custom_props",
+        "rewriting unsupported custom-property content is refused",
+    );
+    assert_code(
+        litchi_docx::metadata::Error::Properties(litchi_ooxml_common::properties::Error::Refused(
+            refusal,
+        )),
+        Code::UnsupportedCapability,
+    );
+    let (expected, observed) = changed();
+    assert_code(
+        litchi_docx::metadata::Error::Properties(
+            litchi_ooxml_common::properties::Error::SourceChanged { expected, observed },
+        ),
+        Code::IoError,
+    );
+}
+
+#[cfg(feature = "docx")]
+#[test]
 fn docx_recorded_replay_conflicts_are_invalid_input() {
     use litchi_docx::Error as DocxError;
 

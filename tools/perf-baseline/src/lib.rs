@@ -39,6 +39,7 @@ mod opc_part_add;
 mod operation_metrics;
 mod ordinary_save;
 mod parallel_metrics;
+pub mod ppt_lazy_native;
 pub mod pptx_cache_retention;
 pub mod pptx_metadata_spool;
 pub mod pptx_native_image;
@@ -48,7 +49,6 @@ pub mod pptx_pair_lifecycle;
 pub mod pptx_provider_lifecycle;
 pub mod pptx_range_source;
 pub mod pptx_retention;
-pub mod ppt_lazy_native;
 mod pptx_slide_boundaries;
 mod pptx_streaming_create;
 mod process_metrics;
@@ -34810,10 +34810,12 @@ fn run_rtf_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |bytes| Ok(litchi_rtf::ValidationReport::from_bytes(
-            bytes,
-            litchi_rtf::OpenOptions::default(),
-        )?),
+        |bytes| {
+            Ok(litchi_rtf::ValidationReport::from_bytes(
+                bytes,
+                litchi_rtf::OpenOptions::default(),
+            )?)
+        },
         rtf_validation_summary,
     )
 }
@@ -62106,7 +62108,13 @@ mod tests {
             title: Some("Benchmark title".to_owned()),
             ..litchi_core::Metadata::default()
         };
-        litchi_ooxml_common::properties::write(&mut package, &expected).unwrap();
+        let mut edit = litchi_ooxml_common::properties::Edit::new(
+            &package,
+            litchi_ooxml_common::custom::Host::Word,
+        )
+        .unwrap();
+        edit.set_metadata(expected.clone());
+        package = edit.commit().unwrap().into_package();
         assert_eq!(
             super::xlsx_root_metadata_digest(&super::xlsx_root_metadata_oracle(&package).unwrap())
                 .unwrap(),

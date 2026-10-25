@@ -34,11 +34,17 @@ fn signed_package() -> Package {
     Package::from_opc(raw).expect("signed XLSX package")
 }
 
-/// Stage `props` as the custom properties (empty removes them) through the
-/// metadata family and commit.
+/// Stage `props` as the custom properties through the metadata family and
+/// commit.
 fn set_custom_props(package: &Package, props: Props) -> Result<Package, metadata::Error> {
     let mut edit = package.edit_metadata()?;
     edit.set_custom_props(props)?;
+    Ok(edit.commit()?.into_package())
+}
+
+fn remove_custom_props(package: &Package) -> Result<Package, metadata::Error> {
+    let mut edit = package.edit_metadata()?;
+    edit.remove_custom_props()?;
     Ok(edit.commit()?.into_package())
 }
 
@@ -116,7 +122,7 @@ fn removing_custom_properties_removes_the_complete_package_graph() {
     props.insert("Project", "Litchi").unwrap();
 
     let package = set_custom_props(&Package::new().expect("create XLSX package"), props).unwrap();
-    let package = set_custom_props(&package, Props::new()).unwrap();
+    let package = remove_custom_props(&package).unwrap();
     assert!(package.custom_props().unwrap().is_empty());
 
     let raw = package.into_plain_opc();

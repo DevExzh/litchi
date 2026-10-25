@@ -544,7 +544,9 @@ impl Package {
     /// An absent custom-properties relationship and part produce the shared
     /// empty [`Props`] value. The custom-properties package graph follows
     /// MS-OI29500 section 3.11. Edit them through the metadata family
-    /// ([`crate::metadata::Edit::set_custom_props`]).
+    /// ([`crate::metadata::Edit::set_custom_props`]); use
+    /// [`crate::metadata::Edit::remove_custom_props`] for explicit graph
+    /// removal.
     ///
     /// Values are metadata only: this method does not evaluate formulas or
     /// execute macros, controls, VBA, links, external code, or payloads.

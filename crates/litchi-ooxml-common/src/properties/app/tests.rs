@@ -6,7 +6,7 @@
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcError, OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI};
 
 use super::*;
 use crate::Error;
@@ -169,11 +169,23 @@ fn sign(package: &mut OpcPackage) {
     assert!(package.is_signed());
 }
 
+fn publish(
+    package: &mut OpcPackage,
+    props: Option<Props>,
+) -> Result<bool, crate::properties::Error> {
+    let mut edit = crate::properties::Edit::new(package, crate::custom::Host::Word)?;
+    edit.set_app_props(props);
+    let commit = edit.commit()?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
+
 #[test]
 fn package_write_creates_edits_and_clears_the_graph() {
     let mut package = OpcPackage::new();
     assert_eq!(read(&package).unwrap(), None);
-    assert!(write(&mut package, Props::new().company("Litchi")).unwrap());
+    assert!(publish(&mut package, Some(Props::new().company("Litchi"))).unwrap());
     assert_eq!(
         read(&package).unwrap(),
         Some(Props::new().company("Litchi"))
@@ -182,11 +194,11 @@ fn package_write_creates_edits_and_clears_the_graph() {
         .get_part(&PackURI::new("/docProps/app.xml").unwrap())
         .unwrap();
     assert_eq!(part.content_type(), ct::OFC_EXTENDED_PROPERTIES);
-    assert!(!write(&mut package, Props::new().company("Litchi")).unwrap());
-    assert!(write(&mut package, Props::new().manager("Ada")).unwrap());
+    assert!(!publish(&mut package, Some(Props::new().company("Litchi"))).unwrap());
+    assert!(publish(&mut package, Some(Props::new().manager("Ada"))).unwrap());
     assert_eq!(read(&package).unwrap(), Some(Props::new().manager("Ada")));
-    assert!(clear(&mut package).unwrap());
-    assert!(!clear(&mut package).unwrap());
+    assert!(publish(&mut package, None).unwrap());
+    assert!(!publish(&mut package, None).unwrap());
     assert_eq!(read(&package).unwrap(), None);
     assert!(
         package
@@ -200,19 +212,19 @@ fn package_write_creates_edits_and_clears_the_graph() {
 fn signed_packages_keep_noops_and_refuse_changes() {
     let mut package = package_with(WORD.as_bytes());
     sign(&mut package);
-    assert!(!write(&mut package, word()).unwrap());
+    assert!(!publish(&mut package, Some(word())).unwrap());
     assert!(matches!(
-        write(&mut package, Props::new()),
-        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+        publish(&mut package, Some(Props::new())),
+        Err(crate::properties::Error::Signed)
     ));
     assert!(matches!(
-        clear(&mut package),
-        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+        publish(&mut package, None),
+        Err(crate::properties::Error::Signed)
     ));
     assert_eq!(read(&package).unwrap(), Some(word()));
     assert!(package.is_signed());
     package.unsign();
-    assert!(write(&mut package, Props::new()).unwrap());
+    assert!(publish(&mut package, Some(Props::new())).unwrap());
     assert_eq!(read(&package).unwrap(), Some(Props::new()));
 }
 
@@ -228,6 +240,9 @@ fn graph_anomalies_are_errors() {
 
     let mut shared = package_with(WORD.as_bytes());
     shared.relate_to("docProps/app.xml", "urn:test:other");
-    assert!(matches!(clear(&mut shared), Err(Error::Relationship(_))));
+    assert!(matches!(
+        publish(&mut shared, None),
+        Err(crate::properties::Error::Package(Error::Relationship(_)))
+    ));
     assert_eq!(read(&shared).unwrap(), Some(word()));
 }

@@ -72,6 +72,7 @@ pub(crate) fn decode(xml: &[u8]) -> Result<Props> {
 ///
 /// The errors of [`decode`] for `xml`, and [`Error::Invalid`] when a target
 /// text value holds a character XML 1.0 cannot carry.
+#[cfg(test)]
 pub(crate) fn splice(xml: &[u8], target: &Props) -> Result<Option<Vec<u8>>> {
     let Some(plan) = plan_splice(xml, target)? else {
         return Ok(None);
@@ -103,6 +104,19 @@ pub(crate) fn plan_splice(xml: &[u8], target: &Props) -> Result<Option<SplicePla
         Error::Invalid("changed application-properties edit became a no-op".to_owned())
     })?;
     Ok(Some(SplicePlan { layout, output_len }))
+}
+
+/// Validate the authored scalar values before a retained source is scanned.
+/// Keeping this pass separate lets the transaction distinguish an invalid
+/// requested value from an invalid source part, even when both codecs use the
+/// same structural error type.
+pub(crate) fn validate_target(target: &Props) -> Result<()> {
+    for field in Field::ALL {
+        if let Some(value) = field.get(target) {
+            lexical_len(field, value)?;
+        }
+    }
+    Ok(())
 }
 
 pub(crate) fn splice_planned(xml: &[u8], target: &Props, plan: SplicePlan) -> Result<Vec<u8>> {

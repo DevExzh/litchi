@@ -9,6 +9,13 @@ fn source_limits() -> litchi_opc::SourceLimits {
     litchi_opc::SourceLimits::default()
 }
 
+fn add_item(package: &mut OpcPackage, item: NewItem) -> crate::Result<()> {
+    let mut edit = Edit::new(package)?;
+    edit.insert(item)?;
+    *package = edit.commit()?.into_package();
+    Ok(())
+}
+
 const POI_XLSX: &[u8] =
     include_bytes!("../../../../test-data/poi/test-data/spreadsheet/customIndexedColors.xlsx");
 const LO_DOCX: &[u8] = include_bytes!(
@@ -106,7 +113,9 @@ fn mce_selects_fallback_schema_reference() {
         r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_NAMESPACE}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported" ds:itemID="{{11111111-1111-1111-1111-111111111111}}"><ds:schemaRefs><mc:AlternateContent><mc:Choice Requires="x"><ds:schemaRef ds:uri="urn:wrong"/></mc:Choice><mc:Fallback><ds:schemaRef ds:uri="urn:right"/></mc:Fallback></mc:AlternateContent></ds:schemaRefs></ds:datastoreItem>"#
     );
     assert_eq!(
-        read_props(xml.as_bytes(), &source_limits()).unwrap().schemas,
+        read_props(xml.as_bytes(), &source_limits())
+            .unwrap()
+            .schemas,
         ["urn:right"]
     );
 }
@@ -136,7 +145,7 @@ fn package_writer_round_trips_without_interpreting_payload() {
     // part is inserted until the signature is removed explicitly (ADR 0006).
     let parts = package.part_count();
     assert!(matches!(
-        add(&mut package, item()),
+        add_item(&mut package, item()),
         Err(Error::Opc(
             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
         ))
@@ -144,7 +153,7 @@ fn package_writer_round_trips_without_interpreting_payload() {
     assert!(package.is_signed());
     assert_eq!(package.part_count(), parts);
     package.unsign();
-    add(&mut package, item()).unwrap();
+    add_item(&mut package, item()).unwrap();
     assert!(!package.is_signed());
     let items = discover(&package).unwrap();
     assert_eq!(items.len(), 1);
@@ -162,7 +171,7 @@ fn failed_add_is_transactional() {
     let before_parts = package.part_count();
     let before_rels = package.get_part(&source).unwrap().rels().len();
     let same_part = PackURI::new("/customXml/item1.xml").unwrap();
-    let error = add(
+    let error = add_item(
         &mut package,
         NewItem {
             source: source.clone(),
@@ -183,7 +192,7 @@ fn failed_add_is_transactional() {
     assert_eq!(package.part_count(), before_parts);
     assert_eq!(package.get_part(&source).unwrap().rels().len(), before_rels);
 
-    let error = add(
+    let error = add_item(
         &mut package,
         NewItem {
             source: source.clone(),
@@ -319,13 +328,7 @@ fn properties_writer_checks_before_allocating_and_noop_retain_budget() {
         })
     ));
     assert!(matches!(
-        codec::rewrite_props(
-            &output,
-            &props,
-            &props,
-            Conformance::Strict,
-            &tight,
-        ),
+        codec::rewrite_props(&output, &props, &props, Conformance::Strict, &tight,),
         Err(Error::Limit {
             kind: crate::LimitKind::CustomXml(LimitKind::SerializedPropertiesBytes),
             ..
@@ -335,16 +338,16 @@ fn properties_writer_checks_before_allocating_and_noop_retain_budget() {
 
 #[test]
 fn rejects_invalid_declarations_attributes_and_xml_characters() {
-    assert!(validate_payload(
-        br#" <!--before--><?xml version="1.0"?><root/>"#,
-        &source_limits()
-    )
-    .is_err());
-    assert!(validate_payload(
-        br#"<?xml version="1.0" bad="x"?><root/>"#,
-        &source_limits()
-    )
-    .is_err());
+    assert!(
+        validate_payload(
+            br#" <!--before--><?xml version="1.0"?><root/>"#,
+            &source_limits()
+        )
+        .is_err()
+    );
+    assert!(
+        validate_payload(br#"<?xml version="1.0" bad="x"?><root/>"#, &source_limits()).is_err()
+    );
     assert!(
         validate_payload(
             br#"<?xml version="1.0" standalone="yes" encoding="UTF-8"?><root/>"#,
@@ -352,11 +355,13 @@ fn rejects_invalid_declarations_attributes_and_xml_characters() {
         )
         .is_err()
     );
-    assert!(validate_payload(
-        br#"<?xml version="1.0" standalone="maybe"?><root/>"#,
-        &source_limits()
-    )
-    .is_err());
+    assert!(
+        validate_payload(
+            br#"<?xml version="1.0" standalone="maybe"?><root/>"#,
+            &source_limits()
+        )
+        .is_err()
+    );
     assert!(validate_payload(br#"<p:root/>"#, &source_limits()).is_err());
     assert!(validate_payload(br#"<root 1id="value"/>"#, &source_limits()).is_err());
     assert!(
@@ -374,7 +379,7 @@ fn rejects_invalid_declarations_attributes_and_xml_characters() {
 #[test]
 fn transaction_preserves_opaque_payload_and_relationship_topology() {
     let mut package = package_with_source();
-    add(
+    add_item(
         &mut package,
         NewItem {
             source: PackURI::new("/word/document.xml").unwrap(),
@@ -440,7 +445,7 @@ fn transaction_preserves_opaque_payload_and_relationship_topology() {
 #[test]
 fn properties_edits_retain_future_markup() {
     let mut package = package_with_source();
-    add(
+    add_item(
         &mut package,
         NewItem {
             source: PackURI::new("/word/document.xml").unwrap(),
@@ -540,7 +545,7 @@ fn transaction_crud_is_source_checked_and_failure_atomic() {
 #[test]
 fn exact_noop_does_not_unsign_or_rewrite() {
     let mut package = package_with_source();
-    add(
+    add_item(
         &mut package,
         NewItem {
             source: PackURI::new("/word/document.xml").unwrap(),

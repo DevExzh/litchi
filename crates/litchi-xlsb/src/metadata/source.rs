@@ -14,7 +14,7 @@
 //!
 //! The transaction is the shared OOXML engine's
 //! ([`litchi_ooxml_common::properties`]), so field routing, lexical
-//! preservation, refusals ([`Error::Unsupported`], [`Error::Signed`]) and
+//! preservation, refusals ([`Error::Refused`], [`Error::Signed`]) and
 //! the exact no-op contract are those of [`super::Edit`].
 //!
 //! ```
@@ -48,6 +48,12 @@ use super::{Diagnostics, EditOptions, Error, Patch, enforce_snapshot_limit};
 use crate::SourceBackedWorkbook;
 
 type Result<T> = std::result::Result<T, Error>;
+
+fn preflight_noop_source(source: &litchi_opc::SourceBackedPackage) -> Result<()> {
+    source.check_execution()?;
+    source.source_version()?;
+    Ok(())
+}
 
 /// The document-property state a source owner publishes over its source.
 pub(crate) struct Revision {
@@ -148,9 +154,20 @@ impl Edit {
     }
 
     /// Stage the complete custom properties; an empty collection removes the
-    /// part.
+    /// part when it changes the semantic collection. Setting an equal empty
+    /// collection is an exact no-op, preserving a present raw part.
     pub fn set_custom_props(&mut self, props: custom::Props) -> &mut Self {
         self.inner.set_custom_props(props);
+        self
+    }
+
+    /// Stage explicit removal of the custom-properties part and relationship.
+    ///
+    /// This is distinct from setting an equal empty collection: it removes a
+    /// present raw part even when its tolerant semantic projection is empty.
+    /// An absent graph remains an exact no-op.
+    pub fn remove_custom_props(&mut self) -> &mut Self {
+        self.inner.remove_custom_props();
         self
     }
 
@@ -167,7 +184,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for a field no OOXML family stores,
+    /// Returns [`Error::Refused`] for a field no OOXML family stores,
     /// [`Error::Invalid`] or [`Error::Limit`] for a value the families
     /// cannot carry, [`Error::Signed`] for a changed edit of a signed
     /// workbook, and the source-change and topology errors of the planner.
@@ -180,21 +197,28 @@ impl Edit {
         } = self;
         let (current, patch, diagnostics) = inner.finish()?;
         enforce_snapshot_limit(&patch, options)?;
+        let source = workbook.source_backed_package();
         if patch.is_noop() {
+            // Even an exact no-op must authenticate the retained source. The
+            // edit captured a source version when it started; publishing the
+            // unchanged owner after that source changed would otherwise make
+            // the stale edit look valid.
+            preflight_noop_source(source)?;
             return Ok(Commit {
                 package: workbook,
                 patch,
                 diagnostics,
             });
         }
-        let source = workbook.source_backed_package();
         let (base, composed) = match &workbook.metadata {
             Some(revision) => (revision.base.clone(), revision.patch.compose(&patch)?),
             None => (start, patch.clone()),
         };
         // The plan itself is prepared on first publication; its preconditions
         // are checked now, so a stale or signed source fails the commit.
-        if !composed.is_noop() {
+        if composed.is_noop() {
+            preflight_noop_source(source)?;
+        } else {
             composed.check_source_backed(source)?;
             if source.has_signature_infrastructure() {
                 return Err(Error::Signed);
@@ -330,14 +354,23 @@ impl SourceBackedWorkbook {
     /// [`Error::Signed`] for a changed signed source, and the source and
     /// property decoding errors of the patch.
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
+        let source = self.source_backed_package();
         if patch.is_noop() {
+            preflight_noop_source(source)?;
+            if let Some(revision) = &self.metadata {
+                // Composing an empty patch only authenticates the retained
+                // property revision. It cannot observe a change to the
+                // external source, so fence that source independently.
+                revision.patch.compose(patch)?;
+            } else {
+                patch.check_source_backed(source)?;
+            }
             return Ok(Commit {
                 package: self.clone(),
                 patch: patch.clone(),
                 diagnostics: patch.diagnostics(),
             });
         }
-        let source = self.source_backed_package();
         let (base, composed) = match &self.metadata {
             Some(revision) => (revision.base.clone(), revision.patch.compose(patch)?),
             None => (self.metadata_snapshot()?, patch.clone()),

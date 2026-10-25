@@ -6,7 +6,8 @@
 //!
 //! [`Props`] models the 23 scalar properties of `CT_Properties`. The vector
 //! and blob properties (`HeadingPairs`, `TitlesOfParts`, `HLinks`, `DigSig`)
-//! and any extension content are not modelled: [`write()`] splices only the
+//! and any extension content are not modelled: the semantic metadata
+//! transaction ([`crate::properties::Edit::set_app_props`]) splices only the
 //! scalar elements whose value changes, so everything else in the part,
 //! including their bytes, survives an edit. `CT_Properties` is an
 //! `xsd:all`, so a new element can be placed anywhere; it is appended at the
@@ -30,10 +31,10 @@ mod tests;
 pub(crate) use codec::splice;
 pub(crate) use codec::{
     SplicePlan, decode, encode_new, encode_new_len, encode_new_preflighted, plan_splice,
-    splice_planned,
+    splice_planned, validate_target,
 };
-pub use package::{clear, read, read_source_backed, write};
 pub(crate) use package::{inspect, inspect_source};
+pub use package::{read, read_source_backed};
 
 /// Transitional extended-properties namespace.
 pub(crate) const NAMESPACE: &str =
@@ -145,8 +146,9 @@ impl Props {
 
     /// Encodes a standalone Transitional extended-properties document.
     ///
-    /// Prefer [`write()`] when a package is available: it edits an existing
-    /// part in place and keeps everything this model does not carry.
+    /// Prefer [`crate::properties::Edit::set_app_props`] when a package is
+    /// available: it edits an existing part in place and keeps everything
+    /// this model does not carry.
     ///
     /// # Errors
     ///

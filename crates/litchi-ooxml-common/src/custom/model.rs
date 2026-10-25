@@ -215,10 +215,9 @@ impl Props {
 
     /// Validates properties reserved by Microsoft Office for a particular host.
     ///
-    /// Use this before emitting a package when the host is known. [`Self::read`]
-    /// and [`Self::write`] perform the host-independent checks automatically;
-    /// [`Self::read_for`] and [`Self::write_for`] additionally enforce the
-    /// host-specific sensitivity-label property scope.
+    /// Use this before staging a semantic metadata publication when the host
+    /// is known. [`Self::read_for`] additionally applies the host-specific
+    /// sensitivity-label property scope while reading.
     /// # Errors
     ///
     /// Returns an error when input violates OOXML constraints, exceeds a configured

@@ -10,7 +10,7 @@
 //! The shared OOXML engine ([`litchi_ooxml_common::properties`]) routes each
 //! field to the part that stores it and keeps the lexical form of every
 //! unchanged value. A field no OOXML family stores is refused with
-//! [`Error::Unsupported`]; a changed edit of a signed package is refused
+//! [`Error::Refused`]; a changed edit of a signed package is refused
 //! with [`Error::Signed`]; an exact no-op keeps every byte.
 //!
 //! ```
@@ -119,9 +119,20 @@ impl Edit<'_> {
     }
 
     /// Stage the complete custom properties; an empty collection removes the
-    /// part.
+    /// part when it changes the semantic collection. Setting an equal empty
+    /// collection is an exact no-op, preserving a present raw part.
     pub fn set_custom_props(&mut self, props: custom::Props) -> &mut Self {
         self.inner.set_custom_props(props);
+        self
+    }
+
+    /// Stage explicit removal of the custom-properties part and relationship.
+    ///
+    /// This is distinct from setting an equal empty collection: it removes a
+    /// present raw part even when its tolerant semantic projection is empty.
+    /// An absent graph remains an exact no-op.
+    pub fn remove_custom_props(&mut self) -> &mut Self {
+        self.inner.remove_custom_props();
         self
     }
 
@@ -129,7 +140,7 @@ impl Edit<'_> {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for a field no OOXML family stores,
+    /// Returns [`Error::Refused`] for a field no OOXML family stores,
     /// [`Error::Invalid`] or [`Error::Limit`] for a value the families
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// package.
@@ -215,8 +226,7 @@ impl Package {
             patch.check(self.opc.as_ref())?;
             self.duplicate()
         } else {
-            let mut opc = (*self.opc).clone();
-            patch.apply(&mut opc)?;
+            let opc = patch.apply(self.opc.as_ref())?.into_package();
             self.with_metadata_opc(opc)
         };
         Ok(Commit::new(package, patch.clone(), patch.diagnostics()))
@@ -244,6 +254,7 @@ mod tests {
     #[test]
     fn edits_publish_a_new_package_and_replay_exactly() {
         let package = Package::new().unwrap();
+        let original = package.to_bytes().unwrap();
         let mut edit = package.edit_metadata().unwrap();
         edit.update(|metadata| {
             metadata.author = Some("Ada".to_owned());
@@ -262,11 +273,13 @@ mod tests {
         assert!(replayed.diagnostics().changed());
         let replayed = replayed.into_package();
         assert_eq!(replayed.metadata().unwrap(), after.metadata().unwrap());
+        assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
         let restored = after
             .apply_metadata(&patch.inverse())
             .unwrap()
             .into_package();
         assert_eq!(restored.metadata().unwrap(), package.metadata().unwrap());
+        assert_eq!(restored.to_bytes().unwrap(), original);
         assert!(matches!(
             package.apply_metadata(&patch.inverse()),
             Err(Error::PatchConflict)
@@ -281,9 +294,8 @@ mod tests {
             .unwrap();
         assert!(matches!(
             edit.commit(),
-            Err(Error::Unsupported {
-                field: litchi_core::metadata::Field::Codepage
-            })
+            Err(Error::Refused(refusal))
+                if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedProperty
         ));
     }
 

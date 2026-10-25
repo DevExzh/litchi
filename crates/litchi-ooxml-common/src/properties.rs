@@ -20,9 +20,11 @@
 //!   ([`crate::custom::Props`]).
 //!
 //! [`read_with_report`] reads the core family alone and distinguishes an
-//! absent part from a present but empty one. [`write()`] stores the core
-//! fields of a [`Metadata`] and refuses any field core properties cannot
-//! carry. Hosts edit all three families at once through the shared
+//! absent part from a present but empty one. [`Edit::set_metadata`] stores the
+//! core fields of a [`Metadata`] and refuses any field core properties cannot
+//! carry. [`Edit::set_custom_props`] preserves a present raw part when its
+//! equal semantic collection is staged; [`Edit::remove_custom_props`] is the
+//! explicit graph-removal intent. Hosts edit all three families at once through the shared
 //! transaction ([`Edit`], [`Commit`], [`Patch`], read through [`Snapshot`]), which each
 //! format re-exports as its `metadata` module.
 
@@ -37,16 +39,15 @@ mod write;
 #[cfg(test)]
 mod transaction_tests;
 
-pub use transaction::{
-    Change, Commit, Diagnostics, Edit, EditOptions, Error, Family, FamilyAdmission, LimitKind,
-    OwnerAdmission, Patch, Plan, Snapshot,
-};
-pub use write::clear;
-
 pub(crate) use litchi_core::metadata::{Keywords, keywords as keyword};
 pub(crate) use read::{
     read_core_prepared_with_report, read_core_source_backed_with_report, read_core_with_report,
 };
+pub use transaction::{
+    Change, Commit, Diagnostics, Edit, EditOptions, Error, Family, FamilyAdmission, LimitKind,
+    OwnerAdmission, Patch, Plan, Snapshot,
+};
+#[cfg(test)]
 pub(crate) use write::write_core;
 
 use crate::Result;
@@ -294,6 +295,7 @@ impl Core {
         self
     }
 
+    #[cfg(test)]
     pub(crate) fn xml(&self) -> Result<String> {
         write::encode(self, Dialect::Transitional)
     }
@@ -336,6 +338,25 @@ fn ensure_core_only(metadata: &Metadata) -> Result<()> {
         Some(field) => Err(crate::Error::Invalid(format!(
             "metadata field `{field}` is not stored in core properties; edit it through the package's metadata transaction"
         ))),
+        None => Ok(()),
+    }
+}
+
+/// Refuse a core-only semantic transaction carrying an application field.
+fn ensure_core_only_transaction(
+    metadata: &Metadata,
+) -> std::result::Result<(), transaction::Error> {
+    match Field::ALL
+        .into_iter()
+        .find(|field| metadata.is_set(*field) && !CORE_FIELDS.contains(field))
+    {
+        Some(_) => Err(transaction::Error::Refused(
+            litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedProperty,
+                "set_core_metadata",
+                "the OOXML metadata route does not support this property",
+            ),
+        )),
         None => Ok(()),
     }
 }
@@ -390,40 +411,6 @@ pub fn read_prepared_with_report(
     Ok(read_core_prepared_with_report(package, report)?.map(|core| core.metadata()))
 }
 
-/// Store the core fields of `metadata` in a package's core-properties part.
-///
-/// The existing part's dialect, target path and relationship ID are
-/// retained, and every unchanged field keeps its lexical form. A missing
-/// part is created as `/docProps/core.xml` (or the first free numbered
-/// name). Returns whether the package changed. An equal value publishes
-/// nothing, so a signed package keeps its signature; a change to a signed
-/// package is refused before it mutates anything (ADR 0006).
-///
-/// # Errors
-///
-/// Returns [`crate::Error::Invalid`] when `metadata` sets a field core
-/// properties cannot store (application, custom and format-only fields are
-/// written through the package's metadata transaction), [`crate::Error::Opc`]
-/// with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a change to a signed package, and an error when a value violates
-/// OOXML constraints or a bound.
-pub fn write(package: &mut OpcPackage, metadata: &Metadata) -> Result<bool> {
-    ensure_core_only(metadata)?;
-    let base = match graph::inspect(package)?.part {
-        Some(part) => {
-            let current = package.get_part(&part)?;
-            let xml = std::str::from_utf8(current.blob()).map_err(|error| {
-                crate::Error::Xml(format!("invalid UTF-8 in core properties: {error}"))
-            })?;
-            Some(read::decode(xml)?.0)
-        },
-        None => None,
-    };
-    let core = Core::merged(base.as_ref(), metadata)?;
-    write_core(package, core)
-}
-
 /// A host package's authoritative, mutation-tracked core-properties slot.
 ///
 /// This is public so host crates can share the implementation, but ordinary
@@ -433,6 +420,7 @@ pub fn write(package: &mut OpcPackage, metadata: &Metadata) -> Result<bool> {
 #[doc(hidden)]
 #[derive(Debug, Clone)]
 pub struct Slot {
+    #[cfg(test)]
     source: Option<Core>,
     metadata: Option<Metadata>,
     dirty: bool,
@@ -445,12 +433,14 @@ pub struct Slot {
 /// [`Stage::commit`] is the only way to clear the edit intent.
 #[doc(hidden)]
 #[must_use = "commit only after the staged package has been published, or drop to retry"]
+#[cfg(test)]
 pub struct Stage<'a> {
     slot: &'a mut Slot,
     changed: bool,
     staged: Option<Core>,
 }
 
+#[cfg(test)]
 impl Stage<'_> {
     /// Reports whether staging changed package bytes or graph state.
     #[must_use]
@@ -477,6 +467,7 @@ impl Slot {
         let source = read_core_with_report(package, &mut report)?;
         let metadata = source.as_ref().map(Core::metadata);
         Ok(Self {
+            #[cfg(test)]
             source,
             metadata,
             dirty: false,
@@ -521,8 +512,8 @@ impl Slot {
     ///
     /// A failed flush leaves the slot dirty so the caller can repair the value
     /// and retry. A byte-identical write is a true no-op, which keeps a signed
-    /// package's signature; a change to a signed package is refused (see
-    /// [`write()`] and [`clear()`]).
+    /// package's signature; a change to a signed package is refused by the
+    /// shared properties edit.
     ///
     /// # Errors
     ///
@@ -532,7 +523,8 @@ impl Slot {
     /// for a change to a signed package, and an error when input violates
     /// OOXML constraints, exceeds a configured bound, or an underlying XML or
     /// package operation fails.
-    pub fn flush(&mut self, package: &mut OpcPackage) -> Result<bool> {
+    #[cfg(test)]
+    pub(crate) fn flush(&mut self, package: &mut OpcPackage) -> Result<bool> {
         let staged = self.stage(package)?;
         let changed = staged.changed();
         staged.commit();
@@ -549,7 +541,8 @@ impl Slot {
     /// # Errors
     ///
     /// The errors of [`Self::flush`].
-    pub fn stage(&mut self, package: &mut OpcPackage) -> Result<Stage<'_>> {
+    #[cfg(test)]
+    pub(crate) fn stage(&mut self, package: &mut OpcPackage) -> Result<Stage<'_>> {
         if !self.dirty {
             let staged = self.source.clone();
             return Ok(Stage {
@@ -564,7 +557,7 @@ impl Slot {
                 let core = Core::merged(self.source.as_ref(), metadata)?;
                 (write::sync(package, &core)?, Some(core))
             },
-            None => (clear(package)?, None),
+            None => (write::clear(package)?, None),
         };
         Ok(Stage {
             slot: self,
@@ -616,15 +609,21 @@ mod tests {
     }
 
     #[test]
-    fn core_writes_refuse_fields_the_part_cannot_store() {
-        let mut package = OpcPackage::new();
+    fn complete_edit_refuses_fields_no_family_can_store() {
+        let package = OpcPackage::new();
         let metadata = Metadata {
             title: Some("T".to_owned()),
-            company: Some("C".to_owned()),
+            content_type: Some("application/example".to_owned()),
             ..Metadata::default()
         };
-        let error = write(&mut package, &metadata).unwrap_err();
-        assert!(error.to_string().contains("`company`"), "{error}");
+        let mut edit = Edit::new(&package, crate::custom::Host::Word).unwrap();
+        edit.set_metadata(metadata);
+        let error = edit.commit().unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Refused(refusal)
+                if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedProperty
+        ));
         assert!(
             read_with_report(&package, &mut ToleranceReport::default())
                 .unwrap()

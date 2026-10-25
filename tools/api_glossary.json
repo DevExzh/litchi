@@ -786,7 +786,7 @@
         {
           "name": "custom_props_mut",
           "scope": "litchi_docx",
-          "replacement": "metadata::Edit::set_custom_props (record 0351)"
+          "replacement": "metadata::Edit::{set_custom_props, remove_custom_props} (record 0362ac)"
         },
         {
           "name": "into_workbook",
@@ -1562,7 +1562,7 @@
         {
           "name": "custom_props_mut",
           "scope": "litchi_docx",
-          "replacement": "metadata::Edit::set_custom_props (record 0351)"
+          "replacement": "metadata::Edit::{set_custom_props, remove_custom_props} (record 0362ac)"
         },
         {
           "name": "into_workbook",

@@ -75,10 +75,11 @@ Ported from the stale reference `4dba739fac` (`document_properties`,
   `Snapshot`, `Edit`, `Commit`, `Patch`, `Change`, `Diagnostics`, `Error`,
   `LimitKind`, `Family`. It is exact and reversible (`Patch::inverse`,
   `Patch::check`), creates missing parts with free names and relationship
-  IDs, and refuses a stale patch (`Error::Conflict`).
+  IDs, and refuses a stale patch (`Error::PatchConflict`).
   - Each changed field lands in the family that stores it.
   - A changed field no OOXML part stores (`content_type`, `last_backup`,
-    `codepage`) is `Error::Unsupported { field }`, never dropped.
+    `codepage`) is `Error::Refused(Refusal)` with `UnsupportedProperty`, never
+    dropped.
   - An exact no-op commits an empty patch; a signed package keeps its
     bytes. A changed patch of a signed package is `Error::Signed`.
   - No value is invented: nothing stamps `modified`.

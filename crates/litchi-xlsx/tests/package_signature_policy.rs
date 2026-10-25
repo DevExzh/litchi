@@ -1136,7 +1136,7 @@ fn package_unsign_is_explicit_and_leaves_an_unsigned_package_untouched() {
 /// 0014a, F1b).
 mod shared_owners {
     use super::*;
-    use litchi_xlsx::custom::{Host, Props};
+    use litchi_xlsx::custom::Props;
 
     fn props() -> Props {
         let mut props = Props::new();
@@ -1144,14 +1144,20 @@ mod shared_owners {
         props
     }
 
-    /// Stage `props` as the package's custom properties (empty removes them)
-    /// through the metadata family and commit.
+    /// Stage `props` as the package's custom properties through the metadata
+    /// family and commit.
     fn set_custom_props(
         package: &Package,
         props: Props,
     ) -> Result<Package, litchi_xlsx::metadata::Error> {
         let mut edit = package.edit_metadata()?;
         edit.set_custom_props(props)?;
+        Ok(edit.commit()?.into_package())
+    }
+
+    fn remove_custom_props(package: &Package) -> Result<Package, litchi_xlsx::metadata::Error> {
+        let mut edit = package.edit_metadata()?;
+        edit.remove_custom_props()?;
         Ok(edit.commit()?.into_package())
     }
 
@@ -1169,7 +1175,8 @@ mod shared_owners {
         for name in SIGNED {
             let original = signed_fixture(name);
             let package = Package::from_bytes(&original).unwrap();
-            let package = set_custom_props(&package, Props::new()).unwrap();
+            let current = package.custom_props().unwrap().clone();
+            let package = set_custom_props(&package, current).unwrap();
             assert_eq!(package.to_bytes().unwrap(), original, "{name}: no-ops");
 
             assert_metadata_signed(set_custom_props(&package, props()));
@@ -1186,17 +1193,17 @@ mod shared_owners {
 
     #[test]
     fn a_signed_package_keeps_equal_custom_properties_and_refuses_their_removal() {
-        let mut plain = unsigned_fixture(SIGNED[0]);
-        props().write_for(&mut plain, Host::Excel).unwrap();
-        let signed = sign(&plain);
+        let plain = Package::from_opc(unsigned_fixture(SIGNED[0])).unwrap();
+        let plain = set_custom_props(&plain, props()).unwrap();
+        let signed = sign(plain.opc());
         let package = Package::from_bytes(&signed).unwrap();
 
         let package = set_custom_props(&package, props()).unwrap();
         assert_eq!(package.to_bytes().unwrap(), signed, "an equal store");
-        assert_metadata_signed(set_custom_props(&package, Props::new()));
+        assert_metadata_signed(remove_custom_props(&package));
         assert_eq!(package.to_bytes().unwrap(), signed, "the refusal");
 
-        let package = set_custom_props(&package.unsign().unwrap(), Props::new()).unwrap();
+        let package = remove_custom_props(&package.unsign().unwrap()).unwrap();
         assert!(package.custom_props().unwrap().is_empty());
     }
 

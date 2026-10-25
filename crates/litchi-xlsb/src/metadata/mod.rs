@@ -12,7 +12,7 @@
 //! The shared OOXML engine ([`litchi_ooxml_common::properties`]) routes each
 //! field to the part that stores it and keeps the lexical form of every
 //! unchanged value. A field no OOXML family stores is refused with
-//! [`Error::Unsupported`]; a changed edit of a signed workbook is refused
+//! [`Error::Refused`]; a changed edit of a signed workbook is refused
 //! with [`Error::Signed`]; an exact no-op keeps every byte.
 //!
 //! ```
@@ -131,9 +131,20 @@ impl Edit {
     }
 
     /// Stage the complete custom properties; an empty collection removes the
-    /// part.
+    /// part when it changes the semantic collection. Setting an equal empty
+    /// collection is an exact no-op, preserving a present raw part.
     pub fn set_custom_props(&mut self, props: custom::Props) -> &mut Self {
         self.inner.set_custom_props(props);
+        self
+    }
+
+    /// Stage explicit removal of the custom-properties part and relationship.
+    ///
+    /// This is distinct from setting an equal empty collection: it removes a
+    /// present raw part even when its tolerant semantic projection is empty.
+    /// An absent graph remains an exact no-op.
+    pub fn remove_custom_props(&mut self) -> &mut Self {
+        self.inner.remove_custom_props();
         self
     }
 
@@ -148,7 +159,7 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Unsupported`] for a field no OOXML family stores,
+    /// Returns [`Error::Refused`] for a field no OOXML family stores,
     /// [`Error::Invalid`] or [`Error::Limit`] for a value the families
     /// cannot carry, and [`Error::Signed`] for a changed edit of a signed
     /// workbook.
@@ -164,8 +175,7 @@ impl Edit {
             patch.check(source.opc_package())?;
             source
         } else {
-            let mut candidate = source.opc_package().clone();
-            patch.apply(&mut candidate)?;
+            let candidate = patch.apply(source.opc_package())?.into_package();
             source
                 .reparse_candidate_retaining_projection(candidate)
                 .map_err(|error| Error::Invalid(error.to_string()))?
@@ -272,10 +282,10 @@ impl Package {
     /// workbook.
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
         let package = if patch.is_noop() {
+            patch.check(self.opc_package())?;
             self.clone()
         } else {
-            let mut candidate = self.opc_package().clone();
-            patch.apply(&mut candidate)?;
+            let candidate = patch.apply(self.opc_package())?.into_package();
             self.reparse_candidate_retaining_projection(candidate)
                 .map_err(|error| Error::Invalid(error.to_string()))?
         };
@@ -294,6 +304,7 @@ mod tests {
     #[test]
     fn edits_publish_a_new_package_and_replay_exactly() {
         let package = Package::new().unwrap();
+        let original = package.to_bytes().unwrap();
         let mut edit = package.edit_metadata().unwrap();
         edit.update(|metadata| {
             metadata.author = Some("Ada".to_owned());
@@ -310,6 +321,7 @@ mod tests {
         );
         let replayed = package.apply_metadata(&patch).unwrap().into_package();
         assert_eq!(replayed.metadata().unwrap(), after.metadata().unwrap());
+        assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
         assert!(matches!(
             package.apply_metadata(&patch.inverse()),
             Err(Error::PatchConflict)
@@ -319,6 +331,36 @@ mod tests {
             .unwrap()
             .into_package();
         assert_eq!(restored.metadata().unwrap(), package.metadata().unwrap());
+        assert_eq!(restored.to_bytes().unwrap(), original);
+    }
+
+    #[test]
+    fn an_equal_metadata_patch_replays_as_an_exact_package_copy() {
+        let package = Package::new().unwrap();
+        let original = package.to_bytes().unwrap();
+        let commit = package.edit_metadata().unwrap().commit().unwrap();
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
+
+        let replayed = package.apply_metadata(commit.patch()).unwrap();
+        assert!(!replayed.diagnostics().changed());
+        assert!(replayed.patch().is_noop());
+        assert_eq!(replayed.package().to_bytes().unwrap(), original);
+    }
+
+    #[test]
+    fn a_foreign_noop_metadata_patch_conflicts_instead_of_bypassing_scope() {
+        let package = Package::new().unwrap();
+        let mut edit = package.edit_metadata().unwrap();
+        edit.update(|metadata| metadata.title = Some("foreign".to_owned()))
+            .unwrap();
+        let foreign = edit.commit().unwrap().into_package();
+        let foreign_noop = foreign.edit_metadata().unwrap().commit().unwrap();
+
+        assert!(matches!(
+            package.apply_metadata(foreign_noop.patch()),
+            Err(Error::PatchConflict)
+        ));
     }
 
     #[test]
