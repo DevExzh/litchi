@@ -2,9 +2,11 @@
 
 Status: source-ready runtime follow-up based on `e130751fc5`. The supplied
 PPTX full-feature runtime packet had 1,386 passing tests, 10 failures, and one
-ignored test. Seven failures were the existing comments writer/package cases
-and two opened transaction cases that surfaced the same malformed XML. Cargo,
-rustdoc, native fixtures, and the full gate were not run on this leaf.
+ignored test. Five comments-package writer failures and two opened
+serialization failures (seven writer-related failures total) surfaced the same
+malformed XML. Two collaboration MCE failures and one projection error-order
+failure were separate. Cargo, rustdoc, native fixtures, and the full gate were
+not run on this leaf.
 
 ## Diagnosis and correction
 
