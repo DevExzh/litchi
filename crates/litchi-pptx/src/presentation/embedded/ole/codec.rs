@@ -361,7 +361,7 @@ mod tests {
                 kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
                 observed,
                 maximum: MAX_XML_ATTRIBUTES,
-            }) if observed == MAX_XML_ATTRIBUTES + 1
+            }) if *observed == MAX_XML_ATTRIBUTES + 1
         )
     }
 

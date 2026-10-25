@@ -153,9 +153,8 @@ fn replay_notes_index_counts_all_theme_edges_and_refuses_missing_targets() {
             "rIdExtraTheme".into(),
             false,
         );
-    let base = crate::package::replay_index::ReplayIndex::from_package(&package).unwrap();
-    let with_extra_index =
-        crate::package::replay_index::ReplayIndex::from_package(&with_extra).unwrap();
+    let base = ReplayIndex::from_package(&package).unwrap();
+    let with_extra_index = ReplayIndex::from_package(&with_extra).unwrap();
     assert_eq!(
         with_extra_index.notes_total_bytes(),
         base.notes_total_bytes() + 13

@@ -350,7 +350,7 @@ fn managed_replay_budget_failure_is_atomic_and_recovers() {
     assert!(matches!(
         destination.apply(&patch),
         Err(Error::Opc(litchi_opc::OpcError::Execution(
-            litchi_core::ExecutionError::ResourceLimit(_)
+            ExecutionError::ResourceLimit(_)
         )))
     ));
     drop(pressure);

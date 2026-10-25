@@ -447,7 +447,7 @@ fn rejected_managed_reservation_is_atomic_and_budget_recovers() {
     assert!(matches!(
         edit.set_shape_text(0, 0_usize, "rejected"),
         Err(Error::Opc(litchi_opc::OpcError::Execution(
-            litchi_core::ExecutionError::ResourceLimit(_)
+            ExecutionError::ResourceLimit(_)
         )))
     ));
     drop(pressure);

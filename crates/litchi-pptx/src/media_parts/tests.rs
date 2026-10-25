@@ -363,7 +363,7 @@ fn replay_resource_only_change_checks_unchanged_slide_aggregate() {
             under,
         ),
         Err(Error::Limit {
-            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::PayloadBytes),
+            kind: LimitKind::Codec(CodecLimitKind::PayloadBytes),
             observed,
             maximum: 8,
         }) if observed > 8
@@ -465,7 +465,7 @@ fn escaped_media_output_is_preflighted_against_a_typed_budget() {
     assert!(matches!(
         error,
         Error::Limit {
-            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::OutputBytes),
+            kind: LimitKind::Codec(CodecLimitKind::OutputBytes),
             observed,
             maximum: actual_maximum,
         } if observed > maximum && actual_maximum == maximum
@@ -488,7 +488,7 @@ fn media_output_budget_is_aggregate_across_pictures() {
     assert!(matches!(
         error,
         Error::Limit {
-            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::OutputBytes),
+            kind: LimitKind::Codec(CodecLimitKind::OutputBytes),
             observed,
             maximum: actual_maximum,
         } if observed > maximum && actual_maximum == maximum
