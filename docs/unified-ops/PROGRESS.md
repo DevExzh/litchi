@@ -5541,3 +5541,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   physical validation order and added scan cost; 89arb is required. Baseline
   `a4c28413cc` carries the identical reviewed performance harness on unchanged
   763 production source. No runtime or performance exception is accepted.
+
+  Reviewed VBA 94p and Custom XML 94q compose privately at `8c766ac5c6`
+  (94t), addressing fourteen reported failures pending rerun. Properties 94rb,
+  Ribbon 94sa review and PPTX presence 89ard remain active. A fresh eight-row
+  PPTX compiler/consumer packet is running on `cc2ab3f79d`; the initial inert
+  packet was corrected before GO. Completed changes are committed; nothing
+  is pushed. Final acceptance remains open.

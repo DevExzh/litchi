@@ -254,3 +254,39 @@ match reviewed 89and and the production crate trees, root configuration and
 fixtures remain identical to `7637126651`. It is a benchmark endpoint only,
 not a branch to merge into trunk. There are still no benchmark measurements.
 All final acceptance obligations remain open; only audit22 is deferred.
+
+
+## Reviewed repairs merged; consumer compilation active
+
+OOXML private merge `8c766ac5c6` (94t) composes independently reviewed VBA 94p
+and Custom XML 94q without conflicts. Both changed Rust paths pass formatting.
+The VBA fix retains the already-computed recipient admission without an extra
+scan; the Custom XML changes repair four stale fixtures/expectations while
+retaining exact/one-under and lexical/MCE fidelity assertions. These address
+fourteen reported failures; no rerun is claimed yet.
+
+Properties 94ra remains returned for controls in attributes/skipped subtrees and
+duplicate validation/cloning cost; 94rb is active. Ribbon 94sa is under complete
+source review, including atomic selected-limit admission, provenance-key identity
+and insertion scan cost. Neither proposal is composed. PPTX presence 89arc
+still needs matching writer aggregate/physical attribute budgets and canonical
+contract documentation; 89ard is active.
+
+A fresh eight-row PPTX compiler/consumer packet runs on frozen `cc2ab3f79d`.
+It covers scoped formatting, minimal/all-target PPTX, strict all-feature PPTX,
+strict ops/facade consumers, the combined DOCX/PPTX example route, and standalone
+perf/native consumers. Root returns the first inert proposal for using raw exit
+instead of runner status and duplicating compiler/Clippy rows. V2 fixes both;
+root verifies exact commands, source/parents/tree, locks, hydration, tools and
+empty target before GO. No result is claimed at this checkpoint.
+
+Packet: `.coord/pptx-combined-0362ul89-f5-consumer-v2-cc2ab3f79d`.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `plan.json` | 41,672 | `4f560bf7c1a9fe682d36725b7852092d66c8b2e24d55a8dd77c6c6494737a6f8` |
+| `run_f5.py` | 15,464 | `ac617fce81c49ca19c9c34d50ef1b64cd2e6bebc890c2d5dce2a29579865b262` |
+| `manifest.json` | 8,672 | `b4673b96c2be2c652fa8a66994b8f23260a5f63e06081b2c90e53eeddbed86a8` |
+
+Completed work is committed, branch refs and evidence are retained, and nothing
+is pushed. Runtime, performance and final acceptance remain open.
