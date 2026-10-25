@@ -388,7 +388,9 @@ fn validate_processed_part(
     strict_threading: bool,
 ) -> Result<()> {
     match kind {
-        Kind::Presence => crate::comments::parse_comment_authors_processed(source, limits).map(drop),
+        Kind::Presence => {
+            crate::comments::parse_comment_authors_processed(source, limits).map(drop)
+        },
         Kind::Threading => {
             crate::comments::parse_slide_comments_processed(source, limits, strict_threading)
                 .map(drop)
@@ -438,13 +440,7 @@ fn preflight_processed_strings(source: &[u8], kind: Kind, limits: Limits) -> Res
                     ));
                 }
                 let semantic = semantic_element(&namespace, element.local_name().as_ref());
-                preflight_element_attributes(
-                    &element,
-                    semantic,
-                    kind,
-                    &mut strings,
-                    limits,
-                )?;
+                preflight_element_attributes(&element, semantic, kind, &mut strings, limits)?;
                 nodes = checked_preflight_count(
                     nodes,
                     limits.max_nodes,
@@ -457,13 +453,7 @@ fn preflight_processed_strings(source: &[u8], kind: Kind, limits: Limits) -> Res
             },
             Event::Empty(element) => {
                 let semantic = semantic_element(&namespace, element.local_name().as_ref());
-                preflight_element_attributes(
-                    &element,
-                    semantic,
-                    kind,
-                    &mut strings,
-                    limits,
-                )?;
+                preflight_element_attributes(&element, semantic, kind, &mut strings, limits)?;
                 nodes = checked_preflight_count(
                     nodes,
                     limits.max_nodes,
@@ -518,11 +508,7 @@ fn preflight_processed_strings(source: &[u8], kind: Kind, limits: Limits) -> Res
 }
 
 #[cfg(test)]
-pub(super) fn selected_string_budget(
-    source: &[u8],
-    kind: Kind,
-    limits: Limits,
-) -> Result<usize> {
+pub(super) fn selected_string_budget(source: &[u8], kind: Kind, limits: Limits) -> Result<usize> {
     let scan = scan_raw(source, limits)?;
     let mce_source = MceSource::new(source, &scan.processing_instructions)?;
     let capabilities = capabilities();
@@ -618,11 +604,7 @@ fn ensure_preflight_string(observed: usize, maximum: usize) -> Result<()> {
 
 #[cfg(test)]
 fn limit_string(observed: usize, maximum: usize) -> Error {
-    limit(
-        crate::error::CodecLimitKind::StringBytes,
-        observed,
-        maximum,
-    )
+    limit(crate::error::CodecLimitKind::StringBytes, observed, maximum)
 }
 
 /// Count the bytes produced by XML entity decoding without constructing the
@@ -652,7 +634,11 @@ fn decoded_xml_len(value: &[u8]) -> Result<usize> {
         start = end + 1;
     }
     length = length
-        .checked_add(std::str::from_utf8(&value[start..]).map_err(xml_error)?.len())
+        .checked_add(
+            std::str::from_utf8(&value[start..])
+                .map_err(xml_error)?
+                .len(),
+        )
         .ok_or_else(|| invalid("legacy comment collaboration XML string length overflow"))?;
     Ok(length)
 }
@@ -662,25 +648,29 @@ fn entity_value_len(value: &[u8]) -> Result<usize> {
     match value {
         b"amp" | b"lt" | b"gt" | b"apos" | b"quot" => Ok(1),
         value if value.starts_with(b"#x") || value.starts_with(b"#X") => {
-            let number = u32::from_str_radix(
-                std::str::from_utf8(&value[2..]).map_err(xml_error)?,
-                16,
-            )
-                .map_err(|_| invalid("legacy comment collaboration XML character reference is invalid"))?;
-            char::from_u32(number)
-                .map(char::len_utf8)
-                .ok_or_else(|| invalid("legacy comment collaboration XML character reference is invalid"))
+            let number =
+                u32::from_str_radix(std::str::from_utf8(&value[2..]).map_err(xml_error)?, 16)
+                    .map_err(|_| {
+                        invalid("legacy comment collaboration XML character reference is invalid")
+                    })?;
+            char::from_u32(number).map(char::len_utf8).ok_or_else(|| {
+                invalid("legacy comment collaboration XML character reference is invalid")
+            })
         },
         value if value.starts_with(b"#") => {
             let number = std::str::from_utf8(&value[1..])
                 .ok()
                 .and_then(|digits| digits.parse::<u32>().ok())
-                .ok_or_else(|| invalid("legacy comment collaboration XML character reference is invalid"))?;
-            char::from_u32(number)
-                .map(char::len_utf8)
-                .ok_or_else(|| invalid("legacy comment collaboration XML character reference is invalid"))
+                .ok_or_else(|| {
+                    invalid("legacy comment collaboration XML character reference is invalid")
+                })?;
+            char::from_u32(number).map(char::len_utf8).ok_or_else(|| {
+                invalid("legacy comment collaboration XML character reference is invalid")
+            })
         },
-        _ => Err(invalid("custom XML entity is rejected in presentation comment parts")),
+        _ => Err(invalid(
+            "custom XML entity is rejected in presentation comment parts",
+        )),
     }
 }
 

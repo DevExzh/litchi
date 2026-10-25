@@ -52,10 +52,7 @@ pub(super) fn parse_comment_authors_with(
 /// selected by a source-bound owner.  Keeping this entry point separate avoids
 /// running the baseline MCE processor a second time after the collaboration
 /// codec has applied its p15 capability set.
-pub(crate) fn parse_comment_authors_processed(
-    xml: &[u8],
-    limits: Limits,
-) -> Result<Vec<Author>> {
+pub(crate) fn parse_comment_authors_processed(xml: &[u8], limits: Limits) -> Result<Vec<Author>> {
     let (root, instructions) = parse_document_processed(xml, false, limits)?;
     parse_comment_authors_document(root, instructions, limits, None)
 }
@@ -789,7 +786,11 @@ fn decoded_xml_len(value: &[u8]) -> Result<usize> {
         start = end + 1;
     }
     length = length
-        .checked_add(std::str::from_utf8(&value[start..]).map_err(xml_error)?.len())
+        .checked_add(
+            std::str::from_utf8(&value[start..])
+                .map_err(xml_error)?
+                .len(),
+        )
         .ok_or_else(|| invalid("presentation comment XML string length overflow"))?;
     Ok(length)
 }
@@ -798,11 +799,11 @@ fn entity_value_len(value: &[u8]) -> Result<usize> {
     match value {
         b"amp" | b"lt" | b"gt" | b"apos" | b"quot" => Ok(1),
         value if value.starts_with(b"#x") || value.starts_with(b"#X") => {
-            let number = u32::from_str_radix(
-                std::str::from_utf8(&value[2..]).map_err(xml_error)?,
-                16,
-            )
-            .map_err(|_| invalid("presentation comment XML character reference is invalid"))?;
+            let number =
+                u32::from_str_radix(std::str::from_utf8(&value[2..]).map_err(xml_error)?, 16)
+                    .map_err(|_| {
+                        invalid("presentation comment XML character reference is invalid")
+                    })?;
             char::from_u32(number)
                 .map(char::len_utf8)
                 .ok_or_else(|| invalid("presentation comment XML character reference is invalid"))
@@ -811,12 +812,16 @@ fn entity_value_len(value: &[u8]) -> Result<usize> {
             let number = std::str::from_utf8(&value[1..])
                 .ok()
                 .and_then(|digits| digits.parse::<u32>().ok())
-                .ok_or_else(|| invalid("presentation comment XML character reference is invalid"))?;
+                .ok_or_else(|| {
+                    invalid("presentation comment XML character reference is invalid")
+                })?;
             char::from_u32(number)
                 .map(char::len_utf8)
                 .ok_or_else(|| invalid("presentation comment XML character reference is invalid"))
         },
-        _ => Err(invalid("custom XML entity is rejected in presentation comment parts")),
+        _ => Err(invalid(
+            "custom XML entity is rejected in presentation comment parts",
+        )),
     }
 }
 

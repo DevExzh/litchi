@@ -1530,7 +1530,10 @@ mod tests {
             ..Limits::DEFAULT
         };
         let xml = write_comment_authors(&[value.clone()], Conformance::Strict, exact).unwrap();
-        assert_eq!(parse_comment_authors(&xml, exact).unwrap(), vec![value.clone()]);
+        assert_eq!(
+            parse_comment_authors(&xml, exact).unwrap(),
+            vec![value.clone()]
+        );
         let error = write_comment_authors(
             &[value],
             Conformance::Strict,

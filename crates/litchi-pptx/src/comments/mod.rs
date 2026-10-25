@@ -13,6 +13,7 @@ pub use codec::{
     parse_comment_authors, parse_slide_comments, parse_slide_comments_strict,
     parse_slide_comments_with_tolerance, write_comment_authors, write_slide_comments,
 };
+pub(crate) use codec::{parse_comment_authors_processed, parse_slide_comments_processed};
 pub use collaboration::{
     AuthorPresenceSnapshot, CommentThreadingSnapshot, ParentComment, PresenceInfo,
     Revision as CollaborationRevision, ThreadingInfo, load_presence, load_presence_snapshot,
@@ -29,7 +30,6 @@ pub(crate) use package::{
     update_presentation_comment_author_with_limits, update_presentation_comment_with_limits,
     validate_replay_part,
 };
-pub(crate) use codec::{parse_comment_authors_processed, parse_slide_comments_processed};
 pub use package::{
     find_presentation_comment, find_presentation_comment_author, load_presentation_comments,
     load_presentation_comments_strict, load_presentation_comments_with_tolerance,
