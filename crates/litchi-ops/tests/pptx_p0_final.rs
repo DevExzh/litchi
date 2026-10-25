@@ -739,7 +739,7 @@ fn batch(file: &File, items: &Plan) -> (File, Vec<bool>, usize) {
         )
         .unwrap();
     let changes = commit
-        .results()
+        .value()
         .iter()
         .map(|result| match result {
             litchi_ops::ItemResult::Applied(applied) => applied.changed,

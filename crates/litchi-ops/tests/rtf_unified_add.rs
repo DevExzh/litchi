@@ -234,9 +234,9 @@ fn batches_keep_created_paths_and_attribute_failure() {
         paragraphs(best.file()),
         ["First", "Second", "Third", "new", "last"]
     );
-    assert!(matches!(&best.results()[1], litchi_ops::ItemResult::Failed(e) if e.item() == Some(1)));
+    assert!(matches!(&best.value()[1], litchi_ops::ItemResult::Failed(e) if e.item() == Some(1)));
     for (index, path) in [(0, "/body/p[4]"), (2, "/body/p[5]")] {
-        let litchi_ops::ItemResult::Applied(ref applied) = best.results()[index] else {
+        let litchi_ops::ItemResult::Applied(ref applied) = best.value()[index] else {
             panic!("addition should succeed");
         };
         assert_eq!(applied.path.as_ref().unwrap().to_string(), path);

@@ -791,15 +791,15 @@ fn atomic_and_best_effort_batches_handle_mixed_cell_operations() {
             )
             .expect("best-effort batch keeps valid cell writes");
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             ItemResult::Applied(result) if result.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             ItemResult::Failed(error) if error.item() == Some(1)
         ));
         assert!(matches!(
-            &best_effort.results()[2],
+            &best_effort.value()[2],
             ItemResult::Applied(result) if result.changed
         ));
         assert_eq!(cell_text(best_effort.file(), A1).as_deref(), Some("best"));
@@ -956,7 +956,7 @@ fn atomic_batch_reports_exact_noop_per_item() {
                 BatchMode::Atomic,
             )
             .expect("mixed batch");
-        assert!(matches!(&result.results()[0], ItemResult::Applied(result) if !result.changed));
-        assert!(matches!(&result.results()[1], ItemResult::Applied(result) if result.changed));
+        assert!(matches!(&result.value()[0], ItemResult::Applied(result) if !result.changed));
+        assert!(matches!(&result.value()[1], ItemResult::Applied(result) if result.changed));
     }
 }

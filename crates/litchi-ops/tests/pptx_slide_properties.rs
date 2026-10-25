@@ -235,15 +235,15 @@ fn mixed_slide_properties_validate_atomically_and_batch_modes_report_failures() 
             .batch(commands(), BatchMode::BestEffort)
             .expect("best-effort batch");
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             ItemResult::Failed(error) if error.item() == Some(1)
         ));
         assert!(matches!(
-            &best_effort.results()[2],
+            &best_effort.value()[2],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert_eq!(

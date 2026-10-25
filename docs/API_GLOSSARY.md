@@ -1125,7 +1125,7 @@ command `Batch` execution stays pending.
 
 `File::apply` executes one command and returns `transaction::Commit<Applied>`;
 `File::{batch, batch_with_options}` return `BatchCommit` with the accessors
-`file`, `into_file`, `patch`, `diagnostics`, `results`, `into_results` and
+`file`, `into_file`, `patch`, `diagnostics`, `value`, `into_value` and
 `into_parts` (record 0362). `ItemResult::{Applied, Failed}` preserves input
 order; failures retain their original item index. `Applied` carries `changed`
 and `path: Option<Box<Path<'static>>>`, populated by creation. The optional
@@ -3333,22 +3333,22 @@ with the consuming `semantic_limits(limits)` and read with
 `transaction::Commit<T>` and `BatchCommit` have no public fields: the triad
 accessors are `file()` (the facade's spelling of `package()`),
 `into_file()`, `patch()`, `diagnostics()`, `into_parts()` and the value
-(`value()`/`into_value()` on `Commit`, `results()`/`into_results()` on
-`BatchCommit`). Detection functions take the `OpenOptions` the detection
-would be opened with (their OOXML source limits bound the OPC probe); the
-OOXML probes of `detect::ooxml` and the record parsers take their limits as
-a required argument.
+(`value()`/`into_value()` on both `Commit` and `BatchCommit`). Detection
+functions take a required `&SourceLimits`; an owner derives that policy from
+its `OpenOptions` before calling detection (their OOXML source limits bound
+the OPC probe). The OOXML probes of `detect::ooxml` and the record parsers
+take their limits as a required argument.
 
 | Name | Status |
 |---|---|
 | `EditOptions` (`new`, `semantic_limits`, `semantic_limits_value`) | adopted (0362) |
 | `File::{edit_with_options, batch_with_options, import_with_options, merge_with_options, refresh_with_options}` | adopted (0362); replace the `*_with_limits` forms (banned) |
 | `transaction::Commit::{file, into_file, patch, diagnostics, value, into_value, into_parts}` | adopted (0362); public fields removed |
-| `BatchCommit::{file, into_file, patch, diagnostics, results, into_results, into_parts}` | adopted (0362); public fields removed |
+| `BatchCommit::{file, into_file, patch, diagnostics, value, into_value, into_parts}` | adopted (0362); public fields removed |
 | `batch::Options::edit_options` | adopted (0362); replaces `limits` (banned) |
 | `batch::from_bytes(bytes, &SourceLimits)` | adopted (0362); `from_bytes_with_limits` merged |
 | `merge::Data::{from_json(source, &SemanticLimits), from_csv(source, &import::Options, &SemanticLimits)}` | adopted (0362); `from_json_with_limits`, `from_csv_with` merged (banned) |
-| `detect::{detect_format_smart, detect_format_smart_with_tail, detect_and_prepare, detect_and_prepare_with_tail}` taking `&OpenOptions` | adopted (0362); the `*_with_limits` and `*_with_limits_and_tail` forms merged (banned) |
+| `detect::{detect_format_smart, detect_format_smart_with_tail, detect_and_prepare, detect_and_prepare_with_tail}` taking `&SourceLimits` | adopted (0362); the `*_with_limits` and `*_with_limits_and_tail` forms merged (banned) |
 | `detect::ooxml::{detect_zip_format, try_detect_zip_format, detect_zip_format_from_reader, try_detect_zip_format_from_reader}` taking `&SourceLimits` | adopted (0362); the aliases `detect_ooxml_format`, `detect_ooxml_format_from_bytes` and their limit forms deleted (banned) |
 | `format::docx::Docx::section_inventory(&section::Limits)` | adopted (0362); `section_inventory_with_limits` merged |
 | `litchi_doc::{body_text, source_backed}::Refusal::kind` | adopted (0362) |

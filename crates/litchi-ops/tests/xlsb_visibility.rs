@@ -515,9 +515,9 @@ fn mixed_visibility_cell_batches_keep_family_boundaries_and_atomicity() {
         let commit = source
             .batch(commands, BatchMode::Atomic)
             .expect("mixed visibility and cell batch");
-        assert_eq!(commit.results().len(), 3);
+        assert_eq!(commit.value().len(), 3);
         assert!(
-            commit.results().iter().all(|result| {
+            commit.value().iter().all(|result| {
                 matches!(result, ItemResult::Applied(applied) if applied.changed)
             })
         );

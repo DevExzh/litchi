@@ -135,14 +135,14 @@ pub fn unified_output(file: &File, items: &[BatchItem<'static>]) -> Result<(Vec<
     let options = litchi_ops::EditOptions::new().semantic_limits(limits());
     let commit = file.batch_with_options(items.to_vec(), BatchMode::Atomic, options)?;
     let changed = commit
-        .results()
+        .value()
         .iter()
         .filter(|r| matches!(r, ItemResult::Applied(a) if a.changed))
         .count();
-    if commit.results().len() != items.len() || changed != items.len() {
+    if commit.value().len() != items.len() || changed != items.len() {
         return Err(format!(
             "unified accounting: {} results, {} changed, {} items",
-            commit.results().len(),
+            commit.value().len(),
             changed,
             items.len()
         )

@@ -90,7 +90,7 @@ fn a_thousand_run_formats_are_one_commit() {
         let commit = file.batch(items.clone(), BatchMode::Atomic).unwrap();
         assert_eq!(commit.diagnostics().commits(), 1, "{eager}");
         assert_eq!(commit.diagnostics().operations(), 1_000);
-        assert!(changes(commit.results()).iter().all(|changed| *changed));
+        assert!(changes(commit.value()).iter().all(|changed| *changed));
         assert_eq!(
             prop(commit.file(), &run(1), "bold").as_deref(),
             Some("true")
@@ -101,7 +101,7 @@ fn a_thousand_run_formats_are_one_commit() {
         );
         // Replaying the batch on its result changes nothing, item by item.
         let again = commit.file().batch(items, BatchMode::Atomic).unwrap();
-        assert!(changes(again.results()).iter().all(|changed| !*changed));
+        assert!(changes(again.value()).iter().all(|changed| !*changed));
         assert!(!again.diagnostics().changed());
     }
 }
@@ -142,7 +142,7 @@ fn mixed_text_and_formatting_keep_sequential_semantics() {
             )
             .unwrap();
         assert_eq!(
-            changes(commit.results()),
+            changes(commit.value()),
             [true, true, true, false, true, true],
             "{eager}"
         );

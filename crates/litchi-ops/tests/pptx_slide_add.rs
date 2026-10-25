@@ -191,15 +191,15 @@ fn source_add_batches_are_atomic_or_best_effort_with_diagnostics() {
         .batch(commands(), BatchMode::BestEffort)
         .expect("best-effort source insertion");
     assert!(matches!(
-        &best_effort.results()[0],
+        &best_effort.value()[0],
         ItemResult::Applied(applied) if applied.changed
     ));
     assert!(matches!(
-        &best_effort.results()[1],
+        &best_effort.value()[1],
         ItemResult::Failed(error) if error.item() == Some(1) && error.code() == Code::NotFound
     ));
     assert!(matches!(
-        &best_effort.results()[2],
+        &best_effort.value()[2],
         ItemResult::Applied(applied) if applied.changed
     ));
     assert!(best_effort.diagnostics().changed());
@@ -433,9 +433,9 @@ fn batches_preserve_creation_properties_and_isolate_invalid_items() {
         assert!(source.batch(items(), BatchMode::Atomic).is_err());
         assert_eq!(source.to_bytes().unwrap(), before);
         let result = source.batch(items(), BatchMode::BestEffort).unwrap();
-        assert!(matches!(&result.results()[0], ItemResult::Applied(applied) if applied.changed));
+        assert!(matches!(&result.value()[0], ItemResult::Applied(applied) if applied.changed));
         assert!(
-            matches!(&result.results()[1], ItemResult::Failed(error) if error.code() == Code::InvalidValue)
+            matches!(&result.value()[1], ItemResult::Failed(error) if error.code() == Code::InvalidValue)
         );
         assert_eq!(
             slide_property(result.file(), "/slide[4]", "name").as_deref(),

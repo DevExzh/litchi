@@ -140,7 +140,7 @@ fn failed_edits_are_atomic_and_best_effort_keeps_successes() {
     assert_eq!(text(result.file(), "/body/p[2]"), "");
     assert_eq!(text(result.file(), "/body/p[3]"), "last");
     assert!(
-        matches!(&result.results()[1], litchi_ops::ItemResult::Failed(error) if error.item() == Some(1))
+        matches!(&result.value()[1], litchi_ops::ItemResult::Failed(error) if error.item() == Some(1))
     );
     assert!(
         source

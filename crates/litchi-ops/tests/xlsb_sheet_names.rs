@@ -194,11 +194,11 @@ fn complete_catalog_duplicate_names_fail_atomically_and_roll_back_batches() {
             )
             .expect("best-effort batch keeps the first rename");
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::DuplicateName
         ));

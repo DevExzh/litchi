@@ -478,11 +478,11 @@ fn worksheet_name_batches_keep_atomic_and_best_effort_boundaries() {
             .batch(commands(), BatchMode::BestEffort)
             .expect("best-effort duplicate name");
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::DuplicateName
         ));

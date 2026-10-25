@@ -16410,7 +16410,7 @@
         {
           "name": "_with_limits",
           "scope": "litchi_ops",
-          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes the OpenOptions it would be opened with and record parsers take their limits as a required argument (record 0351 \u00a72.5, record 0362)",
+          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes a required SourceLimits policy and record parsers take their limits as a required argument (record 0351 \u00a72.5, record 0362)",
           "match": "suffix"
         }
       ],
@@ -20050,7 +20050,7 @@
         {
           "name": "_with_limits",
           "scope": "litchi_ops",
-          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes the OpenOptions it would be opened with and record parsers take their limits as a required argument (record 0351 \u00a72.5, record 0362)",
+          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes a required SourceLimits policy and record parsers take their limits as a required argument (record 0351 \u00a72.5, record 0362)",
           "match": "suffix"
         }
       ],
@@ -23029,7 +23029,7 @@
         {
           "name": "_with_limits",
           "scope": "litchi_ops",
-          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes the OpenOptions it would be opened with and record parsers take their limits as a required argument (record 0351 \u00a72.5, record 0362)",
+          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes a required SourceLimits policy and record parsers take their limits as a required argument (record 0351 \u00a72.5, record 0362)",
           "match": "suffix"
         }
       ],
@@ -23078,9 +23078,21 @@
           "replacement": "use format::pptx::Slide (record 0362ul42)"
         },
         {
+          "name": "results",
+          "scope": "litchi_ops::BatchCommit",
+          "replacement": "use BatchCommit::value (record 0351 §2.5 rule 7)",
+          "recursive": false
+        },
+        {
+          "name": "into_results",
+          "scope": "litchi_ops::BatchCommit",
+          "replacement": "use BatchCommit::into_value (record 0351 §2.5 rule 7)",
+          "recursive": false
+        },
+        {
           "name": "_with_limits",
           "scope": "litchi_ops",
-          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes the OpenOptions it would be opened with and record parsers take their limits as a required argument (record 0351 \u00a72.5, record 0362)",
+          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes a required SourceLimits policy and record parsers take their limits as a required argument (record 0351 \u00a72.5, record 0362)",
           "match": "suffix"
         },
         {
@@ -23110,12 +23122,12 @@
         {
           "name": "detect_format_smart_with_limits_and_tail",
           "scope": "litchi_ops::detect",
-          "replacement": "`detect_format_smart_with_tail(bytes, &OpenOptions, tail)` (record 0362)"
+          "replacement": "`detect_format_smart_with_tail(bytes, &SourceLimits, tail)` (record 0362)"
         },
         {
           "name": "detect_and_prepare_with_limits_and_tail",
           "scope": "litchi_ops::detect",
-          "replacement": "`detect_and_prepare_with_tail(path, &OpenOptions, tail)` (record 0362)"
+          "replacement": "`detect_and_prepare_with_tail(path, &SourceLimits, tail)` (record 0362)"
         },
         {
           "name": "limits",
@@ -23142,6 +23154,18 @@
           "type_args": [
             "litchi_ops::Applied"
           ]
+        },
+        {
+          "method": "litchi_ops::File::batch",
+          "ok": "litchi_ops::BatchCommit"
+        },
+        {
+          "method": "litchi_ops::File::batch_with",
+          "ok": "litchi_ops::BatchCommit"
+        },
+        {
+          "method": "litchi_ops::File::batch_with_options",
+          "ok": "litchi_ops::BatchCommit"
         }
       ]
     },
@@ -23172,7 +23196,7 @@
         {
           "name": "_with_limits",
           "scope": "litchi",
-          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes the OpenOptions it would be opened with and record parsers take their limits as a required argument (record 0351 \u00a72.5, record 0362)",
+          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes a required SourceLimits policy and record parsers take their limits as a required argument (record 0351 \u00a72.5, record 0362)",
           "match": "suffix"
         }
       ],
@@ -23299,7 +23323,7 @@
         {
           "name": "_with_limits",
           "scope": "litchi",
-          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes the OpenOptions it would be opened with and record parsers take their limits as a required argument (record 0351 \u00a72.5, record 0362)",
+          "replacement": "configure a File transaction through EditOptions (`edit_with_options`, `batch_with_options`, `import_with_options`, `merge_with_options`, `refresh_with_options`); detection takes a required SourceLimits policy and record parsers take their limits as a required argument (record 0351 \u00a72.5, record 0362)",
           "match": "suffix"
         }
       ],
@@ -25929,6 +25953,12 @@
           "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
         },
         {
+          "name": "slide",
+          "scope": "litchi_keynote::Show",
+          "replacement": "use Show::slides().get or Show::select_slide (record 155)",
+          "recursive": false
+        },
+        {
           "name": "_with_limits",
           "scope": "litchi_keynote",
           "replacement": "configure limits through OpenOptions (open_with_options/from_bytes_with_options) or the package's limits; raw/record APIs take limits as a required argument (record 0351)",
@@ -27511,6 +27541,12 @@
           "name": "is_changed",
           "scope": "litchi_keynote",
           "replacement": "use diagnostics().changed() or patch.is_noop() (record 0351)"
+        },
+        {
+          "name": "slide",
+          "scope": "litchi_keynote::Show",
+          "replacement": "use Show::slides().get or Show::select_slide (record 155)",
+          "recursive": false
         },
         {
           "name": "_with_limits",

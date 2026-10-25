@@ -521,16 +521,16 @@ fn atomic_and_best_effort_batches_attribute_formula_admission_failures() {
             )
             .expect("best-effort batch");
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::UnsupportedCapability
         ));
         assert!(matches!(
-            &best_effort.results()[2],
+            &best_effort.value()[2],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert_eq!(cell_text(best_effort.file(), A1).as_deref(), Some("kept"));
@@ -570,7 +570,7 @@ fn atomic_batch_reports_each_scalar_noop_before_changed_items() {
             )
             .expect("mixed no-op and changed atomic batch");
         let changed = commit
-            .results()
+            .value()
             .iter()
             .map(|result| match result {
                 ItemResult::Applied(applied) => applied.changed,
@@ -628,16 +628,16 @@ fn deferred_rich_sst_dependency_failure_keeps_the_original_wire_index() {
             )
             .expect("best-effort rich dependency batch");
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::UnsupportedCapability
         ));
         assert!(matches!(
-            &best_effort.results()[2],
+            &best_effort.value()[2],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert_eq!(cell_text(best_effort.file(), B1).as_deref(), Some("3"));

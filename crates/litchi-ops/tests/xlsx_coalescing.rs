@@ -177,7 +177,7 @@ fn atomic_batch_reports_per_item_noops_while_using_one_native_commit() {
         assert_eq!(commit.diagnostics().commits(), 1);
         assert!(commit.diagnostics().changed());
         let changed = commit
-            .results()
+            .value()
             .iter()
             .map(|result| match result {
                 ItemResult::Applied(applied) => applied.changed,
@@ -302,15 +302,15 @@ fn metadata_closes_atomic_batch_coalescing() {
     assert_eq!(commit.diagnostics().operations(), 2);
     assert_eq!(commit.diagnostics().commits(), 2);
     assert!(matches!(
-        &commit.results()[0],
+        &commit.value()[0],
         ItemResult::Applied(applied) if applied.changed
     ));
     assert!(matches!(
-        &commit.results()[1],
+        &commit.value()[1],
         ItemResult::Applied(applied) if !applied.changed
     ));
     assert!(matches!(
-        &commit.results()[2],
+        &commit.value()[2],
         ItemResult::Applied(applied) if applied.changed
     ));
 }
@@ -333,15 +333,15 @@ fn best_effort_isolates_each_item_and_preserves_wire_indices() {
     assert_eq!(commit.diagnostics().operations(), 2);
     assert_eq!(commit.diagnostics().commits(), 2);
     assert!(matches!(
-        &commit.results()[0],
+        &commit.value()[0],
         ItemResult::Applied(applied) if applied.changed
     ));
     assert!(matches!(
-        &commit.results()[1],
+        &commit.value()[1],
         ItemResult::Failed(error) if error.item() == Some(1)
     ));
     assert!(matches!(
-        &commit.results()[2],
+        &commit.value()[2],
         ItemResult::Applied(applied) if applied.changed
     ));
     assert_eq!(cell_text(commit.file(), A1).as_deref(), Some("kept"));

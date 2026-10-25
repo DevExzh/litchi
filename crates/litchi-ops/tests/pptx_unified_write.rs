@@ -373,7 +373,7 @@ fn batches_keep_atomic_and_best_effort_semantics() {
         assert_eq!(text(&source, FIRST), "first");
         let result = source.batch(commands(), BatchMode::BestEffort).unwrap();
         assert!(
-            matches!(&result.results()[1], ItemResult::Failed(error) if error.item() == Some(1))
+            matches!(&result.value()[1], ItemResult::Failed(error) if error.item() == Some(1))
         );
         assert_eq!(text(result.file(), FIRST), "changed");
         assert_eq!(text(result.file(), "/slide[2]/shape[1]"), "later");
@@ -776,7 +776,7 @@ fn slide_addition_batches_keep_prior_success_only_in_best_effort_mode() {
         Some(1)
     );
     let result = source.batch(commands(), BatchMode::BestEffort).unwrap();
-    assert!(matches!(&result.results()[1], ItemResult::Failed(error) if error.item() == Some(1)));
+    assert!(matches!(&result.value()[1], ItemResult::Failed(error) if error.item() == Some(1)));
     assert!(result.file().get("/slide[2]").is_ok());
     assert!(result.file().get("/slide[3]").is_err());
     assert_eq!(source.to_bytes().unwrap(), before);

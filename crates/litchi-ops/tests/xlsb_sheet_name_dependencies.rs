@@ -240,11 +240,11 @@ fn unknown_reference_carrier_refusal_is_typed_late_and_batch_atomic() {
             )
             .expect("best-effort batch isolates unsupported rename");
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             litchi_ops::ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             litchi_ops::ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::UnsupportedCapability
         ));
@@ -273,11 +273,11 @@ fn markup_compatibility_reference_refusal_preserves_source_and_batch_result() {
             )
             .expect("best-effort MCE batch remains transactional");
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             litchi_ops::ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             litchi_ops::ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::UnsupportedCapability
         ));

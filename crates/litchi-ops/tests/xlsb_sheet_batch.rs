@@ -276,7 +276,7 @@ fn distinct_direct_sheet_states_coalesce_for_closure_and_atomic_json() {
                 BatchMode::Atomic,
             )
             .expect("coalesce atomic JSON states");
-        assert_all_applied_changed(batch.results());
+        assert_all_applied_changed(batch.value());
         assert_eq!(batch.diagnostics().operations(), 2);
         assert_eq!(batch.diagnostics().commits(), 1);
         assert_eq!(batch.diagnostics().leaf_operations(), 2);
@@ -326,7 +326,7 @@ fn hiding_the_active_tab_forces_a_run_boundary_before_the_next_hide() {
                 BatchMode::Atomic,
             )
             .expect("atomic JSON active hides");
-        assert_all_applied_changed(batch.results());
+        assert_all_applied_changed(batch.value());
         assert_eq!(batch.diagnostics().commits(), 2);
         assert_eq!(
             batch.file().to_bytes().expect("publish JSON active hides"),
@@ -373,9 +373,9 @@ fn exact_sheet_state_noops_report_false_changed_and_preserve_bytes() {
                 BatchMode::Atomic,
             )
             .expect("exact visibility no-op batch");
-        assert_eq!(commit.results().len(), 2);
+        assert_eq!(commit.value().len(), 2);
         assert!(
-            commit.results().iter().all(|result| {
+            commit.value().iter().all(|result| {
                 matches!(result, ItemResult::Applied(applied) if !applied.changed)
             })
         );
@@ -675,8 +675,8 @@ fn one_thousand_distinct_direct_state_commands_fit_default_limits() {
     let commit = source
         .batch(commands, BatchMode::Atomic)
         .expect("one thousand non-active sheet commands");
-    assert_eq!(commit.results().len(), 1_000);
-    assert_all_applied_changed(commit.results());
+    assert_eq!(commit.value().len(), 1_000);
+    assert_all_applied_changed(commit.value());
     assert_eq!(commit.diagnostics().operations(), 1_000);
     assert_eq!(commit.diagnostics().commits(), 1);
     assert_eq!(commit.diagnostics().leaf_operations(), 1_000);
@@ -737,9 +737,9 @@ fn best_effort_failure_discards_its_sheet_run_and_later_commands_continue() {
             )
             .expect("isolate last-visible failure");
         assert!(
-            matches!(&batch.results()[2], ItemResult::Failed(error) if error.code() == Code::InvalidArgument && error.item() == Some(2))
+            matches!(&batch.value()[2], ItemResult::Failed(error) if error.code() == Code::InvalidArgument && error.item() == Some(2))
         );
-        assert!(matches!(&batch.results()[3], ItemResult::Applied(applied) if applied.changed));
+        assert!(matches!(&batch.value()[3], ItemResult::Applied(applied) if applied.changed));
         let sequential = source
             .set(SECOND, props! { "hidden" => true })
             .unwrap()

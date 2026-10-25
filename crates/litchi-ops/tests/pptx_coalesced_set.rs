@@ -153,15 +153,15 @@ fn atomic_batch_coalesces_one_thousand_distinct_shapes_with_per_item_changes() {
         let commit = source
             .batch(items, BatchMode::Atomic)
             .expect("coalesced thousand-item batch");
-        assert_eq!(commit.results().len(), LARGE_SHAPE_COUNT);
+        assert_eq!(commit.value().len(), LARGE_SHAPE_COUNT);
         assert_eq!(commit.diagnostics().operations(), LARGE_SHAPE_COUNT);
         assert_eq!(commit.diagnostics().commits(), 1);
         assert!(commit.diagnostics().changed());
         assert!(matches!(
-            &commit.results()[0],
+            &commit.value()[0],
             ItemResult::Applied(applied) if !applied.changed
         ));
-        assert!(commit.results()[1..].iter().all(|result| matches!(
+        assert!(commit.value()[1..].iter().all(|result| matches!(
             result,
             ItemResult::Applied(applied) if applied.changed
         )));
@@ -223,7 +223,7 @@ fn mixed_shape_batch_coalesces_geometry_and_text_and_reports_noops() {
         assert_eq!(commit.diagnostics().operations(), 4);
         assert_eq!(commit.diagnostics().commits(), 1);
         let changed = commit
-            .results()
+            .value()
             .iter()
             .map(|result| match result {
                 ItemResult::Applied(applied) => applied.changed,
@@ -340,7 +340,7 @@ fn repeated_targets_reads_metadata_and_structure_close_direct_runs() {
         assert_eq!(metadata.diagnostics().operations(), 2);
         assert_eq!(metadata.diagnostics().commits(), 2);
         assert!(matches!(
-            &metadata.results()[1],
+            &metadata.value()[1],
             ItemResult::Applied(applied) if !applied.changed
         ));
 
@@ -463,11 +463,11 @@ fn best_effort_isolates_a_late_malformed_transform_from_valid_shape_sets() {
             )
             .expect("best-effort batch should isolate malformed item");
         assert!(matches!(
-            &commit.results()[0],
+            &commit.value()[0],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert!(matches!(
-            &commit.results()[1],
+            &commit.value()[1],
             ItemResult::Failed(error)
                 if error.item() == Some(1)
                     && matches!(
@@ -476,7 +476,7 @@ fn best_effort_isolates_a_late_malformed_transform_from_valid_shape_sets() {
                     )
         ));
         assert!(matches!(
-            &commit.results()[2],
+            &commit.value()[2],
             ItemResult::Applied(applied) if applied.changed
         ));
         assert_eq!(length(commit.file(), 1, "x"), 914_400);
@@ -599,8 +599,8 @@ fn alternating_text_and_geometry_commands_share_a_shape_run() {
             )
             .expect("alternating same-slide shape commands");
         assert_eq!(commit.diagnostics().commits(), 1);
-        assert_eq!(commit.results().len(), LARGE_SHAPE_COUNT);
-        assert!(commit.results().iter().all(|item| matches!(item,
+        assert_eq!(commit.value().len(), LARGE_SHAPE_COUNT);
+        assert!(commit.value().iter().all(|item| matches!(item,
             ItemResult::Applied(applied) if applied.changed)));
         let output = commit.file().to_bytes().expect("serialize command result");
         let package = litchi_pptx::Package::from_bytes(&output).expect("open result");

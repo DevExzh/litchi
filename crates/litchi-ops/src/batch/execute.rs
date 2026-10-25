@@ -88,7 +88,7 @@ pub enum ItemResult {
 /// An immutable batch result. Publication remains an explicit save operation.
 ///
 /// The accessors are those of [`Commit`](crate::transaction::Commit), with
-/// the per-item [`Self::results`] as the commit's value.
+/// the per-item [`Self::value`] as the commit's value.
 pub struct BatchCommit {
     file: File,
     patch: Patch,
@@ -119,12 +119,12 @@ impl BatchCommit {
     }
     /// One outcome per input item, with no renumbering after failures or meta.
     #[must_use]
-    pub fn results(&self) -> &[ItemResult] {
+    pub fn value(&self) -> &[ItemResult] {
         &self.results
     }
     /// Take the per-item outcomes, dropping the file and the patch.
     #[must_use]
-    pub fn into_results(self) -> Vec<ItemResult> {
+    pub fn into_value(self) -> Vec<ItemResult> {
         self.results
     }
     /// Take the file, the patch and the per-item outcomes; the diagnostics
@@ -249,7 +249,7 @@ impl File {
     ///   {"command":"set","path":"/body/p[1]/r[1]","props":{"bold":true}}
     /// ]"#, &batch::SourceLimits::default())?;
     /// let commit = file.batch(items, BatchMode::Atomic)?;
-    /// assert_eq!(commit.results().len(), 2);
+    /// assert_eq!(commit.value().len(), 2);
     /// assert!(commit.diagnostics().changed());
     /// # }
     /// # Ok::<(), litchi_ops::Error>(())
@@ -319,7 +319,7 @@ impl File {
     /// ]"#, &batch::SourceLimits::default())?;
     /// let options = Options::new().unsupported(Unsupported::Warn);
     /// let commit = file.batch_with(&items, &options)?;
-    /// let ItemResult::Applied(first) = &commit.results()[0] else { unreachable!() };
+    /// let ItemResult::Applied(first) = &commit.value()[0] else { unreachable!() };
     /// assert_eq!(first.warnings[0].item(), Some(0));
     /// # }
     /// # Ok::<(), litchi_ops::Error>(())

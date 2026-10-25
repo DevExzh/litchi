@@ -278,7 +278,7 @@ fn finds_join_atomic_batches_and_invert() {
     .unwrap();
     let commit = file.batch(items, BatchMode::Atomic).unwrap();
     let counts: Vec<Option<usize>> = commit
-        .results()
+        .value()
         .iter()
         .map(|result| match result {
             litchi_ops::ItemResult::Applied(applied) => applied.matched(),

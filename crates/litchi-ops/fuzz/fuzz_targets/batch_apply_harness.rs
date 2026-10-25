@@ -37,7 +37,7 @@ pub fn exercise(data: &[u8]) {
         let atomic = Options::new().unsupported(Unsupported::Warn);
         let first = file.batch_with(&items, &atomic);
         match &first {
-            Ok(commit) => assert_eq!(commit.results().len(), items.len()),
+            Ok(commit) => assert_eq!(commit.value().len(), items.len()),
             Err(error) => typed(error.code()),
         }
         // The handle is a snapshot: the same batch behaves the same again.
@@ -54,8 +54,8 @@ pub fn exercise(data: &[u8]) {
         let best_effort = atomic.mode(BatchMode::BestEffort);
         match file.batch_with(&items, &best_effort) {
             Ok(commit) => {
-                assert_eq!(commit.results().len(), items.len());
-                for result in commit.results() {
+                assert_eq!(commit.value().len(), items.len());
+                for result in commit.value() {
                     if let ItemResult::Failed(error) = result {
                         typed(error.code());
                     }

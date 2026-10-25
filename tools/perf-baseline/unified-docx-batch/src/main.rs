@@ -67,11 +67,11 @@ fn measure<T, H>(
     for count in [1, 10, 100, 1_000, 10_000] {
         let oracle = leaf(native, count)?;
         let candidate = unified.batch(input.iter().cycle().take(count), BatchMode::Atomic)?;
-        if candidate.results().len() != count
+        if candidate.value().len() != count
             || candidate.diagnostics().operations() != count
             || candidate.diagnostics().leaf_operations() != count
             || candidate
-                .results()
+                .value()
                 .iter()
                 .any(|r| !matches!(r, litchi_ops::ItemResult::Applied(a) if a.changed))
         {

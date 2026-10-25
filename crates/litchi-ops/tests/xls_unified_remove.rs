@@ -509,15 +509,15 @@ fn removal_batches_are_atomic_or_attribute_failures_per_item() {
             )
             .expect("best-effort removal batch");
         assert!(matches!(
-            &best_effort.results()[0],
+            &best_effort.value()[0],
             ItemResult::Applied(result) if result.changed
         ));
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             ItemResult::Failed(error) if error.item() == Some(1) && error.code() == Code::PathNotFound
         ));
         assert!(matches!(
-            &best_effort.results()[2],
+            &best_effort.value()[2],
             ItemResult::Applied(result) if result.changed
         ));
         assert_eq!(cell_text(best_effort.file(), A1).as_deref(), Some(""));

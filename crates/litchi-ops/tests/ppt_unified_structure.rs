@@ -412,7 +412,7 @@ fn structural_transaction_replays_inverts_and_batches_atomically() {
             .batch(commands(), BatchMode::BestEffort)
             .expect("best effort batch");
         assert!(matches!(
-            &best_effort.results()[1],
+            &best_effort.value()[1],
             litchi_ops::ItemResult::Failed(error)
                 if error.item() == Some(1) && error.code() == Code::PathNotFound
         ));

@@ -278,7 +278,7 @@ fn shape_batches_preserve_atomic_and_best_effort_boundaries() {
         Some(1)
     );
     let result = source.batch(commands(), BatchMode::BestEffort).unwrap();
-    assert!(matches!(&result.results()[1], ItemResult::Failed(error) if error.item() == Some(1)));
+    assert!(matches!(&result.value()[1], ItemResult::Failed(error) if error.item() == Some(1)));
     assert_eq!(text(result.file(), "/slide[1]/shape[2]"), "batch text");
     assert!(result.file().get("/slide[1]/shape[3]").is_err());
     assert_eq!(source.to_bytes().unwrap(), before);
