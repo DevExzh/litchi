@@ -9,6 +9,10 @@ use super::model::*;
 use crate::consts::RecordType;
 use crate::records::Record;
 
+fn limits() -> crate::SourceLimits {
+    crate::SourceLimits::default()
+}
+
 fn metadata() -> Metadata {
     Metadata {
         draw_aspect: DrawAspect::Icon,
@@ -35,7 +39,14 @@ fn ole_object_metadata_roundtrips_exactly() {
 fn ole_object_metadata_rejects_invalid_domains_and_ids() {
     let mut bytes = metadata().to_record_bytes().unwrap();
     bytes[8..12].copy_from_slice(&99u32.to_le_bytes());
-    assert!(Metadata::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
+    assert!(
+        Metadata::parse(
+            &Record::parse(&bytes, 0, &crate::SourceLimits::default())
+                .unwrap()
+                .0
+        )
+        .is_err()
+    );
     let mut value = metadata();
     value.persist_id = 0;
     assert!(value.to_record_bytes().is_err());
@@ -67,7 +78,14 @@ fn link_info_roundtrips_nullable_slide_and_rejects_update_domain() {
     );
     let mut bytes = expected.to_record_bytes().unwrap();
     bytes[12..16].copy_from_slice(&2u32.to_le_bytes());
-    assert!(LinkInfo::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
+    assert!(
+        LinkInfo::parse(
+            &Record::parse(&bytes, 0, &crate::SourceLimits::default())
+                .unwrap()
+                .0
+        )
+        .is_err()
+    );
 }
 
 fn definition(kind: ContainerKind) -> Definition {
@@ -103,7 +121,7 @@ fn embedded_and_linked_containers_roundtrip_canonically() {
         unused: [1, 2, 3, 4],
     }));
     for expected in [embedded, linked] {
-        let parsed = Definition::parse(&expected.to_record().unwrap()).unwrap();
+        let parsed = Definition::parse(&expected.to_record(&limits()).unwrap(), &limits()).unwrap();
         assert_eq!(parsed, expected);
     }
 }
@@ -118,12 +136,12 @@ fn containers_reject_type_mismatch_and_hostile_strings() {
         unused: 0,
     }));
     value.object.object_type = ObjectType::Linked;
-    assert!(value.to_record_bytes().is_err());
+    assert!(value.to_record_bytes(&limits()).is_err());
     value.object.object_type = ObjectType::Embedded;
     value.program_id = Some("bad\nprogram".into());
-    assert!(value.to_record_bytes().is_err());
+    assert!(value.to_record_bytes(&limits()).is_err());
     value.program_id = Some("x".repeat(MAX_OLE_NAME_UNITS + 1));
-    assert!(value.to_record_bytes().is_err());
+    assert!(value.to_record_bytes(&limits()).is_err());
 }
 
 #[test]
@@ -156,7 +174,15 @@ fn containers_reject_duplicate_or_out_of_order_optional_atoms() {
         .unwrap(),
     );
     let bytes = record_bytes(0x0f, 0, RecordType::ExternalOleEmbed, &children).unwrap();
-    assert!(Definition::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
+    assert!(
+        Definition::parse(
+            &Record::parse(&bytes, 0, &crate::SourceLimits::default())
+                .unwrap()
+                .0,
+            &limits(),
+        )
+        .is_err()
+    );
 }
 
 impl Definition {
@@ -179,7 +205,12 @@ fn external_object_list_with_children(seed: i32, children: &[Vec<u8>]) -> (Recor
         child_bytes.extend_from_slice(child);
     }
     let bytes = record_bytes(0x0f, 0, RecordType::ExObjList, &child_bytes).unwrap();
-    (Record::parse(&bytes, 0).unwrap().0, bytes)
+    (
+        Record::parse(&bytes, 0, &crate::SourceLimits::default())
+            .unwrap()
+            .0,
+        bytes,
+    )
 }
 
 #[test]
@@ -197,23 +228,27 @@ fn ole_collection_preserves_unknown_children_and_source_slots() {
         i32::try_from(value.object.id).unwrap(),
         &[
             first_unknown.clone(),
-            value.to_record_bytes().unwrap(),
+            value.to_record_bytes(&limits()).unwrap(),
             second_unknown.clone(),
         ],
     );
-    let collection = Collection::parse(&root).unwrap().unwrap();
+    let collection = Collection::parse(&root, &limits()).unwrap().unwrap();
     assert_eq!(collection.unknown_records().len(), 2);
     assert_eq!(collection.unknown_records()[0].record_type(), 0x7777);
     assert_eq!(collection.unknown_records()[0].data(), b"before");
     assert_eq!(collection.unknown_records()[1].record_type(), 0x8888);
     assert_eq!(collection.unknown_records()[1].data(), b"after");
-    assert_eq!(collection.to_record_bytes().unwrap(), original);
+    assert_eq!(collection.to_record_bytes(&limits()).unwrap(), original);
     assert_eq!(
-        collection.unknown_records()[0].to_record_bytes().unwrap(),
+        collection.unknown_records()[0]
+            .to_record_bytes(&limits())
+            .unwrap(),
         first_unknown
     );
     assert_eq!(
-        collection.unknown_records()[1].to_record_bytes().unwrap(),
+        collection.unknown_records()[1]
+            .to_record_bytes(&limits())
+            .unwrap(),
         second_unknown
     );
 }
@@ -239,25 +274,25 @@ fn ole_collection_reorders_typed_objects_without_losing_unknown_slots() {
         2,
         &[
             first_unknown.clone(),
-            first.to_record_bytes().unwrap(),
+            first.to_record_bytes(&limits()).unwrap(),
             middle_unknown.clone(),
-            second.to_record_bytes().unwrap(),
+            second.to_record_bytes(&limits()).unwrap(),
             last_unknown.clone(),
         ],
     );
-    let mut collection = Collection::parse(&root).unwrap().unwrap();
+    let mut collection = Collection::parse(&root, &limits()).unwrap().unwrap();
     collection.reorder(&[2, 1]).unwrap();
     let (_, reordered) = external_object_list_with_children(
         2,
         &[
             first_unknown,
-            second.to_record_bytes().unwrap(),
+            second.to_record_bytes(&limits()).unwrap(),
             middle_unknown,
-            first.to_record_bytes().unwrap(),
+            first.to_record_bytes(&limits()).unwrap(),
             last_unknown,
         ],
     );
-    assert_eq!(collection.to_record_bytes().unwrap(), reordered);
+    assert_eq!(collection.to_record_bytes(&limits()).unwrap(), reordered);
 }
 
 #[test]
@@ -270,12 +305,12 @@ fn ole_collection_discovers_objects_and_enforces_seed() {
         unused: 0,
     }));
     first.object.id = 21;
-    let root = external_object_list(21, &[first.to_record_bytes().unwrap()]);
-    let parsed = Collection::parse(&root).unwrap().unwrap();
+    let root = external_object_list(21, &[first.to_record_bytes(&limits()).unwrap()]);
+    let parsed = Collection::parse(&root, &limits()).unwrap().unwrap();
     assert_eq!(parsed.id_seed, 21);
     assert!(parsed.get(21).is_some());
-    let wrong_seed_root = external_object_list(20, &[first.to_record_bytes().unwrap()]);
-    assert!(Collection::parse(&wrong_seed_root).is_err());
+    let wrong_seed_root = external_object_list(20, &[first.to_record_bytes(&limits()).unwrap()]);
+    assert!(Collection::parse(&wrong_seed_root, &limits()).is_err());
 }
 
 #[test]
@@ -292,11 +327,11 @@ fn ole_collection_rejects_duplicate_ids() {
     let root = external_object_list(
         i32::try_from(first.object.id).unwrap(),
         &[
-            first.to_record_bytes().unwrap(),
-            second.to_record_bytes().unwrap(),
+            first.to_record_bytes(&limits()).unwrap(),
+            second.to_record_bytes(&limits()).unwrap(),
         ],
     );
-    assert!(Collection::parse(&root).is_err());
+    assert!(Collection::parse(&root, &limits()).is_err());
 }
 
 #[test]
@@ -312,6 +347,28 @@ fn activex_control_roundtrips_as_inert_metadata() {
         clipboard_name: None,
         metafile: Some(vec![1, 2, 3]),
     };
-    let parsed = Control::parse(&expected.to_record().unwrap()).unwrap();
+    let parsed = Control::parse(&expected.to_record(&limits()).unwrap(), &limits()).unwrap();
     assert_eq!(parsed, expected);
+}
+
+#[test]
+fn collection_uses_selected_limits_for_nested_parse_and_output() {
+    let value = definition(ContainerKind::Embedded(EmbedPreferences {
+        color_follow: ColorFollow::None,
+        cannot_lock_server: false,
+        dimension_policy: DimensionPolicy::Send,
+        is_word_table: false,
+        unused: 0,
+    }));
+    let root = external_object_list(
+        i32::try_from(value.object.id).unwrap(),
+        &[value.to_record_bytes(&limits()).unwrap()],
+    );
+    let selected = crate::SourceLimits::builder()
+        .max_record_bytes(16)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(Collection::parse(&root, &selected).is_err());
+    assert!(value.to_record_bytes(&selected).is_err());
 }

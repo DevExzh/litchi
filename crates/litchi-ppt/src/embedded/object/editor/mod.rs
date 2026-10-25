@@ -17,7 +17,7 @@ mod tests;
 
 use super::{Collection, ExternalObject};
 use crate::embedded::storage::Storage;
-use crate::package::Error;
+use crate::package::{Error, SourceLimits};
 #[cfg(test)]
 use litchi_cfb::OleFile;
 use std::collections::{BTreeMap, HashSet};
@@ -32,6 +32,10 @@ type Result<T> = std::result::Result<T, Error>;
 pub(crate) struct Editor {
     pub(super) original: Arc<[u8]>,
     pub(super) max_output_bytes: usize,
+    /// Source-level record limits selected when the owning package was opened.
+    /// Object-list serialization must use this same profile; it may not fall
+    /// back to a fresh parser default during publication.
+    pub(super) source_limits: SourceLimits,
     /// Physical CFB bounds retained from the source admission. Every
     /// source-backed rewrite and candidate reopen must use this same profile.
     pub(super) cfb_limits: litchi_cfb::OleFileLimits,
@@ -104,8 +108,8 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub(crate) fn open_records(bytes: Vec<u8>) -> Result<Self> {
-        lifecycle::open_records(Arc::from(bytes))
+    pub(crate) fn open_records(bytes: Vec<u8>, source_limits: SourceLimits) -> Result<Self> {
+        lifecycle::open_records(Arc::from(bytes), source_limits)
     }
 
     /// Opens a transactional editor over an OLE-backed `PowerPoint` package
@@ -121,8 +125,14 @@ impl Editor {
         bytes: Vec<u8>,
         collection: Collection,
         cfb_limits: litchi_cfb::OleFileLimits,
+        source_limits: SourceLimits,
     ) -> Result<Self> {
-        lifecycle::open::open_admitting_signature(Arc::from(bytes), collection, cfb_limits)
+        lifecycle::open::open_admitting_signature(
+            Arc::from(bytes),
+            collection,
+            cfb_limits,
+            source_limits,
+        )
     }
 
     /// [`Self::open_records`] over a package that may carry a
@@ -131,19 +141,24 @@ impl Editor {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub(crate) fn open_records_admitting_signature(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn open_records_admitting_signature(
+        bytes: Vec<u8>,
+        source_limits: SourceLimits,
+    ) -> Result<Self> {
         lifecycle::open::open_admitting_signature(
             Arc::from(bytes),
             lifecycle::open::no_objects(),
             litchi_cfb::OleFileLimits::default(),
+            source_limits,
         )
     }
 
     pub(crate) fn open_records_arc_with_limit(
         bytes: Arc<[u8]>,
         max_output_bytes: usize,
+        source_limits: SourceLimits,
     ) -> Result<Self> {
-        lifecycle::open::open_records_arc_with_limit(bytes, max_output_bytes)
+        lifecycle::open::open_records_arc_with_limit(bytes, max_output_bytes, source_limits)
     }
 
     /// Selects where a finished package places its sectors.

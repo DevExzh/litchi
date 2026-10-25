@@ -51,7 +51,9 @@ fn presentation_with_vba_storage() -> Presentation {
     let mut powerpoint_document = vba_info;
     powerpoint_document.extend_from_slice(&storage);
     let mut parser = RecordParser::new();
-    parser.parse_document(&powerpoint_document).unwrap();
+    parser
+        .parse_document(&powerpoint_document, &crate::SourceLimits::default())
+        .unwrap();
     let mut persist_mapping = PersistMapping::new();
     persist_mapping.add_mapping(41, storage_offset);
 

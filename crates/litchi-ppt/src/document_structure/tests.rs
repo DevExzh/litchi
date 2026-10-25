@@ -165,8 +165,8 @@ fn rejects_missing_duplicate_nonempty_and_nonterminal_end_records() {
 
 #[test]
 fn source_snapshot_is_exact_on_noop_and_retains_unknown_atoms() {
-    let source = Snapshot::from_record(sample_document(true)).unwrap();
-    let parsed = Snapshot::parse(source.bytes()).unwrap();
+    let source = Snapshot::from_record(sample_document(true), &Limits::default()).unwrap();
+    let parsed = Snapshot::parse(source.bytes(), &Limits::default()).unwrap();
 
     assert_eq!(parsed.bytes(), source.bytes());
     let unknown = parsed.unknown_atoms().collect::<Vec<_>>();
@@ -185,7 +185,7 @@ fn source_snapshot_is_exact_on_noop_and_retains_unknown_atoms() {
 
 #[test]
 fn typed_inventories_validate_and_reorder_owned_groups() {
-    let source = Snapshot::from_record(sample_document(false)).unwrap();
+    let source = Snapshot::from_record(sample_document(false), &Limits::default()).unwrap();
     assert_eq!(
         source
             .masters()
@@ -252,7 +252,7 @@ fn invalid_relationships_and_failed_edits_are_atomic() {
         ),
         end_document(),
     ]);
-    assert!(Snapshot::from_record(duplicate).is_err());
+    assert!(Snapshot::from_record(duplicate, &Limits::default()).is_err());
 
     let out_of_order = document(vec![
         document_atom(),
@@ -270,9 +270,9 @@ fn invalid_relationships_and_failed_edits_are_atomic() {
         ),
         end_document(),
     ]);
-    assert!(Snapshot::from_record(out_of_order).is_err());
+    assert!(Snapshot::from_record(out_of_order, &Limits::default()).is_err());
 
-    let source = Snapshot::from_record(sample_document(false)).unwrap();
+    let source = Snapshot::from_record(sample_document(false), &Limits::default()).unwrap();
     let mut edit = source.edit();
     let before = edit.record().clone();
     assert!(edit.reorder_slides(&[0, 0]).is_err());
@@ -283,7 +283,7 @@ fn invalid_relationships_and_failed_edits_are_atomic() {
 
 #[test]
 fn stale_patches_are_rejected_and_custom_styles_are_reversible() {
-    let source = Snapshot::from_record(sample_document(true)).unwrap();
+    let source = Snapshot::from_record(sample_document(true), &Limits::default()).unwrap();
     let mut edit = source.edit();
     edit.move_custom_table_styles(CustomTableStylesPlacement::AfterEndDocument)
         .unwrap();
@@ -298,6 +298,6 @@ fn stale_patches_are_rejected_and_custom_styles_are_reversible() {
         source
     );
 
-    let stale = Snapshot::from_record(sample_document(false)).unwrap();
+    let stale = Snapshot::from_record(sample_document(false), &Limits::default()).unwrap();
     assert!(commit.patch().apply(&stale).is_err());
 }

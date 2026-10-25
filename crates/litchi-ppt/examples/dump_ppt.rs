@@ -13,7 +13,8 @@ use std::fs::File;
 fn dump_records(data: &[u8], indent: usize) {
     let mut off = 0;
     while off + 8 <= data.len() {
-        if let Ok((rec, consumed)) = Record::parse(data, off) {
+        if let Ok((rec, consumed)) = Record::parse(data, off, &litchi_ppt::SourceLimits::default())
+        {
             if rec.record_type == RecordType::SlideListWithText {
                 println!(
                     "{indent:>width$}- type=0x{:04X} ver=0x{:X} inst={} len={} children={}",

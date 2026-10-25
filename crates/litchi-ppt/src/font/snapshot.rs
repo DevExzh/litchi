@@ -18,14 +18,14 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Snapshot a borrowed whole-CFB source with default limits.
+    /// Snapshot a borrowed whole-CFB source under the caller's limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the source is malformed, exceeds the default
     /// limits, or its live font owner is not losslessly representable.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(bytes, PackageLimits::default())
+    pub fn parse(bytes: &[u8], limits: &PackageLimits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Copy a borrowed package only after enforcing the caller's source limit.
@@ -43,14 +43,14 @@ impl Snapshot {
         Self::from_arc(Arc::from(owned), limits)
     }
 
-    /// Snapshot an owned whole-CFB source with default limits.
+    /// Snapshot an owned whole-CFB source under the caller's limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the source is malformed, exceeds the default
     /// limits, or its live font owner is not losslessly representable.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, PackageLimits::default())
+    pub fn from_bytes(bytes: Vec<u8>, limits: &PackageLimits) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes, *limits)
     }
 
     /// Snapshot an owned whole-CFB source with explicit limits.

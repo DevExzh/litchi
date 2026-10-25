@@ -28,7 +28,9 @@ fn node(diff_type: DiffType, index: bool, children: Vec<DiffNode>) -> DiffNode {
 
 fn record_from_tree(tree: &DiffTree10) -> Record {
     let bytes = tree.to_record_bytes().unwrap();
-    Record::parse(&bytes, 0).unwrap().0
+    Record::parse(&bytes, 0, &crate::SourceLimits::default())
+        .unwrap()
+        .0
 }
 
 #[test]
@@ -65,8 +67,10 @@ fn diff_tree_round_trips_and_preserves_ignored_bits() {
     let reviewer_len = 8 + "Reviewer".encode_utf16().count() * 2;
     let doc_flags_offset = 8 + reviewer_len + codec::DIFF_HEADER_SIZE;
     bytes[doc_flags_offset + 3] = 0x80;
-    let record = Record::parse(&bytes, 0).unwrap().0;
-    let parsed = DiffTree10::parse(&record).unwrap();
+    let record = Record::parse(&bytes, 0, &crate::SourceLimits::default())
+        .unwrap()
+        .0;
+    let parsed = DiffTree10::parse(&record, &Limits::default()).unwrap();
     assert_eq!(parsed.reviewer_name(), "Reviewer");
     assert_eq!(parsed.document_diff().ignored_flag_bits(), 0x8000_0000);
     let round_tripped = parsed.to_record_bytes().unwrap();
@@ -80,8 +84,10 @@ fn malformed_tag_and_child_order_are_rejected() {
     let mut bytes = tree.to_record_bytes().unwrap();
     let tag_offset = 8 + 8 + 2 + 20;
     bytes[tag_offset..tag_offset + 4].copy_from_slice(&1u32.to_le_bytes());
-    let record = Record::parse(&bytes, 0).unwrap().0;
-    assert!(DiffTree10::parse(&record).is_err());
+    let record = Record::parse(&bytes, 0, &crate::SourceLimits::default())
+        .unwrap()
+        .0;
+    assert!(DiffTree10::parse(&record, &Limits::default()).is_err());
 
     let wrong_child = node(DiffType::Text, false, vec![]);
     assert!(
@@ -133,7 +139,7 @@ fn slide_list_table_round_trips_filetime_order_and_entries() {
     .unwrap();
     let bytes = table.to_record_bytes().unwrap();
     let parsed_record = record(0x0f, RecordType::SlideListTable10, bytes[8..].to_vec());
-    let parsed = SlideListTable10::parse(&parsed_record).unwrap();
+    let parsed = SlideListTable10::parse(&parsed_record, &Limits::default()).unwrap();
     assert_eq!(parsed, table);
     assert_eq!(bytes[32..36], 0x1122_3344u32.to_le_bytes());
     assert_eq!(bytes[36..40], 0x5566_7788u32.to_le_bytes());
@@ -164,10 +170,36 @@ fn rejects_bad_headers_counts_order_truncation_and_trailing_data() {
 
     for data in cases {
         assert!(
-            SlideListTable10::parse(&record(0x0f, RecordType::SlideListTable10, data,)).is_err()
+            SlideListTable10::parse(
+                &record(0x0f, RecordType::SlideListTable10, data,),
+                &Limits::default(),
+            )
+            .is_err()
         );
     }
-    assert!(SlideListTable10::parse(&record(0, RecordType::SlideListTable10, payload,)).is_err());
+    assert!(
+        SlideListTable10::parse(
+            &record(0, RecordType::SlideListTable10, payload,),
+            &Limits::default(),
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn slide_list_table_honors_configured_entry_limit_before_allocation() {
+    let table = SlideListTable10::new(vec![
+        SlideCreationEntry::new(1, 2),
+        SlideCreationEntry::new(3, 4),
+    ])
+    .unwrap();
+    let bytes = table.to_record_bytes().unwrap();
+    let record = record(0x0f, RecordType::SlideListTable10, bytes[8..].to_vec());
+    let limits = Limits {
+        max_review_records: 1,
+        ..Limits::default()
+    };
+    assert!(SlideListTable10::parse(&record, &limits).is_err());
 }
 
 #[test]
@@ -191,7 +223,9 @@ fn built_package_with(edit: impl FnOnce(&mut Record)) -> crate::Package {
     let (mut document, _) = Record::parse_strict(&document, 0).unwrap();
     edit(&mut document);
     let replacement = codec::encode_document(&document).unwrap();
-    let mut editor = crate::embedded::object::Editor::open_records(source).unwrap();
+    let mut editor =
+        crate::embedded::object::Editor::open_records(source, crate::SourceLimits::default())
+            .unwrap();
     editor
         .replace_persisted_record(persist_id, replacement)
         .unwrap();

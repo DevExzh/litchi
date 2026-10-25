@@ -3,6 +3,7 @@
 use super::codec;
 use super::model::{DiffFlags, Entry, Limits, Review, ReviewingToolbarStates, Unknown};
 use super::validation;
+use crate::SourceLimits;
 use crate::package::{Error, Result};
 use crate::records::Record;
 use std::sync::Arc;
@@ -163,13 +164,25 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
+    fn record_limits(limits: Limits) -> Result<SourceLimits> {
+        SourceLimits::builder()
+            .max_input_bytes(limits.max_bytes)?
+            .max_entry_bytes(limits.max_bytes)?
+            .max_aggregate_bytes(limits.max_bytes)?
+            .max_record_bytes(limits.max_bytes)?
+            .max_events(limits.max_records)?
+            .max_record_payload_bytes(limits.max_bytes.saturating_sub(8))?
+            .max_aggregate_payload_bytes(limits.max_bytes)?
+            .build()
+    }
+
     /// Capture a validated document record.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record(root: Record) -> Result<Self> {
-        Self::from_record_with_limits(root, Limits::default())
+    pub fn from_record(root: Record, limits: &Limits) -> Result<Self> {
+        Self::from_record_with_limits(root, *limits)
     }
 
     /// Capture a document record with explicit bounded-resource limits.
@@ -190,7 +203,8 @@ impl Snapshot {
                 "document-comparison snapshot exceeds the byte limit".into(),
             ));
         }
-        let (parsed, consumed) = Record::parse_strict(&bytes, 0)?;
+        let record_limits = Self::record_limits(validated)?;
+        let (parsed, consumed) = Record::parse_strict_with_limits(&bytes, 0, record_limits)?;
         if consumed != bytes.len() {
             return Err(Error::Corrupted(
                 "document-comparison snapshot has trailing bytes".into(),
@@ -205,13 +219,13 @@ impl Snapshot {
         })
     }
 
-    /// Parse exactly one complete `DocumentContainer` record.
+    /// Parse exactly one complete `DocumentContainer` record under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(bytes, Limits::default())
+    pub fn parse(bytes: &[u8], limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse one document under explicit bounded-resource limits.
@@ -222,7 +236,8 @@ impl Snapshot {
     pub(crate) fn parse_with_limits(bytes: &[u8], limits: Limits) -> Result<Self> {
         let snapshot = Self::from_record_with_limits(
             {
-                let (record, consumed) = Record::parse_strict(bytes, 0)?;
+                let record_limits = Self::record_limits(limits)?;
+                let (record, consumed) = Record::parse_strict_with_limits(bytes, 0, record_limits)?;
                 if consumed != bytes.len() {
                     return Err(Error::Corrupted(
                         "document-comparison input contains trailing bytes".into(),

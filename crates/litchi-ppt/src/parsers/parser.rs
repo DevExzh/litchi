@@ -38,27 +38,16 @@ impl RecordParser {
     /// 2. Find the Document record
     /// 3. Extract text from all records
     ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_document(&mut self, data: &[u8]) -> Result<()> {
-        self.parse_document_with_limits(data, SourceLimits::default())
-    }
-
     /// Parse a complete PPT document with a shared finite record budget.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub(crate) fn parse_document_with_limits(
-        &mut self,
-        data: &[u8],
-        limits: SourceLimits,
-    ) -> Result<()> {
+    pub fn parse_document(&mut self, data: &[u8], limits: &SourceLimits) -> Result<()> {
         if data.is_empty() {
             return Ok(());
         }
-        let mut budget = ParseBudget::new(limits, data.len())?;
+        let mut budget = ParseBudget::new(*limits, data.len())?;
         self.parse_top_level(data.len(), &mut budget, |offset, budget| {
             Record::parse_with_budget(data, offset, false, budget)
         })
@@ -66,7 +55,7 @@ impl RecordParser {
 
     /// Parse a complete PPT document whose record payloads borrow `data`.
     ///
-    /// The record tree is value-identical to [`Self::parse_document_with_limits`]
+    /// The record tree is value-identical to [`Self::parse_document`]
     /// on the same bytes; only the payload storage differs, so no payload byte
     /// is copied at any nesting level.
     ///
@@ -356,9 +345,9 @@ mod tests {
         }
         let mut parser = RecordParser::new();
         let error = parser
-            .parse_document_with_limits(
+            .parse_document(
                 &data,
-                SourceLimits {
+                &SourceLimits {
                     max_records: 1,
                     ..SourceLimits::default()
                 },

@@ -1,11 +1,12 @@
 use super::codec::ENVELOPE_DATA_RECORD_TYPE;
 use super::model::EnvelopeData;
+use crate::SourceLimits;
 use crate::package::{Error, Result};
 use crate::records::Record;
 
 impl EnvelopeData {
-    pub(crate) fn parse_document(document: &Record) -> Result<Option<Self>> {
-        let records = document.versioned_binary_tag_records(9)?;
+    pub(crate) fn parse_document(document: &Record, limits: &SourceLimits) -> Result<Option<Self>> {
+        let records = document.versioned_binary_tag_records(9, limits)?;
         let mut matches = records
             .iter()
             .filter(|record| record.record_type_raw == ENVELOPE_DATA_RECORD_TYPE);

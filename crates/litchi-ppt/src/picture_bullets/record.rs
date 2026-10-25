@@ -256,8 +256,8 @@ impl PictureBulletCollection {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(record: &Record) -> Result<Self> {
-        Self::parse_with_limits(record, PictureBulletLimits::default())
+    pub fn parse(record: &Record, limits: &PictureBulletLimits) -> Result<Self> {
+        Self::parse_with_limits(record, *limits)
     }
 
     /// Parse a `BlipCollection9Container` record under explicit limits.
@@ -330,8 +330,8 @@ impl PictureBulletCollection {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_from(root: &Record) -> Result<Option<Self>> {
-        Self::parse_from_with_limits(root, PictureBulletLimits::default())
+    pub fn parse_from(root: &Record, limits: &PictureBulletLimits) -> Result<Option<Self>> {
+        Self::parse_from_with_limits(root, *limits)
     }
 
     /// Discover the single `PowerPoint` 9 picture-bullet collection below
@@ -347,7 +347,7 @@ impl PictureBulletCollection {
     ) -> Result<Option<Self>> {
         limits.validate()?;
         let mut result = None;
-        for record in root.versioned_binary_tag_records_with_limits(9, limits.records)? {
+        for record in root.versioned_binary_tag_records(9, &limits.records)? {
             if record.record_type != RecordType::BlipCollection9 {
                 continue;
             }
@@ -654,7 +654,7 @@ fn collect_picture_bullet_references(
     limits.validate()?;
     let mut references = Vec::new();
     collect_direct_references(root, &mut references, limits.max_references)?;
-    for record in root.versioned_binary_tag_records_with_limits(9, limits.records)? {
+    for record in root.versioned_binary_tag_records(9, &limits.records)? {
         collect_atom_references(&record, &mut references, limits.max_references)?;
     }
     Ok(references)
@@ -687,7 +687,7 @@ fn collect_source_picture_bullet_references(
         .into_iter()
         .filter(|record| record.record_type == RecordType::PPDrawing)
     {
-        let drawing = crate::odraw::parse(&record.data)?;
+        let drawing = crate::odraw::parse(&record.data, &crate::odraw::Limits::default())?;
         for shape in &drawing {
             if let Some(tags) = shape.programmable_tags_with_limits(shape_limits)?
                 && let Some(style) = tags.powerpoint9()
@@ -1020,9 +1020,9 @@ struct AdmittedPictureBulletSource {
 }
 
 impl PictureBulletSnapshot {
-    /// Snapshot a borrowed CFB source under default limits.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(bytes, PictureBulletPackageLimits::default())
+    /// Snapshot a borrowed CFB source under the caller's limits.
+    pub fn parse(bytes: &[u8], limits: &PictureBulletPackageLimits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Snapshot a borrowed CFB source under explicit limits.
@@ -1047,9 +1047,9 @@ impl PictureBulletSnapshot {
         ))
     }
 
-    /// Snapshot an owned CFB source under default limits.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, PictureBulletPackageLimits::default())
+    /// Snapshot an owned CFB source under the caller's limits.
+    pub fn from_bytes(bytes: Vec<u8>, limits: &PictureBulletPackageLimits) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes, *limits)
     }
 
     /// Snapshot an owned CFB source under explicit limits.
@@ -1496,6 +1496,7 @@ impl RecordEdit {
         let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
             self.source.bytes.clone(),
             self.source.limits.max_source_bytes,
+            self.source.limits.picture_bullets.records,
         )?;
         let live = editor.persisted_record(self.source.document_persist_id)?;
         if live.as_slice() != self.source.document.as_ref() {
@@ -1777,7 +1778,8 @@ mod tests {
             PictureBulletLimits::default().records.max_record_bytes,
         )
         .unwrap();
-        let mut editor = crate::embedded::object::Editor::open_records(source).unwrap();
+        let mut editor =
+            crate::embedded::object::Editor::open_records(source, SourceLimits::default()).unwrap();
         editor
             .replace_persisted_record(persist_id, replacement)
             .unwrap();
@@ -1870,7 +1872,8 @@ mod tests {
             PictureBulletLimits::default().records.max_record_bytes,
         )
         .unwrap();
-        let mut editor = crate::embedded::object::Editor::open_records(source).unwrap();
+        let mut editor =
+            crate::embedded::object::Editor::open_records(source, SourceLimits::default()).unwrap();
         editor
             .replace_persisted_record(persist_id, replacement)
             .unwrap();
@@ -1933,7 +1936,9 @@ mod tests {
     fn parses_and_resolves_picture_bullets() {
         let mut records = png_bullet(4);
         records.extend_from_slice(&fbse_png_bullet(5));
-        let bullets = PictureBulletCollection::parse(&collection(records)).unwrap();
+        let bullets =
+            PictureBulletCollection::parse(&collection(records), &PictureBulletLimits::default())
+                .unwrap();
         let bullet = bullets.get(4).unwrap();
         assert_eq!(bullet.index, 4);
         assert_eq!(bullet.picture_type, PictureBulletType::Png);
@@ -1955,16 +1960,26 @@ mod tests {
             data: Vec::new().into(),
             children: vec![prog_tags_record(&collection)],
         };
-        let bullets = PictureBulletCollection::parse_from(&root).unwrap().unwrap();
+        let bullets = PictureBulletCollection::parse_from(&root, &PictureBulletLimits::default())
+            .unwrap()
+            .unwrap();
         assert_eq!(bullets.get(7).unwrap().picture_type, PictureBulletType::Png);
     }
 
     #[test]
     fn decodes_direct_and_fbse_picture_bullets() {
-        let direct = PictureBulletCollection::parse(&collection(png_bullet(1))).unwrap();
+        let direct = PictureBulletCollection::parse(
+            &collection(png_bullet(1)),
+            &PictureBulletLimits::default(),
+        )
+        .unwrap();
         assert_eq!(direct.get(1).unwrap().blip().unwrap().data(), b"");
 
-        let embedded = PictureBulletCollection::parse(&collection(fbse_png_bullet(2))).unwrap();
+        let embedded = PictureBulletCollection::parse(
+            &collection(fbse_png_bullet(2)),
+            &PictureBulletLimits::default(),
+        )
+        .unwrap();
         assert_eq!(embedded.get(2).unwrap().blip().unwrap().data(), b"");
     }
 
@@ -1972,31 +1987,58 @@ mod tests {
     fn rejects_malformed_picture_bullet_collections() {
         let mut duplicate = png_bullet(1);
         duplicate.extend_from_slice(&png_bullet(1));
-        assert!(PictureBulletCollection::parse(&collection(duplicate)).is_err());
+        assert!(
+            PictureBulletCollection::parse(&collection(duplicate), &PictureBulletLimits::default())
+                .is_err()
+        );
 
         let mut mismatched = png_bullet(2);
         mismatched[8] = 0x05;
-        assert!(PictureBulletCollection::parse(&collection(mismatched)).is_err());
+        assert!(
+            PictureBulletCollection::parse(
+                &collection(mismatched),
+                &PictureBulletLimits::default()
+            )
+            .is_err()
+        );
 
         let mut truncated = png_bullet(3);
         truncated.pop();
-        assert!(PictureBulletCollection::parse(&collection(truncated)).is_err());
+        assert!(
+            PictureBulletCollection::parse(&collection(truncated), &PictureBulletLimits::default())
+                .is_err()
+        );
 
         let mut invalid_instance = png_bullet(4);
         invalid_instance[10] = 0;
         invalid_instance[11] = 0;
-        assert!(PictureBulletCollection::parse(&collection(invalid_instance)).is_err());
+        assert!(
+            PictureBulletCollection::parse(
+                &collection(invalid_instance),
+                &PictureBulletLimits::default()
+            )
+            .is_err()
+        );
 
         let mut invalid_fbse = fbse_png_bullet(5);
         invalid_fbse[10] = 0;
-        assert!(PictureBulletCollection::parse(&collection(invalid_fbse)).is_err());
+        assert!(
+            PictureBulletCollection::parse(
+                &collection(invalid_fbse),
+                &PictureBulletLimits::default()
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn collection_serialization_is_source_preserving_and_bounded() {
         let source = collection_bytes(png_bullet(0x80));
-        let record = Record::parse(&source, 0).unwrap().0;
-        let parsed = PictureBulletCollection::parse(&record).unwrap();
+        let record = Record::parse(&source, 0, &SourceLimits::default())
+            .unwrap()
+            .0;
+        let parsed =
+            PictureBulletCollection::parse(&record, &PictureBulletLimits::default()).unwrap();
         assert_eq!(parsed.to_bytes().unwrap(), source);
         assert_eq!(parsed.to_record().unwrap().data, record.data);
         let mut opaque = parsed.clone();
@@ -2004,7 +2046,10 @@ mod tests {
         opaque.bullets[0].officeart_record[last] = 0xa5;
         assert_eq!(
             PictureBulletCollection::parse(
-                &Record::parse(&opaque.to_bytes().unwrap(), 0).unwrap().0
+                &Record::parse(&opaque.to_bytes().unwrap(), 0, &SourceLimits::default())
+                    .unwrap()
+                    .0,
+                &PictureBulletLimits::default()
             )
             .unwrap()
             .bullets[0]
@@ -2027,12 +2072,19 @@ mod tests {
 
     #[test]
     fn authored_records_revalidate_preferred_type_and_fbse_shape() {
-        let parsed = PictureBulletCollection::parse(&collection(png_bullet(3))).unwrap();
+        let parsed = PictureBulletCollection::parse(
+            &collection(png_bullet(3)),
+            &PictureBulletLimits::default(),
+        )
+        .unwrap();
         let mut authored = parsed.clone();
         authored.bullets[0].unused = 0xa5;
         assert_eq!(
             PictureBulletCollection::parse(
-                &Record::parse(&authored.to_bytes().unwrap(), 0).unwrap().0
+                &Record::parse(&authored.to_bytes().unwrap(), 0, &SourceLimits::default())
+                    .unwrap()
+                    .0,
+                &PictureBulletLimits::default()
             )
             .unwrap(),
             authored
@@ -2041,7 +2093,11 @@ mod tests {
         authored.bullets[0].picture_type = PictureBulletType::Jpeg;
         assert!(authored.to_record().is_err());
         let (delayed_bullet, delay) = delayed_png_bullet(4);
-        let delayed = PictureBulletCollection::parse(&collection(delayed_bullet)).unwrap();
+        let delayed = PictureBulletCollection::parse(
+            &collection(delayed_bullet),
+            &PictureBulletLimits::default(),
+        )
+        .unwrap();
         assert!(delayed.get(4).unwrap().to_record().is_ok());
         assert!(delayed.get(4).unwrap().to_record_with_delay(None).is_err());
         assert!(
@@ -2090,8 +2146,11 @@ mod tests {
 
     #[test]
     fn nonnull_bullet_references_are_bounded_and_must_resolve() {
-        let source =
-            PictureBulletSnapshot::from_bytes(source_with_bullet_reference(Some(6))).unwrap();
+        let source = PictureBulletSnapshot::from_bytes(
+            source_with_bullet_reference(Some(6)),
+            &PictureBulletPackageLimits::default(),
+        )
+        .unwrap();
         let mut transaction = source.edit().unwrap();
         assert!(matches!(
             transaction.remove_picture_bullet(4),
@@ -2099,8 +2158,11 @@ mod tests {
         ));
         assert!(transaction.changes().is_empty());
 
-        let source =
-            PictureBulletSnapshot::from_bytes(source_with_bullet_reference(Some(0x81))).unwrap();
+        let source = PictureBulletSnapshot::from_bytes(
+            source_with_bullet_reference(Some(0x81)),
+            &PictureBulletPackageLimits::default(),
+        )
+        .unwrap();
         let mut transaction = source.edit().unwrap();
         assert!(matches!(
             transaction.remove_picture_bullet(4),
@@ -2111,8 +2173,11 @@ mod tests {
 
     #[test]
     fn removal_sees_shape_owned_pp9_references_in_ppdrawing() {
-        let source =
-            PictureBulletSnapshot::from_bytes(source_with_shape_bullet_reference(4)).unwrap();
+        let source = PictureBulletSnapshot::from_bytes(
+            source_with_shape_bullet_reference(4),
+            &PictureBulletPackageLimits::default(),
+        )
+        .unwrap();
         let mut transaction = source.edit().unwrap();
         let result = transaction.remove_picture_bullet(4);
         assert!(matches!(
@@ -2125,7 +2190,11 @@ mod tests {
 
     #[test]
     fn empty_reorder_is_a_noop_when_source_has_no_collection() {
-        let source = PictureBulletSnapshot::from_bytes(empty_source()).unwrap();
+        let source = PictureBulletSnapshot::from_bytes(
+            empty_source(),
+            &PictureBulletPackageLimits::default(),
+        )
+        .unwrap();
         assert!(source.picture_bullets().is_none());
 
         let mut transaction = source.edit().unwrap();
@@ -2155,7 +2224,9 @@ mod tests {
                 .index,
             4
         );
-        let source = PictureBulletSnapshot::from_bytes(bytes).unwrap();
+        let source =
+            PictureBulletSnapshot::from_bytes(bytes, &PictureBulletPackageLimits::default())
+                .unwrap();
         assert_eq!(source.picture_bullets().unwrap().bullets.len(), 2);
 
         let mut replacement = source.picture_bullets().unwrap().get(4).unwrap().clone();
@@ -2196,7 +2267,11 @@ mod tests {
 
     #[test]
     fn source_transaction_is_atomic_for_references_stale_sources_and_noop() {
-        let source = PictureBulletSnapshot::from_bytes(source_with_bullets(true)).unwrap();
+        let source = PictureBulletSnapshot::from_bytes(
+            source_with_bullets(true),
+            &PictureBulletPackageLimits::default(),
+        )
+        .unwrap();
         let mut blocked = source.edit().unwrap();
         let before = blocked.picture_bullets().unwrap().clone();
         assert!(blocked.remove_picture_bullet(4).is_err());
@@ -2234,7 +2309,11 @@ mod tests {
             with_stream(source_with_bullets(false), &["_SIGNATURES"], b"signed"),
             with_storage(source_with_bullets(false), &["ObjectPool"]),
         ] {
-            let snapshot = PictureBulletSnapshot::from_bytes(source.clone()).unwrap();
+            let snapshot = PictureBulletSnapshot::from_bytes(
+                source.clone(),
+                &PictureBulletPackageLimits::default(),
+            )
+            .unwrap();
             let noop = snapshot.edit().unwrap().commit().unwrap();
             assert!(noop.patch().is_empty());
             assert!(std::sync::Arc::ptr_eq(
@@ -2258,7 +2337,11 @@ mod tests {
 
     #[test]
     fn snapshots_and_transactions_share_admitted_picture_bullets_until_write() {
-        let source = PictureBulletSnapshot::from_bytes(source_with_bullets(false)).unwrap();
+        let source = PictureBulletSnapshot::from_bytes(
+            source_with_bullets(false),
+            &PictureBulletPackageLimits::default(),
+        )
+        .unwrap();
         let clone = source.clone();
         let source_collection = source.picture_bullets.as_ref().unwrap();
         let clone_collection = clone.picture_bullets.as_ref().unwrap();
@@ -2293,7 +2376,11 @@ mod tests {
 
     #[test]
     fn semantic_reverts_return_the_original_source_and_bytes() {
-        let source = PictureBulletSnapshot::from_bytes(source_with_bullets(false)).unwrap();
+        let source = PictureBulletSnapshot::from_bytes(
+            source_with_bullets(false),
+            &PictureBulletPackageLimits::default(),
+        )
+        .unwrap();
         let original = source.picture_bullets().unwrap().get(4).unwrap().clone();
         let mut replacement = original.clone();
         replacement.unused ^= 1;
@@ -2318,7 +2405,11 @@ mod tests {
 
     #[test]
     fn remove_and_readd_preserves_order_before_semantic_noop_detection() {
-        let source = PictureBulletSnapshot::from_bytes(source_with_bullets(false)).unwrap();
+        let source = PictureBulletSnapshot::from_bytes(
+            source_with_bullets(false),
+            &PictureBulletPackageLimits::default(),
+        )
+        .unwrap();
         let mut transaction = source.edit().unwrap();
         let removed = transaction.remove_picture_bullet(5).unwrap();
         transaction.append_picture_bullet(removed).unwrap();
@@ -2374,7 +2465,10 @@ mod tests {
         // type. Keep the CFB and record framing intact while invalidating the
         // admitted picture-bullet owner.
         malformed[source_offset + document_offset + 8] = 0x04;
-        assert!(PictureBulletSnapshot::parse(&malformed).is_err());
+        assert!(
+            PictureBulletSnapshot::parse(&malformed, &PictureBulletPackageLimits::default())
+                .is_err()
+        );
     }
 
     #[test]

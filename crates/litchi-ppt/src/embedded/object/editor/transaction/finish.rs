@@ -117,7 +117,10 @@ fn rewritten_object_list(editor: &Editor) -> Result<Vec<u8>> {
         .ok_or_else(|| Error::Corrupted("Document persist mapping is missing".into()))?
         as usize;
     let old_document = rewrite::slice(&editor.document, document_offset)?;
-    rewrite::replace_or_insert_object_list(old_document, &editor.collection.to_record_bytes()?)
+    rewrite::replace_or_insert_object_list(
+        old_document,
+        &editor.collection.to_record_bytes(&editor.source_limits)?,
+    )
 }
 
 fn write_package(editor: &mut Editor, appended: Vec<u8>) -> Result<Vec<u8>> {
@@ -494,7 +497,8 @@ mod candidate_finish_tests {
     fn owned_writer_matches_borrowed_writer_for_reuse_and_rewrite() {
         let source = fixture();
         for policy in [SectorLayoutPolicy::Reuse, SectorLayoutPolicy::Rewrite] {
-            let mut candidate = Editor::open_records(source.clone()).unwrap();
+            let mut candidate =
+                Editor::open_records(source.clone(), crate::SourceLimits::default()).unwrap();
             candidate.set_sector_layout_policy(policy);
             let reference = candidate.clone();
             let appended = candidate.document.clone();
@@ -507,18 +511,20 @@ mod candidate_finish_tests {
     #[test]
     fn changed_record_finish_matches_borrowed_finish_and_reopens() {
         let source = fixture();
-        let persist_id = Editor::open_records(source.clone())
+        let persist_id = Editor::open_records(source.clone(), crate::SourceLimits::default())
             .unwrap()
             .document_persist_id;
         for policy in [SectorLayoutPolicy::Reuse, SectorLayoutPolicy::Rewrite] {
-            let mut candidate = Editor::open_records(source.clone()).unwrap();
+            let mut candidate =
+                Editor::open_records(source.clone(), crate::SourceLimits::default()).unwrap();
             let replacement = candidate.persisted_record(persist_id).unwrap();
             candidate
                 .replace_persisted_record(persist_id, replacement.clone())
                 .unwrap();
             candidate.set_sector_layout_policy(policy);
 
-            let mut reference = Editor::open_records(source.clone()).unwrap();
+            let mut reference =
+                Editor::open_records(source.clone(), crate::SourceLimits::default()).unwrap();
             reference
                 .replace_persisted_record(persist_id, replacement.clone())
                 .unwrap();
@@ -527,7 +533,7 @@ mod candidate_finish_tests {
             let expected = finish_reference(reference).unwrap();
             let actual = candidate.finish().unwrap();
             assert_eq!(actual, expected, "policy {policy:?}");
-            let reopened = Editor::open_records(actual).unwrap();
+            let reopened = Editor::open_records(actual, crate::SourceLimits::default()).unwrap();
             assert_eq!(
                 reopened.persisted_record(persist_id).unwrap(),
                 replacement,
@@ -540,15 +546,23 @@ mod candidate_finish_tests {
     fn exact_noop_and_changed_finish_leave_the_source_immutable() {
         let source = fixture();
         let source_arc: Arc<[u8]> = Arc::from(source.clone());
-        let noop = Editor::open_records_arc_with_limit(source_arc.clone(), usize::MAX)
-            .unwrap()
-            .finish()
-            .unwrap();
+        let noop = Editor::open_records_arc_with_limit(
+            source_arc.clone(),
+            usize::MAX,
+            crate::SourceLimits::default(),
+        )
+        .unwrap()
+        .finish()
+        .unwrap();
         assert_eq!(noop, source);
         assert_eq!(source_arc.as_ref(), source.as_slice());
 
-        let mut changed =
-            Editor::open_records_arc_with_limit(source_arc.clone(), usize::MAX).unwrap();
+        let mut changed = Editor::open_records_arc_with_limit(
+            source_arc.clone(),
+            usize::MAX,
+            crate::SourceLimits::default(),
+        )
+        .unwrap();
         let persist_id = changed.document_persist_id;
         let record = changed.persisted_record(persist_id).unwrap();
         changed
@@ -561,7 +575,7 @@ mod candidate_finish_tests {
     #[test]
     fn open_reads_document_and_current_user_streams_once() {
         let source = fixture();
-        let editor = Editor::open_records(source.clone()).unwrap();
+        let editor = Editor::open_records(source.clone(), crate::SourceLimits::default()).unwrap();
         let mut ole = OleFile::open(
             Cursor::new(source.as_slice()),
             litchi_cfb::OleFileLimits::default(),
@@ -591,7 +605,8 @@ mod candidate_finish_tests {
     fn finish_ignores_list_payloads_of_the_owned_streams() {
         let source = fixture();
         for policy in [SectorLayoutPolicy::Reuse, SectorLayoutPolicy::Rewrite] {
-            let mut lean = Editor::open_records(source.clone()).unwrap();
+            let mut lean =
+                Editor::open_records(source.clone(), crate::SourceLimits::default()).unwrap();
             lean.set_sector_layout_policy(policy);
             let persist_id = lean.document_persist_id;
             let record = lean.persisted_record(persist_id).unwrap();
@@ -617,7 +632,7 @@ mod candidate_finish_tests {
     #[test]
     fn projected_output_limit_remains_typed() {
         let source = fixture();
-        let mut editor = Editor::open_records(source).unwrap();
+        let mut editor = Editor::open_records(source, crate::SourceLimits::default()).unwrap();
         editor.max_output_bytes = editor.document.len();
         let persist_id = editor.document_persist_id;
         let record = editor.persisted_record(persist_id).unwrap();
@@ -632,7 +647,7 @@ mod candidate_finish_tests {
     #[test]
     fn duplicate_selected_paths_keep_the_borrowed_fallback() {
         let source = fixture();
-        let mut candidate = Editor::open_records(source).unwrap();
+        let mut candidate = Editor::open_records(source, crate::SourceLimits::default()).unwrap();
         let duplicate_document = (candidate.document_path.clone(), candidate.document.clone());
         let duplicate_current_user = (
             candidate.current_user_path.clone(),

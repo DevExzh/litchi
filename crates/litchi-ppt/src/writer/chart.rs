@@ -354,6 +354,11 @@ pub(crate) struct ChartPlan {
 impl ChartPlan {
     /// The `ExOleEmbedContainer` record declaring this chart object.
     fn embed_container_bytes(&self) -> Result<Vec<u8>, WriteError> {
+        // Chart plans are fresh writer input: unlike an opened presentation,
+        // they have no retained source profile to propagate.  Use the
+        // canonical authoring profile here; source-backed object edits pass
+        // their opened profile through `Editor::source_limits`.
+        let authoring_limits = crate::SourceLimits::default();
         Definition {
             kind: ContainerKind::Embedded(EmbedPreferences {
                 color_follow: ColorFollow::EntireScheme,
@@ -375,7 +380,7 @@ impl ChartPlan {
             clipboard_name: None,
             metafile: None,
         }
-        .to_record_bytes()
+        .to_record_bytes(&authoring_limits)
         .map_err(|error| invalid(format!("chart object container is invalid: {error}")))
     }
 }
@@ -563,10 +568,12 @@ mod tests {
             persist_id: 7,
         }];
         let bytes = build_ex_obj_list(&hyperlinks, &plans).unwrap();
-        let (record, _) = crate::records::Record::parse(&bytes, 0).unwrap();
-        let collection = crate::embedded::object::Collection::parse(&record)
-            .unwrap()
-            .expect("chart object list");
+        let (record, _) =
+            crate::records::Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
+        let collection =
+            crate::embedded::object::Collection::parse(&record, &crate::SourceLimits::default())
+                .unwrap()
+                .expect("chart object list");
         assert_eq!(collection.objects.len(), 1);
         let crate::embedded::object::ExternalObject::Object(definition) = &collection.objects[0]
         else {

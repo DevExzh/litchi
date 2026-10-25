@@ -214,8 +214,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record(context: Context, root: Record) -> Result<Self> {
-        Self::from_record_with_limits(context, root, Limits::default())
+    pub fn from_record(context: Context, root: Record, limits: &Limits) -> Result<Self> {
+        Self::from_record_with_limits(context, root, *limits)
     }
 
     /// Validate and capture a record under explicit resource limits.
@@ -250,8 +250,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(context: Context, bytes: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(context, bytes, Limits::default())
+    pub fn parse(context: Context, bytes: &[u8], limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(context, bytes, *limits)
     }
 
     /// Parse one complete PPT record under explicit resource limits.

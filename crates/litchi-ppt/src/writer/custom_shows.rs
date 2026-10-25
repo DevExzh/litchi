@@ -129,7 +129,9 @@ mod tests {
     }
 
     fn parse(data: &[u8]) -> NamedShows {
-        let record = Record::parse(data, 0).unwrap().0;
+        let record = Record::parse(data, 0, &crate::SourceLimits::default())
+            .unwrap()
+            .0;
         NamedShows::parse(&root(record)).unwrap().unwrap()
     }
 
@@ -189,7 +191,9 @@ mod tests {
         let data =
             build_named_shows(&[CustomShow::new(name, &[0]), CustomShow::new("Second", &[1])])
                 .unwrap();
-        let outer = Record::parse(&data, 0).unwrap().0;
+        let outer = Record::parse(&data, 0, &crate::SourceLimits::default())
+            .unwrap()
+            .0;
         assert!(outer.children.iter().all(|show| show.instance == 0));
         assert_eq!(parse(&data).shows[0].name, name);
     }

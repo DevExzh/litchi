@@ -668,8 +668,13 @@ impl ShapeHyperlink {
             unused: parsed_atom.unused,
             macro_name_data: None,
         };
+        // This is a fresh authoring helper, so use the documented finite
+        // authoring profile rather than a source profile that does not
+        // exist.  Source-backed edits pass their retained profile through
+        // the editor path instead.
+        let limits = crate::InteractionLimits::default();
         interaction
-            .to_bytes()
+            .to_bytes(&limits)
             .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidData, error))
     }
 }

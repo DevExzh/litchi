@@ -481,7 +481,8 @@ mod tests {
         let mut output_builder = SoundCollectionBuilder::new(SoundCollectionLimits::default());
         output_builder.register(42, &embedded).unwrap();
         let (bytes, mapping) = output_builder.build().unwrap();
-        let (record, consumed) = crate::Record::parse(&bytes, 0).unwrap();
+        let (record, consumed) =
+            crate::Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
         assert_eq!(consumed, bytes.len());
         let collection = crate::sound_collection::Collection::parse(&record).unwrap();
         assert_eq!(collection.sounds[0].id, mapping[&42]);

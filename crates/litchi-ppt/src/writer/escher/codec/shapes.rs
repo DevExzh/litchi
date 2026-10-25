@@ -264,7 +264,7 @@ fn append_shape_container_children(
         append_client_data_payload(&mut client_data, &programmable_tags)?;
     }
     if let Some(client_data_bytes) = client_data {
-        crate::ClientData::parse(&client_data_bytes)
+        crate::ClientData::parse(&client_data_bytes, &crate::ClientDataLimits::default())
             .map_err(|error| std::io::Error::other(error.to_string()))?;
         output.extend_from_slice(&client_data_bytes);
     }

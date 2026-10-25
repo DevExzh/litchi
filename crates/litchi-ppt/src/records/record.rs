@@ -87,6 +87,7 @@ impl Record {
     ///
     /// * `data` - Binary data containing the record
     /// * `offset` - Starting offset in the data
+    /// * `limits` - Finite resource limits for this record and its subtree
     ///
     /// # Returns
     ///
@@ -95,26 +96,13 @@ impl Record {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(data: &[u8], offset: usize) -> Result<(Self, usize)> {
-        Self::parse_with_limits(data, offset, SourceLimits::default())
-    }
-
-    /// Parse a PPT record with explicit finite resource limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub(crate) fn parse_with_limits(
-        data: &[u8],
-        offset: usize,
-        limits: SourceLimits,
-    ) -> Result<(Self, usize)> {
-        Self::parse_from_store_with_limits(PayloadStore::Owned(data), offset, limits)
+    pub fn parse(data: &[u8], offset: usize, limits: &SourceLimits) -> Result<(Self, usize)> {
+        Self::parse_from_store_with_limits(PayloadStore::Owned(data), offset, *limits)
     }
 
     /// Parse one record with explicit limits, taking payloads from `store`.
     ///
-    /// [`Self::parse_with_limits`] is this with [`PayloadStore::Owned`]; a
+    /// [`PayloadStore::Owned`] is the storage used by this entry point; a
     /// [`PayloadStore::Shared`] store parses the same bytes at the same offsets
     /// with the same budget and returns a value-identical record whose payloads
     /// span the shared buffer instead of owning a copy.
@@ -320,6 +308,9 @@ impl Record {
                 | RecordType::DocInfoList
                 | RecordType::SlideViewInfo
                 | RecordType::ExObjList
+                | RecordType::ExternalOleEmbed
+                | RecordType::ExternalOleLink
+                | RecordType::ExternalOleControl
                 | RecordType::VBAInfo
                 | RecordType::SlideListWithText
                 | RecordType::NormalViewSetInfo9
@@ -462,22 +453,16 @@ impl Record {
     /// `BinaryTagData` is an atom whose payload is itself a strict sequence of
     /// PPT records, so these records do not appear in the ordinary child tree.
     ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn versioned_binary_tag_records(&self, version: u8) -> Result<Vec<Record>> {
-        self.versioned_binary_tag_records_with_limits(version, SourceLimits::default())
-    }
-
-    /// Return versioned programmable-tag records with explicit parse limits.
+    /// `limits` bounds the synthetic record sequence parsed from each tag.
     ///
     /// # Errors
     ///
-    /// Returns an error if the operation fails.
-    pub(crate) fn versioned_binary_tag_records_with_limits(
+    /// Returns an error if the operation fails or the selected limits are
+    /// exceeded.
+    pub fn versioned_binary_tag_records(
         &self,
         version: u8,
-        limits: SourceLimits,
+        limits: &SourceLimits,
     ) -> Result<Vec<Record>> {
         if !matches!(version, 9..=12) {
             return Err(Error::Corrupted(
@@ -486,7 +471,7 @@ impl Record {
         }
         let expected_tag_name = format!("___PPT{version}");
         let expected_name: Vec<u16> = expected_tag_name.encode_utf16().collect();
-        let mut session = RecordParseSession::new(limits, self.data.len())?;
+        let mut session = RecordParseSession::new(*limits, self.data.len())?;
         let prog_tags = collect_prog_tags(self, &mut session)?;
         let mut records = Vec::new();
 
@@ -866,9 +851,41 @@ impl RecordParseSession {
         Record::parse_sequence_strict_with_budget(data, context, logical_depth, &mut self.budget)
     }
 
-    /// Charge traversal of an existing record without charging a payload copy.
-    pub(crate) fn account_existing(&mut self, logical_depth: usize) -> Result<()> {
-        self.budget.charge_visit(logical_depth)
+    /// Charge traversal of an existing record and its materialized payload.
+    ///
+    /// Semantic projections receive records that were parsed by an earlier
+    /// source operation.  They still need to account the bytes they inspect:
+    /// otherwise a synthetic tree can evade both the per-record payload and
+    /// aggregate-payload ceilings simply by presenting already-built
+    /// [`Record`] values instead of serialized bytes.
+    pub(crate) fn account_existing(&mut self, record: &Record, logical_depth: usize) -> Result<()> {
+        self.budget
+            .charge_record(logical_depth, record.data.len())?;
+        self.budget.charge_copy(record.data.len())
+    }
+
+    /// Charge every node in an already-materialized subtree once.
+    pub(crate) fn account_existing_tree(
+        &mut self,
+        root: &Record,
+        logical_depth: usize,
+    ) -> Result<()> {
+        let mut pending = Vec::new();
+        pending
+            .try_reserve(1)
+            .map_err(|_error| Error::AllocationFailed("record traversal stack"))?;
+        pending.push((root, logical_depth));
+        while let Some((record, depth)) = pending.pop() {
+            self.account_existing(record, depth)?;
+            let child_depth = depth
+                .checked_add(1)
+                .ok_or_else(|| Error::Corrupted("record traversal depth overflows".into()))?;
+            pending
+                .try_reserve(record.children.len())
+                .map_err(|_error| Error::AllocationFailed("record traversal stack"))?;
+            pending.extend(record.children.iter().map(|child| (child, child_depth)));
+        }
+        Ok(())
     }
 
     /// Charge a record that a range-aware resolver validates from its header
@@ -1013,7 +1030,7 @@ fn collect_prog_tags<'a>(
         .map_err(|_err| Error::AllocationFailed("programmable-tag traversal stack"))?;
     pending.push((record, 0usize));
     while let Some((current, depth)) = pending.pop() {
-        session.account_existing(depth)?;
+        session.account_existing(current, depth)?;
         if current.record_type == RecordType::ProgTags {
             output
                 .try_reserve(1)
@@ -1087,7 +1104,7 @@ mod tests {
         }
         let tags = canonical_record(RecordType::ProgTags, &tag_bytes);
         let root = canonical_record(RecordType::Document, &tags);
-        Record::parse(&root, 0).unwrap().0
+        Record::parse(&root, 0, &SourceLimits::default()).unwrap().0
     }
 
     #[test]
@@ -1110,7 +1127,7 @@ mod tests {
 
     #[test]
     fn parse_rejects_header_offset_overflow() {
-        let error = Record::parse(&[0; 8], usize::MAX).unwrap_err();
+        let error = Record::parse(&[0; 8], usize::MAX, &SourceLimits::default()).unwrap_err();
 
         assert!(matches!(
             error,
@@ -1120,7 +1137,7 @@ mod tests {
 
     #[test]
     fn parse_rejects_header_offset_just_below_overflow() {
-        let error = Record::parse(&[0; 8], usize::MAX - 3).unwrap_err();
+        let error = Record::parse(&[0; 8], usize::MAX - 3, &SourceLimits::default()).unwrap_err();
 
         assert!(matches!(
             error,
@@ -1130,7 +1147,7 @@ mod tests {
 
     #[test]
     fn parse_rejects_offset_past_input() {
-        let error = Record::parse(&[0; 8], 9).unwrap_err();
+        let error = Record::parse(&[0; 8], 9, &SourceLimits::default()).unwrap_err();
 
         assert!(matches!(error, Error::Corrupted(_)));
     }
@@ -1141,7 +1158,7 @@ mod tests {
         let mut bytes = vec![0xFF; 5];
         bytes.extend_from_slice(&atom(0x2222, &payload));
 
-        let (record, consumed) = Record::parse(&bytes, 5).unwrap();
+        let (record, consumed) = Record::parse(&bytes, 5, &SourceLimits::default()).unwrap();
 
         assert_eq!(consumed, 8 + payload.len());
         assert_eq!(record.record_type_raw, 0x2222);
@@ -1178,7 +1195,7 @@ mod tests {
             max_depth: 0,
         };
 
-        let (record, consumed) = Record::parse_with_limits(&bytes, 0, limits).unwrap();
+        let (record, consumed) = Record::parse(&bytes, 0, &limits).unwrap();
         assert_eq!(record.data, [1, 2, 3, 4]);
         assert_eq!(consumed, bytes.len());
     }
@@ -1200,7 +1217,7 @@ mod tests {
                 ..SourceLimits::default()
             },
         ] {
-            assert!(Record::parse_with_limits(&bytes, 0, limits).is_err());
+            assert!(Record::parse(&bytes, 0, &limits).is_err());
         }
     }
 
@@ -1210,10 +1227,10 @@ mod tests {
         let container = atom(RecordType::Document.as_u16(), &leaf);
 
         assert!(
-            Record::parse_with_limits(
+            Record::parse(
                 &container,
                 0,
-                SourceLimits {
+                &SourceLimits {
                     max_depth: 0,
                     ..SourceLimits::default()
                 }
@@ -1221,10 +1238,10 @@ mod tests {
             .is_err()
         );
         assert!(
-            Record::parse_with_limits(
+            Record::parse(
                 &container,
                 0,
-                SourceLimits {
+                &SourceLimits {
                     max_records: 1,
                     ..SourceLimits::default()
                 }
@@ -1232,10 +1249,10 @@ mod tests {
             .is_err()
         );
         assert!(
-            Record::parse_with_limits(
+            Record::parse(
                 &container,
                 0,
-                SourceLimits {
+                &SourceLimits {
                     max_copied_payload_bytes: leaf.len(),
                     ..SourceLimits::default()
                 }
@@ -1276,9 +1293,11 @@ mod tests {
             0,
         )
         .unwrap();
-        count_session.account_existing(0).unwrap();
+        let (existing, _) =
+            Record::parse_strict_with_limits(&bytes, 0, SourceLimits::default()).unwrap();
+        count_session.account_existing(&existing, 0).unwrap();
         assert!(matches!(
-            count_session.account_existing(0),
+            count_session.account_existing(&existing, 0),
             Err(Error::Limit {
                 kind: crate::SourceLimitKind::Events,
                 ..
@@ -1355,9 +1374,9 @@ mod tests {
     fn versioned_tags_share_record_count_across_many_nested_payloads() {
         let one = versioned_tag_root(1);
         assert_eq!(
-            one.versioned_binary_tag_records_with_limits(
+            one.versioned_binary_tag_records(
                 10,
-                SourceLimits {
+                &SourceLimits {
                     max_records: 10,
                     max_depth: 8,
                     ..SourceLimits::default()
@@ -1369,9 +1388,9 @@ mod tests {
         );
         let many = versioned_tag_root(2);
         assert!(matches!(
-            many.versioned_binary_tag_records_with_limits(
+            many.versioned_binary_tag_records(
                 10,
-                SourceLimits {
+                &SourceLimits {
                     max_records: 10,
                     max_depth: 8,
                     ..SourceLimits::default()
@@ -1387,24 +1406,46 @@ mod tests {
     #[test]
     fn versioned_tags_share_copied_payload_budget_across_nested_payloads() {
         let one = versioned_tag_root(1);
-        one.versioned_binary_tag_records_with_limits(
+        // The selected projection accounts the already-materialized document
+        // and ProgTags owners before parsing the copied tag payloads.  The
+        // The exact one-tag charge is
+        // 72 + 64 + 56 + 16 + 24 + 16 + 24 + 16 = 288:
+        // existing owners, the first tag parse (including its CString and
+        // BinaryTagData), then the method's child and leaf reparses.
+        one.versioned_binary_tag_records(
             10,
-            SourceLimits {
+            &SourceLimits {
                 max_records: 100,
                 max_depth: 8,
-                max_copied_payload_bytes: 200,
+                max_copied_payload_bytes: 288,
                 ..SourceLimits::default()
             },
         )
         .unwrap();
-        let many = versioned_tag_root(2);
+        let one_under = versioned_tag_root(1);
         assert!(matches!(
-            many.versioned_binary_tag_records_with_limits(
+            one_under.versioned_binary_tag_records(
                 10,
-                SourceLimits {
+                &SourceLimits {
                     max_records: 100,
                     max_depth: 8,
-                    max_copied_payload_bytes: 200,
+                    max_copied_payload_bytes: 287,
+                    ..SourceLimits::default()
+                },
+            ),
+            Err(Error::Limit {
+                kind: crate::SourceLimitKind::AggregatePayloadBytes,
+                ..
+            })
+        ));
+        let many = versioned_tag_root(2);
+        assert!(matches!(
+            many.versioned_binary_tag_records(
+                10,
+                &SourceLimits {
+                    max_records: 100,
+                    max_depth: 8,
+                    max_copied_payload_bytes: 288,
                     ..SourceLimits::default()
                 },
             ),
@@ -1447,12 +1488,11 @@ mod tests {
             },
         ] {
             let mut owned = RecordParser::new();
-            let owned_result = owned.parse_document(&bytes);
+            let limits = SourceLimits::default();
+            let owned_result = owned.parse_document(&bytes, &limits);
             let mut shared = RecordParser::new();
-            let shared_result = shared.parse_shared_document_with_limits(
-                &Arc::new(bytes.clone()),
-                SourceLimits::default(),
-            );
+            let shared_result =
+                shared.parse_shared_document_with_limits(&Arc::new(bytes.clone()), limits);
             assert_eq!(
                 format!("{owned_result:?}"),
                 format!("{shared_result:?}"),
@@ -1472,7 +1512,9 @@ mod tests {
         let bytes = nested_tree();
         let payload_bytes = {
             let mut parser = RecordParser::new();
-            parser.parse_document(&bytes).unwrap();
+            parser
+                .parse_document(&bytes, &SourceLimits::default())
+                .unwrap();
             parser
                 .find_records_ref()
                 .iter()
@@ -1489,9 +1531,7 @@ mod tests {
                 max_copied_payload_bytes: budget,
                 ..SourceLimits::default()
             };
-            let owned = RecordParser::new()
-                .parse_document_with_limits(&bytes, limits)
-                .is_ok();
+            let owned = RecordParser::new().parse_document(&bytes, &limits).is_ok();
             let shared = RecordParser::new()
                 .parse_shared_document_with_limits(&Arc::new(bytes.clone()), limits)
                 .is_ok();

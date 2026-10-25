@@ -16,5 +16,5 @@ pub use model::{
     MacroNameAtom, ShapeInteractionEntry,
 };
 
-pub(crate) use codec::encode_record;
+pub(crate) use codec::{encode_record, interaction_source_limits};
 pub use edit::{Click, Target};

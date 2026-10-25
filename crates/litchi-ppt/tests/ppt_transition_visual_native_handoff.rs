@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use litchi_ppt::package::edit::Error as EditError;
 use litchi_ppt::slide_order::{Error, Position, Refusal, SlideTransitionVisual, Snapshot};
-use litchi_ppt::{Package, TransitionDirection, TransitionSpeed, TransitionType};
+use litchi_ppt::{OpenOptions, Package, TransitionDirection, TransitionSpeed, TransitionType};
 
 const GENERATED_PATH_ENV: &str = "LITCHI_PPT_GENERATED_ARTIFACT";
 const NATIVE_PATH_ENV: &str = "LITCHI_PPT_NATIVE_ARTIFACT";
@@ -46,7 +46,7 @@ fn after_visual() -> SlideTransitionVisual {
 }
 
 fn visual_of(bytes: &[u8]) -> SlideTransitionVisual {
-    Snapshot::parse(bytes)
+    Snapshot::from_bytes_with_options(bytes.to_vec(), OpenOptions::new())
         .expect("fully reopen PPT bytes")
         .slide_transition_visual(source_position())
         .expect("read visual transition")
@@ -105,7 +105,7 @@ fn visual_transition_refusals_are_typed_and_failure_atomic() {
     )
     .expect("read genuine PPT without canonical visual owner");
     assert!(matches!(
-        Snapshot::parse(&bytes)
+        Snapshot::from_bytes_with_options(bytes.clone(), OpenOptions::new())
             .expect("open genuine PPT without canonical visual owner")
             .slide_transition_visual(source_position()),
         Err(Error::Refused(

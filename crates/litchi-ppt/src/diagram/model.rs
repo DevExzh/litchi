@@ -326,8 +326,12 @@ impl<'data> Inventory<'data> {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(build_list: &crate::records::Record, drawing: &'data [u8]) -> Result<Self> {
-        super::codec::parse(build_list, drawing)
+    pub fn parse(
+        build_list: &crate::records::Record,
+        drawing: &'data [u8],
+        limits: &Limits,
+    ) -> Result<Self> {
+        super::codec::parse(build_list, drawing, limits)
     }
 
     /// Parses with explicit resource ceilings.

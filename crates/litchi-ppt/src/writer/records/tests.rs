@@ -119,12 +119,13 @@ fn test_create_environment_minimal() {
     // Should contain FontCollection and other required atoms
     assert!(env.len() > 100);
 
-    let (environment, consumed) = crate::records::Record::parse(&env, 0).unwrap();
+    let (environment, consumed) =
+        crate::records::Record::parse(&env, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(consumed, env.len());
     let collection = environment
         .find_child(crate::consts::RecordType::FontCollection)
         .unwrap();
-    let fonts = crate::FontCollection::parse(collection).unwrap();
+    let fonts = crate::FontCollection::parse(collection, &crate::font::Limits::default()).unwrap();
     assert_eq!(fonts.fonts.len(), 1);
     assert_eq!(fonts.fonts[0].name, "Arial");
     assert!(fonts.fonts[0].truetype);

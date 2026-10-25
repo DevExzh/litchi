@@ -61,13 +61,13 @@ pub struct SlideSnapshot {
 }
 
 impl SlideSnapshot {
-    /// Parse one complete `SlideContainer` with default resource bounds.
+    /// Parse one complete `SlideContainer` under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes.as_ref().to_vec(), SlideLimits::default())
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &SlideLimits) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes.as_ref().to_vec(), *limits)
     }
 
     /// Capture one complete slide without requiring a caller-side copy.
@@ -75,8 +75,8 @@ impl SlideSnapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, SlideLimits::default())
+    pub fn from_bytes(bytes: Vec<u8>, limits: &SlideLimits) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes, *limits)
     }
 
     /// Capture one complete slide under explicit resource bounds.

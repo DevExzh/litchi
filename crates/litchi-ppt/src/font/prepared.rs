@@ -91,7 +91,7 @@ pub(crate) fn restore_staged(
     reason = "test assertions panic on failure by design"
 )]
 mod tests {
-    use super::super::{EotIntent, EotLimits, Facet, PreparedFont, Scope, Snapshot};
+    use super::super::{EotIntent, EotLimits, Facet, PackageLimits, PreparedFont, Scope, Snapshot};
     use crate::Builder;
     use litchi_fonts::{
         Charset, Family, FontProperties, License, Panose, Pitch, Signature, Style,
@@ -247,7 +247,7 @@ mod tests {
         let mut writer = Builder::new();
         let mut output = Cursor::new(Vec::new());
         crate::raw::encode(&mut writer, &mut output).unwrap();
-        Snapshot::from_bytes(output.into_inner()).unwrap()
+        Snapshot::from_bytes(output.into_inner(), &PackageLimits::default()).unwrap()
     }
 
     fn prepared_font(fs_type: u16, style: Style, subsetted: bool) -> PreparedFont {

@@ -38,7 +38,10 @@ impl Transaction {
                 }
             }
         }
-        let authors = crate::comments::Authors::parse(&presentation.live_document_record()?)?;
+        let authors = crate::comments::Authors::parse(
+            &presentation.live_document_record()?,
+            &presentation.source_limits(),
+        )?;
         if let Some(seed) = authors
             .find(author)
             .and_then(|entry| entry.comment_index_seed)
@@ -323,11 +326,12 @@ impl Transaction {
         if click.is_some_and(|click| click.tooltip.is_some()) && !needs_definition {
             return Err(invalid("a slide-show jump has no screen tip"));
         }
+        let source_limits = self.source.limits();
         self.stage_records(Some(target.slide()), needs_definition, |view| {
             let slide = view.slide.ok_or_else(missing_record)?;
             let Some(click) = click else {
                 return Ok(Replacement {
-                    slide: set_shape_click(slide.bytes, shape_id, None)?,
+                    slide: set_shape_click(slide.bytes, shape_id, None, &source_limits)?,
                     document: None,
                 });
             };
@@ -341,6 +345,7 @@ impl Transaction {
                             location: None,
                             tooltip: click.tooltip.as_deref(),
                         },
+                        &source_limits,
                     )?;
                     (Some(record), id)
                 },
@@ -355,14 +360,15 @@ impl Transaction {
                             location: Some(location),
                             tooltip: click.tooltip.as_deref(),
                         },
+                        &source_limits,
                     )?;
                     (Some(record), id)
                 },
                 _ => (None, 0),
             };
-            let container = click_container(&click_atom(&click.target, id))?;
+            let container = click_container(&click_atom(&click.target, id), &source_limits)?;
             Ok(Replacement {
-                slide: set_shape_click(slide.bytes, shape_id, Some(&container))?,
+                slide: set_shape_click(slide.bytes, shape_id, Some(&container), &source_limits)?,
                 document,
             })
         })?;
@@ -452,6 +458,8 @@ impl Transaction {
                 element: "run",
                 reason: "the range is outside the shape's text",
             }))?;
+        let interaction_limits =
+            crate::text_edit::runs::interaction_limits_for_source(self.source.limits());
         self.stage_records(Some(target.slide()), true, |view| {
             let slide = view.slide.ok_or_else(missing_record)?;
             let document = view.document.ok_or_else(missing_record)?;
@@ -460,7 +468,15 @@ impl Transaction {
                 document,
                 persist_id,
                 shape_id,
-                &|records| crate::text_edit::runs::format_body(records, start, end, format),
+                &|records| {
+                    crate::text_edit::runs::format_body(
+                        records,
+                        start,
+                        end,
+                        format,
+                        interaction_limits,
+                    )
+                },
             )?;
             Ok(Replacement { slide, document })
         })
@@ -542,6 +558,7 @@ impl Transaction {
         }) {
             return Err(invalid("a slide-show jump has no screen tip"));
         }
+        let source_limits = self.source.limits();
         self.stage_records(Some(target.slide()), true, |view| {
             let slide = view.slide.ok_or_else(missing_record)?;
             let mut document = view.document.ok_or_else(missing_record)?.to_vec();
@@ -570,14 +587,18 @@ impl Transaction {
                     };
                     let id = match definition {
                         Some(definition) => {
-                            let (record, id) = add_definition(&document, &definition)?;
+                            let (record, id) =
+                                add_definition(&document, &definition, &source_limits)?;
                             document = record;
                             document_changed = true;
                             id
                         },
                         None => 0,
                     };
-                    Some(click_container(&click_atom(&click.target, id))?)
+                    Some(click_container(
+                        &click_atom(&click.target, id),
+                        &source_limits,
+                    )?)
                 },
             };
             let (slide, outline) = crate::text_edit::runs::rewrite(

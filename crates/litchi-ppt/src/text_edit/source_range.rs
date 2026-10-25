@@ -649,7 +649,7 @@ fn build_slide_index(
                 ))
                 .into());
             }
-            let _ = set.text_interactions()?;
+            let _ = set.text_interactions(crate::text_interaction::limits_for_source(limits))?;
             let _ = set.outline_text_refs()?;
         }
     }

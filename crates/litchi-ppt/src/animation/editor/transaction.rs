@@ -30,7 +30,7 @@ impl Editor {
     /// configured limits.
     pub(crate) fn open(bytes: Vec<u8>, limits: EditorLimits) -> Result<Self> {
         validate_limits(limits)?;
-        let package = ObjectEditor::open_records_admitting_signature(bytes)?;
+        let package = ObjectEditor::open_records_admitting_signature(bytes, limits.source_limits)?;
         let ids = package.persist_ids();
         if ids.len() > limits.max_persist_records {
             return invalid("persisted-record count exceeds animation editor limit");
@@ -49,7 +49,7 @@ impl Editor {
             } else {
                 continue;
             };
-            let (parsed, consumed) = Record::parse(&record, 0)?;
+            let (parsed, consumed) = Record::parse(&record, 0, &limits.source_limits)?;
             if consumed != record.len() || parsed.data_length as usize + 8 != record.len() {
                 return corrupted("persisted slide/master record has trailing or truncated bytes");
             }
@@ -490,7 +490,7 @@ impl Editor {
             return invalid("animation extension exceeds record limit");
         }
         let record = rewrite_ppt10_payload(&self.entries[index].record, &payload)?;
-        let (parsed, consumed) = Record::parse(&record, 0)?;
+        let (parsed, consumed) = Record::parse(&record, 0, &self.limits.source_limits)?;
         if consumed != record.len() || parsed.data_length as usize + 8 != record.len() {
             return corrupted("rewritten slide/master record failed length validation");
         }
@@ -709,7 +709,7 @@ fn collect_escher(
                         while ppt < value.len() {
                             let item = raw_record(value, ppt)?;
                             if raw_type(item)? == RecordType::AnimationInfo.as_u16() {
-                                let (parsed, used) = Record::parse(item, 0)?;
+                                let (parsed, used) = Record::parse(item, 0, &limits.source_limits)?;
                                 if used != item.len() {
                                     return corrupted("AnimationInfo length mismatch");
                                 }

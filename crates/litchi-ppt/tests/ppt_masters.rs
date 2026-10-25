@@ -147,7 +147,8 @@ fn masters_retain_unknown_records_and_package_edits_are_atomic() {
         wire(&opaque)
     );
 
-    let snapshot = Snapshot::from_record(Context::Main, main).unwrap();
+    let snapshot =
+        Snapshot::from_record(Context::Main, main, &master_layout::Limits::default()).unwrap();
     assert!(
         snapshot
             .bytes()

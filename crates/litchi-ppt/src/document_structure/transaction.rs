@@ -175,8 +175,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(bytes, Limits::default())
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse one document structure with explicit resource bounds.
@@ -213,13 +213,13 @@ impl Snapshot {
         ))
     }
 
-    /// Capture a parsed record tree using the default resource bounds.
+    /// Capture a parsed record tree under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record(root: Record) -> Result<Self> {
-        Self::from_record_with_limits(root, Limits::default())
+    pub fn from_record(root: Record, limits: &Limits) -> Result<Self> {
+        Self::from_record_with_limits(root, *limits)
     }
 
     /// Capture a parsed record tree with explicit resource bounds.

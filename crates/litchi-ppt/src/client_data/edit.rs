@@ -103,7 +103,8 @@ impl Edit {
         }
         let record = record
             .ok_or_else(|| scoped::unsupported_target(OPERATION, "the shape has no client data"))?;
-        let source = Snapshot::parse(&record).map_err(scoped::publication(OPERATION))?;
+        let source = Snapshot::parse(&record, &super::ClientDataLimits::default())
+            .map_err(scoped::publication(OPERATION))?;
         let inner = source.edit();
         Ok(State {
             native,
@@ -154,7 +155,8 @@ impl Edit {
             let record = record.ok_or_else(|| {
                 scoped::unsupported_target(OPERATION, "the shape has no client data")
             })?;
-            let source = Snapshot::parse(&record).map_err(scoped::publication(OPERATION))?;
+            let source = Snapshot::parse(&record, &super::ClientDataLimits::default())
+                .map_err(scoped::publication(OPERATION))?;
             let inner = source.edit();
             Ok::<State, Failure>(State {
                 native,

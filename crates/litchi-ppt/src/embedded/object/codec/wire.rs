@@ -1,7 +1,7 @@
 //! Common `PowerPoint` record framing and bounded primitive decoding.
 
 use crate::consts::RecordType;
-use crate::package::{Error, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::records::Record;
 
 pub(crate) fn parse_bool(value: u8, field: &str) -> Result<bool> {
@@ -66,6 +66,76 @@ pub(crate) fn record_bytes_raw(
     bytes.extend_from_slice(&length.to_le_bytes());
     bytes.extend_from_slice(data);
     Ok(bytes)
+}
+
+/// Check the selected source profile before allocating a serialized variable
+/// record.  Record headers count toward `max_record_bytes`, while the payload
+/// dimension is checked separately so a caller cannot bypass its narrower
+/// copied-payload budget by selecting a larger complete-record budget.
+pub(crate) fn ensure_record_size(
+    payload_len: usize,
+    limits: &SourceLimits,
+    context: &str,
+) -> Result<()> {
+    if payload_len > limits.max_record_payload_bytes()
+        || payload_len
+            .checked_add(8)
+            .is_none_or(|size| size > limits.max_record_bytes())
+    {
+        return corrupted(format!(
+            "{context} exceeds the configured record size limit"
+        ));
+    }
+    Ok(())
+}
+
+/// Admit an aggregate serialized payload before a container or sequence
+/// allocates its next child buffer.  The aggregate ceiling is the same
+/// selected copied-payload budget used by record parsing; counting framed
+/// child bytes is intentionally conservative because those bytes are also
+/// allocated by the writer.
+pub(crate) fn ensure_output_total(
+    total: usize,
+    limits: &SourceLimits,
+    context: &str,
+) -> Result<()> {
+    if total > limits.max_aggregate_payload_bytes() {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::AggregatePayloadBytes,
+            observed: total,
+            maximum: limits.max_aggregate_payload_bytes(),
+        });
+    }
+    if total > limits.max_record_payload_bytes() {
+        return corrupted(format!(
+            "{context} exceeds the configured record payload limit"
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn record_bytes_with_limits(
+    version: u16,
+    instance: u16,
+    kind: RecordType,
+    data: &[u8],
+    limits: &SourceLimits,
+    context: &str,
+) -> Result<Vec<u8>> {
+    ensure_record_size(data.len(), limits, context)?;
+    record_bytes(version, instance, kind, data)
+}
+
+pub(crate) fn record_bytes_raw_with_limits(
+    version: u16,
+    instance: u16,
+    kind: u16,
+    data: &[u8],
+    limits: &SourceLimits,
+    context: &str,
+) -> Result<Vec<u8>> {
+    ensure_record_size(data.len(), limits, context)?;
+    record_bytes_raw(version, instance, kind, data)
 }
 
 pub(crate) fn corrupted<T>(message: impl Into<String>) -> Result<T> {

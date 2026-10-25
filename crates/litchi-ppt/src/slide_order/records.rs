@@ -117,6 +117,7 @@ pub(crate) fn publish(snapshot: &Snapshot, rewrites: &[Rewrite]) -> Result<Snaps
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
+        snapshot.limits,
     )?;
     for rewrite in rewrites {
         let persist_id = owner_persist_id(snapshot, rewrite.owner)?;

@@ -199,8 +199,7 @@ impl SlideDirectory {
         let document_offset_usize = usize::try_from(document_offset).map_err(|_err| {
             Error::Corrupted("document persist offset does not fit usize".to_string())
         })?;
-        let (document, _) =
-            Record::parse_with_limits(document_data, document_offset_usize, limits)?;
+        let (document, _) = Record::parse(document_data, document_offset_usize, &limits)?;
         if document.record_type != RecordType::Document
             || document.version != 0x0f
             || document.instance != 0
@@ -291,7 +290,7 @@ impl SlideDirectory {
                 // the same way, after the interactions and references, so a
                 // body that cannot be framed never drops them.
                 let read = set
-                    .text_interactions()
+                    .text_interactions(crate::text_interaction::limits_for_source(limits))
                     .and_then(|interactions| Ok((interactions, set.outline_text_refs()?)))
                     .and_then(|(interactions, refs)| {
                         entries[index].outline_text_interactions = interactions;
@@ -1219,7 +1218,7 @@ mod tests {
         let mut fast = String::new();
         let mut joined = String::new();
         for bytes in &records {
-            let (parsed, _) = Record::parse(bytes, 0).unwrap();
+            let (parsed, _) = Record::parse(bytes, 0, &SourceLimits::default()).unwrap();
             append_list_text(&mut fast, &parsed);
             let value = parsed.extract_text().unwrap();
             if !value.is_empty() {

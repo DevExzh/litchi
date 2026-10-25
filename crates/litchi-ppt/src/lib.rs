@@ -204,7 +204,7 @@ pub use slide::{
     SlideFactory, SpeakerNotes,
 };
 pub use sound_collection::{BuiltinId, Sound};
-pub use validation::{PptValidationError, PptValidationLimits, validate_source};
+pub use validation::validate_source;
 pub use view_info::{
     Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewInformation, SlideViewPreferences,
     ViewKind, ViewOrigin, ZoomViewInfo,

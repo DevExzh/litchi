@@ -204,7 +204,8 @@ mod tests {
         let mut records = Vec::new();
         let mut offset = 0;
         while offset < bytes.len() {
-            let (record, consumed) = Record::parse(bytes, offset).unwrap();
+            let (record, consumed) =
+                Record::parse(bytes, offset, &crate::SourceLimits::default()).unwrap();
             records.push(record);
             offset += consumed;
         }
@@ -280,12 +281,20 @@ mod tests {
 
     #[test]
     fn rejects_records_truncated_by_their_container() {
-        let mut header = Record::parse(&record_bytes(0, 0, 3999, &0u32.to_le_bytes()), 0)
-            .unwrap()
-            .0;
-        let text = Record::parse(&record_bytes(0, 0, 4008, b"abc"), 0)
-            .unwrap()
-            .0;
+        let mut header = Record::parse(
+            &record_bytes(0, 0, 3999, &0u32.to_le_bytes()),
+            0,
+            &crate::SourceLimits::default(),
+        )
+        .unwrap()
+        .0;
+        let text = Record::parse(
+            &record_bytes(0, 0, 4008, b"abc"),
+            0,
+            &crate::SourceLimits::default(),
+        )
+        .unwrap()
+        .0;
         let mut truncated = text.clone();
         truncated.data_length = 9;
         assert!(OutlineTextBody::collect(&[&header, &text]).is_ok());

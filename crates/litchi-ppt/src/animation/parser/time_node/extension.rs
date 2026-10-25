@@ -23,7 +23,7 @@ pub fn parse_slide_animation_extension(data: &[u8]) -> Result<SlideAnimationExte
                 "slide binary tag ends with a partial record header".to_string(),
             ));
         }
-        let (record, consumed) = Record::parse(data, offset)?;
+        let (record, consumed) = Record::parse(data, offset, &crate::SourceLimits::default())?;
         if record.data_length as usize != record.data.len() || consumed < 8 {
             return Err(Error::Corrupted(format!(
                 "slide binary tag contains a truncated {:?} record",

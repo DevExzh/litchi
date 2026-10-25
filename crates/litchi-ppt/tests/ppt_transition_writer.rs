@@ -33,7 +33,8 @@ fn slide_info_atom_payloads(bytes: &[u8]) -> Vec<Vec<u8>> {
     let mut payloads = Vec::new();
     let mut offset = 0;
     while offset < stream.len() {
-        let (record, consumed) = Record::parse(&stream, offset).unwrap();
+        let (record, consumed) =
+            Record::parse(&stream, offset, &litchi_ppt::SourceLimits::default()).unwrap();
         if record.record_type_raw == 1006
             && let Some(atom) = record
                 .children

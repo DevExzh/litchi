@@ -48,7 +48,9 @@ fn collection(seed: u32, sounds: &[Vec<u8>]) -> Record {
         data.extend(sound);
     }
     let bytes = record(0x0f, 5, RecordType::SoundCollection, &data);
-    Record::parse(&bytes, 0).unwrap().0
+    Record::parse(&bytes, 0, &crate::SourceLimits::default())
+        .unwrap()
+        .0
 }
 
 #[test]

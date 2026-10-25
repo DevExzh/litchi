@@ -689,7 +689,7 @@ impl Snapshot {
     ///
     /// Returns an error when the complete package or its live slide directory
     /// is malformed.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
+    pub(crate) fn parse(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes(bytes.to_vec())
     }
 
@@ -698,7 +698,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error when the complete package cannot be reopened.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Self::from_bytes_with_options(bytes, OpenOptions::new())
     }
 
@@ -770,7 +770,7 @@ impl Snapshot {
         let document_offset = directory.document_offset();
         let document_stream = presentation.document_stream();
         let (document_record, document_consumed) =
-            crate::Record::parse_with_limits(document_stream, document_offset, limits)?;
+            crate::Record::parse(document_stream, document_offset, &limits)?;
         if document_record.record_type != crate::RecordType::Document {
             return Err(PackageError::Corrupted(
                 "PPT slide-order snapshot resolved a non-document live record".into(),
@@ -1293,6 +1293,7 @@ impl Snapshot {
                 crate::embedded::object::Editor::open_records_arc_with_limit(
                     self.shared_bytes(),
                     self.limits.max_package_bytes,
+                    self.limits,
                 )
                 .map(|_editor| ())
             })
@@ -3187,6 +3188,7 @@ impl Transaction {
         let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
             working.shared_bytes(),
             source.limits.max_package_bytes,
+            source.limits,
         )?;
         // Nothing is staged yet, so the publishing editor reads exactly the
         // working artifact's persisted slide payloads.
@@ -3230,7 +3232,11 @@ impl Transaction {
             )
             .into());
         }
-        let after_slides = persisted_slides(snapshot.artifact.shared(), &snapshot.document)?;
+        let after_slides = persisted_slides(
+            snapshot.artifact.shared(),
+            &snapshot.document,
+            snapshot.limits,
+        )?;
         let expected_slides = expected_persisted_slides(
             document_commit.snapshot().slides(),
             &before_slides,
@@ -3338,6 +3344,7 @@ impl Transaction {
                 crate::embedded::object::Editor::open_records_arc_with_limit(
                     working.shared_bytes(),
                     source.limits.max_package_bytes,
+                    source.limits,
                 )?,
             )
         })?;
@@ -3400,7 +3407,11 @@ impl Transaction {
         }
         let after_slides =
             observe_phase(&mut observer, DiagnosticPhase::AfterPayloadCapture, || {
-                persisted_slides(snapshot.artifact.shared(), &snapshot.document)
+                persisted_slides(
+                    snapshot.artifact.shared(),
+                    &snapshot.document,
+                    snapshot.limits,
+                )
             })?;
         let expected_slides = expected_persisted_slides(
             document_commit.snapshot().slides(),
@@ -4904,7 +4915,7 @@ fn apply_durable_document(
             .and_then(serde_json::Value::as_str)
             .and_then(|hex| blob_by_hex(blobs, hex))
             .ok_or_else(|| invalid_durable_patch("custom table-style blob is missing"))?;
-        let (record, consumed) = crate::Record::parse(blob, 0)
+        let (record, consumed) = crate::Record::parse(blob, 0, &SourceLimits::default())
             .map_err(|_error| invalid_durable_patch("custom table-style blob is not a record"))?;
         if consumed != blob.len() {
             return Err(invalid_durable_patch(
@@ -5640,6 +5651,7 @@ fn publish_live_document(snapshot: &Snapshot, document: &[u8]) -> Result<Snapsho
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
+        snapshot.limits,
     )?;
     let live = editor.persisted_record(snapshot.document_persist_id)?;
     if live.as_slice() != snapshot.document.bytes() {
@@ -5672,10 +5684,12 @@ const fn hex_nibble(value: u8) -> u8 {
 fn persisted_slides(
     bytes: &Arc<[u8]>,
     document: &document_structure::Snapshot,
+    limits: SourceLimits,
 ) -> Result<BTreeMap<u32, Vec<u8>>> {
     let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         bytes.clone(),
         bytes.len().saturating_mul(4),
+        limits,
     )?;
     editor_persisted_slides(&editor, document)
 }
@@ -5703,6 +5717,7 @@ fn persisted_record(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u8>> {
     crate::embedded::object::Editor::open_records_arc_with_limit(
         snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
+        snapshot.limits,
     )?
     .persisted_record(persist_id)
     .map_err(Error::from)
@@ -5733,7 +5748,7 @@ fn persisted_record_readonly(snapshot: &Snapshot, persist_id: u32) -> Result<Vec
             "PPT selected persist record offset exceeds its document stream".into(),
         )
     })?;
-    let (_, consumed) = crate::Record::parse_with_limits(tail, 0, presentation.source_limits())?;
+    let (_, consumed) = crate::Record::parse(tail, 0, &presentation.source_limits())?;
     let end = slide.offset.checked_add(consumed).ok_or_else(|| {
         PackageError::Corrupted("PPT selected persist record length overflows".into())
     })?;
@@ -5774,7 +5789,7 @@ fn persisted_object_record(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u
             "PPT selected persist record offset exceeds its document stream".into(),
         )
     })?;
-    let (_, consumed) = crate::Record::parse_with_limits(tail, 0, presentation.source_limits())?;
+    let (_, consumed) = crate::Record::parse(tail, 0, &presentation.source_limits())?;
     let end = offset.checked_add(consumed).ok_or_else(|| {
         PackageError::Corrupted("PPT selected persist record length overflows".into())
     })?;
@@ -5797,7 +5812,7 @@ fn inspect_slide_hidden(snapshot: &Snapshot, position: Position) -> Result<bool>
         .copied()
         .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
     let bytes = persisted_record(snapshot, slide.persist_id())?;
-    let (root, consumed) = crate::Record::parse_with_limits(&bytes, 0, snapshot.limits)?;
+    let (root, consumed) = crate::Record::parse(&bytes, 0, &snapshot.limits)?;
     if consumed != bytes.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "PPT slide visibility owner is not one complete SlideContainer".into(),
@@ -5839,7 +5854,7 @@ fn new_slide_hidden_atom(limits: SourceLimits) -> Result<crate::Record> {
     let bytes = crate::writer::slide_timing::build_slide_timing(&timing).map_err(|error| {
         PackageError::Corrupted(format!("PPT slide-show information atom: {error}"))
     })?;
-    let (atom, consumed) = crate::Record::parse_with_limits(&bytes, 0, limits)?;
+    let (atom, consumed) = crate::Record::parse(&bytes, 0, &limits)?;
     if consumed != bytes.len() {
         return Err(PackageError::Corrupted(
             "PPT slide-show information atom is not one complete record".into(),
@@ -5880,8 +5895,7 @@ fn replace_slide_hidden(
         .copied()
         .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
     let source_record = persisted_record(snapshot, slide.persist_id())?;
-    let (mut root, consumed) =
-        crate::Record::parse_with_limits(&source_record, 0, snapshot.limits)?;
+    let (mut root, consumed) = crate::Record::parse(&source_record, 0, &snapshot.limits)?;
     if consumed != source_record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "PPT slide visibility owner is not one complete SlideContainer".into(),
@@ -5955,6 +5969,7 @@ fn replace_slide_hidden(
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
+        snapshot.limits,
     )?;
     editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
     let bytes = editor.finish()?;
@@ -5977,7 +5992,7 @@ fn inspect_slide_advance(snapshot: &Snapshot, position: Position) -> Result<Slid
         .copied()
         .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
     let bytes = persisted_record(snapshot, slide.persist_id())?;
-    let (root, consumed) = crate::Record::parse_with_limits(&bytes, 0, snapshot.limits)?;
+    let (root, consumed) = crate::Record::parse(&bytes, 0, &snapshot.limits)?;
     if consumed != bytes.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "PPT slide advance owner is not one complete SlideContainer".into(),
@@ -6038,8 +6053,7 @@ fn replace_slide_advance(
         .copied()
         .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
     let source_record = persisted_record(snapshot, slide.persist_id())?;
-    let (mut root, consumed) =
-        crate::Record::parse_with_limits(&source_record, 0, snapshot.limits)?;
+    let (mut root, consumed) = crate::Record::parse(&source_record, 0, &snapshot.limits)?;
     if consumed != source_record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "PPT slide advance owner is not one complete SlideContainer".into(),
@@ -6086,6 +6100,7 @@ fn replace_slide_advance(
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
+        snapshot.limits,
     )?;
     editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
     let bytes = editor.finish()?;
@@ -6122,7 +6137,7 @@ fn inspect_slide_transition_visual(
         .copied()
         .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
     let bytes = persisted_record(snapshot, slide.persist_id())?;
-    let (root, consumed) = crate::Record::parse_with_limits(&bytes, 0, snapshot.limits)?;
+    let (root, consumed) = crate::Record::parse(&bytes, 0, &snapshot.limits)?;
     if consumed != bytes.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "PPT visual transition owner is not one complete SlideContainer".into(),
@@ -6183,8 +6198,7 @@ fn replace_slide_transition_visual(
         .copied()
         .ok_or(Error::Refused(Refusal::SlideNotFound { position }))?;
     let source_record = persisted_record(snapshot, slide.persist_id())?;
-    let (mut root, consumed) =
-        crate::Record::parse_with_limits(&source_record, 0, snapshot.limits)?;
+    let (mut root, consumed) = crate::Record::parse(&source_record, 0, &snapshot.limits)?;
     if consumed != source_record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "PPT visual transition owner is not one complete SlideContainer".into(),
@@ -6234,6 +6248,7 @@ fn replace_slide_transition_visual(
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
+        snapshot.limits,
     )?;
     editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
     let bytes = editor.finish()?;
@@ -6323,6 +6338,7 @@ fn next_persist_id(source: &Snapshot, inserted: &BTreeMap<u32, Vec<u8>>) -> Resu
     let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         source.shared_bytes(),
         source.limits.max_package_bytes,
+        source.limits,
     )?;
     editor
         .persist_ids()
@@ -6378,7 +6394,7 @@ fn slide_payload(group: Vec<crate::records::Record>, record: Vec<u8>) -> Result<
         )
         .into());
     }
-    let (root, consumed) = crate::Record::parse_with_limits(&record, 0, SourceLimits::default())?;
+    let (root, consumed) = crate::Record::parse(&record, 0, &SourceLimits::default())?;
     if consumed != record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "slide transfer persist record is not one SlideContainer".into(),
@@ -6420,8 +6436,8 @@ fn require_portable_slide(
     donor: &Snapshot,
     record: &mut Vec<u8>,
 ) -> Result<TransferClosure> {
-    let (mut root, consumed) =
-        crate::Record::parse_with_limits(record, 0, SourceLimits::default())?;
+    let source_limits = target.limits();
+    let (mut root, consumed) = crate::Record::parse(record, 0, &source_limits)?;
     if consumed != record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "slide transfer persist record is not one SlideContainer".into(),
@@ -6439,9 +6455,10 @@ fn require_portable_slide(
         }));
     }
     let mut reused = Vec::new();
-    let comments = crate::comments::parse_slide_comments(&root)?;
+    let comments = crate::comments::parse_slide_comments(&root, &source_limits)?;
     if !comments.is_empty() {
-        let target_authors = crate::comments::Authors::parse(target.document.record())?;
+        let target_authors =
+            crate::comments::Authors::parse(target.document.record(), &source_limits)?;
         if comments.iter().any(|comment| {
             target_authors
                 .find(&comment.author)
@@ -6901,7 +6918,7 @@ fn append_transferred_pictures(
         delay.extend_from_slice(blip);
     }
 
-    let (mut root, consumed) = crate::Record::parse_with_limits(document, 0, snapshot.limits)?;
+    let (mut root, consumed) = crate::Record::parse(document, 0, &snapshot.limits)?;
     if consumed != document.len() || root.record_type != crate::RecordType::Document {
         return Err(PackageError::Corrupted(
             "PPT picture-store owner is not one DocumentContainer".into(),
@@ -7204,6 +7221,7 @@ fn drawing_remaps(target: &Snapshot, donor: &SlideRelationships) -> Result<BTree
     let editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         target.shared_bytes(),
         target.limits.max_package_bytes,
+        target.limits,
     )?;
     let mut live_shape_ids = BTreeSet::new();
     let mut available_shape_ids = BTreeSet::new();
@@ -7211,8 +7229,7 @@ fn drawing_remaps(target: &Snapshot, donor: &SlideRelationships) -> Result<BTree
         let Ok(bytes) = editor.persisted_record(persist_id) else {
             continue;
         };
-        let Ok((root, consumed)) = crate::Record::parse_with_limits(&bytes, 0, target.limits)
-        else {
+        let Ok((root, consumed)) = crate::Record::parse(&bytes, 0, &target.limits) else {
             continue;
         };
         if consumed != bytes.len() || root.record_type != crate::RecordType::Slide {
@@ -7370,8 +7387,8 @@ fn hyperlink_remaps(
     donor: &Snapshot,
     references: &BTreeSet<u32>,
 ) -> Result<BTreeMap<u32, u32>> {
-    let donor_links = crate::Hyperlinks::parse(donor.document.record())?;
-    let target_links = crate::Hyperlinks::parse(target.document.record())?;
+    let donor_links = crate::Hyperlinks::parse(donor.document.record(), &donor.limits)?;
+    let target_links = crate::Hyperlinks::parse(target.document.record(), &target.limits)?;
     references
         .iter()
         .map(|source_id| {
@@ -8158,11 +8175,9 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
                     "slide-list/position:{}",
                     list_change.position.get()
                 ));
-                if let Ok((root, consumed)) = crate::Record::parse_with_limits(
-                    &list_change.payload.record,
-                    0,
-                    SourceLimits::default(),
-                ) && consumed == list_change.payload.record.len()
+                if let Ok((root, consumed)) =
+                    crate::Record::parse(&list_change.payload.record, 0, &SourceLimits::default())
+                    && consumed == list_change.payload.record.len()
                     && let Ok(relationships) = scan_slide_relationships(&root)
                 {
                     effects.extend(
@@ -8232,7 +8247,7 @@ fn decode_payload(bytes: &[u8], limits: SourceLimits) -> Result<SlidePayload> {
     let mut group = Vec::with_capacity(count);
     for _ in 0..count {
         let encoded = take_length_prefixed(bytes, &mut offset, limits.max_record_bytes)?;
-        let (record, consumed) = crate::Record::parse_with_limits(encoded, 0, limits)?;
+        let (record, consumed) = crate::Record::parse(encoded, 0, &limits)?;
         if consumed != encoded.len() {
             return Err(invalid_durable_patch(
                 "slide group blob record has trailing bytes",
@@ -8660,8 +8675,7 @@ mod tests {
     fn advance_atom_data(snapshot: &Snapshot, position: Position) -> [u8; 16] {
         let slide = snapshot.document.slides()[position.get()];
         let bytes = persisted_record(snapshot, slide.persist_id()).unwrap();
-        let (root, consumed) =
-            crate::Record::parse_with_limits(&bytes, 0, snapshot.limits).unwrap();
+        let (root, consumed) = crate::Record::parse(&bytes, 0, &snapshot.limits).unwrap();
         assert_eq!(consumed, bytes.len());
         unique_slide_advance_atom(&root, position)
             .unwrap()
@@ -9940,7 +9954,7 @@ mod tests {
     fn slide_children(snapshot: &Snapshot, position: usize) -> Vec<crate::RecordType> {
         let slide = snapshot.document.slides()[position];
         let bytes = persisted_record(snapshot, slide.persist_id()).unwrap();
-        let (root, _) = crate::Record::parse_with_limits(&bytes, 0, snapshot.limits).unwrap();
+        let (root, _) = crate::Record::parse(&bytes, 0, &snapshot.limits).unwrap();
         root.children
             .iter()
             .map(|child| child.record_type)

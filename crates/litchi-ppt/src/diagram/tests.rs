@@ -99,8 +99,12 @@ fn build(build_id: u32, shape_id: u32, mode: BuildType) -> Container {
 #[test]
 fn inventory_groups_build_identity_shapes_and_inert_payloads() {
     let bytes = drawing_with_group();
-    let inventory =
-        parse_bytes(&build_list(&[build(9, 42, BuildType::AllAtOnce)]), &bytes).unwrap();
+    let inventory = parse_bytes(
+        &build_list(&[build(9, 42, BuildType::AllAtOnce)]),
+        &bytes,
+        &Limits::default(),
+    )
+    .unwrap();
     assert_eq!(inventory.len(), 1);
     let diagram = &inventory.diagrams()[0];
     assert_eq!(diagram.id(), Id::new(9, 42));
@@ -126,7 +130,7 @@ fn inventory_groups_build_identity_shapes_and_inert_payloads() {
 fn unknown_build_mode_is_retained_without_claiming_layout_support() {
     let bytes = drawing_with_group();
     let build = build(1, 42, BuildType::Unknown(0xDEAD_BEEF));
-    let inventory = parse_bytes(&build_list(&[build]), &bytes).unwrap();
+    let inventory = parse_bytes(&build_list(&[build]), &bytes, &Limits::default()).unwrap();
     assert_eq!(
         inventory.diagrams()[0].build().mode(),
         BuildType::Unknown(0xDEAD_BEEF)
@@ -140,17 +144,17 @@ fn rejects_duplicate_build_identity_and_missing_shape() {
         build(1, 42, BuildType::AsOneObject),
         build(1, 42, BuildType::Down),
     ]);
-    assert!(parse_bytes(&duplicate, &bytes).is_err());
+    assert!(parse_bytes(&duplicate, &bytes, &Limits::default()).is_err());
 
     let missing = build_list(&[build(1, 999, BuildType::AsOneObject)]);
-    assert!(parse_bytes(&missing, &bytes).is_err());
+    assert!(parse_bytes(&missing, &bytes, &Limits::default()).is_err());
 }
 
 #[test]
 fn rejects_malformed_build_list_and_limit_overflow() {
     let bytes = drawing_with_group();
     let valid = build_list(&[build(1, 42, BuildType::AsOneObject)]);
-    assert!(parse_bytes(&valid[..valid.len() - 1], &bytes).is_err());
+    assert!(parse_bytes(&valid[..valid.len() - 1], &bytes, &Limits::default()).is_err());
     assert!(
         codec::parse_bytes_with_limits(
             &valid,
@@ -175,14 +179,14 @@ fn shared_record_parser_remains_the_single_diagram_wire_owner() {
 #[test]
 fn malformed_drawing_is_not_silently_dropped() {
     let value = build_list(&[build(3, 42, BuildType::Custom)]);
-    assert!(parse_bytes(&value, &[0; 7]).is_err());
+    assert!(parse_bytes(&value, &[0; 7], &Limits::default()).is_err());
 }
 
 #[test]
 fn transaction_noop_replays_the_exact_build_list() {
     let drawing = drawing_with_group();
     let source = build_list(&[build(9, 42, BuildType::AllAtOnce)]);
-    let snapshot = Snapshot::parse(&source, &drawing).unwrap();
+    let snapshot = Snapshot::parse(&source, &drawing, &EditLimits::default()).unwrap();
 
     let commit = snapshot.edit().commit().unwrap();
     assert!(commit.patch().is_empty());
@@ -197,7 +201,7 @@ fn transaction_noop_replays_the_exact_build_list() {
 fn transaction_mode_edit_changes_only_the_fixed_mode_field() {
     let drawing = drawing_with_group();
     let source = build_list(&[build(9, 42, BuildType::AllAtOnce)]);
-    let snapshot = Snapshot::parse(&source, &drawing).unwrap();
+    let snapshot = Snapshot::parse(&source, &drawing, &EditLimits::default()).unwrap();
     let id = Id::new(9, 42);
 
     let mut edit = snapshot.edit();
@@ -221,7 +225,7 @@ fn transaction_shape_edit_checks_the_officeart_graph_and_identity() {
         build(9, 42, BuildType::AllAtOnce),
         build(9, 77, BuildType::Down),
     ]);
-    let snapshot = Snapshot::parse(&source, &drawing).unwrap();
+    let snapshot = Snapshot::parse(&source, &drawing, &EditLimits::default()).unwrap();
     let mut edit = snapshot.edit();
 
     assert!(edit.set_shape_id(Id::new(9, 42), 999).is_err());
@@ -234,7 +238,7 @@ fn transaction_shape_edit_checks_the_officeart_graph_and_identity() {
 fn transaction_shape_edit_updates_to_an_existing_shape() {
     let drawing = drawing_with_group();
     let source = build_list(&[build(9, 42, BuildType::AllAtOnce)]);
-    let snapshot = Snapshot::parse(&source, &drawing).unwrap();
+    let snapshot = Snapshot::parse(&source, &drawing, &EditLimits::default()).unwrap();
     let mut edit = snapshot.edit();
     let target = edit.set_shape_id(Id::new(9, 42), 77).unwrap();
     assert_eq!(target, Id::new(9, 77));
@@ -259,7 +263,7 @@ fn transaction_preserves_unknown_kind_reserved_bytes_and_opaque_children() {
     );
     source[8 + 16..8 + 20].copy_from_slice(&0xCAFE_BABEu32.to_le_bytes());
     source[8 + 30..8 + 32].copy_from_slice(&[0xA5, 0x5A]);
-    let snapshot = Snapshot::parse(&source, &drawing).unwrap();
+    let snapshot = Snapshot::parse(&source, &drawing, &EditLimits::default()).unwrap();
     let before = snapshot.get(Id::new(9, 42)).unwrap();
     assert_eq!(before.record().build().kind(), Kind::Unknown(0xCAFE_BABE));
     assert_eq!(before.record().build().reserved(), [0xA5, 0x5A]);
@@ -290,7 +294,7 @@ fn transaction_preserves_unknown_kind_reserved_bytes_and_opaque_children() {
 fn transaction_rejects_stale_sources_and_supports_inverse_replay() {
     let drawing = drawing_with_group();
     let source = build_list(&[build(9, 42, BuildType::AllAtOnce)]);
-    let snapshot = Snapshot::parse(&source, &drawing).unwrap();
+    let snapshot = Snapshot::parse(&source, &drawing, &EditLimits::default()).unwrap();
     let mut edit = snapshot.edit();
     edit.set_mode(Id::new(9, 42), BuildType::DepthByNode)
         .unwrap();
@@ -333,7 +337,8 @@ fn package_with_diagram() -> (crate::Package, Vec<u8>, Vec<u32>) {
         .iter()
         .find(|child| wire::record_type(child).unwrap() == RecordType::PPDrawing.as_u16())
         .expect("the built slide has a drawing");
-    let parsed = crate::odraw::parse_drawing(&drawing[8..]).unwrap();
+    let parsed =
+        crate::odraw::parse_drawing(&drawing[8..], &crate::odraw::Limits::default()).unwrap();
     let mut shape_ids = validation::shape_ids(&parsed, usize::MAX).unwrap();
     shape_ids.sort_unstable();
     let target = *shape_ids.last().unwrap();

@@ -4,6 +4,7 @@ use crate::consts::RecordType;
 
 use super::package::{Error, Result};
 use super::records::Record;
+use crate::SourceLimits;
 
 const ENVELOPE_FLAGS_RECORD_TYPE: u16 = 0x1784;
 const ENVELOPE_ALLOWED_FLAGS: u32 = 0x13;
@@ -75,8 +76,8 @@ impl EnvelopeSettings {
         Ok(value)
     }
 
-    pub(crate) fn parse_document(document: &Record) -> Result<Option<Self>> {
-        let records = document.versioned_binary_tag_records(9)?;
+    pub(crate) fn parse_document(document: &Record, limits: &SourceLimits) -> Result<Option<Self>> {
+        let records = document.versioned_binary_tag_records(9, limits)?;
         let mut matches = records
             .iter()
             .filter(|record| record.record_type_raw == ENVELOPE_FLAGS_RECORD_TYPE);

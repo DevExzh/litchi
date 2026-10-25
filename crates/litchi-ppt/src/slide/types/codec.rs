@@ -12,7 +12,7 @@ impl Slide<'_> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let shapes = crate::odraw::parse(&ppdrawing.data)?;
+        let shapes = crate::odraw::parse(&ppdrawing.data, &crate::odraw::Limits::default())?;
         let mut animations = Vec::new();
         let mut pending = shapes.iter().rev().collect::<Vec<_>>();
         while let Some(shape) = pending.pop() {
@@ -88,7 +88,7 @@ impl Slide<'_> {
         report: &mut crate::leniency::ToleranceReport,
     ) -> Result<Vec<ShapeEnum<'static>>> {
         // Extract Escher shapes from PPDrawing data
-        let escher_shapes = crate::odraw::parse(ppdrawing_data)?;
+        let escher_shapes = crate::odraw::parse(ppdrawing_data, &crate::odraw::Limits::default())?;
 
         // Convert Escher shapes to ShapeEnum with full property extraction
         let mut shapes = Vec::with_capacity(escher_shapes.len());

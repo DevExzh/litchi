@@ -108,7 +108,7 @@ impl Metadata {
     /// payload exceeds the encodable size, or if the encoded record cannot be
     /// re-parsed.
     pub fn to_record(&self) -> Result<Record> {
-        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
 
     /// Serialize to the raw bytes of a complete `ExOleObjAtom` record.
@@ -191,7 +191,7 @@ impl EmbedPreferences {
     /// Returns an error if the record payload exceeds the encodable size or
     /// if the encoded record cannot be re-parsed.
     pub fn to_record(&self) -> Result<Record> {
-        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
 
     /// Serialize to the raw bytes of a complete `ExOleEmbedAtom` record.
@@ -256,7 +256,7 @@ impl LinkInfo {
     /// Returns an error if the record payload exceeds the encodable size or
     /// if the encoded record cannot be re-parsed.
     pub fn to_record(&self) -> Result<Record> {
-        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
 
     /// Serialize to the raw bytes of a complete `ExOleLinkAtom` record.

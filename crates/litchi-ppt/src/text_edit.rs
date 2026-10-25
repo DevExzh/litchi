@@ -285,6 +285,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Snapshot {
     bytes: Arc<[u8]>,
+    source_limits: crate::SourceLimits,
 }
 
 impl Snapshot {
@@ -303,15 +304,19 @@ impl Snapshot {
     ///
     /// Returns an error when the complete package cannot be opened.
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let _ = presentation(&bytes)?;
+        let presentation = presentation(&bytes)?;
         Ok(Self {
             bytes: Arc::from(bytes.into_boxed_slice()),
+            source_limits: presentation.source_limits(),
         })
     }
 
     pub(crate) fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self> {
-        let _ = presentation_shared(bytes.clone())?;
-        Ok(Self { bytes })
+        let presentation = presentation_shared(bytes.clone())?;
+        Ok(Self {
+            bytes,
+            source_limits: presentation.source_limits(),
+        })
     }
 
     /// Exact bytes of the complete source or committed package artifact.
@@ -351,8 +356,9 @@ impl Snapshot {
         // The shared incremental owner rejects signed and encrypted CFB
         // envelopes before any candidate is staged. Surface that capability
         // boundary as a typed refusal instead of trying to normalize it.
-        let editor = crate::embedded::object::Editor::open_records(self.bytes.to_vec())
-            .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
+        let editor =
+            crate::embedded::object::Editor::open_records(self.bytes.to_vec(), self.source_limits)
+                .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
         let (shape_target, source_view) = shape_target?;
         let mut resolved = resolve_with_shape_target(target, shape_target, &editor)?;
         resolved.source_view = source_view.map(Arc::new);
@@ -2031,8 +2037,10 @@ impl Transaction {
             &self.resolved.payload,
             &encoded,
         )?;
-        let mut editor =
-            crate::embedded::object::Editor::open_records(self.source.bytes.clone().to_vec())?;
+        let mut editor = crate::embedded::object::Editor::open_records(
+            self.source.bytes.clone().to_vec(),
+            self.source.source_limits,
+        )?;
         let live = editor.persisted_record(self.resolved.slide_persist_id)?;
         if live != self.resolved.slide_record.as_ref() {
             return Err(PackageError::Corrupted(
@@ -2046,7 +2054,10 @@ impl Transaction {
         // open also serves the incremental readback (record 0264).
         let bytes: Arc<[u8]> = Arc::from(bytes.into_boxed_slice());
         let opened = presentation_shared(bytes.clone())?;
-        let snapshot = Snapshot { bytes };
+        let snapshot = Snapshot {
+            bytes,
+            source_limits: opened.source_limits(),
+        };
         let (readback, verified) =
             resolve_published(&snapshot.bytes, &self.resolved, &replacement, &opened)?;
         drop(opened);
@@ -2456,8 +2467,18 @@ fn resolved_from_shared_location(
 }
 
 fn resolve_shape(bytes: &[u8], target: Target) -> Result<ShapeLocation> {
-    let (persist_id, shape_id) = resolve_shape_target(bytes, target)?;
-    let editor = crate::embedded::object::Editor::open_records(bytes.to_vec())?;
+    let presentation = presentation(bytes)?;
+    resolve_shape_in_presentation(bytes, target, &presentation)
+}
+
+fn resolve_shape_in_presentation(
+    bytes: &[u8],
+    target: Target,
+    presentation: &Presentation,
+) -> Result<ShapeLocation> {
+    let source_limits = presentation.source_limits();
+    let (persist_id, shape_id) = resolve_shape_target_in_presentation(presentation, target)?;
+    let editor = crate::embedded::object::Editor::open_records(bytes.to_vec(), source_limits)?;
     resolve_shape_record(persist_id, shape_id, &editor)
 }
 
@@ -2515,7 +2536,7 @@ fn resolve_shape_readonly(
     let tail = document.get(slide.offset..).ok_or_else(|| {
         PackageError::Corrupted("PPT selected slide offset exceeds its document stream".into())
     })?;
-    let (_, consumed) = crate::Record::parse_with_limits(tail, 0, presentation.source_limits())?;
+    let (_, consumed) = crate::Record::parse(tail, 0, &presentation.source_limits())?;
     let slide_end = slide
         .offset
         .checked_add(consumed)
@@ -2554,7 +2575,8 @@ fn resolve_published(
         && let Some((shape_target, patched)) =
             incremental_published_target(opened, resolved, view, replacement)
     {
-        let editor = crate::embedded::object::Editor::open_records(bytes.to_vec())?;
+        let editor =
+            crate::embedded::object::Editor::open_records(bytes.to_vec(), opened.source_limits())?;
         let location = resolve_shape_record(shape_target.0, shape_target.1, &editor)?;
         return Ok((
             resolved_from_location(resolved.target, location)?,
@@ -2694,16 +2716,17 @@ pub(crate) fn replace_shape_texts_batch(
             })?;
     require_batch_text_budget(replacement_bytes, 0, max_output_bytes)?;
 
-    let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
-        source.clone(),
-        max_output_bytes,
-    )?;
     // An already opened projection of exactly `source` (the root edit's
     // untouched package) shares its parsed shapes; otherwise open one.
     let presentation = match opened {
         Some(presentation) => presentation.clone(),
         None => presentation_shared(source.clone())?,
     };
+    let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
+        source.clone(),
+        max_output_bytes,
+        presentation.source_limits(),
+    )?;
     let document_persist_id = presentation.slide_directory().document_persist_id();
     let slides = presentation.slides()?;
     let mut targets = Vec::with_capacity(replacements.len());
@@ -3045,9 +3068,13 @@ pub(crate) fn differential_readback_for_test(
 ) -> Result<DifferentialVerdicts> {
     let source: Arc<[u8]> = Arc::from(source);
     let presentation = presentation_shared(source.clone())?;
+    let source_limits = presentation.source_limits();
     let slides = presentation.slides()?;
-    let mut editor =
-        crate::embedded::object::Editor::open_records_arc_with_limit(source.clone(), usize::MAX)?;
+    let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
+        source.clone(),
+        usize::MAX,
+        source_limits,
+    )?;
     let mut views = BTreeMap::new();
     let mut grouped = BTreeMap::<u32, Vec<ShapeTextRewrite<'_>>>::new();
     let mut originals = BTreeMap::new();
@@ -3309,6 +3336,7 @@ pub(crate) fn replace_notes_text(
         return Ok(None);
     }
     let notes_persist_id = notes.persist_id();
+    let source_limits = presentation.source_limits();
     let shape_id = match notes.body_shape_ids()?.as_slice() {
         [] => return Err(Error::Refused(Refusal::NoTextbox)),
         [shape_id] => *shape_id,
@@ -3320,6 +3348,7 @@ pub(crate) fn replace_notes_text(
     let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
         source.clone(),
         max_output_bytes,
+        source_limits,
     )?;
     let original = editor.persisted_record(notes_persist_id)?;
     if record_type(&original)? != RecordType::Notes as u16 {
@@ -3580,7 +3609,8 @@ pub(crate) fn replace_shape_anchor(
     target: Target,
     replacement: crate::Anchor,
 ) -> Result<AnchorRewrite> {
-    let location = resolve_shape(bytes, target)?;
+    let source_presentation = presentation(bytes)?;
+    let location = resolve_shape_in_presentation(bytes, target, &source_presentation)?;
     let before = inspect_anchor(&location.slide_record, location.shape_id)?;
     if before == replacement {
         return Ok(AnchorRewrite {
@@ -3595,7 +3625,10 @@ pub(crate) fn replace_shape_anchor(
         &before.to_bytes(),
         &replacement.to_bytes(),
     )?;
-    let mut editor = crate::embedded::object::Editor::open_records(bytes.to_vec())?;
+    let mut editor = crate::embedded::object::Editor::open_records(
+        bytes.to_vec(),
+        source_presentation.source_limits(),
+    )?;
     if editor.persisted_record(location.persist_id)? != location.slide_record {
         return Err(PackageError::Corrupted(
             "PPT shape-anchor source changed before publication".into(),
@@ -3687,7 +3720,8 @@ pub(crate) fn add_unmodeled_text_dependency_for_test(
         rebuild(record, &data).map_err(Into::into)
     }
 
-    let location = resolve_shape(bytes, target)?;
+    let presentation = presentation(bytes)?;
+    let location = resolve_shape_in_presentation(bytes, target, &presentation)?;
     let mut drawings = 0usize;
     let rewritten = rewrite_ppt_record(&location.slide_record, 0, &mut |record| {
         if record_type(record)? != RecordType::PPDrawing as u16 {
@@ -3708,7 +3742,10 @@ pub(crate) fn add_unmodeled_text_dependency_for_test(
         )
         .into());
     }
-    let mut editor = crate::embedded::object::Editor::open_records(bytes.to_vec())?;
+    let mut editor = crate::embedded::object::Editor::open_records(
+        bytes.to_vec(),
+        presentation.source_limits(),
+    )?;
     editor.replace_persisted_record(location.persist_id, rewritten)?;
     editor.finish().map_err(Into::into)
 }
@@ -3897,7 +3934,12 @@ fn inspect_anchor(slide: &[u8], shape_id: u32) -> Result<crate::Anchor> {
             for child_result in children(container)? {
                 let child = child_result?;
                 if record_type(child)? == OFFICEART_CLIENT_ANCHOR
-                    && anchor.replace(crate::Anchor::parse(child)?).is_some()
+                    && anchor
+                        .replace(crate::Anchor::parse(
+                            child,
+                            &crate::client_anchor::Limits::default(),
+                        )?)
+                        .is_some()
                 {
                     return Err(Error::Refused(Refusal::AmbiguousAnchor));
                 }
@@ -6497,7 +6539,7 @@ mod tests {
         .unwrap();
         let current_user = ole.open_stream(&["Current User"]).unwrap();
         let edit_offset = usize::try_from(
-            crate::CurrentUser::parse(&current_user)
+            crate::CurrentUser::parse(&current_user, &crate::SourceLimits::default())
                 .unwrap()
                 .current_edit_offset(),
         )
@@ -6548,7 +6590,7 @@ mod tests {
         let document = ole.open_stream(&["PowerPoint Document"]).unwrap();
         let current_user = ole.open_stream(&["Current User"]).unwrap();
         let edit_offset = usize::try_from(
-            crate::CurrentUser::parse(&current_user)
+            crate::CurrentUser::parse(&current_user, &crate::SourceLimits::default())
                 .unwrap()
                 .current_edit_offset(),
         )
@@ -6806,7 +6848,11 @@ mod tests {
         let target = target();
         let standalone = super::resolve(&bytes, target).unwrap();
         let shape_target = super::resolve_shape_target(&bytes, target).unwrap();
-        let editor = crate::embedded::object::Editor::open_records(bytes.clone()).unwrap();
+        let editor = crate::embedded::object::Editor::open_records(
+            bytes.clone(),
+            super::presentation(&bytes).unwrap().source_limits(),
+        )
+        .unwrap();
         let supplied = super::resolve_with_shape_target(target, shape_target, &editor).unwrap();
 
         assert_eq!(supplied.target, standalone.target);

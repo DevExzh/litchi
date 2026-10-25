@@ -14,7 +14,7 @@ use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::edit::RefusalKind;
 use litchi_ppt::package::edit::{CustomTableStylesPlacement, Error, Position};
 use litchi_ppt::slide_order::{self, Refusal};
-use litchi_ppt::{DocumentStructure, Package};
+use litchi_ppt::{DocumentStructure, OpenOptions, Package};
 
 fn read(path: &str) -> Vec<u8> {
     std::fs::read(
@@ -447,7 +447,10 @@ fn document_edits_replay_through_the_structural_rebase() {
     let commit = edit.commit().unwrap();
     assert_eq!(flags(commit.package()), !before);
     assert_eq!(
-        slide_order::Snapshot::parse(&bytes(commit.package()))
+        slide_order::Snapshot::from_bytes_with_options(
+            bytes(commit.package()),
+            OpenOptions::new(),
+        )
             .unwrap()
             .external_media_path(1)
             .unwrap()

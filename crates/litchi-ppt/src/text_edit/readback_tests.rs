@@ -665,7 +665,11 @@ fn single_buffer_rewrites_match_the_per_record_rebuild() {
         fixture("poi/test-data/slideshow/41246-1.ppt"),
     ] {
         let presentation = super::presentation(&deck_bytes).unwrap();
-        let editor = crate::embedded::object::Editor::open_records(deck_bytes.clone()).unwrap();
+        let editor = crate::embedded::object::Editor::open_records(
+            deck_bytes.clone(),
+            presentation.source_limits(),
+        )
+        .unwrap();
         for slide in presentation.slides().unwrap() {
             let record = editor.persisted_record(slide.persist_id()).unwrap();
             let Ok(Some(drawing)) =

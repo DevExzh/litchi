@@ -15,11 +15,21 @@ use super::{
 };
 use crate::Package;
 use crate::master::{self, Kind};
+use crate::master_layout;
 use crate::records::Record;
 use crate::scoped::{self, Base, Failure, Lazy};
 use crate::slide_order::{self, records::Owner};
 
 const OPERATION: &str = "edit_master_metadata";
+
+fn layout_limits(base: &Base) -> master_layout::Limits {
+    let source = base.open_options().source_limits_value();
+    master_layout::Limits {
+        max_depth: source.max_depth(),
+        max_records: source.max_events(),
+        max_bytes: source.max_record_bytes(),
+    }
+}
 
 /// A staged metadata edit of one master over one immutable [`Package`].
 pub struct Edit {
@@ -62,7 +72,8 @@ impl Edit {
         let native = self.base.native()?;
         let located =
             master::locate::locate(&self.base, &native, self.kind, self.position, OPERATION)?;
-        let inner = Snapshot::parse(located.context, &located.record)
+        let limits = layout_limits(&self.base);
+        let inner = Snapshot::parse(located.context, &located.record, &limits)
             .map_err(scoped::publication(OPERATION))?
             .edit();
         Ok(State {
@@ -84,7 +95,8 @@ impl Edit {
         self.state.get_or_try_init_mut(|| {
             let native = base.native()?;
             let located = master::locate::locate(&base, &native, kind, position, OPERATION)?;
-            let inner = Snapshot::parse(located.context, &located.record)
+            let limits = layout_limits(&base);
+            let inner = Snapshot::parse(located.context, &located.record, &limits)
                 .map_err(scoped::publication(OPERATION))?
                 .edit();
             Ok::<State, Failure>(State {

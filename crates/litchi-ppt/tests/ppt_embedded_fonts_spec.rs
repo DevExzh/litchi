@@ -57,9 +57,10 @@ fn collection(record_type: u16, payload: &[u8]) -> Vec<u8> {
 }
 
 fn parsed_collection(bytes: &[u8]) -> FontCollection {
-    let (record, consumed) = Record::parse(bytes, 0).expect("valid outer PPT record");
+    let (record, consumed) =
+        Record::parse(bytes, 0, &SourceLimits::default()).expect("valid outer PPT record");
     assert_eq!(consumed, bytes.len());
-    FontCollection::parse(&record).expect("valid MS-PPT font collection")
+    FontCollection::parse(&record, &font::Limits::default()).expect("valid MS-PPT font collection")
 }
 
 #[test]
@@ -132,16 +133,24 @@ fn international_collection_and_pp10_flags_keep_ignored_bits_inert() {
 #[test]
 fn malformed_font_names_and_entity_lengths_are_rejected() {
     let malformed_utf16 = font_entity(0, &[0xd800, 0]);
-    let parsed = Record::parse(&collection(RT_FONT_COLLECTION, &malformed_utf16), 0)
-        .unwrap()
-        .0;
-    assert!(FontCollection::parse(&parsed).is_err());
+    let parsed = Record::parse(
+        &collection(RT_FONT_COLLECTION, &malformed_utf16),
+        0,
+        &SourceLimits::default(),
+    )
+    .unwrap()
+    .0;
+    assert!(FontCollection::parse(&parsed, &font::Limits::default()).is_err());
 
     let short_entity = record(0, 0, RT_FONT_ENTITY_ATOM, &[0; 67]);
-    let record = Record::parse(&collection(RT_FONT_COLLECTION, &short_entity), 0)
-        .unwrap()
-        .0;
-    assert!(FontCollection::parse(&record).is_err());
+    let record = Record::parse(
+        &collection(RT_FONT_COLLECTION, &short_entity),
+        0,
+        &SourceLimits::default(),
+    )
+    .unwrap()
+    .0;
+    assert!(FontCollection::parse(&record, &font::Limits::default()).is_err());
 }
 
 #[test]
@@ -352,8 +361,8 @@ fn signed_source_allows_exact_no_op_but_refuses_changed_font_commit() {
 fn signed_inconsistent_save_with_fonts_flag_is_preserved_on_exact_no_op() {
     let inconsistent = with_inconsistent_save_with_fonts(unsigned_ppt());
     let source = with_stream(inconsistent, &["_xmlsignatures", "origin.sigs"], b"fixture");
-    let snapshot =
-        FontSnapshot::from_bytes(source.clone()).expect("signed PPT remains inspectable");
+    let snapshot = FontSnapshot::from_bytes(source.clone(), &font::PackageLimits::default())
+        .expect("signed PPT remains inspectable");
     assert!(snapshot.fonts().base.as_ref().is_some_and(|collection| {
         collection
             .fonts
@@ -495,7 +504,8 @@ fn with_storage(source: Vec<u8>, path: &[&str]) -> Vec<u8> {
 fn with_inconsistent_save_with_fonts(source: Vec<u8>) -> Vec<u8> {
     use litchi_cfb::{OleFile, OleWriter};
 
-    let snapshot = FontSnapshot::from_bytes(source.clone()).unwrap();
+    let snapshot =
+        FontSnapshot::from_bytes(source.clone(), &font::PackageLimits::default()).unwrap();
     let owner = snapshot.document_bytes();
     let mut offset = 8usize;
     let flag_offset = loop {

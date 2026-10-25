@@ -95,8 +95,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(bytes, ClientDataLimits::default())
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &ClientDataLimits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse one complete record under explicit resource bounds.
