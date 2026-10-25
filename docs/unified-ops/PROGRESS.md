@@ -4525,6 +4525,22 @@ See [0063](0063-source-pptx-modern-comments.md).
   that pinned inactive leaves. No additional worktree has been removed, and
   nothing is pushed.
 
+  C runtime passes sixteen common/OPC/DOCX groups, 1,398 PPTX library tests
+  and integration chunks1–30, then returns the readonly no-op consumer (134).
+  Physical event admission now passes; the later test incorrectly applies a
+  pristine-package patch to different content. Return134a preserves strict
+  base matching and corrects the consumer. Remaining runtime coverage is
+  diagnostic; glossary26 runs separately on frozen C. No repaired-source
+  runtime pass is claimed.
+
+  Census v9 passes root/independent source review after binding-seal and
+  recursion returns, but actual captures remain unrun. The 96-script/6,808-row
+  corpus postcheck targets the existing full53 CLI row. Native policies
+  72/74/75 still need executable v2 consumers, not just final identity pins;
+  required engineering proceeds in separate protocol leaves137/136/135.
+  Final gates, measurements, reviewed composition and trunk integration
+  remain open. Nothing is pushed.
+
 - Coordinator raw-codec integration and cleanup update (2026-10-25):
   Required raw-profile signature enforcement merges at `c51a539757` from
   reviewed `939d401609`. The checker resolves local and external nominal
