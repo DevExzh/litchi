@@ -1,9 +1,8 @@
 use super::{
-    BTreeMap, BlobPart, Conformance, Data, Error, Event, Extension, HashSet, Kind, List,
-    MAX_BOOKMARKS, MAX_DEPTH, MAX_MEDIA, MAX_PAYLOAD_BYTES, MAX_TOTAL_PAYLOAD_BYTES, MAX_XML_BYTES,
+    BTreeMap, BlobPart, Conformance, Data, Error, Event, Extension, HashSet, Kind, Limits, List,
     Namespace, NsReader, Offset, OpcPackage, PackURI, Part, ResolveResult, Resource, Result,
-    STRICT_AUDIO_REL, STRICT_VIDEO_REL, TimeParseError, bounded, ct, document_conformance, invalid,
-    limit, parse, rt, validate_id, write_pictures, xml_error,
+    STRICT_AUDIO_REL, STRICT_VIDEO_REL, TimeParseError, ct, document_conformance_with_limits,
+    invalid, limit, parse, rt, validate_id, write_pictures, xml_error,
 };
 use litchi_core::xml::ReaderOrigin;
 
@@ -11,6 +10,19 @@ use litchi_core::xml::ReaderOrigin;
 ///
 /// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage, slide_name: &PackURI) -> Result<List> {
+    load_with_limits(
+        package,
+        slide_name,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+/// Load one slide's media graph under a caller-selected semantic policy.
+pub(crate) fn load_with_limits(
+    package: &OpcPackage,
+    slide_name: &PackURI,
+    limits: Limits,
+) -> Result<List> {
     if package
         .rels()
         .iter()
@@ -22,8 +34,8 @@ pub fn load(package: &OpcPackage, slide_name: &PackURI) -> Result<List> {
     }
     let slide = package.get_part(slide_name)?;
     require_slide(slide)?;
-    let mut value = parse(slide.blob())?;
-    let conformance = document_conformance(slide.blob())?;
+    let mut value = parse(slide.blob(), limits)?;
+    let conformance = document_conformance_with_limits(slide.blob(), limits)?;
     let mut total = 0usize;
     let mut loaded: BTreeMap<String, Resource> = BTreeMap::new();
     for picture in &mut value.pictures {
@@ -39,6 +51,7 @@ pub fn load(package: &OpcPackage, slide_name: &PackURI) -> Result<List> {
             false,
             &mut total,
             &mut loaded,
+            limits,
         )?;
         picture.resource = Some(resource.clone());
         if let Some(extension) = &picture.office_extension {
@@ -65,6 +78,7 @@ pub fn load(package: &OpcPackage, slide_name: &PackURI) -> Result<List> {
                 true,
                 &mut total,
                 &mut loaded,
+                limits,
             )?);
         }
     }
@@ -97,6 +111,7 @@ fn load_resource(
     image: bool,
     total: &mut usize,
     loaded: &mut BTreeMap<String, Resource>,
+    limits: Limits,
 ) -> Result<Resource> {
     if let Some(value) = loaded.get(target.as_str()) {
         return Ok(value.clone());
@@ -125,7 +140,7 @@ fn load_resource(
             part.content_type()
         )));
     }
-    add_payload(total, part.blob().len())?;
+    add_payload(total, part.blob().len(), limits)?;
     let value = Resource {
         part_name: target.to_string(),
         content_type: part.content_type().to_owned(),
@@ -159,19 +174,38 @@ pub(crate) fn store_with(
     conformance: Conformance,
     append: bool,
 ) -> Result<()> {
-    validate_value(value, true)?;
+    store_with_limits(
+        package,
+        slide_name,
+        value,
+        conformance,
+        append,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+/// [`store_with`] with an owner-retained semantic policy.
+pub(crate) fn store_with_limits(
+    package: &mut OpcPackage,
+    slide_name: &PackURI,
+    value: &List,
+    conformance: Conformance,
+    append: bool,
+    limits: Limits,
+) -> Result<()> {
+    validate_value_with_limits(value, true, limits)?;
     let slide = package.get_part(slide_name)?;
     require_slide(slide)?;
-    if !append && !parse(slide.blob())?.pictures.is_empty() {
+    if !append && !parse(slide.blob(), limits)?.pictures.is_empty() {
         return Err(invalid("slide already contains media pictures"));
     }
-    if document_conformance(slide.blob())? != conformance {
+    if document_conformance_with_limits(slide.blob(), limits)? != conformance {
         return Err(invalid(
             "requested conformance does not match slide namespace",
         ));
     }
-    let fragment = write_pictures(value, conformance)?;
-    let updated = insert_pictures(slide.blob(), &fragment, conformance)?;
+    let fragment = write_pictures(value, conformance, limits)?;
+    let updated = insert_pictures(slide.blob(), &fragment, conformance, limits)?;
     let mut relationships: BTreeMap<String, (String, String)> = BTreeMap::new();
     let mut parts: BTreeMap<String, Resource> = BTreeMap::new();
     for picture in &value.pictures {
@@ -179,7 +213,7 @@ pub(crate) fn store_with(
             .resource
             .as_ref()
             .ok_or_else(|| invalid("media resource is required for package storage"))?;
-        let uri = resource_uri(resource, false, Some(picture.kind))?;
+        let uri = resource_uri_with_limits(resource, false, Some(picture.kind), limits)?;
         add_part_plan(package, &mut parts, resource)?;
         let target = uri.relative_ref(slide_name.base_uri());
         add_relationship_plan(
@@ -202,7 +236,7 @@ pub(crate) fn store_with(
                 .resource
                 .as_ref()
                 .ok_or_else(|| invalid("poster resource is required for package storage"))?;
-            let uri = resource_uri(resource, true, None)?;
+            let uri = resource_uri_with_limits(resource, true, None, limits)?;
             add_part_plan(package, &mut parts, resource)?;
             add_relationship_plan(
                 &mut relationships,
@@ -237,7 +271,12 @@ pub(crate) fn store_with(
     Ok(())
 }
 
-fn insert_pictures(xml: &[u8], fragment: &[u8], conformance: Conformance) -> Result<Vec<u8>> {
+fn insert_pictures(
+    xml: &[u8],
+    fragment: &[u8],
+    conformance: Conformance,
+    limits: Limits,
+) -> Result<Vec<u8>> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     let mut depth = 0usize;
@@ -255,7 +294,7 @@ fn insert_pictures(xml: &[u8], fragment: &[u8], conformance: Conformance) -> Res
                     return Err(invalid("slide root does not match conformance"));
                 }
                 depth += 1;
-                if depth > MAX_DEPTH {
+                if depth > limits.max_depth {
                     return Err(limit("XML depth"));
                 }
                 if core
@@ -292,7 +331,7 @@ fn insert_pictures(xml: &[u8], fragment: &[u8], conformance: Conformance) -> Res
         .len()
         .checked_add(fragment.len())
         .ok_or_else(|| limit("updated XML bytes"))?;
-    if size > MAX_XML_BYTES {
+    if size > limits.max_output_bytes {
         return Err(limit("updated XML bytes"));
     }
     let mut output = Vec::with_capacity(size);
@@ -303,7 +342,15 @@ fn insert_pictures(xml: &[u8], fragment: &[u8], conformance: Conformance) -> Res
 }
 
 pub(crate) fn validate_value(value: &List, require_resources: bool) -> Result<()> {
-    if value.pictures.len() > MAX_MEDIA {
+    validate_value_with_limits(value, require_resources, Limits::DEFAULT)
+}
+
+pub(crate) fn validate_value_with_limits(
+    value: &List,
+    require_resources: bool,
+    limits: Limits,
+) -> Result<()> {
+    if value.pictures.len() > limits.max_media {
         return Err(limit("media count"));
     }
     let mut shape_ids = HashSet::new();
@@ -322,17 +369,18 @@ pub(crate) fn validate_value(value: &List, require_resources: bool) -> Result<()
                 picture.shape_id
             )));
         }
-        bounded(&picture.name)?;
+        bounded_with_limits(&picture.name, limits.max_string_bytes)?;
         validate_id(&picture.relationship_id)?;
         if require_resources && picture.resource.is_none() {
             return Err(invalid("media resource is required for package storage"));
         }
         if let Some(resource) = &picture.resource {
-            resource_uri(resource, false, Some(picture.kind))?;
+            resource_uri_with_limits(resource, false, Some(picture.kind), limits)?;
             count_payload_allocation(
                 &mut payload_allocations,
                 &mut resident_payload,
                 &resource.data,
+                limits,
             )?;
             merge_resource(&mut resources, resource)?;
         }
@@ -342,22 +390,23 @@ pub(crate) fn validate_value(value: &List, require_resources: bool) -> Result<()
                 return Err(invalid("poster resource is required for package storage"));
             }
             if let Some(resource) = &poster.resource {
-                resource_uri(resource, true, None)?;
+                resource_uri_with_limits(resource, true, None, limits)?;
                 count_payload_allocation(
                     &mut payload_allocations,
                     &mut resident_payload,
                     &resource.data,
+                    limits,
                 )?;
                 merge_resource(&mut resources, resource)?;
             }
         }
         if let Some(extension) = &picture.office_extension {
-            validate_extension(extension)?;
+            validate_extension_with_limits(extension, limits)?;
         }
     }
     let mut total = 0usize;
     for resource in resources.values() {
-        add_payload(&mut total, resource.data.len())?;
+        add_payload(&mut total, resource.data.len(), limits)?;
     }
     Ok(())
 }
@@ -366,15 +415,16 @@ fn count_payload_allocation(
     allocations: &mut HashSet<(usize, usize)>,
     total: &mut usize,
     data: &Data,
+    limits: Limits,
 ) -> Result<()> {
     let allocation = (data.as_ptr() as usize, data.len());
     if allocations.insert(allocation) {
-        add_payload(total, data.len())?;
+        add_payload(total, data.len(), limits)?;
     }
     Ok(())
 }
 
-fn validate_extension(value: &Extension) -> Result<()> {
+fn validate_extension_with_limits(value: &Extension, limits: Limits) -> Result<()> {
     if value.embed_relationship_id.is_none() && value.link_relationship_id.is_none() {
         return Err(invalid(
             "p14 media extension requires embed or link relationship",
@@ -387,14 +437,14 @@ fn validate_extension(value: &Extension) -> Result<()> {
     {
         validate_id(id)?;
     }
-    if value.bookmarks.len() > MAX_BOOKMARKS {
+    if value.bookmarks.len() > limits.max_bookmarks {
         return Err(limit("bookmark count"));
     }
     let mut names = HashSet::new();
     let mut times = HashSet::new();
     for bookmark in &value.bookmarks {
         if let Some(name) = &bookmark.name {
-            bounded(name)?;
+            bounded_with_limits(name, limits.max_string_bytes)?;
             if !names.insert(name) {
                 return Err(invalid(format!("duplicate media bookmark name '{name}'")));
             }
@@ -421,6 +471,15 @@ pub(crate) fn resource_uri(
     image: bool,
     kind: Option<Kind>,
 ) -> Result<PackURI> {
+    resource_uri_with_limits(resource, image, kind, Limits::DEFAULT)
+}
+
+fn resource_uri_with_limits(
+    resource: &Resource,
+    image: bool,
+    kind: Option<Kind>,
+    limits: Limits,
+) -> Result<PackURI> {
     let uri = PackURI::new(&resource.part_name).map_err(Error::Invalid)?;
     if !uri.as_str().starts_with("/ppt/media/") {
         return Err(invalid(format!("resource '{uri}' is outside /ppt/media")));
@@ -445,10 +504,18 @@ pub(crate) fn resource_uri(
             ));
         }
     }
-    if resource.data.len() > MAX_PAYLOAD_BYTES {
+    if resource.data.len() > limits.max_payload_bytes {
         return Err(limit("individual payload bytes"));
     }
     Ok(uri)
+}
+
+fn bounded_with_limits(value: &str, maximum: usize) -> Result<()> {
+    if value.len() <= maximum {
+        Ok(())
+    } else {
+        Err(limit("string bytes"))
+    }
 }
 
 fn merge_resource(resources: &mut BTreeMap<String, Resource>, resource: &Resource) -> Result<()> {
@@ -497,14 +564,14 @@ fn add_relationship_plan(
     }
     Ok(())
 }
-fn add_payload(total: &mut usize, size: usize) -> Result<()> {
-    if size > MAX_PAYLOAD_BYTES {
+fn add_payload(total: &mut usize, size: usize, limits: Limits) -> Result<()> {
+    if size > limits.max_payload_bytes {
         return Err(limit("individual payload bytes"));
     }
     *total = total
         .checked_add(size)
         .ok_or_else(|| limit("total payload bytes"))?;
-    if *total > MAX_TOTAL_PAYLOAD_BYTES {
+    if *total > limits.max_total_payload_bytes {
         Err(limit("total payload bytes"))
     } else {
         Ok(())

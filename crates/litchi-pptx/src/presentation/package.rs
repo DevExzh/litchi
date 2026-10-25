@@ -122,7 +122,11 @@ fn capture_slides_inner<'a, 'parent>(
             (SlidePart::from_part(part)?, None)
         };
         slides.push(CaptureSlide {
-            slide: Slide::new(package, slide_part),
+            slide: Slide::new_with_semantic_limits(
+                package,
+                slide_part,
+                presentation.semantic_limits,
+            ),
             name,
         });
     }
@@ -188,8 +192,9 @@ pub(super) fn styles(package: &OpcPackage) -> Result<Option<crate::table::style:
 pub(super) fn notes(
     package: &OpcPackage,
     presentation: &PresentationPart<'_>,
+    limits: crate::notes::Limits,
 ) -> Result<Option<crate::notes::Graph>> {
-    crate::notes::load(package, presentation.part().partname())
+    crate::notes::load_with_limits(package, presentation.part().partname(), limits)
 }
 
 #[cfg(feature = "vba-inspection")]
@@ -274,7 +279,11 @@ pub(super) fn slide<'a>(
         return Ok(None);
     };
     let part = slide_part(package, presentation.part(), reference)?;
-    Ok(Some(Slide::new(package, part)))
+    Ok(Some(Slide::new_with_semantic_limits(
+        package,
+        part,
+        presentation.semantic_limits,
+    )))
 }
 
 pub(super) fn find_slide<'a>(
@@ -308,9 +317,10 @@ pub(super) fn slides<'a>(presentation: &Presentation<'a>) -> Result<Vec<Slide<'a
     let references = presentation.catalog()?;
     let mut slides = Vec::with_capacity(references.len());
     for reference in references {
-        slides.push(Slide::new(
+        slides.push(Slide::new_with_semantic_limits(
             package,
             slide_part(package, presentation.part(), reference)?,
+            presentation.semantic_limits,
         ));
     }
     Ok(slides)

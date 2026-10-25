@@ -80,7 +80,12 @@ impl Edit<'_> {
     pub fn tags<'s>(&self, slide: impl Into<crate::slide::Selector<'s>>) -> Result<Option<List>> {
         let opc = self.staged.opc();
         let slide = crate::package::resolve_slide(opc, slide.into())?;
-        Ok(super::load(opc, &slide)?.map(super::Source::into_list))
+        let limits = self
+            .staged
+            .semantic_limits()
+            .tag()
+            .constrained_by_source(opc.read_limits());
+        Ok(super::load_with_limits(opc, &slide, limits)?.map(super::Source::into_list))
     }
 
     /// Create or replace one slide's direct programmable-tag list. Returns
@@ -96,7 +101,13 @@ impl Edit<'_> {
         list: List,
     ) -> Result<Option<List>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
-        self.staged.update(move |opc| super::put(opc, &slide, list))
+        let limits = self
+            .staged
+            .semantic_limits()
+            .tag()
+            .constrained_by_source(self.staged.opc().read_limits());
+        self.staged
+            .update(move |opc| super::put_with_limits(opc, &slide, list, limits))
     }
 
     /// Remove one slide's direct programmable-tag list. Removal is
@@ -112,7 +123,13 @@ impl Edit<'_> {
         slide: impl Into<crate::slide::Selector<'s>>,
     ) -> Result<Option<List>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
-        self.staged.update(move |opc| super::remove(opc, &slide))
+        let limits = self
+            .staged
+            .semantic_limits()
+            .tag()
+            .constrained_by_source(self.staged.opc().read_limits());
+        self.staged
+            .update(move |opc| super::remove_with_limits(opc, &slide, limits))
     }
 
     /// Discard every staged change.

@@ -69,15 +69,18 @@ const MAX_CHART_XML: usize = 64 * 1024 * 1024;
 pub(crate) fn load_eager_notes<'a>(
     package: &'a litchi_opc::OpcPackage,
     slide: &SlidePart<'a>,
+    shape_limits: crate::shape::Limits,
+    notes_limits: crate::notes::Limits,
 ) -> Result<Option<Notes>> {
-    eager_notes::load(package, slide)
+    eager_notes::load(package, slide, shape_limits, notes_limits)
 }
 
 pub(crate) fn load_eager_comments<'a>(
     package: &'a litchi_opc::OpcPackage,
     slide: &SlidePart<'a>,
+    limits: crate::comments::Limits,
 ) -> Result<Option<Comments>> {
-    comments::load_eager(package, slide)
+    comments::load_eager(package, slide, limits)
 }
 
 /// A source part retained by a detached related-part snapshot.
@@ -466,6 +469,7 @@ fn selected_relationship(
 fn selected_source_authors(
     owner: &SourceInner,
     comments: &[crate::comments::Comment],
+    limits: crate::comments::Limits,
 ) -> Result<Option<(String, SourcePart, Vec<crate::comments::Author>)>> {
     // A non-empty legacy comments part requires the presentation-level author
     // relationship and its selected closure before any values are projected.
@@ -498,18 +502,13 @@ fn selected_source_authors(
     let target = relationship.target_partname().map_err(|_| {
         Error::Relationship("source comment-author relationship target is invalid".into())
     })?;
-    let part = load_part(
-        owner,
-        &target,
-        AUTHORS_CONTENT_TYPE,
-        crate::comments::MAX_PART_BYTES,
-    )?;
+    let part = load_part(owner, &target, AUTHORS_CONTENT_TYPE, limits.max_input_bytes)?;
     if !part.source_relationships().is_empty() {
         return Err(Error::Relationship(
             "source comment-author part must not have relationships".into(),
         ));
     }
-    let authors = parse_comment_authors(part.blob())?;
+    let authors = parse_comment_authors(part.blob(), limits)?;
     Ok(Some((relationship.r_id().to_owned(), part, authors)))
 }
 
@@ -716,22 +715,25 @@ impl SourceSlide {
     /// Returns typed source, execution, limit, relationship or XML errors.
     pub fn notes(&self) -> Result<Option<Notes>> {
         let pending = with_fences(&self.owner, || {
+            let semantic = self.owner.semantic_limits.unwrap_or_default();
+            let shape_limits = semantic.shape();
+            let notes_limits = semantic.notes().constrained_by_source(self.owner.limits);
             let Some((relationship_id, part)) = selected_relationship(
                 &self.owner,
                 self,
                 NOTES_SLIDE_REL,
                 "notesSlide",
                 CT_NOTES_SLIDE,
-                crate::notes::MAX_NOTES_XML,
+                notes_limits.max_input_bytes,
                 "source slide has multiple notes relationships",
             )?
             else {
                 return Ok(None);
             };
 
-            notes::validate(&self.owner, &self.data.part_uri, &part)?;
+            notes::validate_with_limits(&self.owner, &self.data.part_uri, &part, notes_limits)?;
             let candidate = acquire_scene(&self.owner, &part, |source| {
-                let parsed = crate::shape::Scene::read(source.blob())?;
+                let parsed = crate::shape::Scene::read(source.blob(), shape_limits)?;
                 let scene = OwnedScene::from_source(parsed, source.source_data().clone())?;
                 strict_scene(&scene, "notes")?;
                 Ok(scene)
@@ -756,13 +758,19 @@ impl SourceSlide {
     /// Returns typed source, execution, limit, relationship or XML errors.
     pub fn comments(&self) -> Result<Option<Comments>> {
         with_fences(&self.owner, || {
+            let comment_limits = self
+                .owner
+                .semantic_limits
+                .unwrap_or_default()
+                .comments()
+                .constrained_by_source(self.owner.limits);
             let Some((relationship_id, part)) = selected_relationship(
                 &self.owner,
                 self,
                 COMMENTS_REL,
                 "comments",
                 CT_COMMENTS,
-                crate::comments::MAX_PART_BYTES,
+                comment_limits.max_input_bytes,
                 "source slide has multiple comments relationships",
             )?
             else {
@@ -774,14 +782,14 @@ impl SourceSlide {
                     "source comments part must not have relationships".into(),
                 ));
             }
-            let comments = parse_slide_comments_strict(part.blob())?;
+            let comments = parse_slide_comments_strict(part.blob(), comment_limits)?;
             if comments.len() > crate::comments::MAX_COMMENTS_PER_SLIDE {
                 return Err(Error::Limit {
                     resource: "source comments entries",
                     limit: crate::comments::MAX_COMMENTS_PER_SLIDE,
                 });
             }
-            let authors = selected_source_authors(&self.owner, &comments)?;
+            let authors = selected_source_authors(&self.owner, &comments, comment_limits)?;
             let (author_related, author_values) = match authors {
                 Some((relationship_id, part, authors)) => (
                     Some(RelatedPart::new(part, &relationship_id)),

@@ -1,6 +1,6 @@
 use super::super::codec::{parse_profiled, pml, xml_error};
 use super::super::{
-    CONTENT_TYPE, Conformance, Error, List, MAX_OWNER_BYTES, MAX_OWNER_DEPTH,
+    CONTENT_TYPE, Conformance, Error, Limits, List, MAX_OWNER_BYTES, MAX_OWNER_DEPTH,
     MAX_OWNER_MARKED_BYTES, MAX_OWNER_NODES, MAX_TAG_PARTS, P14, P15, Result, Source, allocation,
     invalid, is_relationship, write,
 };
@@ -18,7 +18,7 @@ use super::validation::{
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{
-    Capabilities, Limits, OffsetLimits, active_offsets, process_markup_compatibility,
+    Capabilities, Limits as MceLimits, OffsetLimits, active_offsets, process_markup_compatibility,
 };
 use litchi_opc::{OpcPackage, PackURI, Part as OpcPart, XmlPart};
 use quick_xml::events::{BytesStart, Event};
@@ -38,6 +38,14 @@ use std::ops::Range;
 ///
 /// Returns an error if the operation fails.
 pub fn discover(owner: &dyn OpcPart, package: &OpcPackage) -> Result<Vec<Source>> {
+    discover_with_limits(owner, package, Limits::from_source(package.read_limits()))
+}
+
+pub(crate) fn discover_with_limits(
+    owner: &dyn OpcPart,
+    package: &OpcPackage,
+    limits: Limits,
+) -> Result<Vec<Source>> {
     let mut scanned = 0usize;
     let mut relationships = Vec::new();
     relationships
@@ -91,7 +99,7 @@ pub fn discover(owner: &dyn OpcPart, package: &OpcPackage) -> Result<Vec<Source>
                 "tag-list part '{target}' has unexpected relationships"
             )));
         }
-        let (list, conformance) = parse_profiled(part.blob())?;
+        let (list, conformance) = parse_profiled(part.blob(), limits)?;
         output.push(Source {
             relationship_id: relationship.r_id().into(),
             part_name: target,
@@ -113,13 +121,25 @@ pub fn discover(owner: &dyn OpcPart, package: &OpcPackage) -> Result<Vec<Source>
 ///
 /// Returns an error if the input cannot be read or is malformed.
 pub fn load(package: &OpcPackage, owner: &PackURI) -> Result<Option<Source>> {
+    load_with_limits(package, owner, Limits::from_source(package.read_limits()))
+}
+
+/// Load the optional owner tag list under an owner-retained semantic policy.
+pub(crate) fn load_with_limits(
+    package: &OpcPackage,
+    owner: &PackURI,
+    limits: Limits,
+) -> Result<Option<Source>> {
     let owner = package.get_part(owner)?;
-    let processed = process_owner_ooxml(owner.blob())?;
-    let layout = scan_owner_xml(processed.as_ref(), owner.content_type())?;
+    let owner_limit = owner_xml_limit(package.read_limits());
+    let processed = process_owner_ooxml_with_limit(owner.blob(), owner_limit)?;
+    let layout = scan_owner_xml_with_limit(processed.as_ref(), owner.content_type(), owner_limit)?;
     layout
         .anchor
         .as_ref()
-        .map(|anchor| resolve_anchor(owner, package, anchor, layout.conformance))
+        .map(|anchor| {
+            resolve_anchor_with_limits(owner, package, anchor, layout.conformance, limits)
+        })
         .transpose()
 }
 
@@ -142,14 +162,30 @@ pub fn load(package: &OpcPackage, owner: &PackURI) -> Result<Option<Source>> {
 ///
 /// Returns an error if the operation fails.
 pub(crate) fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Option<List>> {
+    put_with_limits(
+        package,
+        owner,
+        list,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+pub(crate) fn put_with_limits(
+    package: &mut OpcPackage,
+    owner: &PackURI,
+    list: List,
+    limits: Limits,
+) -> Result<Option<List>> {
+    let owner_limit = owner_xml_limit(package.read_limits());
     let (owner_name, layout, attached, anchor_uses) = {
         let owner = package.get_part(owner)?;
-        let layout = scan_owner_source(owner.blob(), owner.content_type())?;
+        let layout = scan_owner_source_with_limit(owner.blob(), owner.content_type(), owner_limit)?;
         let attached = layout
             .anchor
             .as_ref()
             .map(|anchor| {
-                let source = resolve_anchor(owner, package, anchor, layout.conformance)?;
+                let source =
+                    resolve_anchor_with_limits(owner, package, anchor, layout.conformance, limits)?;
                 let relationship = owner.rels().get(source.rel()).ok_or_else(|| {
                     invalid("anchored tag-list relationship disappeared during preflight")
                 })?;
@@ -171,7 +207,7 @@ pub(crate) fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Resu
     let conformance = attached
         .as_ref()
         .map_or(layout.conformance, |value| value.source.conformance);
-    let xml = staged_xml(&list, conformance)?;
+    let xml = staged_xml(&list, conformance, limits)?;
 
     if let Some(attached) = attached {
         if package.get_part(attached.source.part())?.blob() == xml {
@@ -199,9 +235,14 @@ pub(crate) fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Resu
         let (relationship_id, owner_xml) = if shared_anchor {
             let owner = package.get_part(&owner_name)?;
             let relationship_id = available_relationship_id(owner)?;
-            let owner_xml =
-                replace_anchor_relationship_id(owner.blob(), &layout, relationship_id.as_str())?;
-            let staged = scan_owner_source(&owner_xml, owner.content_type())?;
+            let owner_xml = replace_anchor_relationship_id(
+                owner.blob(),
+                &layout,
+                relationship_id.as_str(),
+                owner_limit,
+            )?;
+            let staged =
+                scan_owner_source_with_limit(&owner_xml, owner.content_type(), owner_limit)?;
             if staged.conformance != layout.conformance
                 || staged.anchor.as_ref().map(|anchor| anchor.id.as_str())
                     != Some(relationship_id.as_str())
@@ -251,8 +292,8 @@ pub(crate) fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Resu
         let part_name = available_part_name(package)?;
         let target_ref = part_name.relative_ref(owner_name.base_uri());
         validate_relative_target(&owner_name, &target_ref, &part_name)?;
-        let owner_xml = add_anchor(owner.blob(), &layout, &relationship_id)?;
-        let staged = scan_owner_source(&owner_xml, owner.content_type())?;
+        let owner_xml = add_anchor(owner.blob(), &layout, &relationship_id, owner_limit)?;
+        let staged = scan_owner_source_with_limit(&owner_xml, owner.content_type(), owner_limit)?;
         if staged.conformance != layout.conformance
             || staged.anchor.as_ref().map(|anchor| anchor.id.as_str())
                 != Some(relationship_id.as_str())
@@ -265,7 +306,8 @@ pub(crate) fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Resu
     refuse_signed_change(package)?;
     {
         let owner = package.get_part_mut(&owner_name)?;
-        let current = scan_owner_source(owner.blob(), owner.content_type())?;
+        let current =
+            scan_owner_source_with_limit(owner.blob(), owner.content_type(), owner_limit)?;
         if current.anchor.is_some() || owner.rels().get(&relationship_id).is_some() {
             return Err(invalid("tag-owner graph changed during preflight"));
         }
@@ -300,21 +342,31 @@ pub(crate) fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Resu
 ///
 /// Returns an error if the operation fails.
 pub(crate) fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option<List>> {
+    remove_with_limits(package, owner, Limits::from_source(package.read_limits()))
+}
+
+pub(crate) fn remove_with_limits(
+    package: &mut OpcPackage,
+    owner: &PackURI,
+    limits: Limits,
+) -> Result<Option<List>> {
+    let owner_limit = owner_xml_limit(package.read_limits());
     let (owner_name, layout, attached, owner_xml, retain_relationship, orphan) = {
         let owner = package.get_part(owner)?;
-        let layout = scan_owner_source(owner.blob(), owner.content_type())?;
+        let layout = scan_owner_source_with_limit(owner.blob(), owner.content_type(), owner_limit)?;
         let Some(anchor) = layout.anchor.as_ref() else {
             return Ok(None);
         };
-        let source = resolve_anchor(owner, package, anchor, layout.conformance)?;
+        let source =
+            resolve_anchor_with_limits(owner, package, anchor, layout.conformance, limits)?;
         let relationship = owner.rels().get(source.rel()).ok_or_else(|| {
             invalid("anchored tag-list relationship disappeared during preflight")
         })?;
         let relationship_type = relationship.reltype().to_owned();
         let owner_name = owner.partname().clone();
         let retain_relationship = owner_anchor_uses(owner.blob(), anchor.id.as_str())? > 1;
-        let owner_xml = remove_anchor(owner.blob(), &layout)?;
-        let staged = scan_owner_source(&owner_xml, owner.content_type())?;
+        let owner_xml = remove_anchor(owner.blob(), &layout, owner_limit)?;
+        let staged = scan_owner_source_with_limit(&owner_xml, owner.content_type(), owner_limit)?;
         if staged.conformance != layout.conformance || staged.anchor.is_some() {
             return Err(invalid("staged tag-owner removal did not round-trip"));
         }
@@ -336,7 +388,8 @@ pub(crate) fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option
     refuse_signed_change(package)?;
     {
         let owner = package.get_part_mut(&owner_name)?;
-        let current = scan_owner_source(owner.blob(), owner.content_type())?;
+        let current =
+            scan_owner_source_with_limit(owner.blob(), owner.content_type(), owner_limit)?;
         if current.anchor.as_ref().map(|anchor| anchor.id.as_str())
             != layout.anchor.as_ref().map(|anchor| anchor.id.as_str())
         {
@@ -360,11 +413,11 @@ pub(crate) fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option
     Ok(Some(attached.source.into_list()))
 }
 
-fn scan_owner_xml(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
-    if xml.len() > MAX_OWNER_BYTES {
+fn scan_owner_xml_with_limit(xml: &[u8], content_type: &str, max_bytes: usize) -> Result<OwnerXml> {
+    if xml.len() > max_bytes {
         return Err(Error::Limit {
             resource: "tag-owner XML bytes",
-            limit: MAX_OWNER_BYTES,
+            limit: max_bytes,
         });
     }
     let mut reader = NsReader::from_reader(xml);
@@ -718,26 +771,37 @@ fn owner_mce_capabilities() -> Capabilities {
     capabilities
 }
 
-fn owner_mce_limits(max_bytes: usize) -> Limits {
-    Limits {
+fn owner_mce_limits(max_bytes: usize) -> MceLimits {
+    MceLimits {
         max_input_bytes: max_bytes,
         max_output_bytes: max_bytes,
         max_depth: MAX_OWNER_DEPTH,
-        ..Limits::default()
+        ..MceLimits::default()
     }
 }
 
-fn owner_active_offset_limits() -> OffsetLimits {
+fn owner_active_offset_limits(max_bytes: usize) -> OffsetLimits {
     OffsetLimits {
-        max_source_bytes: MAX_OWNER_BYTES,
+        max_source_bytes: max_bytes,
         max_offsets: MAX_OWNER_NODES,
-        max_marked_bytes: MAX_OWNER_MARKED_BYTES,
-        processing: owner_mce_limits(MAX_OWNER_MARKED_BYTES),
+        max_marked_bytes: max_bytes.min(MAX_OWNER_MARKED_BYTES),
+        processing: owner_mce_limits(max_bytes.min(MAX_OWNER_MARKED_BYTES)),
     }
 }
 
 pub(crate) fn process_owner_ooxml(xml: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>> {
-    process_pptx_ooxml(xml, MAX_OWNER_BYTES)
+    process_owner_ooxml_with_limit(xml, MAX_OWNER_BYTES)
+}
+
+fn owner_xml_limit(source: litchi_opc::SourceLimits) -> usize {
+    MAX_OWNER_BYTES.min(source.max_part_bytes().min(usize::MAX as u64) as usize)
+}
+
+fn process_owner_ooxml_with_limit(
+    xml: &[u8],
+    max_bytes: usize,
+) -> Result<std::borrow::Cow<'_, [u8]>> {
+    process_pptx_ooxml(xml, max_bytes)
 }
 
 pub(crate) fn process_pptx_ooxml(
@@ -750,29 +814,33 @@ pub(crate) fn process_pptx_ooxml(
     )
 }
 
-fn scan_owner_source(xml: &[u8], content_type: &str) -> Result<OwnerXml> {
-    let processed = process_owner_ooxml(xml)?;
+fn scan_owner_source_with_limit(
+    xml: &[u8],
+    content_type: &str,
+    max_bytes: usize,
+) -> Result<OwnerXml> {
+    let processed = process_owner_ooxml_with_limit(xml, max_bytes)?;
     if matches!(processed, std::borrow::Cow::Borrowed(_)) {
-        return scan_owner_xml(xml, content_type);
+        return scan_owner_xml_with_limit(xml, content_type, max_bytes);
     }
-    let semantic = scan_owner_xml(processed.as_ref(), content_type)?;
-    let source_offsets = owner_map_offsets(xml)?;
+    let semantic = scan_owner_xml_with_limit(processed.as_ref(), content_type, max_bytes)?;
+    let source_offsets = owner_map_offsets_with_limit(xml, max_bytes)?;
     let active = active_offsets(
         xml,
         &source_offsets,
         &owner_mce_capabilities(),
-        &owner_active_offset_limits(),
+        &owner_active_offset_limits(max_bytes),
     )?;
     let processed_elements = collect_owner_map_elements(processed.as_ref(), None)?;
     let source_elements = collect_owner_map_elements(xml, Some(&active))?;
     map_owner_source(xml, semantic, &processed_elements, source_elements)
 }
 
-fn owner_map_offsets(xml: &[u8]) -> Result<Vec<u32>> {
-    if xml.len() > MAX_OWNER_BYTES {
+fn owner_map_offsets_with_limit(xml: &[u8], max_bytes: usize) -> Result<Vec<u32>> {
+    if xml.len() > max_bytes {
         return Err(Error::Limit {
             resource: "tag-owner XML bytes",
-            limit: MAX_OWNER_BYTES,
+            limit: max_bytes,
         });
     }
     let mut reader = NsReader::from_reader(xml);
@@ -1156,7 +1224,12 @@ fn raw_container_contains_only_anchor(
     Ok(before.iter().all(u8::is_ascii_whitespace) && after.iter().all(u8::is_ascii_whitespace))
 }
 
-fn add_anchor(xml: &[u8], layout: &OwnerXml, relationship_id: &str) -> Result<Vec<u8>> {
+fn add_anchor(
+    xml: &[u8],
+    layout: &OwnerXml,
+    relationship_id: &str,
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
     if layout.anchor.is_some() {
         return Err(invalid("tag owner already has a direct p:tags anchor"));
     }
@@ -1168,7 +1241,7 @@ fn add_anchor(xml: &[u8], layout: &OwnerXml, relationship_id: &str) -> Result<Ve
     );
     if let Some(container) = &layout.container {
         if !container.empty {
-            return insert_xml(xml, container.close_start, anchor.as_bytes());
+            return insert_xml(xml, container.close_start, anchor.as_bytes(), max_bytes);
         }
         let raw = xml
             .get(container.span.clone())
@@ -1184,28 +1257,34 @@ fn add_anchor(xml: &[u8], layout: &OwnerXml, relationship_id: &str) -> Result<Ve
         replacement.extend_from_slice(b"</");
         replacement.extend_from_slice(&container.qualified_name);
         replacement.push(b'>');
-        return replace_xml(xml, container.span.clone(), &replacement);
+        return replace_xml(xml, container.span.clone(), &replacement, max_bytes);
     }
     let container = format!(
         "<p:custDataLst xmlns:p=\"{}\">{anchor}</p:custDataLst>",
         layout.conformance.namespace()
     );
-    insert_xml(xml, layout.insertion, container.as_bytes())
+    insert_xml(xml, layout.insertion, container.as_bytes(), max_bytes)
 }
 
 fn replace_anchor_relationship_id(
     xml: &[u8],
     layout: &OwnerXml,
     relationship_id: &str,
+    max_bytes: usize,
 ) -> Result<Vec<u8>> {
     let anchor = layout
         .anchor
         .as_ref()
         .ok_or_else(|| invalid("tag owner has no direct p:tags anchor"))?;
-    replace_xml(xml, anchor.id_value.clone(), relationship_id.as_bytes())
+    replace_xml(
+        xml,
+        anchor.id_value.clone(),
+        relationship_id.as_bytes(),
+        max_bytes,
+    )
 }
 
-fn remove_anchor(xml: &[u8], layout: &OwnerXml) -> Result<Vec<u8>> {
+fn remove_anchor(xml: &[u8], layout: &OwnerXml, max_bytes: usize) -> Result<Vec<u8>> {
     let anchor = layout
         .anchor
         .as_ref()
@@ -1215,17 +1294,22 @@ fn remove_anchor(xml: &[u8], layout: &OwnerXml) -> Result<Vec<u8>> {
         .as_ref()
         .ok_or_else(|| invalid("direct p:tags has no p:custDataLst parent"))?;
     if container.child_elements == 1 && !container.other_content && !container.preserve_when_empty {
-        replace_xml(xml, container.span.clone(), &[])
+        replace_xml(xml, container.span.clone(), &[], max_bytes)
     } else {
-        replace_xml(xml, anchor.span.clone(), &[])
+        replace_xml(xml, anchor.span.clone(), &[], max_bytes)
     }
 }
 
-fn insert_xml(xml: &[u8], offset: usize, value: &[u8]) -> Result<Vec<u8>> {
-    replace_xml(xml, offset..offset, value)
+fn insert_xml(xml: &[u8], offset: usize, value: &[u8], max_bytes: usize) -> Result<Vec<u8>> {
+    replace_xml(xml, offset..offset, value, max_bytes)
 }
 
-pub(crate) fn replace_xml(xml: &[u8], range: Range<usize>, value: &[u8]) -> Result<Vec<u8>> {
+pub(crate) fn replace_xml(
+    xml: &[u8],
+    range: Range<usize>,
+    value: &[u8],
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
     let before = xml
         .get(..range.start)
         .ok_or_else(|| invalid("XML patch start is outside owner XML"))?;
@@ -1237,10 +1321,10 @@ pub(crate) fn replace_xml(xml: &[u8], range: Range<usize>, value: &[u8]) -> Resu
         .checked_add(value.len())
         .and_then(|len| len.checked_add(after.len()))
         .ok_or_else(|| invalid("patched tag-owner XML length overflow"))?;
-    if len > MAX_OWNER_BYTES {
+    if len > max_bytes {
         return Err(Error::Limit {
             resource: "patched tag-owner XML bytes",
-            limit: MAX_OWNER_BYTES,
+            limit: max_bytes,
         });
     }
     let mut output = Vec::new();
@@ -1253,9 +1337,13 @@ pub(crate) fn replace_xml(xml: &[u8], range: Range<usize>, value: &[u8]) -> Resu
     Ok(output)
 }
 
-pub(crate) fn staged_xml(value: &List, conformance: Conformance) -> Result<Vec<u8>> {
-    let xml = write(value, conformance)?;
-    let (staged, staged_conformance) = parse_profiled(&xml)?;
+pub(crate) fn staged_xml(
+    value: &List,
+    conformance: Conformance,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    let xml = write(value, conformance, limits)?;
+    let (staged, staged_conformance) = parse_profiled(&xml, limits)?;
     if staged_conformance != conformance || &staged != value {
         return Err(invalid("staged tag-list XML did not round-trip"));
     }

@@ -739,6 +739,10 @@ impl Snapshot {
         self.limits
     }
 
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        self.owner_state.semantic_limits.unwrap_or_default()
+    }
+
     pub(crate) fn resolve_slide(&self, key: crate::slide::Selector<'_>) -> Result<Slide> {
         match key {
             crate::slide::Selector::Position(position) => {
@@ -771,6 +775,15 @@ pub(crate) fn capture_with_provenance(
     limits: Limits,
     physical_source_provenance: bool,
 ) -> Result<Snapshot> {
+    capture_with_provenance_and_semantic_limits(package, limits, physical_source_provenance, None)
+}
+
+pub(crate) fn capture_with_provenance_and_semantic_limits(
+    package: &OpcPackage,
+    limits: Limits,
+    physical_source_provenance: bool,
+    semantic_limits: Option<crate::open_options::SemanticLimits>,
+) -> Result<Snapshot> {
     capture_internal(
         package,
         limits,
@@ -778,6 +791,7 @@ pub(crate) fn capture_with_provenance(
         Revision::Cold,
         None,
         None,
+        semantic_limits,
     )
 }
 
@@ -793,6 +807,22 @@ pub(crate) fn capture_with_parent_digests(
     physical_source_provenance: bool,
     parent: &PartDigests,
 ) -> Result<Snapshot> {
+    capture_with_parent_digests_and_semantic_limits(
+        package,
+        limits,
+        physical_source_provenance,
+        parent,
+        None,
+    )
+}
+
+pub(crate) fn capture_with_parent_digests_and_semantic_limits(
+    package: &OpcPackage,
+    limits: Limits,
+    physical_source_provenance: bool,
+    parent: &PartDigests,
+    semantic_limits: Option<crate::open_options::SemanticLimits>,
+) -> Result<Snapshot> {
     capture_internal(
         package,
         limits,
@@ -800,6 +830,7 @@ pub(crate) fn capture_with_parent_digests(
         Revision::Parent(parent),
         None,
         None,
+        semantic_limits,
     )
 }
 
@@ -818,6 +849,28 @@ pub(crate) fn capture_with_revision_and_digests_and_mce(
     parent_mce: Option<&RetainedMce>,
     parent_roots: Option<&SlideRootMemo>,
 ) -> Result<Snapshot> {
+    capture_with_revision_and_digests_and_mce_and_semantic_limits(
+        package,
+        limits,
+        physical_source_provenance,
+        revision,
+        digests,
+        parent_mce,
+        parent_roots,
+        None,
+    )
+}
+
+pub(crate) fn capture_with_revision_and_digests_and_mce_and_semantic_limits(
+    package: &OpcPackage,
+    limits: Limits,
+    physical_source_provenance: bool,
+    revision: [u8; 32],
+    digests: PartDigests,
+    parent_mce: Option<&RetainedMce>,
+    parent_roots: Option<&SlideRootMemo>,
+    semantic_limits: Option<crate::open_options::SemanticLimits>,
+) -> Result<Snapshot> {
     capture_internal(
         package,
         limits,
@@ -825,6 +878,7 @@ pub(crate) fn capture_with_revision_and_digests_and_mce(
         Revision::Known(revision, digests),
         parent_mce,
         parent_roots,
+        semantic_limits,
     )
 }
 
@@ -846,6 +900,7 @@ fn capture_internal(
     revision: Revision<'_>,
     parent_mce: Option<&RetainedMce>,
     parent_roots: Option<&SlideRootMemo>,
+    semantic_limits: Option<crate::open_options::SemanticLimits>,
 ) -> Result<Snapshot> {
     let presentation = PresentationPart::from_package(package)?;
     let presentation_name = presentation.part().partname().clone();
@@ -857,7 +912,11 @@ fn capture_internal(
             limit: limits.max_parts,
         });
     }
-    let view = crate::presentation::Presentation::new(presentation, package);
+    let view = crate::presentation::Presentation::new_with_semantic_limits(
+        presentation,
+        package,
+        semantic_limits,
+    );
     let mut mce_capture = MceCapture::new(parent_mce, limits.max_retained_mce_bytes());
     let captured = view.capture_slides_with_mce(&mut mce_capture, parent_roots)?;
     if references.len() != captured.slides.len() {
@@ -929,13 +988,24 @@ fn capture_internal(
         });
     }
     let _notes = match slide_root_proofs.as_deref() {
-        Some(proofs) => crate::notes::load_snapshot_with_slide_root_proofs(
+        Some(proofs) => crate::notes::load_snapshot_with_slide_root_proofs_and_limits(
             package,
             &presentation_name,
             references.len(),
             proofs,
+            semantic_limits
+                .unwrap_or_default()
+                .notes()
+                .constrained_by_source(package.read_limits()),
         )?,
-        None => crate::notes::load_snapshot(package, &presentation_name)?,
+        None => crate::notes::load_snapshot_with_limits(
+            package,
+            &presentation_name,
+            semantic_limits
+                .unwrap_or_default()
+                .notes()
+                .constrained_by_source(package.read_limits()),
+        )?,
     };
     let slide_name_index = SlideNameIndex::build(&slides)?;
     // The snapshot owns its package from here on, and the memo it keeps must

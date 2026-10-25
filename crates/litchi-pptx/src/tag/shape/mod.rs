@@ -23,6 +23,7 @@ mod validation;
 mod tests;
 
 pub use codec::load;
+pub(crate) use codec::load_with_limits;
 mod edit;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
@@ -35,4 +36,4 @@ pub(crate) use codec::{selected_raw_span, selected_raw_span_for_shape};
 // `tag::package` uses this narrow lexical seam while discovering package-level
 // tag anchors. The implementation remains private to the tag subsystem.
 pub(crate) use codec::attribute_value_span;
-pub(crate) use codec::{put, remove};
+pub(crate) use codec::{put, put_with_limits, remove, remove_with_limits};

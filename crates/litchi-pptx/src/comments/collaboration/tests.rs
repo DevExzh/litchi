@@ -91,7 +91,8 @@ fn package_with_sources() -> OpcPackage {
 #[test]
 fn presence_reads_required_fields_and_preserves_source_on_edit_and_inverse() {
     let source = author_source();
-    let snapshot = AuthorPresenceSnapshot::from_xml(&source, 7).unwrap();
+    let snapshot =
+        AuthorPresenceSnapshot::from_xml(&source, 7, crate::comments::Limits::DEFAULT).unwrap();
     assert_eq!(
         snapshot.value(),
         Some(&PresenceInfo::new("Ada & One", "AD"))
@@ -124,7 +125,9 @@ fn presence_reads_required_fields_and_preserves_source_on_edit_and_inverse() {
 #[test]
 fn threading_reads_parent_and_updates_optional_fields_without_normalizing_source() {
     let source = comment_source();
-    let snapshot = CommentThreadingSnapshot::from_xml(&source, 7, 2).unwrap();
+    let snapshot =
+        CommentThreadingSnapshot::from_xml(&source, 7, 2, crate::comments::Limits::DEFAULT)
+            .unwrap();
     assert_eq!(
         snapshot.value(),
         Some(&ThreadingInfo::new(
@@ -167,7 +170,9 @@ fn threading_self_closing_joint_update_coalesces_attribute_and_child_edits() {
         uri = super::THREADING_EXTENSION_URI,
     )
     .into_bytes();
-    let snapshot = CommentThreadingSnapshot::from_xml(&source, 7, 2).unwrap();
+    let snapshot =
+        CommentThreadingSnapshot::from_xml(&source, 7, 2, crate::comments::Limits::DEFAULT)
+            .unwrap();
     assert_eq!(snapshot.value(), Some(&ThreadingInfo::new(Some(-60), None)));
 
     let mut edit = snapshot.edit();
@@ -210,7 +215,9 @@ fn threading_self_closing_joint_update_reuses_payload_namespace_alias() {
         uri = super::THREADING_EXTENSION_URI,
     )
     .into_bytes();
-    let snapshot = CommentThreadingSnapshot::from_xml(&source, 7, 2).unwrap();
+    let snapshot =
+        CommentThreadingSnapshot::from_xml(&source, 7, 2, crate::comments::Limits::DEFAULT)
+            .unwrap();
     let mut edit = snapshot.edit();
     edit.set_threading(ThreadingInfo::new(
         Some(-30),
@@ -230,7 +237,7 @@ fn threading_self_closing_joint_update_reuses_payload_namespace_alias() {
             .any(|window| window == b"p15:parentCm")
     );
     assert_eq!(
-        CommentThreadingSnapshot::from_xml(changed, 7, 2)
+        CommentThreadingSnapshot::from_xml(changed, 7, 2, crate::comments::Limits::DEFAULT)
             .unwrap()
             .value(),
         Some(&ThreadingInfo::new(
@@ -249,7 +256,9 @@ fn threading_new_parent_uses_a_bound_generated_namespace() {
         r#"<p:cmLst xmlns:p="{PML}" xmlns:x="{P15}"><p:cm authorId="7" idx="2"><p:pos x="1" y="2"/><p:text>hello</p:text><p:extLst/></p:cm></p:cmLst>"#
     )
     .into_bytes();
-    let snapshot = CommentThreadingSnapshot::from_xml(&source, 7, 2).unwrap();
+    let snapshot =
+        CommentThreadingSnapshot::from_xml(&source, 7, 2, crate::comments::Limits::DEFAULT)
+            .unwrap();
     assert_eq!(snapshot.value(), None);
     let mut edit = snapshot.edit();
     edit.set_threading(ThreadingInfo::new(
@@ -270,7 +279,7 @@ fn threading_new_parent_uses_a_bound_generated_namespace() {
             .any(|window| window == b"<p15:parentCm authorId=\"8\" idx=\"1\"/>")
     );
     assert_eq!(
-        CommentThreadingSnapshot::from_xml(changed, 7, 2)
+        CommentThreadingSnapshot::from_xml(changed, 7, 2, crate::comments::Limits::DEFAULT)
             .unwrap()
             .value(),
         Some(&ThreadingInfo::new(
@@ -286,7 +295,8 @@ fn threading_new_parent_uses_a_bound_generated_namespace() {
 #[test]
 fn exact_noops_keep_source_and_insert_remove_round_trip() {
     let source = author_source();
-    let snapshot = AuthorPresenceSnapshot::from_xml(&source, 7).unwrap();
+    let snapshot =
+        AuthorPresenceSnapshot::from_xml(&source, 7, crate::comments::Limits::DEFAULT).unwrap();
     let mut noop = snapshot.edit();
     noop.set_presence(PresenceInfo::new("Ada & One", "AD"))
         .unwrap();
@@ -297,7 +307,9 @@ fn exact_noops_keep_source_and_insert_remove_round_trip() {
     let absent = format!(
         r#"<p:cmAuthorLst xmlns:p="{PML}"><p:cmAuthor id="7" name="A" initials="A" lastIdx="0" clrIdx="0"/></p:cmAuthorLst>"#
     );
-    let absent = AuthorPresenceSnapshot::from_xml(absent.as_bytes(), 7).unwrap();
+    let absent =
+        AuthorPresenceSnapshot::from_xml(absent.as_bytes(), 7, crate::comments::Limits::DEFAULT)
+            .unwrap();
     let mut add = absent.edit();
     add.set_presence(PresenceInfo::new("u", "p")).unwrap();
     let added = add.commit().unwrap();
@@ -320,7 +332,10 @@ fn required_fields_duplicate_payloads_and_wrong_namespaces_fail_closed() {
         r#"<p:cmAuthorLst xmlns:p="{PML}" xmlns:p15="{P15}"><p:cmAuthor id="7" name="A" initials="A" lastIdx="0" clrIdx="0"><p:extLst><p:ext uri="{uri}"><p15:presenceInfo providerId="AD"/></p:ext></p:extLst></p:cmAuthor></p:cmAuthorLst>"#,
         uri = super::PRESENCE_EXTENSION_URI,
     );
-    assert!(AuthorPresenceSnapshot::from_xml(missing.as_bytes(), 7).is_err());
+    assert!(
+        AuthorPresenceSnapshot::from_xml(missing.as_bytes(), 7, crate::comments::Limits::DEFAULT)
+            .is_err()
+    );
     let duplicate_source = author_source();
     let duplicate = String::from_utf8(duplicate_source).unwrap();
     assert_eq!(duplicate.matches("<p15:presenceInfo").count(), 1);
@@ -331,17 +346,26 @@ fn required_fields_duplicate_payloads_and_wrong_namespaces_fail_closed() {
             super::PRESENCE_EXTENSION_URI
         ),
     );
-    assert!(AuthorPresenceSnapshot::from_xml(duplicate.as_bytes(), 7).is_err());
+    assert!(
+        AuthorPresenceSnapshot::from_xml(duplicate.as_bytes(), 7, crate::comments::Limits::DEFAULT)
+            .is_err()
+    );
     let wrong = author_source().to_vec();
     let wrong = String::from_utf8(wrong)
         .unwrap()
         .replace("providerId=\"AD\"", "p:providerId=\"AD\"");
-    assert!(AuthorPresenceSnapshot::from_xml(wrong.as_bytes(), 7).is_err());
+    assert!(
+        AuthorPresenceSnapshot::from_xml(wrong.as_bytes(), 7, crate::comments::Limits::DEFAULT)
+            .is_err()
+    );
     let text = String::from_utf8(author_source()).unwrap().replace(
         "<p15:presenceInfo userId=\"Ada &amp; One\" providerId=\"AD\"/>",
         "<p15:presenceInfo userId=\"Ada &amp; One\" providerId=\"AD\">text</p15:presenceInfo>",
     );
-    assert!(AuthorPresenceSnapshot::from_xml(text.as_bytes(), 7).is_err());
+    assert!(
+        AuthorPresenceSnapshot::from_xml(text.as_bytes(), 7, crate::comments::Limits::DEFAULT)
+            .is_err()
+    );
 }
 
 #[test]
@@ -356,7 +380,10 @@ fn active_foreign_payload_children_are_rejected_but_inactive_mce_children_are_ig
             r#"<p15:presenceInfo userId="Ada &amp; One" providerId="AD"/>"#,
             r#"<p15:presenceInfo userId="Ada &amp; One" providerId="AD"><f:bad/></p15:presenceInfo>"#,
         );
-    assert!(AuthorPresenceSnapshot::from_xml(author.as_bytes(), 7).is_err());
+    assert!(
+        AuthorPresenceSnapshot::from_xml(author.as_bytes(), 7, crate::comments::Limits::DEFAULT)
+            .is_err()
+    );
 
     let comment = String::from_utf8(comment_source())
         .unwrap()
@@ -368,7 +395,15 @@ fn active_foreign_payload_children_are_rejected_but_inactive_mce_children_are_ig
             r#"<p15:threadingInfo timeZoneBias="-60"><p15:parentCm authorId="7" idx="1"/></p15:threadingInfo>"#,
             r#"<p15:threadingInfo timeZoneBias="-60"><f:bad/><p15:parentCm authorId="7" idx="1"/></p15:threadingInfo>"#,
     );
-    assert!(CommentThreadingSnapshot::from_xml(comment.as_bytes(), 7, 2).is_err());
+    assert!(
+        CommentThreadingSnapshot::from_xml(
+            comment.as_bytes(),
+            7,
+            2,
+            crate::comments::Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     let parent_child = String::from_utf8(comment_source())
         .unwrap()
@@ -380,13 +415,23 @@ fn active_foreign_payload_children_are_rejected_but_inactive_mce_children_are_ig
             r#"<p15:parentCm authorId="7" idx="1"/>"#,
             r#"<p15:parentCm authorId="7" idx="1"><f:bad/></p15:parentCm>"#,
         );
-    assert!(CommentThreadingSnapshot::from_xml(parent_child.as_bytes(), 7, 2).is_err());
+    assert!(
+        CommentThreadingSnapshot::from_xml(
+            parent_child.as_bytes(),
+            7,
+            2,
+            crate::comments::Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     let inactive = format!(
         r#"<p:cmAuthorLst xmlns:p="{PML}" xmlns:p15="{P15}" xmlns:mc="{MCE}" xmlns:f="urn:foreign"><p:cmAuthor id="7" name="A" initials="A" lastIdx="0" clrIdx="0"><p:extLst><mc:AlternateContent><mc:Choice Requires="p15"><p:ext uri="{uri}"><p15:presenceInfo userId="choice" providerId="provider"/></p:ext></mc:Choice><mc:Fallback><p:ext uri="{uri}"><p15:presenceInfo userId="fallback" providerId="provider"><f:bad/></p15:presenceInfo></p:ext></mc:Fallback></mc:AlternateContent></p:extLst></p:cmAuthor></p:cmAuthorLst>"#,
         uri = super::PRESENCE_EXTENSION_URI,
     );
-    let snapshot = AuthorPresenceSnapshot::from_xml(inactive.as_bytes(), 7).unwrap();
+    let snapshot =
+        AuthorPresenceSnapshot::from_xml(inactive.as_bytes(), 7, crate::comments::Limits::DEFAULT)
+            .unwrap();
     assert_eq!(snapshot.value().unwrap().user_id(), "choice");
 }
 
@@ -397,7 +442,8 @@ fn mce_choice_is_typed_while_fallback_bytes_remain_opaque() {
         uri = super::PRESENCE_EXTENSION_URI,
     );
     let source = source.into_bytes();
-    let snapshot = AuthorPresenceSnapshot::from_xml(&source, 7).unwrap();
+    let snapshot =
+        AuthorPresenceSnapshot::from_xml(&source, 7, crate::comments::Limits::DEFAULT).unwrap();
     assert_eq!(snapshot.value().unwrap().user_id(), "choice");
     let mut edit = snapshot.edit();
     edit.set_presence(PresenceInfo::new("updated", "provider"))
@@ -435,7 +481,8 @@ fn supported_mce_choice_with_another_extension_leaves_fallback_presence_opaque()
         uri = super::PRESENCE_EXTENSION_URI,
     )
     .into_bytes();
-    let snapshot = AuthorPresenceSnapshot::from_xml(&source, 7).unwrap();
+    let snapshot =
+        AuthorPresenceSnapshot::from_xml(&source, 7, crate::comments::Limits::DEFAULT).unwrap();
     assert_eq!(snapshot.value(), None);
 
     let mut edit = snapshot.edit();
@@ -466,7 +513,9 @@ fn supported_mce_choice_with_another_extension_leaves_fallback_presence_opaque()
 
 #[test]
 fn presence_values_reject_xml_10_forbidden_noncharacters_before_output() {
-    let snapshot = AuthorPresenceSnapshot::from_xml(author_source(), 7).unwrap();
+    let snapshot =
+        AuthorPresenceSnapshot::from_xml(author_source(), 7, crate::comments::Limits::DEFAULT)
+            .unwrap();
     for forbidden in ['\u{FFFE}', '\u{FFFF}'] {
         let mut edit = snapshot.edit();
         let error = edit
@@ -499,7 +548,8 @@ fn oversized_source_preserving_edit_is_rejected_before_output_allocation() {
     padded.extend_from_slice(&source[insertion..]);
     assert!(padded.len() <= crate::comments::MAX_PART_BYTES);
 
-    let snapshot = AuthorPresenceSnapshot::from_xml(&padded, 7).unwrap();
+    let snapshot =
+        AuthorPresenceSnapshot::from_xml(&padded, 7, crate::comments::Limits::DEFAULT).unwrap();
     let mut edit = snapshot.edit();
     edit.set_presence(PresenceInfo::new(
         "x".repeat(crate::comments::MAX_STRING_BYTES),
@@ -526,7 +576,8 @@ fn escaped_replacement_size_is_rejected_before_serialization() {
     padded.extend(std::iter::repeat_n(b'x', filler_len));
     padded.extend_from_slice(b"-->");
     padded.extend_from_slice(&source[insertion..]);
-    let snapshot = AuthorPresenceSnapshot::from_xml(&padded, 7).unwrap();
+    let snapshot =
+        AuthorPresenceSnapshot::from_xml(&padded, 7, crate::comments::Limits::DEFAULT).unwrap();
     let mut edit = snapshot.edit();
     edit.set_presence(PresenceInfo::new(
         "&".repeat(crate::comments::MAX_STRING_BYTES),

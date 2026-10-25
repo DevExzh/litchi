@@ -118,7 +118,9 @@ impl Package {
         let mut notes_master = BlobPart::new(
             notes_master_name,
             ct::PML_NOTES_MASTER.to_string(),
-            crate::notes::master_xml().as_bytes().to_vec(),
+            crate::notes::master_xml(crate::notes::Limits::DEFAULT)?
+                .as_bytes()
+                .to_vec(),
         );
         notes_master.relate_to("../theme/theme2.xml", rt::THEME);
 
@@ -176,6 +178,7 @@ impl Package {
             opc: std::sync::Arc::new(package),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
             physical_source_provenance: false,
+            semantic_limits: None,
             tolerance: crate::leniency::ToleranceReport::default(),
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
@@ -202,7 +205,11 @@ impl Package {
     /// the input exceeds the source limits, cannot be read or is malformed.
     pub fn open_with_options<P: AsRef<Path>>(path: P, options: crate::OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        Self::from_opc_package_with_provenance(OpcPackage::open(path, options.source_limits)?, true)
+        Self::from_opc_package_with_provenance_and_semantic_limits(
+            OpcPackage::open(path, options.source_limits)?,
+            true,
+            options.semantic_limits,
+        )
     }
 
     /// Parse a PPTX from a reader.
@@ -228,9 +235,10 @@ impl Package {
         options: crate::OpenOptions,
     ) -> Result<Self> {
         options.check_owning()?;
-        Self::from_opc_package_with_provenance(
+        Self::from_opc_package_with_provenance_and_semantic_limits(
             OpcPackage::from_reader(reader, options.source_limits)?,
             true,
+            options.semantic_limits,
         )
     }
 
@@ -252,7 +260,11 @@ impl Package {
     /// malformed.
     pub fn from_bytes_with_options(bytes: &[u8], options: crate::OpenOptions) -> Result<Self> {
         options.check_owning()?;
-        Self::from_opc_package(OpcPackage::from_bytes(bytes, options.source_limits)?)
+        Self::from_opc_package_with_provenance_and_semantic_limits(
+            OpcPackage::from_bytes(bytes, options.source_limits)?,
+            false,
+            options.semantic_limits,
+        )
     }
 
     /// Adopt an already parsed OPC graph without hydrating a mutable model.
@@ -267,6 +279,18 @@ impl Package {
     pub(crate) fn from_opc_package_with_provenance(
         opc: OpcPackage,
         physical_source_provenance: bool,
+    ) -> Result<Self> {
+        Self::from_opc_package_with_provenance_and_semantic_limits(
+            opc,
+            physical_source_provenance,
+            None,
+        )
+    }
+
+    pub(crate) fn from_opc_package_with_provenance_and_semantic_limits(
+        opc: OpcPackage,
+        physical_source_provenance: bool,
+        semantic_limits: Option<crate::open_options::SemanticLimits>,
     ) -> Result<Self> {
         let main = opc.main_document_part()?;
         let presentation = PresentationPart::from_part(main)?;
@@ -298,6 +322,7 @@ impl Package {
             opc: std::sync::Arc::new(opc),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
             physical_source_provenance,
+            semantic_limits,
             tolerance,
             #[cfg(feature = "encryption")]
             encryption: litchi_ooxml_common::package_encryption::PackageEncryption::plain(),
@@ -468,7 +493,12 @@ impl Package {
                 let mut notes_part = BlobPart::new(
                     notes_name,
                     ct::PML_NOTES_SLIDE.to_string(),
-                    crate::notes::write_text(text)?,
+                    crate::notes::write_text(
+                        text,
+                        self.semantic_limits()
+                            .notes()
+                            .constrained_by_source(self.opc.read_limits()),
+                    )?,
                 );
                 notes_part.relate_to(&format!("../slides/slide{}.xml", index + 1), rt::SLIDE);
                 notes_part.relate_to("../notesMasters/notesMaster1.xml", rt::NOTES_MASTER);

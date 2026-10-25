@@ -67,8 +67,13 @@ impl Edit<'_> {
     ) -> Result<Option<crate::tag::List>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let limits = self
+            .staged
+            .semantic_limits()
+            .tag()
+            .constrained_by_source(self.staged.opc().read_limits());
         self.staged
-            .update(move |opc| super::put(opc, &slide, shape, list))
+            .update(move |opc| super::put_with_limits(opc, &slide, shape, list, limits))
     }
 
     /// Remove the programmable-tag list of the selected shape. Returns the
@@ -85,8 +90,13 @@ impl Edit<'_> {
     ) -> Result<Option<crate::tag::List>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let limits = self
+            .staged
+            .semantic_limits()
+            .tag()
+            .constrained_by_source(self.staged.opc().read_limits());
         self.staged
-            .update(move |opc| super::remove(opc, &slide, shape))
+            .update(move |opc| super::remove_with_limits(opc, &slide, shape, limits))
     }
 
     /// Discard every staged change.

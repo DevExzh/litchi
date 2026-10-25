@@ -53,6 +53,13 @@ impl Package {
 }
 
 impl Edit<'_> {
+    fn limits(&self) -> super::super::Limits {
+        self.staged
+            .semantic_limits()
+            .comments()
+            .constrained_by_source(self.staged.opc().read_limits())
+    }
+
     /// The staged threading extension of the legacy comment `index` (its
     /// `p:cm/@idx`) by the author `author_id` on the selected slide.
     ///
@@ -66,12 +73,14 @@ impl Edit<'_> {
         index: u32,
     ) -> Result<Option<ThreadingInfo>> {
         let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
-        package::load_threading(
+        Ok(package::load_threading_snapshot_with_limits(
             self.staged.opc(),
             slide_part_name.as_str(),
             author_id,
             index,
-        )
+            self.limits(),
+        )?
+        .and_then(|snapshot| snapshot.value().cloned()))
     }
 
     /// Create or replace the threading extension of one legacy comment.
@@ -89,8 +98,16 @@ impl Edit<'_> {
         value: ThreadingInfo,
     ) -> Result<Option<ThreadingInfo>> {
         let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        let limits = self.limits();
         self.staged.update(move |opc| {
-            package::put_threading(opc, slide_part_name.as_str(), author_id, index, value)
+            package::put_threading_with_limits(
+                opc,
+                slide_part_name.as_str(),
+                author_id,
+                index,
+                value,
+                limits,
+            )
         })
     }
 
@@ -108,8 +125,15 @@ impl Edit<'_> {
         index: u32,
     ) -> Result<Option<ThreadingInfo>> {
         let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        let limits = self.limits();
         self.staged.update(move |opc| {
-            package::remove_threading(opc, slide_part_name.as_str(), author_id, index)
+            package::remove_threading_with_limits(
+                opc,
+                slide_part_name.as_str(),
+                author_id,
+                index,
+                limits,
+            )
         })
     }
 

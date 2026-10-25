@@ -281,14 +281,6 @@ impl AsRef<str> for ExtensionList {
     }
 }
 
-impl TryFrom<&str> for ExtensionList {
-    type Error = Error;
-
-    fn try_from(value: &str) -> Result<Self> {
-        Self::parse(value.as_bytes())
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Extension {
     pub embed_relationship_id: Option<String>,

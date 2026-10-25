@@ -52,13 +52,25 @@ impl Package {
 }
 
 impl Edit<'_> {
+    fn limits(&self) -> super::super::Limits {
+        self.staged
+            .semantic_limits()
+            .comments()
+            .constrained_by_source(self.staged.opc().read_limits())
+    }
+
     /// The staged presence extension of the comment author `author_id`.
     ///
     /// # Errors
     ///
     /// Returns an error for malformed comment-author markup.
     pub fn presence(&self, author_id: u32) -> Result<Option<PresenceInfo>> {
-        package::load_presence(self.staged.opc(), author_id)
+        Ok(package::load_presence_snapshot_with_limits(
+            self.staged.opc(),
+            author_id,
+            self.limits(),
+        )?
+        .and_then(|snapshot| snapshot.value().cloned()))
     }
 
     /// Create or replace the presence extension of the comment author
@@ -69,8 +81,9 @@ impl Edit<'_> {
     /// Returns an error for a missing author, malformed markup, or a changed
     /// edit of a signed package.
     pub fn set(&mut self, author_id: u32, value: PresenceInfo) -> Result<Option<PresenceInfo>> {
+        let limits = self.limits();
         self.staged
-            .update(move |opc| package::put_presence(opc, author_id, value))
+            .update(move |opc| package::put_presence_with_limits(opc, author_id, value, limits))
     }
 
     /// Remove the presence extension of the comment author `author_id`.
@@ -81,8 +94,9 @@ impl Edit<'_> {
     /// Returns an error for malformed markup or a changed edit of a signed
     /// package.
     pub fn remove(&mut self, author_id: u32) -> Result<Option<PresenceInfo>> {
+        let limits = self.limits();
         self.staged
-            .update(move |opc| package::remove_presence(opc, author_id))
+            .update(move |opc| package::remove_presence_with_limits(opc, author_id, limits))
     }
 
     /// Discard every staged change.

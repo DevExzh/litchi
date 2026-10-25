@@ -124,6 +124,10 @@ pub(super) struct SourceInner {
     _presentation: SourcePart,
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
     pub(super) limits: SourceLimits,
+    /// Non-default semantic codec policies selected at ingress.  Keep this
+    /// with the deferred owner so related-part reads and source-backed edits
+    /// use the same policy as eager and owning projections.
+    pub(super) semantic_limits: Option<crate::open_options::SemanticLimits>,
     /// Every non-structural defect repaired while the source was opened, in
     /// discovery order: the OPC manifest repairs folded from `litchi_opc`,
     /// then the slide-list repairs of audit finding 6.7. Repairs a
@@ -1345,9 +1349,11 @@ impl SourceBackedPresentation {
         options: crate::OpenOptions,
     ) -> Result<Self> {
         let limits = options.source_limits;
+        let semantic_limits = options.semantic_limits;
         Self::from_source_backed_package_with_limits(
             source_backed_package(source, options)?,
             limits,
+            semantic_limits,
         )
     }
 
@@ -1375,9 +1381,11 @@ impl SourceBackedPresentation {
     ) -> Result<Self> {
         options.check_owning()?;
         let limits = options.source_limits;
+        let semantic_limits = options.semantic_limits;
         Self::from_source_backed_package_with_limits(
             SourceBackedPackage::from_reader(reader, limits, SourceCacheLimits::default(), None)?,
             limits,
+            semantic_limits,
         )
     }
 
@@ -1391,12 +1399,13 @@ impl SourceBackedPresentation {
     /// coherent PresentationML presentation.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
         let limits = package.read_limits();
-        Self::from_source_backed_package_with_limits(package, limits)
+        Self::from_source_backed_package_with_limits(package, limits, None)
     }
 
     fn from_source_backed_package_with_limits(
         package: SourceBackedPackage,
         limits: SourceLimits,
+        semantic_limits: Option<crate::open_options::SemanticLimits>,
     ) -> Result<Self> {
         package.check_execution()?;
         let mut tolerance = crate::leniency::ToleranceReport::default();
@@ -1415,6 +1424,7 @@ impl SourceBackedPresentation {
                 _presentation: catalog.presentation,
                 slides: catalog.slides,
                 limits,
+                semantic_limits,
                 tolerance,
                 strict_slide_list,
             }),
@@ -1486,6 +1496,7 @@ impl SourceBackedPresentation {
             _presentation,
             slides,
             limits,
+            semantic_limits: _,
             tolerance: _,
             strict_slide_list: _,
         } = inner;

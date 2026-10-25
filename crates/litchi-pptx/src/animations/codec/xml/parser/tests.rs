@@ -5,6 +5,7 @@
 )]
 
 use super::{parse_processed_timing, parse_recursive_timing_tree};
+use crate::animations::Limits;
 
 const PRESENTATIONML_NS: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const STRICT_PRESENTATIONML_NS: &str = "http://purl.oclc.org/ooxml/presentationml/main";
@@ -12,7 +13,8 @@ const STRICT_PRESENTATIONML_NS: &str = "http://purl.oclc.org/ooxml/presentationm
 #[test]
 fn processed_parser_accepts_transitional_namespace_without_timing() {
     let xml = format!(r#"<p:sld xmlns:p="{PRESENTATIONML_NS}"><p:cSld/></p:sld>"#);
-    let sequence = parse_processed_timing(xml.as_bytes(), true).expect("parse slide");
+    let sequence =
+        parse_processed_timing(xml.as_bytes(), true, Limits::DEFAULT).expect("parse slide");
     assert!(sequence.is_empty());
 }
 
@@ -20,7 +22,7 @@ fn processed_parser_accepts_transitional_namespace_without_timing() {
 fn recursive_parser_preserves_strict_timing_snapshot() {
     let xml =
         format!(r#"<p:sld xmlns:p="{STRICT_PRESENTATIONML_NS}"><p:timing></p:timing></p:sld>"#);
-    let tree = parse_recursive_timing_tree(&xml).expect("parse timing tree");
+    let tree = parse_recursive_timing_tree(&xml, Limits::DEFAULT).expect("parse timing tree");
     assert!(tree.roots.is_empty());
     assert_eq!(tree.source_xml.as_deref(), Some("<p:timing></p:timing>"));
 }
@@ -28,6 +30,7 @@ fn recursive_parser_preserves_strict_timing_snapshot() {
 #[test]
 fn processed_parser_rejects_doctype() {
     let xml = format!(r#"<!DOCTYPE sld><p:sld xmlns:p="{PRESENTATIONML_NS}"/>"#);
-    let error = parse_processed_timing(xml.as_bytes(), false).expect_err("reject doctype");
+    let error =
+        parse_processed_timing(xml.as_bytes(), false, Limits::DEFAULT).expect_err("reject doctype");
     assert!(error.to_string().contains("DOCTYPE"));
 }

@@ -6,6 +6,7 @@ use litchi_opc::OpcPackage;
 
 use super::codec::{self, Kind, Owner, Value};
 use super::{PresenceInfo, ThreadingInfo};
+use crate::comments::Limits;
 use crate::{Error, Result};
 
 /// Stable fingerprint used for optimistic source checks.
@@ -19,6 +20,7 @@ pub struct AuthorPresenceSnapshot {
     pub(crate) author_id: u32,
     pub(crate) located: codec::Located,
     pub(crate) revision: Revision,
+    pub(crate) limits: Limits,
 }
 
 impl AuthorPresenceSnapshot {
@@ -28,17 +30,29 @@ impl AuthorPresenceSnapshot {
     }
 
     /// Parse one complete comment-author part while retaining its exact bytes.
-    pub fn from_xml(source: impl AsRef<[u8]>, author_id: u32) -> Result<Self> {
-        Self::from_xml_owned(source.as_ref().to_vec(), author_id)
+    pub fn from_xml(source: impl AsRef<[u8]>, author_id: u32, limits: Limits) -> Result<Self> {
+        let source = source.as_ref();
+        check_source_size(source, limits)?;
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(source.len())
+            .map_err(|error| Error::Allocation {
+                resource: "legacy comment collaboration source XML",
+                source: error,
+            })?;
+        owned.extend_from_slice(source);
+        Self::from_xml_owned(owned, author_id, limits)
     }
 
     /// Parse owned source bytes without a second source copy.
-    pub fn from_xml_owned(source: Vec<u8>, author_id: u32) -> Result<Self> {
+    pub fn from_xml_owned(source: Vec<u8>, author_id: u32, limits: Limits) -> Result<Self> {
+        check_source_size(&source, limits)?;
         let source_xml = Arc::new(source);
         let located = codec::locate(
             source_xml.as_slice(),
             Kind::Presence,
             Owner::Author(author_id),
+            limits,
         )?;
         let revision = fingerprint(source_xml.as_slice());
         Ok(Self {
@@ -47,6 +61,7 @@ impl AuthorPresenceSnapshot {
             author_id,
             located,
             revision,
+            limits,
         })
     }
 
@@ -54,11 +69,13 @@ impl AuthorPresenceSnapshot {
         source_part_name: String,
         source_xml: Arc<Vec<u8>>,
         author_id: u32,
+        limits: Limits,
     ) -> Result<Self> {
         let located = codec::locate(
             source_xml.as_slice(),
             Kind::Presence,
             Owner::Author(author_id),
+            limits,
         )?;
         let revision = fingerprint(source_xml.as_slice());
         Ok(Self {
@@ -67,6 +84,7 @@ impl AuthorPresenceSnapshot {
             author_id,
             located,
             revision,
+            limits,
         })
     }
 
@@ -123,6 +141,7 @@ impl AuthorPresenceSnapshot {
             && self.author_id == other.author_id
             && self.value() == other.value()
             && self.revision == other.revision
+            && self.limits == other.limits
     }
 
     pub(crate) fn source_arc(&self) -> &Arc<Vec<u8>> {
@@ -158,7 +177,11 @@ impl PresenceDraft {
     /// Set or remove the optional presence extension.
     pub(crate) fn set(&mut self, value: Option<PresenceInfo>) -> Result<bool> {
         if let Some(value) = &value {
-            codec::validate_value(Kind::Presence, &Value::Presence(value.clone()))?;
+            codec::validate_value_with_limit(
+                Kind::Presence,
+                &Value::Presence(value.clone()),
+                self.original.limits.max_string_bytes,
+            )?;
         }
         let changed = self.working != value;
         self.working = value;
@@ -190,6 +213,7 @@ impl PresenceDraft {
             self.original.source_xml.as_slice(),
             &self.original.located,
             value,
+            self.original.limits,
         )?;
         let source_xml = Arc::new(updated);
         let revision = fingerprint(source_xml.as_slice());
@@ -197,6 +221,7 @@ impl PresenceDraft {
             source_xml.as_slice(),
             Kind::Presence,
             Owner::Author(self.original.author_id),
+            self.original.limits,
         )?;
         let snapshot = AuthorPresenceSnapshot {
             source_part_name: self.original.source_part_name.clone(),
@@ -204,6 +229,7 @@ impl PresenceDraft {
             author_id: self.original.author_id,
             located,
             revision,
+            limits: self.original.limits,
         };
         if snapshot.value() != self.value() {
             return Err(invalid("presenceInfo source did not round-trip"));
@@ -312,6 +338,7 @@ impl PresenceChange {
             self.after.source_xml.as_slice(),
             Kind::Presence,
             Owner::Author(self.after.author_id),
+            self.after.limits,
         )?;
         let result = AuthorPresenceSnapshot {
             source_part_name: self.after.source_part_name.clone(),
@@ -319,6 +346,7 @@ impl PresenceChange {
             author_id: self.after.author_id,
             located,
             revision: fingerprint(self.after.source_xml.as_slice()),
+            limits: self.after.limits,
         };
         if !result.same_source(&self.after) {
             return Err(invalid(
@@ -340,6 +368,7 @@ pub struct CommentThreadingSnapshot {
     pub(crate) index: u32,
     pub(crate) located: codec::Located,
     pub(crate) revision: Revision,
+    pub(crate) limits: Limits,
 }
 
 impl CommentThreadingSnapshot {
@@ -354,8 +383,23 @@ impl CommentThreadingSnapshot {
     }
 
     /// Parse one complete comment part while retaining its exact bytes.
-    pub fn from_xml(source: impl AsRef<[u8]>, author_id: u32, index: u32) -> Result<Self> {
-        Self::from_xml_owned(source.as_ref().to_vec(), String::new(), author_id, index)
+    pub fn from_xml(
+        source: impl AsRef<[u8]>,
+        author_id: u32,
+        index: u32,
+        limits: Limits,
+    ) -> Result<Self> {
+        let source = source.as_ref();
+        check_source_size(source, limits)?;
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(source.len())
+            .map_err(|error| Error::Allocation {
+                resource: "legacy comment collaboration source XML",
+                source: error,
+            })?;
+        owned.extend_from_slice(source);
+        Self::from_xml_owned(owned, String::new(), author_id, index, limits)
     }
 
     /// Parse owned source bytes with an optional source slide name.
@@ -364,12 +408,15 @@ impl CommentThreadingSnapshot {
         slide_part_name: impl Into<String>,
         author_id: u32,
         index: u32,
+        limits: Limits,
     ) -> Result<Self> {
+        check_source_size(&source, limits)?;
         let source_xml = Arc::new(source);
         let located = codec::locate(
             source_xml.as_slice(),
             Kind::Threading,
             Owner::Comment { author_id, index },
+            limits,
         )?;
         let revision = fingerprint(source_xml.as_slice());
         Ok(Self {
@@ -380,6 +427,7 @@ impl CommentThreadingSnapshot {
             index,
             located,
             revision,
+            limits,
         })
     }
 
@@ -389,11 +437,13 @@ impl CommentThreadingSnapshot {
         slide_part_name: String,
         author_id: u32,
         index: u32,
+        limits: Limits,
     ) -> Result<Self> {
         let located = codec::locate(
             source_xml.as_slice(),
             Kind::Threading,
             Owner::Comment { author_id, index },
+            limits,
         )?;
         let revision = fingerprint(source_xml.as_slice());
         Ok(Self {
@@ -404,6 +454,7 @@ impl CommentThreadingSnapshot {
             index,
             located,
             revision,
+            limits,
         })
     }
 
@@ -474,11 +525,22 @@ impl CommentThreadingSnapshot {
             && self.index == other.index
             && self.value() == other.value()
             && self.revision == other.revision
+            && self.limits == other.limits
     }
 
     pub(crate) fn source_arc(&self) -> &Arc<Vec<u8>> {
         &self.source_xml
     }
+}
+
+fn check_source_size(source: &[u8], limits: Limits) -> Result<()> {
+    if source.len() > limits.max_input_bytes {
+        return Err(Error::Limit {
+            resource: "legacy comment collaboration XML bytes",
+            limit: limits.max_input_bytes,
+        });
+    }
+    Ok(())
 }
 
 /// Detached edit of one comment threading extension.
@@ -502,7 +564,11 @@ impl ThreadingDraft {
     /// Set or remove the optional threading extension.
     pub(crate) fn set(&mut self, value: Option<ThreadingInfo>) -> Result<bool> {
         if let Some(value) = &value {
-            codec::validate_value(Kind::Threading, &Value::Threading(value.clone()))?;
+            codec::validate_value_with_limit(
+                Kind::Threading,
+                &Value::Threading(value.clone()),
+                self.original.limits.max_string_bytes,
+            )?;
         }
         let changed = self.working != value;
         self.working = value;
@@ -533,6 +599,7 @@ impl ThreadingDraft {
             self.original.source_xml.as_slice(),
             &self.original.located,
             value,
+            self.original.limits,
         )?;
         let source_xml = Arc::new(updated);
         let revision = fingerprint(source_xml.as_slice());
@@ -543,6 +610,7 @@ impl ThreadingDraft {
                 author_id: self.original.author_id,
                 index: self.original.index,
             },
+            self.original.limits,
         )?;
         let snapshot = CommentThreadingSnapshot {
             source_part_name: self.original.source_part_name.clone(),
@@ -552,6 +620,7 @@ impl ThreadingDraft {
             index: self.original.index,
             located,
             revision,
+            limits: self.original.limits,
         };
         if snapshot.value() != self.value() {
             return Err(invalid("threadingInfo source did not round-trip"));
@@ -642,6 +711,7 @@ impl ThreadingChange {
                 author_id: self.after.author_id,
                 index: self.after.index,
             },
+            self.after.limits,
         )?;
         let result = CommentThreadingSnapshot {
             source_part_name: self.after.source_part_name.clone(),
@@ -651,6 +721,7 @@ impl ThreadingChange {
             index: self.after.index,
             located,
             revision: fingerprint(self.after.source_xml.as_slice()),
+            limits: self.after.limits,
         };
         if !result.same_source(&self.after) {
             return Err(invalid(

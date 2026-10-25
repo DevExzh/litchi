@@ -16,6 +16,7 @@ use super::package;
 pub struct Presentation<'a> {
     pub(super) package: &'a OpcPackage,
     pub(super) part: PresentationPart<'a>,
+    pub(super) semantic_limits: Option<crate::open_options::SemanticLimits>,
     /// Memo of [`PresentationPart::slide_references`]: the ordered catalog as
     /// parsed from the main part, before any package-graph validation.
     ///
@@ -34,12 +35,29 @@ impl<'a> Presentation<'a> {
     /// Construct a view from a validated main part and its package.
     #[must_use]
     pub fn new(part: PresentationPart<'a>, package: &'a OpcPackage) -> Self {
+        Self::new_with_semantic_limits(part, package, None)
+    }
+
+    pub(crate) fn new_with_semantic_limits(
+        part: PresentationPart<'a>,
+        package: &'a OpcPackage,
+        semantic_limits: Option<crate::open_options::SemanticLimits>,
+    ) -> Self {
         Self {
             package,
             part,
+            semantic_limits,
             catalog: OnceLock::new(),
             catalog_validated: OnceLock::new(),
         }
+    }
+
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        self.semantic_limits.unwrap_or_default()
+    }
+
+    pub(crate) fn shape_limits(&self) -> crate::shape::Limits {
+        self.semantic_limits().shape()
     }
 
     /// The ordered slide catalog parsed from the immutable main part.
@@ -134,7 +152,13 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn notes(&self) -> Result<Option<crate::notes::Graph>> {
-        package::notes(self.package, &self.part)
+        package::notes(
+            self.package,
+            &self.part,
+            self.semantic_limits()
+                .notes()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Discover the optional opaque VBA project relationship owned by this

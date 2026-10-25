@@ -9,6 +9,14 @@ use crate::Error;
 use super::package::store;
 use super::*;
 
+fn parse(xml: &[u8]) -> Result<List> {
+    super::parse(xml, Limits::DEFAULT)
+}
+
+fn write_pictures(value: &List, conformance: Conformance) -> Result<Vec<u8>> {
+    super::write_pictures(value, conformance, Limits::DEFAULT)
+}
+
 const POI_AUDIO: &[u8] =
     include_bytes!("../../../../test-data/poi/test-data/slideshow/EmbeddedAudio.pptx");
 const POI_VIDEO: &[u8] =
@@ -100,6 +108,38 @@ fn strict_xml_round_trip_covers_typed_extension_properties() {
 }
 
 #[test]
+fn raw_policy_admits_exact_media_wire_and_refuses_one_byte_under() {
+    let expected = value();
+    let wire =
+        super::write_pictures(&expected, Conformance::Transitional, Limits::DEFAULT).unwrap();
+    let input = slide_xml(Conformance::Transitional, &wire);
+    let exact = Limits {
+        max_input_bytes: input.len(),
+        max_output_bytes: wire.len(),
+        ..Limits::DEFAULT
+    };
+    assert_eq!(
+        super::write_pictures(&expected, Conformance::Transitional, exact).unwrap(),
+        wire
+    );
+    assert_eq!(
+        super::parse(&input, exact).unwrap().pictures.len(),
+        expected.pictures.len()
+    );
+    assert!(
+        super::write_pictures(
+            &expected,
+            Conformance::Transitional,
+            Limits {
+                max_output_bytes: wire.len().saturating_sub(1),
+                ..exact
+            },
+        )
+        .is_err()
+    );
+}
+
+#[test]
 fn media_transform_round_trips_coordinate_offsets_and_integer_extents() {
     let mut expected = value();
     expected.pictures[0].transform = Some(Transform::new(
@@ -179,6 +219,7 @@ fn opaque_media_extensions_round_trip_canonically() {
                 r#"<p:extLst xmlns:p="{PML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:z="urn:example" mc:Ignorable="z"><p:ext uri="{{EXAMPLE}}"><z:data z:flag="a&amp;b">before<![CDATA[<literal>]]><z:inner/>after &amp; done</z:data></p:ext></p:extLst>"#
             )
             .as_bytes(),
+            Limits::DEFAULT,
         )
         .unwrap();
     assert!(opaque.as_str().contains("before&lt;literal&gt;<z:inner"));
@@ -203,7 +244,7 @@ fn opaque_media_extensions_round_trip_canonically() {
             .unwrap()
             .extensions
             .as_ref(),
-        Some(&opaque)
+        Some(&opaque),
     );
 }
 
@@ -230,8 +271,14 @@ fn rejects_duplicate_and_misordered_media_children() {
 
 #[test]
 fn opaque_media_extension_constructor_is_bounded_and_typed() {
-    assert!(ExtensionList::parse(b"<not-an-extension-list/>").is_err());
-    assert!(ExtensionList::parse(&vec![b' '; MAX_MEDIA_EXTENSION_XML_BYTES + 1]).is_err());
+    assert!(ExtensionList::parse(b"<not-an-extension-list/>", Limits::DEFAULT).is_err());
+    assert!(
+        ExtensionList::parse(
+            &vec![b' '; MAX_MEDIA_EXTENSION_XML_BYTES + 1],
+            Limits::DEFAULT,
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -395,7 +442,7 @@ fn escaped_media_output_is_preflighted_against_a_typed_budget() {
 #[test]
 fn media_output_budget_is_aggregate_across_pictures() {
     let picture = value().pictures.pop().unwrap();
-    let mut single = BoundedXml::new();
+    let mut single = BoundedXml::new(MAX_XML_BYTES, MAX_STRING_BYTES);
     write_picture(&mut single, &picture, Conformance::Transitional).unwrap();
     let single_len = single.bytes.len();
     let maximum = single_len + single_len / 2;

@@ -13,8 +13,9 @@ use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
 
 use super::super::{SourceInner, SourcePart};
 use crate::notes::{
-    Conformance, MAX_MASTER_XML, MAX_NOTES_XML, MAX_PRESENTATION_XML, MAX_SLIDE_XML, MAX_THEME_XML,
-    root_conformance, scan_xml, validate_id, validate_resource_xml,
+    Conformance, Limits, MAX_MASTER_XML, MAX_NOTES_XML, MAX_PRESENTATION_XML, MAX_SLIDE_XML,
+    MAX_THEME_XML, root_conformance_with_limits, scan_xml_with_limits, validate_id,
+    validate_resource_xml_with_limits,
 };
 use crate::parts::is_relationship_type;
 use crate::{Error, Result};
@@ -93,6 +94,20 @@ impl PartLoader for EagerLoader<'_> {
 
 /// Validate the selected source-backed notes part and its targeted closure.
 pub(super) fn validate(owner: &SourceInner, slide: &PackURI, part: &SourcePart) -> Result<()> {
+    validate_with_limits(
+        owner,
+        slide,
+        part,
+        crate::notes::Limits::from_source(owner.limits),
+    )
+}
+
+pub(super) fn validate_with_limits(
+    owner: &SourceInner,
+    slide: &PackURI,
+    part: &SourcePart,
+    limits: crate::notes::Limits,
+) -> Result<()> {
     let presentation_uri = owner._presentation.source_partname().clone();
     let presentation_content_type = owner._presentation.content_type().to_owned();
     let loader = SourceLoader { owner };
@@ -102,6 +117,7 @@ pub(super) fn validate(owner: &SourceInner, slide: &PackURI, part: &SourcePart) 
         &presentation_uri,
         &presentation_content_type,
         part,
+        limits,
     )
 }
 
@@ -111,20 +127,40 @@ pub(super) fn validate_eager(
     slide: &dyn Part,
     part: &dyn Part,
 ) -> Result<()> {
+    validate_eager_with_limits(
+        package,
+        slide,
+        part,
+        crate::notes::Limits::from_source(package.read_limits()),
+    )
+}
+
+pub(super) fn validate_eager_with_limits(
+    package: &OpcPackage,
+    slide: &dyn Part,
+    part: &dyn Part,
+    limits: crate::notes::Limits,
+) -> Result<()> {
     let presentation_part = package.main_document_part()?;
     let presentation_uri = presentation_part.partname().clone();
     let presentation_content_type = presentation_part.content_type().to_owned();
     let notes_uri = part.partname().clone();
     let loader = EagerLoader { package };
-    loader.with_part(&notes_uri, ct::PML_NOTES_SLIDE, MAX_NOTES_XML, |selected| {
-        validate_selected(
-            &loader,
-            slide.partname(),
-            &presentation_uri,
-            &presentation_content_type,
-            selected,
-        )
-    })
+    loader.with_part(
+        &notes_uri,
+        ct::PML_NOTES_SLIDE,
+        MAX_NOTES_XML.min(limits.max_input_bytes),
+        |selected| {
+            validate_selected(
+                &loader,
+                slide.partname(),
+                &presentation_uri,
+                &presentation_content_type,
+                selected,
+                limits,
+            )
+        },
+    )
 }
 
 /// Process one eager notes part with the same bounded MCE policy used by the
@@ -134,7 +170,24 @@ pub(super) fn processed_eager_notes(
     part: &dyn Part,
     source_limits: litchi_opc::SourceLimits,
 ) -> Result<Arc<Vec<u8>>> {
-    Ok(super::process_eager_part(part, MAX_NOTES_XML, source_limits)?.blob_arc())
+    processed_eager_notes_with_limits(
+        part,
+        source_limits,
+        crate::notes::Limits::from_source(source_limits),
+    )
+}
+
+pub(super) fn processed_eager_notes_with_limits(
+    part: &dyn Part,
+    source_limits: litchi_opc::SourceLimits,
+    limits: crate::notes::Limits,
+) -> Result<Arc<Vec<u8>>> {
+    Ok(super::process_eager_part(
+        part,
+        MAX_NOTES_XML.min(limits.max_input_bytes),
+        source_limits,
+    )?
+    .blob_arc())
 }
 
 fn validate_selected<L: PartLoader>(
@@ -143,19 +196,28 @@ fn validate_selected<L: PartLoader>(
     presentation_uri: &PackURI,
     presentation_content_type: &str,
     part: &dyn Part,
+    limits: crate::notes::Limits,
 ) -> Result<()> {
     require_content_type(part, ct::PML_NOTES_SLIDE)?;
     validate_leaf_path(part.partname(), "/ppt/notesSlides/")?;
 
-    let conformance = validate_xml(part, MAX_NOTES_XML, "notes", "notes slide")?;
+    let conformance = validate_xml(
+        part,
+        MAX_NOTES_XML.min(limits.max_input_bytes),
+        "notes",
+        "notes slide",
+        limits,
+    )?;
 
     // The backlink target is checked against the selected slide, and the
     // selected slide itself is loaded so a stale relationship cannot validate
     // against a missing or non-slide part.
-    let slide_conformance =
-        loader.with_part(slide, ct::PML_SLIDE, MAX_SLIDE_XML, |slide_part| {
-            root_conformance(slide_part.blob(), MAX_SLIDE_XML, "sld")
-        })?;
+    let slide_conformance = loader.with_part(
+        slide,
+        ct::PML_SLIDE,
+        MAX_SLIDE_XML.min(limits.max_input_bytes),
+        |slide_part| root_conformance_with_limits(slide_part.blob(), MAX_SLIDE_XML, "sld", limits),
+    )?;
     if slide_conformance != conformance {
         return Err(invalid("notes slide and owning slide conformance differ"));
     }
@@ -172,15 +234,21 @@ fn validate_selected<L: PartLoader>(
         presentation_content_type,
         conformance,
         &master_target,
+        limits,
     )?;
 
     let (master_conformance, theme_target) = loader.with_part(
         &master_target,
         ct::PML_NOTES_MASTER,
-        MAX_MASTER_XML,
+        MAX_MASTER_XML.min(limits.max_input_bytes),
         |master| {
-            let master_conformance =
-                validate_xml(master, MAX_MASTER_XML, "notesMaster", "notes master")?;
+            let master_conformance = validate_xml(
+                master,
+                MAX_MASTER_XML,
+                "notesMaster",
+                "notes master",
+                limits,
+            )?;
             let theme_target = required_theme(loader, master, conformance)?;
             Ok((master_conformance, theme_target))
         },
@@ -193,10 +261,10 @@ fn validate_selected<L: PartLoader>(
     let theme_conformance = loader.with_part(
         &theme_target,
         crate::notes::THEME_CT,
-        MAX_THEME_XML,
+        MAX_THEME_XML.min(limits.max_input_bytes),
         |theme| {
             let theme_conformance =
-                validate_xml(theme, MAX_THEME_XML, "theme", "notes-master theme")?;
+                validate_xml(theme, MAX_THEME_XML, "theme", "notes-master theme", limits)?;
             validate_opaque_relationships(loader, theme)?;
             Ok(theme_conformance)
         },
@@ -208,12 +276,18 @@ fn validate_selected<L: PartLoader>(
 }
 
 /// Validate the selected notes XML and return the dialect its root uses.
-fn validate_xml(part: &dyn Part, maximum: usize, root: &str, label: &str) -> Result<Conformance> {
-    let conformance = root_conformance(part.blob(), maximum, root)?;
+fn validate_xml(
+    part: &dyn Part,
+    maximum: usize,
+    root: &str,
+    label: &str,
+    limits: Limits,
+) -> Result<Conformance> {
+    let conformance = root_conformance_with_limits(part.blob(), maximum, root, limits)?;
     // `root_conformance` checks the root and namespace. The resource scan
     // additionally refuses authored relationship references, matching the
     // complete notes graph's inert-resource policy.
-    validate_resource_xml(part.blob(), maximum, conformance, root, label)?;
+    validate_resource_xml_with_limits(part.blob(), maximum, conformance, root, label, limits)?;
     Ok(conformance)
 }
 
@@ -227,23 +301,29 @@ fn validate_presentation_notes_master<L: PartLoader>(
     presentation_content_type: &str,
     conformance: Conformance,
     selected: &PackURI,
+    limits: Limits,
 ) -> Result<()> {
     loader.with_part(
         presentation_uri,
         presentation_content_type,
-        MAX_PRESENTATION_XML,
+        MAX_PRESENTATION_XML.min(limits.max_input_bytes),
         |presentation| {
-            let presentation_conformance =
-                root_conformance(presentation.blob(), MAX_PRESENTATION_XML, "presentation")?;
+            let presentation_conformance = root_conformance_with_limits(
+                presentation.blob(),
+                MAX_PRESENTATION_XML,
+                "presentation",
+                limits,
+            )?;
             if presentation_conformance != conformance {
                 return Err(invalid("presentation and notes slide conformance differ"));
             }
 
-            let presentation_scan = scan_xml(
+            let presentation_scan = scan_xml_with_limits(
                 presentation.blob(),
                 MAX_PRESENTATION_XML,
                 conformance,
                 "presentation",
+                limits,
             )?;
             if presentation_scan.notes_master_ids.len() > 1 {
                 return Err(invalid(

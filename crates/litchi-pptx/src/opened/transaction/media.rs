@@ -70,7 +70,12 @@ impl Edit {
         let mut candidate = self.working.clone();
         crate::package::signature::refuse_signed_change(&candidate)?;
         let slide_part = candidate.get_part(&selected.part_name)?;
-        let conformance = crate::media_parts::document_conformance(slide_part.blob())?;
+        let conformance = crate::media_parts::document_conformance_with_limits(
+            slide_part.blob(),
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(candidate.read_limits()),
+        )?;
         let scene = crate::shape::Scene::read(slide_part.blob())?;
         let shape_id = next_shape_id(&scene, "media picture")?;
         drop(scene);
@@ -113,12 +118,17 @@ impl Edit {
         let list = List {
             pictures: vec![picture],
         };
-        crate::media_parts::store_with(
+        let media_limits = self
+            .semantic_limits()
+            .media_parts()
+            .constrained_by_source(candidate.read_limits());
+        crate::media_parts::store_with_limits(
             &mut candidate,
             &selected.part_name,
             &list,
             conformance,
             true,
+            media_limits,
         )?;
         let staged = crate::shape::Scene::read(candidate.get_part(&selected.part_name)?.blob())?;
         let added = staged

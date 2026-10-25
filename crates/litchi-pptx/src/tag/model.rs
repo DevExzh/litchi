@@ -519,8 +519,8 @@ impl List {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn xml(&self, conformance: Conformance) -> Result<Vec<u8>> {
-        write(self, conformance)
+    pub fn xml(&self, conformance: Conformance, limits: super::Limits) -> Result<Vec<u8>> {
+        write(self, conformance, limits)
     }
 
     fn offset(&self, key: Key<'_>) -> Result<usize> {

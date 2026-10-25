@@ -3307,7 +3307,9 @@ fn composes_order_shape_and_notes_in_one_durable_inverse_commit() -> Result<()> 
         .notes()?
         .ok_or_else(|| Error::Invalid("published notes disappeared".into()))?;
     assert_eq!(
-        notes.slides()[0].text()?.as_deref(),
+        notes.slides()[0]
+            .text(crate::notes::Limits::DEFAULT)?
+            .as_deref(),
         Some("Edited & second notes")
     );
     let after = part_states(&package);
@@ -3667,7 +3669,7 @@ fn three_way_plan_is_immutable_and_history_supports_redo() -> Result<()> {
             .notes()?
             .ok_or_else(|| Error::Invalid("notes disappeared".into()))?
             .slides()[1]
-            .text()?
+            .text(crate::notes::Limits::DEFAULT)?
             .as_deref(),
         Some("Merged notes")
     );
@@ -4435,7 +4437,7 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
             .notes()?
             .ok_or_else(|| Error::Invalid("reopened notes disappeared".into()))?
             .slides()[0]
-            .text()?
+            .text(crate::notes::Limits::DEFAULT)?
             .as_deref(),
         Some("Disjoint grouped-transfer note")
     );

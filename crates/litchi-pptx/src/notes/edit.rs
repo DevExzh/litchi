@@ -55,10 +55,17 @@ impl Package {
 }
 
 impl Edit<'_> {
+    fn limits(&self) -> super::Limits {
+        self.staged
+            .semantic_limits()
+            .notes()
+            .constrained_by_source(self.staged.opc().read_limits())
+    }
+
     fn snapshot(&self) -> Result<Option<super::Snapshot>> {
         let opc = self.staged.opc();
         let presentation = PresentationPart::from_package(opc)?;
-        super::load_snapshot(opc, presentation.part().partname())
+        super::load_snapshot_with_limits(opc, presentation.part().partname(), self.limits())
     }
 
     fn stage(&mut self, change: impl FnOnce(&mut Draft) -> Result<bool>) -> Result<bool> {
@@ -164,8 +171,9 @@ impl Edit<'_> {
         let Some(source) = self.snapshot()? else {
             return Ok(false);
         };
+        let limits = self.limits();
         self.staged
-            .update(|opc| super::remove_checked(opc, &source, &slide))
+            .update(|opc| super::remove_checked_with_limits(opc, &source, &slide, limits))
     }
 
     /// Remove the notes of every slide while retaining shared notes
@@ -179,7 +187,9 @@ impl Edit<'_> {
         let Some(source) = self.snapshot()? else {
             return Ok(0);
         };
-        self.staged.update(|opc| super::clear_checked(opc, &source))
+        let limits = self.limits();
+        self.staged
+            .update(|opc| super::clear_checked_with_limits(opc, &source, limits))
     }
 
     /// The position, in the staged notes graph, of the selected slide's

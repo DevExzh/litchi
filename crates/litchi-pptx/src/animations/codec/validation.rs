@@ -5,6 +5,7 @@ use super::super::model::{
     Direction, Duration, Effect, GroupId, MotionFraction, ParagraphBuildType, Repeat, Sequence,
     SequenceContext,
 };
+use crate::animations::Limits;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::encoding::Decoder;
@@ -74,8 +75,8 @@ pub(super) fn parse_build_auto_advance(value: &str) -> Result<Duration> {
         .map_err(|_err| invalid("invalid paragraph build auto-advance time"))
 }
 
-pub(super) fn validate_template_time_node(xml: &str) -> Result<()> {
-    if xml.len() > MAX_TEMPLATE_TIME_NODE_BYTES {
+pub(super) fn validate_template_time_node(xml: &str, limits: Limits) -> Result<()> {
+    if xml.len() > limits.max_template_bytes {
         return Err(invalid("paragraph template time node exceeds safety limit"));
     }
     let wrapped = format!(
@@ -95,10 +96,10 @@ pub(super) fn validate_template_time_node(xml: &str) -> Result<()> {
             Event::Start(element) => {
                 depth += 1;
                 nodes += 1;
-                if depth > MAX_TIMING_DEPTH || nodes > MAX_TIMING_NODES {
+                if depth > limits.max_depth || nodes > limits.max_nodes {
                     return Err(invalid("paragraph template time node exceeds safety limit"));
                 }
-                check_attribute_count(&element)?;
+                check_attribute_count(&element, limits)?;
                 if depth == 2 {
                     if saw_par || !is_presentationml_name(&namespace, element.name(), b"par") {
                         return Err(invalid(
@@ -117,10 +118,10 @@ pub(super) fn validate_template_time_node(xml: &str) -> Result<()> {
             },
             Event::Empty(element) => {
                 nodes += 1;
-                if nodes > MAX_TIMING_NODES {
+                if nodes > limits.max_nodes {
                     return Err(invalid("paragraph template time node exceeds safety limit"));
                 }
-                check_attribute_count(&element)?;
+                check_attribute_count(&element, limits)?;
                 let element_depth = depth + 1;
                 if element_depth == 2 {
                     return Err(invalid("paragraph template par node cannot be empty"));
@@ -143,7 +144,7 @@ pub(super) fn validate_template_time_node(xml: &str) -> Result<()> {
                 text_bytes = text_bytes
                     .checked_add(text.len())
                     .ok_or_else(|| invalid("paragraph template text size overflows"))?;
-                if text_bytes > MAX_TIMING_TEXT_BYTES {
+                if text_bytes > limits.max_text_bytes {
                     return Err(invalid("paragraph template text exceeds safety limit"));
                 }
                 if depth <= 1 && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
@@ -154,7 +155,7 @@ pub(super) fn validate_template_time_node(xml: &str) -> Result<()> {
                 text_bytes = text_bytes
                     .checked_add(text.len())
                     .ok_or_else(|| invalid("paragraph template text size overflows"))?;
-                if text_bytes > MAX_TIMING_TEXT_BYTES {
+                if text_bytes > limits.max_text_bytes {
                     return Err(invalid("paragraph template text exceeds safety limit"));
                 }
                 if depth <= 1 && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
@@ -292,22 +293,30 @@ pub(super) fn attribute(
     )?)
 }
 
-pub(super) fn check_attribute_count(element: &BytesStart<'_>) -> Result<()> {
+pub(super) fn check_attribute_count(element: &BytesStart<'_>, limits: Limits) -> Result<()> {
     let mut count = 0usize;
+    let mut bytes = 0usize;
     for attribute in element.checked_attributes() {
-        attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         count += 1;
-        if count > MAX_TIMING_ATTRIBUTES {
+        if count > limits.max_attributes {
             return Err(invalid(
                 "animation XML attribute count exceeds safety limit",
             ));
+        }
+        bytes = bytes
+            .checked_add(attribute.key.as_ref().len())
+            .and_then(|value| value.checked_add(attribute.value.len()))
+            .ok_or_else(|| invalid("animation XML attribute bytes overflow"))?;
+        if bytes > limits.max_text_bytes {
+            return Err(invalid("animation XML attribute bytes exceed safety limit"));
         }
     }
     Ok(())
 }
 
-pub(super) fn check_xml_size(size: usize) -> Result<()> {
-    if size > MAX_TIMING_XML_BYTES {
+pub(super) fn check_xml_size(size: usize, limits: Limits) -> Result<()> {
+    if size > limits.max_input_bytes {
         Err(invalid("animation XML exceeds safety limit"))
     } else {
         Ok(())
@@ -353,7 +362,7 @@ impl Sequence {
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn to_xml_for_slide(&self, valid_targets: &HashSet<u32>) -> Result<String> {
+    pub fn to_xml_for_slide(&self, valid_targets: &HashSet<u32>, limits: Limits) -> Result<String> {
         if self.len() > MAX_ANIMATIONS {
             return Err(invalid("slide animation count exceeds safety limit"));
         }
@@ -506,6 +515,6 @@ impl Sequence {
                 return Err(invalid("animation time filter exceeds safety limit"));
             }
         }
-        Ok(self.to_xml())
+        self.to_xml(limits)
     }
 }

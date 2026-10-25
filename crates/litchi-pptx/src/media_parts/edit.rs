@@ -57,6 +57,13 @@ impl Package {
 }
 
 impl Edit<'_> {
+    fn limits(&self) -> super::Limits {
+        self.staged
+            .semantic_limits()
+            .media_parts()
+            .constrained_by_source(self.staged.opc().read_limits())
+    }
+
     /// The staged media list of the selected slide.
     ///
     /// # Errors
@@ -64,7 +71,7 @@ impl Edit<'_> {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn media<'s>(&self, slide: impl Into<crate::slide::Selector<'s>>) -> Result<List> {
         let slide_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
-        load(self.staged.opc(), &slide_name)
+        super::package::load_with_limits(self.staged.opc(), &slide_name, self.limits())
     }
 
     /// Adds a new set of media pictures and their inert internal resources to a Slide part.
@@ -79,8 +86,10 @@ impl Edit<'_> {
         conformance: Conformance,
     ) -> Result<()> {
         let slide_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
-        self.staged
-            .update(move |opc| raw::store(opc, &slide_name, value, conformance))
+        let limits = self.limits();
+        self.staged.update(move |opc| {
+            raw::store_with_limits(opc, &slide_name, value, conformance, false, limits)
+        })
     }
 
     /// Discard every staged change.

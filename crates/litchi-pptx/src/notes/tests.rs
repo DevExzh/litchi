@@ -9,6 +9,18 @@ use super::*;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{OpcPackage, PackURI};
+
+fn write_text(text: &str) -> Result<Vec<u8>> {
+    super::write_text(text, Limits::DEFAULT)
+}
+
+fn write_text_with(conformance: Conformance, text: &str) -> Result<Vec<u8>> {
+    super::write_text_with(conformance, text, Limits::DEFAULT)
+}
+
+fn master_xml() -> &'static str {
+    super::master_xml(Limits::DEFAULT).unwrap()
+}
 const POI: &[u8] = include_bytes!("../../../../test-data/poi/test-data/slideshow/prProps.pptx");
 const LO: &[u8] =
     include_bytes!("../../../../test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx");
@@ -28,6 +40,26 @@ fn plain_text_writer_escapes_and_rejects_invalid_xml() {
     assert!(xml.contains("<a:t>A &lt; B &amp; C</a:t>"));
     assert!(xml.ends_with("</p:notes>"));
     assert!(write_text("bad\u{0}text").is_err());
+}
+
+#[test]
+fn raw_policy_admits_exact_notes_wire_and_refuses_one_byte_under() {
+    let wire = write_text("bounded note").unwrap();
+    let exact = Limits {
+        max_output_bytes: wire.len(),
+        ..Limits::DEFAULT
+    };
+    assert_eq!(super::write_text("bounded note", exact).unwrap(), wire);
+    assert!(
+        super::write_text(
+            "bounded note",
+            Limits {
+                max_output_bytes: wire.len().saturating_sub(1),
+                ..exact
+            },
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -72,7 +104,7 @@ fn consuming_put_moves_changed_xml_and_refuses_signed_changes_until_unsigned() {
     assert!(!package.is_signed());
     assert_eq!(
         load(&package, &name).unwrap().unwrap().slides()[0]
-            .text()
+            .text(Limits::DEFAULT)
             .unwrap()
             .as_deref(),
         Some("Updated note")
@@ -170,13 +202,13 @@ fn strict_mce_graph_round_trips_and_projects_text() {
     let (mut package, name) = synthetic(Conformance::Strict);
     let graph = load(&package, &name).unwrap().unwrap();
     assert_eq!(
-        graph.slides[0].text().unwrap().as_deref(),
+        graph.slides[0].text(Limits::DEFAULT).unwrap().as_deref(),
         Some("Strict note")
     );
     put(&mut package, &name, graph).unwrap();
     assert_eq!(
         load(&package, &name).unwrap().unwrap().slides[0]
-            .text()
+            .text(Limits::DEFAULT)
             .unwrap()
             .as_deref(),
         Some("Strict note")
@@ -218,7 +250,7 @@ fn strict_text_writer_validates_and_round_trips_replacement() {
     let graph = load(&package, &name).unwrap().unwrap();
     assert_eq!(graph.conformance(), Conformance::Strict);
     assert_eq!(
-        graph.slides()[0].text().unwrap().as_deref(),
+        graph.slides()[0].text(Limits::DEFAULT).unwrap().as_deref(),
         Some("Updated strict note")
     );
 }

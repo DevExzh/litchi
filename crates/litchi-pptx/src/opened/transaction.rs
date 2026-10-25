@@ -265,6 +265,30 @@ impl Edit {
             .ok_or_else(|| invalid("opened-presentation edit source state is unavailable"))
     }
 
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        self.source
+            .as_ref()
+            .and_then(|source| source.owner_state.semantic_limits)
+            .or_else(|| {
+                self.lazy
+                    .as_ref()
+                    .and_then(|source| source.owner_state.semantic_limits)
+            })
+            .unwrap_or_default()
+    }
+
+    fn notes_limits(&self) -> crate::notes::Limits {
+        self.semantic_limits()
+            .notes()
+            .constrained_by_source(self.working.read_limits())
+    }
+
+    fn comments_limits(&self) -> crate::comments::Limits {
+        self.semantic_limits()
+            .comments()
+            .constrained_by_source(self.working.read_limits())
+    }
+
     /// Record that the payload now staged for `part_name` was read back as a
     /// complete scene. A part whose shared allocation does not alias its
     /// visible payload, or a record that cannot be reserved, is simply not
@@ -1147,7 +1171,12 @@ impl Edit {
         let owner = self.working.get_part(&selected.part_name)?;
         let scene = crate::shape::Scene::read(owner.blob())?;
         let shape_id = next_shape_id(&scene, "text box")?;
-        let conformance = crate::media_parts::document_conformance(owner.blob())?;
+        let conformance = crate::media_parts::document_conformance_with_limits(
+            owner.blob(),
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(self.working.read_limits()),
+        )?;
         let fragment = text_box_fragment(
             text.as_ref(),
             bounds,
@@ -1234,7 +1263,12 @@ impl Edit {
         let owner = self.working.get_part(&selected.part_name)?;
         let scene = crate::shape::Scene::read(owner.blob())?;
         let shape_id = next_shape_id(&scene, "picture")?;
-        let conformance = crate::media_parts::document_conformance(owner.blob())?;
+        let conformance = crate::media_parts::document_conformance_with_limits(
+            owner.blob(),
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(self.working.read_limits()),
+        )?;
         let reserved: HashSet<_> = self
             .working
             .iter_parts()
@@ -1516,7 +1550,11 @@ impl Edit {
     ) -> Result<usize> {
         let selected_slide = self.resolve_slide(slide.into())?;
         let presentation_name = self.source_ref()?.presentation_name.clone();
-        let source = crate::notes::load_snapshot(&self.working, &presentation_name)?;
+        let source = crate::notes::load_snapshot_with_limits(
+            &self.working,
+            &presentation_name,
+            self.notes_limits(),
+        )?;
         let Some(note) = source.as_ref().and_then(|source| {
             source
                 .slides()
@@ -1588,7 +1626,11 @@ impl Edit {
     ) -> Result<usize> {
         let selected_slide = self.resolve_slide(slide)?;
         let presentation_name = self.source_ref()?.presentation_name.clone();
-        let source = crate::notes::load_snapshot(&self.working, &presentation_name)?;
+        let source = crate::notes::load_snapshot_with_limits(
+            &self.working,
+            &presentation_name,
+            self.notes_limits(),
+        )?;
         let Some(note) = source.as_ref().and_then(|source| {
             source
                 .slides()
@@ -1641,7 +1683,11 @@ impl Edit {
             });
         }
         let presentation_name = self.source_ref()?.presentation_name.clone();
-        let source = crate::notes::load_snapshot(&self.working, &presentation_name)?;
+        let source = crate::notes::load_snapshot_with_limits(
+            &self.working,
+            &presentation_name,
+            self.notes_limits(),
+        )?;
         let note = source.as_ref().and_then(|source| {
             source
                 .slides()
@@ -1650,12 +1696,13 @@ impl Edit {
         });
         match note {
             Some(note) => {
-                if note.text()?.as_deref() == (!text.is_empty()).then_some(text) {
+                let limits = self.notes_limits();
+                if note.text(limits)?.as_deref() == (!text.is_empty()).then_some(text) {
                     return Ok(false);
                 }
                 let part_name = PackURI::new(note.part())
                     .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
-                let xml = crate::notes::rewrite_text(note.xml(), text)?;
+                let xml = crate::notes::rewrite_text(note.xml(), text, limits)?;
                 self.working.get_part_mut(&part_name)?.set_blob(xml);
             },
             // A slide without notes and empty text is already as requested.
@@ -1680,14 +1727,18 @@ impl Edit {
     /// Read the staged notes of `slide` back and require `text`.
     fn verify_notes_text(&self, slide: &PackURI, text: &str) -> Result<()> {
         let presentation_name = self.source_ref()?.presentation_name.clone();
-        let staged = crate::notes::load_snapshot(&self.working, &presentation_name)?
-            .ok_or_else(|| invalid("opened-presentation staged notes graph disappeared"))?;
+        let staged = crate::notes::load_snapshot_with_limits(
+            &self.working,
+            &presentation_name,
+            self.notes_limits(),
+        )?
+        .ok_or_else(|| invalid("opened-presentation staged notes graph disappeared"))?;
         let staged_note = staged
             .slides()
             .iter()
             .find(|note| note.owner() == slide.as_str())
             .ok_or_else(|| invalid("opened-presentation staged notes owner disappeared"))?;
-        let actual = staged_note.text()?;
+        let actual = staged_note.text(self.notes_limits())?;
         if actual.as_deref() != (!text.is_empty()).then_some(text) {
             return Err(invalid(
                 "opened-presentation notes text did not round-trip semantically",
@@ -1747,7 +1798,12 @@ impl Edit {
         let owner = self.working.get_part(&selected.part_name)?;
         let scene = crate::shape::Scene::read(owner.blob())?;
         let shape_id = next_shape_id(&scene, "table")?;
-        let conformance = crate::media_parts::document_conformance(owner.blob())?;
+        let conformance = crate::media_parts::document_conformance_with_limits(
+            owner.blob(),
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(self.working.read_limits()),
+        )?;
         let fragment = table_fragment(
             cells,
             bounds,
@@ -1992,11 +2048,17 @@ impl Edit {
         conformance: crate::media_parts::Conformance,
     ) -> Result<()> {
         let selected = self.resolve_slide(slide.into())?;
-        crate::media_parts::package::store(
+        let limits = self
+            .semantic_limits()
+            .media_parts()
+            .constrained_by_source(self.working.read_limits());
+        crate::media_parts::package::store_with_limits(
             &mut self.working,
             &selected.part_name,
             media,
             conformance,
+            false,
+            limits,
         )
     }
 
@@ -2074,7 +2136,13 @@ impl Edit {
         conformance: crate::comments::Conformance,
     ) -> Result<()> {
         self.ensure_ready()?;
-        crate::comments::add_presentation_comment_author(&mut self.working, author, conformance)
+        let limits = self.comments_limits();
+        crate::comments::add_presentation_comment_author_with_limits(
+            &mut self.working,
+            author,
+            conformance,
+            limits,
+        )
     }
 
     /// Add a legacy comment owned by one selected slide.
@@ -2095,11 +2163,13 @@ impl Edit {
         conformance: crate::comments::Conformance,
     ) -> Result<()> {
         let selected = self.resolve_slide(slide.into())?;
-        crate::comments::add_presentation_comment(
+        let limits = self.comments_limits();
+        crate::comments::add_presentation_comment_with_limits(
             &mut self.working,
             selected.part_name.as_str(),
             comment,
             conformance,
+            limits,
         )
     }
 
@@ -2122,12 +2192,14 @@ impl Edit {
         conformance: crate::comments::Conformance,
     ) -> Result<bool> {
         let selected = self.resolve_slide(slide.into())?;
-        crate::comments::remove_presentation_comment(
+        let limits = self.comments_limits();
+        crate::comments::remove_presentation_comment_with_limits(
             &mut self.working,
             selected.part_name.as_str(),
             author_id,
             index,
             conformance,
+            limits,
         )
     }
 
@@ -2661,7 +2733,12 @@ impl Edit {
         let owner = self.working.get_part(&selected.part_name)?;
         let scene = crate::shape::Scene::read(owner.blob())?;
         let shape_id = next_shape_id(&scene, label)?;
-        let conformance = crate::media_parts::document_conformance(owner.blob())?;
+        let conformance = crate::media_parts::document_conformance_with_limits(
+            owner.blob(),
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(self.working.read_limits()),
+        )?;
         let fragment =
             preset_shape_fragment(preset, label, bounds, fill_color, shape_id, conformance)?;
         self.append_checked_shape(&selected, shape_id, fragment.as_bytes())?;

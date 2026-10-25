@@ -494,6 +494,11 @@ impl<'a> Staged<'a> {
         }
     }
 
+    /// The owner-retained semantic codec policies for this staged family.
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        self.package.semantic_limits()
+    }
+
     /// Run one typed graph operation on the staged graph. An error leaves
     /// the staged graph as it was before the operation.
     pub(crate) fn update<T>(

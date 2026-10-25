@@ -27,11 +27,12 @@ const PACKAGE_REL: &str =
 fn package_notes_crud_uses_semantic_slide_selectors() {
     let mut package = opened_deck(&[("Overview", "First note"), ("Appendix", "Second note")]);
     let mut graph = package.notes().unwrap().unwrap();
-    graph.slides_mut()[0].replace_xml(notes::write_text("Revised note").unwrap());
+    graph.slides_mut()[0]
+        .replace_xml(notes::write_text("Revised note", notes::Limits::DEFAULT).unwrap());
     package.put_notes_in_place(graph).unwrap();
     assert_eq!(
         package.notes().unwrap().unwrap().slides()[0]
-            .text()
+            .text(notes::Limits::DEFAULT)
             .unwrap(),
         Some("Revised note".into())
     );
@@ -76,7 +77,7 @@ fn facade_publishes_source_checked_lossless_edits_and_rejects_stale_patches() {
     package = commit.into_package();
     assert_eq!(
         package.notes().unwrap().unwrap().slides()[0]
-            .text()
+            .text(notes::Limits::DEFAULT)
             .unwrap(),
         Some("Committed note".into())
     );
@@ -94,7 +95,7 @@ fn facade_publishes_source_checked_lossless_edits_and_rejects_stale_patches() {
     assert!(matches!(error, Error::PatchConflict));
     assert_eq!(
         package.notes().unwrap().unwrap().slides()[0]
-            .text()
+            .text(notes::Limits::DEFAULT)
             .unwrap(),
         Some("Committed note".into())
     );
@@ -230,8 +231,11 @@ fn notes_descendant_limit_rejects_n_plus_one_before_mutation() {
 #[test]
 fn authored_notes_xml_and_referenced_master_are_compact() {
     for xml in [
-        notes::write_text("Compact").unwrap(),
-        notes::master_xml().as_bytes().to_vec(),
+        notes::write_text("Compact", notes::Limits::DEFAULT).unwrap(),
+        notes::master_xml(notes::Limits::DEFAULT)
+            .unwrap()
+            .as_bytes()
+            .to_vec(),
     ] {
         assert!(!xml.contains(&b'\n'));
         assert!(!xml.contains(&b'\r'));

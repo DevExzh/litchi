@@ -17,17 +17,22 @@ use crate::{Error, Result};
 pub(crate) fn slide_tags<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
+    limits: crate::tag::Limits,
 ) -> Result<Option<crate::tag::List>> {
-    Ok(crate::tag::load(package, part.part().partname())?.map(crate::tag::Source::into_list))
+    Ok(
+        crate::tag::load_with_limits(package, part.part().partname(), limits)?
+            .map(crate::tag::Source::into_list),
+    )
 }
 
 pub(crate) fn slide_shape_tags<'a, 'k>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
     shape: impl Into<crate::shape::Key<'k>>,
+    limits: crate::tag::Limits,
 ) -> Result<Option<crate::tag::List>> {
     Ok(
-        crate::tag::shape::load(package, part.part().partname(), shape)?
+        crate::tag::shape::load_with_limits(package, part.part().partname(), shape, limits)?
             .map(crate::tag::Source::into_list),
     )
 }
@@ -108,8 +113,9 @@ pub(crate) fn slide_designer_tags<'a>(
 pub(crate) fn slide_tag_inventory<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
+    limits: crate::tag::Limits,
 ) -> Result<Vec<crate::tag::Source>> {
-    crate::tag::discover(part.part(), package)
+    crate::tag::discover_with_limits(part.part(), package, limits)
 }
 
 pub(crate) fn slide_charts<'a>(
@@ -136,15 +142,18 @@ pub(crate) fn slide_comments<'a>(
 pub(crate) fn slide_comment_snapshot<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
+    limits: crate::comments::Limits,
 ) -> Result<Option<crate::presentation::related::Comments>> {
-    crate::presentation::related::load_eager_comments(package, part)
+    crate::presentation::related::load_eager_comments(package, part, limits)
 }
 
 pub(crate) fn slide_notes<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
+    shape_limits: crate::shape::Limits,
+    notes_limits: crate::notes::Limits,
 ) -> Result<Option<crate::presentation::related::Notes>> {
-    crate::presentation::related::load_eager_notes(package, part)
+    crate::presentation::related::load_eager_notes(package, part, shape_limits, notes_limits)
 }
 
 pub(crate) fn slide_zooms<'a>(

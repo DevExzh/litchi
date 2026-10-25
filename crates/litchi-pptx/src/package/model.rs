@@ -14,6 +14,10 @@ pub struct Package {
     /// Whether ingress retained the exact source archive needed for physical
     /// revision authorization of topology-changing cross-package edits.
     pub(crate) physical_source_provenance: bool,
+    /// Non-default semantic codec policies selected at ingress. Keeping the
+    /// override bundle optional preserves the ordinary package footprint while
+    /// edits and projections retain a caller-selected policy.
+    pub(crate) semantic_limits: Option<crate::open_options::SemanticLimits>,
     /// Every non-structural defect repaired while the package was opened, in
     /// discovery order: the OPC manifest repairs folded from
     /// `litchi_opc` ([`crate::Defect::Package`]), the slide-list repairs of
@@ -63,6 +67,7 @@ impl std::fmt::Debug for Package {
 #[derive(Clone, Default)]
 pub(crate) struct OpenedOwnerState {
     tolerance: crate::leniency::ToleranceReport,
+    pub(crate) semantic_limits: Option<crate::open_options::SemanticLimits>,
     #[cfg(feature = "encryption")]
     encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
     #[cfg(feature = "encryption")]
@@ -83,6 +88,12 @@ impl OpenedOwnerState {
 }
 
 impl Package {
+    /// The package's selected semantic codec policies, or the finite defaults
+    /// for packages built without an explicit ingress profile.
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        self.semantic_limits.unwrap_or_default()
+    }
+
     /// Every non-structural defect the reader repaired while opening this
     /// package, in discovery order.
     ///
@@ -133,9 +144,10 @@ impl Package {
     ///
     /// Returns an error if the operation fails.
     pub fn presentation(&self) -> Result<Presentation<'_>> {
-        Ok(Presentation::new(
+        Ok(Presentation::new_with_semantic_limits(
             PresentationPart::from_package(&self.opc)?,
             &self.opc,
+            self.semantic_limits,
         ))
     }
 
@@ -204,16 +216,18 @@ impl Package {
         limits: crate::opened::Limits,
     ) -> Result<crate::opened::Snapshot> {
         let mut snapshot = match self.part_digest_memo() {
-            Some(parent) => crate::opened::capture_with_parent_digests(
+            Some(parent) => crate::opened::capture_with_parent_digests_and_semantic_limits(
                 &self.opc,
                 limits,
                 self.physical_source_provenance,
                 parent,
+                self.semantic_limits,
             )?,
-            None => crate::opened::capture_with_provenance(
+            None => crate::opened::capture_with_provenance_and_semantic_limits(
                 &self.opc,
                 limits,
                 self.physical_source_provenance,
+                self.semantic_limits,
             )?,
         };
         snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
@@ -422,6 +436,7 @@ impl Package {
     fn opened_owner_state(&self) -> OpenedOwnerState {
         OpenedOwnerState {
             tolerance: self.tolerance.clone(),
+            semantic_limits: self.semantic_limits,
             #[cfg(feature = "encryption")]
             encryption: self.encryption,
             #[cfg(feature = "encryption")]
@@ -444,6 +459,7 @@ impl Package {
         Self {
             opc: opc.into(),
             physical_source_provenance: self.physical_source_provenance,
+            semantic_limits: self.semantic_limits,
             tolerance: self.tolerance.clone(),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
             #[cfg(feature = "encryption")]
@@ -472,6 +488,7 @@ impl Package {
         let mut package = Self {
             opc: std::sync::Arc::new(opc),
             physical_source_provenance: snapshot.physical_source_provenance,
+            semantic_limits: state.semantic_limits,
             tolerance: state.tolerance.clone(),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
             #[cfg(feature = "encryption")]
@@ -513,7 +530,13 @@ impl Package {
     /// graph is malformed or exceeds its resource limits.
     pub fn notes(&self) -> Result<Option<crate::notes::Graph>> {
         let presentation = PresentationPart::from_package(&self.opc)?;
-        crate::notes::load(&self.opc, presentation.part().partname())
+        crate::notes::load_with_limits(
+            &self.opc,
+            presentation.part().partname(),
+            self.semantic_limits()
+                .notes()
+                .constrained_by_source(self.opc.read_limits()),
+        )
     }
 
     /// Capture the complete notes graph as a source-checked snapshot.
@@ -524,7 +547,13 @@ impl Package {
     /// graph is malformed or exceeds its resource limits.
     pub fn notes_snapshot(&self) -> Result<Option<crate::notes::Snapshot>> {
         let presentation = PresentationPart::from_package(&self.opc)?;
-        crate::notes::load_snapshot(&self.opc, presentation.part().partname())
+        crate::notes::load_snapshot_with_limits(
+            &self.opc,
+            presentation.part().partname(),
+            self.semantic_limits()
+                .notes()
+                .constrained_by_source(self.opc.read_limits()),
+        )
     }
 
     /// Read the presentation-owned embedded-font collection.
@@ -608,7 +637,14 @@ impl Package {
         slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<Option<crate::tag::List>> {
         let slide_name = self.resolve_slide(slide.into())?;
-        Ok(crate::tag::load(&self.opc, &slide_name)?.map(crate::tag::Source::into_list))
+        Ok(crate::tag::load_with_limits(
+            &self.opc,
+            &slide_name,
+            self.semantic_limits()
+                .tag()
+                .constrained_by_source(self.opc.read_limits()),
+        )?
+        .map(crate::tag::Source::into_list))
     }
 
     /// Read the source-bound Designer tags owned by one stable slide ID.
@@ -690,8 +726,15 @@ impl Package {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::tag::List>> {
         let slide_name = self.resolve_slide(slide.into())?;
-        Ok(crate::tag::shape::load(&self.opc, &slide_name, shape)?
-            .map(crate::tag::Source::into_list))
+        Ok(crate::tag::shape::load_with_limits(
+            &self.opc,
+            &slide_name,
+            shape,
+            self.semantic_limits()
+                .tag()
+                .constrained_by_source(self.opc.read_limits()),
+        )?
+        .map(crate::tag::Source::into_list))
     }
 
     /// Read the optional classification outcome attached to one semantic
