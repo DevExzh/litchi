@@ -12,13 +12,14 @@ tighter edit policy therefore returns the VBA `PartBytes` limit identity
 without hydrating the payload.  The repair does not change the bounded
 metadata scan or publication order.
 
-The noncanonical content-types replay test now derives the expected composed
-manifest from the graph operation.  It still checks exact bytes, including the
-recipient/source spelling marker, while accounting for the required
-macro-enabled main-part and VBA-project overrides.  The structural-limit
-fixtures now set their `parts` and `relationship_parts` ceilings alongside
-`members`, so they exercise the intended refusal kinds instead of rejecting
-the limit configuration itself.
+The noncanonical content-types replay test now spells out the expected Excel
+fixture manifest independently: it replaces the known plain workbook
+override with the required macro-enabled main-part and VBA-project overrides.
+It still checks exact bytes, including the recipient/source spelling marker.
+The structural-limit fixtures now set their `parts` and `relationship_parts`
+ceilings alongside `members`, so they exercise the intended refusal kinds
+instead of rejecting the limit configuration itself.
 
-Only source inspection, formatting, and repository-size/binary guards remain
-pending here; the coordinator must rerun the focused and common runtime rows.
+Source inspection, formatting, and repository-size/binary checks passed in this
+leaf.  Cargo, compiler, and runtime execution remain intentionally pending for
+the coordinator's focused and common runtime rerun.

@@ -3073,6 +3073,34 @@ mod tests {
         package
     }
 
+    // This fixture starts with one authored workbook override.  The expected
+    // Excel VBA edit is deliberately spelled out here instead of reusing the
+    // production content-types composer: replace that known plain-main
+    // declaration with the required macro-main and VBA-project declarations,
+    // leaving every other source byte untouched.
+    fn expected_excel_vba_content_types(source: &[u8]) -> Vec<u8> {
+        const PLAIN_WORKBOOK_OVERRIDE: &[u8] = br#"<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>"#;
+        const VBA_WORKBOOK_OVERRIDES: &[u8] = br#"<Override PartName="/xl/workbook.xml" ContentType="application/vnd.ms-excel.sheet.macroEnabled.main+xml"/><Override PartName="/xl/vbaProject.bin" ContentType="application/vnd.ms-office.vbaProject"/>"#;
+        let offset = source
+            .windows(PLAIN_WORKBOOK_OVERRIDE.len())
+            .position(|window| window == PLAIN_WORKBOOK_OVERRIDE)
+            .expect("plain Excel workbook content-type override");
+        assert_eq!(
+            source
+                .windows(PLAIN_WORKBOOK_OVERRIDE.len())
+                .filter(|window| *window == PLAIN_WORKBOOK_OVERRIDE)
+                .count(),
+            1,
+            "Excel fixture must contain one plain workbook override"
+        );
+        let mut expected = source.to_vec();
+        expected.splice(
+            offset..offset + PLAIN_WORKBOOK_OVERRIDE.len(),
+            VBA_WORKBOOK_OVERRIDES.iter().copied(),
+        );
+        expected
+    }
+
     fn add_noncanonical_content_types(package: &mut OpcPackage) -> Vec<u8> {
         let limits = package.read_limits();
         let expected = package.source_content_types(limits).unwrap();
@@ -3142,20 +3170,8 @@ mod tests {
             )
             .unwrap();
         let noncanonical_content_types = add_noncanonical_content_types(&mut package);
-        let source_content_types = package.source_content_types(limits).unwrap();
-        let expected_stored_content_types = content_types_after_graph_store(
-            &source_content_types,
-            &source_name,
-            Host::Excel,
-            inspect_existing_graph(&package, &source_name, Host::Excel)
-                .unwrap()
-                .as_ref(),
-            ct::SML_SHEET_MACRO_MAIN,
-            limits,
-        )
-        .unwrap()
-        .bytes()
-        .to_vec();
+        let expected_stored_content_types =
+            expected_excel_vba_content_types(&noncanonical_content_types);
 
         let mut edit = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
         edit.store(b"project".to_vec(), None).unwrap();
@@ -3223,18 +3239,8 @@ mod tests {
                 limits,
             )
             .unwrap();
-        let divergent_source_content_types = divergent.source_content_types(limits).unwrap();
-        let divergent_existing =
-            inspect_existing_graph(&divergent, &source_name, Host::Excel).unwrap();
-        let expected_divergent_content_types = content_types_after_graph_replace(
-            &divergent_source_content_types,
-            commit.patch().after.as_ref().unwrap(),
-            divergent_existing.as_ref(),
-            limits,
-        )
-        .unwrap()
-        .bytes()
-        .to_vec();
+        let expected_divergent_content_types =
+            expected_excel_vba_content_types(&divergent_content_types);
         let divergent_replayed = commit.patch().apply(&divergent).unwrap();
         assert_eq!(
             divergent_replayed
