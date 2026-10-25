@@ -939,7 +939,7 @@ fn capture_internal(
     let view = crate::presentation::Presentation::new_with_semantic_limits(
         presentation,
         package,
-        semantic_limits,
+        semantic_limits.clone(),
     );
     let mut mce_capture = MceCapture::new(parent_mce, limits.max_retained_mce_bytes());
     let captured = view.capture_slides_with_mce(&mut mce_capture, parent_roots)?;
@@ -1017,16 +1017,14 @@ fn capture_internal(
             &presentation_name,
             references.len(),
             proofs,
-            semantic_limits
-                .unwrap_or_default()
+            crate::open_options::selected(semantic_limits.as_ref())
                 .notes()
                 .constrained_by_source(package.read_limits()),
         )?,
         None => crate::notes::load_snapshot_with_limits(
             package,
             &presentation_name,
-            semantic_limits
-                .unwrap_or_default()
+            crate::open_options::selected(semantic_limits.as_ref())
                 .notes()
                 .constrained_by_source(package.read_limits()),
         )?,
