@@ -5,7 +5,7 @@ use litchi_opc::{OpcPackage, PackURI};
 use litchi_spreadsheet_drawing::chart::anchor::write_all;
 use litchi_spreadsheet_drawing::chart::builder::Anchor;
 use litchi_spreadsheet_drawing::chart::{read as read_chart, write};
-use litchi_spreadsheet_drawing::shape::{Object, read as read_drawing};
+use litchi_spreadsheet_drawing::shape::{Limits as ShapeLimits, Object, read as read_drawing};
 use std::path::{Path, PathBuf};
 
 fn fixture(path: &str) -> PathBuf {
@@ -48,10 +48,12 @@ fn assert_minimal_xml(xml: &[u8]) {
 fn extracts_real_shape_and_chart_parts_without_copying_fixture_xml() {
     let shape_package = fixture("ooxml/xlsx/fontSize.xlsx");
     let drawing_xml = part(&shape_package, "/xl/drawings/drawing1.xml");
-    let objects =
-        read_drawing(std::str::from_utf8(&drawing_xml).expect("OOXML drawing XML must be UTF-8"))
-            .expect("real worksheet drawing must parse")
-            .expect("fixture must contain a drawing object");
+    let objects = read_drawing(
+        std::str::from_utf8(&drawing_xml).expect("OOXML drawing XML must be UTF-8"),
+        &ShapeLimits::DEFAULT,
+    )
+    .expect("real worksheet drawing must parse")
+    .expect("fixture must contain a drawing object");
     assert!(matches!(objects[0].object, Object::Shape(_)));
 
     let chart_xml = part(

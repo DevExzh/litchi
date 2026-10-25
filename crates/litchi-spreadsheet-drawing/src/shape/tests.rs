@@ -3,6 +3,7 @@
 //! Regression tests for typed `SpreadsheetDrawing` models and bounded codecs.
 
 use super::*;
+use crate::Error;
 use litchi_drawingml::geom::Preset;
 use std::mem::size_of;
 
@@ -51,7 +52,7 @@ fn text_box_shape() -> &'static str {
 #[test]
 fn parses_two_cell_text_box() {
     let xml = drawing(&two_cell_anchor(text_box_shape()));
-    let objects = read(&xml).unwrap().unwrap();
+    let objects = read(&xml, &Limits::DEFAULT).unwrap().unwrap();
     assert_eq!(objects.len(), 1);
     let anchored = &objects[0];
     assert_eq!(
@@ -113,7 +114,7 @@ fn parses_two_cell_text_box() {
 fn preset_attributes_apply_xml_schema_token_whitespace() {
     let shape_xml =
         text_box_shape().replace("prst=\"roundRect\"", "prst=\" &#x9;roundRect&#xA;&#xD; \"");
-    let objects = read(&drawing(&two_cell_anchor(&shape_xml)))
+    let objects = read(&drawing(&two_cell_anchor(&shape_xml)), &Limits::DEFAULT)
         .unwrap()
         .unwrap();
     let Object::Shape(shape) = &objects[0].object else {
@@ -132,7 +133,7 @@ fn parses_one_cell_connection_shape() {
              <xdr:ext cx=\"914400\" cy=\"457200\"/>{object}<xdr:clientData/></xdr:oneCellAnchor>",
         marker(0, 0, 0, 0)
     );
-    let objects = read(&drawing(&anchor)).unwrap().unwrap();
+    let objects = read(&drawing(&anchor), &Limits::DEFAULT).unwrap().unwrap();
     assert_eq!(objects.len(), 1);
     assert_eq!(
         objects[0].anchor,
@@ -178,12 +179,52 @@ fn connection_custom_geometry_is_typed_and_exclusive() {
              <xdr:ext cx=\"914400\" cy=\"457200\"/>{object}<xdr:clientData/></xdr:oneCellAnchor>",
         marker(0, 0, 0, 0)
     );
-    let objects = read(&drawing(&anchor)).unwrap().unwrap();
+    let objects = read(&drawing(&anchor), &Limits::DEFAULT).unwrap().unwrap();
     let Object::ConnectionShape(connection) = &objects[0].object else {
         panic!("expected a connection shape");
     };
     assert_eq!(connection.preset(), None);
     assert!(connection.custom_geometry().is_some());
+}
+
+#[test]
+fn custom_geometry_uses_the_shape_reader_policy() {
+    let object = "<xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"9\" name=\"Custom\"/>\
+            <xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr><a:custGeom><a:gdLst>\
+            <a:gd name=\"one\" fmla=\"val 1\"/><a:gd name=\"two\" fmla=\"val 2\"/>\
+            </a:gdLst><a:pathLst><a:path/></a:pathLst></a:custGeom></xdr:spPr></xdr:sp>";
+    let xml = drawing(&two_cell_anchor(object));
+    let geometry = litchi_drawingml::geometry::Limits::new(
+        litchi_drawingml::geometry::Limits::DEFAULT.max_adjust_handles,
+        litchi_drawingml::geometry::Limits::DEFAULT.max_connection_sites,
+        1,
+        litchi_drawingml::geometry::Limits::DEFAULT.max_paths,
+        litchi_drawingml::geometry::Limits::DEFAULT.max_path_commands,
+        litchi_drawingml::geometry::Limits::DEFAULT.max_output_bytes,
+    );
+    let limits = Limits {
+        geometry,
+        ..Limits::DEFAULT
+    };
+    let error = read(&xml, &limits).unwrap_err();
+    assert!(error.to_string().contains("geometry guide"));
+}
+
+#[test]
+fn shape_reader_checks_selected_part_bytes_before_mce_and_parse() {
+    let xml = drawing(&two_cell_anchor(text_box_shape()));
+    let limits = Limits {
+        max_drawing_part_bytes: xml.len() - 1,
+        ..Limits::DEFAULT
+    };
+    assert!(matches!(
+        read(&xml, &limits),
+        Err(Error::Limit {
+            kind: crate::LimitKind::DrawingBytes,
+            observed,
+            maximum,
+        }) if observed == xml.len() && maximum == xml.len() - 1
+    ));
 }
 
 #[test]
@@ -194,7 +235,7 @@ fn rejects_unknown_preset() {
         "<xdr:absoluteAnchor><xdr:pos x=\"123\" y=\"456\"/>\
              <xdr:ext cx=\"789\" cy=\"101\"/>{object}<xdr:clientData/></xdr:absoluteAnchor>"
     );
-    let error = read(&drawing(&anchor)).unwrap_err();
+    let error = read(&drawing(&anchor), &Limits::DEFAULT).unwrap_err();
     let message = error.to_string();
     assert!(message.contains("invalid DrawingML shape preset"));
     assert!(!message.contains("vendorWeird"));
@@ -208,10 +249,16 @@ fn rejects_missing_presets_and_invalid_text_domains() {
         "<xdr:absoluteAnchor><xdr:pos x=\"123\" y=\"456\"/>\
              <xdr:ext cx=\"789\" cy=\"101\"/>{missing}<xdr:clientData/></xdr:absoluteAnchor>"
     );
-    let error = read(&drawing(&anchor)).unwrap_err();
+    let error = read(&drawing(&anchor), &Limits::DEFAULT).unwrap_err();
     assert!(error.to_string().contains("missing required prst"));
 
-    assert!(read(&drawing("<xdr:twoCellAnchor editAs=\"vendor\"/>")).is_err());
+    assert!(
+        read(
+            &drawing("<xdr:twoCellAnchor editAs=\"vendor\"/>"),
+            &Limits::DEFAULT
+        )
+        .is_err()
+    );
 
     for attribute in [
         "anchor=\"middle\"",
@@ -226,7 +273,7 @@ fn rejects_missing_presets_and_invalid_text_domains() {
                  </xdr:nvSpPr><xdr:txBody><a:bodyPr {attribute}/><a:p/></xdr:txBody></xdr:sp>"
         );
         assert!(
-            read(&drawing(&two_cell_anchor(&object))).is_err(),
+            read(&drawing(&two_cell_anchor(&object)), &Limits::DEFAULT).is_err(),
             "accepted {attribute}"
         );
     }
@@ -238,7 +285,7 @@ fn rejects_missing_presets_and_invalid_text_domains() {
                  <a:t>x</a:t></a:r></a:p></xdr:txBody></xdr:sp>"
         );
         assert!(
-            read(&drawing(&two_cell_anchor(&object))).is_err(),
+            read(&drawing(&two_cell_anchor(&object)), &Limits::DEFAULT).is_err(),
             "accepted {run_properties}"
         );
     }
@@ -253,7 +300,7 @@ fn rejects_competing_shape_geometries() {
         "<xdr:absoluteAnchor><xdr:pos x=\"123\" y=\"456\"/>\
              <xdr:ext cx=\"789\" cy=\"101\"/>{object}<xdr:clientData/></xdr:absoluteAnchor>"
     );
-    let error = read(&drawing(&anchor)).unwrap_err();
+    let error = read(&drawing(&anchor), &Limits::DEFAULT).unwrap_err();
     assert!(error.to_string().contains("competing"));
 }
 
@@ -268,7 +315,7 @@ fn retains_unknown_objects_attributes_and_drawingml_children() {
         two_cell_anchor(unknown_xml),
         two_cell_anchor(known)
     ));
-    let objects = read(&xml).unwrap().unwrap();
+    let objects = read(&xml, &Limits::DEFAULT).unwrap().unwrap();
     assert_eq!(objects.len(), 2);
     let Object::Unknown(unknown) = &objects[0].object else {
         panic!("expected an unknown drawing object");
@@ -311,7 +358,7 @@ fn parses_nested_groups() {
              <a:chOff x=\"5\" y=\"6\"/><a:chExt cx=\"7\" cy=\"8\"/></a:xfrm></xdr:grpSpPr>\
              {inner_xml}{nested_group}</xdr:grpSp>"
     );
-    let objects = read(&drawing(&two_cell_anchor(&group_xml)))
+    let objects = read(&drawing(&two_cell_anchor(&group_xml)), &Limits::DEFAULT)
         .unwrap()
         .unwrap();
     let Object::Group(group) = &objects[0].object else {
@@ -356,7 +403,7 @@ fn skips_pictures_and_charts_but_keeps_ole_objects() {
         two_cell_anchor(chart),
         two_cell_anchor(ole)
     );
-    let objects = read(&drawing(&body)).unwrap().unwrap();
+    let objects = read(&drawing(&body), &Limits::DEFAULT).unwrap().unwrap();
     assert_eq!(objects.len(), 1);
     let Object::OleObject(ole_object) = &objects[0].object else {
         panic!("expected an OLE object");
@@ -379,7 +426,7 @@ fn rejects_unknown_ole_object_aspect() {
             r:id=\"rId7\"/></a:graphicData></a:graphic></xdr:graphicFrame>";
     let xml = drawing(&two_cell_anchor(ole));
 
-    let error = read(&xml).unwrap_err();
+    let error = read(&xml, &Limits::DEFAULT).unwrap_err();
 
     let message = error.to_string();
     assert!(message.contains("invalid OLE data/view aspect"));
@@ -404,7 +451,7 @@ fn parses_strict_namespace_dialect() {
         strict_marker(0, 0),
         strict_marker(1, 1)
     );
-    let objects = read(&xml).unwrap().unwrap();
+    let objects = read(&xml, &Limits::DEFAULT).unwrap().unwrap();
     let Object::Shape(shape) = &objects[0].object else {
         panic!("expected a shape");
     };
@@ -423,10 +470,18 @@ fn parses_strict_namespace_dialect() {
 #[test]
 fn tolerates_empty_drawing_and_non_drawing_root() {
     let empty = drawing("");
-    assert_eq!(read(&empty).unwrap().unwrap(), Vec::<AnchoredObject>::new());
+    assert_eq!(
+        read(&empty, &Limits::DEFAULT).unwrap().unwrap(),
+        Vec::<AnchoredObject>::new()
+    );
     let empty_root = format!("<xdr:wsDr xmlns:xdr=\"{XDR}\"/>");
-    assert!(read(&empty_root).unwrap().unwrap().is_empty());
-    assert!(read("<other/>").unwrap().is_none());
+    assert!(
+        read(&empty_root, &Limits::DEFAULT)
+            .unwrap()
+            .unwrap()
+            .is_empty()
+    );
+    assert!(read("<other/>", &Limits::DEFAULT).unwrap().is_none());
 }
 
 #[test]
@@ -479,7 +534,7 @@ fn rejects_malformed_drawings() {
             )),
         ];
     for xml in cases {
-        assert!(read(&xml).is_err(), "accepted {xml}");
+        assert!(read(&xml, &Limits::DEFAULT).is_err(), "accepted {xml}");
     }
 }
 
@@ -497,7 +552,9 @@ fn text_bodies_come_from_the_shared_reader_under_the_strict_contract() {
          <a:br><a:rPr sz=\"1100\"/></a:br>\
          <a:fld id=\"{4E5A4B57-27D5-4D0E-8F5C-4A5B5B1E5F01}\" type=\"TxLink\"><a:t>linked</a:t></a:fld>\
          <a:endParaRPr sz=\"900\"/></a:p></xdr:txBody></xdr:sp>";
-    let objects = read(&drawing(&two_cell_anchor(object))).unwrap().unwrap();
+    let objects = read(&drawing(&two_cell_anchor(object)), &Limits::DEFAULT)
+        .unwrap()
+        .unwrap();
     let Object::Shape(shape) = &objects[0].object else {
         panic!("expected a shape");
     };
@@ -566,9 +623,12 @@ fn text_bodies_come_from_the_shared_reader_under_the_strict_contract() {
 
 #[test]
 fn debug_redacts_authored_shape_values() {
-    let objects = read(&drawing(&two_cell_anchor(text_box_shape())))
-        .unwrap()
-        .unwrap();
+    let objects = read(
+        &drawing(&two_cell_anchor(text_box_shape())),
+        &Limits::DEFAULT,
+    )
+    .unwrap()
+    .unwrap();
     let shape_debug = format!("{:?}", &objects[0].object);
     assert!(!shape_debug.contains("Text Box 7"));
     assert!(!shape_debug.contains("alt"));

@@ -12,21 +12,21 @@
 //! The model is generic over the [`Color`] each format uses for an RGB value
 //! (`litchi_xlsx::Rgb`, or `0xRRGGBB` as a `u32` in XLSB).
 
-use std::fmt::Write as _;
+use std::fmt::{self, Write as _};
 use std::ops::Range;
 
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{PackURI, Relationships};
 use quick_xml::events::{BytesStart, Event};
 
-use crate::{Error, Result};
+use crate::{Error, LimitKind, Result};
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
 /// An RGB color of a drawing's fills, lines and text.
-pub trait Color: Copy + PartialEq + std::fmt::Debug {
+pub trait Color: Copy + PartialEq + fmt::Debug {
     /// Black, the color a line without a solid fill reads as.
     const BLACK: Self;
 
@@ -59,45 +59,95 @@ pub const MAX_DRAWING_BYTES: usize = 64 * 1024 * 1024;
 /// The largest image a picture may carry, in bytes.
 pub const MAX_IMAGE_BYTES: usize = 256 * 1024 * 1024;
 
-/// A bounded dimension of worksheet drawings.
+/// The caller-selected bounds for one variable SpreadsheetDrawing XML
+/// operation. Every raw read and rewrite takes this policy explicitly.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum LimitKind {
-    /// Top-level objects of one drawing ([`MAX_ELEMENTS`]).
-    Elements,
-    /// Bytes of one drawing part ([`MAX_DRAWING_BYTES`]).
-    DrawingBytes,
-    /// Bytes of one staged image ([`MAX_IMAGE_BYTES`]).
-    ImageBytes,
+#[must_use]
+pub struct Limits {
+    /// Maximum top-level objects retained by a scan.
+    pub max_elements: usize,
+    /// Maximum input or output drawing bytes.
+    pub max_drawing_bytes: usize,
+    /// Maximum image bytes admitted by picture validation.
+    pub max_image_bytes: usize,
 }
 
-impl LimitKind {
-    const fn maximum(self) -> usize {
-        match self {
-            Self::Elements => MAX_ELEMENTS,
-            Self::DrawingBytes => MAX_DRAWING_BYTES,
-            Self::ImageBytes => MAX_IMAGE_BYTES,
+impl Limits {
+    /// The established finite worksheet-drawing policy.
+    pub const DEFAULT: Self = Self {
+        max_elements: MAX_ELEMENTS,
+        max_drawing_bytes: MAX_DRAWING_BYTES,
+        max_image_bytes: MAX_IMAGE_BYTES,
+    };
+
+    /// Construct a caller-selected policy. [`Self::validate`] is run at each
+    /// raw boundary so malformed policies cannot bypass the hard ceilings.
+    #[must_use = "use the selected worksheet-drawing limits"]
+    pub const fn new(
+        max_elements: usize,
+        max_drawing_bytes: usize,
+        max_image_bytes: usize,
+    ) -> Self {
+        Self {
+            max_elements,
+            max_drawing_bytes,
+            max_image_bytes,
         }
     }
 
-    /// Refuse `observed` when it exceeds this dimension's maximum.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::Invalid`] naming the exceeded dimension.
-    pub fn check(self, observed: usize) -> Result<()> {
-        if observed > self.maximum() {
-            return Err(invalid(format!(
-                "worksheet drawing {} limit exceeded: {observed} exceeds {}",
-                match self {
-                    Self::Elements => "object",
-                    Self::DrawingBytes => "drawing byte",
-                    Self::ImageBytes => "image byte",
-                },
-                self.maximum()
-            )));
+    /// Derive a worksheet-drawing policy from the retained OPC source policy.
+    /// The shared hard ceilings are never widened by an owner policy.
+    #[must_use = "use the limits derived from the retained source policy"]
+    pub fn from_source_limits(source: litchi_opc::SourceLimits) -> Self {
+        Self {
+            max_elements: source.max_events().clamp(1, MAX_ELEMENTS),
+            max_drawing_bytes: usize::try_from(source.max_part_bytes())
+                .unwrap_or(usize::MAX)
+                .clamp(1, MAX_DRAWING_BYTES),
+            max_image_bytes: usize::try_from(source.max_part_bytes())
+                .unwrap_or(usize::MAX)
+                .clamp(1, MAX_IMAGE_BYTES),
+        }
+    }
+
+    /// Validate the policy against this module's hard ceilings.
+    pub fn validate(self) -> Result<Self> {
+        for (kind, value) in [
+            (LimitKind::Elements, self.max_elements),
+            (LimitKind::DrawingBytes, self.max_drawing_bytes),
+            (LimitKind::ImageBytes, self.max_image_bytes),
+        ] {
+            let maximum = kind.maximum();
+            if value == 0 || value > maximum {
+                return Err(Error::invalid_limit(kind, value, maximum));
+            }
+        }
+        Ok(self)
+    }
+
+    fn check(self, kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
+        if observed > maximum {
+            return Err(Error::limit(kind, observed, maximum));
         }
         Ok(())
+    }
+
+    fn drawing_bytes(self, observed: usize) -> Result<()> {
+        self.check(LimitKind::DrawingBytes, observed, self.max_drawing_bytes)
+    }
+
+    fn elements(self, observed: usize) -> Result<()> {
+        self.check(LimitKind::Elements, observed, self.max_elements)
+    }
+
+    fn image_bytes(self, observed: usize) -> Result<()> {
+        self.check(LimitKind::ImageBytes, observed, self.max_image_bytes)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
     }
 }
 
@@ -233,8 +283,8 @@ impl Placement {
         }
     }
 
-    fn xml(self, out: &mut String) {
-        let marker = |out: &mut String, tag: &str, marker: Marker| {
+    fn xml<W: fmt::Write>(self, out: &mut W) {
+        let marker = |out: &mut W, tag: &str, marker: Marker| {
             let _ = write!(
                 out,
                 "<xdr:{tag}><xdr:col>{}</xdr:col><xdr:colOff>{}</xdr:colOff><xdr:row>{}</xdr:row><xdr:rowOff>{}</xdr:rowOff></xdr:{tag}>",
@@ -697,8 +747,8 @@ struct MarkerScan {
 
 /// Scan a drawing part's top-level anchors. Names are matched by local name
 /// under the `SpreadsheetDrawing` and `DrawingML` vocabularies.
-fn scan<C: Color>(xml: &[u8]) -> Result<(Vec<Element<C>>, usize, u32)> {
-    LimitKind::DrawingBytes.check(xml.len())?;
+fn scan<C: Color>(xml: &[u8], limits: Limits) -> Result<(Vec<Element<C>>, usize, u32)> {
+    limits.drawing_bytes(xml.len())?;
     let mut reader = quick_xml::Reader::from_reader(xml);
     let mut stack: Vec<Vec<u8>> = Vec::new();
     let mut elements = Vec::new();
@@ -980,8 +1030,11 @@ fn scan<C: Color>(xml: &[u8]) -> Result<(Vec<Element<C>>, usize, u32)> {
                         let text = paragraphs.join("\n");
                         object.text = Some(text);
                     }
+                    let next = elements.len().checked_add(1).ok_or_else(|| {
+                        Error::limit(LimitKind::Elements, usize::MAX, limits.max_elements)
+                    })?;
+                    limits.elements(next)?;
                     elements.push(object);
-                    LimitKind::Elements.check(elements.len())?;
                 }
                 if depth == 0 {
                     root_close = Some(start);
@@ -995,12 +1048,58 @@ fn scan<C: Color>(xml: &[u8]) -> Result<(Vec<Element<C>>, usize, u32)> {
     Ok((elements, root_close, max_id))
 }
 
+/// Count the top-level XML elements a fragment would add to a drawing root.
+///
+/// The fragment is intentionally scanned without retaining events or source
+/// text. This keeps the element policy enforceable before append allocates its
+/// rewritten drawing.
+fn fragment_elements(fragment: &str) -> Result<usize> {
+    let mut reader = quick_xml::Reader::from_reader(fragment.as_bytes());
+    let mut depth = 0usize;
+    let mut count = 0usize;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("drawing fragment: {error}")))?
+        {
+            Event::Start(_) => {
+                if depth == 0 {
+                    count = count
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("drawing fragment element count overflow"))?;
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("drawing fragment nesting overflow"))?;
+            },
+            Event::Empty(_) if depth == 0 => {
+                count = count
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("drawing fragment element count overflow"))?;
+            },
+            Event::End(_) => {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("drawing fragment closes outside an element"))?;
+            },
+            Event::Eof => {
+                if depth != 0 {
+                    return Err(invalid("drawing fragment has an unclosed element"));
+                }
+                return Ok(count);
+            },
+            _ => {},
+        }
+    }
+}
+
 /// Resolve the image and hyperlink relationships of scanned elements.
 fn resolve<C>(
     elements: &mut [Element<C>],
     relationships: &Relationships,
     image: impl Fn(&PackURI) -> Option<(String, u64)>,
-) {
+    limits: Limits,
+) -> Result<()> {
     for element in elements {
         if let Some(id) = element.embed.as_deref()
             && let Some(relationship) = relationships.get(id)
@@ -1008,6 +1107,8 @@ fn resolve<C>(
             && let Ok(target) = relationship.target_partname()
             && let Some((content_type, size)) = image(&target)
         {
+            let image_size = usize::try_from(size).unwrap_or(usize::MAX);
+            limits.image_bytes(image_size)?;
             element.image = Some(Image {
                 part: target.as_str().to_owned(),
                 content_type,
@@ -1020,10 +1121,7 @@ fn resolve<C>(
             element.hyperlink = Some(relationship.target_ref().to_owned());
         }
     }
-}
-
-fn escape(value: &str) -> String {
-    quick_xml::escape::escape(value).into_owned()
+    Ok(())
 }
 
 fn check_text(value: &str, what: &str) -> Result<()> {
@@ -1050,17 +1148,63 @@ fn rotation(degrees: Option<f64>) -> Result<Option<i64>> {
         .map(|value| value.filter(|value| *value != 0))
 }
 
-fn xfrm(out: &mut String, placement: Placement, rotation: Option<i64>, flip_h: bool, flip_v: bool) {
+/// A formatting sink used to measure a fragment before its output buffer is
+/// allocated. It deliberately retains no source text.
+#[derive(Default)]
+struct LengthWriter {
+    length: usize,
+}
+
+impl fmt::Write for LengthWriter {
+    fn write_str(&mut self, value: &str) -> fmt::Result {
+        self.length = self.length.saturating_add(value.len());
+        Ok(())
+    }
+}
+
+fn put<W: fmt::Write>(out: &mut W, value: &str) -> Result<()> {
+    out.write_str(value)
+        .map_err(|_| invalid("drawing output could not be formatted"))
+}
+
+fn escaped<W: fmt::Write>(out: &mut W, value: &str) -> Result<()> {
+    let mut start = 0;
+    for (index, byte) in value.bytes().enumerate() {
+        let replacement = match byte {
+            b'<' => Some("&lt;"),
+            b'>' => Some("&gt;"),
+            b'&' => Some("&amp;"),
+            b'\'' => Some("&apos;"),
+            b'\"' => Some("&quot;"),
+            _ => None,
+        };
+        let Some(replacement) = replacement else {
+            continue;
+        };
+        put(out, &value[start..index])?;
+        put(out, replacement)?;
+        start = index + 1;
+    }
+    put(out, &value[start..])
+}
+
+fn xfrm<W: fmt::Write>(
+    out: &mut W,
+    placement: Placement,
+    rotation: Option<i64>,
+    flip_h: bool,
+    flip_v: bool,
+) {
     let (x, y, cx, cy) = placement.frame();
-    out.push_str("<a:xfrm");
+    let _ = out.write_str("<a:xfrm");
     if let Some(rotation) = rotation {
         let _ = write!(out, " rot=\"{rotation}\"");
     }
     if flip_h {
-        out.push_str(" flipH=\"1\"");
+        let _ = out.write_str(" flipH=\"1\"");
     }
     if flip_v {
-        out.push_str(" flipV=\"1\"");
+        let _ = out.write_str(" flipV=\"1\"");
     }
     let _ = write!(
         out,
@@ -1068,24 +1212,31 @@ fn xfrm(out: &mut String, placement: Placement, rotation: Option<i64>, flip_h: b
     );
 }
 
-fn name_attributes(
-    out: &mut String,
+fn name_attributes<W: fmt::Write>(
+    out: &mut W,
     id: u32,
     name: &str,
     description: Option<&str>,
     title: Option<&str>,
-) {
-    let _ = write!(out, "<xdr:cNvPr id=\"{id}\" name=\"{}\"", escape(name));
+) -> Result<()> {
+    let _ = write!(out, "<xdr:cNvPr id=\"{id}\" name=\"");
+    escaped(out, name)?;
+    put(out, "\"")?;
     if let Some(description) = description {
-        let _ = write!(out, " descr=\"{}\"", escape(description));
+        put(out, " descr=\"")?;
+        escaped(out, description)?;
+        put(out, "\"")?;
     }
     if let Some(title) = title {
-        let _ = write!(out, " title=\"{}\"", escape(title));
+        put(out, " title=\"")?;
+        escaped(out, title)?;
+        put(out, "\"")?;
     }
-    out.push_str("/>");
+    put(out, "/>")?;
+    Ok(())
 }
 
-fn anchor_open(out: &mut String, placement: Placement, edit_as: Option<&str>) {
+fn anchor_open<W: fmt::Write>(out: &mut W, placement: Placement, edit_as: Option<&str>) {
     let _ = write!(
         out,
         "<xdr:{} xmlns:xdr=\"http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing\" xmlns:a=\"http://schemas.openxmlformats.org/drawingml/2006/main\"",
@@ -1094,34 +1245,85 @@ fn anchor_open(out: &mut String, placement: Placement, edit_as: Option<&str>) {
     if let (Placement::TwoCell { .. }, Some(edit_as)) = (placement, edit_as) {
         let _ = write!(out, " editAs=\"{edit_as}\"");
     }
-    out.push('>');
+    let _ = out.write_char('>');
     placement.xml(out);
 }
 
-fn anchor_close(out: &mut String, placement: Placement) {
+fn anchor_close<W: fmt::Write>(out: &mut W, placement: Placement) {
     let _ = write!(out, "<xdr:clientData/></xdr:{}>", placement.element());
 }
 
-fn shape_xml<C: Color>(spec: &ShapeSpec<C>, id: u32) -> Result<String> {
+fn write_font_properties<C: Color, W: fmt::Write>(
+    out: &mut W,
+    font: &Font<C>,
+    end_paragraph: bool,
+) -> Result<()> {
+    let tag = if end_paragraph {
+        "a:endParaRPr"
+    } else {
+        "a:rPr"
+    };
+    let _ = write!(out, "<{tag} lang=\"en-US\"");
+    if let Some(size) = font.size {
+        if !size.is_finite() || !(1.0..=4000.0).contains(&size) {
+            return Err(invalid("a font size must be 1 to 4000 points"));
+        }
+        #[allow(clippy::cast_possible_truncation, reason = "bounded above")]
+        let _ = write!(out, " sz=\"{}\"", (size * 100.0).round() as i64);
+    }
+    if let Some(bold) = font.bold {
+        let _ = write!(out, " b=\"{}\"", u8::from(bold));
+    }
+    if let Some(italic) = font.italic {
+        let _ = write!(out, " i=\"{}\"", u8::from(italic));
+    }
+    if let Some(underline) = &font.underline {
+        if !underline.bytes().all(|b| b.is_ascii_alphanumeric()) {
+            return Err(invalid("an underline is an alphanumeric token"));
+        }
+        let _ = write!(out, " u=\"{underline}\"");
+    }
+    put(out, ">")?;
+    if let Some(color) = font.color {
+        let _ = write!(
+            out,
+            "<a:solidFill><a:srgbClr val=\"{}\"/></a:solidFill>",
+            color.hex()
+        );
+    }
+    if let Some(name) = &font.name {
+        check_text(name, "font name")?;
+        put(out, "<a:latin typeface=\"")?;
+        escaped(out, name)?;
+        put(out, "\"/>")?;
+    }
+    let _ = write!(out, "</{tag}>");
+    Ok(())
+}
+
+fn write_shape_xml<C: Color, W: fmt::Write>(
+    out: &mut W,
+    spec: &ShapeSpec<C>,
+    id: u32,
+) -> Result<()> {
     spec.placement.validate()?;
     check_text(&spec.name, "name")?;
     if spec.geometry.is_empty() || !spec.geometry.bytes().all(|b| b.is_ascii_alphanumeric()) {
         return Err(invalid("a preset geometry is an alphanumeric token"));
     }
     let rotation = rotation(spec.rotation)?;
-    let mut out = String::new();
-    anchor_open(&mut out, spec.placement, None);
-    out.push_str("<xdr:sp macro=\"\" textlink=\"\"><xdr:nvSpPr>");
-    name_attributes(&mut out, id, &spec.name, spec.description.as_deref(), None);
-    out.push_str("<xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr>");
-    xfrm(&mut out, spec.placement, rotation, spec.flip_h, spec.flip_v);
+    anchor_open(out, spec.placement, None);
+    put(out, r#"<xdr:sp macro="" textlink=""><xdr:nvSpPr>"#)?;
+    name_attributes(out, id, &spec.name, spec.description.as_deref(), None)?;
+    put(out, r#"<xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr>"#)?;
+    xfrm(out, spec.placement, rotation, spec.flip_h, spec.flip_v);
     let _ = write!(
         out,
         "<a:prstGeom prst=\"{}\"><a:avLst/></a:prstGeom>",
         spec.geometry
     );
     match spec.fill {
-        Some(Fill::None) => out.push_str("<a:noFill/>"),
+        Some(Fill::None) => put(out, "<a:noFill/>")?,
         Some(Fill::Solid(color)) => {
             let _ = write!(
                 out,
@@ -1141,9 +1343,9 @@ fn shape_xml<C: Color>(spec: &ShapeSpec<C>, id: u32) -> Result<String> {
         None => {},
     }
     match spec.line {
-        Some(Line::None) => out.push_str("<a:ln><a:noFill/></a:ln>"),
+        Some(Line::None) => put(out, "<a:ln><a:noFill/></a:ln>")?,
         Some(Line::Solid { color, width, dash }) => {
-            out.push_str("<a:ln");
+            put(out, "<a:ln")?;
             if let Some(width) = width {
                 if !(0..=20_116_800).contains(&width) {
                     return Err(invalid("a line width must be 0 to 1584 points"));
@@ -1161,20 +1363,21 @@ fn shape_xml<C: Color>(spec: &ShapeSpec<C>, id: u32) -> Result<String> {
                 }
                 let _ = write!(out, "<a:prstDash val=\"{dash}\"/>");
             }
-            out.push_str("</a:ln>");
+            put(out, "</a:ln>")?;
         },
         None => {},
     }
-    out.push_str("</xdr:spPr>");
+    put(out, "</xdr:spPr>")?;
     if spec.text.is_some()
         || !spec.font.is_empty()
         || spec.align.is_some()
         || spec.valign.is_some()
         || spec.margin.is_some()
     {
-        out.push_str(
-            "<xdr:txBody><a:bodyPr vertOverflow=\"clip\" horzOverflow=\"clip\" rtlCol=\"0\"",
-        );
+        put(
+            out,
+            r#"<xdr:txBody><a:bodyPr vertOverflow="clip" horzOverflow="clip" rtlCol="0""#,
+        )?;
         if let Some(valign) = spec.valign {
             let _ = write!(out, " anchor=\"{}\"", valign.token());
         }
@@ -1188,92 +1391,66 @@ fn shape_xml<C: Color>(spec: &ShapeSpec<C>, id: u32) -> Result<String> {
                 " lIns=\"{left}\" tIns=\"{top}\" rIns=\"{right}\" bIns=\"{bottom}\""
             );
         }
-        out.push_str("/><a:lstStyle/>");
+        put(out, "/><a:lstStyle/>")?;
         let text = spec.text.as_deref().unwrap_or("");
         check_text(text, "text")?;
         for paragraph in text.split('\n') {
-            out.push_str("<a:p>");
+            put(out, "<a:p>")?;
             if let Some(align) = spec.align {
                 let _ = write!(out, "<a:pPr algn=\"{}\"/>", align.token());
             }
-            let mut properties = String::from("<a:rPr lang=\"en-US\"");
-            if let Some(size) = spec.font.size {
-                if !size.is_finite() || !(1.0..=4000.0).contains(&size) {
-                    return Err(invalid("a font size must be 1 to 4000 points"));
-                }
-                #[allow(clippy::cast_possible_truncation, reason = "bounded above")]
-                let _ = write!(properties, " sz=\"{}\"", (size * 100.0).round() as i64);
-            }
-            if let Some(bold) = spec.font.bold {
-                let _ = write!(properties, " b=\"{}\"", u8::from(bold));
-            }
-            if let Some(italic) = spec.font.italic {
-                let _ = write!(properties, " i=\"{}\"", u8::from(italic));
-            }
-            if let Some(underline) = &spec.font.underline {
-                if !underline.bytes().all(|b| b.is_ascii_alphanumeric()) {
-                    return Err(invalid("an underline is an alphanumeric token"));
-                }
-                let _ = write!(properties, " u=\"{underline}\"");
-            }
-            properties.push('>');
-            if let Some(color) = spec.font.color {
-                let _ = write!(
-                    properties,
-                    "<a:solidFill><a:srgbClr val=\"{}\"/></a:solidFill>",
-                    color.hex()
-                );
-            }
-            if let Some(name) = &spec.font.name {
-                check_text(name, "font name")?;
-                let _ = write!(properties, "<a:latin typeface=\"{}\"/>", escape(name));
-            }
-            properties.push_str("</a:rPr>");
             if paragraph.is_empty() {
-                let _ = write!(
-                    out,
-                    "<a:endParaRPr{}",
-                    &properties["<a:rPr".len()..].replace("</a:rPr>", "</a:endParaRPr>")
-                );
+                write_font_properties(out, &spec.font, true)?;
             } else {
-                let _ = write!(
-                    out,
-                    "<a:r>{properties}<a:t>{}</a:t></a:r>",
-                    escape(paragraph)
-                );
+                put(out, "<a:r>")?;
+                write_font_properties(out, &spec.font, false)?;
+                put(out, "<a:t>")?;
+                escaped(out, paragraph)?;
+                put(out, "</a:t></a:r>")?;
             }
-            out.push_str("</a:p>");
+            put(out, "</a:p>")?;
         }
-        out.push_str("</xdr:txBody>");
+        put(out, "</xdr:txBody>")?;
     }
-    out.push_str("</xdr:sp>");
-    anchor_close(&mut out, spec.placement);
-    Ok(out)
+    put(out, "</xdr:sp>")?;
+    anchor_close(out, spec.placement);
+    Ok(())
 }
 
-fn picture_xml(spec: &PictureSpec, id: u32, relationship_id: &str) -> Result<String> {
+fn write_picture_xml<W: fmt::Write>(
+    out: &mut W,
+    spec: &PictureSpec,
+    id: u32,
+    relationship_id: &str,
+) -> Result<()> {
     spec.placement.validate()?;
     check_text(&spec.name, "name")?;
     let rotation = rotation(spec.rotation)?;
-    let mut out = String::new();
-    anchor_open(&mut out, spec.placement, Some("oneCell"));
-    out.push_str("<xdr:pic><xdr:nvPicPr>");
+    anchor_open(out, spec.placement, Some("oneCell"));
+    put(out, "<xdr:pic><xdr:nvPicPr>")?;
     name_attributes(
-        &mut out,
+        out,
         id,
         &spec.name,
         spec.description.as_deref(),
         spec.title.as_deref(),
-    );
+    )?;
     let _ = write!(
         out,
-        "<xdr:cNvPicPr><a:picLocks noChangeAspect=\"1\"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r=\"{RELATIONSHIP_NS}\" r:embed=\"{}\"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr>",
-        escape(relationship_id)
+        "<xdr:cNvPicPr><a:picLocks noChangeAspect=\"1\"/></xdr:cNvPicPr></xdr:nvPicPr><xdr:blipFill><a:blip xmlns:r=\"{RELATIONSHIP_NS}\" r:embed=\""
     );
-    xfrm(&mut out, spec.placement, rotation, spec.flip_h, spec.flip_v);
-    out.push_str("<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic>");
-    anchor_close(&mut out, spec.placement);
-    Ok(out)
+    escaped(out, relationship_id)?;
+    put(
+        out,
+        "\"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill><xdr:spPr>",
+    )?;
+    xfrm(out, spec.placement, rotation, spec.flip_h, spec.flip_v);
+    put(
+        out,
+        "<a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic>",
+    )?;
+    anchor_close(out, spec.placement);
+    Ok(())
 }
 
 /// `r:link`, ...): every prefixed attribute whose value looks like one.
@@ -1303,10 +1480,9 @@ fn relationship_ids(fragment: &[u8]) -> Vec<String> {
 }
 
 /// Replace an anchor fragment's element name and placement children.
-fn replace_placement(fragment: &str, placement: Placement) -> Result<String> {
+fn replace_placement(fragment: &str, placement: Placement, max_output: usize) -> Result<String> {
     let mut reader = quick_xml::Reader::from_reader(fragment.as_bytes());
     let mut depth = 0usize;
-    let mut prefix = String::new();
     let mut open_end = None;
     let mut object_start = None;
     let mut root_close = None;
@@ -1319,10 +1495,6 @@ fn replace_placement(fragment: &str, placement: Placement) -> Result<String> {
         match event {
             Event::Start(element) => {
                 if depth == 0 {
-                    let name = String::from_utf8_lossy(element.name().as_ref()).into_owned();
-                    prefix = name
-                        .split_once(':')
-                        .map_or(String::new(), |(p, _)| format!("{p}:"));
                     open_end = Some(end);
                 } else if depth == 1 {
                     let local = element.local_name();
@@ -1361,29 +1533,104 @@ fn replace_placement(fragment: &str, placement: Placement) -> Result<String> {
     };
     // Keep the root's attributes except a two-cell `editAs`.
     let open = &fragment[..open_end];
+    let name_end = open[1..]
+        .find(|character: char| {
+            character.is_ascii_whitespace() || character == '>' || character == '/'
+        })
+        .map_or(open.len() - 1, |offset| offset + 1);
+    let root_name = &open[1..name_end];
+    let prefix = root_name.find(':').map_or("", |at| &root_name[..=at]);
     let attributes = open
         .find(char::is_whitespace)
         .map_or("", |at| &open[at..open.len() - 1]);
-    let attributes = if matches!(placement, Placement::TwoCell { .. }) {
-        attributes.to_owned()
+    let (attributes_before, attributes_after) = if matches!(placement, Placement::TwoCell { .. }) {
+        (attributes, "")
     } else {
-        remove_attribute(attributes, "editAs")
+        attribute_parts(attributes, "editAs")
     };
-    let mut markers = String::new();
-    placement.xml(&mut markers);
-    if !prefix.is_empty() && prefix != "xdr:" {
-        markers = markers.replace("xdr:", &prefix);
-    } else if prefix.is_empty() {
-        markers = markers.replace("xdr:", "");
+
+    let mut measured = LengthWriter::default();
+    write_replaced_placement(
+        &mut measured,
+        fragment,
+        placement,
+        prefix,
+        attributes_before,
+        attributes_after,
+        object_start,
+        root_close,
+    )?;
+    if measured.length > max_output {
+        return Err(Error::limit(
+            LimitKind::DrawingBytes,
+            measured.length,
+            max_output,
+        ));
     }
-    let element = format!("{prefix}{}", placement.element());
-    Ok(format!(
-        "<{element}{attributes}>{markers}{}</{element}>",
-        &fragment[object_start..root_close]
-    ))
+    let mut output = String::with_capacity(measured.length);
+    write_replaced_placement(
+        &mut output,
+        fragment,
+        placement,
+        prefix,
+        attributes_before,
+        attributes_after,
+        object_start,
+        root_close,
+    )?;
+    debug_assert_eq!(output.len(), measured.length);
+    Ok(output)
 }
 
-fn remove_attribute(attributes: &str, name: &str) -> String {
+fn write_replaced_placement<W: fmt::Write>(
+    out: &mut W,
+    fragment: &str,
+    placement: Placement,
+    prefix: &str,
+    attributes_before: &str,
+    attributes_after: &str,
+    object_start: usize,
+    root_close: usize,
+) -> Result<()> {
+    let element = placement.element();
+    let _ = write!(out, "<{prefix}{element}");
+    put(out, attributes_before)?;
+    put(out, attributes_after)?;
+    put(out, ">")?;
+    write_placement(out, placement, prefix)?;
+    put(out, &fragment[object_start..root_close])?;
+    let _ = write!(out, "</{prefix}{element}>");
+    Ok(())
+}
+
+fn write_placement<W: fmt::Write>(out: &mut W, placement: Placement, prefix: &str) -> Result<()> {
+    let marker = |out: &mut W, tag: &str, marker: Marker| {
+        let _ = write!(
+            out,
+            "<{prefix}{tag}><{prefix}col>{}</{prefix}col><{prefix}colOff>{}</{prefix}colOff><{prefix}row>{}</{prefix}row><{prefix}rowOff>{}</{prefix}rowOff></{prefix}{tag}>",
+            marker.col, marker.col_offset, marker.row, marker.row_offset
+        );
+    };
+    match placement {
+        Placement::TwoCell { from, to } => {
+            marker(out, "from", from);
+            marker(out, "to", to);
+        },
+        Placement::OneCell { from, cx, cy } => {
+            marker(out, "from", from);
+            let _ = write!(out, "<{prefix}ext cx=\"{cx}\" cy=\"{cy}\"/>");
+        },
+        Placement::Absolute { x, y, cx, cy } => {
+            let _ = write!(
+                out,
+                "<{prefix}pos x=\"{x}\" y=\"{y}\"/><{prefix}ext cx=\"{cx}\" cy=\"{cy}\"/>"
+            );
+        },
+    }
+    Ok(())
+}
+
+fn attribute_parts<'a>(attributes: &'a str, name: &str) -> (&'a str, &'a str) {
     let needle = format!(" {name}=\"");
     match attributes.find(&needle) {
         Some(at) => {
@@ -1391,9 +1638,9 @@ fn remove_attribute(attributes: &str, name: &str) -> String {
             let value_end = attributes[value_start..]
                 .find('"')
                 .map_or(attributes.len(), |offset| value_start + offset + 1);
-            format!("{}{}", &attributes[..at], &attributes[value_end..])
+            (&attributes[..at], &attributes[value_end..])
         },
-        None => attributes.to_owned(),
+        None => (attributes, ""),
     }
 }
 
@@ -1404,6 +1651,8 @@ fn set_tag_attribute(
     local: &str,
     name: &str,
     value: Option<&str>,
+    escape_value: bool,
+    max_output: usize,
 ) -> Result<String> {
     let mut at = None;
     for pattern in [
@@ -1427,15 +1676,51 @@ fn set_tag_attribute(
         Some(body) => (body, "/"),
         None => (tag, ""),
     };
-    let mut body = remove_attribute(body, name);
-    if let Some(value) = value {
-        let _ = write!(body, " {name}=\"{value}\"");
+    let (body_before, body_after) = attribute_parts(body, name);
+    let value_length = match value {
+        Some(value) if escape_value => {
+            let mut measured = LengthWriter::default();
+            escaped(&mut measured, value)?;
+            measured.length
+        },
+        Some(value) => value.len(),
+        None => 0,
+    };
+    let attribute_length = value.map_or(0, |_| {
+        name.len().saturating_add(value_length).saturating_add(4)
+    });
+    let output_length = fragment[..start]
+        .len()
+        .checked_add(body_before.len())
+        .and_then(|length| length.checked_add(body_after.len()))
+        .and_then(|length| length.checked_add(attribute_length))
+        .and_then(|length| length.checked_add(self_closing.len()))
+        .and_then(|length| length.checked_add(fragment[end..].len()))
+        .ok_or_else(|| Error::limit(LimitKind::DrawingBytes, usize::MAX, max_output))?;
+    if output_length > max_output {
+        return Err(Error::limit(
+            LimitKind::DrawingBytes,
+            output_length,
+            max_output,
+        ));
     }
-    Ok(format!(
-        "{}{body}{self_closing}{}",
-        &fragment[..start],
-        &fragment[end..]
-    ))
+    let mut output = String::with_capacity(output_length);
+    output.push_str(&fragment[..start]);
+    output.push_str(body_before);
+    output.push_str(body_after);
+    if let Some(value) = value {
+        let _ = write!(output, " {name}=\"");
+        if escape_value {
+            escaped(&mut output, value)?;
+        } else {
+            output.push_str(value);
+        }
+        output.push('"');
+    }
+    output.push_str(self_closing);
+    output.push_str(&fragment[end..]);
+    debug_assert_eq!(output.len(), output_length);
+    Ok(output)
 }
 
 /// The text of a predefined or character entity reference (`amp`, `#x41`).
@@ -1479,9 +1764,11 @@ pub fn read<C: Color>(
     xml: &[u8],
     relationships: &Relationships,
     image: impl Fn(&PackURI) -> Option<(String, u64)>,
+    limits: &Limits,
 ) -> Result<Vec<Element<C>>> {
-    let (mut elements, _, _) = scan(xml)?;
-    resolve(&mut elements, relationships, image);
+    let limits = limits.validate()?;
+    let (mut elements, _, _) = scan(xml, limits)?;
+    resolve(&mut elements, relationships, image, limits)?;
     Ok(elements)
 }
 
@@ -1503,8 +1790,13 @@ pub struct ChartFrame {
 /// # Errors
 ///
 /// Returns [`Error::Invalid`] for malformed markup or an exceeded limit.
-pub fn chart_frames(xml: &[u8], relationships: &Relationships) -> Result<Vec<ChartFrame>> {
-    let (elements, _, _) = scan::<u32>(xml)?;
+pub fn chart_frames(
+    xml: &[u8],
+    relationships: &Relationships,
+    limits: &Limits,
+) -> Result<Vec<ChartFrame>> {
+    let limits = limits.validate()?;
+    let (elements, _, _) = scan::<u32>(xml, limits)?;
     Ok(elements
         .into_iter()
         .filter(|element| element.kind == ElementKind::Frame)
@@ -1532,8 +1824,9 @@ pub fn chart_frames(xml: &[u8], relationships: &Relationships) -> Result<Vec<Cha
 /// # Errors
 ///
 /// Returns [`Error::Invalid`] for malformed markup or an exceeded limit.
-pub fn count(xml: &[u8], kind: ElementKind) -> Result<usize> {
-    Ok(scan::<u32>(xml)?
+pub fn count(xml: &[u8], kind: ElementKind, limits: &Limits) -> Result<usize> {
+    let limits = limits.validate()?;
+    Ok(scan::<u32>(xml, limits)?
         .0
         .iter()
         .filter(|element| element.kind == kind)
@@ -1546,8 +1839,9 @@ pub fn count(xml: &[u8], kind: ElementKind) -> Result<usize> {
 /// # Errors
 ///
 /// Returns [`Error::Invalid`] for malformed markup or an exceeded limit.
-pub fn next_id(xml: &[u8]) -> Result<u32> {
-    let (_, _, max_id) = scan::<u32>(xml)?;
+pub fn next_id(xml: &[u8], limits: &Limits) -> Result<u32> {
+    let limits = limits.validate()?;
+    let (_, _, max_id) = scan::<u32>(xml, limits)?;
     Ok(max_id.saturating_add(1).max(2))
 }
 
@@ -1557,11 +1851,26 @@ pub fn next_id(xml: &[u8]) -> Result<u32> {
 ///
 /// Returns [`Error::Invalid`] for malformed markup or a part that would
 /// exceed [`MAX_DRAWING_BYTES`].
-pub fn append(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
-    let (_, root_close, _) = scan::<u32>(xml)?;
-    let mut out = xml.to_vec();
+pub fn append(xml: &[u8], fragment: &str, limits: &Limits) -> Result<Vec<u8>> {
+    let limits = limits.validate()?;
+    let (elements, root_close, _) = scan::<u32>(xml, limits)?;
+    let added = fragment_elements(fragment)?;
+    let total = elements
+        .len()
+        .checked_add(added)
+        .ok_or_else(|| Error::limit(LimitKind::Elements, usize::MAX, limits.max_elements))?;
+    limits.elements(total)?;
+    let output_len = xml.len().checked_add(fragment.len()).ok_or_else(|| {
+        Error::limit(
+            LimitKind::DrawingBytes,
+            usize::MAX,
+            limits.max_drawing_bytes,
+        )
+    })?;
+    limits.drawing_bytes(output_len)?;
+    let mut out = Vec::with_capacity(output_len);
+    out.extend_from_slice(xml);
     out.splice(root_close..root_close, fragment.bytes());
-    LimitKind::DrawingBytes.check(out.len())?;
     Ok(out)
 }
 
@@ -1571,8 +1880,9 @@ pub fn append(xml: &[u8], fragment: &str) -> Result<Vec<u8>> {
 /// # Errors
 ///
 /// Returns [`Error::Invalid`] for the first value that is out of bounds.
-pub fn check_picture(spec: &PictureSpec) -> Result<()> {
-    LimitKind::ImageBytes.check(spec.image.len())?;
+pub fn check_picture(spec: &PictureSpec, limits: &Limits) -> Result<()> {
+    let limits = limits.validate()?;
+    limits.image_bytes(spec.image.len())?;
     if !spec.content_type.starts_with("image/")
         || spec.extension.is_empty()
         || !spec.extension.bytes().all(|b| b.is_ascii_alphanumeric())
@@ -1590,8 +1900,20 @@ pub fn check_picture(spec: &PictureSpec) -> Result<()> {
 /// # Errors
 ///
 /// Returns [`Error::Invalid`] for an invalid placement, name or rotation.
-pub fn picture_fragment(spec: &PictureSpec, id: u32, relationship_id: &str) -> Result<String> {
-    picture_xml(spec, id, relationship_id)
+pub fn picture_fragment(
+    spec: &PictureSpec,
+    id: u32,
+    relationship_id: &str,
+    limits: &Limits,
+) -> Result<String> {
+    let limits = limits.validate()?;
+    let mut measured = LengthWriter::default();
+    write_picture_xml(&mut measured, spec, id, relationship_id)?;
+    limits.drawing_bytes(measured.length)?;
+    let mut fragment = String::with_capacity(measured.length);
+    write_picture_xml(&mut fragment, spec, id, relationship_id)?;
+    debug_assert_eq!(fragment.len(), measured.length);
+    Ok(fragment)
 }
 
 /// The anchor markup of a new preset shape with `cNvPr/@id` `id`.
@@ -1600,14 +1922,21 @@ pub fn picture_fragment(spec: &PictureSpec, id: u32, relationship_id: &str) -> R
 ///
 /// Returns [`Error::Invalid`] for an invalid placement, geometry, fill,
 /// line, text or font.
-pub fn shape_fragment<C: Color>(spec: &ShapeSpec<C>, id: u32) -> Result<String> {
-    shape_xml(spec, id)
+pub fn shape_fragment<C: Color>(spec: &ShapeSpec<C>, id: u32, limits: &Limits) -> Result<String> {
+    let limits = limits.validate()?;
+    let mut measured = LengthWriter::default();
+    write_shape_xml(&mut measured, spec, id)?;
+    limits.drawing_bytes(measured.length)?;
+    let mut fragment = String::with_capacity(measured.length);
+    write_shape_xml(&mut fragment, spec, id)?;
+    debug_assert_eq!(fragment.len(), measured.length);
+    Ok(fragment)
 }
 
 /// The byte range of the object at `index` among a drawing part's objects of
 /// `kind`.
-fn select(xml: &[u8], kind: ElementKind, index: usize) -> Result<Range<usize>> {
-    let (elements, _, _) = scan::<u32>(xml)?;
+fn select(xml: &[u8], kind: ElementKind, index: usize, limits: Limits) -> Result<Range<usize>> {
+    let (elements, _, _) = scan::<u32>(xml, limits)?;
     elements
         .into_iter()
         .filter(|element| element.kind == kind)
@@ -1630,50 +1959,111 @@ pub fn change(
     kind: ElementKind,
     index: usize,
     change: &Change,
+    limits: &Limits,
 ) -> Result<Option<Vec<u8>>> {
-    let span = select(xml, kind, index)?;
-    let fragment = String::from_utf8(xml[span.clone()].to_vec())
+    let limits = limits.validate()?;
+    let span = select(xml, kind, index, limits)?;
+    let fragment = std::str::from_utf8(&xml[span.clone()])
         .map_err(|_utf8| invalid("drawing markup is not UTF-8"))?;
-    let mut updated = fragment.clone();
+    let base_len = xml.len().checked_sub(span.len()).ok_or_else(|| {
+        Error::limit(
+            LimitKind::DrawingBytes,
+            usize::MAX,
+            limits.max_drawing_bytes,
+        )
+    })?;
+    let max_updated = limits
+        .max_drawing_bytes
+        .checked_sub(base_len)
+        .ok_or_else(|| {
+            Error::limit(LimitKind::DrawingBytes, xml.len(), limits.max_drawing_bytes)
+        })?;
+    let mut updated = None;
     if let Some(placement) = change.placement {
         placement.validate()?;
-        updated = replace_placement(&updated, placement)?;
+        updated = Some(replace_placement(fragment, placement, max_updated)?);
     }
     if let Some(name) = &change.name {
         check_text(name, "name")?;
-        updated = set_tag_attribute(&updated, "cNvPr", "name", Some(&escape(name)))?;
+        let current = updated.as_deref().unwrap_or(fragment);
+        updated = Some(set_tag_attribute(
+            current,
+            "cNvPr",
+            "name",
+            Some(name),
+            true,
+            max_updated,
+        )?);
     }
     if let Some(description) = &change.description {
         if let Some(value) = description {
             check_text(value, "description")?;
         }
+        let current = updated.as_deref().unwrap_or(fragment);
         updated = set_tag_attribute(
-            &updated,
+            current,
             "cNvPr",
             "descr",
-            description.as_deref().map(escape).as_deref(),
-        )?;
+            description.as_deref(),
+            true,
+            max_updated,
+        )
+        .map(Some)?;
     }
     if change.rotation.is_some() || change.flip_h.is_some() || change.flip_v.is_some() {
-        if !updated.contains(":xfrm") && !updated.contains("<xfrm") {
+        let current = updated.as_deref().unwrap_or(fragment);
+        if !current.contains(":xfrm") && !current.contains("<xfrm") {
             return Err(invalid("the element has no transform to change"));
         }
         if let Some(degrees) = change.rotation {
             let value = rotation(Some(degrees))?.map(|value| value.to_string());
-            updated = set_tag_attribute(&updated, "xfrm", "rot", value.as_deref())?;
+            let current = updated.as_deref().unwrap_or(fragment);
+            updated = Some(set_tag_attribute(
+                current,
+                "xfrm",
+                "rot",
+                value.as_deref(),
+                false,
+                max_updated,
+            )?);
         }
         for (key, value) in [("flipH", change.flip_h), ("flipV", change.flip_v)] {
             if let Some(value) = value {
-                updated = set_tag_attribute(&updated, "xfrm", key, value.then_some("1"))?;
+                let current = updated.as_deref().unwrap_or(fragment);
+                updated = Some(set_tag_attribute(
+                    current,
+                    "xfrm",
+                    key,
+                    value.then_some("1"),
+                    false,
+                    max_updated,
+                )?);
             }
         }
     }
-    if updated == fragment {
+    let updated_ref = updated.as_deref().unwrap_or(fragment);
+    if updated_ref == fragment {
         return Ok(None);
     }
-    let mut out = xml.to_vec();
-    out.splice(span, updated.into_bytes());
-    if scan::<u32>(&out)?.0.len() != scan::<u32>(xml)?.0.len() {
+    let output_len = xml
+        .len()
+        .checked_sub(span.len())
+        .and_then(|length| length.checked_add(updated_ref.len()))
+        .ok_or_else(|| {
+            Error::limit(
+                LimitKind::DrawingBytes,
+                usize::MAX,
+                limits.max_drawing_bytes,
+            )
+        })?;
+    limits.drawing_bytes(output_len)?;
+    let mut out = Vec::with_capacity(output_len);
+    out.extend_from_slice(xml);
+    let replacement = updated
+        .map(String::into_bytes)
+        .ok_or_else(|| invalid("drawing change did not produce a replacement"))?;
+    out.splice(span, replacement);
+    if scan::<u32>(&out, limits)?.0.len() != scan::<u32>(xml, limits)?.0.len() {
         return Err(invalid("the changed drawing element did not read back"));
     }
     Ok(Some(out))
@@ -1695,9 +2085,11 @@ pub struct Detached {
 /// # Errors
 ///
 /// Returns [`Error::Invalid`] for malformed markup or a missing object.
-pub fn detach(xml: &[u8], kind: ElementKind, index: usize) -> Result<Detached> {
-    let span = select(xml, kind, index)?;
-    let mut out = xml.to_vec();
+pub fn detach(xml: &[u8], kind: ElementKind, index: usize, limits: &Limits) -> Result<Detached> {
+    let limits = limits.validate()?;
+    let span = select(xml, kind, index, limits)?;
+    let mut out = Vec::with_capacity(xml.len());
+    out.extend_from_slice(xml);
     let fragment: Vec<u8> = out.drain(span).collect();
     let rest = String::from_utf8_lossy(&out).into_owned();
     let released = relationship_ids(&fragment)
@@ -1705,4 +2097,141 @@ pub fn detach(xml: &[u8], kind: ElementKind, index: usize) -> Result<Detached> {
         .filter(|id| !rest.contains(&format!("\"{id}\"")))
         .collect();
     Ok(Detached { xml: out, released })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn output_limits_are_admitted_before_rewrite_allocation() {
+        let source = EMPTY_DRAWING.as_bytes();
+        let exact = Limits::new(1, source.len(), MAX_IMAGE_BYTES);
+        assert_eq!(count(source, ElementKind::Other, &exact).unwrap(), 0);
+        assert!(matches!(
+            append(source, "<xdr:twoCellAnchor/>", &exact),
+            Err(Error::Limit {
+                kind: LimitKind::DrawingBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn an_invalid_caller_policy_is_typed() {
+        assert!(matches!(
+            count(
+                EMPTY_DRAWING.as_bytes(),
+                ElementKind::Other,
+                &Limits::new(0, 1, 1)
+            ),
+            Err(Error::InvalidLimit {
+                kind: LimitKind::Elements,
+                value: 0,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn fragment_output_is_admitted_before_buffer_allocation() {
+        let spec = ShapeSpec::<u32>::new(
+            Placement::Absolute {
+                x: 0,
+                y: 0,
+                cx: 1,
+                cy: 1,
+            },
+            "shape",
+        );
+        let limits = Limits::new(1, 1, 1);
+        assert!(matches!(
+            shape_fragment(&spec, 2, &limits),
+            Err(Error::Limit {
+                kind: LimitKind::DrawingBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn append_admits_all_fragment_elements_before_buffer_allocation() {
+        let limits = Limits::new(1, MAX_DRAWING_BYTES, MAX_IMAGE_BYTES);
+        let fragment = "<xdr:twoCellAnchor/><xdr:twoCellAnchor/>";
+        assert!(matches!(
+            append(EMPTY_DRAWING.as_bytes(), fragment, &limits),
+            Err(Error::Limit {
+                kind: LimitKind::Elements,
+                observed: 2,
+                maximum: 1,
+            })
+        ));
+    }
+
+    #[test]
+    fn change_admits_replacement_bytes_before_rewrite_growth() {
+        let source = concat!(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+            "\n",
+            r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"><xdr:twoCellAnchor><xdr:from/><xdr:to/><xdr:sp><xdr:nvSpPr><xdr:cNvPr id="2" name="a"/></xdr:nvSpPr></xdr:sp></xdr:twoCellAnchor></xdr:wsDr>"#
+        );
+        let update = Change {
+            name: Some("x".repeat(1024)),
+            ..Default::default()
+        };
+        let limits = Limits::new(1, source.len(), MAX_IMAGE_BYTES);
+        assert!(matches!(
+            change(source.as_bytes(), ElementKind::Shape, 0, &update, &limits),
+            Err(Error::Limit {
+                kind: LimitKind::DrawingBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn change_preserves_noop_and_allows_a_bounded_shrink() {
+        let noop_source = concat!(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+            "\n",
+            r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"><xdr:twoCellAnchor><xdr:from/><xdr:to/><xdr:sp><xdr:nvSpPr><xdr:cNvPr id="2" name="a"/></xdr:nvSpPr></xdr:sp></xdr:twoCellAnchor></xdr:wsDr>"#
+        );
+        let noop = Change {
+            name: Some("a".to_owned()),
+            ..Default::default()
+        };
+        let limits = Limits::new(1, noop_source.len(), MAX_IMAGE_BYTES);
+        assert_eq!(
+            change(
+                noop_source.as_bytes(),
+                ElementKind::Shape,
+                0,
+                &noop,
+                &limits
+            )
+            .unwrap(),
+            None
+        );
+
+        let shrink_source = concat!(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+            "\n",
+            r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing"><xdr:twoCellAnchor><xdr:from/><xdr:to/><xdr:sp><xdr:nvSpPr><xdr:cNvPr id="2" name="a" descr="long description"/></xdr:nvSpPr></xdr:sp></xdr:twoCellAnchor></xdr:wsDr>"#
+        );
+        let shrink = Change {
+            description: Some(None),
+            ..Default::default()
+        };
+        let changed = change(
+            shrink_source.as_bytes(),
+            ElementKind::Shape,
+            0,
+            &shrink,
+            &Limits::new(1, shrink_source.len(), MAX_IMAGE_BYTES),
+        )
+        .unwrap()
+        .unwrap();
+        assert!(changed.len() < shrink_source.len());
+        assert!(!String::from_utf8_lossy(&changed).contains("descr="));
+    }
 }

@@ -391,7 +391,8 @@ impl Workbook {
         let drawing_xml = std::str::from_utf8(drawing_part.blob()).map_err(|_error| {
             crate::package::error::Error::Encoding("Drawings part is not UTF-8")
         })?;
-        let shapes = crate::shapes::read(drawing_xml)?.unwrap_or_default();
+        let shape_limits = crate::shapes::Limits::from_core(self.semantic_limits.xml_parts_value());
+        let shapes = crate::shapes::read(drawing_xml, &shape_limits)?.unwrap_or_default();
         let drawing = crate::package::drawing::parse_drawing_part(
             drawing_part.blob(),
             self.semantic_limits.xml_parts_value(),

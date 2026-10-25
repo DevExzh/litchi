@@ -3,6 +3,7 @@
 //! This layer resolves worksheet and drawing parts only. It never follows OLE
 //! payloads, external links, or chart/image targets.
 
+use crate::drawing::edit::LimitKind;
 use crate::error::{Error, Result};
 use crate::raw::Sheet;
 use crate::raw::parse_catalog;
@@ -12,9 +13,7 @@ use litchi_opc::{OpcPackage, Part};
 use super::{Shapes, read};
 
 const MAX_WORKBOOK_BYTES: usize = 32 * 1024 * 1024;
-const MAX_DRAWING_PART_BYTES: usize = 32 * 1024 * 1024;
 const MAX_DRAWINGS_PER_WORKSHEET: usize = 64;
-const MAX_ANCHORS_PER_DRAWING: usize = 100_000;
 
 /// Load the shape inventory of every worksheet in a workbook package.
 ///
@@ -56,6 +55,8 @@ fn load_shapes_for_sheet(
     workbook_part: &dyn Part,
     sheet: &Sheet,
 ) -> Result<Shapes> {
+    let shape_limits =
+        litchi_spreadsheet_drawing::shape::Limits::from_source_limits(package.read_limits());
     let relationship = workbook_part
         .rels()
         .get(&sheet.relationship_id)
@@ -109,17 +110,26 @@ fn load_shapes_for_sheet(
                 ct::OFC_DRAWING
             )));
         }
-        if drawing_part.blob().len() > MAX_DRAWING_PART_BYTES {
-            return Err(limit("drawing part bytes"));
+        if drawing_part.blob().len() > shape_limits.max_drawing_part_bytes {
+            return Err(Error::limit(
+                LimitKind::DrawingBytes,
+                drawing_part.blob().len(),
+                shape_limits.max_drawing_part_bytes,
+            ));
         }
         let drawing_xml = std::str::from_utf8(drawing_part.blob())
             .map_err(|error| Error::Invalid(error.to_string()))?;
-        let Some(anchored) = read(drawing_xml)? else {
+        let Some(anchored) = read(drawing_xml, &shape_limits)? else {
             continue;
         };
         for object in anchored {
-            if objects.len() >= MAX_ANCHORS_PER_DRAWING {
-                return Err(limit("shapes per worksheet"));
+            let next = objects.len().saturating_add(1);
+            if next > shape_limits.max_anchors {
+                return Err(Error::limit(
+                    LimitKind::Anchors,
+                    next,
+                    shape_limits.max_anchors,
+                ));
             }
             objects.push(object);
         }

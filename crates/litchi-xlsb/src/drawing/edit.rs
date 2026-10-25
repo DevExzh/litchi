@@ -48,17 +48,18 @@ use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use litchi_spreadsheet_drawing::objects;
 
 use crate::package::Package;
-use crate::package::error::Result;
+use crate::package::error::{Error as PackageError, Result};
 use crate::part_edit::{Rank, SheetLayout, Staged, family, invalid, snapshot_options, splice};
 use crate::raw::{Encoder, kind};
 
 family!("drawing");
 snapshot_options!("drawing");
 
+pub use litchi_spreadsheet_drawing::LimitKind;
 pub use objects::{
-    Align, COLUMN_EMU, Change, DASHES, ElementKind, Image, LimitKind, MAX_DRAWING_BYTES,
-    MAX_ELEMENTS, MAX_IMAGE_BYTES, Marker, PictureSpec, Placement, ROW_EMU, SCHEME_COLORS,
-    VerticalAlign, canonical,
+    Align, COLUMN_EMU, Change, DASHES, ElementKind, Image, Limits, MAX_DRAWING_BYTES, MAX_ELEMENTS,
+    MAX_IMAGE_BYTES, Marker, PictureSpec, Placement, ROW_EMU, SCHEME_COLORS, VerticalAlign,
+    canonical,
 };
 
 /// A `0xRRGGBB` color.
@@ -80,10 +81,16 @@ pub(crate) fn eager_elements(package: &OpcPackage, worksheet: &PackURI) -> Resul
         return Ok(Vec::new());
     };
     let part = package.get_part(&drawing)?;
-    Ok(objects::read(part.blob(), part.rels(), |target| {
-        let image = package.get_part(target).ok()?;
-        Some((image.content_type().to_owned(), image.blob().len() as u64))
-    })?)
+    let limits = Limits::from_source_limits(package.read_limits());
+    Ok(objects::read(
+        part.blob(),
+        part.rels(),
+        |target| {
+            let image = package.get_part(target).ok()?;
+            Some((image.content_type().to_owned(), image.blob().len() as u64))
+        },
+        &limits,
+    )?)
 }
 
 /// The elements of a worksheet part's drawing in a source-backed package:
@@ -98,15 +105,28 @@ pub(crate) fn source_elements(
     };
     let part = package.part(&drawing)?;
     let declared = part.declared_uncompressed_size()?;
-    LimitKind::DrawingBytes.check(usize::try_from(declared).unwrap_or(usize::MAX))?;
+    let limits = Limits::from_source_limits(package.read_limits());
+    let declared = usize::try_from(declared).unwrap_or(usize::MAX);
+    if declared > limits.max_drawing_bytes {
+        return Err(PackageError::limit(
+            LimitKind::DrawingBytes,
+            declared,
+            limits.max_drawing_bytes,
+        ));
+    }
     let data = part.data()?;
-    Ok(objects::read(data.as_bytes(), part.rels(), |target| {
-        let image = package.part(target).ok()?;
-        Some((
-            image.content_type().to_owned(),
-            image.declared_uncompressed_size().ok()?,
-        ))
-    })?)
+    Ok(objects::read(
+        data.as_bytes(),
+        part.rels(),
+        |target| {
+            let image = package.part(target).ok()?;
+            Some((
+                image.content_type().to_owned(),
+                image.declared_uncompressed_size().ok()?,
+            ))
+        },
+        &limits,
+    )?)
 }
 
 /// A chart a worksheet drawing hosts: its frame's placement and name, and
@@ -130,7 +150,8 @@ pub(crate) fn eager_charts(package: &OpcPackage, worksheet: &PackURI) -> Result<
     };
     let part = package.get_part(&drawing)?;
     let mut charts = Vec::new();
-    for frame in objects::chart_frames(part.blob(), part.rels())? {
+    let limits = Limits::from_source_limits(package.read_limits());
+    for frame in objects::chart_frames(part.blob(), part.rels(), &limits)? {
         charts.push(ChartPart {
             placement: frame.placement,
             name: frame.name,
@@ -150,13 +171,28 @@ pub(crate) fn source_charts(
     };
     let part = package.part(&drawing)?;
     let declared = part.declared_uncompressed_size()?;
-    LimitKind::DrawingBytes.check(usize::try_from(declared).unwrap_or(usize::MAX))?;
+    let limits = Limits::from_source_limits(package.read_limits());
+    let declared = usize::try_from(declared).unwrap_or(usize::MAX);
+    if declared > limits.max_drawing_bytes {
+        return Err(PackageError::limit(
+            LimitKind::DrawingBytes,
+            declared,
+            limits.max_drawing_bytes,
+        ));
+    }
     let data = part.data()?;
     let mut charts = Vec::new();
-    for frame in objects::chart_frames(data.as_bytes(), part.rels())? {
+    for frame in objects::chart_frames(data.as_bytes(), part.rels(), &limits)? {
         let chart = package.part(&frame.target)?;
         let declared = chart.declared_uncompressed_size()?;
-        LimitKind::DrawingBytes.check(usize::try_from(declared).unwrap_or(usize::MAX))?;
+        let declared = usize::try_from(declared).unwrap_or(usize::MAX);
+        if declared > limits.max_drawing_bytes {
+            return Err(PackageError::limit(
+                LimitKind::DrawingBytes,
+                declared,
+                limits.max_drawing_bytes,
+            ));
+        }
         charts.push(ChartPart {
             placement: frame.placement,
             name: frame.name,
@@ -263,8 +299,9 @@ impl Edit {
 
     /// Append `fragment` to `drawing` and count its elements of `kind`.
     fn append(&mut self, drawing: &PackURI, fragment: &str, kind: ElementKind) -> Result<usize> {
-        let xml = objects::append(self.staged.blob(drawing)?, fragment)?;
-        let count = objects::count(&xml, kind)?;
+        let limits = Limits::from_source_limits(self.staged.opc().read_limits());
+        let xml = objects::append(self.staged.blob(drawing)?, fragment, &limits)?;
+        let count = objects::count(&xml, kind, &limits)?;
         self.staged.replace_blob(drawing, xml)?;
         Ok(count)
     }
@@ -276,9 +313,10 @@ impl Edit {
     /// Returns an error for a missing sheet or a chartsheet, an invalid
     /// placement, name or content type, a full drawing, or a signed workbook.
     pub fn add_picture(&mut self, sheet: usize, spec: &PictureSpec) -> Result<usize> {
-        objects::check_picture(spec)?;
+        let limits = Limits::from_source_limits(self.staged.opc().read_limits());
+        objects::check_picture(spec, &limits)?;
         let drawing = self.drawing(sheet)?;
-        let id = objects::next_id(self.staged.blob(&drawing)?)?;
+        let id = objects::next_id(self.staged.blob(&drawing)?, &limits)?;
         let media = self
             .staged
             .free_name("/xl/media/image", &format!(".{}", spec.extension))?;
@@ -293,7 +331,7 @@ impl Edit {
             .get_part_mut(&drawing)?
             .relate_to(&media.relative_ref(drawing.base_uri()), rt::IMAGE);
         self.staged.touch(&drawing);
-        let fragment = objects::picture_fragment(spec, id, &relationship_id)?;
+        let fragment = objects::picture_fragment(spec, id, &relationship_id, &limits)?;
         Ok(self.append(&drawing, &fragment, ElementKind::Picture)? - 1)
     }
 
@@ -307,8 +345,9 @@ impl Edit {
     pub fn add_shape(&mut self, sheet: usize, spec: &ShapeSpec) -> Result<usize> {
         spec.placement.validate()?;
         let drawing = self.drawing(sheet)?;
-        let id = objects::next_id(self.staged.blob(&drawing)?)?;
-        let fragment = objects::shape_fragment(spec, id)?;
+        let limits = Limits::from_source_limits(self.staged.opc().read_limits());
+        let id = objects::next_id(self.staged.blob(&drawing)?, &limits)?;
+        let fragment = objects::shape_fragment(spec, id, &limits)?;
         Ok(self.append(&drawing, &fragment, ElementKind::Shape)? - 1)
     }
 
@@ -335,7 +374,8 @@ impl Edit {
         change: &Change,
     ) -> Result<bool> {
         let drawing = self.existing_drawing(sheet)?;
-        match objects::change(self.staged.blob(&drawing)?, kind, index, change)? {
+        let limits = Limits::from_source_limits(self.staged.opc().read_limits());
+        match objects::change(self.staged.blob(&drawing)?, kind, index, change, &limits)? {
             Some(xml) => self.staged.replace_blob(&drawing, xml),
             None => Ok(false),
         }
@@ -349,7 +389,8 @@ impl Edit {
     /// Returns an error for a missing element or a signed workbook.
     pub fn remove(&mut self, sheet: usize, kind: ElementKind, index: usize) -> Result<()> {
         let drawing = self.existing_drawing(sheet)?;
-        let detached = objects::detach(self.staged.blob(&drawing)?, kind, index)?;
+        let limits = Limits::from_source_limits(self.staged.opc().read_limits());
+        let detached = objects::detach(self.staged.blob(&drawing)?, kind, index, &limits)?;
         let opc = self.staged.opc_mut()?;
         let part = opc.get_part_mut(&drawing)?;
         part.set_blob(detached.xml);
