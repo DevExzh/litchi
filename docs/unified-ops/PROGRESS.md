@@ -5835,3 +5835,18 @@ See [0063](0063-source-pptx-modern-comments.md).
   checks. Totals reach257 worktrees and422 refs. Preserving its full deletion
   manifest costs57,864,192 net allocated bytes, reducing the ledger to
   753,286,500,352 bytes under the same exclusions. No push or final acceptance.
+
+  All sixteen remaining diagnostic rows pass on frozen a8 and receive root
+  terminal verification. Eight reviewed repairs (119b,120a,121c,123a,124a,
+  126,128c,129) compose without conflicts at ef5b837b34, retaining coordinator
+  records through130. Root verifies every changed crate file: fourteen exact
+  leaf blobs and two independent combinations, with no extra crate changes.
+  All three locks stay unchanged. Fresh composed-source qualification and
+  the S→C census binding follow; 126 performance acceptance remains open (131).
+
+  Cleanup100 removes the unused DOC toggle candidate after lock restoration
+  and fresh holder checks. Its canonical baseline and staged source remain
+  unchanged. Totals reach258 worktrees and422 refs; the allocated ledger is
+  760,834,469,888 bytes under its recorded exclusions. The eight merged repair
+  leaves await fresh removal guards. Final gates and all fidelity/performance
+  obligations remain open; no push.
