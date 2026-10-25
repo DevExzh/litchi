@@ -206,7 +206,7 @@ fn replay_rechecks_readonly_output_with_the_recipient_profile() {
         .into_package();
     assert_eq!(unchanged_tight.to_bytes().unwrap(), tight_source);
 
-    let mut foreign = Package::new().unwrap();
+    let foreign = Package::new().unwrap();
     let foreign_source = foreign.to_bytes().unwrap();
     let error = foreign
         .apply_read_only_recommended(noop.patch())
