@@ -5223,3 +5223,48 @@ See [0063](0063-source-pptx-modern-comments.md).
   signatures and returned the record for correction. No duplicate engineering
   scope or generic exemption is accepted from those historical claims. Only
   redaction audit 22 remains deferred. Nothing is pushed.
+
+- Coordinator Numbers integration and cleanup checkpoint (2026-10-25):
+  Numbers-wire atomic `0f098a25d9` merges at `6fe60b8d9a`. All 16 actual
+  guarded rows pass on `67613f5dd0`, including 177 wire tests, 157 focused
+  consumer tests, strict Clippy and seven glossary profiles. Root verifies
+  every receipt, child log, target trace, source/lock fence and terminal
+  ownership sample. Peak and final target usage is 4,660,470,149 bytes.
+  The earlier mixed-scalar failure remains preserved. All 94 implementation,
+  consumer, test and existing record blobs match the validated leaf; only
+  the two additive glossary files and the new composition record differ.
+  All 99 selected glossary, inventory, census and fixture-guard tool tests
+  pass after correcting a mistyped test-module name in the initial command.
+  The glossary now has 69 profiles; the raw-census matrix becomes 69 plus
+  15 package-only profiles, still separate from the 68 all-feature inputs.
+
+  Cleanup wave 62 removes the merged Formula and XLDM author worktrees,
+  preserving refs, ignored payloads and external evidence. Root verifies
+  the five payloads and same-device restoration receipt. Net allocation
+  reclaimed is 15,120,351,232 bytes after final quarantine overhead; record
+  0362ul88 binds the evidence. Trunk/integration holds are released and the
+  protected constructor probe is unchanged.
+
+  PPTX returns 61h (`6139650eea`), 62g (`790f694f88`) and 81c
+  (`bf41322310`) pass independent scoped source reviews. The fixes cover
+  recipient reservation transfer, lazy policy-aware laser accounting,
+  reusable no-op proofs, persistent replay-index deletion, exact output
+  admission, opaque custom-show preservation and deterministic guide edits.
+  History 82a and core 63 remain ready in their reviewed scopes. Typed-error
+  work 84 remains active: generic count dimensions and fabricated saturated
+  observations must be replaced with actual typed dimensions and counts.
+  Combined source integration, actual tests and performance remain required.
+
+  Corrected census record 79d and shared OOXML audit 87 are merged. Audit
+  87 confirms public semantic publication through `&mut OpcPackage` in
+  properties/custom XML, web/Ribbon and VBA; workers 87a–87c must migrate
+  those paths and every consumer to Edit/Commit/replay. Initial source
+  proposals remain under review and are not accepted. ZIP alias work 86
+  removes three confirmed compatibility aliases and migrates their callers.
+  Its first guarded row stops on workspace formatting differences in 335
+  files, including 112 vendored files. The failed capture is retained;
+  changed-file formatting repair and fresh scoped validation are pending.
+  Full workspace formatting remains required before the final gate.
+
+  Final census, complete gate, native/corpus and performance qualification
+  remain open. Only redaction audit 22 is deferred. Nothing is pushed.
