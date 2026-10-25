@@ -53,12 +53,14 @@ SCHEMA = "litchi.native-qualification.v1"
 ABBA_ORDER = ("before", "after", "after", "before")
 # The v2 DrawingML validator and its imports must come from the pinned
 # protocol checkout, never from either source leg.  Keep this list explicit so
-# a candidate cannot replace one of the policy modules through its own tree.
+# a candidate cannot replace one of the policy or compile modules through its
+# own tree.
 DRAWINGML_V2_PROTOCOL_TOOL_PATHS = (
     "tools/native_qualification_runner.py",
     "tools/native_qualification/drawingml_raw_paired_runner_v2.py",
     "tools/native_qualification/drawingml_raw_validator_v2.py",
     "tools/native_qualification/drawingml_compile_driver_v2.py",
+    "tools/native_qualification/drawingml_compile_driver.py",
     "tools/native_qualification/prepare_drawingml_raw_inputs_v2.py",
     "tools/native_qualification/drawingml_raw_paired_runner.py",
     "tools/native_qualification/drawingml_raw_validator.py",

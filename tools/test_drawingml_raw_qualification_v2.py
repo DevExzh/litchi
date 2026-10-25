@@ -118,6 +118,15 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
             with self.assertRaisesRegex(paired.generic.RunnerError, "candidate policy is incomplete"):
                 paired.generic._validate_drawingml_raw_workload(profile)
 
+            tampered_tools = copy.deepcopy(profile)
+            tampered_tools["drawingml_protocol_tools"][
+                "tools/native_qualification/drawingml_compile_driver.py"
+            ]["sha256"] = "0" * 64
+            with self.assertRaisesRegex(
+                paired.generic.RunnerError, "protocol tool identities differ"
+            ):
+                paired.generic._validate_drawingml_raw_workload(tampered_tools)
+
             bad_compile_module = copy.deepcopy(data)
             bad_compile_module["compile_driver_module"] = str(
                 Path(data["candidate_root"])
