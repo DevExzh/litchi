@@ -130,13 +130,18 @@ fn batch(file: &File, sets: &[Set]) -> Outcome {
     }
 }
 
-fn signed_batch_error_without_reading(file: &File, item: BatchItem<'static>) -> litchi_ops::Error {
+fn signed_batch_error_without_reading(
+    file: &File,
+    items: Vec<BatchItem<'static>>,
+) -> litchi_ops::Error {
     let reads = Cell::new(0usize);
+    let mut items = items.into_iter();
     let error = file
         .batch(
-            std::iter::once_with(|| {
+            std::iter::from_fn(|| {
+                let item = items.next()?;
                 reads.set(reads.get() + 1);
-                item.clone()
+                Some(item)
             }),
             BatchMode::Atomic,
         )
@@ -219,12 +224,6 @@ fn check(name: &str, bytes: &[u8], sets_for: impl Fn(&File, u64) -> Vec<Set>) ->
                     Outcome::Refused(None, "DocumentProtected".to_owned()),
                     "{name} seed {seed} signed batch admission: {sets:?}",
                 );
-                let one = sequential(&file, &sets);
-                assert_eq!(
-                    closure(&file, &sets),
-                    one,
-                    "{name} seed {seed} signed edit/set: {sets:?}",
-                );
                 assert_eq!(
                     file.to_bytes().expect("republish signed source"),
                     before,
@@ -290,7 +289,7 @@ fn signed_batch_refuses_before_item_admission() {
     let mut item = BatchItem::new("set");
     item.path = Some("/slide[1]/shape[1]".into());
     item.props = Some(Props::new().with("text", "changed"));
-    let error = signed_batch_error_without_reading(&signed, item);
+    let error = signed_batch_error_without_reading(&signed, vec![item]);
     assert_eq!(error.code(), litchi_ops::Code::DocumentProtected);
     assert_eq!(error.item(), None);
 
@@ -328,13 +327,64 @@ fn signed_batch_admission_precedes_invalid_path_resolution() {
         let mut item = BatchItem::new("set");
         item.path = Some("/slide[1]/notes/paragraph[1]".into());
         item.props = Some(Props::new().with("align", "left"));
-        let error = signed_batch_error_without_reading(&file, item);
+        let error = signed_batch_error_without_reading(&file, vec![item]);
         assert_eq!(error.code(), litchi_ops::Code::DocumentProtected);
         assert_eq!(error.item(), None);
 
         let single = Outcome::Refused(Some(0), "PathNotFound".to_owned());
         assert_eq!(sequential(&file, &sets), single);
         assert_eq!(closure(&file, &sets), single);
+        assert_eq!(file.to_bytes().expect("republish signed source"), before);
+        owners_checked += 1;
+    }
+    assert_eq!(owners_checked, 2, "Auto and Eager signed owners");
+}
+
+#[test]
+fn signed_edit_resolves_a_later_invalid_path_after_staging() {
+    let bytes = std::fs::read("../../test-data/poi/test-data/xmldsign/hello-world-signed.pptx")
+        .expect("signed PPTX fixture");
+    let sets = vec![
+        Set {
+            path: "/slide[1]/shape[1]".to_owned(),
+            props: vec![("text", PropValue::from("signed batch changed"))],
+        },
+        Set {
+            path: "/slide[1]/notes/paragraph[1]".to_owned(),
+            props: vec![("align", PropValue::from("left"))],
+        },
+    ];
+
+    let mut owners_checked = 0;
+    for file in owners(&bytes) {
+        assert!(file.is_signed(), "fixture must remain signed");
+        let before = file.to_bytes().expect("publish signed source");
+        assert_eq!(
+            batch(&file, &sets),
+            Outcome::Refused(None, "DocumentProtected".to_owned()),
+            "batch admission must precede both target resolutions",
+        );
+
+        let mut first = BatchItem::new("set");
+        first.path = Some("/slide[1]/shape[1]".into());
+        first.props = Some(Props::new().with("text", "signed batch changed"));
+        let mut second = BatchItem::new("set");
+        second.path = Some("/slide[1]/notes/paragraph[1]".into());
+        second.props = Some(Props::new().with("align", "left"));
+        let error = signed_batch_error_without_reading(&file, vec![first, second]);
+        assert_eq!(error.code(), litchi_ops::Code::DocumentProtected);
+        assert_eq!(error.item(), None);
+
+        assert_eq!(
+            sequential(&file, &sets),
+            Outcome::Refused(Some(0), "DocumentProtected".to_owned()),
+            "single-set publication refuses the first signed change",
+        );
+        assert_eq!(
+            closure(&file, &sets),
+            Outcome::Refused(Some(1), "PathNotFound".to_owned()),
+            "closure resolves the later invalid target before its final signed fence",
+        );
         assert_eq!(file.to_bytes().expect("republish signed source"), before);
         owners_checked += 1;
     }

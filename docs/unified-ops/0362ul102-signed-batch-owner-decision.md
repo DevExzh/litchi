@@ -33,6 +33,14 @@ that a signed batch remains `DocumentProtected`/`None` without path resolution,
 while both sequential `set` and closure `edit` retain their `PathNotFound` /
 `Some(0)` result.
 
+For multi-item signed closures, the individual route may resolve a later
+invalid target after an earlier valid change has been staged.  The focused
+shape-then-invalid-notes case therefore expects sequential `set` to stop at
+the first signed change (`DocumentProtected`/`Some(0)`) while one closure
+reaches the later target (`PathNotFound`/`Some(1)`).  The random signed corpus
+branch checks only the batch admission and source-preservation contract; it
+does not pretend these distinct individual route schedules are equivalent.
+
 The iWork equivalence consumer already preserved `None` through its
 `error.item().or(fallback)` helper and required no change.  No production
 crate, facade admission path, or frozen qualification probe is changed.
