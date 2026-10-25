@@ -141,7 +141,7 @@ impl Edit<'_> {
         let package = if patch.is_noop() {
             self.package.duplicate()
         } else {
-            self.package.with_metadata_opc(opc)
+            self.package.with_metadata_opc(opc)?
         };
         Ok(Commit::new(package, patch, diagnostics))
     }
@@ -217,25 +217,15 @@ impl Package {
         } else {
             let mut opc = (*self.opc).clone();
             patch.apply(&mut opc)?;
-            self.with_metadata_opc(opc)
+            self.with_metadata_opc(opc)?
         };
         Ok(Commit::new(package, patch.clone(), patch.diagnostics()))
     }
 
     /// This package with `opc`, whose document properties changed.
-    fn with_metadata_opc(&self, opc: litchi_opc::OpcPackage) -> Self {
-        Self {
-            opc: std::sync::Arc::new(opc),
-            part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
-            replay_index: std::sync::Arc::clone(&self.replay_index),
-            physical_source_provenance: self.physical_source_provenance,
-            semantic_limits: self.semantic_limits.clone(),
-            tolerance: self.tolerance.clone(),
-            #[cfg(feature = "encryption")]
-            encryption: self.encryption,
-            #[cfg(feature = "encryption")]
-            encryption_limits: self.encryption_limits,
-        }
+    fn with_metadata_opc(&self, opc: litchi_opc::OpcPackage) -> Result<Self> {
+        let part_bytes = Self::part_bytes_for(&opc)?;
+        Ok(self.derive_with_part_bytes(std::sync::Arc::new(opc), part_bytes))
     }
 }
 

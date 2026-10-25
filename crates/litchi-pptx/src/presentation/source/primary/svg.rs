@@ -189,7 +189,10 @@ pub(super) fn physical(package: &Package) -> Result<Package> {
     if effective.is_pristine() {
         return Ok(effective.clone());
     }
-    let options = crate::OpenOptions::default().source_limits(effective.owner.limits);
+    let mut options = crate::OpenOptions::default()
+        .source_limits(effective.owner.limits)
+        .cache_limits(effective.owner.package.cache_limits());
+    options.semantic_limits = effective.owner.semantic_limits.clone();
     let options = match effective.owner.package.execution_context() {
         Some(context) => options.execution_context(context),
         None => options,
