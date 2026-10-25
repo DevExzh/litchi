@@ -62,15 +62,38 @@ fn replay_validator_uses_recipient_presentation_profile() {
         crate::presentation_properties::validate_replay_part(
             &part,
             crate::presentation_properties::Limits::default(),
+            litchi_opc::SourceLimits::default(),
         )
         .is_ok()
     );
     let tight =
         crate::presentation_properties::Limits::new(1024, 1024, 128, 1, 1024, 1, 1).unwrap();
     assert!(
-        crate::presentation_properties::validate_replay_part(&part, tight).is_err(),
+        crate::presentation_properties::validate_replay_part(
+            &part,
+            tight,
+            litchi_opc::SourceLimits::default(),
+        )
+        .is_err(),
         "the recipient's tighter node profile must be enforced during replay"
     );
+
+    let event_limited = litchi_opc::SourceLimits::builder()
+        .max_events(4)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        crate::presentation_properties::validate_replay_part(
+            &part,
+            crate::presentation_properties::Limits::default(),
+            event_limited,
+        ),
+        Err(crate::Error::Opc(litchi_opc::OpcError::Limit {
+            kind: litchi_opc::SourceLimitKind::Events,
+            ..
+        }))
+    ));
 }
 
 #[test]

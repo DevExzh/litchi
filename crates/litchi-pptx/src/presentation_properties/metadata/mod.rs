@@ -428,6 +428,7 @@ pub(crate) fn validate_replay_part_policy(
         return crate::presentation_properties::validate_replay_part(
             part,
             crate::presentation_properties::Limits::from_source_limits(source_limits),
+            source_limits,
         );
     }
 
