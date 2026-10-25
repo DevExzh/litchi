@@ -5527,3 +5527,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   Presence 89ar is returned for allocation, date-time, inactive-threading and
   physical-attribute defects; 89ara is active. No performance acceptance is
   claimed, and all final acceptance obligations remain open.
+
+  The first OOXML runtime packet stops before compilation on an unsupported
+  helper option. Root verifies the failed receipt and corrects the CLI audit;
+  the fresh v2 packet is running. Reviewed notes performance harness 89and is
+  merged privately at `cc2ab3f79d` (89av), with 23 Python tests passing after
+  composition. Baseline source preparation continues; no benchmark or runtime
+  acceptance is claimed. All changes are committed and nothing is pushed.

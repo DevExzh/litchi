@@ -174,3 +174,44 @@ ordinary-field refusal, an omitted date-time bound, raw threading validation
 before MCE and an unpreserved physical attribute ceiling. Repair 89ara is active;
 these are correctness/performance returns, not accepted exceptions. Notes-memo
 harness 89and is separately under protocol review and remains unmeasured.
+
+
+## Runtime driver correction and harness review
+
+The first 38-row runtime packet stops before Cargo: the approved helper does
+not accept the supplied `--root` argument. The helper exits 2 in 1.235 seconds,
+the outer session exits 1 and the target remains empty. Root verifies the
+failed receipt. The original command review incorrectly accepted the proposed
+CLI audit; this is a driver failure and provides no runtime qualification.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `rows.json` | 3,846 | `28929df7915bfd4413a0e3eb89d9dff211c38c4c243f163afe38c190ae5ff591` |
+| `result.json` | 4,552 | `e9c24ce177e0b78bf5b50dd53a45e6770b048b8e4536aeaffe38824052ecc740` |
+
+Corrected packet `.coord/ooxml-combined-0362ul94-f5-runtime-3774fe43-v2`
+removes only that option/value and rebinds external paths. F5 already sets the
+source working directory. Root reads the actual parser and verifies all 38
+command deltas, source/tool/three-lock/fixture fences, empty target and global
+builder state before GO. The corrected run is active. The preparer's one
+`--plan` probe invoked Cargo metadata, but no build or test; its five-command
+output confirms common library, all six integration targets and doctest
+coverage. This preparatory metadata probe is not runtime evidence.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `plan.json` | 29,467 | `f579d6c5dbf28e50b09ff65e4c9fb47ca0c02ae3001adca21a634516b4993f5f` |
+| `run_f5.py` | 21,537 | `db91f22624a1840c65510463670f516073962faee089f5d88ab0e461cf5514cc` |
+| `manifest.json` | 15,094 | `3b1daab31cc38ea5a565f03bf3a6bb1ffbff0d5e7c1f18f7df6e48663b207614` |
+| `common-safe-plan.txt` | 474 | `631bb39ddc6f60d301176fbfbc90f198ccc84821d91d1c2cc35e7c4257868e4e` |
+
+The notes performance harness completes independent review at 89and
+`9a43258fd0406f93e63469c9c39f2dcfe37b1db4`, tree
+`4eae20d44a78a85f06b4cce7b1d86cf804d62af2`. Private merge `cc2ab3f79d`
+(89av) composes it without conflicts. Root runs both Python modules: 23 tests
+pass with warnings as errors. The review establishes genuine four-round,
+sixteen-process minimum ABBA ordering, source/binary/manifest bindings, strict
+JSON and metric/fidelity checks. No benchmark is run and no performance result
+is claimed. A source-only equivalent-harness baseline endpoint is being prepared
+from production `7637126651`; final correctness and quiet measurements remain
+required. Presence repair 89ara remains active and uncomposed.
