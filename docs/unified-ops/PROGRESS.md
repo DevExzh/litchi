@@ -5850,3 +5850,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   760,834,469,888 bytes under its recorded exclusions. The eight merged repair
   leaves await fresh removal guards. Final gates and all fidelity/performance
   obligations remain open; no push.
+
+  Record131a regenerates the 84-profile/68-package census matrix against
+  composed source S=faab79bc38. The profile set is unchanged; current glossary
+  and common manifest identities replace stale pins. The matrix remains
+  incomplete until actual capture and callable review. Its commit C is the
+  next qualification source, with the same three locks. No capture or final
+  acceptance is inferred from matrix preparation.

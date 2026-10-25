@@ -188,10 +188,10 @@
       "id": "ooxml-common-minimal",
       "manifest": "crates/litchi-ooxml-common/Cargo.toml",
       "manifest_identity": {
-        "blob": "14093c2dde595e2f708e97a43f5fe77bb71c12a5",
-        "bytes": 930,
+        "blob": "297a73b830ec845fb3dda4a7c2c5ffe3298f0059",
+        "bytes": 987,
         "path": "crates/litchi-ooxml-common/Cargo.toml",
-        "sha256": "6c5beccc9d0a0246177602b2cb0b0326366c0a9cb0b36e520a8dec4b47775e78"
+        "sha256": "6925eb74e593efbe8d20427ca52311365c787b1b561f7d7f7937c846f0273954"
       },
       "origin": "glossary",
       "package": "litchi-ooxml-common"
@@ -205,10 +205,10 @@
       "id": "ooxml-common-full",
       "manifest": "crates/litchi-ooxml-common/Cargo.toml",
       "manifest_identity": {
-        "blob": "14093c2dde595e2f708e97a43f5fe77bb71c12a5",
-        "bytes": 930,
+        "blob": "297a73b830ec845fb3dda4a7c2c5ffe3298f0059",
+        "bytes": 987,
         "path": "crates/litchi-ooxml-common/Cargo.toml",
-        "sha256": "6c5beccc9d0a0246177602b2cb0b0326366c0a9cb0b36e520a8dec4b47775e78"
+        "sha256": "6925eb74e593efbe8d20427ca52311365c787b1b561f7d7f7937c846f0273954"
       },
       "origin": "glossary",
       "package": "litchi-ooxml-common"
@@ -1341,12 +1341,12 @@
   "reason": "84 current profile inputs are prepared from 69 glossary profiles and 15 direct package-only profiles; rustdoc inputs, receipts, callable entries, and dispositions are intentionally not supplied",
   "schema": "litchi.raw-api-census-matrix.v1",
   "source": {
-    "commit": "412058ab39d338de248d1cee7f5f3f58f76602ff",
+    "commit": "faab79bc388e09101f8f4cf53ff722e0c4de5046",
     "glossary": {
-      "blob": "fee2d6cdf75eb13064f37a2ede4999459e525ba9",
-      "bytes": 1055093,
+      "blob": "b0d641cca4ffd7bd98b3b004a6b6a062b448dbb2",
+      "bytes": 1100333,
       "path": "tools/api_glossary.json",
-      "sha256": "5d544c6e96186b3ba8f121ef86fdb0467c1e293d70c0d303309b3206963509ab"
+      "sha256": "d30620cf6575ffea61e781a5ad6679abf7f1d906789311861f40a8149eb52eed"
     },
     "workspace": {
       "blob": "f75fa5fe8973c92ef4fd70152a07a2891c63e365",
