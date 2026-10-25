@@ -1207,7 +1207,7 @@ def make_ppt_steps_v2(
     TRUSTED_POLICY.require_execution_ready()
     root = Path(root)
     state_dir = Path(state_dir)
-    target = Path(target)
+    target = Path(target).absolute()
     _check_plan_paths(root, state_dir, target, source_archive)
     if source_archive is None:
         raise PolicyMismatch(f"PPT v2 {side} execution requires the verified source archive")
@@ -1237,13 +1237,13 @@ def make_ppt_steps_v2(
     ]
     correctness = (
         "set -eu; "
-        f"cargo test --offline --locked --target {TARGET} --release -p litchi-ppt {' '.join(feature_flags)} --lib scoped::tests -- --test-threads=1; "
-        f"cargo test --offline --locked --target {TARGET} --release -p litchi-ppt {' '.join(feature_flags)} --lib -- --test-threads=1; "
-        f"cargo test --offline --locked --target {TARGET} --release -p litchi-cfb {' '.join(feature_flags)} --lib -- --test-threads=1; "
-        f"cargo test --offline --locked --target {TARGET} --release -p litchi-ppt {' '.join(feature_flags)} --tests -- --test-threads=1; "
-        f"cargo test --offline --locked --target {TARGET} --release -p litchi-cfb {' '.join(feature_flags)} --tests -- --test-threads=1; "
-        f"cargo clippy --offline --locked --target {TARGET} --release -p litchi-ppt {' '.join(feature_flags)} --all-targets -- -D warnings; "
-        f"cargo clippy --offline --locked --target {TARGET} --release -p litchi-cfb {' '.join(feature_flags)} --all-targets -- -D warnings; "
+        f"cargo test --offline --locked --target {TARGET} --target-dir {shlex.quote(str(target))} --release -p litchi-ppt {' '.join(feature_flags)} --lib scoped::tests -- --test-threads=1; "
+        f"cargo test --offline --locked --target {TARGET} --target-dir {shlex.quote(str(target))} --release -p litchi-ppt {' '.join(feature_flags)} --lib -- --test-threads=1; "
+        f"cargo test --offline --locked --target {TARGET} --target-dir {shlex.quote(str(target))} --release -p litchi-cfb {' '.join(feature_flags)} --lib -- --test-threads=1; "
+        f"cargo test --offline --locked --target {TARGET} --target-dir {shlex.quote(str(target))} --release -p litchi-ppt {' '.join(feature_flags)} --tests -- --test-threads=1; "
+        f"cargo test --offline --locked --target {TARGET} --target-dir {shlex.quote(str(target))} --release -p litchi-cfb {' '.join(feature_flags)} --tests -- --test-threads=1; "
+        f"cargo clippy --offline --locked --target {TARGET} --target-dir {shlex.quote(str(target))} --release -p litchi-ppt {' '.join(feature_flags)} --all-targets -- -D warnings; "
+        f"cargo clippy --offline --locked --target {TARGET} --target-dir {shlex.quote(str(target))} --release -p litchi-cfb {' '.join(feature_flags)} --all-targets -- -D warnings; "
         f"printf '%s\\n' {shlex.quote(json.dumps({'route': 'ppt-scoped-correctness-suite', 'status': 'ok'}, separators=(',', ':')))} > {shlex.quote(str(suite_receipt))}"
     )
 
@@ -1267,7 +1267,7 @@ def make_ppt_steps_v2(
     return [
         direct(
             "ppt-scoped-build",
-            [*guarded, str(host_guard), "--", "cargo", "build", "--offline", "--locked", "--target", TARGET, "--release", *feature_flags, "-p", "litchi-ppt", "--example", "scoped_patch_probe", "--example", "scoped_patch_correctness"],
+            [*guarded, str(host_guard), "--", "cargo", "build", "--offline", "--locked", "--target", TARGET, "--target-dir", str(target), "--release", *feature_flags, "-p", "litchi-ppt", "--example", "scoped_patch_probe", "--example", "scoped_patch_correctness"],
             route=PPT_ROUTES[0], phase="build",
             artifact_path=binary_paths[0],
         ),
@@ -1297,7 +1297,7 @@ def make_legacy_steps_v2(
     TRUSTED_POLICY.require_execution_ready()
     root = Path(root)
     state_dir = Path(state_dir)
-    target = Path(target)
+    target = Path(target).absolute()
     _check_plan_paths(root, state_dir, target, source_archive)
     if source_archive is None:
         raise PolicyMismatch(f"legacy v2 {side} execution requires the verified source archive")
@@ -1313,7 +1313,7 @@ def make_legacy_steps_v2(
         *guarded,
         str(host_guard),
         "--",
-        "cargo", "build", "--offline", "--locked", "--target", TARGET, "--release",
+        "cargo", "build", "--offline", "--locked", "--target", TARGET, "--target-dir", str(target), "--release",
         "--manifest-path", "tools/perf-baseline/Cargo.toml", "--no-default-features",
         "--features", *adapter_features, "--example", "refusal_contract_bench",
     ]

@@ -485,6 +485,27 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 legacy_steps = policy.make_legacy_steps_v2(after, parent / "legacy-state", parent / "legacy-target", source_archive=after_archive)
                 self.assertEqual(ppt_steps[0]["argv"][2:4], ["guard-role-lock", "workspace"])
                 self.assertEqual(legacy_steps[0]["argv"][2:4], ["guard-role-lock", "perf"])
+                def option(argv: list[object], name: str) -> str:
+                    index = argv.index(name)
+                    return str(argv[index + 1])
+                ppt_target = (parent / "ppt-target").absolute()
+                legacy_target = (parent / "legacy-target").absolute()
+                self.assertEqual(option(ppt_steps[0]["argv"], "--target-dir"), str(ppt_target))
+                self.assertEqual(option(legacy_steps[0]["argv"], "--target-dir"), str(legacy_target))
+                self.assertEqual(
+                    ppt_steps[0]["binary_paths"],
+                    [
+                        str(ppt_target / policy.TARGET / "release/examples/scoped_patch_probe"),
+                        str(ppt_target / policy.TARGET / "release/examples/scoped_patch_correctness"),
+                    ],
+                )
+                self.assertEqual(
+                    legacy_steps[0]["binary_paths"],
+                    [str(legacy_target / policy.TARGET / "release/examples/refusal_contract_bench")],
+                )
+                suite_command = str(ppt_steps[1]["argv"][-1])
+                self.assertEqual(suite_command.count("--target-dir"), 7)
+                self.assertIn(str(ppt_target), suite_command)
 
     def test_injected_executor_writes_and_consumes_v2_abba_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
