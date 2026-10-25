@@ -54,7 +54,13 @@ pub(super) fn parse_comment_authors_with(
     if root.children.len() > MAX_AUTHORS || root.children.len() > limits.max_nodes {
         return Err(invalid("comment-author count exceeds limit"));
     }
-    let mut authors = Vec::with_capacity(root.children.len());
+    let mut authors = Vec::new();
+    authors
+        .try_reserve_exact(root.children.len())
+        .map_err(|source| Error::Allocation {
+            resource: "comment author records",
+            source,
+        })?;
     let mut ids = HashSet::new();
     for node in &root.children {
         require_name(node, namespace, "cmAuthor")?;
@@ -148,7 +154,13 @@ fn parse_slide_comments_inner(
     if root.children.len() > MAX_COMMENTS_PER_SLIDE || root.children.len() > limits.max_nodes {
         return Err(invalid("slide comment count exceeds limit"));
     }
-    let mut comments = Vec::with_capacity(root.children.len());
+    let mut comments = Vec::new();
+    comments
+        .try_reserve_exact(root.children.len())
+        .map_err(|source| Error::Allocation {
+            resource: "slide comment records",
+            source,
+        })?;
     let mut keys = HashSet::new();
     for node in &root.children {
         require_name(node, namespace, "cm")?;

@@ -193,6 +193,17 @@ fn load_comments_with_limits(
     Ok(Some(value))
 }
 
+/// Validate one payload changed by a legacy-comment patch under the
+/// recipient's selected comment policy. The patch engine already verifies
+/// relationships and before bytes; only changed comment XML is parsed here.
+pub(crate) fn validate_replay_part(part: &dyn Part, limits: Limits) -> Result<()> {
+    match part.content_type() {
+        AUTHORS_CONTENT_TYPE => parse_comment_authors(part.blob(), limits).map(drop),
+        COMMENTS_CONTENT_TYPE => parse_slide_comments_strict(part.blob(), limits).map(drop),
+        _ => Ok(()),
+    }
+}
+
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
@@ -238,7 +249,13 @@ pub(crate) fn store_presentation_comments_with_limits(
     let mut part_names = HashSet::new();
     part_names.insert(author_uri.to_string());
     let author_xml = write_comment_authors(&value.authors, conformance, limits)?;
-    let mut pending = Vec::with_capacity(value.slides.len());
+    let mut pending = Vec::new();
+    pending
+        .try_reserve_exact(value.slides.len())
+        .map_err(|source| Error::Allocation {
+            resource: "presentation comment package parts",
+            source,
+        })?;
     for slide_list in &value.slides {
         if !slide_set.contains(&slide_list.slide_part_name) {
             return Err(invalid(format!(

@@ -17,7 +17,7 @@ pub use model::{
     Resource, Transform, Trim,
 };
 pub use package::load;
-pub(crate) use package::{store_with, store_with_limits};
+pub(crate) use package::{store_with, store_with_limits, validate_replay_part};
 pub use summary::{Summary, summary};
 
 // These are crate-private seams shared by the XML and package layers and by

@@ -27,6 +27,7 @@ pub(crate) use package::{
     remove_presentation_comment_with_limits, reorder_presentation_comment_authors_with_limits,
     reorder_presentation_comments_with_limits, store_presentation_comments_with_limits,
     update_presentation_comment_author_with_limits, update_presentation_comment_with_limits,
+    validate_replay_part,
 };
 pub use package::{
     find_presentation_comment, find_presentation_comment_author, load_presentation_comments,

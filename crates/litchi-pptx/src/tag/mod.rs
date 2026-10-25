@@ -112,7 +112,7 @@ pub(crate) use codec::{bounded_text, is_namespace, pml, validate_qname};
 pub(crate) use package::{
     Anchor, available_part_name, available_relationship_id, discover_with_limits,
     has_other_inbound, load_with_limits, relationship_namespace, replace_xml, resolve_anchor,
-    resolve_anchor_with_limits, staged_xml, validate_relative_target,
+    resolve_anchor_with_limits, staged_xml, validate_relative_target, validate_replay_part,
     validate_selected_relationship,
 };
 

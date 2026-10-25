@@ -17,7 +17,7 @@ pub use codec::{discover, load};
 pub(crate) use codec::process_owner_ooxml;
 pub(crate) use codec::{
     discover_with_limits, load_with_limits, process_pptx_ooxml, put, put_with_limits, remove,
-    remove_with_limits, replace_xml, staged_xml,
+    remove_with_limits, replace_xml, staged_xml, validate_replay_part,
 };
 pub(crate) use model::Anchor;
 pub(crate) use validation::{

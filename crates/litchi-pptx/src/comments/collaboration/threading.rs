@@ -45,10 +45,20 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_comment_threading(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_comment_threading")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_comment_threading",
+            |package, target, patch| {
+                let limits = package
+                    .semantic_limits()
+                    .comments()
+                    .constrained_by_source(target.read_limits());
+                patch.validate_changed_parts(target, |_, part| {
+                    crate::comments::validate_replay_part(part, limits)
+                })
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 

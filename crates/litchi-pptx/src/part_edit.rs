@@ -366,6 +366,29 @@ impl PartPatch {
     /// Replay onto `package`, refusing a package that is not the patch's
     /// before state.
     pub(crate) fn apply(&self, package: &Package, operation: &'static str) -> Result<Package> {
+        self.apply_inner(package, operation, None)
+    }
+
+    /// Replay with a family-owned semantic validator for changed payloads.
+    ///
+    /// Generic replay still owns before-state matching, exact patch scope and
+    /// atomic target construction. A typed family may validate only the
+    /// changed payloads against the recipient's retained semantic policy.
+    pub(crate) fn apply_with_replay_validation(
+        &self,
+        package: &Package,
+        operation: &'static str,
+        validate: impl Fn(&Package, &OpcPackage, &Self) -> Result<()>,
+    ) -> Result<Package> {
+        self.apply_inner(package, operation, Some(&validate))
+    }
+
+    fn apply_inner(
+        &self,
+        package: &Package,
+        operation: &'static str,
+        validate: Option<&dyn Fn(&Package, &OpcPackage, &Self) -> Result<()>>,
+    ) -> Result<Package> {
         if self.is_noop() {
             return Ok(package.duplicate());
         }
@@ -448,8 +471,37 @@ impl PartPatch {
                 }
             }
         }
+        if let Some(validate) = validate {
+            validate(package, &target, self)?;
+        }
         crate::package::signature::settle_unsigned_change(&mut target)?;
         Ok(package.derive(target))
+    }
+
+    /// Visit only added or byte-replaced parts in an assembled replay target.
+    /// Relationship-only deltas are skipped so a small patch does not turn
+    /// replay into a package-wide semantic scan.
+    pub(crate) fn validate_changed_parts(
+        &self,
+        target: &OpcPackage,
+        mut validate: impl FnMut(&PackURI, &dyn Part) -> Result<()>,
+    ) -> Result<()> {
+        for delta in &self.deltas {
+            let Some(after) = &delta.after else {
+                continue;
+            };
+            let payload_changed = match &delta.before {
+                Some(before) => {
+                    before.content_type != after.content_type || before.blob != after.blob
+                },
+                None => true,
+            };
+            if !payload_changed {
+                continue;
+            }
+            validate(&delta.name, target.get_part(&delta.name)?)?;
+        }
+        Ok(())
     }
 }
 

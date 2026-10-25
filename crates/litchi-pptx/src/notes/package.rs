@@ -314,6 +314,20 @@ pub(crate) fn load_with_limits(
     Ok(Some(materialize(package, index)?))
 }
 
+/// Validate one changed notes payload under the recipient's selected policy.
+/// Patch replay calls this only for payload deltas, avoiding a second complete
+/// notes-graph scan when the patch changes one XML member.
+pub(crate) fn validate_replay_part(part: &dyn Part, limits: Limits) -> Result<()> {
+    let (max, root, label) = match part.content_type() {
+        ct::PML_NOTES_MASTER => (MAX_MASTER_XML, "notesMaster", "notes master"),
+        ct::PML_NOTES_SLIDE => (MAX_NOTES_XML, "notes", "notes slide"),
+        THEME_CT => (MAX_THEME_XML, "theme", "notes-master theme"),
+        _ => return Ok(()),
+    };
+    let conformance = root_conformance_with_limits(part.blob(), max, root, limits)?;
+    validate_resource_xml_with_limits(part.blob(), max, conformance, root, label, limits)
+}
+
 /// Capture a complete source-checked snapshot of an existing notes graph.
 pub(crate) fn load_snapshot(
     package: &OpcPackage,
@@ -535,7 +549,10 @@ fn load_index_with_slide_root_proofs_and_limits<'a>(
     }
     let proof_inventory_matches = slide_root_proofs
         .is_some_and(|(expected_len, _)| expected_len == presentation_scan.slide_ids.len());
-    let mut slide_sources = Vec::with_capacity(presentation_scan.slide_ids.len());
+    let mut slide_sources = Vec::new();
+    slide_sources
+        .try_reserve_exact(presentation_scan.slide_ids.len())
+        .map_err(|source| allocation("notes source slide inventory", source))?;
     for (slide_index, id) in presentation_scan.slide_ids.iter().enumerate() {
         validate_id(id)?;
         let relationship = presentation

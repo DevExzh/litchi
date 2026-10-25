@@ -7,7 +7,7 @@ use litchi_opc::{PackURI, TargetMode};
 use super::model::Link;
 use super::transaction::PartState;
 use super::{Limits, invalid, limit};
-use crate::Result;
+use crate::{Error, Result};
 
 pub(crate) const MAX_RELATIONSHIP_FIELD_BYTES: usize = 16 * 1024;
 pub(crate) const MAX_RELATIONSHIPS: usize = 4_096;
@@ -26,7 +26,12 @@ pub(crate) fn validate_links(links: &[Link]) -> Result<()> {
     if links.len() > MAX_RELATIONSHIPS {
         return Err(limit("notes relationship count", MAX_RELATIONSHIPS));
     }
-    let mut ids = HashSet::with_capacity(links.len());
+    let mut ids = HashSet::new();
+    ids.try_reserve(links.len())
+        .map_err(|source| Error::Allocation {
+            resource: "notes relationship IDs",
+            source,
+        })?;
     for link in links {
         validate_link(link)?;
         if !ids.insert(link.id()) {
@@ -42,7 +47,13 @@ pub(crate) fn validate_parts(parts: &[PartState]) -> Result<()> {
 
 pub(crate) fn validate_parts_with_limits(parts: &[PartState], limits: Limits) -> Result<()> {
     let mut total = 0usize;
-    let mut names = HashSet::with_capacity(parts.len());
+    let mut names = HashSet::new();
+    names
+        .try_reserve(parts.len())
+        .map_err(|source| Error::Allocation {
+            resource: "notes part names",
+            source,
+        })?;
     for part in parts {
         let name = part.name.as_str();
         if name.len() > MAX_RELATIONSHIP_FIELD_BYTES {

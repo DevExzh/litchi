@@ -200,6 +200,7 @@ impl Package {
             package_relationships: seed.package_relationships,
             presentation_binding: seed.presentation_binding,
             limits: inner.limits,
+            semantic_limits: inner.semantic_limits.clone(),
         };
         let order = source_order(&owner)?;
         let physical = source_physical_index(&owner)?;

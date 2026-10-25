@@ -85,6 +85,25 @@ pub(crate) fn load_with_limits(
     Ok(value)
 }
 
+/// Validate one payload changed by a typed patch against the recipient's
+/// selected media policy. Replay already checks the exact before state; this
+/// hook parses changed slide XML and bounds newly supplied media payloads
+/// without scanning unrelated package parts.
+pub(crate) fn validate_replay_part(
+    package: &OpcPackage,
+    part_name: &PackURI,
+    part: &dyn Part,
+    limits: Limits,
+) -> Result<()> {
+    if part.content_type() == ct::PML_SLIDE {
+        load_with_limits(package, part_name, limits).map(drop)
+    } else if part.blob().len() > limits.max_payload_bytes {
+        Err(limit("individual payload bytes"))
+    } else {
+        Ok(())
+    }
+}
+
 fn relationship_target(part: &dyn Part, id: &str, expected_type: &str) -> Result<PackURI> {
     let relationship = part
         .rels()
@@ -334,7 +353,13 @@ fn insert_pictures(
     if size > limits.max_output_bytes {
         return Err(limit("updated XML bytes"));
     }
-    let mut output = Vec::with_capacity(size);
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(size)
+        .map_err(|source| Error::Allocation {
+            resource: "media slide XML",
+            source,
+        })?;
     output.extend_from_slice(&xml[..position]);
     output.extend_from_slice(fragment);
     output.extend_from_slice(&xml[position..]);

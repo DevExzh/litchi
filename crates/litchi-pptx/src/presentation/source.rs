@@ -1101,6 +1101,10 @@ pub(crate) struct SourceBackedPresentationEditor {
     package_relationships: Arc<[RelationshipBinding]>,
     presentation_binding: Arc<PartBinding>,
     pub(super) limits: SourceLimits,
+    /// The ingress-selected semantic policies must stay attached to the
+    /// deferred owner.  Source limits alone cannot recover content-family
+    /// ceilings when a snapshot is projected or replayed.
+    pub(super) semantic_limits: Option<crate::open_options::SemanticLimits>,
 }
 
 /// An immutable exact-source snapshot of one slide XML part.
@@ -1111,6 +1115,9 @@ pub(crate) struct SourceBackedSlideSnapshot {
     xml: SourcePayload,
     closure: SlideClosure,
     max_output_bytes: usize,
+    /// Preserve the complete ingress semantic bundle with the exact source
+    /// image.  A snapshot may outlive its presentation projection.
+    semantic_limits: Option<crate::open_options::SemanticLimits>,
     source_version: SourceVersion,
     lineage: SourceLineage,
     context: Option<ExecutionContext>,
@@ -1349,7 +1356,7 @@ impl SourceBackedPresentation {
         options: crate::OpenOptions,
     ) -> Result<Self> {
         let limits = options.source_limits;
-        let semantic_limits = options.semantic_limits;
+        let semantic_limits = options.semantic_limits.clone();
         Self::from_source_backed_package_with_limits(
             source_backed_package(source, options)?,
             limits,
@@ -1381,7 +1388,7 @@ impl SourceBackedPresentation {
     ) -> Result<Self> {
         options.check_owning()?;
         let limits = options.source_limits;
-        let semantic_limits = options.semantic_limits;
+        let semantic_limits = options.semantic_limits.clone();
         Self::from_source_backed_package_with_limits(
             SourceBackedPackage::from_reader(reader, limits, SourceCacheLimits::default(), None)?,
             limits,
@@ -1496,7 +1503,7 @@ impl SourceBackedPresentation {
             _presentation,
             slides,
             limits,
-            semantic_limits: _,
+            semantic_limits,
             tolerance: _,
             strict_slide_list: _,
         } = inner;
@@ -1511,6 +1518,7 @@ impl SourceBackedPresentation {
             package_relationships: seed.package_relationships,
             presentation_binding: seed.presentation_binding,
             limits,
+            semantic_limits,
         })
     }
 
@@ -1868,7 +1876,12 @@ impl SourceBackedPresentationEditor {
         options: crate::OpenOptions,
     ) -> Result<Self> {
         let limits = options.source_limits;
-        Self::from_source_backed_package(source_backed_package(source, options)?, limits)
+        let semantic_limits = options.semantic_limits.clone();
+        Self::from_source_backed_package_with_semantic_limits(
+            source_backed_package(source, options)?,
+            limits,
+            semantic_limits,
+        )
     }
 
     /// Build an owning editor from a validated deferred OPC package.
@@ -1876,6 +1889,15 @@ impl SourceBackedPresentationEditor {
     fn from_source_backed_package(
         package: SourceBackedPackage,
         limits: SourceLimits,
+    ) -> Result<Self> {
+        Self::from_source_backed_package_with_semantic_limits(package, limits, None)
+    }
+
+    #[cfg(test)]
+    fn from_source_backed_package_with_semantic_limits(
+        package: SourceBackedPackage,
+        limits: SourceLimits,
+        semantic_limits: Option<crate::open_options::SemanticLimits>,
     ) -> Result<Self> {
         package.check_execution()?;
         // The lossless editor keeps the strict slide-list contract.
@@ -1890,6 +1912,7 @@ impl SourceBackedPresentationEditor {
             package_relationships,
             presentation_binding,
             limits,
+            semantic_limits,
         })
     }
 
@@ -2184,7 +2207,13 @@ impl SourceBackedPresentationEditor {
         SlidePart::from_part(&part)?;
         #[cfg(test)]
         record_test_semantic_scene_read();
-        crate::presentation::transition::admit_source(part.source_data().as_bytes(), operation)?;
+        let semantic = crate::open_options::selected(self.semantic_limits.as_ref());
+        crate::presentation::transition::admit_source_with_limits(
+            part.source_data().as_bytes(),
+            operation,
+            semantic.shape(),
+            semantic.transition(),
+        )?;
         self.package.check_execution()?;
         let _source_version = self.package.source_version()?;
         Ok(())
@@ -2234,6 +2263,7 @@ impl SourceBackedPresentationEditor {
                 slide: data.binding.clone(),
             },
             max_output_bytes: source_slide_output_limit(self.limits),
+            semantic_limits: self.semantic_limits.clone(),
             source_version,
             lineage,
             context,
@@ -2433,7 +2463,13 @@ impl SourceBackedPresentationEditor {
         #[cfg(test)]
         record_test_semantic_scene_read();
         crate::source_limits::validate_xml_limits(raw.as_bytes(), self.limits)?;
-        let mce = crate::presentation::transition::admit_source(raw.as_bytes(), operation)?;
+        let semantic = crate::open_options::selected(self.semantic_limits.as_ref());
+        let mce = crate::presentation::transition::admit_source_with_limits(
+            raw.as_bytes(),
+            operation,
+            semantic.shape(),
+            semantic.transition(),
+        )?;
         let part = SourcePart::from_view(&view, raw)?;
         #[cfg(test)]
         record_test_semantic_slide_part_read();
@@ -2459,6 +2495,7 @@ impl SourceBackedPresentationEditor {
                 slide: data.binding.clone(),
             },
             max_output_bytes: source_slide_output_limit(self.limits),
+            semantic_limits: self.semantic_limits.clone(),
             source_version,
             lineage,
             context,
@@ -2486,7 +2523,10 @@ impl SourceBackedSlideSnapshot {
     /// unrelated slide markup.
     pub(crate) fn transition(&self) -> Result<Option<crate::transition::Transition>> {
         self.check_execution()?;
-        let mut transition = crate::presentation::transition::read_direct(self.xml.as_bytes())?;
+        let mut transition = crate::presentation::transition::read_direct_with_limits(
+            self.xml.as_bytes(),
+            crate::open_options::selected(self.semantic_limits.as_ref()).transition(),
+        )?;
         if let Some(transition) = transition.as_mut() {
             transition.locate_in_part(self.part_uri.as_str());
         }
@@ -2546,7 +2586,6 @@ impl SourceBackedSlideSnapshot {
             && self.closure.presentation == other.closure.presentation
             && self.closure.presentation_xml.as_bytes() == other.closure.presentation_xml.as_bytes()
             && self.closure.slide == other.closure.slide
-            && self.max_output_bytes == other.max_output_bytes
     }
 }
 
@@ -3117,6 +3156,7 @@ impl SourceBackedSlideEdit {
             xml: self.working,
             closure: source.closure.clone(),
             max_output_bytes: self.source_max_output_bytes,
+            semantic_limits: source.semantic_limits.clone(),
             source_version: source.source_version,
             lineage: source.lineage.clone(),
             context: source.context.clone(),
@@ -6095,6 +6135,7 @@ mod tests {
             xml: SourcePayload::Edited(Arc::new(after_xml)),
             closure: before.closure.clone(),
             max_output_bytes: before.max_output_bytes,
+            semantic_limits: before.semantic_limits.clone(),
             source_version: before.source_version,
             lineage: before.lineage.clone(),
             context: before.context.clone(),
@@ -6521,6 +6562,51 @@ mod tests {
         assert_eq!(under_source.second_payload_reads.load(Ordering::SeqCst), 0);
         drop(under_editor);
         assert_eq!(under_budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn selected_semantic_bundle_survives_source_editor_and_snapshot_projection() {
+        let comments = crate::comments::Limits {
+            max_nodes: crate::comments::Limits::DEFAULT.max_nodes - 1,
+            ..crate::comments::Limits::DEFAULT
+        };
+        let options = crate::OpenOptions::default().comments_limits(comments);
+        let presentation = SourceBackedPresentation::from_read_at_with_options(
+            Arc::new(CountingSource::new(source_backed_pptx())),
+            options.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            presentation
+                .inner
+                .semantic_limits
+                .as_ref()
+                .expect("selected semantic profile")
+                .comments(),
+            comments
+        );
+        let editor = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(CountingSource::new(source_backed_pptx())),
+            options,
+        )
+        .unwrap();
+        assert_eq!(
+            editor
+                .semantic_limits
+                .as_ref()
+                .expect("editor profile")
+                .comments(),
+            comments
+        );
+        let snapshot = editor.slide_snapshot(0).unwrap();
+        assert_eq!(
+            snapshot
+                .semantic_limits
+                .as_ref()
+                .expect("snapshot profile")
+                .comments(),
+            comments
+        );
     }
 
     #[test]

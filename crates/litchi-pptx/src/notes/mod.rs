@@ -19,6 +19,7 @@ pub(crate) use package::{
     clear_with_limits, load, load_snapshot, load_snapshot_with_limits,
     load_snapshot_with_slide_root_proofs, load_snapshot_with_slide_root_proofs_and_limits,
     load_with_limits, remove_checked, remove_checked_with_limits, remove_with_limits,
+    validate_replay_part,
 };
 #[cfg(test)]
 pub(crate) use package::{clear, put, remove, with_refused_slide_root_reservation};

@@ -3,7 +3,7 @@
 use super::model::{Conformance, Slide};
 use super::{
     Limits, MAX_ATTRIBUTE_BYTES, MAX_ATTRIBUTES, MAX_DEPTH, MAX_NODES, MAX_NOTES_XML,
-    MAX_SLIDE_ROOT_NODES, allocation, invalid, limit, resolved, xml_error,
+    MAX_SLIDE_ROOT_NODES, allocation, checked_add, invalid, limit, resolved, xml_error,
 };
 use crate::{Error, Result};
 #[cfg(test)]
@@ -364,7 +364,11 @@ fn text_spans(xml: &[u8]) -> Result<Vec<TextSpan>> {
             continue;
         }
         let close_prefix = {
-            let mut value = Vec::with_capacity(name.len() + 2);
+            let capacity = checked_add(name.len(), 2, "notes close-tag bytes")?;
+            let mut value = Vec::new();
+            value
+                .try_reserve_exact(capacity)
+                .map_err(|source| allocation("notes close-tag bytes", source))?;
             value.extend_from_slice(b"</");
             value.extend_from_slice(name);
             value.push(b'>');

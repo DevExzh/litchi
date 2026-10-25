@@ -143,6 +143,24 @@ pub(crate) fn load_with_limits(
         .transpose()
 }
 
+/// Validate one payload changed by a typed tag patch under the recipient's
+/// selected tag policy. Only changed tag parts and changed slide owners are
+/// visited; unrelated package parts remain untouched.
+pub(crate) fn validate_replay_part(
+    package: &OpcPackage,
+    part_name: &PackURI,
+    part: &dyn OpcPart,
+    limits: Limits,
+) -> Result<()> {
+    if part.content_type() == CONTENT_TYPE {
+        parse_profiled(part.blob(), limits).map(drop)
+    } else if part.content_type() == litchi_opc::constants::content_type::PML_SLIDE {
+        load_with_limits(package, part_name, limits).map(drop)
+    } else {
+        Ok(())
+    }
+}
+
 /// Create or replace the selected part-level object's optional tag list.
 ///
 /// The list is moved into a staged tag part. Adding also stages the owner XML

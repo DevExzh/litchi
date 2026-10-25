@@ -114,6 +114,11 @@ impl SemanticLimits {
     }
 }
 
+#[inline]
+pub(crate) fn selected(value: Option<&SemanticLimits>) -> SemanticLimits {
+    value.copied().unwrap_or_default()
+}
+
 /// Policies for owning and positional-source PPTX ingress.
 ///
 /// One envelope serves every configured open route:
