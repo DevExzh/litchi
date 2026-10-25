@@ -2,8 +2,9 @@
 
 The 94v import repair was rerun from
 `f167986c745fdd6c305f8095e311980aee24d799`. Formatting passed, but the
-minimal-feature Clippy leaf stopped with 35 `unnecessary qualification`
-diagnostics in the existing `litchi-opc` package module. The captured log was
+all-features leaf Clippy command across DOCX/PPTX/XLSX/XLSB stopped with 35
+`unnecessary qualification` diagnostics in the existing `litchi-opc` package
+module. The captured log was
 `ooxml-combined-0362ul94-f5-final-f167986c/01-clippy-leaves-attempt-actual-f5-01.log`,
 30,940 bytes, SHA-256
 `f74cbbe6c4c33edc5c14c47d97a2703fe9c4b1ede69ebee0733137b146f9b45d`.
