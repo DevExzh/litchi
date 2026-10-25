@@ -7,7 +7,7 @@ use super::model::{Client, Info, Namespace, Part};
 use crate::{Error, Result};
 use chrono::{DateTime, NaiveDateTime};
 use litchi_core::xml::ReaderOrigin;
-use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, SourceLimits};
 use quick_xml::encoding::Decoder;
@@ -403,7 +403,10 @@ fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
     if xml.len() > limits.max_input_bytes() {
         return Err(limit("Revision Information part bytes"));
     }
-    let selected = process_ooxml(xml)?;
+    // Bound the potentially expanding MCE selection before the revision
+    // parser receives it; a post-expansion check would be too late.
+    let mce_limits = mce_limits(limits);
+    let selected = process_markup_compatibility(xml, &Capabilities::default(), &mce_limits)?.xml;
     if selected.len() > limits.max_input_bytes() {
         return Err(limit("MCE-processed Revision Information bytes"));
     }
@@ -593,6 +596,18 @@ fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
     };
     validate_model(&value, limits)?;
     Ok(value)
+}
+
+fn mce_limits(limits: Limits) -> MceLimits {
+    MceLimits {
+        max_input_bytes: limits.max_input_bytes(),
+        max_output_bytes: limits.max_output_bytes(),
+        max_depth: limits.max_depth(),
+        max_namespace_bindings: 4096.min(limits.max_nodes()),
+        max_directive_tokens: 4096.min(limits.max_nodes()),
+        max_choices_per_alternate: 1024.min(limits.max_nodes()),
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
+    }
 }
 
 fn parse_client(element: &BytesStart<'_>, decoder: Decoder, limits: Limits) -> Result<Client> {
@@ -1144,5 +1159,17 @@ mod tests {
         assert!(store(&mut package, &invalid_value, Limits::DEFAULT).is_err());
         assert_eq!(package.part_count(), before);
         assert!(load(&package, Limits::DEFAULT).unwrap().is_none());
+    }
+
+    #[test]
+    fn selected_profile_bounds_mce_admission() {
+        let limits = Limits::new(512, 768, 7, 19, 11, 3, 23).unwrap();
+        let mce = mce_limits(limits);
+        assert_eq!(mce.max_input_bytes, 512);
+        assert_eq!(mce.max_output_bytes, 768);
+        assert_eq!(mce.max_depth, 7);
+        assert_eq!(mce.max_namespace_bindings, 19);
+        assert_eq!(mce.max_directive_tokens, 19);
+        assert_eq!(mce.max_choices_per_alternate, 19.min(1024));
     }
 }

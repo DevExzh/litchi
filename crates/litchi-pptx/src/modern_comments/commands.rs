@@ -29,11 +29,11 @@ pub struct ChangeCommand {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load_modern_comment_changes(package: &OpcPackage) -> Result<Vec<ChangeCommand>> {
-    let limits =
-        super::super::presentation_properties::metadata::changes::Limits::from_source_limits(
-            package.read_limits(),
-        );
+pub fn load_modern_comment_changes(
+    package: &OpcPackage,
+    selected_limits: super::super::presentation_properties::metadata::changes::Limits,
+) -> Result<Vec<ChangeCommand>> {
+    let limits = selected_limits.constrained_by_source(package.read_limits());
     let Some(part) =
         super::super::presentation_properties::metadata::changes::load(package, limits)?
     else {
@@ -71,14 +71,15 @@ pub fn load_modern_comment_changes(package: &OpcPackage) -> Result<Vec<ChangeCom
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub(crate) fn update_modern_comment_changes<F>(package: &mut OpcPackage, update: F) -> Result<bool>
+pub(crate) fn update_modern_comment_changes<F>(
+    package: &mut OpcPackage,
+    selected_limits: super::super::presentation_properties::metadata::changes::Limits,
+    update: F,
+) -> Result<bool>
 where
     F: FnOnce(&mut Vec<ChangeCommand>),
 {
-    let limits =
-        super::super::presentation_properties::metadata::changes::Limits::from_source_limits(
-            package.read_limits(),
-        );
+    let limits = selected_limits.constrained_by_source(package.read_limits());
     let Some(mut part) =
         super::super::presentation_properties::metadata::changes::load(package, limits)?
     else {
@@ -153,7 +154,7 @@ where
     if cursor != commands.len() {
         return Err(invalid("modern comment command locations are incomplete"));
     }
-    let xml = part.changes_information.to_xml()?;
+    let xml = part.changes_information.to_xml(limits)?;
     let uri = PackURI::new(&part.part_name).map_err(invalid)?;
     let stored = package.get_part(&uri)?;
     if stored.content_type() != CHANGES_CONTENT_TYPE {
@@ -170,4 +171,76 @@ where
     package.get_part_mut(&uri)?.set_blob(xml);
     settle_unsigned_change(package)?;
     Ok(true)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_opc::{BlobPart, OpcPackage, PackURI};
+
+    const PRESENTATION_CONTENT_TYPE: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
+
+    fn package_with_changes(xml: Vec<u8>) -> OpcPackage {
+        let mut package = OpcPackage::new();
+        package.rels_mut().add_relationship(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+                .into(),
+            "ppt/presentation.xml".into(),
+            "rId1".into(),
+            false,
+        );
+        let presentation_name = PackURI::new("/ppt/presentation.xml").unwrap();
+        package.add_part(Box::new(BlobPart::new(
+            presentation_name.clone(),
+            PRESENTATION_CONTENT_TYPE.into(),
+            Vec::new(),
+        )));
+        package
+            .get_part_mut(&presentation_name)
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                super::super::super::presentation_properties::metadata::changes::RELATIONSHIP_TYPE
+                    .into(),
+                "changesInfos/changesInfo1.xml".into(),
+                "rIdChanges".into(),
+                false,
+            );
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/ppt/changesInfos/changesInfo1.xml").unwrap(),
+            CHANGES_CONTENT_TYPE.into(),
+            xml,
+        )));
+        package
+    }
+
+    #[test]
+    fn selected_changes_profile_is_used_by_the_raw_helper() {
+        let xml = br#"<pc:chgInfo xmlns:pc="http://schemas.microsoft.com/office/powerpoint/2013/main/command"><pc:docChgLst/></pc:chgInfo>"#;
+        let package = package_with_changes(xml.to_vec());
+        assert!(
+            load_modern_comment_changes(
+                &package,
+                super::super::super::presentation_properties::metadata::changes::Limits::DEFAULT,
+            )
+            .unwrap()
+            .is_empty()
+        );
+
+        let default =
+            super::super::super::presentation_properties::metadata::changes::Limits::DEFAULT;
+        let tight = super::super::super::presentation_properties::metadata::changes::Limits::new(
+            xml.len() - 1,
+            default.max_output_bytes(),
+            default.max_depth(),
+            default.max_nodes(),
+            default.max_lists(),
+            default.max_changes(),
+            default.max_extensions(),
+            default.max_string_bytes(),
+        )
+        .unwrap();
+        assert!(load_modern_comment_changes(&package, tight).is_err());
+    }
 }

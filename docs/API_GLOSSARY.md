@@ -3345,3 +3345,20 @@ only twin, alias or `_with_limits` entry point was added.
 | `OpenOptions::{changes_limits,revision_limits,slide_sync_limits,tracks_limits,events_limits}` and each family's `EditOptions::limits` | adopted (0362ul82); profiles survive owners, projections, edits, snapshots, patches and replay |
 
 See [0362ul82](unified-ops/0362ul82-pptx-metadata-history.md).
+
+## PPTX metadata history bounded admission (record 0362ul82a)
+
+The 82a correction applies the selected semantic profile before MCE
+expansion, keeps modern-comment Changes operations on the retained owner
+profile, and performs checked, fallible event-fragment and slide-splice
+allocation. Escaped slide-synchronization identifiers are counted before
+output admission. These are corrections to the 82 contracts, not aliases or
+additional default entry points.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::modern_comments::{load_modern_comment_changes, Edit::{changes, update_changes}}` | adopted (0362ul82a); selected Changes limits are intersected with physical source limits and used for reads and writes |
+| `litchi_pptx::presentation_properties::metadata::{changes,revision,slide_sync}::Limits` | adopted (0362ul82a); bounded MCE admission uses the selected profile before expansion |
+| `litchi_pptx::presentation_properties::metadata::events::store` and slide extension splice | adopted (0362ul82a); checked exact sizing and fallible reservation use the selected output ceiling |
+
+See [0362ul82a](unified-ops/0362ul82a-pptx-metadata-history-admission.md).

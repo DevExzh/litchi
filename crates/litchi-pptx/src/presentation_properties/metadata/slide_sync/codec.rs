@@ -1,6 +1,6 @@
 //! Bounded XML codec for Slide Synchronization Data parts.
 
-use litchi_ooxml_common::mce::process_ooxml;
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_ooxml_common::xml::unqualified_attribute_value;
 use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
@@ -177,7 +177,11 @@ impl Properties {
         if xml.len() > limits.max_input_bytes() {
             return Err(limit("slide synchronization XML bytes"));
         }
-        let xml = process_ooxml(xml)?;
+        // Apply the selected MCE budget while AlternateContent is being
+        // expanded.  Checking the expanded size only afterwards can already
+        // have paid for an over-budget intermediate document.
+        let mce_limits = mce_limits(limits);
+        let xml = process_markup_compatibility(xml, &Capabilities::default(), &mce_limits)?.xml;
         if xml.len() > limits.max_input_bytes() {
             return Err(limit("MCE-processed slide synchronization XML bytes"));
         }
@@ -282,7 +286,10 @@ impl Properties {
         if self.server_slide_id.len() > limits.max_server_slide_id_bytes() {
             return Err(limit("slide synchronization server slide ID bytes"));
         }
-        let server_slide_id = escape_xml(&self.server_slide_id);
+        // Preflight the escaped byte count before constructing the escaped
+        // string or the final output buffer.  XML entities can expand a
+        // caller-provided ID substantially.
+        let escaped_server_slide_id_len = escaped_xml_len(&self.server_slide_id)?;
         let server_modified_time = self.server_modified_time.to_lexical();
         let client_inserted_time = self.client_inserted_time.to_lexical();
         let prefix = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#;
@@ -297,7 +304,7 @@ impl Properties {
         let output_len = prefix
             .len()
             .checked_add(root.len())
-            .and_then(|length| length.checked_add(server_slide_id.len()))
+            .and_then(|length| length.checked_add(escaped_server_slide_id_len))
             .and_then(|length| length.checked_add(server_time.len()))
             .and_then(|length| length.checked_add(server_modified_time.len()))
             .and_then(|length| length.checked_add(client_time.len()))
@@ -306,6 +313,12 @@ impl Properties {
             .ok_or_else(|| limit("serialized slide synchronization XML bytes"))?;
         if output_len > limits.max_output_bytes() {
             return Err(limit("serialized slide synchronization XML bytes"));
+        }
+        let server_slide_id = escape_xml(&self.server_slide_id);
+        if server_slide_id.len() != escaped_server_slide_id_len {
+            return Err(invalid(
+                "slide synchronization escaped server slide ID length changed",
+            ));
         }
         let mut out = Vec::new();
         out.try_reserve_exact(output_len)
@@ -331,6 +344,32 @@ impl Properties {
         Self::parse(&out, parse_limits)?;
         Ok(out)
     }
+}
+
+fn mce_limits(limits: Limits) -> MceLimits {
+    MceLimits {
+        max_input_bytes: limits.max_input_bytes(),
+        max_output_bytes: limits.max_output_bytes(),
+        max_depth: limits.max_depth(),
+        max_namespace_bindings: 4096.min(limits.max_nodes()),
+        max_directive_tokens: 4096.min(limits.max_nodes()),
+        max_choices_per_alternate: 1024.min(limits.max_nodes()),
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
+    }
+}
+
+fn escaped_xml_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |length, character| {
+        let bytes = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '"' | '\'' => 6,
+            _ => character.len_utf8(),
+        };
+        length.checked_add(bytes).ok_or(Error::CapacityOverflow {
+            resource: "slide synchronization escaped server slide ID",
+        })
+    })
 }
 
 fn from_root(element: &BytesStart<'_>, decoder: Decoder, limits: Limits) -> Result<Properties> {
@@ -377,4 +416,35 @@ fn increment(value: usize, max: usize, label: &str) -> Result<usize> {
         return Err(limit(label));
     }
     Ok(next)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn escaped_server_id_is_counted_before_output_admission() {
+        assert_eq!(escaped_xml_len("a&<'\"").unwrap(), 1 + 5 + 4 + 6 + 6);
+
+        let timestamp = DateTime::parse("2024-01-02T03:04:05Z").unwrap();
+        let value = Properties::new("a&<'\"", timestamp.clone(), timestamp);
+        let written = value.to_xml(Limits::DEFAULT).unwrap();
+        assert!(
+            written
+                .windows(b"a&amp;&lt;&apos;&quot;".len())
+                .any(|window| { window == b"a&amp;&lt;&apos;&quot;" })
+        );
+
+        let tight = Limits::new(
+            Limits::DEFAULT.max_input_bytes(),
+            written.len() - 1,
+            Limits::DEFAULT.max_total_input_bytes(),
+            Limits::DEFAULT.max_parts(),
+            Limits::DEFAULT.max_nodes(),
+            Limits::DEFAULT.max_depth(),
+            Limits::DEFAULT.max_server_slide_id_bytes(),
+        )
+        .unwrap();
+        assert!(value.to_xml(tight).is_err());
+    }
 }

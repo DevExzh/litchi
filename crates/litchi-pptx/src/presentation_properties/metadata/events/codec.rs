@@ -4,6 +4,7 @@
 //! module never replays, renders, seeks, pauses, resumes, stops, or otherwise
 //! executes a recorded action.
 
+use std::fmt::Write as _;
 use std::ops::Range;
 
 use super::model::{Draft, Event, Kind, Trigger};
@@ -690,9 +691,20 @@ pub(super) fn store(
         ));
     }
 
-    let mut fragment = String::with_capacity(events.len() * 72 + 256);
+    let dialect = super::super::slide_patch::slide_dialect(slide.blob())?;
+    let fragment_len = event_fragment_len(events, dialect)?;
+    if fragment_len > policy.max_output_bytes() {
+        return Err(limit("slide-show event XML fragment bytes"));
+    }
+    let mut fragment = String::new();
+    fragment
+        .try_reserve_exact(fragment_len)
+        .map_err(|source| Error::Allocation {
+            resource: "slide-show event XML fragment",
+            source,
+        })?;
     fragment.push_str("<p:ext xmlns:p=\"");
-    fragment.push_str(super::super::slide_patch::slide_dialect(slide.blob())?);
+    fragment.push_str(dialect);
     fragment.push_str("\" xmlns:p14=\"");
     fragment.push_str(P14_NAMESPACE);
     fragment.push_str("\" uri=\"");
@@ -709,7 +721,8 @@ pub(super) fn store(
         fragment.push_str(" time=\"");
         fragment.push_str(event.time.as_str());
         fragment.push_str("\" objId=\"");
-        fragment.push_str(&event.object_id.to_string());
+        write!(fragment, "{}", event.object_id)
+            .map_err(|_| invalid("slide-show event object ID formatting failed"))?;
         fragment.push('"');
         if let Kind::Seek { at: seek_time } = &event.kind {
             fragment.push_str(" seek=\"");
@@ -719,8 +732,17 @@ pub(super) fn store(
         fragment.push_str("/>");
     }
     fragment.push_str("</p14:showEvtLst></p:ext>");
+    if fragment.len() != fragment_len {
+        return Err(invalid(
+            "slide-show event fragment length changed during emission",
+        ));
+    }
 
-    let updated = super::super::slide_patch::insert_extension_fragment(slide.blob(), &fragment)?;
+    let updated = super::super::slide_patch::insert_extension_fragment(
+        slide.blob(),
+        &fragment,
+        policy.max_output_bytes(),
+    )?;
     // Self-check: the patched slide must read back through discovery.
     let probe =
         litchi_opc::BlobPart::new(slide_name.clone(), ct::PML_SLIDE.into(), updated.clone());
@@ -732,6 +754,62 @@ pub(super) fn store(
     }
     package.get_part_mut(slide_name)?.set_blob(updated);
     Ok(())
+}
+
+fn event_fragment_len(events: &[Draft], dialect: &str) -> Result<usize> {
+    let mut length = 0usize;
+    let mut add = |part: usize| {
+        length
+            .checked_add(part)
+            .ok_or(Error::CapacityOverflow {
+                resource: "slide-show event XML fragment",
+            })
+            .map(|next| length = next)
+    };
+    add(b"<p:ext xmlns:p=\"".len())?;
+    add(dialect.len())?;
+    add(b"\" xmlns:p14=\"".len())?;
+    add(P14_NAMESPACE.len())?;
+    add(b"\" uri=\"".len())?;
+    add(EXTENSION_URI.len())?;
+    add(b"\"><p14:showEvtLst>".len())?;
+    for event in events {
+        add(b"<p14:".len())?;
+        add(event.element_name().len())?;
+        if let Kind::Trigger(trigger) = &event.kind {
+            add(b" type=\"".len())?;
+            add(trigger_token(*trigger).len())?;
+            add(1)?;
+        }
+        add(b" time=\"".len())?;
+        add(event.time.as_str().len())?;
+        add(b"\" objId=\"".len())?;
+        add(decimal_len(event.object_id))?;
+        add(1)?;
+        if let Kind::Seek { at: seek_time } = &event.kind {
+            add(b" seek=\"".len())?;
+            add(seek_time.as_str().len())?;
+            add(1)?;
+        }
+        add(b"/>".len())?;
+    }
+    add(b"</p14:showEvtLst></p:ext>".len())?;
+    Ok(length)
+}
+
+fn decimal_len(value: u32) -> usize {
+    match value {
+        0..=9 => 1,
+        10..=99 => 2,
+        100..=999 => 3,
+        1_000..=9_999 => 4,
+        10_000..=99_999 => 5,
+        100_000..=999_999 => 6,
+        1_000_000..=9_999_999 => 7,
+        10_000_000..=99_999_999 => 8,
+        100_000_000..=999_999_999 => 9,
+        _ => 10,
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1542,5 +1620,23 @@ mod tests {
                 .unwrap()
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn selected_output_budget_is_checked_before_slide_splice() {
+        let (mut package, slide_name) = slide_package("");
+        let limits = Limits::new(
+            Limits::DEFAULT.max_slide_xml_bytes(),
+            1,
+            Limits::DEFAULT.max_total_slide_xml_bytes(),
+            Limits::DEFAULT.max_events(),
+            Limits::DEFAULT.max_xml_nodes(),
+            Limits::DEFAULT.max_xml_depth(),
+            Limits::DEFAULT.max_event_string_bytes(),
+        )
+        .unwrap();
+        let before = package.get_part(&slide_name).unwrap().blob().to_vec();
+        assert!(store(&mut package, &slide_name, &sample_events(), limits).is_err());
+        assert_eq!(package.get_part(&slide_name).unwrap().blob(), before);
     }
 }
