@@ -7,6 +7,7 @@ use super::limit::LimitKind;
 use litchi_opc::{OpcPackage, PackURI, Part, XmlPart};
 use std::cmp::Ordering;
 use std::collections::VecDeque;
+use std::sync::Arc;
 
 use super::codec::{require_content_type, require_internal_target, validate_images, validate_xml};
 use super::model::{Family, Limits, Set, Ui, Version};
@@ -74,13 +75,13 @@ pub fn load<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Set<'a>> {
 /// for a change to a signed package, and an error when input violates OOXML
 /// constraints, exceeds a configured bound, or an underlying XML or package
 /// operation fails.
-pub fn put(
+fn put_mut(
     package: &mut OpcPackage,
     version: Version,
-    xml: Vec<u8>,
+    xml: Arc<Vec<u8>>,
     limits: &Limits,
 ) -> Result<()> {
-    let parsed = validate_xml(&xml, version.family(), limits)?;
+    let parsed = validate_xml(xml.as_slice(), version.family(), limits)?;
     if parsed != version {
         return Err(Error::Invalid(format!(
             "Ribbon root namespace does not match requested {version:?} version"
@@ -90,7 +91,9 @@ pub fn put(
     let existing = {
         let ribbons = load(package, limits)?;
         match ribbons.get(version.family()) {
-            Some(current) if current.version() == version && current.xml() == xml => return Ok(()),
+            Some(current) if current.version() == version && current.xml() == xml.as_slice() => {
+                return Ok(());
+            },
             Some(current) => {
                 let part = current.part().clone();
                 let id = current.id().to_owned();
@@ -103,14 +106,14 @@ pub fn put(
 
     if let Some((part, _, false)) = existing.as_ref() {
         refuse_signed_change(package)?;
-        package.get_part_mut(part)?.set_blob(xml);
+        package.get_part_mut(part)?.set_blob_shared(xml);
         settle_unsigned_change(package)?;
         return Ok(());
     }
 
     let part = available_part_name(package, version)?;
     let target = part.as_str().trim_start_matches('/').to_owned();
-    let mut replacement = XmlPart::new(part, CONTENT_TYPE.to_owned(), xml);
+    let mut replacement = XmlPart::new_shared(part, CONTENT_TYPE.to_owned(), xml);
     if let Some((shared, _, true)) = existing.as_ref() {
         let base = replacement.partname().base_uri().to_owned();
         for relationship in package.get_part(shared)?.rels().iter() {
@@ -159,9 +162,9 @@ pub fn put(
 /// for a change to a signed package, and an error when input violates OOXML
 /// constraints, exceeds a configured bound, or an underlying XML or package
 /// operation fails.
-pub fn remove(package: &mut OpcPackage, family: Family) -> Result<bool> {
+fn remove_mut(package: &mut OpcPackage, family: Family, limits: &Limits) -> Result<bool> {
     let (relationship_id, ribbon_part, images) = {
-        let ribbons = load(package, &Limits::standard())?;
+        let ribbons = load(package, limits)?;
         let Some(selected) = ribbons.get(family) else {
             return Ok(false);
         };
@@ -193,6 +196,331 @@ pub fn remove(package: &mut OpcPackage, family: Family) -> Result<bool> {
     settle_unsigned_change(package)?;
     Ok(true)
 }
+
+#[derive(Clone, PartialEq, Eq)]
+struct OwnedUi {
+    part: PackURI,
+    id: String,
+    version: Version,
+    xml: Arc<Vec<u8>>,
+}
+
+impl OwnedUi {
+    fn capture(package: &OpcPackage, family: Family, limits: &Limits) -> Result<Option<Self>> {
+        let ribbons = load(package, limits)?;
+        let Some(ui) = ribbons.get(family) else {
+            return Ok(None);
+        };
+        Ok(Some(Self {
+            part: ui.part().clone(),
+            id: ui.id().to_owned(),
+            version: ui.version(),
+            xml: package.get_part(ui.part())?.blob_arc(),
+        }))
+    }
+}
+
+#[derive(Clone, PartialEq, Eq)]
+struct FamilyChange {
+    family: Family,
+    before: Option<OwnedUi>,
+    after: Option<OwnedUi>,
+}
+
+/// A source-checked Ribbon publication.
+///
+/// A patch may carry one or both fixed Ribbon relationship families. Keeping
+/// the complete family change in one patch lets a staged edit publish one
+/// commit even when it changes both legacy and modern slots.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Patch {
+    changes: Box<[FamilyChange]>,
+    limits: Limits,
+}
+
+impl std::fmt::Debug for Patch {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Patch")
+            .field(
+                "families",
+                &self
+                    .changes
+                    .iter()
+                    .filter(|change| change.before != change.after)
+                    .count(),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl Patch {
+    /// Whether this patch preserves every Ribbon family exactly.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.changes
+            .iter()
+            .all(|change| same_content(change.before.as_ref(), change.after.as_ref()))
+    }
+
+    /// Return the exact inverse publication.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            changes: self
+                .changes
+                .iter()
+                .rev()
+                .map(|change| FamilyChange {
+                    family: change.family,
+                    before: change.after.clone(),
+                    after: change.before.clone(),
+                })
+                .collect(),
+            limits: self.limits,
+        }
+    }
+
+    /// Apply this patch to a Ribbon source with matching family content and
+    /// publish a new package.
+    ///
+    /// The receiver is unchanged. Unrelated package parts remain owned by the
+    /// receiver; only the selected Ribbon families are planned and published.
+    pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
+        for change in &self.changes {
+            let current = OwnedUi::capture(package, change.family, &self.limits)?;
+            if !same_content(current.as_ref(), change.before.as_ref()) {
+                return Err(Error::Relationship("Ribbon patch source changed".into()));
+            }
+        }
+        if self.is_noop() {
+            return Ok(Commit::new(
+                package.clone(),
+                self.clone(),
+                litchi_core::edit::Diagnostics::UNCHANGED,
+            ));
+        }
+        let mut candidate = package.clone();
+        for change in &self.changes {
+            match &change.after {
+                Some(after) => put_mut(
+                    &mut candidate,
+                    after.version,
+                    Arc::clone(&after.xml),
+                    &self.limits,
+                )?,
+                None => {
+                    remove_mut(&mut candidate, change.family, &self.limits)?;
+                },
+            }
+        }
+        for change in &self.changes {
+            let resulting = OwnedUi::capture(&candidate, change.family, &self.limits)?;
+            if !same_content(resulting.as_ref(), change.after.as_ref()) {
+                return Err(Error::Relationship(
+                    "Ribbon patch publication changed the selected graph".into(),
+                ));
+            }
+        }
+        Ok(Commit::new(
+            candidate,
+            self.clone(),
+            litchi_core::edit::Diagnostics::CHANGED,
+        ))
+    }
+
+    fn single(
+        family: Family,
+        before: Option<OwnedUi>,
+        after: Option<OwnedUi>,
+        limits: Limits,
+    ) -> Self {
+        Self {
+            changes: vec![FamilyChange {
+                family,
+                before,
+                after,
+            }]
+            .into_boxed_slice(),
+            limits,
+        }
+    }
+
+    fn from_families(
+        before: [Option<OwnedUi>; 2],
+        after: [Option<OwnedUi>; 2],
+        limits: Limits,
+    ) -> Self {
+        let changes = [Family::Legacy, Family::Modern]
+            .into_iter()
+            .zip(before.into_iter().zip(after))
+            .map(|(family, (before, after))| FamilyChange {
+                family,
+                before,
+                after,
+            })
+            .collect();
+        Self { changes, limits }
+    }
+}
+
+fn same_content(left: Option<&OwnedUi>, right: Option<&OwnedUi>) -> bool {
+    match (left, right) {
+        (None, None) => true,
+        (Some(left), Some(right)) => {
+            left.version == right.version && left.xml.as_slice() == right.xml.as_slice()
+        },
+        _ => false,
+    }
+}
+
+/// Publish one Ribbon family without mutating the source package.
+pub fn put(
+    package: &OpcPackage,
+    version: Version,
+    xml: Vec<u8>,
+    limits: &Limits,
+) -> Result<Commit> {
+    let family = version.family();
+    let before = OwnedUi::capture(package, family, limits)?;
+    let mut candidate = package.clone();
+    put_mut(&mut candidate, version, Arc::new(xml), limits)?;
+    let after = OwnedUi::capture(&candidate, family, limits)?;
+    let patch = Patch::single(family, before, after, *limits);
+    let changed = !patch.is_noop();
+    Ok(Commit::new(
+        candidate,
+        patch,
+        litchi_core::edit::Diagnostics::new(changed),
+    ))
+}
+
+/// Remove one Ribbon family without mutating the source package.
+pub fn remove(package: &OpcPackage, family: Family) -> Result<Commit> {
+    let limits = Limits::standard();
+    let before = OwnedUi::capture(package, family, &limits)?;
+    let mut candidate = package.clone();
+    remove_mut(&mut candidate, family, &limits)?;
+    let after = OwnedUi::capture(&candidate, family, &limits)?;
+    let patch = Patch::single(family, before, after, limits);
+    let changed = !patch.is_noop();
+    Ok(Commit::new(
+        candidate,
+        patch,
+        litchi_core::edit::Diagnostics::new(changed),
+    ))
+}
+
+/// Limits selected before a staged Ribbon edit starts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EditOptions {
+    /// Resource ceilings used by Ribbon reads and publication.
+    pub limits: Limits,
+}
+
+impl Default for EditOptions {
+    fn default() -> Self {
+        Self {
+            limits: Limits::standard(),
+        }
+    }
+}
+
+/// A staged Ribbon edit over an immutable OPC package source.
+///
+/// The source and untouched package parts remain shared until publication.
+/// Dropping the edit discards its working package.
+#[derive(Clone)]
+pub struct Edit {
+    source: OpcPackage,
+    working: OpcPackage,
+    options: EditOptions,
+}
+
+impl std::fmt::Debug for Edit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("limits", &self.options.limits)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Edit {
+    /// Start a staged edit with standard Ribbon limits.
+    pub fn new(package: &OpcPackage) -> Result<Self> {
+        Self::new_with_options(package, EditOptions::default())
+    }
+
+    /// Start a staged edit with caller-selected Ribbon limits.
+    pub fn new_with_options(package: &OpcPackage, options: EditOptions) -> Result<Self> {
+        Ok(Self {
+            source: package.clone(),
+            working: package.clone(),
+            options,
+        })
+    }
+
+    /// Read one staged Ribbon family as owned, inert data.
+    pub fn get(&self, family: Family) -> Result<Option<(Version, Vec<u8>)>> {
+        Ok(
+            OwnedUi::capture(&self.working, family, &self.options.limits)?
+                .map(|ui| (ui.version, ui.xml.as_ref().clone())),
+        )
+    }
+
+    /// Create or replace one staged Ribbon family.
+    pub fn put(&mut self, version: Version, xml: Vec<u8>) -> Result<bool> {
+        let commit = put(&self.working, version, xml, &self.options.limits)?;
+        let changed = commit.diagnostics().changed();
+        self.working = commit.into_package();
+        Ok(changed)
+    }
+
+    /// Remove one staged Ribbon family.
+    pub fn remove(&mut self, family: Family) -> Result<bool> {
+        let limits = self.options.limits;
+        let before = OwnedUi::capture(&self.working, family, &limits)?;
+        let mut candidate = self.working.clone();
+        remove_mut(&mut candidate, family, &limits)?;
+        let after = OwnedUi::capture(&candidate, family, &limits)?;
+        let patch = Patch::single(family, before, after, limits);
+        let changed = !patch.is_noop();
+        self.working = candidate;
+        Ok(changed)
+    }
+
+    /// Discard all staged operations.
+    pub fn reset(&mut self) {
+        self.working = self.source.clone();
+    }
+
+    /// Publish all staged Ribbon families as one commit triad.
+    pub fn commit(self) -> Result<Commit> {
+        let before = capture_families(&self.source, &self.options.limits)?;
+        let after = capture_families(&self.working, &self.options.limits)?;
+        let patch = Patch::from_families(before, after, self.options.limits);
+        let changed = !patch.is_noop();
+        Ok(Commit::new(
+            self.working,
+            patch,
+            litchi_core::edit::Diagnostics::new(changed),
+        ))
+    }
+}
+
+fn capture_families(package: &OpcPackage, limits: &Limits) -> Result<[Option<OwnedUi>; 2]> {
+    Ok([
+        OwnedUi::capture(package, Family::Legacy, limits)?,
+        OwnedUi::capture(package, Family::Modern, limits)?,
+    ])
+}
+
+/// A published Ribbon change.
+pub type Commit = litchi_core::edit::Commit<OpcPackage, Patch>;
+
+/// Content-free diagnostics of a Ribbon commit.
+pub use litchi_core::edit::Diagnostics;
 
 fn reject_part_sourced_ribbons(package: &OpcPackage, scanned: &mut usize) -> Result<()> {
     for part in package.iter_parts() {

@@ -5734,7 +5734,8 @@ impl Edit {
             }
         }
         if let Some(web) = &web_patch {
-            web.apply(&mut package)?;
+            let commit = web.apply(&package)?;
+            package = commit.into_package();
         }
         if has_svg_lifecycle {
             validate_svg_final_removals(&package, &svg_parts)?;

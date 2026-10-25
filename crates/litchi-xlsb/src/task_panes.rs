@@ -172,7 +172,12 @@ impl Edit {
             return Ok(false);
         }
         crate::signature_policy::ensure_unsigned(self.staged.opc())?;
-        self.staged.update(|candidate| Ok(patch.apply(candidate)?))
+        self.staged.update(|candidate| {
+            let commit = patch.apply(candidate)?;
+            let changed = commit.diagnostics().changed();
+            *candidate = commit.into_package();
+            Ok(changed)
+        })
     }
 
     /// Discard every staged change.

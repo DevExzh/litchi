@@ -8,7 +8,7 @@ use litchi_ooxml_common::Error as CommonError;
 use litchi_ooxml_common::web::raw::{
     ADD_IN_CONTENT_TYPE, ADD_IN_RELATIONSHIP, TASK_PANES_CONTENT_TYPE, TASK_PANES_RELATIONSHIP,
 };
-use litchi_ooxml_common::web::{Conformance, Limits, Store, load, put, remove};
+use litchi_ooxml_common::web::{Conformance, Limits, Store, load, plan_put, plan_remove};
 use litchi_opc::part::{Part, XmlPart};
 use litchi_opc::{OpcPackage, PackURI};
 
@@ -16,6 +16,25 @@ const TASK_PANES_XML: &[u8] =
     include_bytes!("../../../test-data/ooxml/web_extensions/visible_taskpanes.xml");
 const WEB_EXTENSION_XML: &[u8] =
     include_bytes!("../../../test-data/ooxml/web_extensions/omex_webextension.xml");
+
+fn put(
+    package: &mut OpcPackage,
+    panes: litchi_ooxml_common::web::Panes,
+    conformance: Conformance,
+    limits: &Limits,
+) -> litchi_ooxml_common::Result<()> {
+    let patch = plan_put(package, panes, conformance, limits)?;
+    *package = patch.apply(package)?.into_package();
+    Ok(())
+}
+
+fn remove(package: &mut OpcPackage, limits: &Limits) -> litchi_ooxml_common::Result<bool> {
+    let patch = plan_remove(package, limits)?;
+    let commit = patch.apply(package)?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
 
 #[test]
 fn common_web_owner_loads_inert_task_panes() {

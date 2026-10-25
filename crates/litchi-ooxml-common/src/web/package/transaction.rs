@@ -193,19 +193,24 @@ impl Patch {
 
     /// Apply this patch after checking its exact source graph.
     ///
-    /// Returns `true` when the package changed. Source checks, destination-name
-    /// checks, and relationship staging all finish before the first mutation.
+    /// The source package is unchanged; the returned commit owns the new
+    /// package. Source checks, destination-name checks, and relationship
+    /// staging all finish before publication.
     /// # Errors
     ///
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<bool> {
+    pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
         if self.is_empty() {
             if self.is_source_bound() {
                 self.validate_source(package)?;
                 self.validate_protection(package)?;
             }
-            return Ok(false);
+            return Ok(Commit::new(
+                package.clone(),
+                self.clone(),
+                litchi_core::edit::Diagnostics::UNCHANGED,
+            ));
         }
         self.validate_source(package)?;
         self.validate_protection(package)?;
@@ -218,8 +223,11 @@ impl Patch {
         // including a late lexical replacement, is atomic.
         let mut candidate = package.clone();
         self.apply_to_candidate(&mut candidate)?;
-        *package = candidate;
-        Ok(true)
+        Ok(Commit::new(
+            candidate,
+            self.clone(),
+            litchi_core::edit::Diagnostics::CHANGED,
+        ))
     }
 
     pub(in crate::web) fn has_changes(&self) -> bool {
@@ -430,6 +438,12 @@ impl Patch {
         Ok(())
     }
 }
+
+/// A published Web Extensions graph change.
+pub type Commit = litchi_core::edit::Commit<OpcPackage, Patch>;
+
+/// Minimal content-free diagnostics for a Web Extensions commit.
+pub use litchi_core::edit::Diagnostics;
 
 #[derive(Clone)]
 pub(in crate::web::package) struct LexicalChange {

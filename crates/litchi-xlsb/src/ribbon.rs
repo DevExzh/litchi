@@ -103,8 +103,11 @@ impl Edit {
         // a signed workbook is refused here, before it is reached.
         crate::signature_policy::ensure_unsigned(self.staged.opc())?;
         self.staged.update(|candidate| {
-            common_ribbon::put(candidate, version, xml, &common_ribbon::Limits::standard())?;
-            Ok(true)
+            let commit =
+                common_ribbon::put(candidate, version, xml, &common_ribbon::Limits::standard())?;
+            let changed = commit.diagnostics().changed();
+            *candidate = commit.into_package();
+            Ok(changed)
         })
     }
 
@@ -121,8 +124,12 @@ impl Edit {
             return Ok(false);
         }
         crate::signature_policy::ensure_unsigned(self.staged.opc())?;
-        self.staged
-            .update(|candidate| Ok(common_ribbon::remove(candidate, family)?))
+        self.staged.update(|candidate| {
+            let commit = common_ribbon::remove(candidate, family)?;
+            let changed = commit.diagnostics().changed();
+            *candidate = commit.into_package();
+            Ok(changed)
+        })
     }
 
     /// Discard every staged change.

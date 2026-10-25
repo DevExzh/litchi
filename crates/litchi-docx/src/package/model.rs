@@ -857,7 +857,8 @@ impl Package {
                 crate::signature_policy::ensure_unsigned(&self.opc)?;
             }
         }
-        ribbon::put(&mut self.opc, version, xml, &ribbon::Limits::standard())?;
+        let commit = ribbon::put(&self.opc, version, xml, &ribbon::Limits::standard())?;
+        self.opc = commit.into_package();
         Ok(self)
     }
 
@@ -881,7 +882,10 @@ impl Package {
         {
             crate::signature_policy::ensure_unsigned(&self.opc)?;
         }
-        Ok(ribbon::remove(&mut self.opc, family)?)
+        let commit = ribbon::remove(&self.opc, family)?;
+        let changed = commit.diagnostics().changed();
+        self.opc = commit.into_package();
+        Ok(changed)
     }
 
     /// Read typed font metadata and inert embedded-font resources.

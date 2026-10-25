@@ -28,13 +28,10 @@ fn package_graph_discovers_local_task_panes_without_activation() {
 #[test]
 fn package_authoring_and_removal_round_trip_inert_task_panes() {
     let mut package = OpcPackage::new();
-    web::put(
-        &mut package,
-        authored_task_panes(),
-        Conformance::Transitional,
-        &web::Limits::standard(),
-    )
-    .unwrap();
+    let mut edit = web::Edit::new(&package).unwrap();
+    edit.put(authored_task_panes(), Conformance::Transitional)
+        .unwrap();
+    package = edit.commit().unwrap().into_package();
     assert_task_pane(
         web::load(&package, &web::Limits::standard())
             .unwrap()
@@ -48,7 +45,9 @@ fn package_authoring_and_removal_round_trip_inert_task_panes() {
             .unwrap()
             .unwrap(),
     );
-    assert!(web::remove(&mut reopened, &web::Limits::standard()).unwrap());
+    let mut edit = web::Edit::new(&reopened).unwrap();
+    assert!(edit.remove().unwrap());
+    reopened = edit.commit().unwrap().into_package();
     assert!(
         web::load(&reopened, &web::Limits::standard())
             .unwrap()
@@ -199,13 +198,9 @@ fn public_web_facade_updates_and_round_trips_crud() {
     assert!(panes.get(1usize).is_none());
 
     let mut package = OpcPackage::new();
-    web::put(
-        &mut package,
-        panes,
-        Conformance::Transitional,
-        &web::Limits::standard(),
-    )
-    .unwrap();
+    let mut edit = web::Edit::new(&package).unwrap();
+    edit.put(panes, Conformance::Transitional).unwrap();
+    package = edit.commit().unwrap().into_package();
     let bytes = PackageWriter::to_bytes(&package).unwrap();
     let package = OpcPackage::from_bytes(&bytes, litchi_opc::SourceLimits::default()).unwrap();
     let panes = web::load(&package, &web::Limits::standard())

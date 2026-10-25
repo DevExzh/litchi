@@ -13,31 +13,11 @@ use super::durable::{WebIntent, bind_intent, custom_edit_for_graph};
 use super::{
     PackageGraphIndex, Patch, PatchPlan, PlannedGraph, PlannedPart, PlannedRelationship,
     RelationshipState, add_or_match_planned_part, existing_web_extension_graph, fold_part_name,
-    folded_name_conflicts, graph_matches_plan, has_task_panes_relationship,
+    folded_name_conflicts, graph_matches_plan, has_task_panes_relationship, load,
     next_package_relationship_id, next_task_panes_part_name, next_web_extension_part_name,
     planned_deletions, preflight_planned_parts, validate_plan_counts,
 };
 use crate::web::LimitKind;
-/// Create or replace the package-level persisted task-pane graph under
-/// `limits` ([`Limits::standard`] for the safe defaults).
-///
-/// Add-in references, bindings, properties, and snapshot resources are stored
-/// as inert data. External snapshot links are never contacted.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn put(
-    package: &mut OpcPackage,
-    task_panes: Panes,
-    conformance: Conformance,
-    limits: &Limits,
-) -> Result<()> {
-    plan_put(package, task_panes, conformance, limits)?
-        .apply(package)
-        .map(|_| ())
-}
-
 /// Plan an exact, source-checked replacement of the persisted task-pane graph
 /// under `limits`.
 ///
@@ -613,16 +593,110 @@ fn inspect_relationship_attributes(node: &Node, expected: &str, opposite_seen: &
     }
 }
 
-/// Remove the package-level task-pane relationship and graph under the
-/// package graph and deletion ceilings of `limits`.
+/// A staged Web Extensions edit over one OPC package.
 ///
-/// Parts still referenced elsewhere remain in the package.
-/// # Errors
-///
-/// Returns an error when input violates OOXML constraints, exceeds a configured
-/// bound, or an underlying XML or package operation fails.
-pub fn remove(package: &mut OpcPackage, limits: &Limits) -> Result<bool> {
-    plan_remove(package, limits)?.apply(package)
+/// The source package is shared and never changed. Each operation publishes
+/// into the private working graph; `commit` creates one source-checked patch
+/// from the original package to the final graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EditOptions {
+    /// Resource ceilings used by Web Extensions reads and publication.
+    pub limits: Limits,
+}
+
+impl Default for EditOptions {
+    fn default() -> Self {
+        Self {
+            limits: Limits::standard(),
+        }
+    }
+}
+
+/// A staged Web Extensions edit over one OPC package.
+#[derive(Clone)]
+pub struct Edit {
+    source: OpcPackage,
+    working: OpcPackage,
+    limits: Limits,
+    conformance: Option<Conformance>,
+}
+
+impl std::fmt::Debug for Edit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("limits", &self.limits)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Edit {
+    /// Start an edit over `package` using the standard graph limits.
+    pub fn new(package: &OpcPackage) -> Result<Self> {
+        Self::new_with_options(package, EditOptions::default())
+    }
+
+    /// Start an edit with caller-selected graph limits.
+    pub fn new_with_options(package: &OpcPackage, options: EditOptions) -> Result<Self> {
+        Ok(Self {
+            source: package.clone(),
+            working: package.clone(),
+            limits: options.limits,
+            conformance: None,
+        })
+    }
+
+    /// Replace the complete task-pane graph.
+    pub fn put(&mut self, panes: Panes, conformance: Conformance) -> Result<bool> {
+        let patch = plan_put(&self.working, panes, conformance, &self.limits)?;
+        let commit = patch.apply(&self.working)?;
+        let changed = commit.diagnostics().changed();
+        self.working = commit.into_package();
+        self.conformance = Some(conformance);
+        Ok(changed)
+    }
+
+    /// Remove the complete task-pane graph.
+    pub fn remove(&mut self) -> Result<bool> {
+        let patch = plan_remove(&self.working, &self.limits)?;
+        let commit = patch.apply(&self.working)?;
+        let changed = commit.diagnostics().changed();
+        self.working = commit.into_package();
+        Ok(changed)
+    }
+
+    /// Discard all staged operations.
+    pub fn reset(&mut self) {
+        self.working = self.source.clone();
+        self.conformance = None;
+    }
+
+    /// Publish the final graph as a shared commit triad.
+    pub fn commit(self) -> Result<super::Commit> {
+        let before = load(&self.source, &self.limits)?;
+        let after = load(&self.working, &self.limits)?;
+        if before == after {
+            let mut budget = OperationBudget::default();
+            let index = PackageGraphIndex::build(&self.source, &self.limits, &mut budget)?;
+            if let Some(graph) =
+                existing_web_extension_graph(&self.source, &self.limits, &index, &mut budget)?
+            {
+                return source_bound_noop_patch(&self.source, &graph, &self.limits)?
+                    .apply(&self.source);
+            }
+            return empty_source_bound_noop_patch(&self.source, &self.limits)?.apply(&self.source);
+        }
+        let patch = match after {
+            Some(panes) => plan_put(
+                &self.source,
+                panes,
+                self.conformance.unwrap_or(Conformance::Transitional),
+                &self.limits,
+            )?,
+            None => plan_remove(&self.source, &self.limits)?,
+        };
+        patch.apply(&self.source)
+    }
 }
 
 /// Plan removal of the package-level task-pane relationship and owned graph

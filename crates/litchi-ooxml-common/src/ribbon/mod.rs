@@ -16,4 +16,4 @@ mod tests;
 
 pub use limit::LimitKind;
 pub use model::{Family, Limits, Set, Ui, Version};
-pub use package::{load, put, remove};
+pub use package::{Commit, Diagnostics, Edit, EditOptions, Patch, load, put, remove};

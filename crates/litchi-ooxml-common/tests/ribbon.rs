@@ -8,13 +8,14 @@ const CUSTOM_UI2_XML: &[u8] = include_bytes!("../../../test-data/ooxml/ribbonx/c
 #[test]
 fn stores_borrows_and_roundtrips_local_ribbon_xml() {
     let mut package = OpcPackage::new();
-    ribbon::put(
-        &mut package,
+    package = ribbon::put(
+        &package,
         Version::V2007,
         OFFICE_2007_XML.to_vec(),
         &ribbon::Limits::standard(),
     )
-    .unwrap();
+    .unwrap()
+    .into_package();
 
     let ribbons = ribbon::load(&package, &ribbon::Limits::standard()).unwrap();
     let stored = ribbons.effective().unwrap();
@@ -38,13 +39,14 @@ fn stores_borrows_and_roundtrips_local_ribbon_xml() {
 #[test]
 fn updates_the_modern_family_in_place() {
     let mut package = OpcPackage::new();
-    ribbon::put(
-        &mut package,
+    package = ribbon::put(
+        &package,
         Version::Ui2,
         CUSTOM_UI2_XML.to_vec(),
         &ribbon::Limits::standard(),
     )
-    .unwrap();
+    .unwrap()
+    .into_package();
     let first_part = ribbon::load(&package, &ribbon::Limits::standard())
         .unwrap()
         .modern()
@@ -52,13 +54,14 @@ fn updates_the_modern_family_in_place() {
         .part()
         .clone();
 
-    ribbon::put(
-        &mut package,
+    package = ribbon::put(
+        &package,
         Version::V2010,
         OFFICE_2010_XML.to_vec(),
         &ribbon::Limits::standard(),
     )
-    .unwrap();
+    .unwrap()
+    .into_package();
 
     let updated = ribbon::load(&package, &ribbon::Limits::standard()).unwrap();
     let updated = updated.modern().unwrap();
@@ -74,26 +77,59 @@ fn updates_the_modern_family_in_place() {
 #[test]
 fn keeps_fixed_family_slots_with_modern_precedence() {
     let mut package = OpcPackage::new();
-    ribbon::put(
-        &mut package,
+    package = ribbon::put(
+        &package,
         Version::V2007,
         OFFICE_2007_XML.to_vec(),
         &ribbon::Limits::standard(),
     )
-    .unwrap();
-    ribbon::put(
-        &mut package,
+    .unwrap()
+    .into_package();
+    package = ribbon::put(
+        &package,
         Version::V2010,
         OFFICE_2010_XML.to_vec(),
         &ribbon::Limits::standard(),
     )
-    .unwrap();
+    .unwrap()
+    .into_package();
 
     let ribbons = ribbon::load(&package, &ribbon::Limits::standard()).unwrap();
     assert_eq!(ribbons.legacy().unwrap().version(), Version::V2007);
     assert_eq!(ribbons.modern().unwrap().version(), Version::V2010);
     assert_eq!(ribbons.effective(), ribbons.modern());
     assert_eq!(ribbons.iter().count(), 2);
+}
+
+#[test]
+fn staged_edit_publishes_both_families_and_replays_without_mutating_source() {
+    let source = OpcPackage::new();
+    let mut edit = ribbon::Edit::new(&source).unwrap();
+    assert!(edit.put(Version::V2007, OFFICE_2007_XML.to_vec(),).unwrap());
+    assert!(edit.put(Version::V2010, OFFICE_2010_XML.to_vec(),).unwrap());
+
+    let commit = edit.commit().unwrap();
+    assert!(
+        ribbon::load(&source, &ribbon::Limits::standard())
+            .unwrap()
+            .iter()
+            .next()
+            .is_none()
+    );
+    let published = commit.package().clone();
+    let replayed = commit.patch().apply(&source).unwrap();
+    assert_eq!(
+        ribbon::load(&published, &ribbon::Limits::standard()).unwrap(),
+        ribbon::load(replayed.package(), &ribbon::Limits::standard()).unwrap()
+    );
+    let restored = commit.patch().inverse().apply(&published).unwrap();
+    assert!(
+        ribbon::load(restored.package(), &ribbon::Limits::standard())
+            .unwrap()
+            .iter()
+            .next()
+            .is_none()
+    );
 }
 
 #[test]

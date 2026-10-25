@@ -164,13 +164,13 @@ impl Patch {
 }
 
 /// Apply one durable Web Extensions transaction under the caller's graph
-/// limits. The caller owns the package mutation; every failure leaves it
-/// unchanged.
+/// limits. The source package is unchanged; the returned commit owns the
+/// published package and every failure leaves the source untouched.
 pub fn apply_durable<Mode>(
-    package: &mut OpcPackage,
+    package: &OpcPackage,
     patch: &CorePatch<Mode>,
     limits: &Limits,
-) -> Result<bool> {
+) -> Result<super::Commit> {
     let planned = plan_durable(package, patch, limits)?;
     planned.apply(package)
 }
