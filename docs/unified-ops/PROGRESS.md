@@ -5574,3 +5574,13 @@ See [0063](0063-source-pptx-modern-comments.md).
   four retired worktrees removed, twelve blobs restored, branches retained,
   7,692,996,608 bytes recovered; cleanup68–71 totals 60,657,246,208 bytes.
   The live-holder 89at tree and all external captures/targets remain intact.
+
+
+  Subsequent PPTX minimal all-target compilation passes; strict Clippy finds
+  one redundant test-helper conversion. Reviewed one-line 89ba is fast-forwarded
+  at `afede08087`, with fresh qualification prepared. OOXML's new publication
+  code needs two imports; reviewed import-only 94v is fast-forwarded at
+  `f167986c74` and its fresh compiler packet is active. Both failed captures
+  are root-verified and retained. Baseline `6cb65f6358` now includes the
+  previously missing vendored release inputs with unchanged production and
+  identical harness. No runtime or performance exception is accepted.

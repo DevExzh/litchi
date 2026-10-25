@@ -98,3 +98,51 @@ Evidence directory:
 
 The receipt accurately distinguishes concurrent root/integration documentation
 advances from the frozen production candidates. Final acceptance remains open.
+
+
+## Further compiler closure
+
+PPTX `2ac6bca410` passes all-target minimal compilation (63.962 seconds),
+then strict all-feature Clippy reports one redundant `as_ref()` in a test-only
+namespace helper (85.309 seconds). Root verifies the complete failed capture
+before independently reviewing and fast-forwarding the single-line correction
+`afede08087cc9039a5d3a43233c8420c09c90e83` (89ba). Formatting passes. The
+candidate tree is `6fccce20e955b9800dddb83db68a90ee56ef2af9`; its fresh
+compiler and runtime/glossary packets are prepared, with no result yet.
+
+OOXML `b73ee18a69` passes formatting (2.255 seconds), then leaf Clippy stops
+on fifteen missing-type errors (44.066 seconds). Two missing imports cause
+all of them: `BlobPart` and `SourceLimitKind`. Root verifies the failed capture,
+independently reviews the import-only repair and fast-forwards
+`f167986c745fdd6c305f8095e311980aee24d799` (94v), tree
+`d5405d079e7af24897fffc48fb0d04c9805187c6`. Formatting passes. A fresh four-row
+compiler packet is active after root command/tool/source/lock/hydration and
+empty-target/global-process preflight. The 38 runtime and 13 glossary profiles
+remain separately prepared and unrun.
+
+| Capture artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `pptx-combined-0362ul89-f5-consumer-2ac6bca410/rows.json` | 36,497 | `67fdcd0ca5321882d71580ef95a8623d283e86d6e770a9521373876bc55e02ea` |
+| Same packet `result.json` | 38,424 | `590955d9014a89d39e7de1501d5875dac470cffa01613214db9061dcda01576e` |
+| `ooxml-combined-0362ul94-f5-final-b73ee18a/rows.json` | 12,754 | `78d87a03eb0857e7a9083063d9878a93602a9c5120b31f8851b51f0355cdfa63` |
+| Same packet `result.json` | 13,874 | `a2086da6604d6f0d0c9ba623c308a9a5f91592560bc06e39d429c3476b7e2e91` |
+
+All capture paths above are relative to the external `.coord/` directory.
+Unrun rows remain open. No source behavior, limit, API or test assertion is
+relaxed by either compiler repair.
+
+The baseline preparation initially omitted root path-patched vendor inputs.
+Root detects that gap before any build; the owner restores all 205 tracked
+vendor files and six native-resave inputs and corrects the provenance record.
+Baseline tip `6cb65f6358d5105561ee084ec6f89ad3d9daf481` retains the original
+production tree. Root verifies eight identical harness blobs against `afede`,
+unchanged production/config/vendor/fixtures against 763, present path-patched
+manifests and all three exact role locks. The static owner audit reports 64
+reachable path packages with no missing release dependencies. No measurement
+has run.
+
+A read-only integration audit identifies one production conflict in PPTX
+metadata replay: composition must retain both OOXML's `Commit` extraction
+and PPTX's fallible byte accounting. Root will resolve it during actual
+integration. Coordinator progress is a separate documentation conflict.
+Both proposals still require runtime, fidelity and performance acceptance.
