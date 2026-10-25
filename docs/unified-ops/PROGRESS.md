@@ -5493,3 +5493,18 @@ See [0063](0063-source-pptx-modern-comments.md).
   22,698,254,336 bytes, or 37,831,081,984 bytes across cleanup68/69. The
   separate notes-memo performance harness proposal is under source review.
   Runtime, performance and final acceptance remain open; nothing is pushed.
+
+- Coordinator golden and runtime qualification checkpoint (2026-10-25):
+  PPTX `e10039df1c` passes formatting, minimal all-target compilation, strict
+  Clippy and actual golden generation. Independent review confirms all 192
+  row keys and all 140 digests are unchanged; exactly 18 typed limit records
+  change. Root commits the reviewed artifact privately at `ef9470f7da` (89ap).
+  Its full/minimal runtime and glossary packet is active after root preflight.
+
+  OOXML `305a7c0ee6` passes common/OPC Clippy, then reviewed 94n/94na fix two
+  XLSX findings and restore repository formatting. The actual `11c3f2fc8c`
+  run reaches one XLSB exhaustive-match lint. Its complete failed receipt is
+  root-verified; reviewed 94o is fast-forwarded privately. Unrun rows
+  remain open. Performance harness review and cleanup70 audit continue.
+  Record 0362ul99 retains the evidence. Final gates, census/dispositions,
+  corpus/native and ABBA remain open; only audit22 is deferred. Nothing is pushed.
