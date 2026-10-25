@@ -4,8 +4,11 @@
 //! only validates and mutates the OPC relationship graph shared by DOCX,
 //! PPTX, XLSX, and XLSB hosts.
 
+/// The VBA family uses the shared OOXML error contract.
+pub use crate::Error;
+
+use crate::Result;
 use crate::signature::{refuse_signed_change, settle_unsigned_change};
-use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
 use litchi_opc::{

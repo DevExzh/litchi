@@ -2506,7 +2506,7 @@ impl OpcPackage {
     ///
     /// This is for format-owned opaque XML whose semantics have already been
     /// validated by the format codec. It performs the ordinary bounded XML
-    /// publication audit, but does not issue an [`OwnedXmlPart`] source-splice
+    /// publication audit, but does not issue a [`crate::OwnedXmlPart`] source-splice
     /// token: source-splice tokens require literal namespace declarations so
     /// expanded-name edits cannot be ambiguous, while a whole-part authored
     /// replacement preserves the caller's namespace spelling byte-for-byte.
