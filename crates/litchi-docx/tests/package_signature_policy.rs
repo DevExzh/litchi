@@ -10,8 +10,11 @@
 //!
 //! Each family is checked three ways: a change to a signed document is
 //! refused with `OpcError::SignedSourceRequiresExplicitPolicy` and leaves the
-//! document as it was (it still publishes its signed source byte for byte);
-//! an exact no-op keeps the signature byte for byte; and after the explicit
+//! document as it was (it still publishes its signed source byte for byte).
+//! The Ribbon adapter exposes the shared signed fence as the DOCX-level
+//! `Error::Signed`, so its assertion is kept separate from the OPC-backed
+//! families below. In either case an exact no-op keeps the signature byte for
+//! byte, and after the explicit
 //! removal (`Package::unsign` or `OpcPackage::unsign`) the same change
 //! publishes a document without signature parts. Changes to the
 //! producer-signed fixtures are stores; removals run against a document that
@@ -160,6 +163,14 @@ fn assert_signed<T>(result: litchi_docx::Result<T>) {
         ),
         "{error:?}"
     );
+}
+
+#[track_caller]
+fn assert_ribbon_signed<T>(result: litchi_docx::Result<T>) {
+    let Err(error) = result else {
+        panic!("a Ribbon change to a signed document must be refused");
+    };
+    assert!(matches!(error, Error::Signed), "{error:?}");
 }
 
 mod web_settings {
@@ -554,7 +565,7 @@ mod ribbon_family {
                 package = edit.commit().unwrap().into_package();
                 value
             });
-            assert_signed({
+            assert_ribbon_signed({
                 let mut edit = package.edit_ribbon();
                 edit.put(Version::V2007, UI_2007.to_vec())
                     .map(|_| ())
@@ -596,13 +607,13 @@ mod ribbon_family {
             value
         });
         assert_eq!(bytes(&mut package), signed, "exact no-ops");
-        assert_signed({
+        assert_ribbon_signed({
             let mut edit = package.edit_ribbon();
             edit.put(Version::V2007, UI_2007_CHANGED.to_vec())
                 .map(|_| ())
                 .and_then(|()| edit.commit().map(|_| ()))
         });
-        assert_signed({
+        assert_ribbon_signed({
             let mut edit = package.edit_ribbon();
             edit.remove(Family::Legacy)
                 .map(|_| ())
