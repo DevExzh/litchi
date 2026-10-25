@@ -5950,3 +5950,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   are accounted for: three unified controls, main/office and 68 independent
   office refs. Required detached baselines remain. Final binding, qualification
   and trunk integration are open; nothing is pushed.
+
+  Final candidate C=f8cd398a77 is frozen after the coordinator documentation
+  merge and matrix refresh (145a/146). Its three locks and all 84 profiles
+  remain unchanged. The reviewed raw-census v9 packet is bound to C and
+  launched; the first two rustc identity steps pass. Capture, callable review
+  and strict finalization remain open. Full65 qualification awaits its
+  corrected executable driver. A separate sparse protocol worktree holds
+  further native qualification fixes while C stays immutable. No acceptance
+  or performance result is inferred; nothing is pushed.
