@@ -330,47 +330,228 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
     })
 }
 
-/// Validate every typed presence extension in one changed author part under
-/// the recipient's selected policy. The ordinary comment codec accepts the
-/// extension list as opaque; replay must additionally run the typed locator so
-/// string and MCE ceilings apply to the changed collaboration payload.
-pub(crate) fn validate_presence_replay(source: &[u8], limits: Limits) -> Result<()> {
-    let authors = crate::comments::parse_comment_authors(source, limits)?;
-    if !source
-        .windows(PRESENCE_EXTENSION_URI.len())
-        .any(|window| window == PRESENCE_EXTENSION_URI.as_bytes())
-    {
+/// Validate the active typed collaboration extensions in one changed part
+/// under the recipient's selected policy. The ordinary comment codec accepts
+/// extension lists as opaque; replay must additionally apply the typed
+/// payload grammar. One source scan and one MCE selection are shared by all
+/// owners, so a large multi-owner part remains linear rather than invoking
+/// [`locate`] once per author or comment.
+fn validate_replay_extensions(source: &[u8], kind: Kind, limits: Limits) -> Result<()> {
+    if source.len() > limits.max_input_bytes {
+        return Err(limit(
+            "legacy comment collaboration XML bytes",
+            limits.max_input_bytes,
+        ));
+    }
+    let scan = scan_raw(source, limits)?;
+    let root_index = scan
+        .root
+        .ok_or_else(|| invalid("legacy comment collaboration root is missing"))?;
+    let root = &scan.nodes[root_index];
+    let expected_root = match kind {
+        Kind::Presence => b"cmAuthorLst".as_slice(),
+        Kind::Threading => b"cmLst".as_slice(),
+    };
+    if !pml_namespace(&root.namespace) || root.local.as_slice() != expected_root {
+        return Err(invalid(
+            "legacy comment collaboration owner has the wrong root",
+        ));
+    }
+
+    let capabilities = capabilities();
+    let mce_limits = mce_limits(limits);
+    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
+    let processed = process_markup_compatibility(mce_source.bytes(), &capabilities, &mce_limits)
+        .map_err(Error::MarkupCompatibility)?
+        .xml;
+    if processed.len() > limits.max_input_bytes {
+        return Err(limit(
+            "MCE-expanded legacy comment collaboration XML bytes",
+            limits.max_input_bytes,
+        ));
+    }
+    match kind {
+        Kind::Presence => {
+            let _ = crate::comments::parse_comment_authors(&processed, limits)?;
+        },
+        Kind::Threading => {
+            let _ = crate::comments::parse_slide_comments(&processed, limits)?;
+        },
+    }
+
+    let mut candidate_items = Vec::new();
+    let mut candidate_set = HashSet::new();
+    for (target_index, _target) in scan.nodes.iter().enumerate() {
+        if let Some(item_index) = target_extension_owner(&scan, target_index, kind) {
+            candidate_set
+                .try_reserve(1)
+                .map_err(|source| Error::Allocation {
+                    resource: "legacy comment collaboration replay owner set",
+                    source,
+                })?;
+            if candidate_set.insert(item_index) {
+                candidate_items
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation {
+                        resource: "legacy comment collaboration replay owners",
+                        source,
+                    })?;
+                candidate_items.push(item_index);
+            }
+        }
+    }
+    if candidate_items.is_empty() {
         return Ok(());
     }
-    for author in authors {
-        locate(source, Kind::Presence, Owner::Author(author.id), limits)?;
+    let offsets = collect_offsets(&scan, &candidate_items);
+    let translated_offsets = mce_source.translate_offsets(&offsets)?;
+    let active_offsets = active_offsets(
+        mce_source.bytes(),
+        &translated_offsets,
+        &capabilities,
+        &OffsetLimits {
+            max_source_bytes: limits.max_input_bytes,
+            max_offsets: limits.max_nodes,
+            max_marked_bytes: limits.max_input_bytes,
+            processing: mce_limits,
+        },
+    )
+    .map_err(Error::MarkupCompatibility)?;
+    let mut active = HashSet::new();
+    active
+        .try_reserve(active_offsets.len())
+        .map_err(|source| Error::Allocation {
+            resource: "legacy comment collaboration replay active offsets",
+            source,
+        })?;
+    active.extend(active_offsets);
+
+    let mut owners = HashSet::new();
+    owners
+        .try_reserve(candidate_items.len())
+        .map_err(|source| Error::Allocation {
+            resource: "legacy comment collaboration replay active owners",
+            source,
+        })?;
+    for (target_index, target) in scan.nodes.iter().enumerate() {
+        let Some(item_index) = target_extension_owner(&scan, target_index, kind) else {
+            continue;
+        };
+        if !is_active(&target.span, &active) || !is_active(&scan.nodes[item_index].span, &active) {
+            continue;
+        }
+        if !owners.insert(item_index) {
+            return Err(invalid(
+                "legacy comment collaboration owner has duplicate typed extensions",
+            ));
+        }
+        validate_active_extension(&scan, item_index, target_index, kind, &active, limits)?;
     }
     Ok(())
 }
 
-/// Validate every typed threading extension in one changed comment part under
-/// the recipient's selected policy. This retains the generic comment grammar
-/// check while applying the collaboration locator to recognized p15 payloads.
+fn validate_active_extension(
+    scan: &Scan,
+    item_index: usize,
+    target_index: usize,
+    kind: Kind,
+    active: &HashSet<u32>,
+    limits: Limits,
+) -> Result<()> {
+    let target_ext_list = nearest_non_mce_parent(scan, target_index)
+        .ok_or_else(|| invalid("legacy comment collaboration extension list is missing"))?;
+    let mut ext_list_count = 0usize;
+    let mut target_in_active_ext_list = false;
+    for index in direct_non_mce_children(scan, item_index) {
+        let node = &scan.nodes[index];
+        if !is_active(&node.span, active)
+            || !pml_namespace(&node.namespace)
+            || node.local.as_slice() != b"extLst"
+        {
+            continue;
+        }
+        ext_list_count += 1;
+        target_in_active_ext_list |= index == target_ext_list;
+    }
+    if ext_list_count > 1 {
+        return Err(invalid(
+            "legacy comment collaboration owner has duplicate extLst",
+        ));
+    }
+    if !target_in_active_ext_list {
+        return Err(invalid(
+            "legacy comment collaboration extension list is inactive",
+        ));
+    }
+
+    let mut payload_index = None;
+    for index in direct_non_mce_children(scan, target_index) {
+        let node = &scan.nodes[index];
+        if !is_active(&node.span, active) {
+            continue;
+        }
+        if !payload_name(node, kind) {
+            return Err(invalid(
+                "recognized legacy comment extension contains an unexpected child",
+            ));
+        }
+        if payload_index.replace(index).is_some() {
+            return Err(invalid(
+                "recognized legacy comment extension requires exactly one typed payload",
+            ));
+        }
+    }
+    let payload_index = payload_index.ok_or_else(|| {
+        invalid("recognized legacy comment extension requires exactly one typed payload")
+    })?;
+    let payload = &scan.nodes[payload_index];
+    match kind {
+        Kind::Presence => {
+            if direct_non_mce_children(scan, payload_index)
+                .any(|index| is_active(&scan.nodes[index].span, active))
+            {
+                return Err(invalid("presenceInfo must not contain child elements"));
+            }
+            parse_presence(
+                payload,
+                payload_index,
+                scan,
+                active,
+                limits.max_string_bytes,
+            )
+            .map(drop)
+        },
+        Kind::Threading => {
+            let mut parent_index = None;
+            for index in direct_non_mce_children(scan, payload_index) {
+                let node = &scan.nodes[index];
+                if !is_active(&node.span, active) {
+                    continue;
+                }
+                if p15_namespace(&node.namespace) && node.local.as_slice() == b"parentCm" {
+                    if parent_index.replace(index).is_some() {
+                        return Err(invalid(
+                            "threadingInfo contains duplicate parentCm elements",
+                        ));
+                    }
+                } else {
+                    return Err(invalid("threadingInfo contains an unexpected child"));
+                }
+            }
+            parse_threading(payload, payload_index, parent_index, scan, active).map(drop)
+        },
+    }
+}
+
+/// Validate active presence extensions in one changed author part.
+pub(crate) fn validate_presence_replay(source: &[u8], limits: Limits) -> Result<()> {
+    validate_replay_extensions(source, Kind::Presence, limits)
+}
+
+/// Validate active threading extensions in one changed comment part.
 pub(crate) fn validate_threading_replay(source: &[u8], limits: Limits) -> Result<()> {
-    let comments = crate::comments::parse_slide_comments_strict(source, limits)?;
-    if !source
-        .windows(THREADING_EXTENSION_URI.len())
-        .any(|window| window == THREADING_EXTENSION_URI.as_bytes())
-    {
-        return Ok(());
-    }
-    for comment in comments {
-        locate(
-            source,
-            Kind::Threading,
-            Owner::Comment {
-                author_id: comment.author_id,
-                index: comment.index,
-            },
-            limits,
-        )?;
-    }
-    Ok(())
+    crate::comments::parse_slide_comments_strict(source, limits)?;
+    validate_replay_extensions(source, Kind::Threading, limits)
 }
 
 /// Source-splice a typed value. A `None` value removes every recognized

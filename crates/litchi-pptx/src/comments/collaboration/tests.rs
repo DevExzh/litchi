@@ -27,6 +27,34 @@ fn replay_presence_validator_applies_recipient_extension_limits() {
 }
 
 #[test]
+fn replay_presence_validator_accepts_partial_multi_author_extensions() {
+    let mut source = author_source();
+    let closing = b"</p:cmAuthorLst>";
+    let position = source
+        .windows(closing.len())
+        .position(|window| window == closing)
+        .unwrap();
+    source.splice(
+        position..position,
+        br#"<p:cmAuthor id="8" name="B" initials="B" lastIdx="0" clrIdx="0"/>"#
+            .iter()
+            .copied(),
+    );
+    assert!(super::validate_presence_replay(&source, crate::comments::Limits::DEFAULT,).is_ok());
+}
+
+#[test]
+fn replay_presence_validator_ignores_inactive_typed_uri_bytes() {
+    let source = format!(
+        r#"<p:cmAuthorLst xmlns:p="{PML}" xmlns:p15="{P15}" xmlns:mc="{MCE}"><p:cmAuthor id="7" name="A" initials="A" lastIdx="0" clrIdx="0"><p:extLst><mc:AlternateContent><mc:Choice Requires="p15"><p:ext uri="urn:other-extension"/></mc:Choice><mc:Fallback><p:ext uri="{uri}"><p15:presenceInfo userId="inactive-user" providerId="inactive-provider"><p15:unexpected/></p15:presenceInfo></p:ext></mc:Fallback></mc:AlternateContent></p:extLst></p:cmAuthor></p:cmAuthorLst>"#,
+        uri = super::PRESENCE_EXTENSION_URI,
+    );
+    let mut limits = crate::comments::Limits::DEFAULT;
+    limits.max_string_bytes = 1;
+    assert!(super::validate_presence_replay(source.as_bytes(), limits).is_ok());
+}
+
+#[test]
 fn replay_threading_validator_checks_typed_extension_children() {
     let source = String::from_utf8(comment_source())
         .unwrap()
