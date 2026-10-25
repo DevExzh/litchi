@@ -418,10 +418,7 @@ pub(crate) fn unsupported_field(metadata: &Metadata) -> Option<&'static str> {
 /// refusal.  The leaf refusal intentionally redacts the field from its fixed
 /// reason; only the facade boundary has the request context needed to name
 /// the shared field.  Existing property context, when any, always wins.
-pub(crate) fn with_unsupported_property(
-    mut error: Error,
-    property: Option<&'static str>,
-) -> Error {
+pub(crate) fn with_unsupported_property(mut error: Error, property: Option<&'static str>) -> Error {
     if error.code() == Code::UnsupportedProperty
         && error.property().is_none()
         && let Some(property) = property
