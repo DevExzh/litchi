@@ -1,16 +1,23 @@
+#[cfg(test)]
+use super::graph;
 use super::{
-    Core, Dialect, Keywords, MAX_PROPERTY_TEXT, MAX_XML_BYTES, MAX_XML_EVENTS, graph, keyword::Item,
+    Core, Dialect, Keywords, MAX_PROPERTY_TEXT, MAX_XML_BYTES, MAX_XML_EVENTS, keyword::Item,
 };
+#[cfg(test)]
 use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
+#[cfg(test)]
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+#[cfg(test)]
 use litchi_opc::part::BlobPart;
+#[cfg(test)]
 use litchi_opc::rel::TargetMode;
+#[cfg(test)]
 use litchi_opc::{OpcPackage, PackURI};
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const CANONICAL_PART: &str = "/docProps/core.xml";
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 const MAX_PART_CANDIDATES: u32 = 10_000;
 // Reserve enough reader events for the declaration, root, every other
 // property, and EOF. A nonempty structured keyword value costs Start, Text,
@@ -36,7 +43,7 @@ const CORE_CLOSE: &str = "</cp:coreProperties>";
 /// for a change to a signed package, and an error when input violates OOXML
 /// constraints, exceeds a configured bound, or an underlying XML or package
 /// operation fails.
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub(crate) fn write_core(package: &mut OpcPackage, props: Core) -> Result<bool> {
     let result = sync(package, &props);
     drop(props);
@@ -57,7 +64,7 @@ pub(crate) fn write_core(package: &mut OpcPackage, props: Core) -> Result<bool> 
 /// for a change to a signed package, and an error when input violates OOXML
 /// constraints, exceeds a configured bound, or an underlying XML or package
 /// operation fails.
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub(crate) fn clear(package: &mut OpcPackage) -> Result<bool> {
     let graph = graph::inspect(package)?;
     let Some(part_name) = graph.part else {
@@ -87,7 +94,7 @@ pub(crate) fn clear(package: &mut OpcPackage) -> Result<bool> {
     Ok(true)
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub(super) fn sync(package: &mut OpcPackage, props: &Core) -> Result<bool> {
     let graph = graph::inspect(package)?;
     match (graph.part, graph.dialect) {
@@ -142,7 +149,7 @@ pub(super) fn sync(package: &mut OpcPackage, props: &Core) -> Result<bool> {
     }
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 pub(super) fn encode(props: &Core, dialect: Dialect) -> Result<String> {
     let encoded_bytes = preflight(props, dialect)?;
     encode_preflighted(props, dialect, encoded_bytes)
@@ -206,7 +213,7 @@ pub(super) fn encode_preflighted(
     xml.finish()
 }
 
-/// Return the exact UTF-8 length produced by [`encode`] without allocating
+/// Return the exact UTF-8 length produced by [`encode_preflighted`] without allocating
 /// the XML string. Metadata admission uses this before retaining an after
 /// image of a core-properties part.
 pub(super) fn encoded_len(props: &Core, dialect: Dialect) -> Result<usize> {
@@ -579,7 +586,7 @@ fn is_xml_10_char(character: char) -> bool {
         || matches!(u32::from(character), 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
     for index in 1..=MAX_PART_CANDIDATES {
         let candidate = if index == 1 {
@@ -599,7 +606,7 @@ fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
     })
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
+#[cfg(test)]
 fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<String> {
     let mut index = 1u32;
     loop {

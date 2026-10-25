@@ -295,6 +295,7 @@ impl Core {
         self
     }
 
+    #[cfg(test)]
     pub(crate) fn xml(&self) -> Result<String> {
         write::encode(self, Dialect::Transitional)
     }
@@ -412,12 +413,14 @@ pub struct Slot {
 /// [`Stage::commit`] is the only way to clear the edit intent.
 #[doc(hidden)]
 #[must_use = "commit only after the staged package has been published, or drop to retry"]
+#[cfg(test)]
 pub struct Stage<'a> {
     slot: &'a mut Slot,
     changed: bool,
     staged: Option<Core>,
 }
 
+#[cfg(test)]
 impl Stage<'_> {
     /// Reports whether staging changed package bytes or graph state.
     #[must_use]
@@ -499,7 +502,7 @@ impl Slot {
     /// for a change to a signed package, and an error when input violates
     /// OOXML constraints, exceeds a configured bound, or an underlying XML or
     /// package operation fails.
-    #[cfg_attr(not(test), allow(dead_code))]
+    #[cfg(test)]
     pub(crate) fn flush(&mut self, package: &mut OpcPackage) -> Result<bool> {
         let staged = self.stage(package)?;
         let changed = staged.changed();
@@ -517,7 +520,7 @@ impl Slot {
     /// # Errors
     ///
     /// The errors of [`Self::flush`].
-    #[cfg_attr(not(test), allow(dead_code))]
+    #[cfg(test)]
     pub(crate) fn stage(&mut self, package: &mut OpcPackage) -> Result<Stage<'_>> {
         if !self.dirty {
             let staged = self.source.clone();
