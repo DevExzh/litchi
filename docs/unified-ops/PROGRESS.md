@@ -5451,3 +5451,31 @@ See [0063](0063-source-pptx-modern-comments.md).
   candidate to `491137abe2`. Its fresh eleven-row capture is running;
   formatting and common compilation report PASS, with terminal verification
   pending. Final acceptance obligations remain unchanged.
+
+- Coordinator notes admission, consumer repairs and cleanup (2026-10-25):
+  OOXML `491137abe2` passes format/common/OPC, then the actual leaf check
+  exposes three remaining consumer errors. Root verifies the terminal failed
+  capture. Independently reviewed 94k `5e89400413` repairs them and is
+  fast-forwarded privately; fresh isolated validation is active. The first
+  prepared packet's author-worktree binding is returned before GO.
+
+  PPTX 89aj passes source review for selected raw notes/master/theme aggregate
+  admission without additional reads or copies. 89aca follow-ups repair
+  selected physical policy, deferred root-only admission and exact proof
+  identity, with positive-control regression coverage. Runtime and cold/warm
+  performance acceptance remain pending; no exception is accepted.
+
+  Cleanup68 removes two retired PPTX worktrees without force, retaining
+  branches and all evidence. Root verifies full-chain restoration and an exact
+  formatter preimage; net recovery is 15,132,827,648 bytes. Holds are released
+  and the protected constructor probe is unchanged. Record 0362ul98 binds this
+  checkpoint. Final gates, census/dispositions, corpus/native and ABBA remain
+  open. Only audit22 is deferred. Nothing is pushed.
+
+  Subsequent verified result: OOXML 94k passes all six formatting/compiler
+  rows, including all four format crates, ops and facade. Strict Clippy then
+  stops on two OPC findings; 94l is repairing them. Root verifies every
+  completed receipt and terminal session. PPTX `3377583e2b` composes the
+  independently reviewed final notes-proof chain and aggregate repair (89al).
+  Fresh compiler/Clippy, actual golden generation/review and runtime/performance
+  qualification remain required.
