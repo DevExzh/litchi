@@ -9,7 +9,8 @@ This correction closes the replay-policy gap for the typed PPTX raw-property
 families. `apply_math_properties`, `apply_model3d`, and every presentation
 metadata `apply_*` family now use the shared recipient-aware replay hook.
 Before publication, the hook validates only changed payloads under the
-recipient package's retained `SourceLimits`: presentation-properties payloads
+recipient package's selected `SourceLimits` (including an explicit
+`OpenOptions::source_limits` on borrowed owning ingress): presentation-properties payloads
 are strict-parsed, changed model3d slide XML is loaded with the recipient's
 structural and payload profile while model and preview parts receive their
 selected byte bounds, and metadata owners use their detached/package-aware
@@ -18,7 +19,7 @@ without invoking a semantic scan.
 
 The read-only-recommendation owner edit already re-parses its candidate through
 `load_snapshot`, which derives the same presentation-properties policy from the
-recipient's retained source limits. Its public package replay now adds the
+recipient's selected source limits. Its public package replay now adds the
 same strict changed-payload admission to the shared part-patch path. View-
 properties is a raw projection with no patch family, so its required-limit
 parse and serialization paths remain unchanged. The new boundary tests cover a

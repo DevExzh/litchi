@@ -69,7 +69,7 @@ impl Edit<'_> {
     /// Returns an error for a malformed presentation-properties part, or a changed edit of a signed package.
     pub fn set(&mut self, value: Properties) -> Result<Option<Properties>> {
         let limits = crate::presentation_properties::Limits::from_source_limits(
-            self.staged.opc().source_read_limits().unwrap_or_default(),
+            self.staged.opc().read_limits(),
         );
         self.staged.update(move |opc| {
             crate::presentation_properties::put_math_to_package(opc, value, limits)
@@ -83,7 +83,7 @@ impl Edit<'_> {
     /// Returns an error for a malformed presentation-properties part, or a changed edit of a signed package.
     pub fn remove(&mut self) -> Result<Option<Properties>> {
         let limits = crate::presentation_properties::Limits::from_source_limits(
-            self.staged.opc().source_read_limits().unwrap_or_default(),
+            self.staged.opc().read_limits(),
         );
         self.staged.update(move |opc| {
             crate::presentation_properties::remove_math_from_package(opc, limits)

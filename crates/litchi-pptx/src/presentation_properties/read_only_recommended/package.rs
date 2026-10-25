@@ -29,7 +29,7 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
         return Ok(None);
     };
     let part = package.get_part(&uri)?;
-    let limits = Limits::from_source_limits(package.source_read_limits().unwrap_or_default());
+    let limits = Limits::from_source_limits(package.read_limits());
     Snapshot::from_part(uri.to_string(), part.blob_arc(), limits).map(Some)
 }
 
