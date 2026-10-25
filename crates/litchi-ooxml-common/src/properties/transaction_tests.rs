@@ -90,6 +90,48 @@ fn core_only_staging_preserves_application_properties() {
 }
 
 #[test]
+fn repaired_core_content_is_refused_only_when_core_is_rewritten() {
+    let mut package = full();
+    let mut dirty = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap()).unwrap();
+    let closing = dirty.find("</cp:coreProperties>").unwrap();
+    dirty.insert_str(closing, "<cp:opaque>preserve me</cp:opaque>");
+    let dirty = dirty.into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(dirty.clone());
+
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    assert!(!snapshot.core_tolerance_report().is_clean());
+
+    let mut core_edit = Edit::new(&package, Host::Word).unwrap();
+    core_edit
+        .update_metadata(|metadata| metadata.title = Some("rewritten".to_owned()))
+        .unwrap();
+    assert!(matches!(
+        core_edit.commit(),
+        Err(Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+    ));
+
+    let mut app_edit = Edit::new(&package, Host::Word).unwrap();
+    app_edit
+        .update_metadata(|metadata| metadata.company = Some("New".to_owned()))
+        .unwrap();
+    let after = app_edit.commit().unwrap().into_package();
+    assert_eq!(bytes(&after, "/docProps/core.xml").unwrap(), dirty);
+    assert_eq!(
+        Snapshot::read(&after, Host::Word)
+            .unwrap()
+            .metadata()
+            .unwrap()
+            .company
+            .as_deref(),
+        Some("New")
+    );
+}
+
+#[test]
 fn core_only_staging_refuses_application_fields_as_properties() {
     let package = full();
     let mut edit = Edit::new(&package, Host::Word).unwrap();
@@ -888,6 +930,18 @@ fn malformed_source_property_xml_is_package_corruption() {
         .set_blob(b"<Properties>".to_vec());
     let snapshot = Snapshot::read(&package, Host::Word).unwrap();
     assert!(matches!(snapshot.metadata(), Err(Error::Package(_))));
+}
+
+#[test]
+fn authored_application_xml_text_remains_an_invalid_value() {
+    let package = full();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.update_metadata(|metadata| metadata.company = Some("bad\0value".to_owned()))
+        .unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Invalid(message)) if message.contains("XML 1.0-forbidden character")
+    ));
 }
 
 #[test]

@@ -106,6 +106,19 @@ pub(crate) fn plan_splice(xml: &[u8], target: &Props) -> Result<Option<SplicePla
     Ok(Some(SplicePlan { layout, output_len }))
 }
 
+/// Validate the authored scalar values before a retained source is scanned.
+/// Keeping this pass separate lets the transaction distinguish an invalid
+/// requested value from an invalid source part, even when both codecs use the
+/// same structural error type.
+pub(crate) fn validate_target(target: &Props) -> Result<()> {
+    for field in Field::ALL {
+        if let Some(value) = field.get(target) {
+            lexical_len(field, value)?;
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn splice_planned(xml: &[u8], target: &Props, plan: SplicePlan) -> Result<Vec<u8>> {
     let SplicePlan { layout, output_len } = plan;
     let prefix = qualified_prefix(&layout.root_name);

@@ -826,9 +826,7 @@ fn metadata_noop_commit_rechecks_stale_source() {
 
     assert!(matches!(
         edit.commit(),
-        Err(MetadataError::Package(OoxmlError::Opc(
-            OpcError::SourceChanged { .. }
-        )))
+        Err(MetadataError::SourceChanged { .. })
     ));
 }
 
@@ -866,9 +864,7 @@ fn metadata_revised_noop_replay_rechecks_stale_source() {
 
     assert!(matches!(
         revised.apply_metadata(no_op.patch()),
-        Err(MetadataError::Package(OoxmlError::Opc(
-            OpcError::SourceChanged { .. }
-        )))
+        Err(MetadataError::SourceChanged { .. })
     ));
 }
 
@@ -912,9 +908,7 @@ fn metadata_revised_undo_rechecks_stale_source() {
 
     assert!(matches!(
         undo.commit(),
-        Err(MetadataError::Package(OoxmlError::Opc(
-            OpcError::SourceChanged { .. }
-        )))
+        Err(MetadataError::SourceChanged { .. })
     ));
 }
 

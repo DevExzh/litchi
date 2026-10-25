@@ -31,7 +31,7 @@ mod tests;
 pub(crate) use codec::splice;
 pub(crate) use codec::{
     SplicePlan, decode, encode_new, encode_new_len, encode_new_preflighted, plan_splice,
-    splice_planned,
+    splice_planned, validate_target,
 };
 pub(crate) use package::{inspect, inspect_source};
 pub use package::{read, read_source_backed};

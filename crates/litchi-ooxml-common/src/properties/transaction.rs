@@ -272,6 +272,70 @@ fn source_local_error(error: Error) -> Error {
     }
 }
 
+fn is_xml_lexical_error(message: &str) -> bool {
+    message.contains("XML 1.0-forbidden character")
+}
+
+fn app_plan_error(error: crate::Error) -> Error {
+    match error {
+        crate::Error::Limit { .. } => Error::from(error),
+        crate::Error::Invalid(message)
+            if message == "changed application-properties edit became a no-op"
+                || message == "extended-properties encoded size overflow" =>
+        {
+            Error::Internal("application-properties prepared-size invariant failed")
+        },
+        crate::Error::Invalid(message) => Error::Package(crate::Error::Invalid(message)),
+        other => Error::from(other),
+    }
+}
+
+fn generated_codec_error(
+    error: crate::Error,
+    authored_lexical: bool,
+    reason: &'static str,
+) -> Error {
+    match error {
+        crate::Error::Limit { .. } => Error::from(error),
+        crate::Error::Invalid(message) if authored_lexical && is_xml_lexical_error(&message) => {
+            Error::Invalid(message)
+        },
+        crate::Error::Invalid(_)
+        | crate::Error::Xml(_)
+        | crate::Error::Decode(_)
+        | crate::Error::Allocation { .. } => Error::Internal(reason),
+        other => Error::from(other),
+    }
+}
+
+fn app_generated_error(error: crate::Error) -> Error {
+    generated_codec_error(
+        error,
+        true,
+        "application-properties prepared output invariant failed",
+    )
+}
+
+fn core_generated_error(error: crate::Error) -> Error {
+    generated_codec_error(
+        error,
+        true,
+        "core-properties prepared output invariant failed",
+    )
+}
+
+fn custom_generated_error(error: crate::Error) -> Error {
+    generated_codec_error(
+        error,
+        true,
+        "custom-properties prepared output invariant failed",
+    )
+}
+
+fn patch_output_error(error: crate::Error) -> Error {
+    generated_codec_error(error, false, "metadata patch output failed validation")
+}
+
 fn source_changed(
     error: &OpcError,
 ) -> Option<(litchi_core::SourceVersion, litchi_core::SourceVersion)> {
@@ -295,6 +359,14 @@ fn unsupported_custom_content() -> Error {
         RefusalKind::UnsupportedContent,
         "set_custom_props",
         "rewriting unsupported custom-property content is refused",
+    ))
+}
+
+fn unsupported_core_content() -> Error {
+    Error::Refused(Refusal::new(
+        RefusalKind::UnsupportedContent,
+        "set_metadata",
+        "rewriting unsupported core-properties content is refused",
     ))
 }
 
@@ -713,12 +785,15 @@ impl Snapshot {
                             Dialect::Transitional
                         };
                     let mut report = ToleranceReport::default();
-                    self.core_value = Some(read::decode_selected(
-                        after,
-                        change.part.as_str(),
-                        Some(dialect),
-                        &mut report,
-                    )?);
+                    self.core_value = Some(
+                        read::decode_selected(
+                            after,
+                            change.part.as_str(),
+                            Some(dialect),
+                            &mut report,
+                        )
+                        .map_err(patch_output_error)?,
+                    );
                     self.core_dialect = Some(dialect);
                     self.core_report = report;
                 } else {
@@ -729,7 +804,8 @@ impl Snapshot {
             },
             Family::Custom => {
                 self.custom_value = match change.after.as_deref() {
-                    Some(after) => custom::Props::decode_for(after, &change.part, self.host)?,
+                    Some(after) => custom::Props::decode_for(after, &change.part, self.host)
+                        .map_err(patch_output_error)?,
                     None => custom::Props::new(),
                 };
             },
@@ -1198,10 +1274,9 @@ impl Plan {
                         .changed_fields(&target)
                         .filter(|field| !CORE_FIELDS.contains(field))
                         .collect();
-                    if let Some(field) = changed_fields
+                    if changed_fields
                         .iter()
-                        .copied()
-                        .find(|field| !app::METADATA_FIELDS.contains(field))
+                        .any(|field| !app::METADATA_FIELDS.contains(field))
                     {
                         return Err(unsupported_property());
                     }
@@ -1226,7 +1301,7 @@ impl Plan {
                 Some(target) => {
                     let before = base.metadata()?;
                     let changed_fields: Vec<_> = before.changed_fields(&target).collect();
-                    if let Some(field) = changed_fields.iter().copied().find(|field| {
+                    if changed_fields.iter().any(|field| {
                         !CORE_FIELDS.contains(field) && !app::METADATA_FIELDS.contains(field)
                     }) {
                         return Err(unsupported_property());
@@ -1259,6 +1334,9 @@ impl Plan {
 
         let core = match core_metadata {
             Some(Some(target)) => {
+                if base.core.present.is_some() && !base.core_report.is_clean() {
+                    return Err(unsupported_core_content());
+                }
                 let (current, dialect) = match &base.core.present {
                     Some(present) => {
                         let xml = std::str::from_utf8(&present.bytes).map_err(|error| {
@@ -1303,10 +1381,15 @@ impl Plan {
             } else {
                 let (after_len, plan) = match (&base.app.present, &target) {
                     (Some(present), Some(props)) => {
-                        let plan = app::plan_splice(&present.bytes, props)?;
+                        app::validate_target(props).map_err(Error::from)?;
+                        let plan =
+                            app::plan_splice(&present.bytes, props).map_err(app_plan_error)?;
                         (plan.as_ref().map(|plan| plan.output_len()), plan)
                     },
-                    (None, Some(props)) => (Some(app::encode_new_len(props)?), None),
+                    (None, Some(props)) => (
+                        Some(app::encode_new_len(props).map_err(app_generated_error)?),
+                        None,
+                    ),
                     (_, None) => (None, None),
                 };
                 Some(PreparedApp {
@@ -1332,7 +1415,7 @@ impl Plan {
                     return Err(unsupported_custom_content());
                 }
                 let after_len = (!remove_custom && !target.is_empty())
-                    .then(|| custom::encoded_len(&target))
+                    .then(|| custom::encoded_len(&target).map_err(custom_generated_error))
                     .transpose()?;
                 Ok(PreparedCustom { target, after_len })
             })
@@ -1534,7 +1617,8 @@ impl PreparedPlan {
             let (after_bytes, merged) = match (core.target, core.after_len) {
                 (Some(merged), Some(after_len)) => (
                     Some(
-                        super::write::encode_preflighted(&merged, core.dialect, after_len)?
+                        super::write::encode_preflighted(&merged, core.dialect, after_len)
+                            .map_err(core_generated_error)?
                             .into_bytes(),
                     ),
                     Some(merged),
@@ -1563,19 +1647,25 @@ impl PreparedPlan {
         if let Some(app) = app {
             let planned = take_planned_change(&mut planned_changes, Family::App)?;
             let after_bytes = match (&base.app.present, &app.target) {
-                (Some(present), Some(props)) => Some(app::splice_planned(
-                    &present.bytes,
-                    props,
-                    app.plan.ok_or_else(|| {
-                        Error::Internal("missing prepared application-properties layout")
-                    })?,
-                )?),
-                (None, Some(props)) => Some(app::encode_new_preflighted(
-                    props,
-                    app.after_len.ok_or_else(|| {
-                        Error::Internal("missing prepared application-properties length")
-                    })?,
-                )?),
+                (Some(present), Some(props)) => Some(
+                    app::splice_planned(
+                        &present.bytes,
+                        props,
+                        app.plan.ok_or_else(|| {
+                            Error::Internal("missing prepared application-properties layout")
+                        })?,
+                    )
+                    .map_err(app_generated_error)?,
+                ),
+                (None, Some(props)) => Some(
+                    app::encode_new_preflighted(
+                        props,
+                        app.after_len.ok_or_else(|| {
+                            Error::Internal("missing prepared application-properties length")
+                        })?,
+                    )
+                    .map_err(app_generated_error)?,
+                ),
                 (_, None) => None,
             };
             if let Some(change) = stage_prepared_change(&mut after, planned, after_bytes)? {
@@ -1588,12 +1678,15 @@ impl PreparedPlan {
             let after_bytes = if custom.target.is_empty() {
                 None
             } else {
-                Some(custom::encode_preflighted(
-                    &custom.target,
-                    custom.after_len.ok_or_else(|| {
-                        Error::Internal("missing prepared custom-properties length")
-                    })?,
-                )?)
+                Some(
+                    custom::encode_preflighted(
+                        &custom.target,
+                        custom.after_len.ok_or_else(|| {
+                            Error::Internal("missing prepared custom-properties length")
+                        })?,
+                    )
+                    .map_err(custom_generated_error)?,
+                )
             };
             if let Some(change) = stage_prepared_change(&mut after, planned, after_bytes)? {
                 changes.push(change);
@@ -2759,4 +2852,58 @@ fn check_change<P: PackageMetadata>(
         },
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod classification_tests {
+    use super::{
+        Error, app_generated_error, app_plan_error, core_generated_error, custom_generated_error,
+        patch_output_error,
+    };
+
+    #[test]
+    fn source_and_prepared_codec_errors_keep_their_contract_classification() {
+        assert!(matches!(
+            app_plan_error(crate::Error::Invalid(
+                "unexpected source element".to_owned()
+            )),
+            Error::Package(crate::Error::Invalid(_))
+        ));
+        assert!(matches!(
+            app_plan_error(crate::Error::Invalid(
+                "extended property Company contains XML 1.0-forbidden character U+0000"
+                    .to_owned()
+            )),
+            Error::Invalid(message) if message.contains("U+0000")
+        ));
+
+        for error in [
+            app_generated_error(crate::Error::Invalid(
+                "extended-properties edits overlap".to_owned(),
+            )),
+            core_generated_error(crate::Error::Invalid(
+                "core-properties encoded-size invariant failed".to_owned(),
+            )),
+            custom_generated_error(crate::Error::Invalid(
+                "custom-properties encoded-size invariant failed".to_owned(),
+            )),
+            patch_output_error(crate::Error::Invalid(
+                "generated metadata patch did not decode".to_owned(),
+            )),
+        ] {
+            assert!(matches!(error, Error::Internal(_)));
+        }
+
+        let authored = app_generated_error(crate::Error::Invalid(
+            "extended property Company contains XML 1.0-forbidden character U+0000".to_owned(),
+        ));
+        assert!(matches!(authored, Error::Invalid(message) if message.contains("U+0000")));
+
+        let bounded = app_generated_error(crate::Error::Limit {
+            kind: crate::LimitKind::ExtendedPropertiesXmlBytes,
+            maximum: 8 * 1024 * 1024,
+            observed: 8 * 1024 * 1024 + 1,
+        });
+        assert!(matches!(bounded, Error::Limit { .. }));
+    }
 }
