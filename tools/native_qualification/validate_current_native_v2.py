@@ -187,9 +187,20 @@ def _validate_output_artifact(evidence: Mapping[str, Any], expected: Any, output
         raise ValidationError(f"{label} output relative path is unsafe")
     if relative != expected.output:
         raise ValidationError(f"{label} output path differs from the policy")
-    expected_path = (output_root / relative).resolve(strict=False)
+    relative_path = Path(relative)
+    expected_path = output_root / relative_path
+    cursor = output_root
+    for component in relative_path.parts:
+        cursor /= component
+        if cursor.is_symlink():
+            raise ValidationError(f"{label} output path contains a symlink component: {cursor}")
+    try:
+        expected_path.absolute().relative_to(output_root.absolute())
+    except ValueError as error:
+        raise ValidationError(f"{label} output path escapes the prepared output root") from error
+    expected_path = expected_path.absolute()
     recorded_path = artifact.get("path")
-    if not isinstance(recorded_path, str) or Path(recorded_path).absolute().resolve(strict=False) != expected_path:
+    if not isinstance(recorded_path, str) or Path(recorded_path).absolute() != expected_path:
         raise ValidationError(f"{label} output artifact is outside the prepared output root")
     try:
         actual_output = _file_identity(expected_path, label)
