@@ -152,7 +152,12 @@ def prepare(
 
     before_path = Path(before).absolute()
     after_path = Path(after).absolute()
-    disjoint = [("baseline source", before_path), ("candidate source", after_path)]
+    protocol_root = Path(__file__).resolve().parents[2]
+    disjoint = [
+        ("baseline source", before_path),
+        ("candidate source", after_path),
+        ("protocol checkout", protocol_root),
+    ]
     if before_archive is not None:
         disjoint.append(("baseline source archive", Path(before_archive)))
     if after_archive is not None:

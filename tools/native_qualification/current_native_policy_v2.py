@@ -281,8 +281,8 @@ _BASELINE_PIN = SourcePin(
     tree_sha256=BASELINE_TREE_SHA256,
     role_locks=(
         _artifact("Cargo.lock", BASELINE_LOCK_SHA256, BASELINE_LOCK_BYTES),
-        _artifact("tools/perf-baseline/Cargo.lock", "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c", 57_227),
-        _artifact("tools/native-resave/Cargo.lock", "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378", 56_975),
+        _artifact("tools/perf-baseline/Cargo.lock", "57c2a19ffeff395fdea95c33f295c85b08400b00e2fd9cec94d66cff56d1583f", 57_028),
+        _artifact("tools/native-resave/Cargo.lock", "6aaa0e3800a4db72afbe8783aab382accdb4a6355d06bb97fb1c12dd78839408", 56_929),
     ),
     source_manifests=(
         _artifact("Cargo.toml", "66a8f4d2b0ffb6b9ba4eb87d84fee8a3049e8ef7e4380b6ee48acaaf372dd7b5", 10_608),
@@ -837,13 +837,9 @@ def observe_source(source: Path, side: str, archive: Path | None = None) -> dict
     }
 
 
-def validate_source(source: Path, side: str, archive: Path | None = None) -> dict[str, Any]:
-    """Validate one endpoint against its fixed policy pins."""
+def _validate_observed_source(observed: Mapping[str, Any], side: str, policy_pin: SourcePin) -> Path:
+    """Validate source/tree and every in-tree artifact, excluding archives."""
 
-    policy_pin = TRUSTED_POLICY.baseline if side == "baseline" else TRUSTED_POLICY.candidate
-    if not policy_pin.complete():
-        raise PolicyIncomplete(f"{side} source pins are not complete in current-source policy v2")
-    observed = observe_source(source, side, archive)
     if observed["commit"] != policy_pin.commit:
         raise PolicyMismatch(f"{side} source commit differs from the trusted policy")
     if observed["git_tree"] != policy_pin.git_tree or observed["tree_sha256"] != policy_pin.tree_sha256:
@@ -860,7 +856,19 @@ def validate_source(source: Path, side: str, archive: Path | None = None) -> dic
     for item in policy_pin.probes:
         _pin_file(source_root, item, f"{side} probe {item.relative_path}")
     for item in policy_pin.fixtures:
-        _pin_file(Path(observed["source_root"]), item, f"{side} fixture {item.relative_path}")
+        _pin_file(source_root, item, f"{side} fixture {item.relative_path}")
+    return source_root
+
+
+def validate_source(source: Path, side: str, archive: Path | None = None) -> dict[str, Any]:
+    """Validate one endpoint against its fixed policy pins."""
+
+    policy_pin = TRUSTED_POLICY.baseline if side == "baseline" else TRUSTED_POLICY.candidate
+    if not policy_pin.complete():
+        raise PolicyIncomplete(f"{side} source pins are not complete in current-source policy v2")
+    observed = observe_source(source, side, archive)
+    _validate_observed_source(observed, side, policy_pin)
+    source_root = Path(observed["source_root"])
     if archive is None:
         raise PolicyMismatch(f"{side} source archive is required by the trusted policy")
     archive_path = Path(archive).absolute()
@@ -883,13 +891,12 @@ def validate_source(source: Path, side: str, archive: Path | None = None) -> dic
     return observed
 
 
-def validate_lock(path: Path, side: str = "candidate", role: str = "workspace") -> dict[str, Any]:
-    """Validate one role lock using only the fixed policy.
+def validate_lock(source_root: Path, side: str = "candidate", role: str = "workspace") -> dict[str, Any]:
+    """Validate a role lock at its fixed path under a trusted source root.
 
-    ``role`` selects one of the three reviewed lock pins; neither the path nor
-    a digest is accepted as policy input from a caller.  The default preserves
-    the historical workspace-lock command spelling while all new consumers
-    pass their explicit role.
+    The first argument is deliberately a source checkout, never a copied
+    lockfile.  Its commit/tree/materialization and all fixed in-tree inputs are
+    checked before the role-specific lock is read.
     """
 
     if side not in {"baseline", "candidate"}:
@@ -897,11 +904,18 @@ def validate_lock(path: Path, side: str = "candidate", role: str = "workspace") 
     TRUSTED_POLICY.require_execution_ready()
     if role not in ROLE_NAMES:
         raise PolicyError(f"unknown lock role: {role}")
-    pin = (TRUSTED_POLICY.baseline if side == "baseline" else TRUSTED_POLICY.candidate).lock_for_role(role)
-    digest, size = _hash_file(Path(path), f"{side} Cargo.lock")
+    policy_pin = TRUSTED_POLICY.baseline if side == "baseline" else TRUSTED_POLICY.candidate
+    root = _safe_source(Path(source_root), f"{side} source root")
+    observed = observe_source(root, side)
+    _validate_observed_source(observed, side, policy_pin)
+    pin = policy_pin.lock_for_role(role)
+    lock_path = root / ROLE_LOCK_PATHS[role]
+    if pin.relative_path != ROLE_LOCK_PATHS[role]:
+        raise PolicyMismatch(f"{side} {role} lock policy path is not fixed")
+    digest, size = _hash_file(lock_path, f"{side} {role} Cargo.lock")
     if digest != pin.sha256 or size != pin.bytes:
         raise PolicyMismatch(f"{side} {role} lock differs from the trusted current-source policy")
-    return {"path": str(Path(path).resolve()), "sha256": digest, "bytes": size, "side": side, "role": role}
+    return {"path": str(lock_path.resolve()), "sha256": digest, "bytes": size, "side": side, "role": role, "source_root": str(root)}
 
 
 def validate_routes(lane: str, routes: Sequence[Mapping[str, Any]]) -> None:
@@ -919,7 +933,8 @@ def validate_routes(lane: str, routes: Sequence[Mapping[str, Any]]) -> None:
 
 
 def _check_plan_paths(root: Path, state_dir: Path, target: Path, source_archive: Path | None) -> None:
-    paths = [("source", root), ("state output", state_dir), ("Cargo target output", target)]
+    protocol_root = Path(__file__).resolve().parents[2]
+    paths = [("source", root), ("state output", state_dir), ("Cargo target output", target), ("protocol checkout", protocol_root)]
     if source_archive is not None:
         paths.append(("source archive", source_archive))
     resolved: list[tuple[str, Path]] = []
@@ -945,7 +960,7 @@ def _role_lock_path(root: Path, role: str) -> Path:
 
 
 def _guarded_lock(root: Path, role: str, guard: Path) -> list[str]:
-    return [sys.executable, str(guard), "guard-role-lock", role, str(_role_lock_path(root, role)), "--"]
+    return [sys.executable, str(guard), "guard-role-lock", role, str(root), "--"]
 
 
 def make_ppt_steps_v2(
@@ -1061,10 +1076,10 @@ def make_legacy_steps_v2(
     ]
 
 
-def _cli_guard_lock(path: Path, command: Sequence[str], role: str = "workspace") -> int:
-    """CLI implementation for the new PPT guard; no expected hash input."""
+def _cli_guard_lock(source_root: Path, command: Sequence[str], role: str = "workspace") -> int:
+    """CLI implementation for a role guard; no expected hash input."""
 
-    validate_lock(path, "candidate", role)
+    validate_lock(source_root, "candidate", role)
     if not command:
         print(TRUSTED_POLICY.candidate.lock_for_role(role).sha256)
         return 0
@@ -1075,8 +1090,8 @@ def _cli_guard_lock(path: Path, command: Sequence[str], role: str = "workspace")
 def main(argv: Sequence[str] | None = None) -> int:
     args = list(sys.argv[1:] if argv is None else argv)
     if not args or args[0] not in {"guard-lock", "guard-role-lock"}:
-        print("usage: current_native_policy_v2.py guard-lock CARGO_LOCK [-- COMMAND ...]", file=sys.stderr)
-        print("       current_native_policy_v2.py guard-role-lock ROLE CARGO_LOCK [-- COMMAND ...]", file=sys.stderr)
+        print("usage: current_native_policy_v2.py guard-lock SOURCE_ROOT [-- COMMAND ...]", file=sys.stderr)
+        print("       current_native_policy_v2.py guard-role-lock ROLE SOURCE_ROOT [-- COMMAND ...]", file=sys.stderr)
         return 2
     try:
         separator = args.index("--")
@@ -1084,13 +1099,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         separator = len(args)
     if args[0] == "guard-role-lock":
         if len(args) < 3 or separator != 3 or args[1] not in ROLE_NAMES:
-            print("usage: current_native_policy_v2.py guard-role-lock ROLE CARGO_LOCK [-- COMMAND ...]", file=sys.stderr)
+            print("usage: current_native_policy_v2.py guard-role-lock ROLE SOURCE_ROOT [-- COMMAND ...]", file=sys.stderr)
             return 2
         role = args[1]
         path_index = 2
     else:
         if len(args) < 2 or separator != 2:
-            print("usage: current_native_policy_v2.py guard-lock CARGO_LOCK [-- COMMAND ...]", file=sys.stderr)
+            print("usage: current_native_policy_v2.py guard-lock SOURCE_ROOT [-- COMMAND ...]", file=sys.stderr)
             return 2
         role = "workspace"
         path_index = 1

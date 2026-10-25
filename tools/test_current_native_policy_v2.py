@@ -167,6 +167,22 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 policy._check_plan_paths(source, source / "state", Path(directory) / "target", None)
             with self.assertRaises(policy.PolicyMismatch):
                 policy._check_plan_paths(source, Path(directory) / "state", Path(directory) / "target", source / "archive.tar")
+            with self.assertRaises(policy.PolicyMismatch):
+                policy._check_plan_paths(ROOT, Path(directory) / "state", Path(directory) / "target", None)
+
+    def test_preparation_rejects_protocol_checkout_as_source(self) -> None:
+        manifest = ROOT / "tools/native_qualification/manifests/ppt-current-v2.json"
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            after = self._fake_source(parent / "after", "protocol-boundary")
+            with self.assertRaises(preparer.PreparationError):
+                preparer.prepare(
+                    lane="ppt-auxiliary",
+                    manifest=manifest,
+                    before=ROOT,
+                    after=after,
+                    output=parent / "receipt.json",
+                )
 
     def test_output_artifact_must_be_the_policy_path_under_the_prepared_root(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -437,6 +453,10 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                     policy.validate_source(wrong, "candidate", wrong_archive)
                 with self.assertRaises(policy.PolicyMismatch):
                     policy.validate_lock(parent / "wrong-lock", "candidate", "perf")
+                copied_lock = parent / "copied-lock"
+                shutil.copyfile(after / policy.ROLE_LOCK_PATHS["perf"], copied_lock)
+                with self.assertRaises(policy.PolicyMismatch):
+                    policy.validate_lock(copied_lock, "candidate", "perf")
                 bad_archive = parent / "bad.tar"
                 shutil.copyfile(after_archive, bad_archive)
                 with bad_archive.open("ab") as stream:
