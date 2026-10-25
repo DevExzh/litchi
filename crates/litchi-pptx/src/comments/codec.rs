@@ -293,7 +293,7 @@ fn write_comment_authors_output(
     output.write(declaration())?;
     output.write(b"<p:cmAuthorLst")?;
     output.attribute("xmlns:p", conformance.namespace())?;
-    output.write(b"\">")?;
+    output.write(b">")?;
     for author in authors {
         output.write(b"<p:cmAuthor")?;
         output.attribute("id", &author.id.to_string())?;
@@ -333,7 +333,7 @@ fn write_slide_comments_output(
     output.write(declaration())?;
     output.write(b"<p:cmLst")?;
     output.attribute("xmlns:p", conformance.namespace())?;
-    output.write(b"\">")?;
+    output.write(b">")?;
     for comment in comments {
         output.write(b"<p:cm")?;
         output.attribute("authorId", &comment.author_id.to_string())?;
