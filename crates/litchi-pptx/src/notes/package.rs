@@ -335,6 +335,11 @@ pub(crate) fn validate_replay_part(part: &dyn Part, limits: Limits) -> Result<()
 /// notes-master/theme edges and slide contributions are updated by the exact
 /// replay write set.
 pub(crate) fn validate_replay_total(index: &ReplayIndex, limits: Limits) -> Result<()> {
+    if let Some(theme) = index.missing_theme_name()? {
+        return Err(Error::Opc(litchi_opc::OpcError::PartNotFound(
+            theme.to_string(),
+        )));
+    }
     let total = usize::try_from(index.notes_total_bytes())
         .map_err(|_| invalid("notes aggregate bytes overflow"))?;
     if total > limits.max_total_bytes {

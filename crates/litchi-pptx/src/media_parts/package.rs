@@ -6,6 +6,7 @@ use super::{
 };
 use crate::package::replay_index::ReplayIndex;
 use litchi_core::xml::ReaderOrigin;
+use std::collections::HashSet;
 
 /// # Errors
 ///
@@ -123,16 +124,50 @@ pub(crate) fn validate_replay_references(
     if changed_resources.is_empty() {
         return Ok(());
     }
+    let mut changed_slide_set = HashSet::new();
+    changed_slide_set
+        .try_reserve(changed_slides.len())
+        .map_err(|source| crate::Error::Allocation {
+            resource: "media replay changed slide names",
+            source,
+        })?;
+    changed_slide_set.extend(changed_slides.iter().cloned());
+    let mut affected_slides = HashSet::new();
+    affected_slides
+        .try_reserve(changed_resources.len())
+        .map_err(|source| crate::Error::Allocation {
+            resource: "media replay affected slide names",
+            source,
+        })?;
     for resource in changed_resources {
         let Some(slides) = index.media_slides(resource) else {
             continue;
         };
         for slide in slides.iter() {
-            if changed_slides.iter().any(|name| name == slide) {
+            if changed_slide_set.contains(slide) {
                 continue;
             }
-            load_with_limits(package, slide, limits).map(drop)?;
+            affected_slides
+                .try_reserve(1)
+                .map_err(|source| crate::Error::Allocation {
+                    resource: "media replay affected slide names",
+                    source,
+                })?;
+            affected_slides.insert(slide.clone());
         }
+    }
+    let mut affected_slides_ordered = Vec::new();
+    affected_slides_ordered
+        .try_reserve(affected_slides.len())
+        .map_err(|source| crate::Error::Allocation {
+            resource: "media replay affected slide names",
+            source,
+        })?;
+    affected_slides_ordered.extend(affected_slides);
+    let mut affected_slides = affected_slides_ordered;
+    affected_slides.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+    for slide in affected_slides {
+        load_with_limits(package, &slide, limits).map(drop)?;
     }
     Ok(())
 }

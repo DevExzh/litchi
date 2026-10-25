@@ -131,6 +131,72 @@ fn replay_notes_index_applies_changed_slide_delta() {
 }
 
 #[test]
+fn replay_notes_index_counts_all_theme_edges_and_refuses_missing_targets() {
+    let (package, _) = synthetic(Conformance::Transitional);
+    let master_name = PackURI::new("/ppt/notesMasters/notesMaster1.xml").unwrap();
+    let extra_theme = PackURI::new("/ppt/theme/theme-extra.xml").unwrap();
+    let mut with_extra = package.clone();
+    with_extra.add_part(Box::new(BlobPart::new(
+        extra_theme.clone(),
+        THEME_CT.into(),
+        vec![0; 13],
+    )));
+    with_extra
+        .get_part_mut(&master_name)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            "urn:opaque/theme".into(),
+            "../theme/theme-extra.xml".into(),
+            "rIdExtraTheme".into(),
+            false,
+        );
+    let base = crate::package::replay_index::ReplayIndex::from_package(&package).unwrap();
+    let with_extra_index =
+        crate::package::replay_index::ReplayIndex::from_package(&with_extra).unwrap();
+    assert_eq!(
+        with_extra_index.notes_total_bytes(),
+        base.notes_total_bytes() + 13
+    );
+
+    let mut removed = with_extra.clone();
+    removed
+        .get_part_mut(&master_name)
+        .unwrap()
+        .rels_mut()
+        .remove("rIdExtraTheme");
+    removed.remove_part(&extra_theme);
+    let changed = [master_name.clone(), extra_theme.clone()];
+    let restored = with_extra_index
+        .update(&with_extra, &removed, &changed)
+        .unwrap();
+    assert_eq!(restored.notes_total_bytes(), base.notes_total_bytes());
+
+    let missing_theme = PackURI::new("/ppt/theme/theme-missing.xml").unwrap();
+    let mut missing = package.clone();
+    missing
+        .get_part_mut(&master_name)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            "urn:opaque/theme".into(),
+            "../theme/theme-missing.xml".into(),
+            "rIdMissingTheme".into(),
+            false,
+        );
+    assert!(
+        base.update(&package, &missing, std::slice::from_ref(&master_name))
+            .is_err()
+    );
+    let missing_index = crate::package::replay_index::ReplayIndex::from_package(&missing).unwrap();
+    assert!(matches!(
+        super::package::validate_replay_total(&missing_index, Limits::DEFAULT),
+        Err(Error::Opc(litchi_opc::OpcError::PartNotFound(_)))
+    ));
+    assert!(!missing.contains_part(&missing_theme));
+}
+
+#[test]
 fn notes_master_template_is_canonical_and_deterministic() {
     assert!(master_xml().contains("<p:notesMaster"));
     assert_eq!(master_xml().as_ptr(), master_xml().as_ptr());
