@@ -367,16 +367,13 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
     let mut stack = Vec::new();
     let mut root = None;
     let mut nodes = 0usize;
     let mut strings = 0usize;
     loop {
         let decoder = reader.decoder();
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
                 if stack.len() >= limits.max_depth {
@@ -519,7 +516,6 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
             Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => break,
         }
-        buffer.clear();
     }
     if !stack.is_empty() {
         return Err(invalid("unterminated presentation comment XML"));

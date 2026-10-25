@@ -1385,10 +1385,11 @@ fn scan_raw(source: &[u8], limits: Limits) -> Result<Scan> {
     let mut nodes_seen = 0usize;
     loop {
         let before = position(&reader, origin)?;
-        let event = reader
-            .read_event_into(&mut buffer)
-            .map_err(xml_error)?
-            .into_owned();
+        let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
+        if let Event::Start(element) | Event::Empty(element) = &event {
+            check_raw_attribute_bytes(element, limits.max_attribute_bytes)?;
+        }
+        let event = event.into_owned();
         let after = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
@@ -1773,6 +1774,20 @@ fn make_node(
         parent,
         children: Vec::new(),
     })
+}
+
+fn check_raw_attribute_bytes(element: &BytesStart<'_>, maximum: usize) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        if attribute.value.len() > maximum {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.len(),
+                maximum,
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn item_indices(scan: &Scan, root: usize, kind: Kind, owner: Owner) -> Result<Vec<usize>> {
