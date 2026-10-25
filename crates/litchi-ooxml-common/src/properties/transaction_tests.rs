@@ -70,6 +70,26 @@ fn snapshot_projects_core_and_app_fields_into_one_metadata() {
 }
 
 #[test]
+fn core_only_staging_preserves_application_properties() {
+    let package = full();
+    let app_before = bytes(&package, "/docProps/app.xml").unwrap();
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.set_core_metadata(Metadata {
+        title: Some("After".to_owned()),
+        ..Metadata::default()
+    })
+    .unwrap();
+    let after = edit.commit().unwrap().into_package();
+
+    assert_eq!(bytes(&after, "/docProps/app.xml").unwrap(), app_before);
+    let snapshot = Snapshot::read(&after, Host::Word).unwrap();
+    let metadata = snapshot.metadata().unwrap();
+    assert_eq!(metadata.title.as_deref(), Some("After"));
+    assert_eq!(metadata.application.as_deref(), Some("Producer"));
+    assert_eq!(metadata.company.as_deref(), Some("Old"));
+}
+
+#[test]
 fn metadata_commit_admits_exact_escaped_patch_size_before_capture() {
     let package = full();
     let mut edit = Edit::new(&package, Host::Word).unwrap();

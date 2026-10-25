@@ -144,7 +144,7 @@ impl Package {
                 let mut core_edit = families::Edit::new(opc, Host::Word)?;
                 match target {
                     Some(props) => {
-                        core_edit.set_metadata(props.clone());
+                        core_edit.set_core_metadata(props.clone())?;
                     },
                     None => {
                         core_edit.clear_metadata();

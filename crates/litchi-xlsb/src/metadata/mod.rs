@@ -164,8 +164,7 @@ impl Edit {
             patch.check(source.opc_package())?;
             source
         } else {
-            let mut candidate = source.opc_package().clone();
-            patch.apply(&mut candidate)?;
+            let candidate = patch.apply(source.opc_package())?.into_package();
             source
                 .reparse_candidate_retaining_projection(candidate)
                 .map_err(|error| Error::Invalid(error.to_string()))?
@@ -274,8 +273,7 @@ impl Package {
         let package = if patch.is_noop() {
             self.clone()
         } else {
-            let mut candidate = self.opc_package().clone();
-            patch.apply(&mut candidate)?;
+            let candidate = patch.apply(self.opc_package())?.into_package();
             self.reparse_candidate_retaining_projection(candidate)
                 .map_err(|error| Error::Invalid(error.to_string()))?
         };
@@ -294,6 +292,7 @@ mod tests {
     #[test]
     fn edits_publish_a_new_package_and_replay_exactly() {
         let package = Package::new().unwrap();
+        let original = package.to_bytes().unwrap();
         let mut edit = package.edit_metadata().unwrap();
         edit.update(|metadata| {
             metadata.author = Some("Ada".to_owned());
@@ -310,6 +309,7 @@ mod tests {
         );
         let replayed = package.apply_metadata(&patch).unwrap().into_package();
         assert_eq!(replayed.metadata().unwrap(), after.metadata().unwrap());
+        assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
         assert!(matches!(
             package.apply_metadata(&patch.inverse()),
             Err(Error::PatchConflict)
@@ -319,6 +319,21 @@ mod tests {
             .unwrap()
             .into_package();
         assert_eq!(restored.metadata().unwrap(), package.metadata().unwrap());
+        assert_eq!(restored.to_bytes().unwrap(), original);
+    }
+
+    #[test]
+    fn an_equal_metadata_patch_replays_as_an_exact_package_copy() {
+        let package = Package::new().unwrap();
+        let original = package.to_bytes().unwrap();
+        let commit = package.edit_metadata().unwrap().commit().unwrap();
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
+
+        let replayed = package.apply_metadata(commit.patch()).unwrap();
+        assert!(!replayed.diagnostics().changed());
+        assert!(replayed.patch().is_noop());
+        assert_eq!(replayed.package().to_bytes().unwrap(), original);
     }
 
     #[test]

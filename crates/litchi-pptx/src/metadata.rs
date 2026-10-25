@@ -215,8 +215,7 @@ impl Package {
             patch.check(self.opc.as_ref())?;
             self.duplicate()
         } else {
-            let mut opc = (*self.opc).clone();
-            patch.apply(&mut opc)?;
+            let opc = patch.apply(self.opc.as_ref())?.into_package();
             self.with_metadata_opc(opc)
         };
         Ok(Commit::new(package, patch.clone(), patch.diagnostics()))
@@ -244,6 +243,7 @@ mod tests {
     #[test]
     fn edits_publish_a_new_package_and_replay_exactly() {
         let package = Package::new().unwrap();
+        let original = package.to_bytes().unwrap();
         let mut edit = package.edit_metadata().unwrap();
         edit.update(|metadata| {
             metadata.author = Some("Ada".to_owned());
@@ -262,11 +262,13 @@ mod tests {
         assert!(replayed.diagnostics().changed());
         let replayed = replayed.into_package();
         assert_eq!(replayed.metadata().unwrap(), after.metadata().unwrap());
+        assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
         let restored = after
             .apply_metadata(&patch.inverse())
             .unwrap()
             .into_package();
         assert_eq!(restored.metadata().unwrap(), package.metadata().unwrap());
+        assert_eq!(restored.to_bytes().unwrap(), original);
         assert!(matches!(
             package.apply_metadata(&patch.inverse()),
             Err(Error::PatchConflict)

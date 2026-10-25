@@ -430,6 +430,7 @@ mod tests {
         let package = Package::new()?;
         let original = package.clone().to_bytes()?;
         let mut edit = package.edit_metadata();
+        edit.update(|props| props.title = Some("Quarterly".to_owned()));
         let mut app = edit.app_props()?.unwrap_or_default();
         app.company = Some("Acme".to_owned());
         app.manager = Some("Dana".to_owned());
@@ -450,8 +451,12 @@ mod tests {
             next.custom_props().get("Reviewed"),
             Some(&litchi_ooxml_common::custom::Value::Bool(true))
         );
-        // The core properties are untouched, and the source is unchanged.
-        assert_eq!(next.metadata(), package.metadata());
+        // All three property families were published, and the source is unchanged.
+        assert_eq!(
+            next.metadata().and_then(|props| props.title.as_deref()),
+            Some("Quarterly")
+        );
+        assert_eq!(package.metadata(), None);
         assert_eq!(package.clone().to_bytes()?, original);
         let reopened = Package::from_bytes(&next.clone().to_bytes()?)?;
         assert_eq!(
@@ -460,6 +465,7 @@ mod tests {
         );
         let replayed = package.apply_metadata(&patch)?.into_package();
         assert_eq!(replayed.app_props()?, next.app_props()?);
+        assert_eq!(replayed.metadata(), next.metadata());
         let restored = next.apply_metadata(&patch.inverse())?.into_package();
         assert_eq!(restored.to_bytes()?, original);
         Ok(())

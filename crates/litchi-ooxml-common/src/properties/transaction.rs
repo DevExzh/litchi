@@ -54,6 +54,24 @@ use crate::custom::{self, Host};
 use crate::leniency::ToleranceReport;
 use crate::signature::{refuse_signed_change, settle_unsigned_change};
 
+fn merge_core_metadata(target: &mut Metadata, core: &Metadata) {
+    target.title.clone_from(&core.title);
+    target.subject.clone_from(&core.subject);
+    target.author.clone_from(&core.author);
+    target.keywords.clone_from(&core.keywords);
+    target.description.clone_from(&core.description);
+    target.identifier.clone_from(&core.identifier);
+    target.language.clone_from(&core.language);
+    target.last_modified_by.clone_from(&core.last_modified_by);
+    target.revision.clone_from(&core.revision);
+    target.created = core.created;
+    target.modified = core.modified;
+    target.category.clone_from(&core.category);
+    target.content_status.clone_from(&core.content_status);
+    target.version.clone_from(&core.version);
+    target.last_printed = core.last_printed;
+}
+
 /// The resource a metadata limit bounds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -957,6 +975,21 @@ impl Plan {
         self
     }
 
+    /// Stage only the core-properties fields, retaining the staged or source
+    /// application projection unchanged.
+    ///
+    /// This is the compatibility boundary for hosts whose core-properties
+    /// family is edited separately from application and custom properties.
+    /// Non-core fields are rejected instead of being silently discarded.
+    pub fn set_core_metadata(&mut self, metadata: Metadata) -> Result<&mut Self> {
+        super::ensure_core_only(&metadata)?;
+        let mut target = self.metadata()?;
+        merge_core_metadata(&mut target, &metadata);
+        self.metadata = Some(target);
+        self.clear_core = false;
+        Ok(self)
+    }
+
     /// Stage removal of the core-properties part.
     pub fn clear_metadata(&mut self) -> &mut Self {
         self.metadata = None;
@@ -1685,6 +1718,13 @@ impl Edit {
     pub fn set_metadata(&mut self, metadata: Metadata) -> &mut Self {
         self.plan.set_metadata(metadata);
         self
+    }
+
+    /// Stage only the core-properties fields, retaining the staged or source
+    /// application projection unchanged.
+    pub fn set_core_metadata(&mut self, metadata: Metadata) -> Result<&mut Self> {
+        self.plan.set_core_metadata(metadata)?;
+        Ok(self)
     }
 
     /// Stage removal of the core-properties part.

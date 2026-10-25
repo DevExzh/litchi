@@ -398,8 +398,7 @@ impl Package {
                 diagnostics: patch.diagnostics(),
             });
         }
-        let mut candidate = self.opc().clone();
-        patch.apply(&mut candidate)?;
+        let candidate = patch.apply(self.opc())?.into_package();
         let package = self.adopt_metadata(candidate)?;
         Ok(Commit {
             package,
@@ -466,6 +465,7 @@ mod tests {
     #[test]
     fn edits_publish_a_new_snapshot_and_replay_exactly() {
         let package = Package::new().unwrap();
+        let original = package.to_bytes().unwrap();
         let mut edit = package.edit_metadata().unwrap();
         edit.update(|metadata| {
             metadata.author = Some("Ada".to_owned());
@@ -486,6 +486,7 @@ mod tests {
         assert!(replayed.diagnostics().changed());
         let replayed = replayed.into_package();
         assert!(replayed.same_content(&after).unwrap());
+        assert_eq!(replayed.to_bytes().unwrap(), after.to_bytes().unwrap());
         assert!(matches!(
             package.apply_metadata(&patch.inverse()),
             Err(Error::PatchConflict)
@@ -495,6 +496,7 @@ mod tests {
             .unwrap()
             .into_package();
         assert!(restored.same_content(&package).unwrap());
+        assert_eq!(restored.to_bytes().unwrap(), original);
     }
 
     #[test]
