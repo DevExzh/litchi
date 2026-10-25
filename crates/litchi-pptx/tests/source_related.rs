@@ -902,7 +902,7 @@ fn managed_source_related_scenes_are_unretained_but_live_snapshots_remain_valid(
     let (budget, cancellation, context) = managed_context(16 * 1024 * 1024);
     let presentation = SourceBackedPresentation::from_read_at_with_options(
         source,
-        litchi_pptx::OpenOptions::default()
+        OpenOptions::default()
             .source_limits(SourceLimits::default())
             .execution_context(context),
     )
@@ -922,23 +922,23 @@ fn managed_source_related_scenes_are_unretained_but_live_snapshots_remain_valid(
     cancellation.cancel();
     assert!(matches!(
         slide.layout(),
-        Err(litchi_pptx::Error::Opc(OpcError::Cancelled))
+        Err(Error::Opc(OpcError::Cancelled))
     ));
     assert!(matches!(
         slide.notes(),
-        Err(litchi_pptx::Error::Opc(OpcError::Cancelled))
+        Err(Error::Opc(OpcError::Cancelled))
     ));
     assert!(matches!(
         slide.comments(),
-        Err(litchi_pptx::Error::Opc(OpcError::Cancelled))
+        Err(Error::Opc(OpcError::Cancelled))
     ));
     assert!(matches!(
         slide.charts(),
-        Err(litchi_pptx::Error::Opc(OpcError::Cancelled))
+        Err(Error::Opc(OpcError::Cancelled))
     ));
     assert!(matches!(
         slide.chart(Position::new(0)),
-        Err(litchi_pptx::Error::Opc(OpcError::Cancelled))
+        Err(Error::Opc(OpcError::Cancelled))
     ));
     assert_eq!(first.len(), second.len());
     drop((first_layout, second_layout));
@@ -960,14 +960,14 @@ fn source_related_layout_applies_physical_depth_limits_before_mce_and_does_not_c
         .unwrap();
     let presentation = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_pptx::OpenOptions::default().source_limits(limits),
+        OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let slide = presentation.slide(0).unwrap();
     for _ in 0..2 {
         assert!(matches!(
             slide.layout(),
-            Err(litchi_pptx::Error::Opc(OpcError::Limit {
+            Err(Error::Opc(OpcError::Limit {
                 kind: SourceLimitKind::Depth,
                 ..
             }))
@@ -1001,14 +1001,14 @@ fn source_related_mce_expansion_is_bounded_before_scene_publication() {
         .unwrap();
     let presentation = SourceBackedPresentation::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        litchi_pptx::OpenOptions::default().source_limits(limits),
+        OpenOptions::default().source_limits(limits),
     )
     .unwrap();
     let slide = presentation.slide(0).unwrap();
     let error = slide.layout().unwrap_err();
     assert!(matches!(
         error,
-        litchi_pptx::Error::MarkupCompatibility(
+        Error::MarkupCompatibility(
             litchi_ooxml_common::mce::Error::LimitExceeded { kind, .. }
         ) if kind == litchi_ooxml_common::mce::LimitKind::OutputBytes
     ));
@@ -1034,27 +1034,27 @@ fn related_reads_refuse_source_changes_while_detached_snapshots_remain_readable(
     source.changed();
     assert!(matches!(
         slide.layout(),
-        Err(litchi_pptx::Error::Opc(OpcError::SourceChanged { .. }))
+        Err(Error::Opc(OpcError::SourceChanged { .. }))
     ));
     assert!(matches!(
         slide.notes(),
-        Err(litchi_pptx::Error::Opc(OpcError::SourceChanged { .. }))
+        Err(Error::Opc(OpcError::SourceChanged { .. }))
     ));
     assert!(matches!(
         slide.comments(),
-        Err(litchi_pptx::Error::Opc(OpcError::SourceChanged { .. }))
+        Err(Error::Opc(OpcError::SourceChanged { .. }))
     ));
     assert!(matches!(
         slide.charts(),
-        Err(litchi_pptx::Error::Opc(OpcError::SourceChanged { .. }))
+        Err(Error::Opc(OpcError::SourceChanged { .. }))
     ));
     assert!(matches!(
         slide.chart(Position::new(0)),
-        Err(litchi_pptx::Error::Opc(OpcError::SourceChanged { .. }))
+        Err(Error::Opc(OpcError::SourceChanged { .. }))
     ));
     assert!(matches!(
         slide.is_hidden(),
-        Err(litchi_pptx::Error::Opc(OpcError::SourceChanged { .. }))
+        Err(Error::Opc(OpcError::SourceChanged { .. }))
     ));
 
     assert_eq!(layout.name(), Some("Charts"));
@@ -1086,7 +1086,7 @@ fn post_publication_layout_fence_discards_the_published_scene() {
     );
     assert!(matches!(
         slide.layout(),
-        Err(litchi_pptx::Error::Opc(OpcError::SourceChanged { .. }))
+        Err(Error::Opc(OpcError::SourceChanged { .. }))
     ));
     let diagnostics = presentation.scene_cache_diagnostics();
     assert_eq!(diagnostics.builds, 1);
@@ -1114,7 +1114,7 @@ fn post_publication_notes_fence_discards_the_published_scene() {
     );
     assert!(matches!(
         slide.notes(),
-        Err(litchi_pptx::Error::Opc(OpcError::SourceChanged { .. }))
+        Err(Error::Opc(OpcError::SourceChanged { .. }))
     ));
     let diagnostics = presentation.scene_cache_diagnostics();
     assert_eq!(diagnostics.builds, 1);
