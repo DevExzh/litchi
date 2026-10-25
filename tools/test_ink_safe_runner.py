@@ -32,6 +32,9 @@ class SafeInkRunnerTests(unittest.TestCase):
         self.fake_systemd = self.root / "fake-systemd-run"
         self.fake_systemctl_log = self.root / "systemctl.log"
         self.fake_systemctl = self.root / "fake-systemctl"
+        self.stop_coordination = self.root / "stop-coordination"
+        self.stop_marker = self.root / "stop.marker"
+        self.done_marker = self.root / "done.marker"
         self.fake_systemd.write_text(
             "#!/bin/sh\n"
             "set -eu\n"
@@ -50,6 +53,10 @@ class SafeInkRunnerTests(unittest.TestCase):
             "#!/bin/sh\n"
             "set -eu\n"
             f"printf '%s\\n' \"$*\" >> {str(self.fake_systemctl_log)!r}\n"
+            f"if [ -f {str(self.stop_coordination)!r} ]; then\n"
+            f"  : > {str(self.stop_marker)!r}\n"
+            f"  while [ ! -f {str(self.done_marker)!r} ]; do :; done\n"
+            "fi\n"
             "case \" $* \" in\n"
             "  *' show '*)\n"
             "    printf '%s\\n' 'ActiveState=inactive' 'SubState=dead' 'Result=success' "
@@ -153,12 +160,15 @@ class SafeInkRunnerTests(unittest.TestCase):
 
     def test_fast_exit_output_cap_is_failed(self) -> None:
         runner, output, _tmp, _logs = self._runner(output_cap=4096)
+        self.stop_coordination.touch()
         command = [
             "/bin/sh",
             "-c",
             f"mkdir -p {str(output)!r}; "
             f"dd if=/dev/zero of={str(output / 'a')!r} bs=4096 count=1 >/dev/null; "
-            f"dd if=/dev/zero of={str(output / 'b')!r} bs=4096 count=1 >/dev/null",
+            f"dd if=/dev/zero of={str(output / 'b')!r} bs=4096 count=1 >/dev/null; "
+            f"while [ ! -f {str(self.stop_marker)!r} ]; do :; done; "
+            f": > {str(self.done_marker)!r}",
         ]
         receipt = runner.run(command)
         self.assertEqual(receipt["status"], "failed")
@@ -168,11 +178,14 @@ class SafeInkRunnerTests(unittest.TestCase):
 
     def test_fast_exit_tmp_cap_is_failed(self) -> None:
         runner, _output, tmp, _logs = self._runner(tmp_cap=4096)
+        self.stop_coordination.touch()
         command = [
             "/bin/sh",
             "-c",
             "dd if=/dev/zero of=\"$TMPDIR/a\" bs=4096 count=1 >/dev/null; "
-            "dd if=/dev/zero of=\"$TMPDIR/b\" bs=4096 count=1 >/dev/null",
+            "dd if=/dev/zero of=\"$TMPDIR/b\" bs=4096 count=1 >/dev/null; "
+            f"while [ ! -f {str(self.stop_marker)!r} ]; do :; done; "
+            f": > {str(self.done_marker)!r}",
         ]
         receipt = runner.run(command)
         self.assertEqual(receipt["status"], "failed")

@@ -41,7 +41,7 @@ import subprocess
 import sys
 import time
 import tomllib
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from native_qualification.prepare_xlsx_raw_inputs import (
     BASELINE_REVISION,
@@ -103,8 +103,12 @@ class ProcMonitorError(RunnerError):
     """The process monitor could not establish a trustworthy /proc scan."""
 
 
+def _utc_now() -> _dt.datetime:
+    return _dt.datetime.now(_dt.timezone.utc)
+
+
 def _now() -> str:
-    return _dt.datetime.now(_dt.timezone.utc).isoformat(timespec="milliseconds")
+    return _utc_now().isoformat(timespec="milliseconds")
 
 
 def _parse_utc(value: Any, label: str) -> _dt.datetime:
@@ -1604,7 +1608,13 @@ class BuildOverlapLease:
     active lease, phase change, or expiry is a hard failure.
     """
 
-    def __init__(self, manifest: Mapping[str, Any], manifest_path: Path):
+    def __init__(
+        self,
+        manifest: Mapping[str, Any],
+        manifest_path: Path,
+        *,
+        clock: Callable[[], _dt.datetime] | None = None,
+    ):
         execution = manifest.get("build_execution")
         if not isinstance(execution, dict) or execution.get("class") != "compile_only":
             raise RunnerError("compile_only build_execution is required for an overlap lease")
@@ -1613,6 +1623,7 @@ class BuildOverlapLease:
             raise RunnerError("compile_only build_execution needs permit_path")
         self.manifest = manifest
         self.manifest_path = manifest_path.resolve()
+        self._clock = clock or _utc_now
         self.manifest_hash, self.manifest_bytes = _sha256_file(self.manifest_path)
         self.permit_path = _resolve_path(permit_value)
         if self.permit_path.is_symlink() or not self.permit_path.is_file():
@@ -1628,7 +1639,7 @@ class BuildOverlapLease:
         self.grant_id = self._text("grant_id")
         self.job_group = self._text("job_group")
         self.expires = _parse_utc(value.get("expires_utc"), "build permit expires_utc")
-        if self.expires <= _dt.datetime.now(_dt.timezone.utc):
+        if self.expires <= self._clock():
             raise RunnerError("build permit is expired")
         max_jobs = value.get("max_jobs")
         if isinstance(max_jobs, bool) or not isinstance(max_jobs, int) or not 1 <= max_jobs <= 4:
@@ -2158,7 +2169,7 @@ class BuildOverlapLease:
     def ensure_valid(self) -> None:
         if self.lease_path is None or self.lease_id is None:
             raise RunnerError("build overlap lease is not acquired")
-        if _dt.datetime.now(_dt.timezone.utc) >= self.expires:
+        if self._clock() >= self.expires:
             raise RunnerError("build overlap permit expired")
         current_hash, _ = _sha256_file(self.permit_path)
         if current_hash != self.permit_hash:
@@ -2369,6 +2380,7 @@ class SafeRunner:
         phase: str,
         cpu: int | None,
         process_observer: Any | None = None,
+        clock: Callable[[], _dt.datetime] | None = None,
     ):
         self.manifest = manifest
         self.manifest_path = manifest_path.resolve()
@@ -2379,6 +2391,7 @@ class SafeRunner:
         # for its measurement children; it never has to intercept helper
         # subprocesses used by this runner's git/config checks.
         self.process_observer = process_observer
+        self.clock = clock
         self.guard = ProcessGuard()
         self.build_execution = manifest.get("build_execution")
         if self.build_execution is None:
@@ -2466,7 +2479,9 @@ class SafeRunner:
     def _acquire_overlap_lease(self) -> None:
         if self.build_execution.get("class") != "compile_only":
             return
-        self.overlap_lease = BuildOverlapLease(self.manifest, self.manifest_path)
+        self.overlap_lease = BuildOverlapLease(
+            self.manifest, self.manifest_path, clock=self.clock
+        )
         self.overlap_lease.acquire()
 
     def _load_preparation_receipt(self) -> dict[str, Any]:

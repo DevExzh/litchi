@@ -842,7 +842,9 @@ class NativeQualificationRunnerTests(unittest.TestCase):
         return manifest, manifest_path, permit, lease_dir
 
     @staticmethod
-    def _make_fake_cargo_source(root: Path, *, sleep_seconds: float) -> Path:
+    def _make_fake_cargo_source(
+        root: Path, *, sleep_seconds: float | None = None, hold: bool = False
+    ) -> Path:
         """Create a tiny committed source tree whose cargo symlink is bash.
 
         Invoking ``cargo build`` with cwd at this tree makes bash execute the
@@ -851,6 +853,10 @@ class NativeQualificationRunnerTests(unittest.TestCase):
         SafeRunner subprocess/lease path without invoking Cargo or native
         code.
         """
+
+        if (sleep_seconds is None) == (not hold):
+            raise ValueError("choose exactly one fake-cargo wait mode")
+        wait = "sleep infinity" if hold else f"sleep {sleep_seconds}"
 
         root.mkdir(parents=True, exist_ok=False)
         (root / "Cargo.lock").write_text("# fake lock for runner tests\n", encoding="utf-8")
@@ -862,7 +868,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             "mkdir -p \"$CARGO_TARGET_DIR\"\n"
             "printf '#!/bin/sh\\nexit 0\\n' > \"$CARGO_TARGET_DIR/probe\"\n"
             "chmod +x \"$CARGO_TARGET_DIR/probe\"\n"
-            f"sleep {sleep_seconds}\n",
+            f"{wait}\n",
             encoding="utf-8",
         )
         build.chmod(0o755)
@@ -1239,10 +1245,14 @@ class NativeQualificationRunnerTests(unittest.TestCase):
     def test_expired_compile_lease_reaps_child_and_writes_failed_receipt(self) -> None:
         with tempfile.TemporaryDirectory(prefix="native-build-overlap-expiry-child-") as directory:
             root = Path(directory)
-            source = self._make_fake_cargo_source(root / "source", sleep_seconds=5.0)
+            source = self._make_fake_cargo_source(root / "source", hold=True)
+            permit_expiry = (
+                runner._dt.datetime.now(runner._dt.timezone.utc)
+                + runner._dt.timedelta(minutes=5)
+            )
             manifest, manifest_path, permit, _lease_dir = self._overlap_fixture_with_sources(
                 root,
-                expires=(runner._dt.datetime.now(runner._dt.timezone.utc) + runner._dt.timedelta(seconds=1)).isoformat(),
+                expires=permit_expiry.isoformat(),
                 source_roots=(source.parent, source.parent),
             )
             for leg in manifest["legs"].values():
@@ -1254,16 +1264,74 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             permit_value["allowed_manifest_sha256"] = [manifest_hash]
             permit_value["manifest_bindings"][0]["sha256"] = manifest_hash
             permit.write_text(json.dumps(permit_value), encoding="utf-8")
-            # The permit is intentionally made short-lived only after the
-            # manifest/lease identity is complete, avoiding a startup race.
-            permit_value["expires_utc"] = (
-                runner._dt.datetime.now(runner._dt.timezone.utc) + runner._dt.timedelta(seconds=2)
-            ).isoformat()
+            # The permit expiry is comfortably beyond setup.  The controlled
+            # clock below advances only after the child is bound, so this
+            # test never relies on startup latency or arbitrary sleep time.
+            permit_value["expires_utc"] = permit_expiry.isoformat()
             permit.write_text(json.dumps(permit_value), encoding="utf-8")
-            safe = runner.SafeRunner(manifest, manifest_path, "build", None)
-            safe.guard.offenders = lambda *args, **kwargs: []
+            permit_hash = hashlib.sha256(permit.read_bytes()).hexdigest()
+
+            # Advance the lease clock only after the real child has been
+            # bound.  This uses the runner's process-start hook as a
+            # deterministic hand-off, so setup latency cannot consume the
+            # permit before the event journal exists.  The permit file and
+            # its hash remain unchanged; the monitor still exercises the
+            # actual expiry/reap path while the fake Cargo child is live.
+            state: dict[str, bool] = {
+                "started": False,
+                "permit_was_future": False,
+                "clock_advanced": False,
+            }
+            safe_ref: dict[str, runner.SafeRunner] = {}
+            clock_value = {"now": runner._dt.datetime.now(runner._dt.timezone.utc)}
+
+            def clock() -> runner._dt.datetime:
+                return clock_value["now"]
+
+            class ExpireAfterStart:
+                def process_started(self, **_kwargs: object) -> dict[str, bool]:
+                    safe = safe_ref["safe"]
+                    lease = safe.overlap_lease
+                    assert lease is not None
+                    state["started"] = True
+                    state["permit_was_future"] = lease.expires > clock()
+                    clock_value["now"] = permit_expiry + runner._dt.timedelta(seconds=1)
+                    state["clock_advanced"] = True
+                    return {"expired_after_start": True}
+
+                def process_finished(
+                    self, token: dict[str, bool], *, returncode: int | None
+                ) -> dict[str, object]:
+                    return {**token, "returncode": returncode}
+
+            safe = runner.SafeRunner(
+                manifest,
+                manifest_path,
+                "build",
+                None,
+                process_observer=ExpireAfterStart(),
+                clock=clock,
+            )
+            safe_ref["safe"] = safe
+
+            def isolated_offenders(*args: object, **kwargs: object) -> list[dict[str, object]]:
+                # Keep the host-builder isolation from the historical test,
+                # but retain the lease validation that the monitor performs
+                # through the overlap argument.
+                overlap = kwargs.get("overlap")
+                if overlap is not None:
+                    overlap.ensure_valid()
+                return []
+
+            safe.guard.offenders = isolated_offenders
             with self.assertRaisesRegex(runner.RunnerError, "expired"):
                 safe.build()
+            self.assertEqual(state, {
+                "started": True,
+                "permit_was_future": True,
+                "clock_advanced": True,
+            })
+            self.assertEqual(hashlib.sha256(permit.read_bytes()).hexdigest(), permit_hash)
             receipt = json.loads((root / "output" / "build-receipt.json").read_text(encoding="utf-8"))
             self.assertEqual(receipt["status"], "failed")
             self.assertEqual(receipt["build_execution"]["class"], "compile_only")
@@ -1273,6 +1341,7 @@ class NativeQualificationRunnerTests(unittest.TestCase):
             event = json.loads(events[0])
             self.assertIn("expired", event["runner_error"])
             self.assertEqual(event["post_exit_descendants"], [])
+            self.assertEqual(event["process_observation"]["expired_after_start"], True)
 
     def test_runner_reaps_setsid_descendant_after_rapid_leader_exit(self) -> None:
         """A detached helper cannot escape the generic runner's ownership."""

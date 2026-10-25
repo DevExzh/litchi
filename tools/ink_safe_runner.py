@@ -220,13 +220,19 @@ class SafeInkCommand:
             systemctl_exit = None
             systemctl_stderr = f"systemctl stop timed out: {error}"
         group_signal = None
+        # The unit kill is asynchronous.  A fast child may have completed
+        # successfully while systemctl was issuing the kill request; do not
+        # turn that completed result into a synthetic SIGTERM just because
+        # the outer poll observed the cap first.
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+                group_signal = "SIGTERM"
+            except ProcessLookupError:
+                pass
         try:
-            os.killpg(process.pid, signal.SIGTERM)
-            group_signal = "SIGTERM"
-        except ProcessLookupError:
-            pass
-        try:
-            process.wait(timeout=2)
+            if process.poll() is None:
+                process.wait(timeout=2)
         except subprocess.TimeoutExpired:
             try:
                 os.killpg(process.pid, signal.SIGKILL)
