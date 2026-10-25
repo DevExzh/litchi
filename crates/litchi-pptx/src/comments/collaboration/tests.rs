@@ -68,17 +68,39 @@ fn replay_presence_validator_accepts_partial_multi_author_extensions() {
 
 #[test]
 fn replay_presence_validator_ignores_inactive_typed_uri_bytes() {
-    let inactive_user = "inactive-user".repeat(16);
-    let inactive_provider = "inactive-provider".repeat(16);
+    // Keep both discarded values above the selected budget.  Their only
+    // reason for being accepted is that MCE removes their branch before the
+    // recipient-owned semantic aggregate is charged.
+    let inactive_user = "inactive-user".repeat(32);
+    let inactive_provider = "inactive-provider".repeat(32);
     let source = format!(
         r#"<p:cmAuthorLst xmlns:p="{PML}" xmlns:p15="{P15}" xmlns:mc="{MCE}"><p:cmAuthor id="7" name="A" initials="A" lastIdx="0" clrIdx="0"><p:extLst><mc:AlternateContent><mc:Choice Requires="p15"><p:ext uri="urn:other-extension"/></mc:Choice><mc:Fallback><p:ext uri="{uri}"><p15:presenceInfo userId="{inactive_user}" providerId="{inactive_provider}"><p15:unexpected/></p15:presenceInfo></p:ext></mc:Fallback></mc:AlternateContent></p:extLst></p:cmAuthor></p:cmAuthorLst>"#,
         uri = super::PRESENCE_EXTENSION_URI,
         inactive_user = inactive_user,
         inactive_provider = inactive_provider,
     );
-    let mut limits = crate::comments::Limits::DEFAULT;
-    limits.max_string_bytes = 128;
-    assert!(super::validate_presence_replay(source.as_bytes(), limits).is_ok());
+    // Independent fixture calculation: root xmlns:p/p15/mc (7+58, 9+56,
+    // 8+59), cmAuthor's five attributes (2+1, 4+1, 8+1, 7+1, 6+1), and
+    // the selected p:ext URI (3+19) total 251 decoded name/value bytes.
+    // Do not derive this boundary from the production preflight helper.
+    let selected_aggregate = (7 + PML.len())
+        + (9 + P15.len())
+        + (8 + MCE.len())
+        + (2 + 1)
+        + (4 + 1)
+        + (8 + 1)
+        + (7 + 1)
+        + (6 + 1)
+        + (3 + "urn:other-extension".len());
+    assert_eq!(selected_aggregate, 251);
+
+    let mut exact = crate::comments::Limits::DEFAULT;
+    exact.max_string_bytes = selected_aggregate;
+    assert!(super::validate_presence_replay(source.as_bytes(), exact).is_ok());
+
+    let mut one_under = exact;
+    one_under.max_string_bytes = selected_aggregate - 1;
+    assert!(super::validate_presence_replay(source.as_bytes(), one_under).is_err());
 }
 
 #[test]
@@ -177,9 +199,33 @@ fn replay_threading_validator_ignores_inactive_ordinary_values_after_mce() {
         uri = super::THREADING_EXTENSION_URI,
         inactive = inactive,
     );
-    let mut limits = crate::comments::Limits::DEFAULT;
-    limits.max_string_bytes = 128;
-    assert!(super::validate_threading_replay(source.as_bytes(), limits).is_ok());
+    // Independent fixture calculation: root xmlns:p/p15/mc (7+58, 9+56,
+    // 8+59), the active comment/position attributes (8+1, 3+1, 1+1, 1+1),
+    // text "hello" (5), the threading URI (3+38), timeZoneBias (12+3), and
+    // parentCm's two attributes (8+1, 3+1) total 288 bytes.  The inactive
+    // fallback has much larger dt/text values but is excluded by MCE.
+    // Do not derive this boundary from the production preflight helper.
+    let selected_aggregate = (7 + PML.len())
+        + (9 + P15.len())
+        + (8 + MCE.len())
+        + (8 + 1)
+        + (3 + 1)
+        + (1 + 1)
+        + (1 + 1)
+        + 5
+        + (3 + super::THREADING_EXTENSION_URI.len())
+        + (12 + 3)
+        + (8 + 1)
+        + (3 + 1);
+    assert_eq!(selected_aggregate, 288);
+
+    let mut exact = crate::comments::Limits::DEFAULT;
+    exact.max_string_bytes = selected_aggregate;
+    assert!(super::validate_threading_replay(source.as_bytes(), exact).is_ok());
+
+    let mut one_under = exact;
+    one_under.max_string_bytes = selected_aggregate - 1;
+    assert!(super::validate_threading_replay(source.as_bytes(), one_under).is_err());
 }
 
 fn package_with_sources() -> OpcPackage {
