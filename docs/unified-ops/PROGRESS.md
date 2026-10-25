@@ -5268,3 +5268,37 @@ See [0063](0063-source-pptx-modern-comments.md).
 
   Final census, complete gate, native/corpus and performance qualification
   remain open. Only redaction audit 22 is deferred. Nothing is pushed.
+
+- Coordinator ZIP acceptance, PPTX composition and cleanup checkpoint (2026-10-25):
+  ZIP atomic `04879dd503` merges at `76b2d275f9`. All eight actual guarded
+  rows pass on `e49a1062ec`, including 948 tests; root verifies every receipt,
+  source/lock fence, log, target trace and terminal ownership sample. All 22
+  implementation/prior-record blobs match tested source, glossary composition
+  retains 69 profiles, and 99 selected tooling tests pass. Record 0362ul89
+  binds acceptance. The earlier 335-path workspace formatting failure remains
+  preserved and full formatting remains required before the final gate.
+
+  Cleanup wave 63 removes the accepted ZIP author and atomic worktrees
+  without force, preserving branches, two ignored payloads and external
+  evidence/target. Root verifies same-device sparse restoration and final
+  receipts. Net reclaimed allocation is 15,131,107,328 bytes; record 0362ul90
+  binds the evidence. Trunk/integration holds are released and the protected
+  constructor probe is unchanged.
+
+  Private PPTX composition joins 61h/62g/63/81c/82a, retaining all 13 selected
+  profiles, physical byte accounting and persistent replay indexes. Its 99
+  tooling tests pass; runtime acceptance is not claimed. Composition review
+  fixes metadata publication bookkeeping and policy loss during deferred/SVG
+  reopening, with a committed regression still to run. The 89a/b laser/MCE
+  return is composed: aggregate staging stays atomic and prepared-slide
+  admission precedes allocation. Typed-error 84a/b remains in source review
+  and compiler preparation; exact cross-copy transcript regeneration is open.
+
+  Shared properties and Web/Ribbon pass scoped source review. Actual
+  properties validation preserves a formatting failure, then a stale private
+  helper compile failure; both have committed repairs. Web/Ribbon's initial
+  preflight refuses an overlapping build before running a row, so isolated
+  captures are serialized. VBA87c remains under recipient-policy and lexical
+  fidelity repair. Final gate/docs, census, native/corpus and performance
+  qualification remain open. Only redaction audit 22 is deferred. Nothing is
+  pushed.
