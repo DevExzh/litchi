@@ -5994,3 +5994,14 @@ See [0063](0063-source-pptx-modern-comments.md).
   remain under repair, and a capped source-archive job runs outside Git.
   Actual native measurements, final gates, census review, trunk integration
   and cleanup remain open. Nothing is pushed.
+
+  Root verifies nine final65 rows: seven compiler supplements, workspace
+  formatting and all-feature Clippy (151). DrawingML's C binding is generated;
+  the exact 461,401-file C archive passes the reviewed verifier. Current-native
+  v6 passes 22 focused tests and starts source binding against P4ab42bb.
+  Signed v3 stops before archive generation on a lock permission assumption;
+  reviewed v4 preserves C permissions, passes eight tests and starts fresh.
+  Binding test migrations and DrawingML baseline preparation continue.
+  The census remains 55 worktrees/74 heads, with four active unified controls.
+  Native measurements, remaining gates, census review, final merge and cleanup
+  remain required. Nothing is pushed.
