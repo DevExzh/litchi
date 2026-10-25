@@ -131,10 +131,24 @@ fn storage_rejects_invalid_instance_and_truncated_compressed_header() {
     let value = Storage::uncompressed(Kind::OleObject, Vec::new()).unwrap();
     let mut bytes = value.to_record_bytes().unwrap();
     bytes[0..2].copy_from_slice(&(2u16 << 4).to_le_bytes());
-    assert!(Storage::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
+    assert!(
+        Storage::parse(
+            &Record::parse(&bytes, 0, &crate::SourceLimits::default())
+                .unwrap()
+                .0
+        )
+        .is_err()
+    );
     bytes.truncate(8);
     bytes[0..2].copy_from_slice(&(1u16 << 4).to_le_bytes());
-    assert!(Storage::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
+    assert!(
+        Storage::parse(
+            &Record::parse(&bytes, 0, &crate::SourceLimits::default())
+                .unwrap()
+                .0
+        )
+        .is_err()
+    );
 }
 
 #[test]

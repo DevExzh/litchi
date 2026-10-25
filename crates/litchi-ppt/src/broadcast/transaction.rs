@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use crate::package::{Error, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::records::Record;
 
 use super::codec;
@@ -72,6 +72,7 @@ pub struct Snapshot {
     broadcast: Broadcast,
     unknown_records: Vec<UnknownRecord>,
     revision: Revision,
+    limits: SourceLimits,
 }
 
 impl Snapshot {
@@ -80,15 +81,15 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &SourceLimits) -> Result<Self> {
         let source = bytes.as_ref();
-        let (record, consumed) = Record::parse_strict(source, 0)?;
+        let (record, consumed) = Record::parse_strict_with_limits(source, 0, *limits)?;
         if consumed != source.len() {
             return Err(Error::Corrupted(
                 "broadcast snapshot contains trailing bytes".into(),
             ));
         }
-        Self::from_record_and_bytes(&record, source.to_vec())
+        Self::from_record_and_bytes(&record, source.to_vec(), *limits)
     }
 
     /// Capture owned source bytes without a caller-side borrow.
@@ -96,8 +97,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::parse(bytes)
+    pub fn from_bytes(bytes: Vec<u8>, limits: &SourceLimits) -> Result<Self> {
+        Self::parse(bytes, limits)
     }
 
     /// Capture a validated typed broadcast using canonical source bytes.
@@ -105,7 +106,7 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_broadcast(broadcast: &Broadcast) -> Result<Self> {
+    pub fn from_broadcast(broadcast: &Broadcast, limits: &SourceLimits) -> Result<Self> {
         let record = broadcast.to_record()?;
         let bytes = codec::record_bytes(
             record.version,
@@ -113,10 +114,14 @@ impl Snapshot {
             record.record_type_raw,
             &record.data,
         )?;
-        Self::parse(bytes)
+        Self::parse(bytes, limits)
     }
 
-    fn from_record_and_bytes(record: &Record, bytes: Vec<u8>) -> Result<Self> {
+    fn from_record_and_bytes(
+        record: &Record,
+        bytes: Vec<u8>,
+        limits: SourceLimits,
+    ) -> Result<Self> {
         let parsed = codec::parse_lossless(record)?;
         let shared: Arc<[u8]> = Arc::from(bytes.into_boxed_slice());
         Ok(Self {
@@ -124,6 +129,7 @@ impl Snapshot {
             bytes: shared,
             broadcast: parsed.value,
             unknown_records: parsed.unknown_records,
+            limits,
         })
     }
 
@@ -476,7 +482,7 @@ impl Transaction {
             record.record_type_raw,
             &record.data,
         )?;
-        Snapshot::parse(bytes)
+        Snapshot::parse(bytes, &self.source.limits)
     }
 }
 
@@ -604,7 +610,7 @@ impl Patch {
         if self.is_empty() {
             return Ok(current.clone());
         }
-        Snapshot::parse(self.after.as_ref())
+        Snapshot::parse(self.after.as_ref(), &current.limits)
     }
 
     /// Apply the inverse to the exact committed target.

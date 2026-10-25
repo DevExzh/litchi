@@ -2,7 +2,7 @@ use litchi_odraw::shape::Shape;
 use litchi_odraw::{Container, Record, RecordKind};
 
 use crate::embedded::reference::Reference;
-use crate::package::Result;
+use crate::package::{Result, SourceLimits};
 
 use super::model::{Anchor, Drawing, Frame, FrameKind, Placeholder, ShapeExt, ShapeLimitsExt};
 use super::package::{
@@ -170,8 +170,19 @@ impl ShapeLimitsExt for Shape<'_> {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse(data: &[u8]) -> Result<Vec<Shape<'_>>> {
-    parse_drawing(data).map(Drawing::into_shapes)
+pub fn parse<'data>(data: &'data [u8], limits: &litchi_odraw::Limits) -> Result<Vec<Shape<'data>>> {
+    parse_drawing(data, limits).map(Drawing::into_shapes)
+}
+
+/// Derive the neutral OfficeArt traversal policy from the selected PPT
+/// source profile. A source-backed slide projection must not reopen its
+/// drawing with the neutral crate's defaults.
+pub(crate) fn limits_for_source(source: SourceLimits) -> litchi_odraw::Limits {
+    litchi_odraw::Limits {
+        max_record_bytes: source.max_record_bytes().min(u32::MAX as usize) as u32,
+        max_depth: source.max_depth().min(u16::MAX as usize) as u16,
+        max_records: source.max_events().min(u32::MAX as usize) as u32,
+    }
 }
 
 /// Parse a `PowerPoint` `OfficeArt` stream while retaining its validated root
@@ -185,19 +196,19 @@ pub fn parse(data: &[u8]) -> Result<Vec<Shape<'_>>> {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse_drawing(data: &[u8]) -> Result<Drawing<'_>> {
+pub fn parse_drawing<'data>(
+    data: &'data [u8],
+    limits: &litchi_odraw::Limits,
+) -> Result<Drawing<'data>> {
     let mut roots = Vec::new();
     let mut shapes = Vec::new();
     let mut offset = 0usize;
     let mut visited = 0u32;
     while offset < data.len() {
         visit_host_record(&mut visited)?;
-        let (record, consumed) = Record::parse(data, offset, litchi_odraw::Limits::default())?;
+        let (record, consumed) = Record::parse(data, offset, *limits)?;
         let end = advance(offset, consumed, "PowerPoint OfficeArt drawing stream")?;
-        shapes.extend(litchi_odraw::shape::parse(
-            &data[offset..end],
-            Default::default(),
-        )?);
+        shapes.extend(litchi_odraw::shape::parse(&data[offset..end], *limits)?);
         roots.push(record);
         offset = end;
     }
@@ -224,7 +235,8 @@ pub fn anchor(shape: &Shape<'_>) -> Result<Option<Anchor>> {
     {
         return Err(corrupted("Invalid PowerPoint OfficeArtClientAnchor header"));
     }
-    let parsed = crate::client_anchor::Data::parse(anchor.data())?;
+    let parsed =
+        crate::client_anchor::Data::parse(anchor.data(), &crate::client_anchor::Limits::default())?;
     Anchor::new(parsed.left(), parsed.top(), parsed.right(), parsed.bottom()).map(Some)
 }
 

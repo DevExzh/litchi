@@ -41,8 +41,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record(context: Context, root: Record) -> RecordResult<Self> {
-        Self::from_inner(master_layout::Snapshot::from_record(context, root)?)
+    pub fn from_record(context: Context, root: Record, limits: &Limits) -> RecordResult<Self> {
+        Self::from_inner(master_layout::Snapshot::from_record(context, root, limits)?)
     }
 
     /// Parse one complete contextual master record.
@@ -50,8 +50,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(context: Context, bytes: &[u8]) -> RecordResult<Self> {
-        Self::from_inner(master_layout::Snapshot::parse(context, bytes)?)
+    pub fn parse(context: Context, bytes: &[u8], limits: &Limits) -> RecordResult<Self> {
+        Self::from_inner(master_layout::Snapshot::parse(context, bytes, limits)?)
     }
 
     fn from_inner(inner: master_layout::Snapshot) -> RecordResult<Self> {

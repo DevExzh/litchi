@@ -18,7 +18,7 @@ fn round_trips_exact_time_node_atoms_and_envelopes() {
     };
     let bytes = write_time_node_atom(&atom);
     assert_eq!(bytes.len(), 40);
-    let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+    let (record, consumed) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(consumed, bytes.len());
     assert_eq!(parse_time_node_atom(&record).unwrap(), atom);
 
@@ -94,7 +94,8 @@ fn round_trips_exact_time_node_atoms_and_envelopes() {
         ..ExtendedTimeNode::default()
     };
     let node_bytes = write_extended_time_node(&node).unwrap();
-    let (node_record, node_consumed) = Record::parse(&node_bytes, 0).unwrap();
+    let (node_record, node_consumed) =
+        Record::parse(&node_bytes, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(node_consumed, node_bytes.len());
     assert_eq!(
         node_record
@@ -133,14 +134,14 @@ fn rejects_malformed_time_node_atoms() {
     for &(offset, value) in mutations {
         let mut bytes = default.clone();
         bytes[offset..offset + 4].copy_from_slice(&value.to_le_bytes());
-        let (record, _) = Record::parse(&bytes, 0).unwrap();
+        let (record, _) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
         assert!(parse_time_node_atom(&record).is_err());
     }
 
     let mut invalid_enum = default;
     invalid_enum[20..24].copy_from_slice(&5u32.to_le_bytes());
     invalid_enum[36..40].copy_from_slice(&1u32.to_le_bytes());
-    let (record, _) = Record::parse(&invalid_enum, 0).unwrap();
+    let (record, _) = Record::parse(&invalid_enum, 0, &crate::SourceLimits::default()).unwrap();
     assert!(parse_time_node_atom(&record).is_err());
 }
 
@@ -191,7 +192,7 @@ fn rejects_invalid_extended_time_node_structure() {
     assert!(write_extended_time_node(&invalid).is_err());
 
     let bytes = write_extended_time_node(&behavior_node).unwrap();
-    let (mut record, _) = Record::parse(&bytes, 0).unwrap();
+    let (mut record, _) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
     record.children[0].data[8..12].copy_from_slice(&0u32.to_le_bytes());
     assert!(parse_extended_time_node(&record).is_err());
 
@@ -220,7 +221,8 @@ fn rejects_invalid_extended_time_node_structure() {
         ..ExtendedTimeNode::default()
     };
     let ordered_bytes = write_extended_time_node(&ordered).unwrap();
-    let (mut ordered_record, _) = Record::parse(&ordered_bytes, 0).unwrap();
+    let (mut ordered_record, _) =
+        Record::parse(&ordered_bytes, 0, &crate::SourceLimits::default()).unwrap();
     ordered_record.children.swap(1, 2);
     assert!(parse_extended_time_node(&ordered_record).is_err());
 }
@@ -250,7 +252,7 @@ fn round_trips_and_validates_subordinate_effects() {
         modifiers: vec![TimeModifier::RepeatDuration(1_000)],
     };
     let bytes = write_time_sub_effect(&media).unwrap();
-    let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+    let (record, consumed) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(consumed, bytes.len());
     assert_eq!(parse_time_sub_effect(&record).unwrap(), media);
 
@@ -310,7 +312,8 @@ fn supports_every_time_node_atom_enum_value_and_ignores_reserved_fields() {
                 bytes[28] = 0xFF;
                 let flags = u32::from_le_bytes(bytes[36..40].try_into().unwrap()) | 0xFFFF_FFE0;
                 bytes[36..40].copy_from_slice(&flags.to_le_bytes());
-                let (record, _) = Record::parse(&bytes, 0).unwrap();
+                let (record, _) =
+                    Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
                 assert_eq!(parse_time_node_atom(&record).unwrap(), expected);
             }
         }
@@ -322,7 +325,7 @@ fn decodes_grouping_type_property_flag_from_time_node_atom() {
     let mut bytes = write_time_node_atom(&TimeNodeAtom::default());
     bytes[16..20].copy_from_slice(&TimeNodeKind::Sequential.as_u32().to_le_bytes());
     bytes[36..40].copy_from_slice(&0x08u32.to_le_bytes());
-    let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+    let (record, consumed) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(consumed, bytes.len());
     assert_eq!(
         parse_time_node_atom(&record).unwrap().node_type,
@@ -354,7 +357,7 @@ fn round_trips_all_time_node_property_variants() {
         ],
     };
     let bytes = write_time_node_property_list(&root, TimePropertyListContext::TimeNode).unwrap();
-    let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+    let (record, consumed) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(consumed, bytes.len());
     assert_eq!(
         parse_time_node_property_list(&record, TimePropertyListContext::TimeNode).unwrap(),
@@ -374,7 +377,8 @@ fn round_trips_all_time_node_property_variants() {
     };
     let subeffect_bytes =
         write_time_node_property_list(&subeffect, TimePropertyListContext::SubEffect).unwrap();
-    let (subeffect_record, _) = Record::parse(&subeffect_bytes, 0).unwrap();
+    let (subeffect_record, _) =
+        Record::parse(&subeffect_bytes, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(
         parse_time_node_property_list(&subeffect_record, TimePropertyListContext::SubEffect)
             .unwrap(),
@@ -418,7 +422,7 @@ fn validates_effect_ids_and_category_specific_directions() {
         let expected = list(effect_type, effect_id, direction);
         let bytes =
             write_time_node_property_list(&expected, TimePropertyListContext::TimeNode).unwrap();
-        let (record, _) = Record::parse(&bytes, 0).unwrap();
+        let (record, _) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
         assert_eq!(
             parse_time_node_property_list(&record, TimePropertyListContext::TimeNode).unwrap(),
             expected
@@ -458,7 +462,7 @@ fn validates_effect_ids_and_category_specific_directions() {
 
     let valid = list(TimeEffectType::Entrance, 2, Some(2));
     let bytes = write_time_node_property_list(&valid, TimePropertyListContext::TimeNode).unwrap();
-    let (mut record, _) = Record::parse(&bytes, 0).unwrap();
+    let (mut record, _) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
     let direction = record
         .children
         .iter_mut()
@@ -501,7 +505,7 @@ fn rejects_invalid_time_node_property_lists() {
         properties: vec![TimeNodeProperty::MediaMute(true)],
     };
     let bytes = write_time_node_property_list(&valid, TimePropertyListContext::TimeNode).unwrap();
-    let (mut record, _) = Record::parse(&bytes, 0).unwrap();
+    let (mut record, _) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
     record.children[0].data[0] = 1;
     assert!(parse_time_node_property_list(&record, TimePropertyListContext::TimeNode).is_err());
 }
@@ -531,7 +535,7 @@ fn round_trips_time_conditions_and_modifiers() {
             visual_target: Some(TimeVisualElement::Page),
         };
         let bytes = write_time_condition(&expected).unwrap();
-        let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+        let (record, consumed) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
         assert_eq!(consumed, bytes.len());
         assert_eq!(parse_time_condition(&record).unwrap(), expected);
     }
@@ -554,7 +558,7 @@ fn round_trips_time_conditions_and_modifiers() {
             delay_ms: i32::MIN,
         };
         let bytes = write_time_condition_atom(&atom).unwrap();
-        let (record, _) = Record::parse(&bytes, 0).unwrap();
+        let (record, _) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
         assert_eq!(parse_time_condition_atom(&record).unwrap(), atom);
     }
 
@@ -568,7 +572,7 @@ fn round_trips_time_conditions_and_modifiers() {
     ];
     for modifier in modifiers {
         let bytes = write_time_modifier(&modifier);
-        let (record, _) = Record::parse(&bytes, 0).unwrap();
+        let (record, _) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
         assert_eq!(parse_time_modifier(&record).unwrap(), modifier);
     }
 }
@@ -602,12 +606,13 @@ fn rejects_malformed_time_conditions_and_modifiers() {
     })
     .unwrap();
     bytes[12..16].copy_from_slice(&2u32.to_le_bytes());
-    let (record, _) = Record::parse(&bytes, 0).unwrap();
+    let (record, _) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
     assert!(parse_time_condition_atom(&record).is_err());
 
     let mut modifier_bytes = write_time_modifier(&TimeModifier::Speed(100));
     modifier_bytes[8..12].copy_from_slice(&6u32.to_le_bytes());
-    let (modifier_record, _) = Record::parse(&modifier_bytes, 0).unwrap();
+    let (modifier_record, _) =
+        Record::parse(&modifier_bytes, 0, &crate::SourceLimits::default()).unwrap();
     assert!(parse_time_modifier(&modifier_record).is_err());
 }
 

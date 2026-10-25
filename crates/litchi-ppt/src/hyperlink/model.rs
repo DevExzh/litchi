@@ -56,6 +56,14 @@ pub struct InteractionLimits {
     pub max_record_bytes: usize,
     /// Maximum `MacroNameAtom` UTF-16 payload size.
     pub max_macro_name_bytes: usize,
+    /// Maximum record events admitted while parsing the interaction payload.
+    pub max_events: usize,
+    /// Maximum nested record depth admitted while parsing the interaction.
+    pub max_depth: usize,
+    /// Maximum payload of one child record.
+    pub max_record_payload_bytes: usize,
+    /// Maximum aggregate payload admitted by the interaction parser.
+    pub max_aggregate_payload_bytes: usize,
 }
 
 impl Default for InteractionLimits {
@@ -63,6 +71,10 @@ impl Default for InteractionLimits {
         Self {
             max_record_bytes: 1024 * 1024,
             max_macro_name_bytes: 64 * 1024,
+            max_events: crate::SourceLimits::DEFAULT_MAX_EVENTS,
+            max_depth: crate::SourceLimits::DEFAULT_MAX_DEPTH,
+            max_record_payload_bytes: crate::SourceLimits::DEFAULT_MAX_RECORD_PAYLOAD_BYTES,
+            max_aggregate_payload_bytes: crate::SourceLimits::DEFAULT_MAX_AGGREGATE_PAYLOAD_BYTES,
         }
     }
 }

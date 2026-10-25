@@ -368,6 +368,7 @@ impl Transaction {
         let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
             self.source.bytes.clone(),
             self.source.limits.max_source_bytes,
+            self.source.limits.fonts.records,
         )?;
         let live = editor.persisted_record(self.source.document_persist_id)?;
         if live.as_slice() != self.source.document.as_ref() {

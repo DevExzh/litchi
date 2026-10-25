@@ -100,13 +100,13 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse one complete root record with default limits.
+    /// Parse one complete root record under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(bytes, Limits::default())
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse one complete root record under explicit resource limits.
@@ -123,8 +123,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
+    pub fn from_bytes(bytes: Vec<u8>, limits: &Limits) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes, *limits)
     }
 
     /// Capture an owned root record under explicit resource limits.
@@ -420,7 +420,7 @@ impl RecordEdit {
     }
 
     fn validate_candidate(&self, candidate: &Collection) -> Result<()> {
-        validation::validate_collection(candidate, &self.source.hyperlink_ids)
+        validation::validate_collection(candidate, &self.source.hyperlink_ids, self.source.limits)
     }
 
     fn emit_candidate(&self) -> Result<Vec<u8>> {

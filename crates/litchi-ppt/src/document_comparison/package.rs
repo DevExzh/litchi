@@ -27,25 +27,26 @@ pub struct Snapshot {
     document: DocumentSnapshot,
     document_persist_id: u32,
     limits: Limits,
+    source_limits: crate::SourceLimits,
 }
 
 impl Snapshot {
-    /// Parse a complete OLE2 `PowerPoint` package using default limits.
+    /// Parse a complete OLE2 `PowerPoint` package under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes.to_vec(), Limits::default())
+    pub fn parse(bytes: &[u8], limits: &Limits) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes.to_vec(), *limits)
     }
 
-    /// Capture a complete OLE2 `PowerPoint` package without another caller copy.
+    /// Capture a complete OLE2 `PowerPoint` package under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, Limits::default())
+    pub fn from_bytes(bytes: Vec<u8>, limits: &Limits) -> Result<Self> {
+        Self::from_bytes_with_limits(bytes, *limits)
     }
 
     /// Parse a package with the document-comparison resource limits supplied
@@ -69,6 +70,7 @@ impl Snapshot {
             document,
             document_persist_id,
             limits,
+            source_limits: presentation.source_limits(),
         })
     }
 
@@ -197,7 +199,10 @@ impl Editor {
             });
         }
 
-        let mut editor = crate::embedded::object::Editor::open_records(source.bytes.to_vec())?;
+        let mut editor = crate::embedded::object::Editor::open_records(
+            source.bytes.to_vec(),
+            source.source_limits,
+        )?;
         let current = editor.persisted_record(source.document_persist_id)?;
         if current.as_slice() != source.document.bytes() {
             return Err(Error::InvalidFormat(

@@ -358,7 +358,7 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok((Vec::new(), report));
         };
-        let parsed = crate::odraw::parse(&drawing.data)?;
+        let parsed = crate::odraw::parse(&drawing.data, &crate::odraw::Limits::default())?;
         let mut shapes = Vec::with_capacity(parsed.len());
         for (index, shape) in parsed.iter().enumerate() {
             if let Some(mut converted_shape) =
@@ -387,7 +387,7 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let shapes = crate::odraw::parse(&drawing.data)?;
+        let shapes = crate::odraw::parse(&drawing.data, &crate::odraw::Limits::default())?;
         let mut ids = Vec::new();
         let mut pending = shapes.iter().rev().collect::<Vec<_>>();
         let mut visited = 0usize;
@@ -415,7 +415,7 @@ impl SpeakerNotes {
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(String::new());
         };
-        let shapes = crate::odraw::parse(&drawing.data)?;
+        let shapes = crate::odraw::parse(&drawing.data, &crate::odraw::Limits::default())?;
         let mut text = Vec::new();
         for shape in &shapes {
             collect_notes_body_text(shape, &mut text)?;
@@ -502,7 +502,8 @@ mod tests {
     }
 
     fn build(document: &[u8]) -> Result<NotesIndex> {
-        let (document, _) = Record::parse(document, 0).expect("parse synthetic document");
+        let (document, _) =
+            Record::parse(document, 0, &SourceLimits::default()).expect("parse synthetic document");
         NotesIndex::try_from_document(&document)
     }
 
@@ -526,18 +527,19 @@ mod tests {
 
         // A malformed list is kept as the error of every slide with notes,
         // and slides without notes are unaffected.
-        let (document, _) = Record::parse(&document, 0).unwrap();
+        let (document, _) = Record::parse(&document, 0, &SourceLimits::default()).unwrap();
         let deferred = NotesIndex::from_document(&document);
         let mut slide_atom_data = [0u8; SLIDE_ATOM_SIZE];
         let without_notes = record(0x0f, 0, 0x03ee, &record(2, 0, 0x03ef, &slide_atom_data));
-        let (without_notes, _) = Record::parse(&without_notes, 0).unwrap();
+        let (without_notes, _) =
+            Record::parse(&without_notes, 0, &SourceLimits::default()).unwrap();
         assert!(matches!(
             deferred.descriptor(&without_notes, 256, &PersistMapping::new()),
             Ok(None)
         ));
         slide_atom_data[16..20].copy_from_slice(&0x345u32.to_le_bytes());
         let with_notes = record(0x0f, 0, 0x03ee, &record(2, 0, 0x03ef, &slide_atom_data));
-        let (with_notes, _) = Record::parse(&with_notes, 0).unwrap();
+        let (with_notes, _) = Record::parse(&with_notes, 0, &SourceLimits::default()).unwrap();
         assert!(
             deferred
                 .descriptor(&with_notes, 256, &PersistMapping::new())
@@ -552,7 +554,8 @@ mod tests {
         slide_atom_data[16..20].copy_from_slice(&0x345u32.to_le_bytes());
         let slide_atom = record(2, 0, 0x03ef, &slide_atom_data);
         let slide_bytes = record(0x0f, 0, 0x03ee, &slide_atom);
-        let (slide, _) = Record::parse(&slide_bytes, 0).expect("parse synthetic slide");
+        let (slide, _) = Record::parse(&slide_bytes, 0, &SourceLimits::default())
+            .expect("parse synthetic slide");
         let error = index
             .descriptor(&slide, 4, &PersistMapping::new())
             .expect_err("dangling persist reference must fail");

@@ -41,10 +41,10 @@ impl Presentation {
             let persist_offset = usize::try_from(offset).map_err(|_err| {
                 crate::package::Error::Corrupted("persist offset exceeds usize".into())
             })?;
-            let (resolved, _) = Record::parse_with_limits(
+            let (resolved, _) = Record::parse(
                 self.document_stream(),
                 persist_offset,
-                self.inner.source_limits,
+                &self.inner.source_limits,
             )?;
             if let Some(record) = records
                 .iter()

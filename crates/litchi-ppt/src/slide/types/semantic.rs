@@ -181,7 +181,9 @@ impl Slide<'_> {
     ///
     /// Returns an error if the operation fails.
     pub fn shape_interactions(&self) -> Result<Vec<crate::ShapeInteractionEntry>> {
-        self.shape_interactions_with_limits(crate::InteractionLimits::default())
+        self.shape_interactions_with_limits(crate::text_edit::runs::interaction_limits_for_source(
+            self.source_limits,
+        ))
     }
 
     /// Return shape interactions with caller-supplied record and name limits.
@@ -196,7 +198,10 @@ impl Slide<'_> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
+        let escher_shapes = crate::odraw::parse(
+            &ppdrawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut result = Vec::new();
         let mut pending = escher_shapes.iter().rev().collect::<Vec<_>>();
         while let Some(shape) = pending.pop() {
@@ -218,7 +223,9 @@ impl Slide<'_> {
     ///
     /// Returns an error if the operation fails.
     pub fn shape_text_interactions(&self) -> Result<Vec<crate::ShapeTextInteractionEntry>> {
-        self.shape_text_interactions_with_limits(crate::TextInteractionLimits::default())
+        self.shape_text_interactions_with_limits(crate::text_interaction::limits_for_source(
+            self.source_limits,
+        ))
     }
 
     /// Return shape text actions with caller-supplied resource limits.
@@ -233,7 +240,10 @@ impl Slide<'_> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
+        let escher_shapes = crate::odraw::parse(
+            &ppdrawing.data,
+            &crate::odraw::limits_for_source(self.source_limits),
+        )?;
         let mut result = Vec::new();
         let mut pending = escher_shapes.iter().rev().collect::<Vec<_>>();
         while let Some(shape) = pending.pop() {
@@ -299,7 +309,7 @@ impl Slide<'_> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
+        let escher_shapes = crate::odraw::parse(&ppdrawing.data, &crate::odraw::Limits::default())?;
         let mut result = Vec::new();
         for shape in &escher_shapes {
             if let Some(programmable_tags) = shape.programmable_tags_with_limits(limits)? {
@@ -360,7 +370,7 @@ impl Slide<'_> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
+        let escher_shapes = crate::odraw::parse(&ppdrawing.data, &crate::odraw::Limits::default())?;
         let mut result = Vec::new();
         for shape in &escher_shapes {
             if let Some(projection) = shape.ppt_flags_with(limits)? {
@@ -394,7 +404,7 @@ impl Slide<'_> {
         let Some(ppdrawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(Vec::new());
         };
-        let escher_shapes = crate::odraw::parse(&ppdrawing.data)?;
+        let escher_shapes = crate::odraw::parse(&ppdrawing.data, &crate::odraw::Limits::default())?;
         let mut positions = std::collections::HashSet::new();
         let mut result = Vec::new();
         for shape in &escher_shapes {
@@ -461,7 +471,7 @@ impl Slide<'_> {
     /// Returns an error if the operation fails.
     pub fn powerpoint12_extension(&self) -> Result<&SlideExtension> {
         self.powerpoint12_extension
-            .get_or_try_init(|| SlideExtension::parse(&self.record))
+            .get_or_try_init(|| SlideExtension::parse(&self.record, &self.source_limits))
     }
 
     /// Return inert `PowerPoint` 12 slide-library synchronization metadata.
@@ -552,7 +562,12 @@ impl Slide<'_> {
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(None);
         };
-        match crate::text_edit::runs::read(&drawing.data, self.outline_text_bodies, shape_id) {
+        match crate::text_edit::runs::read(
+            &drawing.data,
+            self.outline_text_bodies,
+            shape_id,
+            self.source_limits,
+        ) {
             Ok(runs) => Ok(runs),
             // A body the run model does not cover (several text atoms, an
             // ambiguous textbox) has no run projection.
@@ -566,7 +581,7 @@ impl Slide<'_> {
     }
 
     pub fn comments(&self) -> Result<Vec<ParsedComment>> {
-        crate::comments::parse_slide_comments(&self.record)
+        crate::comments::parse_slide_comments(&self.record, &self.source_limits)
     }
 
     /// Get the slide transition from the `SSSlideInfoAtom` record.

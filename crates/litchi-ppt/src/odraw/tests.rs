@@ -47,11 +47,15 @@ fn concatenated_drawing_roots_are_complete_and_strict() {
     let root = record(0x0f, 0, RecordKind::DgContainer.raw(), &dg);
     let stream = [root.as_slice(), root.as_slice()].concat();
 
-    assert!(parse(&stream).unwrap().is_empty());
+    assert!(
+        parse(&stream, &super::Limits::default())
+            .unwrap()
+            .is_empty()
+    );
     assert_eq!(text_from_drawing(&stream).unwrap(), "");
 
     let malformed = [stream.as_slice(), &[0]].concat();
-    assert!(parse(&malformed).is_err());
+    assert!(parse(&malformed, &super::Limits::default()).is_err());
     assert!(text_from_drawing(&malformed).is_err());
 }
 
@@ -75,7 +79,7 @@ fn drawing_retains_root_records_alongside_typed_shapes() {
         &[dg, future, shape].concat(),
     );
 
-    let parsed = parse_drawing(&drawing).unwrap();
+    let parsed = parse_drawing(&drawing, &super::Limits::default()).unwrap();
     assert_eq!(parsed.records().len(), 1);
     assert_eq!(parsed.records()[0].kind(), RecordKind::DgContainer);
     assert_eq!(parsed.shapes().len(), 1);
@@ -108,7 +112,7 @@ fn ppt_client_anchor_projects_small_rect_order() {
     drawing_children.extend(shape);
     let drawing = record(0x0f, 0, RecordKind::DgContainer.raw(), &drawing_children);
 
-    let shapes = parse(&drawing).unwrap();
+    let shapes = parse(&drawing, &super::Limits::default()).unwrap();
     let anchor = anchor(&shapes[0]).unwrap().unwrap();
     assert_eq!((anchor.left(), anchor.top()), (10, 20));
     assert_eq!((anchor.right(), anchor.bottom()), (110, 70));

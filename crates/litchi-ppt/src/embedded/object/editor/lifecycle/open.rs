@@ -1,7 +1,7 @@
 //! Package discovery and initial persisted-record state.
 
 use super::super::{Collection, Editor, Result, mapping, rewrite};
-use crate::package::Error;
+use crate::package::{Error, SourceLimits};
 use litchi_cfb::OleFile;
 use litchi_ole_common::protection::is_protected_component;
 use std::collections::{BTreeMap, HashSet};
@@ -76,8 +76,16 @@ pub(crate) fn open_admitting_signature(
     bytes: Arc<[u8]>,
     collection: Collection,
     cfb_limits: litchi_cfb::OleFileLimits,
+    source_limits: SourceLimits,
 ) -> Result<Editor> {
-    open_with_limit(bytes, collection, usize::MAX, true, cfb_limits)
+    open_with_limit(
+        bytes,
+        collection,
+        source_limits.max_package_bytes,
+        true,
+        cfb_limits,
+        source_limits,
+    )
 }
 
 /// The empty collection of a records-only editor.
@@ -91,6 +99,7 @@ fn open_with_limit(
     max_output_bytes: usize,
     admit_signature: bool,
     cfb_limits: litchi_cfb::OleFileLimits,
+    source_limits: SourceLimits,
 ) -> Result<Editor> {
     if bytes.len() > max_output_bytes {
         return Err(Error::ResourceLimit(format!(
@@ -132,6 +141,7 @@ fn open_with_limit(
     Ok(Editor {
         original: bytes,
         max_output_bytes,
+        source_limits,
         cfb_limits,
         streams,
         document_path,
@@ -151,13 +161,14 @@ fn open_with_limit(
     })
 }
 
-pub(crate) fn open_records(bytes: Arc<[u8]>) -> Result<Editor> {
-    open_records_arc_with_limit(bytes, usize::MAX)
+pub(crate) fn open_records(bytes: Arc<[u8]>, source_limits: SourceLimits) -> Result<Editor> {
+    open_records_arc_with_limit(bytes, source_limits.max_package_bytes, source_limits)
 }
 
 pub(crate) fn open_records_arc_with_limit(
     bytes: Arc<[u8]>,
     max_output_bytes: usize,
+    source_limits: SourceLimits,
 ) -> Result<Editor> {
     open_with_limit(
         bytes,
@@ -165,6 +176,7 @@ pub(crate) fn open_records_arc_with_limit(
         max_output_bytes,
         false,
         litchi_cfb::OleFileLimits::default(),
+        source_limits,
     )
 }
 

@@ -60,7 +60,8 @@ impl Edit {
         let document = self.base.owner_record(&native, Owner::Document)?;
         let located = Located::find(&document)?;
         let source = located.container(self.position)?;
-        let inner = Snapshot::parse(source)
+        let limits = self.base.open_options().source_limits_value();
+        let inner = Snapshot::parse(source, &limits)
             .map_err(scoped::publication(OPERATION))?
             .edit();
         Ok(State {
@@ -82,7 +83,8 @@ impl Edit {
             let document = base.owner_record(&native, Owner::Document)?;
             let located = Located::find(&document)?;
             let source = located.container(position)?;
-            let inner = Snapshot::parse(source)
+            let limits = base.open_options().source_limits_value();
+            let inner = Snapshot::parse(source, &limits)
                 .map_err(scoped::publication(OPERATION))?
                 .edit();
             Ok(State {

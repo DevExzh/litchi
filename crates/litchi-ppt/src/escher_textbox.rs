@@ -4,7 +4,7 @@ use super::package::{Error, Result};
 ///
 /// Based on Apache POI's `EscherTextboxWrapper`, this wraps an Escher textbox record
 /// and provides access to its child PPT records (`TextCharsAtom`, `TextBytesAtom`, `StyleTextPropAtom`).
-use super::records::Record;
+use super::records::{Record, RecordParseSession};
 use super::text_interaction::{TextInteraction, TextInteractionLimits, text_units_from_records};
 use super::text_run::{ParagraphRun, TextRun, TextRunExtractor};
 use crate::consts::RecordType;
@@ -110,7 +110,8 @@ impl EscherTextboxWrapper {
         report: &mut crate::leniency::ToleranceReport,
     ) -> Result<Self> {
         // Parse child records from the escher data
-        let child_records = Self::find_child_records(&data)?;
+        let source_limits = crate::hyperlink::interaction_source_limits(limits.interaction)?;
+        let child_records = Self::find_child_records(&data, &source_limits)?;
 
         let mut extractor = TextRunExtractor::new();
         extractor.extract_from_records_with_report(&child_records, report)?;
@@ -153,7 +154,8 @@ impl EscherTextboxWrapper {
     /// Find child PPT records in the Escher textbox data.
     ///
     /// Based on POI's `Record.findChildRecords()`.
-    fn find_child_records(data: &[u8]) -> Result<Vec<Record>> {
+    fn find_child_records(data: &[u8], limits: &crate::SourceLimits) -> Result<Vec<Record>> {
+        let mut session = RecordParseSession::new(*limits, data.len())?;
         let mut records = Vec::new();
         let mut offset = 0;
 
@@ -185,7 +187,7 @@ impl EscherTextboxWrapper {
                 ));
             }
 
-            let (record, consumed) = Record::parse(&data[offset..record_end], 0)?;
+            let (record, consumed) = session.parse_strict_record_at_depth(data, offset, 0)?;
             if consumed != record_end - offset {
                 return Err(Error::Corrupted(
                     "ClientTextbox child record was only partially parsed".to_string(),
@@ -207,7 +209,8 @@ impl EscherTextboxWrapper {
         data: &[u8],
         limits: TextInteractionLimits,
     ) -> Result<Vec<TextInteraction>> {
-        let records = Self::find_child_records(data)?;
+        let source_limits = crate::hyperlink::interaction_source_limits(limits.interaction)?;
+        let records = Self::find_child_records(data, &source_limits)?;
         Self::text_interactions_from_records(&records, limits)
     }
 

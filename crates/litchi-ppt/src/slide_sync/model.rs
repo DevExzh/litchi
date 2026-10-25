@@ -407,8 +407,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record(root: Record) -> Result<Self> {
-        Self::from_record_with_limits(root, Limits::default())
+    pub fn from_record(root: Record, limits: &Limits) -> Result<Self> {
+        Self::from_record_with_limits(root, *limits)
     }
 
     /// Capture a slide record under explicit resource limits.
@@ -438,8 +438,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(bytes, Limits::default())
+    pub fn parse(bytes: &[u8], limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse one complete slide record under explicit limits.

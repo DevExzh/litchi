@@ -130,8 +130,11 @@ fn named_stream<'a>(streams: &'a BTreeMap<Vec<String>, Vec<u8>>, name: &str) -> 
 
 fn current_edit_offset(bytes: &[u8]) -> usize {
     let streams = stream_map(bytes);
-    let current_user = CurrentUser::parse(named_stream(&streams, "Current User"))
-        .expect("parse Current User stream");
+    let current_user = CurrentUser::parse(
+        named_stream(&streams, "Current User"),
+        &SourceLimits::default(),
+    )
+    .expect("parse Current User stream");
     usize::try_from(current_user.current_edit_offset()).expect("Current User offset fits usize")
 }
 
@@ -145,7 +148,8 @@ fn top_level_user_edit_offsets(bytes: &[u8]) -> Vec<usize> {
         let mut offsets = Vec::new();
         let mut offset = 0usize;
         while offset < document.len() {
-            let Ok((record, consumed)) = Record::parse(document, offset) else {
+            let Ok((record, consumed)) = Record::parse(document, offset, &SourceLimits::default())
+            else {
                 break;
             };
             if consumed == 0 {
@@ -165,7 +169,8 @@ fn top_level_user_edit_offsets(bytes: &[u8]) -> Vec<usize> {
 fn user_edit_predecessor(bytes: &[u8]) -> usize {
     let offset = current_edit_offset(bytes);
     with_document_stream(bytes, |document| {
-        let (record, consumed) = Record::parse(document, offset).expect("parse current UserEdit");
+        let (record, consumed) = Record::parse(document, offset, &SourceLimits::default())
+            .expect("parse current UserEdit");
         assert_eq!(record.record_type, RecordType::UserEditAtom);
         assert!(consumed >= 20, "UserEditAtom contains offsetLastEdit");
         usize::try_from(u32::from_le_bytes(

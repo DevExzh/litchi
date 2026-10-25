@@ -98,7 +98,7 @@ fn legacy_shape_edit_preserves_inert_interactive_records() {
             .windows(interactive.len())
             .any(|value| value == interactive)
     );
-    let (record, used) = Record::parse(&rewritten, 0).unwrap();
+    let (record, used) = Record::parse(&rewritten, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(used, rewritten.len());
     let (shapes, legacy) =
         collect_shapes_and_legacy(1, Scope::Slide, &record, EditorLimits::default()).unwrap();

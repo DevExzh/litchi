@@ -106,7 +106,8 @@ fn record_range(record: &Record, offset: usize, wanted: RecordType) -> Option<Ra
 }
 
 fn replace_hyperlink_with_media(document: &[u8]) -> Vec<u8> {
-    let (root, consumed) = Record::parse(document, 0).expect("parse generated document root");
+    let (root, consumed) = Record::parse(document, 0, &litchi_ppt::SourceLimits::default())
+        .expect("parse generated document root");
     assert_eq!(root.record_type, RecordType::Document);
     assert!(consumed <= document.len());
     let range = record_range(&root, 0, RecordType::ExternalHyperlink)
@@ -291,10 +292,13 @@ fn package() -> Package {
 }
 
 fn first_shape_anchor(package: &Package) -> Anchor {
-    Snapshot::from_bytes(package.to_bytes().expect("signed source bytes"))
-        .expect("parse signed source snapshot")
-        .shape_anchor(Target::new(Position::new(0), Position::new(0)))
-        .expect("read generated shape anchor")
+    Snapshot::from_bytes_with_options(
+        package.to_bytes().expect("signed source bytes"),
+        OpenOptions::new(),
+    )
+    .expect("parse signed source snapshot")
+    .shape_anchor(Target::new(Position::new(0), Position::new(0)))
+    .expect("read generated shape anchor")
 }
 
 fn assert_signed(error: Error) {
@@ -344,7 +348,8 @@ fn signed_empty_commit_is_an_exact_noop_and_preserves_every_stream() {
 fn signed_semantic_noops_are_admitted_but_changed_operations_are_typed_refusals() {
     let package = package();
     let before = package.to_bytes().expect("signed source bytes");
-    let snapshot = Snapshot::from_bytes(before.clone()).expect("parse signed source snapshot");
+    let snapshot = Snapshot::from_bytes_with_options(before.clone(), OpenOptions::new())
+        .expect("parse signed source snapshot");
     let advance = snapshot
         .slide_advance(Position::new(0))
         .expect("read generated slide advance");

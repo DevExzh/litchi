@@ -19,7 +19,7 @@ use litchi_ppt::package::edit::{
     CustomTableStylesPlacement, Error, Position, SlideTransitionVisual, Target,
 };
 use litchi_ppt::slide_order::{self, Refusal};
-use litchi_ppt::{Package, TransitionDirection, TransitionSpeed, TransitionType};
+use litchi_ppt::{OpenOptions, Package, TransitionDirection, TransitionSpeed, TransitionType};
 
 fn fixture(path: &str) -> Package {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -337,7 +337,9 @@ fn joins_refuse_overlap_other_operations_and_other_sources() {
     edit.set_slide_hidden(Position::new(3), true).unwrap();
     let hidden = edit.commit().unwrap().patch().clone();
     let joined = source.apply(&first.join(&hidden).unwrap()).unwrap();
-    let native = slide_order::Snapshot::parse(&bytes(joined.package())).unwrap();
+    let native =
+        slide_order::Snapshot::from_bytes_with_options(bytes(joined.package()), OpenOptions::new())
+            .unwrap();
     assert!(native.slide_hidden(Position::new(3)).unwrap());
 
     let other = fixture("poi/test-data/slideshow/basic_test_ppt_file.ppt");
@@ -378,7 +380,7 @@ fn visual(
 }
 
 fn transition_visual(package: &Package, position: Position) -> SlideTransitionVisual {
-    slide_order::Snapshot::parse(&bytes(package))
+    slide_order::Snapshot::from_bytes_with_options(bytes(package), OpenOptions::new())
         .unwrap()
         .slide_transition_visual(position)
         .unwrap()

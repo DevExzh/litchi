@@ -20,7 +20,7 @@ pub(super) fn drawing_textboxes(data: &[u8]) -> Result<Vec<litchi_odraw::Record<
         Ok(())
     }
 
-    let shapes = crate::odraw::parse(data)?;
+    let shapes = crate::odraw::parse(data, &crate::odraw::Limits::default())?;
     let mut records = Vec::new();
     for shape in &shapes {
         collect(shape, &mut records)?;
@@ -56,7 +56,7 @@ fn drawing_shapes(
     let Some(drawing) = record.find_child(RecordType::PPDrawing) else {
         return Ok(None);
     };
-    let parsed = crate::odraw::parse(&drawing.data)?;
+    let parsed = crate::odraw::parse(&drawing.data, &crate::odraw::Limits::default())?;
     let mut shapes = Vec::with_capacity(parsed.len());
     for (index, shape) in parsed.iter().enumerate() {
         if let Some(converted) =

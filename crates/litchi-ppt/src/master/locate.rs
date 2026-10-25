@@ -49,8 +49,8 @@ pub(crate) fn locate(
 ) -> Result<Located, Failure> {
     let limits = base.open_options().source_limits_value();
     let document_bytes = base.owner_record(native, Owner::Document)?;
-    let (document, _) = Record::parse_with_limits(&document_bytes, 0, limits)
-        .map_err(scoped::publication(operation))?;
+    let (document, _) =
+        Record::parse(&document_bytes, 0, &limits).map_err(scoped::publication(operation))?;
     let missing = || scoped::not_found(operation, "no master of this kind at the position");
 
     let found = match kind {
@@ -72,7 +72,7 @@ pub(crate) fn locate(
                     let (id, _) = validation::master_persist(reference)
                         .map_err(scoped::publication(operation))?;
                     let bytes = base.owner_record(native, Owner::Persist(id))?;
-                    let (record, _) = Record::parse_with_limits(&bytes, 0, limits)
+                    let (record, _) = Record::parse(&bytes, 0, &limits)
                         .map_err(scoped::publication(operation))?;
                     if record.record_type != expected {
                         continue;

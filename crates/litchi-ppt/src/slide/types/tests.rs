@@ -599,7 +599,9 @@ fn exposes_inert_slide_library_synchronization_metadata() {
     }
     let atom = record_bytes(0, 0, 0x3715, &times);
     let container = record_bytes(0x0f, 0, 0x3714, &[server_record, url_record, atom].concat());
-    let sync = Record::parse(&container, 0).unwrap().0;
+    let sync = Record::parse(&container, 0, &crate::SourceLimits::default())
+        .unwrap()
+        .0;
     let mut slide_record = create_test_record(RecordType::Slide, Vec::new(), vec![sync]);
     // The owner validates a real SlideContainer root (MS-PPT: container
     // records carry recVer 0xF).
@@ -1692,7 +1694,7 @@ fn exposes_powerpoint_2002_animation_extension_from_programmable_tags() {
     )
     .unwrap();
 
-    let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+    let (record, consumed) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(consumed, bytes.len());
     let doc_data = Vec::new();
     let slide = Slide::from_slide_data(create_slide_data(record, 256, &doc_data), 1);
@@ -1736,7 +1738,9 @@ fn truncated_comment_atoms_are_rejected_without_panicking() {
 
     let extension = prog_tags_record(10, &data);
     let slide = create_test_record(RecordType::Slide, Vec::new(), vec![extension]);
-    assert!(crate::comments::parse_slide_comments(&slide).is_err());
+    assert!(
+        crate::comments::parse_slide_comments(&slide, &crate::SourceLimits::default()).is_err()
+    );
 }
 
 #[test]
@@ -1802,7 +1806,8 @@ fn outline_bodies() -> Vec<crate::OutlineTextBody> {
     let mut records = Vec::new();
     let mut offset = 0;
     while offset < bytes.len() {
-        let (record, consumed) = Record::parse(&bytes, offset).unwrap();
+        let (record, consumed) =
+            Record::parse(&bytes, offset, &crate::SourceLimits::default()).unwrap();
         records.push(record);
         offset += consumed;
     }

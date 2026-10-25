@@ -108,8 +108,12 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(build_list: impl AsRef<[u8]>, drawing: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(build_list, drawing, EditLimits::default())
+    pub fn parse(
+        build_list: impl AsRef<[u8]>,
+        drawing: impl AsRef<[u8]>,
+        limits: &EditLimits,
+    ) -> Result<Self> {
+        Self::parse_with_limits(build_list, drawing, *limits)
     }
 
     /// Parse with explicit source and graph resource ceilings.
@@ -132,7 +136,8 @@ impl Snapshot {
             return invalid("OfficeArt drawing exceeds the configured transaction byte limit");
         }
 
-        let parsed_drawing = crate::odraw::parse_drawing(drawing_bytes)?;
+        let parsed_drawing =
+            crate::odraw::parse_drawing(drawing_bytes, &crate::odraw::Limits::default())?;
         let mut shape_ids = validation::shape_ids(&parsed_drawing, limits.max_shapes)?;
         shape_ids.sort_unstable();
         let build_list_arc = Arc::<[u8]>::from(build_list_bytes.to_vec().into_boxed_slice());

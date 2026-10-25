@@ -4,6 +4,7 @@ use crate::consts::RecordType;
 
 use super::package::{Error, Result};
 use super::records::Record;
+use crate::SourceLimits;
 
 const PRESENTATION_ADVISOR_RECORD_TYPE: u16 = 0x177a;
 const ADVISOR_RULE_MASK: u32 = 0x07ff;
@@ -97,8 +98,8 @@ impl PresentationAdvisorSettings {
     }
 
     /// Discover the single advisor atom in the PPT9 document tag.
-    pub(crate) fn parse_document(document: &Record) -> Result<Option<Self>> {
-        let records = document.versioned_binary_tag_records(9)?;
+    pub(crate) fn parse_document(document: &Record, limits: &SourceLimits) -> Result<Option<Self>> {
+        let records = document.versioned_binary_tag_records(9, limits)?;
         let mut matches = records
             .iter()
             .filter(|record| record.record_type_raw == PRESENTATION_ADVISOR_RECORD_TYPE);

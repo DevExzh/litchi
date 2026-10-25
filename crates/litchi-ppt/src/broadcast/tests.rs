@@ -153,7 +153,7 @@ fn record_bytes(record: &Record) -> Vec<u8> {
 #[test]
 fn snapshot_no_op_keeps_exact_source_bytes() {
     let source = record_bytes(&broadcast().to_record().unwrap());
-    let snapshot = Snapshot::parse(source.clone()).unwrap();
+    let snapshot = Snapshot::parse(source.clone(), &crate::SourceLimits::default()).unwrap();
     let commit = snapshot.edit().commit().unwrap();
 
     assert!(commit.patch().is_empty());
@@ -166,7 +166,7 @@ fn snapshot_no_op_keeps_exact_source_bytes() {
 #[test]
 fn invalid_inert_targets_are_failure_atomic() {
     let source = record_bytes(&broadcast().to_record().unwrap());
-    let snapshot = Snapshot::parse(source).unwrap();
+    let snapshot = Snapshot::parse(source, &crate::SourceLimits::default()).unwrap();
     let mut transaction = snapshot.edit();
     let before = transaction.broadcast().clone();
 
@@ -196,7 +196,7 @@ fn edits_retain_unknown_children_and_support_inverse_and_stale_rejection() {
         &data,
     )
     .unwrap();
-    let snapshot = Snapshot::parse(source.clone()).unwrap();
+    let snapshot = Snapshot::parse(source.clone(), &crate::SourceLimits::default()).unwrap();
     assert_eq!(snapshot.unknown_records().len(), 1);
     assert_eq!(
         snapshot.unknown_records()[0].to_record_bytes().unwrap(),
@@ -231,7 +231,7 @@ fn edits_retain_unknown_children_and_support_inverse_and_stale_rejection() {
 
     let mut stale_bytes = source;
     stale_bytes[16] = b'R';
-    let stale = Snapshot::parse(stale_bytes).unwrap();
+    let stale = Snapshot::parse(stale_bytes, &crate::SourceLimits::default()).unwrap();
     assert!(commit.patch().apply(&stale).is_err());
 }
 

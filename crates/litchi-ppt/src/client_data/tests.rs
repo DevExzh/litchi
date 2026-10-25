@@ -62,7 +62,7 @@ fn parses_accesses_and_round_trips_the_complete_ordered_grammar() {
     ));
     let bytes = container(&payload);
 
-    let parsed = ClientData::parse(&bytes).unwrap();
+    let parsed = ClientData::parse(&bytes, &ClientDataLimits::default()).unwrap();
     assert!(parsed.shape_flags().is_some());
     assert_eq!(
         parsed
@@ -105,7 +105,7 @@ fn canonical_constructor_writes_valid_records() {
     ];
     let value = ClientData::new(records).unwrap();
     assert_eq!(
-        ClientData::parse(&value.to_bytes().unwrap()).unwrap(),
+        ClientData::parse(&value.to_bytes().unwrap(), &ClientDataLimits::default()).unwrap(),
         value
     );
 }
@@ -116,15 +116,15 @@ fn rejects_outer_header_length_truncation_and_trailing_data() {
     for index in [0usize, 1, 2] {
         let mut bad = valid.clone();
         bad[index] ^= 1;
-        assert!(ClientData::parse(&bad).is_err());
+        assert!(ClientData::parse(&bad, &ClientDataLimits::default()).is_err());
     }
     let mut bad_length = valid.clone();
     bad_length[4..8].copy_from_slice(&1u32.to_le_bytes());
-    assert!(ClientData::parse(&bad_length).is_err());
+    assert!(ClientData::parse(&bad_length, &ClientDataLimits::default()).is_err());
     let mut trailing = valid.clone();
     trailing.push(0);
-    assert!(ClientData::parse(&trailing).is_err());
-    assert!(ClientData::parse(&valid[..7]).is_err());
+    assert!(ClientData::parse(&trailing, &ClientDataLimits::default()).is_err());
+    assert!(ClientData::parse(&valid[..7], &ClientDataLimits::default()).is_err());
 }
 
 #[test]
@@ -136,12 +136,24 @@ fn preserves_unknown_children_and_rejects_duplicate_and_out_of_order_known_child
         ClientDataChildKind::Placeholder,
         &[0, 0, 0, 0, 13, 0, 0, 0],
     );
-    assert!(ClientData::parse(&container(&[flags.clone(), flags.clone()].concat())).is_err());
-    assert!(ClientData::parse(&container(&[placeholder, flags].concat())).is_err());
+    assert!(
+        ClientData::parse(
+            &container(&[flags.clone(), flags.clone()].concat()),
+            &ClientDataLimits::default()
+        )
+        .is_err()
+    );
+    assert!(
+        ClientData::parse(
+            &container(&[placeholder, flags].concat()),
+            &ClientDataLimits::default()
+        )
+        .is_err()
+    );
 
     let unknown = opaque(7, 0x123, 0x2222, &[0xCA, 0xFE]);
     let unknown_container = container(&unknown);
-    let parsed = ClientData::parse(&unknown_container).unwrap();
+    let parsed = ClientData::parse(&unknown_container, &ClientDataLimits::default()).unwrap();
     assert_eq!(parsed.children().len(), 1);
     assert_eq!(parsed.children()[0].kind(), ClientDataChildKind::Unknown);
     assert_eq!(parsed.children()[0].record_type(), 0x2222);
@@ -151,69 +163,78 @@ fn preserves_unknown_children_and_rejects_duplicate_and_out_of_order_known_child
     assert_eq!(parsed.to_bytes().unwrap(), unknown_container);
 
     let shape_id = child(0, 0, ClientDataChildKind::RoundTripShapeId12, &[0; 4]);
-    assert!(ClientData::parse(&container(&[shape_id.clone(), shape_id].concat())).is_err());
+    assert!(
+        ClientData::parse(
+            &container(&[shape_id.clone(), shape_id].concat()),
+            &ClientDataLimits::default()
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn rejects_bad_child_headers_reserved_values_and_boundaries() {
     assert!(
-        ClientData::parse(&container(&child(
-            1,
-            0,
-            ClientDataChildKind::ShapeFlags,
-            &[0]
-        )))
+        ClientData::parse(
+            &container(&child(1, 0, ClientDataChildKind::ShapeFlags, &[0])),
+            &ClientDataLimits::default()
+        )
         .is_err()
     );
     assert!(
-        ClientData::parse(&container(&child(
-            0,
-            1,
-            ClientDataChildKind::ShapeFlags,
-            &[0]
-        )))
+        ClientData::parse(
+            &container(&child(0, 1, ClientDataChildKind::ShapeFlags, &[0])),
+            &ClientDataLimits::default()
+        )
         .is_err()
     );
     assert!(
-        ClientData::parse(&container(&child(
-            0,
-            0,
-            ClientDataChildKind::ShapeFlags,
-            &[2]
-        )))
+        ClientData::parse(
+            &container(&child(0, 0, ClientDataChildKind::ShapeFlags, &[2])),
+            &ClientDataLimits::default()
+        )
         .is_err()
     );
     assert!(
-        ClientData::parse(&container(&child(
-            0,
-            0,
-            ClientDataChildKind::Placeholder,
-            &[0, 0, 0, 0, 0, 0, 0, 0]
-        )))
+        ClientData::parse(
+            &container(&child(
+                0,
+                0,
+                ClientDataChildKind::Placeholder,
+                &[0, 0, 0, 0, 0, 0, 0, 0]
+            )),
+            &ClientDataLimits::default()
+        )
         .is_err()
     );
     assert!(
-        ClientData::parse(&container(&child(
-            0,
-            0,
-            ClientDataChildKind::RoundTripNewPlaceholderId12,
-            &[24]
-        )))
+        ClientData::parse(
+            &container(&child(
+                0,
+                0,
+                ClientDataChildKind::RoundTripNewPlaceholderId12,
+                &[24]
+            )),
+            &ClientDataLimits::default()
+        )
         .is_err()
     );
     assert!(
-        ClientData::parse(&container(&child(
-            0,
-            2,
-            ClientDataChildKind::MouseClickInteractiveInfo,
-            &[]
-        )))
+        ClientData::parse(
+            &container(&child(
+                0,
+                2,
+                ClientDataChildKind::MouseClickInteractiveInfo,
+                &[]
+            )),
+            &ClientDataLimits::default()
+        )
         .is_err()
     );
 
     let mut truncated = child(0, 0, ClientDataChildKind::ExternalObjectReference, &[0; 4]);
     truncated.pop();
-    assert!(ClientData::parse(&container(&truncated)).is_err());
+    assert!(ClientData::parse(&container(&truncated), &ClientDataLimits::default()).is_err());
 }
 
 #[test]
@@ -268,7 +289,7 @@ fn snapshot_noop_is_source_exact_and_unknown_order_is_retained() {
         &[3, 0, 0, 0, 13, 1, 0, 0],
     ));
     let source_bytes = container(&payload);
-    let source = super::Snapshot::parse(&source_bytes).unwrap();
+    let source = super::Snapshot::parse(&source_bytes, &ClientDataLimits::default()).unwrap();
 
     let commit = source.edit().commit().unwrap();
     assert!(commit.patch().is_empty());
@@ -293,7 +314,7 @@ fn transaction_edits_are_checked_ordered_and_reversible() {
         ClientDataChildKind::RoundTripShapeId12,
         &0x1020u32.to_le_bytes(),
     ));
-    let source = super::Snapshot::parse(container(&payload)).unwrap();
+    let source = super::Snapshot::parse(container(&payload), &ClientDataLimits::default()).unwrap();
     let mut edit = source.edit();
 
     let before = edit
@@ -331,18 +352,21 @@ fn transaction_edits_are_checked_ordered_and_reversible() {
 
 #[test]
 fn failed_child_edits_leave_the_candidate_unchanged() {
-    let source = super::Snapshot::parse(container(
-        &[
-            child(0, 0, ClientDataChildKind::ShapeFlags, &[1]),
-            child(
-                0,
-                0,
-                ClientDataChildKind::Placeholder,
-                &[3, 0, 0, 0, 13, 1, 0, 0],
-            ),
-        ]
-        .concat(),
-    ))
+    let source = super::Snapshot::parse(
+        container(
+            &[
+                child(0, 0, ClientDataChildKind::ShapeFlags, &[1]),
+                child(
+                    0,
+                    0,
+                    ClientDataChildKind::Placeholder,
+                    &[3, 0, 0, 0, 13, 1, 0, 0],
+                ),
+            ]
+            .concat(),
+        ),
+        &ClientDataLimits::default(),
+    )
     .unwrap();
     let mut edit = source.edit();
     let original = edit.children().to_vec();

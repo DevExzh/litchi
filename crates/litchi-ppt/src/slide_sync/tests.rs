@@ -45,10 +45,13 @@ fn root(children: Vec<Record>) -> Record {
 }
 
 fn source() -> Snapshot {
-    Snapshot::from_record(root(vec![
-        atom(RecordType::SlideAtom, 2, 0, &[0; 24]),
-        atom(RecordType::Unknown, 0, 7, &[0xaa, 0xbb]),
-    ]))
+    Snapshot::from_record(
+        root(vec![
+            atom(RecordType::SlideAtom, 2, 0, &[0; 24]),
+            atom(RecordType::Unknown, 0, 7, &[0xaa, 0xbb]),
+        ]),
+        &Limits::default(),
+    )
     .unwrap()
 }
 
@@ -95,7 +98,7 @@ fn parses_and_round_trips_slide_sync_without_editing_unknown_records() {
     assert_eq!(target.synchronization().unwrap(), Some(value));
     assert_eq!(target.record().children[1].record_type, RecordType::Unknown);
     assert_eq!(target.record().children[1].data, [0xaa, 0xbb]);
-    let reparsed = Snapshot::parse(target.bytes()).unwrap();
+    let reparsed = Snapshot::parse(target.bytes(), &Limits::default()).unwrap();
     assert_eq!(reparsed.bytes(), target.bytes());
 }
 
@@ -130,7 +133,7 @@ fn rejects_duplicate_or_malformed_sync_records_before_mutation() {
     duplicate.children.push(first.clone());
     duplicate.data = duplicate.children.iter().flat_map(wire).collect();
     duplicate.data_length = u32::try_from(duplicate.data.len()).unwrap();
-    assert!(Snapshot::from_record(duplicate).is_err());
+    assert!(Snapshot::from_record(duplicate, &Limits::default()).is_err());
 
     let malformed = root(vec![record(
         RecordType::RoundTripSlideSyncInfo12,
@@ -139,13 +142,13 @@ fn rejects_duplicate_or_malformed_sync_records_before_mutation() {
         vec![1, 2, 3],
         Vec::new(),
     )]);
-    assert!(Snapshot::from_record(malformed).is_err());
+    assert!(Snapshot::from_record(malformed, &Limits::default()).is_err());
 }
 
 #[test]
 fn rejects_wrong_root_and_stale_revision_operations() {
     let wrong = atom(RecordType::Notes, 0x0f, 0, &[]);
-    assert!(Snapshot::from_record(wrong).is_err());
+    assert!(Snapshot::from_record(wrong, &Limits::default()).is_err());
 
     let original = source();
     let mut editor = original.edit();

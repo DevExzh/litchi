@@ -1,7 +1,7 @@
 //! Record codecs for strict, inert legacy `PowerPoint` external-media metadata.
 
 use super::model::{
-    CdAudio, CdTime, Collection, EmbeddedWav, LinkedAudio, LinkedAudioKind, Media, Movie,
+    CdAudio, CdTime, Collection, EmbeddedWav, Limits, LinkedAudio, LinkedAudioKind, Media, Movie,
     MovieKind, Object, UnknownRecord, Video,
 };
 use crate::consts::RecordType;
@@ -60,7 +60,7 @@ impl Media {
     /// Returns an error if serialization fails or the bytes cannot be reparsed
     /// as a record.
     pub fn to_record(&self) -> Result<Record> {
-        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
 
     /// Serialize this atom into its exact 16-byte record image.
@@ -93,14 +93,19 @@ impl Video {
     /// Returns an error if the container header is invalid, the child sequence
     /// is malformed, or the container does not hold one media atom and at most
     /// one path atom.
-    pub fn parse(record: &Record) -> Result<Self> {
+    pub fn parse(record: &Record, limits: &Limits) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
             || record.record_type_raw != RecordType::ExternalVideo.as_u16()
         {
             return corrupted("ExVideoContainer has an invalid header");
         }
-        let children = Record::parse_sequence_strict(&record.data, "ExVideoContainer")?;
+        let record_limits = super::validation::record_limits(*limits)?;
+        let children = Record::parse_sequence_strict_with_limits(
+            &record.data,
+            "ExVideoContainer",
+            record_limits,
+        )?;
         if !(1..=2).contains(&children.len()) {
             return corrupted("ExVideoContainer must contain media and optional path atoms");
         }
@@ -119,7 +124,7 @@ impl Video {
     /// Returns an error if serialization fails or the bytes cannot be reparsed
     /// as a record.
     pub fn to_record(&self) -> Result<Record> {
-        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
 
     /// Serialize this container, including its optional path atom.
@@ -170,18 +175,23 @@ impl Movie {
     ///
     /// Returns an error if the container header or record type is invalid, or
     /// the container does not hold exactly one `ExVideoContainer`.
-    pub fn parse(record: &Record) -> Result<Self> {
+    pub fn parse(record: &Record, limits: &Limits) -> Result<Self> {
         if record.version != 0x0f || record.instance != 0 {
             return corrupted("external movie container has an invalid header");
         }
         let kind = MovieKind::from_record_type(record.record_type_raw)?;
-        let children = Record::parse_sequence_strict(&record.data, "external movie container")?;
+        let record_limits = super::validation::record_limits(*limits)?;
+        let children = Record::parse_sequence_strict_with_limits(
+            &record.data,
+            "external movie container",
+            record_limits,
+        )?;
         if children.len() != 1 {
             return corrupted("external movie container must contain exactly one ExVideoContainer");
         }
         Ok(Self {
             kind,
-            video: Video::parse(&children[0])?,
+            video: Video::parse(&children[0], limits)?,
         })
     }
 
@@ -192,7 +202,7 @@ impl Movie {
     /// Returns an error if serialization fails or the bytes cannot be reparsed
     /// as a record.
     pub fn to_record(&self) -> Result<Record> {
-        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
 
     /// Serialize this container, wrapping its `ExVideoContainer`.
@@ -235,12 +245,17 @@ impl LinkedAudio {
     ///
     /// Returns an error if the container header or record type is invalid, or
     /// the container does not hold one media atom and at most one path atom.
-    pub fn parse(record: &Record) -> Result<Self> {
+    pub fn parse(record: &Record, limits: &Limits) -> Result<Self> {
         if record.version != 0x0f || record.instance != 0 {
             return corrupted("linked audio container has an invalid header");
         }
         let kind = LinkedAudioKind::from_record_type(record.record_type_raw)?;
-        let children = Record::parse_sequence_strict(&record.data, "linked audio container")?;
+        let record_limits = super::validation::record_limits(*limits)?;
+        let children = Record::parse_sequence_strict_with_limits(
+            &record.data,
+            "linked audio container",
+            record_limits,
+        )?;
         if !(1..=2).contains(&children.len()) {
             return corrupted("linked audio container must contain media and optional path atoms");
         }
@@ -258,7 +273,7 @@ impl LinkedAudio {
     /// Returns an error if serialization fails or the bytes cannot be reparsed
     /// as a record.
     pub fn to_record(&self) -> Result<Record> {
-        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
 
     /// Serialize this container, including its optional path atom.
@@ -289,14 +304,19 @@ impl EmbeddedWav {
     /// Returns an error if the container header is invalid, the container does
     /// not hold exactly one media atom and one embedded-audio atom, or the
     /// duration is negative.
-    pub fn parse(record: &Record) -> Result<Self> {
+    pub fn parse(record: &Record, limits: &Limits) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
             || record.record_type_raw != RecordType::ExternalWavAudioEmbedded.as_u16()
         {
             return corrupted("ExWAVAudioEmbeddedContainer has an invalid header");
         }
-        let children = Record::parse_sequence_strict(&record.data, "ExWAVAudioEmbeddedContainer")?;
+        let record_limits = super::validation::record_limits(*limits)?;
+        let children = Record::parse_sequence_strict_with_limits(
+            &record.data,
+            "ExWAVAudioEmbeddedContainer",
+            record_limits,
+        )?;
         if children.len() != 2 {
             return corrupted(
                 "ExWAVAudioEmbeddedContainer must contain media and embedded-audio atoms",
@@ -346,7 +366,7 @@ impl EmbeddedWav {
     /// Returns an error if serialization fails or the bytes cannot be reparsed
     /// as a record.
     pub fn to_record(&self) -> Result<Record> {
-        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
 
     /// Serialize this container with its embedded-audio atom.
@@ -410,9 +430,10 @@ impl Collection {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(root: &Record) -> Result<Option<Self>> {
-        let result = Self::parse_media_only(root)?;
-        let hyperlinks = Hyperlinks::parse(root)?;
+    pub fn parse(root: &Record, limits: &Limits) -> Result<Option<Self>> {
+        super::validation::validate_record_tree(root, *limits)?;
+        let result = Self::parse_media_only(root, *limits)?;
+        let hyperlinks = Hyperlinks::parse(root, &super::validation::record_limits(*limits)?)?;
         if let Some(collection) = &result
             && hyperlinks
                 .hyperlinks
@@ -425,7 +446,7 @@ impl Collection {
     }
 
     /// Discover media without re-parsing the hyperlink relationship graph.
-    pub(crate) fn parse_media_only(root: &Record) -> Result<Option<Self>> {
+    pub(crate) fn parse_media_only(root: &Record, limits: Limits) -> Result<Option<Self>> {
         let mut lists = Vec::new();
         collect_external_object_lists(root, &mut lists);
         if lists.len() > 1 {
@@ -434,17 +455,22 @@ impl Collection {
         let Some(record) = lists.first() else {
             return Ok(None);
         };
-        Ok(Some(Self::parse_list(record)?))
+        Ok(Some(Self::parse_list(record, limits)?))
     }
 
-    fn parse_list(record: &Record) -> Result<Self> {
+    fn parse_list(record: &Record, limits: Limits) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
             || record.record_type_raw != RecordType::ExObjList.as_u16()
         {
             return corrupted("ExObjListContainer has an invalid header");
         }
-        let children = Record::parse_sequence_strict(&record.data, "ExObjListContainer")?;
+        let record_limits = super::validation::record_limits(limits)?;
+        let children = Record::parse_sequence_strict_with_limits(
+            &record.data,
+            "ExObjListContainer",
+            record_limits,
+        )?;
         let Some(atom) = children.first() else {
             return corrupted("ExObjListContainer is missing ExObjListAtom");
         };
@@ -472,14 +498,16 @@ impl Collection {
             )]
             let parsed_object = match child.record_type {
                 RecordType::ExternalAviMovie | RecordType::ExternalMciMovie => {
-                    Some(Object::Movie(Movie::parse(child)?))
+                    Some(Object::Movie(Movie::parse(child, &limits)?))
                 },
                 RecordType::ExternalMidiAudio | RecordType::ExternalWavAudioLink => {
-                    Some(Object::LinkedAudio(LinkedAudio::parse(child)?))
+                    Some(Object::LinkedAudio(LinkedAudio::parse(child, &limits)?))
                 },
-                RecordType::ExternalCdAudio => Some(Object::CdAudio(CdAudio::parse(child)?)),
+                RecordType::ExternalCdAudio => {
+                    Some(Object::CdAudio(CdAudio::parse(child, &limits)?))
+                },
                 RecordType::ExternalWavAudioEmbedded => {
-                    Some(Object::EmbeddedWav(EmbeddedWav::parse(child)?))
+                    Some(Object::EmbeddedWav(EmbeddedWav::parse(child, &limits)?))
                 },
                 _ => {
                     unknown_records.push(UnknownRecord::from_record(child, objects.len()));
@@ -489,7 +517,7 @@ impl Collection {
             let Some(object) = parsed_object else {
                 continue;
             };
-            if objects.len() >= MAX_EXTERNAL_MEDIA_OBJECTS {
+            if objects.len() >= MAX_EXTERNAL_MEDIA_OBJECTS.min(limits.max_records) {
                 return corrupted(format!(
                     "external-object list exceeds {MAX_EXTERNAL_MEDIA_OBJECTS} media objects"
                 ));
@@ -674,14 +702,19 @@ impl CdAudio {
     /// Returns an error if the container header is invalid, the container does
     /// not hold exactly one media atom and one CD-audio atom, or the start
     /// time is later than the end time.
-    pub fn parse(record: &Record) -> Result<Self> {
+    pub fn parse(record: &Record, limits: &Limits) -> Result<Self> {
         if record.version != 0x0f
             || record.instance != 0
             || record.record_type_raw != RecordType::ExternalCdAudio.as_u16()
         {
             return corrupted("ExCDAudioContainer has an invalid header");
         }
-        let children = Record::parse_sequence_strict(&record.data, "ExCDAudioContainer")?;
+        let record_limits = super::validation::record_limits(*limits)?;
+        let children = Record::parse_sequence_strict_with_limits(
+            &record.data,
+            "ExCDAudioContainer",
+            record_limits,
+        )?;
         if children.len() != 2 {
             return corrupted("ExCDAudioContainer must contain media and CD-audio atoms");
         }
@@ -710,7 +743,7 @@ impl CdAudio {
     /// Returns an error if serialization fails or the bytes cannot be reparsed
     /// as a record.
     pub fn to_record(&self) -> Result<Record> {
-        Ok(Record::parse(&self.to_record_bytes()?, 0)?.0)
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
     }
 
     /// Serialize this container with its CD-audio atom.

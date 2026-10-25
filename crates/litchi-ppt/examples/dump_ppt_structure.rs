@@ -344,7 +344,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut index = 0usize;
 
     while offset + 8 <= len {
-        match Record::parse(&data, offset) {
+        match Record::parse(&data, offset, &litchi_ppt::SourceLimits::default()) {
             Ok((rec, consumed)) => {
                 println!(
                     "[{}] @0x{:08X}: ver={}, inst={}, type_raw=0x{:04X}, type={:?}, len={}",

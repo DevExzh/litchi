@@ -31,8 +31,12 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn from_record(root: Record) -> Result<Self> {
-        Self::from_inner(metadata::Snapshot::from_record(Context::Main, root)?)
+    pub fn from_record(root: Record, limits: &Limits) -> Result<Self> {
+        Self::from_inner(metadata::Snapshot::from_record(
+            Context::Main,
+            root,
+            limits,
+        )?)
     }
 
     /// Parse one complete main-master record.
@@ -40,8 +44,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::from_inner(metadata::Snapshot::parse(Context::Main, bytes)?)
+    pub fn parse(bytes: &[u8], limits: &Limits) -> Result<Self> {
+        Self::from_inner(metadata::Snapshot::parse(Context::Main, bytes, limits)?)
     }
 
     fn from_inner(inner: metadata::Snapshot) -> Result<Self> {

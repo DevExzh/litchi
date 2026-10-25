@@ -58,8 +58,8 @@ interpreting the two defined settings.
 
 ## Resource and transaction policy
 
-Use `Record::parse_with_limits`, package `*_with_limits` constructors, or
-`OpenOptions::record_limits` for untrusted input. Limits cover the input stream,
+Use `Record::parse(data, offset, limits)` for detached records, or configure
+package ingress with `OpenOptions::source_limits(limits)`. Limits cover the input stream,
 individual record and payload sizes, record count, nesting depth, and aggregate
 copied payload bytes. EOT validation has independent input, output, font,
 table-count, and name-byte limits.

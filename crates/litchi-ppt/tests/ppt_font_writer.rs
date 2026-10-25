@@ -258,7 +258,7 @@ fn font_ppt10_and_smart_tag_ppt11_share_one_document_prog_tags_owner() {
         litchi_cfb::OleFile::open(Cursor::new(&bytes), litchi_cfb::OleFileLimits::default())
             .unwrap();
     let stream = ole.open_stream(&["PowerPoint Document"]).unwrap();
-    let (document, _) = Record::parse(&stream, 0).unwrap();
+    let (document, _) = Record::parse(&stream, 0, &litchi_ppt::SourceLimits::default()).unwrap();
     let doc_info = document
         .children
         .iter()
@@ -376,7 +376,8 @@ fn notes_font_references_round_trip_through_the_rich_text_path() {
     let stream = ole.open_stream(&["PowerPoint Document"]).unwrap();
     let mut offset = 0usize;
     let notes = loop {
-        let (record, consumed) = Record::parse(&stream, offset).unwrap();
+        let (record, consumed) =
+            Record::parse(&stream, offset, &litchi_ppt::SourceLimits::default()).unwrap();
         offset += consumed;
         if record.record_type == RecordType::Notes {
             break record;
@@ -387,7 +388,8 @@ fn notes_font_references_round_trip_through_the_rich_text_path() {
         .iter()
         .find(|record| record.record_type == RecordType::PPDrawing)
         .unwrap();
-    let shapes = litchi_ppt::odraw::parse(&drawing.data).unwrap();
+    let shapes =
+        litchi_ppt::odraw::parse(&drawing.data, &litchi_ppt::odraw::Limits::default()).unwrap();
     let mut pending = shapes.iter().collect::<Vec<_>>();
     let (textbox, tags) = loop {
         let shape = pending.pop().unwrap();

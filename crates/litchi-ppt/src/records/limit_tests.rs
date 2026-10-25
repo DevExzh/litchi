@@ -5,7 +5,7 @@
 )]
 
 //! Source limits enforced by the bounded record parser (moved from the
-//! embedded-font vectors when `Record::parse_with_limits` became
+//! embedded-font vectors when `Record::parse` became
 //! crate-private, record 0357).
 
 use super::Record;
@@ -50,7 +50,7 @@ fn source_limits_reject_oversize_font_records_before_materialization() {
         .build()
         .unwrap();
     assert!(matches!(
-        Record::parse_with_limits(&bytes, 0, limits),
+        Record::parse(&bytes, 0, &limits),
         Err(Error::Limit {
             kind: SourceLimitKind::RecordBytes | SourceLimitKind::RecordPayloadBytes,
             ..
@@ -74,7 +74,7 @@ fn source_limits_bound_record_events_and_depth() {
         .build()
         .unwrap();
     assert!(matches!(
-        Record::parse_with_limits(&event_bytes, 0, event_limits),
+        Record::parse(&event_bytes, 0, &event_limits),
         Err(Error::Limit {
             kind: SourceLimitKind::Events,
             observed,
@@ -88,7 +88,7 @@ fn source_limits_bound_record_events_and_depth() {
         .build()
         .unwrap();
     assert!(matches!(
-        Record::parse_with_limits(&nested_record(3), 0, depth_limits),
+        Record::parse(&nested_record(3), 0, &depth_limits),
         Err(Error::Limit {
             kind: SourceLimitKind::Depth,
             observed,

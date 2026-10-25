@@ -98,7 +98,9 @@ fn reads_and_authors_names_for_all_master_contexts() {
         Context::Notes,
         Context::Handout,
     ] {
-        let snapshot = Snapshot::from_record(context, master(context, Vec::new())).unwrap();
+        let snapshot =
+            Snapshot::from_record(context, master(context, Vec::new()), &Limits::default())
+                .unwrap();
         assert!(snapshot.name().unwrap().is_none());
 
         let mut edit = snapshot.edit();
@@ -134,6 +136,7 @@ fn replacement_and_clear_are_atomic_and_keep_unknown_records() {
                 opaque_after.clone(),
             ],
         ),
+        &Limits::default(),
     )
     .unwrap();
 
@@ -173,6 +176,7 @@ fn inserts_before_main_template_and_round_trip_tail() {
     let source = Snapshot::from_record(
         Context::Main,
         master(Context::Main, vec![unknown(), template.clone(), round_trip]),
+        &Limits::default(),
     )
     .unwrap();
 
@@ -199,6 +203,7 @@ fn rejects_duplicate_malformed_and_oversized_names() {
             Context::Handout,
             vec![name_record("one"), name_record("two")],
         ),
+        &Limits::default(),
     );
     assert!(duplicate.is_err());
 
@@ -208,13 +213,14 @@ fn rejects_duplicate_malformed_and_oversized_names() {
     odd_root.children[2].data_length = 1;
     odd_root.data = children_wire(&odd_root.children).into();
     odd_root.data_length = u32::try_from(odd_root.data.len()).unwrap();
-    assert!(Snapshot::from_record(Context::Notes, odd_root).is_err());
+    assert!(Snapshot::from_record(Context::Notes, odd_root, &Limits::default()).is_err());
 
     let invalid_utf16 = record(RecordType::CString, 0, 3, vec![0, 0xd8], Vec::new());
     assert!(
         Snapshot::from_record(
             Context::Handout,
-            master(Context::Handout, vec![invalid_utf16])
+            master(Context::Handout, vec![invalid_utf16]),
+            &Limits::default(),
         )
         .is_err()
     );
@@ -223,7 +229,8 @@ fn rejects_duplicate_malformed_and_oversized_names() {
     assert!(
         Snapshot::from_record(
             Context::Handout,
-            master(Context::Handout, vec![wrong_header])
+            master(Context::Handout, vec![wrong_header]),
+            &Limits::default(),
         )
         .is_err()
     );

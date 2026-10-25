@@ -79,11 +79,9 @@ impl Edit {
     fn initialize_state(&self) -> std::result::Result<State, Failure> {
         // A document without an `ExObjListContainer` edits an empty list; a
         // committed change inserts the container ([MS-PPT] 2.4.1).
-        let source = self
-            .base
-            .package()
-            .presentation()
-            .map_err(Failure::from)?
+        let presentation = self.base.package().presentation().map_err(Failure::from)?;
+        let source_limits = presentation.source_limits();
+        let source = presentation
             .ole_objects()?
             .unwrap_or_else(Collection::empty);
         // A signed package opens for staging; only a changed commit is
@@ -92,6 +90,7 @@ impl Edit {
             self.base.bytes()?.to_vec(),
             source.clone(),
             self.base.cfb_limits()?,
+            source_limits,
         )
         .map_err(scoped::publication("embedded_object.edit"))?;
         Ok(State { source, inner })
@@ -104,16 +103,16 @@ impl Edit {
     fn state_mut(&mut self) -> std::result::Result<&mut State, Failure> {
         let base = self.base.clone();
         self.state.get_or_try_init_mut(|| {
-            let source = base
-                .package()
-                .presentation()
-                .map_err(Failure::from)?
+            let presentation = base.package().presentation().map_err(Failure::from)?;
+            let source_limits = presentation.source_limits();
+            let source = presentation
                 .ole_objects()?
                 .unwrap_or_else(Collection::empty);
             let inner = Editor::open_admitting_signature(
                 base.bytes()?.to_vec(),
                 source.clone(),
                 base.cfb_limits()?,
+                source_limits,
             )
             .map_err(scoped::publication("embedded_object.edit"))?;
             Ok::<State, Failure>(State { source, inner })
@@ -230,16 +229,16 @@ impl Edit {
         let Self { base, state } = self;
         state
             .get_or_try_init(|| {
-                let source = base
-                    .package()
-                    .presentation()
-                    .map_err(Failure::from)?
+                let presentation = base.package().presentation().map_err(Failure::from)?;
+                let source_limits = presentation.source_limits();
+                let source = presentation
                     .ole_objects()?
                     .unwrap_or_else(Collection::empty);
                 let inner = Editor::open_admitting_signature(
                     base.bytes()?.to_vec(),
                     source.clone(),
                     base.cfb_limits()?,
+                    source_limits,
                 )
                 .map_err(scoped::publication("embedded_object.edit"))?;
                 Ok::<State, Failure>(State { source, inner })

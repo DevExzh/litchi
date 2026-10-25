@@ -4,6 +4,7 @@ use crate::consts::RecordType;
 
 use super::package::{Error, Result};
 use super::records::Record;
+use crate::SourceLimits;
 
 const FILTER_PRIVACY_FLAGS_RECORD_TYPE: u16 = 0x36b0;
 
@@ -55,8 +56,8 @@ impl PrivacySettings {
     }
 
     /// Discover the single privacy atom in the PPT10 document tag.
-    pub(crate) fn parse_document(document: &Record) -> Result<Option<Self>> {
-        let records = document.versioned_binary_tag_records(10)?;
+    pub(crate) fn parse_document(document: &Record, limits: &SourceLimits) -> Result<Option<Self>> {
+        let records = document.versioned_binary_tag_records(10, limits)?;
         let mut matches = records
             .iter()
             .filter(|record| record.record_type_raw == FILTER_PRIVACY_FLAGS_RECORD_TYPE);

@@ -1173,7 +1173,8 @@ fn custom_table_styles_record(atom: &[u8]) -> Result<crate::Record> {
             },
         ))
     };
-    let (record, consumed) = crate::Record::parse(atom, 0).map_err(|_error| invalid())?;
+    let (record, consumed) = crate::Record::parse(atom, 0, &crate::SourceLimits::default())
+        .map_err(|_error| invalid())?;
     if consumed != atom.len() {
         return Err(invalid());
     }

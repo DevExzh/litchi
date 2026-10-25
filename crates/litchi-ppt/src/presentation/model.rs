@@ -4,7 +4,7 @@ use crate::embedded::object::Collection as OleCollection;
 #[cfg(feature = "vba-inspection")]
 use crate::embedded::storage::Ref as StorageRef;
 use crate::embedded::storage::{Kind as StorageKind, Storage};
-use crate::external_media::Collection as MediaCollection;
+use crate::external_media::{Collection as MediaCollection, Limits as MediaLimits};
 use crate::header_footer::{
     HeaderFooterParent, HeaderFooterParentOrdinal, HeaderFooterScope, HeaderFooters,
 };
@@ -611,7 +611,7 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn powerpoint12_document_properties(&self) -> Result<DocumentProperties12> {
         let document = self.live_document_ref()?;
-        DocumentProperties12::parse(document)
+        DocumentProperties12::parse(document, &self.inner.source_limits)
     }
 
     /// Return the document routing-slip metadata, when present.
@@ -716,10 +716,20 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn external_media(&self) -> Result<Option<MediaCollection>> {
         let document = self.live_document_ref()?;
-        let Some(media) = MediaCollection::parse(document)? else {
+        let source_limits = self.inner.source_limits;
+        let media_limits = MediaLimits {
+            max_root_bytes: source_limits
+                .max_record_bytes()
+                .min(source_limits.max_input_bytes()),
+            max_record_bytes: source_limits.max_record_bytes(),
+            max_depth: source_limits.max_depth(),
+            max_records: source_limits.max_events(),
+            max_owner_references: source_limits.max_events(),
+        };
+        let Some(media) = MediaCollection::parse(document, &media_limits)? else {
             return Ok(None);
         };
-        let _ = OleCollection::parse(document)?;
+        let _ = OleCollection::parse(document, &source_limits)?;
         let sounds = self.embedded_sounds()?;
         media.validate_sound_collection(sounds.as_ref())?;
         Ok(Some(media))
@@ -734,7 +744,8 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn hyperlinks(&self) -> Result<Hyperlinks> {
-        Hyperlinks::parse(&self.live_document_record()?)
+        let source_limits = self.inner.source_limits;
+        Hyperlinks::parse(&self.live_document_record()?, &source_limits)
     }
 
     /// Resolve a click interaction (record 0323): a URL, a slide of this
@@ -803,7 +814,8 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn ole_objects(&self) -> Result<Option<OleCollection>> {
         let document = self.live_document_ref()?;
-        let Some(objects) = OleCollection::parse(document)? else {
+        let source_limits = self.inner.source_limits;
+        let Some(objects) = OleCollection::parse(document, &source_limits)? else {
             return Ok(None);
         };
         objects.validate_persist_mapping(&self.inner.persist_mapping)?;
@@ -830,10 +842,10 @@ impl Presentation {
         };
         let storage_offset = usize::try_from(offset)
             .map_err(|_err| Error::Corrupted("OLE storage offset exceeds usize".to_string()))?;
-        let (record, _) = Record::parse_with_limits(
+        let (record, _) = Record::parse(
             &self.inner.powerpoint_document,
             storage_offset,
-            self.inner.source_limits,
+            &self.inner.source_limits,
         )?;
         if record.record_type != RecordType::ExternalOleObjectStg {
             return Err(Error::Corrupted(format!(
@@ -933,10 +945,10 @@ impl Presentation {
             })?;
         let document_offset = usize::try_from(offset)
             .map_err(|_err| Error::Corrupted("document offset exceeds usize".to_string()))?;
-        let (record, _) = Record::parse_with_limits(
+        let (record, _) = Record::parse(
             &self.inner.powerpoint_document,
             document_offset,
-            self.inner.source_limits,
+            &self.inner.source_limits,
         )?;
         if record.record_type != RecordType::Document {
             return Err(Error::Corrupted(
@@ -950,10 +962,10 @@ impl Presentation {
     pub(crate) fn live_document_bytes(&self) -> Result<Vec<u8>> {
         self.check_source()?;
         let offset = self.inner.slide_directory.document_offset();
-        let (record, consumed) = Record::parse_with_limits(
+        let (record, consumed) = Record::parse(
             &self.inner.powerpoint_document,
             offset,
-            self.inner.source_limits,
+            &self.inner.source_limits,
         )?;
         if record.record_type != RecordType::Document {
             return Err(Error::Corrupted(
@@ -1100,7 +1112,7 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn modify_password(&self) -> Result<Option<crate::ModifyPassword>> {
         let document = self.live_document_ref()?;
-        crate::ModifyPassword::parse_document(document)
+        crate::ModifyPassword::parse_document(document, &self.inner.source_limits)
     }
 
     /// Return the inert `PowerPoint` 10 privacy preference, if present.
@@ -1112,7 +1124,7 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn privacy_settings(&self) -> Result<Option<crate::PrivacySettings>> {
         let document = self.live_document_ref()?;
-        crate::PrivacySettings::parse_document(document)
+        crate::PrivacySettings::parse_document(document, &self.inner.source_limits)
     }
 
     /// Return typed `PowerPoint` 9 Presentation Advisor warning preferences.
@@ -1124,7 +1136,7 @@ impl Presentation {
         &self,
     ) -> Result<Option<crate::PresentationAdvisorSettings>> {
         let document = self.live_document_ref()?;
-        crate::PresentationAdvisorSettings::parse_document(document)
+        crate::PresentationAdvisorSettings::parse_document(document, &self.inner.source_limits)
     }
 
     /// Return typed `PowerPoint` 9 Web-document publishing preferences.
@@ -1136,7 +1148,7 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn html_document_settings(&self) -> Result<Option<crate::HtmlDocumentSettings>> {
         let document = self.live_document_ref()?;
-        crate::HtmlDocumentSettings::parse_document(document)
+        crate::HtmlDocumentSettings::parse_document(document, &self.inner.source_limits)
     }
 
     /// Return inert `PowerPoint` 9 Web-publication metadata, if present.
@@ -1150,7 +1162,7 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn html_publish_settings(&self) -> Result<Option<crate::HtmlPublishSettings>> {
         let document = self.live_document_ref()?;
-        crate::HtmlPublishSettings::parse_document(document)
+        crate::HtmlPublishSettings::parse_document(document, &self.inner.source_limits)
     }
 
     /// Return all inert `PowerPoint` 9 presentation-broadcast descriptions.
@@ -1164,7 +1176,7 @@ impl Presentation {
     pub fn broadcasts(&self) -> Result<crate::Broadcasts> {
         // The live document: an incrementally saved presentation keeps its
         // superseded `DocumentContainer` records in the stream (record 0357).
-        crate::Broadcasts::parse_document(&self.live_document_record()?)
+        crate::Broadcasts::parse_document(&self.live_document_record()?, &self.inner.source_limits)
     }
 
     /// Return the structurally decoded, inert `PowerPoint` 9 mail envelope.
@@ -1177,7 +1189,7 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn envelope_data(&self) -> Result<Option<crate::EnvelopeData>> {
         let document = self.live_document_ref()?;
-        crate::EnvelopeData::parse_document(document)
+        crate::EnvelopeData::parse_document(document, &self.inner.source_limits)
     }
 
     /// Validate and expose the specification-defined terminal document records.
@@ -1251,7 +1263,7 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn envelope_settings(&self) -> Result<Option<crate::EnvelopeSettings>> {
         let document = self.live_document_ref()?;
-        crate::EnvelopeSettings::parse_document(document)
+        crate::EnvelopeSettings::parse_document(document, &self.inner.source_limits)
     }
 
     /// Return strictly validated header/footer metadata from all specification-defined scopes.
@@ -1613,7 +1625,10 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn comment_catalog(&self) -> Result<crate::comments::Catalog> {
-        let authors = crate::comments::Authors::parse(&self.live_document_record()?)?;
+        let authors = crate::comments::Authors::parse(
+            &self.live_document_record()?,
+            &self.inner.source_limits,
+        )?;
         crate::comments::Catalog::from_parts(authors, self.comments()?)
     }
 
@@ -1635,7 +1650,7 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn smart_tags(&self) -> Result<Option<crate::SmartTagStore>> {
         let document = self.live_document_record()?;
-        crate::SmartTagStore::parse(&document)
+        crate::SmartTagStore::parse(&document, &self.inner.source_limits)
     }
 
     /// Return the typed document-level programmable tags (MS-PPT 2.4.23), when

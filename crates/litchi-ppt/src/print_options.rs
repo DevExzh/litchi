@@ -108,7 +108,7 @@ impl PrintOptions {
     /// Returns an error if the canonical record cannot be re-parsed.
     pub fn to_record(&self) -> Result<Record> {
         let bytes = self.to_record_bytes();
-        let (record, end) = Record::parse(&bytes, 0)?;
+        let (record, end) = Record::parse(&bytes, 0, &crate::SourceLimits::default())?;
         if end != bytes.len() {
             return corrupted("canonical PrintOptionsAtom did not consume its bytes");
         }
@@ -210,7 +210,9 @@ mod tests {
         for (offset, invalid) in [(0, 1), (8, 10), (9, 3), (10, 2), (11, 0xff), (12, 7)] {
             let mut bytes = value.to_record_bytes();
             bytes[offset] = invalid;
-            let mutated_record = Record::parse(&bytes, 0).unwrap().0;
+            let mutated_record = Record::parse(&bytes, 0, &crate::SourceLimits::default())
+                .unwrap()
+                .0;
             assert!(PrintOptions::parse(&root(vec![mutated_record])).is_err());
         }
     }

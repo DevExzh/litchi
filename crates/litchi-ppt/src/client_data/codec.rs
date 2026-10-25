@@ -260,8 +260,8 @@ impl ClientData {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(bytes: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(bytes, ClientDataLimits::default())
+    pub fn parse(bytes: &[u8], limits: &ClientDataLimits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse one exact complete record with explicit resource limits.

@@ -47,7 +47,7 @@ fn view_records(bytes: &[u8]) -> Vec<Record> {
         litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
             .unwrap();
     let stream = ole.open_stream(&["PowerPoint Document"]).unwrap();
-    let (document, _) = Record::parse(&stream, 0).unwrap();
+    let (document, _) = Record::parse(&stream, 0, &litchi_ppt::SourceLimits::default()).unwrap();
     let doc_info = document
         .children
         .iter()

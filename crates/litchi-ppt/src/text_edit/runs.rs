@@ -12,8 +12,9 @@
 //! An edit rewrites the body's style atom or interaction pairs and re-frames
 //! only the records that contain them; every other record keeps its bytes.
 
+use crate::SourceLimits;
 use crate::consts::RecordType;
-use crate::hyperlink::Interaction;
+use crate::hyperlink::{Interaction, InteractionLimits};
 use crate::package::Error as PackageError;
 use crate::text_format_exception::TextCFException;
 
@@ -117,7 +118,10 @@ impl RunFormat {
 }
 
 /// Parse one body's records.
-fn parse_body<'a>(records: impl IntoIterator<Item = &'a [u8]>) -> Result<TextRuns> {
+fn parse_body<'a>(
+    records: impl IntoIterator<Item = &'a [u8]>,
+    interaction_limits: InteractionLimits,
+) -> Result<TextRuns> {
     let records = records.into_iter().collect::<Vec<_>>();
     let mut text = None;
     for record in &records {
@@ -169,7 +173,7 @@ fn parse_body<'a>(records: impl IntoIterator<Item = &'a [u8]>) -> Result<TextRun
     for record in &records {
         let kind = record_type(record)?;
         if kind == RecordType::InteractiveInfo as u16 {
-            pending = Some(Interaction::parse_bytes(record)?);
+            pending = Some(Interaction::parse_bytes(record, &interaction_limits)?);
         } else if kind == RecordType::TextInteractiveInfoAtom as u16 {
             let Some(interaction) = pending.take() else {
                 continue;
@@ -250,6 +254,7 @@ pub(crate) fn read(
     drawing: &[u8],
     outline: &[crate::OutlineTextBody],
     shape_id: u32,
+    source_limits: SourceLimits,
 ) -> Result<Option<TextRuns>> {
     let mut found = None;
     let records = super::ChildRecords {
@@ -274,10 +279,10 @@ pub(crate) fn read(
             offset: 0,
         }
         .collect::<crate::package::Result<Vec<_>>>()?;
-        return parse_body(records).map(Some);
+        return parse_body(records, interaction_limits_for_source(source_limits)).map(Some);
     }
     let records = children(textbox)?.collect::<crate::package::Result<Vec<_>>>()?;
-    parse_body(records).map(Some)
+    parse_body(records, interaction_limits_for_source(source_limits)).map(Some)
 }
 
 /// The text-body rewrite of an element edit: the new body records, or
@@ -452,6 +457,7 @@ pub(crate) fn format_body(
     start: usize,
     end: usize,
     format: &RunFormat,
+    interaction_limits: InteractionLimits,
 ) -> Result<Option<Vec<u8>>> {
     let units = text_units(records)?;
     let mut style = None;
@@ -483,7 +489,7 @@ pub(crate) fn format_body(
         if style.is_some() {
             // The run already shows the format, or the atom is not
             // reproducible byte for byte.
-            let current = parse_body(records.iter().copied())?;
+            let current = parse_body(records.iter().copied(), interaction_limits)?;
             if current
                 .runs
                 .iter()
@@ -510,6 +516,22 @@ pub(crate) fn format_body(
         }
     }
     Ok(Some(data))
+}
+
+/// Derive the interaction family profile from the selected package source
+/// profile.  Text-run readback is source-backed, so it must not silently
+/// reopen an `InteractiveInfo` child with an unrelated default budget.
+pub(crate) fn interaction_limits_for_source(source_limits: SourceLimits) -> InteractionLimits {
+    InteractionLimits {
+        max_record_bytes: source_limits.max_record_bytes(),
+        max_macro_name_bytes: source_limits
+            .max_record_payload_bytes()
+            .min(InteractionLimits::default().max_macro_name_bytes),
+        max_events: source_limits.max_events(),
+        max_depth: source_limits.max_depth(),
+        max_record_payload_bytes: source_limits.max_record_payload_bytes(),
+        max_aggregate_payload_bytes: source_limits.max_aggregate_payload_bytes(),
+    }
 }
 
 /// The body with its click hyperlink over exactly `start..end` replaced by

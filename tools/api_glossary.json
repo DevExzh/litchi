@@ -11501,6 +11501,368 @@
       "package": "litchi-ppt",
       "default_features": false,
       "features": [],
+      "required_signatures": [
+        {
+          "method": "litchi_ppt::Record::parse",
+          "inputs": ["data", "offset", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::RecordParser::parse_document",
+          "inputs": ["self", "data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::broadcast::Snapshot::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::broadcast::Snapshot::from_bytes",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::broadcast::Snapshot::from_broadcast",
+          "inputs": ["broadcast", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::client_anchor::Anchor::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::client_anchor::Limits"
+        },
+        {
+          "method": "litchi_ppt::client_anchor::Data::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::client_anchor::Limits"
+        },
+        {
+          "method": "litchi_ppt::client_anchor::Snapshot::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::client_anchor::Limits"
+        },
+        {
+          "method": "litchi_ppt::client_data::ClientData::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::client_data::ClientDataLimits"
+        },
+        {
+          "method": "litchi_ppt::client_data::Container::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::client_data::ClientDataLimits"
+        },
+        {
+          "method": "litchi_ppt::client_data::Snapshot::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::client_data::ClientDataLimits"
+        },
+        {
+          "method": "litchi_ppt::current_user::CurrentUser::parse",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::diagram::parse",
+          "inputs": ["build_list", "drawing", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::diagram::Limits"
+        },
+        {
+          "method": "litchi_ppt::diagram::parse_bytes",
+          "inputs": ["build_list", "drawing", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::diagram::Limits"
+        },
+        {
+          "method": "litchi_ppt::diagram::Inventory::parse",
+          "inputs": ["build_list", "drawing", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::diagram::Limits"
+        },
+        {
+          "method": "litchi_ppt::diagram::Snapshot::parse",
+          "inputs": ["build_list", "drawing", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::diagram::EditLimits"
+        },
+        {
+          "method": "litchi_ppt::diagram::SlideSnapshot::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::diagram::SlideLimits"
+        },
+        {
+          "method": "litchi_ppt::diagram::SlideSnapshot::from_bytes",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::diagram::SlideLimits"
+        },
+        {
+          "method": "litchi_ppt::document_comparison::DiffTree10::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::document_comparison::Limits"
+        },
+        {
+          "method": "litchi_ppt::document_comparison::PackageSnapshot::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::document_comparison::Limits"
+        },
+        {
+          "method": "litchi_ppt::document_comparison::PackageSnapshot::from_bytes",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::document_comparison::Limits"
+        },
+        {
+          "method": "litchi_ppt::document_comparison::Snapshot::from_record",
+          "inputs": ["root", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::document_comparison::Limits"
+        },
+        {
+          "method": "litchi_ppt::document_comparison::Snapshot::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::document_comparison::Limits"
+        },
+        {
+          "method": "litchi_ppt::document_structure::Snapshot::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::document_structure::Limits"
+        },
+        {
+          "method": "litchi_ppt::document_structure::Snapshot::from_record",
+          "inputs": ["root", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::document_structure::Limits"
+        },
+        {
+          "method": "litchi_ppt::external_media::Snapshot::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::external_media::Limits"
+        },
+        {
+          "method": "litchi_ppt::external_media::Snapshot::from_bytes",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::external_media::Limits"
+        },
+        {
+          "method": "litchi_ppt::font::FontCollections::parse",
+          "inputs": ["root", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::font::Limits"
+        },
+        {
+          "method": "litchi_ppt::font::FontCollection::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::font::Limits"
+        },
+        {
+          "method": "litchi_ppt::font::Snapshot::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::font::PackageLimits"
+        },
+        {
+          "method": "litchi_ppt::font::Snapshot::from_bytes",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::font::PackageLimits"
+        },
+        {
+          "method": "litchi_ppt::master::metadata::Snapshot::from_record",
+          "inputs": ["context", "root", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::master_layout::Limits"
+        },
+        {
+          "method": "litchi_ppt::master::metadata::Snapshot::parse",
+          "inputs": ["context", "bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::master_layout::Limits"
+        },
+        {
+          "method": "litchi_ppt::master::metadata::template::Snapshot::from_record",
+          "inputs": ["root", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::master_layout::Limits"
+        },
+        {
+          "method": "litchi_ppt::master::metadata::template::Snapshot::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::master_layout::Limits"
+        },
+        {
+          "method": "litchi_ppt::master_layout::Snapshot::from_record",
+          "inputs": ["context", "root", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::master_layout::Limits"
+        },
+        {
+          "method": "litchi_ppt::master_layout::Snapshot::parse",
+          "inputs": ["context", "bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::master_layout::Limits"
+        },
+        {
+          "method": "litchi_ppt::odraw::parse",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::odraw::Limits"
+        },
+        {
+          "method": "litchi_ppt::odraw::parse_drawing",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::odraw::Limits"
+        },
+        {
+          "method": "litchi_ppt::picture_bullets::PictureBulletCollection::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::picture_bullets::PictureBulletLimits"
+        },
+        {
+          "method": "litchi_ppt::picture_bullets::PictureBulletCollection::parse_from",
+          "inputs": ["root", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::picture_bullets::PictureBulletLimits"
+        },
+        {
+          "method": "litchi_ppt::picture_bullets::PictureBulletSnapshot::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::picture_bullets::PictureBulletPackageLimits"
+        },
+        {
+          "method": "litchi_ppt::picture_bullets::PictureBulletSnapshot::from_bytes",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::picture_bullets::PictureBulletPackageLimits"
+        },
+        {
+          "method": "litchi_ppt::slide_sync::Snapshot::from_record",
+          "inputs": ["root", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::slide_sync::Limits"
+        },
+        {
+          "method": "litchi_ppt::slide_sync::Snapshot::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::slide_sync::Limits"
+        },
+        {
+          "method": "litchi_ppt::external_media::Video::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::external_media::Limits"
+        },
+        {
+          "method": "litchi_ppt::external_media::Movie::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::external_media::Limits"
+        },
+        {
+          "method": "litchi_ppt::external_media::LinkedAudio::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::external_media::Limits"
+        },
+        {
+          "method": "litchi_ppt::external_media::EmbeddedWav::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::external_media::Limits"
+        },
+        {
+          "method": "litchi_ppt::external_media::CdAudio::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::external_media::Limits"
+        },
+        {
+          "method": "litchi_ppt::external_media::Collection::parse",
+          "inputs": ["root", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::external_media::Limits"
+        },
+        {
+          "method": "litchi_ppt::document_comparison::SlideListTable10::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::document_comparison::Limits"
+        },
+        {
+          "method": "litchi_ppt::embedded::object::Collection::parse",
+          "inputs": ["root", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::embedded::object::Control::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::embedded::object::Definition::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::hyperlink::Hyperlink::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::hyperlink::HyperlinkExtension::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::hyperlink::Hyperlinks::parse",
+          "inputs": ["root", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::hyperlink::Interaction::parse",
+          "inputs": ["record", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::hyperlink::InteractionLimits"
+        },
+        {
+          "method": "litchi_ppt::hyperlink::Interaction::parse_bytes",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::hyperlink::InteractionLimits"
+        }
+      ],
       "banned_names": [
         {
           "name": "RecordLimits",
@@ -12435,6 +12797,78 @@
         "performance-diagnostics",
         "sign",
         "vba-inspection"
+      ],
+      "required_signatures": [
+        {
+          "method": "litchi_ppt::Record::parse",
+          "inputs": ["data", "offset", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {
+          "method": "litchi_ppt::RecordParser::parse_document",
+          "inputs": ["self", "data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ppt::SourceLimits"
+        },
+        {"method":"litchi_ppt::broadcast::Snapshot::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::SourceLimits"},
+        {"method":"litchi_ppt::broadcast::Snapshot::from_bytes","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::SourceLimits"},
+        {"method":"litchi_ppt::broadcast::Snapshot::from_broadcast","inputs":["broadcast","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::SourceLimits"},
+        {"method":"litchi_ppt::client_anchor::Anchor::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::client_anchor::Limits"},
+        {"method":"litchi_ppt::client_anchor::Data::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::client_anchor::Limits"},
+        {"method":"litchi_ppt::client_anchor::Snapshot::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::client_anchor::Limits"},
+        {"method":"litchi_ppt::client_data::ClientData::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::client_data::ClientDataLimits"},
+        {"method":"litchi_ppt::client_data::Container::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::client_data::ClientDataLimits"},
+        {"method":"litchi_ppt::client_data::Snapshot::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::client_data::ClientDataLimits"},
+        {"method":"litchi_ppt::current_user::CurrentUser::parse","inputs":["data","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::SourceLimits"},
+        {"method":"litchi_ppt::diagram::parse","inputs":["build_list","drawing","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::diagram::Limits"},
+        {"method":"litchi_ppt::diagram::parse_bytes","inputs":["build_list","drawing","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::diagram::Limits"},
+        {"method":"litchi_ppt::diagram::Inventory::parse","inputs":["build_list","drawing","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::diagram::Limits"},
+        {"method":"litchi_ppt::diagram::Snapshot::parse","inputs":["build_list","drawing","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::diagram::EditLimits"},
+        {"method":"litchi_ppt::diagram::SlideSnapshot::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::diagram::SlideLimits"},
+        {"method":"litchi_ppt::diagram::SlideSnapshot::from_bytes","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::diagram::SlideLimits"},
+        {"method":"litchi_ppt::document_comparison::DiffTree10::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::document_comparison::Limits"},
+        {"method":"litchi_ppt::document_comparison::PackageSnapshot::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::document_comparison::Limits"},
+        {"method":"litchi_ppt::document_comparison::PackageSnapshot::from_bytes","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::document_comparison::Limits"},
+        {"method":"litchi_ppt::document_comparison::Snapshot::from_record","inputs":["root","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::document_comparison::Limits"},
+        {"method":"litchi_ppt::document_comparison::Snapshot::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::document_comparison::Limits"},
+        {"method":"litchi_ppt::document_structure::Snapshot::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::document_structure::Limits"},
+        {"method":"litchi_ppt::document_structure::Snapshot::from_record","inputs":["root","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::document_structure::Limits"},
+        {"method":"litchi_ppt::external_media::Snapshot::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::external_media::Limits"},
+        {"method":"litchi_ppt::external_media::Snapshot::from_bytes","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::external_media::Limits"},
+        {"method":"litchi_ppt::font::FontCollections::parse","inputs":["root","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::font::Limits"},
+        {"method":"litchi_ppt::font::FontCollection::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::font::Limits"},
+        {"method":"litchi_ppt::font::Snapshot::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::font::PackageLimits"},
+        {"method":"litchi_ppt::font::Snapshot::from_bytes","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::font::PackageLimits"},
+        {"method":"litchi_ppt::master::metadata::Snapshot::from_record","inputs":["context","root","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::master_layout::Limits"},
+        {"method":"litchi_ppt::master::metadata::Snapshot::parse","inputs":["context","bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::master_layout::Limits"},
+        {"method":"litchi_ppt::master::metadata::template::Snapshot::from_record","inputs":["root","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::master_layout::Limits"},
+        {"method":"litchi_ppt::master::metadata::template::Snapshot::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::master_layout::Limits"},
+        {"method":"litchi_ppt::master_layout::Snapshot::from_record","inputs":["context","root","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::master_layout::Limits"},
+        {"method":"litchi_ppt::master_layout::Snapshot::parse","inputs":["context","bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::master_layout::Limits"},
+        {"method":"litchi_ppt::odraw::parse","inputs":["data","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::odraw::Limits"},
+        {"method":"litchi_ppt::odraw::parse_drawing","inputs":["data","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::odraw::Limits"},
+        {"method":"litchi_ppt::picture_bullets::PictureBulletCollection::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::picture_bullets::PictureBulletLimits"},
+        {"method":"litchi_ppt::picture_bullets::PictureBulletCollection::parse_from","inputs":["root","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::picture_bullets::PictureBulletLimits"},
+        {"method":"litchi_ppt::picture_bullets::PictureBulletSnapshot::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::picture_bullets::PictureBulletPackageLimits"},
+        {"method":"litchi_ppt::picture_bullets::PictureBulletSnapshot::from_bytes","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::picture_bullets::PictureBulletPackageLimits"},
+        {"method":"litchi_ppt::slide_sync::Snapshot::from_record","inputs":["root","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::slide_sync::Limits"},
+        {"method":"litchi_ppt::slide_sync::Snapshot::parse","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::slide_sync::Limits"},
+        {"method":"litchi_ppt::external_media::Video::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::external_media::Limits"},
+        {"method":"litchi_ppt::external_media::Movie::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::external_media::Limits"},
+        {"method":"litchi_ppt::external_media::LinkedAudio::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::external_media::Limits"},
+        {"method":"litchi_ppt::external_media::EmbeddedWav::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::external_media::Limits"},
+        {"method":"litchi_ppt::external_media::CdAudio::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::external_media::Limits"},
+        {"method":"litchi_ppt::external_media::Collection::parse","inputs":["root","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::external_media::Limits"},
+        {"method":"litchi_ppt::document_comparison::SlideListTable10::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::document_comparison::Limits"},
+        {"method":"litchi_ppt::embedded::object::Collection::parse","inputs":["root","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::SourceLimits"},
+        {"method":"litchi_ppt::embedded::object::Control::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::SourceLimits"},
+        {"method":"litchi_ppt::embedded::object::Definition::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::SourceLimits"},
+        {"method":"litchi_ppt::hyperlink::Hyperlink::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::SourceLimits"},
+        {"method":"litchi_ppt::hyperlink::HyperlinkExtension::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::SourceLimits"},
+        {"method":"litchi_ppt::hyperlink::Hyperlinks::parse","inputs":["root","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::SourceLimits"},
+        {"method":"litchi_ppt::hyperlink::Interaction::parse","inputs":["record","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::hyperlink::InteractionLimits"},
+        {"method":"litchi_ppt::hyperlink::Interaction::parse_bytes","inputs":["bytes","limits"],"limits_argument":"limits","limits_type":"litchi_ppt::hyperlink::InteractionLimits"}
       ],
       "banned_names": [
         {

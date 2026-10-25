@@ -648,7 +648,8 @@ fn typed_interactions_coexist_in_client_data_grammar_order() {
     complete.extend_from_slice(&record.len().to_le_bytes());
     complete.extend_from_slice(record.data());
 
-    let client_data = crate::ClientData::parse(&complete).unwrap();
+    let client_data =
+        crate::ClientData::parse(&complete, &crate::ClientDataLimits::default()).unwrap();
     assert!(client_data.animation_info().is_some());
     assert!(client_data.mouse_click_interactive_info().is_some());
     assert!(client_data.mouse_over_interactive_info().is_some());

@@ -36,13 +36,13 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
-    /// Parse one serialized anchor record using the default bound.
+    /// Parse one serialized anchor record under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the record header or payload is malformed.
-    pub fn parse(bytes: impl AsRef<[u8]>) -> Result<Self> {
-        Self::parse_with_limits(bytes, Limits::default())
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
     }
 
     /// Parse one serialized anchor record with an explicit resource bound.

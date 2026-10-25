@@ -20,14 +20,14 @@ impl FontCollections {
         validation::validate_collections(self, limits)
     }
 
-    /// Parse font semantics from a live `DocumentContainer` with default limits.
+    /// Parse font semantics from a live `DocumentContainer` under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the record tree is not a valid live document font
     /// owner or contains malformed or unsupported font records.
-    pub fn parse(root: &Record) -> Result<Self> {
-        Self::parse_with_limits(root, Limits::default())
+    pub fn parse(root: &Record, limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(root, *limits)
     }
 
     /// Parse only the live document's direct `Environment` and document-level
@@ -39,7 +39,7 @@ impl FontCollections {
     pub(crate) fn parse_with_limits(root: &Record, limits: Limits) -> Result<Self> {
         validation::validate_limits(limits)?;
         let mut session = RecordParseSession::new(limits.records, root.data.len())?;
-        session.account_existing(0)?;
+        session.account_existing(root, 0)?;
         if root.record_type != RecordType::Document || root.version != 0x0f || root.instance != 0 {
             return Err(Error::Corrupted(
                 "font owner is not a valid live DocumentContainer".into(),
@@ -62,8 +62,8 @@ impl FontCollections {
                 "Environment has an invalid owner header".into(),
             ));
         }
-        if !environments.is_empty() {
-            session.account_existing(1)?;
+        if let Some(environment) = environments.first() {
+            session.account_existing(environment, 1)?;
         }
         let base_records: Vec<_> = environments
             .first()
@@ -451,14 +451,14 @@ impl FontEmbeddingFlags {
 }
 
 impl FontCollection {
-    /// Parse a font collection record with default limits.
+    /// Parse a font collection record under `limits`.
     ///
     /// # Errors
     ///
     /// Returns an error if the record is malformed or violates the default
     /// limits.
-    pub fn parse(record: &Record) -> Result<Self> {
-        Self::parse_with_limits(record, Limits::default())
+    pub fn parse(record: &Record, limits: &Limits) -> Result<Self> {
+        Self::parse_with_limits(record, *limits)
     }
 
     /// Parse a font collection record, enforcing `limits`.
@@ -482,7 +482,7 @@ impl FontCollection {
         children_already_accounted: bool,
     ) -> Result<Self> {
         if !owner_already_accounted {
-            session.account_existing(logical_depth)?;
+            session.account_existing(record, logical_depth)?;
         }
         #[allow(
             clippy::wildcard_enum_match_arm,
@@ -508,8 +508,8 @@ impl FontCollection {
             parsed = session.parse_sequence(&record.data, "font collection", child_depth)?;
             parsed.as_slice()
         } else if !children_already_accounted {
-            for _ in &record.children {
-                session.account_existing(child_depth)?;
+            for child in &record.children {
+                session.account_existing(child, child_depth)?;
             }
             record.children.as_slice()
         } else {
@@ -640,12 +640,12 @@ impl FontCollection {
     /// drained payloads lose alignment with the parsed facets.
     pub(crate) fn take_with_limits(record: &mut Record, limits: Limits) -> Result<Self> {
         let mut session = RecordParseSession::new(limits.records, record.data.len())?;
-        session.account_existing(0)?;
+        session.account_existing(record, 0)?;
         if record.children.is_empty() {
             record.children = session.parse_sequence(&record.data, "owned font collection", 1)?;
         } else {
-            for _ in &record.children {
-                session.account_existing(1)?;
+            for child in &record.children {
+                session.account_existing(child, 1)?;
             }
         }
         let mut payloads = Vec::new();
@@ -1032,7 +1032,7 @@ fn ppt10_records(
     let Some(doc_info) = doc_info_lists.first().copied() else {
         return Ok(None);
     };
-    session.account_existing(1)?;
+    session.account_existing(doc_info, 1)?;
     if doc_info.version != 0x0f || doc_info.instance != 0 {
         return Err(Error::Corrupted(
             "DocInfoList has an invalid owner header".into(),
@@ -1051,7 +1051,7 @@ fn ppt10_records(
     let Some(prog_tags) = prog_tag_owners.first().copied() else {
         return Ok(None);
     };
-    session.account_existing(2)?;
+    session.account_existing(prog_tags, 2)?;
     if prog_tags.version != 0x0f || prog_tags.instance != 0 {
         return Err(Error::Corrupted(
             "DocProgTags has an invalid owner header".into(),
@@ -1108,7 +1108,7 @@ fn edit_ppt10_records_optional(
     edit: impl FnOnce(&mut Vec<Record>) -> Result<()>,
 ) -> Result<bool> {
     let mut session = RecordParseSession::new(limits.records, root.data.len())?;
-    session.account_existing(0)?;
+    session.account_existing(root, 0)?;
     let doc_info_positions: Vec<_> = root
         .children
         .iter()
@@ -1123,7 +1123,7 @@ fn edit_ppt10_records_optional(
         ));
     }
     let doc_info = &mut root.children[doc_info_positions[0]];
-    session.account_existing(1)?;
+    session.account_existing(doc_info, 1)?;
     if doc_info.version != 0x0f || doc_info.instance != 0 {
         return Err(Error::Corrupted(
             "DocInfoList has an invalid owner header".into(),
@@ -1141,7 +1141,7 @@ fn edit_ppt10_records_optional(
         ));
     }
     let prog_tags = &mut doc_info.children[prog_positions[0]];
-    session.account_existing(2)?;
+    session.account_existing(prog_tags, 2)?;
     if prog_tags.version != 0x0f || prog_tags.instance != 0 {
         return Err(Error::Corrupted(
             "DocProgTags has an invalid owner header".into(),

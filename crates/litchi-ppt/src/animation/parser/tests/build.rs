@@ -15,7 +15,7 @@ fn round_trips_exact_powerpoint_2002_build_lists() {
     let bytes = write_build_list(&sample_build_list()).unwrap();
     assert_eq!(RecordType::TimeNode.as_u16(), 0xF127);
     assert_eq!(bytes.len(), 216);
-    let (record, consumed) = Record::parse(&bytes, 0).unwrap();
+    let (record, consumed) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(consumed, bytes.len());
     assert_eq!(record.record_type, RecordType::BuildList);
     assert_eq!(record.children.len(), 3);
@@ -51,12 +51,13 @@ fn round_trips_exact_powerpoint_2002_build_lists() {
 #[test]
 fn rejects_malformed_powerpoint_2002_build_lists() {
     let bytes = write_build_list(&sample_build_list()).unwrap();
-    let (valid, _) = Record::parse(&bytes, 0).unwrap();
+    let (valid, _) = Record::parse(&bytes, 0, &crate::SourceLimits::default()).unwrap();
 
     let mut truncated = bytes.clone();
     let claimed_length = u32::from_le_bytes(truncated[4..8].try_into().unwrap()) + 1;
     truncated[4..8].copy_from_slice(&claimed_length.to_le_bytes());
-    let (truncated_record, _) = Record::parse(&truncated, 0).unwrap();
+    let (truncated_record, _) =
+        Record::parse(&truncated, 0, &crate::SourceLimits::default()).unwrap();
     assert_eq!(truncated_record.data_length, claimed_length);
     assert!(parse_build_list(&truncated_record).is_err());
 

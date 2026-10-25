@@ -126,6 +126,238 @@ impl<'a> Blob<'a> {
         &self.records
     }
 
+    /// Return the exact owner size after appending `extra_record_bytes` to
+    /// this blob, without allocating any of the replacement record vectors.
+    ///
+    /// Hyperlink screen-tip edits use this admission before cloning the
+    /// existing binary-tag records.  Every framing layer is fixed-width, so
+    /// the projected size can be calculated from the retained source spans.
+    pub(crate) fn projected_rebuild_len(
+        &self,
+        owner: &[u8],
+        extra_record_bytes: usize,
+    ) -> Result<usize> {
+        let records_len = self.records.iter().try_fold(0usize, |total, record| {
+            total
+                .checked_add(record.len())
+                .ok_or_else(|| Error::ResourceLimit("binary-tag record length overflows".into()))
+        })?;
+        let blob_payload_len = records_len
+            .checked_add(extra_record_bytes)
+            .ok_or_else(|| Error::ResourceLimit("binary-tag payload length overflows".into()))?;
+        let new_blob_len = blob_payload_len
+            .checked_add(8)
+            .ok_or_else(|| Error::ResourceLimit("BinaryTagData length overflows".into()))?;
+        let new_tag_len = match (self.tag, self.blob) {
+            (Some(tag), Some(blob)) => self.tags[tag]
+                .len()
+                .checked_sub(self.tag_children[blob].len())
+                .and_then(|payload_without_blob| payload_without_blob.checked_add(new_blob_len))
+                .ok_or_else(|| Error::ResourceLimit("ProgBinaryTag length overflows".into()))?,
+            (Some(_), None) => {
+                return Err(Error::Corrupted(
+                    "a programmable tag has no BinaryTagData child".into(),
+                )
+                .into());
+            },
+            (None, _) => {
+                let name_bytes = self
+                    .name
+                    .encode_utf16()
+                    .count()
+                    .checked_mul(2)
+                    .ok_or_else(|| Error::ResourceLimit("binary-tag name overflows".into()))?;
+                8usize
+                    .checked_add(8)
+                    .and_then(|total| total.checked_add(name_bytes))
+                    .and_then(|total| total.checked_add(new_blob_len))
+                    .ok_or_else(|| Error::ResourceLimit("ProgBinaryTag length overflows".into()))?
+            },
+        };
+        let new_prog_tags_len = match (self.prog_tags, self.tag) {
+            (Some(prog_tags), Some(tag)) => self.owner_children[prog_tags]
+                .len()
+                .checked_sub(self.tags[tag].len())
+                .and_then(|payload_without_tag| payload_without_tag.checked_add(new_tag_len))
+                .ok_or_else(|| Error::ResourceLimit("ProgTags length overflows".into()))?,
+            (Some(prog_tags), None) => self.owner_children[prog_tags]
+                .len()
+                .checked_add(new_tag_len)
+                .ok_or_else(|| Error::ResourceLimit("ProgTags length overflows".into()))?,
+            (None, _) => 8usize
+                .checked_add(new_tag_len)
+                .ok_or_else(|| Error::ResourceLimit("ProgTags length overflows".into()))?,
+        };
+        match self.prog_tags {
+            Some(prog_tags) => owner
+                .len()
+                .checked_sub(self.owner_children[prog_tags].len())
+                .and_then(|remaining| remaining.checked_add(new_prog_tags_len))
+                .ok_or_else(|| Error::ResourceLimit("owner length overflows".into()))
+                .map_err(Into::into),
+            None => owner
+                .len()
+                .checked_add(new_prog_tags_len)
+                .ok_or_else(|| Error::ResourceLimit("owner length overflows".into()))
+                .map_err(Into::into),
+        }
+    }
+
+    /// Return the aggregate record-payload charge after appending one
+    /// serialized record to this blob.  The charge includes the payload of
+    /// every newly materialized framing container as well as the inserted
+    /// record's own nested payloads.
+    pub(crate) fn projected_rebuild_aggregate(
+        &self,
+        owner: &[u8],
+        extra_record_bytes: usize,
+        extra_aggregate: usize,
+    ) -> Result<usize> {
+        let records_len = self.records.iter().try_fold(0usize, |total, record| {
+            total
+                .checked_add(record.len())
+                .ok_or_else(|| Error::ResourceLimit("binary-tag record length overflows".into()))
+        })?;
+        let records_aggregate = aggregate_records(&self.records)?;
+        let blob_payload_len = records_len
+            .checked_add(extra_record_bytes)
+            .ok_or_else(|| Error::ResourceLimit("binary-tag payload length overflows".into()))?;
+        let blob_aggregate = blob_payload_len
+            .checked_add(records_aggregate)
+            .and_then(|value| value.checked_add(extra_aggregate))
+            .ok_or_else(|| Error::ResourceLimit("BinaryTagData aggregate overflows".into()))?;
+        let new_blob_len = blob_payload_len
+            .checked_add(8)
+            .ok_or_else(|| Error::ResourceLimit("BinaryTagData length overflows".into()))?;
+        let new_blob_aggregate = blob_aggregate;
+
+        let (new_tag_len, new_tag_aggregate) = match (self.tag, self.blob) {
+            (Some(tag), Some(blob)) => {
+                let payload_len = self.tags[tag]
+                    .len()
+                    .checked_sub(8)
+                    .and_then(|payload| payload.checked_sub(self.tag_children[blob].len()))
+                    .and_then(|payload_without_blob| payload_without_blob.checked_add(new_blob_len))
+                    .ok_or_else(|| Error::ResourceLimit("ProgBinaryTag length overflows".into()))?;
+                let other_aggregate = aggregate_indexed(&self.tag_children, blob)?;
+                let aggregate = payload_len
+                    .checked_add(other_aggregate)
+                    .and_then(|value| value.checked_add(new_blob_aggregate))
+                    .ok_or_else(|| {
+                        Error::ResourceLimit("ProgBinaryTag aggregate overflows".into())
+                    })?;
+                (
+                    payload_len.checked_add(8).ok_or_else(|| {
+                        Error::ResourceLimit("ProgBinaryTag length overflows".into())
+                    })?,
+                    aggregate,
+                )
+            },
+            (Some(_), None) => {
+                return Err(Error::Corrupted(
+                    "a programmable tag has no BinaryTagData child".into(),
+                )
+                .into());
+            },
+            (None, _) => {
+                let name_bytes = self
+                    .name
+                    .encode_utf16()
+                    .count()
+                    .checked_mul(2)
+                    .ok_or_else(|| Error::ResourceLimit("binary-tag name overflows".into()))?;
+                let payload_len = 16usize
+                    .checked_add(name_bytes)
+                    .and_then(|value| value.checked_add(blob_payload_len))
+                    .ok_or_else(|| Error::ResourceLimit("ProgBinaryTag length overflows".into()))?;
+                let aggregate = payload_len
+                    .checked_add(name_bytes)
+                    .and_then(|value| value.checked_add(new_blob_aggregate))
+                    .ok_or_else(|| {
+                        Error::ResourceLimit("ProgBinaryTag aggregate overflows".into())
+                    })?;
+                (
+                    payload_len.checked_add(8).ok_or_else(|| {
+                        Error::ResourceLimit("ProgBinaryTag length overflows".into())
+                    })?,
+                    aggregate,
+                )
+            },
+        };
+
+        let (new_prog_len, new_prog_aggregate) = match (self.prog_tags, self.tag) {
+            (Some(prog_tags), Some(tag)) => {
+                let payload_len = self.owner_children[prog_tags]
+                    .len()
+                    .checked_sub(8)
+                    .and_then(|payload| payload.checked_sub(self.tags[tag].len()))
+                    .and_then(|payload_without_tag| payload_without_tag.checked_add(new_tag_len))
+                    .ok_or_else(|| Error::ResourceLimit("ProgTags length overflows".into()))?;
+                let other_aggregate = aggregate_indexed(&self.tags, tag)?;
+                let aggregate = payload_len
+                    .checked_add(other_aggregate)
+                    .and_then(|value| value.checked_add(new_tag_aggregate))
+                    .ok_or_else(|| Error::ResourceLimit("ProgTags aggregate overflows".into()))?;
+                (
+                    payload_len
+                        .checked_add(8)
+                        .ok_or_else(|| Error::ResourceLimit("ProgTags length overflows".into()))?,
+                    aggregate,
+                )
+            },
+            (Some(prog_tags), None) => {
+                let payload_len = self.owner_children[prog_tags]
+                    .len()
+                    .checked_sub(8)
+                    .and_then(|payload| payload.checked_add(new_tag_len))
+                    .ok_or_else(|| Error::ResourceLimit("ProgTags length overflows".into()))?;
+                let old_tags_aggregate = aggregate_records(&self.tags)?;
+                let aggregate = payload_len
+                    .checked_add(old_tags_aggregate)
+                    .and_then(|value| value.checked_add(new_tag_aggregate))
+                    .ok_or_else(|| Error::ResourceLimit("ProgTags aggregate overflows".into()))?;
+                (
+                    payload_len
+                        .checked_add(8)
+                        .ok_or_else(|| Error::ResourceLimit("ProgTags length overflows".into()))?,
+                    aggregate,
+                )
+            },
+            (None, _) => {
+                let aggregate = new_tag_len
+                    .checked_add(new_tag_aggregate)
+                    .ok_or_else(|| Error::ResourceLimit("ProgTags aggregate overflows".into()))?;
+                (
+                    new_tag_len
+                        .checked_add(8)
+                        .ok_or_else(|| Error::ResourceLimit("ProgTags length overflows".into()))?,
+                    aggregate,
+                )
+            },
+        };
+        let owner_children_aggregate = match self.prog_tags {
+            Some(prog_tags) => aggregate_indexed(&self.owner_children, prog_tags)?,
+            None => aggregate_records(&self.owner_children)?,
+        };
+        let owner_payload_len = match self.prog_tags {
+            Some(prog_tags) => owner
+                .len()
+                .checked_sub(8)
+                .and_then(|payload| payload.checked_sub(self.owner_children[prog_tags].len()))
+                .and_then(|remaining| remaining.checked_add(new_prog_len))
+                .ok_or_else(|| Error::ResourceLimit("owner length overflows".into()))?,
+            None => owner
+                .len()
+                .checked_sub(8)
+                .and_then(|payload| payload.checked_add(new_prog_len))
+                .ok_or_else(|| Error::ResourceLimit("owner length overflows".into()))?,
+        };
+        Ok(owner_payload_len
+            .checked_add(owner_children_aggregate)
+            .and_then(|value| value.checked_add(new_prog_aggregate))
+            .ok_or_else(|| Error::ResourceLimit("owner aggregate overflows".into()))?)
+    }
+
     /// Re-frame `owner` around new blob `records`. A missing tag container
     /// goes after the last owner child whose type is in `before_tags`.
     pub(crate) fn rebuild(
@@ -201,4 +433,70 @@ impl<'a> Blob<'a> {
         }
         Ok(wire::rebuild(owner, &data)?)
     }
+}
+
+fn aggregate_records(records: &[&[u8]]) -> Result<usize> {
+    records.iter().try_fold(0usize, |total, record| {
+        total
+            .checked_add(serialized_payload_budget(record)?)
+            .ok_or_else(|| {
+                EditError::from(Error::ResourceLimit(
+                    "serialized-record aggregate overflows".into(),
+                ))
+            })
+    })
+}
+
+fn aggregate_indexed(records: &[&[u8]], skip: usize) -> Result<usize> {
+    records
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| *index != skip)
+        .try_fold(0usize, |total, (_, record)| {
+            total
+                .checked_add(serialized_payload_budget(record)?)
+                .ok_or_else(|| {
+                    EditError::from(Error::ResourceLimit(
+                        "serialized-record aggregate overflows".into(),
+                    ))
+                })
+        })
+}
+
+/// Compute the payload charge used by the strict PPT record parser for one
+/// serialized record and all of its nested container records.
+pub(crate) fn serialized_payload_budget(record: &[u8]) -> Result<usize> {
+    let mut pending = Vec::new();
+    pending
+        .try_reserve(1)
+        .map_err(|_error| Error::AllocationFailed("serialized-record traversal stack"))?;
+    pending.push((record, 0usize));
+    let mut total = 0usize;
+    while let Some((current, depth)) = pending.pop() {
+        if depth > crate::SourceLimits::MAX_DEPTH {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::Depth,
+                observed: depth,
+                maximum: crate::SourceLimits::MAX_DEPTH,
+            }
+            .into());
+        }
+        let payload = wire::payload(current)?;
+        total = total
+            .checked_add(payload.len())
+            .ok_or_else(|| Error::ResourceLimit("serialized-record aggregate overflows".into()))?;
+        let record_type = RecordType::from(wire::record_type(current)?);
+        if crate::records::Record::is_container_record(record_type) {
+            let child_depth = depth
+                .checked_add(1)
+                .ok_or_else(|| Error::ResourceLimit("serialized-record depth overflows".into()))?;
+            for child in wire::children(current)? {
+                pending
+                    .try_reserve(1)
+                    .map_err(|_error| Error::AllocationFailed("serialized-record stack"))?;
+                pending.push((child?, child_depth));
+            }
+        }
+    }
+    Ok(total)
 }

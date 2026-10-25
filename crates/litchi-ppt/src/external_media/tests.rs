@@ -27,7 +27,7 @@ fn cd_audio() -> CdAudio {
 #[test]
 fn protocol_shaped_cd_audio_roundtrips_losslessly() {
     let expected = cd_audio();
-    let parsed = CdAudio::parse(&expected.to_record().unwrap()).unwrap();
+    let parsed = CdAudio::parse(&expected.to_record().unwrap(), &Limits::default()).unwrap();
     assert_eq!(parsed, expected);
     assert_eq!(
         parsed.to_record_bytes().unwrap(),
@@ -51,12 +51,16 @@ fn rejects_hostile_media_flags_times_order_and_headers() {
     assert!(value.to_record_bytes().is_err());
     let mut bytes = cd_audio().to_record_bytes().unwrap();
     bytes[20] = 0x08;
-    let record = Record::parse(&bytes, 0).unwrap().0;
-    assert!(CdAudio::parse(&record).is_err());
+    let record = Record::parse(&bytes, 0, &crate::SourceLimits::default())
+        .unwrap()
+        .0;
+    assert!(CdAudio::parse(&record, &Limits::default()).is_err());
     bytes = cd_audio().to_record_bytes().unwrap();
     bytes[0] = 0;
-    let zeroed_header_record = Record::parse(&bytes, 0).unwrap().0;
-    assert!(CdAudio::parse(&zeroed_header_record).is_err());
+    let zeroed_header_record = Record::parse(&bytes, 0, &crate::SourceLimits::default())
+        .unwrap()
+        .0;
+    assert!(CdAudio::parse(&zeroed_header_record, &Limits::default()).is_err());
 }
 
 #[test]
@@ -72,7 +76,7 @@ fn external_video_roundtrips_optional_inert_paths() {
             },
             path,
         };
-        let parsed = Video::parse(&expected.to_record().unwrap()).unwrap();
+        let parsed = Video::parse(&expected.to_record().unwrap(), &Limits::default()).unwrap();
         assert_eq!(parsed, expected);
     }
 }
@@ -92,6 +96,40 @@ fn external_video_rejects_narration_and_hostile_paths() {
 }
 
 #[test]
+fn variable_media_containers_honor_selected_record_budget() {
+    let video = Video {
+        media: Media {
+            id: 23,
+            loop_playback: false,
+            rewind_after_playing: false,
+            narration: false,
+            unused: [0, 0],
+        },
+        path: Some("movie.avi".into()),
+    };
+    let record = video.to_record().unwrap();
+    let limits = Limits {
+        max_records: 1,
+        ..Limits::default()
+    };
+    assert!(Video::parse(&record, &limits).is_err());
+
+    let list = external_object_list_bytes(
+        23,
+        &[Object::Movie(Movie {
+            kind: MovieKind::Avi,
+            video,
+        })
+        .to_record_bytes()
+        .unwrap()],
+    );
+    let list_record = Record::parse(&list, 0, &crate::SourceLimits::default())
+        .unwrap()
+        .0;
+    assert!(Collection::parse(&list_record, &limits).is_err());
+}
+
+#[test]
 fn avi_and_mci_movie_containers_roundtrip_canonically() {
     for kind in [MovieKind::Avi, MovieKind::Mci] {
         let expected = Movie {
@@ -107,7 +145,7 @@ fn avi_and_mci_movie_containers_roundtrip_canonically() {
                 path: Some(r"\\server\share\movie.avi".into()),
             },
         };
-        let parsed = Movie::parse(&expected.to_record().unwrap()).unwrap();
+        let parsed = Movie::parse(&expected.to_record().unwrap(), &Limits::default()).unwrap();
         assert_eq!(parsed, expected);
         assert_eq!(
             parsed.to_record_bytes().unwrap(),
@@ -133,13 +171,29 @@ fn movie_containers_reject_wrong_headers_and_extra_children() {
     };
     let mut bytes = movie.to_record_bytes().unwrap();
     bytes[0] = 0;
-    assert!(Movie::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
+    assert!(
+        Movie::parse(
+            &Record::parse(&bytes, 0, &crate::SourceLimits::default())
+                .unwrap()
+                .0,
+            &Limits::default(),
+        )
+        .is_err()
+    );
 
     let child = movie.video.to_record_bytes().unwrap();
     let doubled = [child.as_slice(), child.as_slice()].concat();
     let doubled_bytes =
         record_bytes(0x0f, 0, RecordType::ExternalAviMovie.as_u16(), &doubled).unwrap();
-    assert!(Movie::parse(&Record::parse(&doubled_bytes, 0).unwrap().0).is_err());
+    assert!(
+        Movie::parse(
+            &Record::parse(&doubled_bytes, 0, &crate::SourceLimits::default())
+                .unwrap()
+                .0,
+            &Limits::default(),
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -151,7 +205,7 @@ fn midi_and_linked_wav_roundtrip_optional_inert_paths() {
             path: Some(r"C:\media\theme.mid".into()),
         };
         assert_eq!(
-            LinkedAudio::parse(&expected.to_record().unwrap()).unwrap(),
+            LinkedAudio::parse(&expected.to_record().unwrap(), &Limits::default()).unwrap(),
             expected
         );
     }
@@ -169,7 +223,15 @@ fn linked_audio_rejects_misplaced_children_and_hostile_paths() {
     let child = audio.media.to_record_bytes().unwrap();
     let payload = [child.as_slice(), child.as_slice()].concat();
     let bytes = record_bytes(0x0f, 0, RecordType::ExternalWavAudioLink.as_u16(), &payload).unwrap();
-    assert!(LinkedAudio::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
+    assert!(
+        LinkedAudio::parse(
+            &Record::parse(&bytes, 0, &crate::SourceLimits::default())
+                .unwrap()
+                .0,
+            &Limits::default(),
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -181,7 +243,7 @@ fn embedded_wav_roundtrips_nullable_sound_reference() {
             duration_ms: 90_000,
         };
         assert_eq!(
-            EmbeddedWav::parse(&expected.to_record().unwrap()).unwrap(),
+            EmbeddedWav::parse(&expected.to_record().unwrap(), &Limits::default()).unwrap(),
             expected
         );
     }
@@ -204,13 +266,25 @@ fn embedded_wav_rejects_negative_or_overflowing_duration() {
     .unwrap();
     let duration_offset = 8 + 16 + 8 + 4;
     bytes[duration_offset..duration_offset + 4].copy_from_slice(&(-1i32).to_le_bytes());
-    assert!(EmbeddedWav::parse(&Record::parse(&bytes, 0).unwrap().0).is_err());
+    assert!(
+        EmbeddedWav::parse(
+            &Record::parse(&bytes, 0, &crate::SourceLimits::default())
+                .unwrap()
+                .0,
+            &Limits::default(),
+        )
+        .is_err()
+    );
 }
 
 fn external_object_list(seed: i32, objects: &[Vec<u8>]) -> Record {
-    Record::parse(&external_object_list_bytes(seed, objects), 0)
-        .unwrap()
-        .0
+    Record::parse(
+        &external_object_list_bytes(seed, objects),
+        0,
+        &crate::SourceLimits::default(),
+    )
+    .unwrap()
+    .0
 }
 
 fn external_object_list_bytes(seed: i32, objects: &[Vec<u8>]) -> Vec<u8> {
@@ -286,7 +360,9 @@ fn media_collection_discovers_typed_objects_and_resolves_ids() {
             audio.to_record_bytes().unwrap(),
         ],
     );
-    let parsed = Collection::parse(&root).unwrap().unwrap();
+    let parsed = Collection::parse(&root, &Limits::default())
+        .unwrap()
+        .unwrap();
     assert_eq!(parsed.id_seed, 7);
     assert_eq!(parsed.objects.len(), 2);
     assert!(parsed.get(3).is_some());
@@ -315,8 +391,14 @@ fn media_collection_rejects_duplicate_ids_and_low_seed() {
     }
     .to_record_bytes()
     .unwrap();
-    assert!(Collection::parse(&external_object_list(9, &[first.clone(), second])).is_err());
-    assert!(Collection::parse(&external_object_list(8, &[first])).is_err());
+    assert!(
+        Collection::parse(
+            &external_object_list(9, &[first.clone(), second]),
+            &Limits::default()
+        )
+        .is_err()
+    );
+    assert!(Collection::parse(&external_object_list(8, &[first]), &Limits::default()).is_err());
 }
 
 #[test]
@@ -332,7 +414,7 @@ fn media_collection_rejects_cross_family_hyperlink_id_collisions() {
     .to_record_bytes()
     .unwrap();
     let root = external_object_list(11, &[media, hyperlink(11)]);
-    assert!(Collection::parse(&root).is_err());
+    assert!(Collection::parse(&root, &Limits::default()).is_err());
 }
 
 fn movie_object(id: u32, path: Option<&str>) -> Object {
@@ -374,7 +456,7 @@ fn snapshot_transaction_rewrites_only_media_and_preserves_opaque_records() {
     let list = external_object_list_bytes(3, &[opaque.clone(), object.to_record_bytes().unwrap()]);
     let trailer = record_bytes(0, 0, 0x7ABD, &[1, 2, 3, 4, 5]).unwrap();
     let source_bytes = document_bytes(&[list.clone(), trailer.clone()].concat());
-    let source = Snapshot::parse(&source_bytes).unwrap();
+    let source = Snapshot::parse(&source_bytes, &Limits::default()).unwrap();
 
     let mut editor = source.edit();
     editor
@@ -426,7 +508,7 @@ fn snapshot_transaction_supports_exact_noop_and_source_stale_rejection() {
         3,
         &[object.to_record_bytes().unwrap()],
     ));
-    let source = Snapshot::parse(&source_bytes).unwrap();
+    let source = Snapshot::parse(&source_bytes, &Limits::default()).unwrap();
 
     let noop = source.edit().commit().unwrap();
     assert!(noop.patch().is_empty());
@@ -445,7 +527,7 @@ fn snapshot_transaction_supports_exact_noop_and_source_stale_rejection() {
     };
     let mut stale_bytes = source.bytes().to_vec();
     *stale_bytes.last_mut().unwrap() ^= 1;
-    let stale = Snapshot::parse(&stale_bytes).unwrap();
+    let stale = Snapshot::parse(&stale_bytes, &Limits::default()).unwrap();
     assert!(changed.patch().apply(&stale).is_err());
 }
 
@@ -460,7 +542,11 @@ fn owner_validation_blocks_media_removal_and_keeps_failed_edits_atomic() {
         &officeart_media_owner(3),
     )
     .unwrap();
-    let source = Snapshot::parse(document_bytes(&[list, drawing].concat())).unwrap();
+    let source = Snapshot::parse(
+        document_bytes(&[list, drawing].concat()),
+        &Limits::default(),
+    )
+    .unwrap();
     assert_eq!(source.owner_ids(), &[3]);
     assert_eq!(source.owner_count(3), 1);
 
@@ -481,7 +567,7 @@ fn owner_validation_blocks_media_removal_and_keeps_failed_edits_atomic() {
 #[test]
 fn insert_attaches_a_missing_list_to_document_and_remove_preserves_unknown_order() {
     let trailer = record_bytes(0, 4, 0x7AC0, &[8, 9]).unwrap();
-    let source = Snapshot::parse(document_bytes(&trailer)).unwrap();
+    let source = Snapshot::parse(document_bytes(&trailer), &Limits::default()).unwrap();
     assert!(source.collection().is_none());
 
     let mut editor = source.edit();
@@ -510,7 +596,7 @@ fn bounded_snapshot_rejects_truncated_roots_and_overlarge_sources() {
         3,
         &[object.to_record_bytes().unwrap()],
     ));
-    assert!(Snapshot::parse(&source_bytes[..source_bytes.len() - 1]).is_err());
+    assert!(Snapshot::parse(&source_bytes[..source_bytes.len() - 1], &Limits::default()).is_err());
     let limits = Limits {
         max_root_bytes: source_bytes.len() - 1,
         ..Limits::default()
