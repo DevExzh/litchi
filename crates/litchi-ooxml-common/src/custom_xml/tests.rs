@@ -165,7 +165,7 @@ fn mce_schema_rewrite_maps_the_selected_source_branch() {
         .unwrap()
         .build()
         .unwrap();
-    let before = codec::read_props(source.as_bytes(), &mce_limits).unwrap();
+    let before = read_props(source.as_bytes(), &mce_limits).unwrap();
     assert_eq!(before.id, "{22222222-2222-2222-2222-222222222222}");
     assert_eq!(before.schemas, ["urn:active"]);
     let id_only = Props {
@@ -183,10 +183,7 @@ fn mce_schema_rewrite_maps_the_selected_source_branch() {
     let id_rewritten_text = std::str::from_utf8(&id_rewritten).unwrap();
     assert!(id_rewritten_text.contains("{11111111-1111-1111-1111-111111111111}"));
     assert!(id_rewritten_text.contains("{aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa}"));
-    assert_eq!(
-        codec::read_props(&id_rewritten, &mce_limits).unwrap(),
-        id_only
-    );
+    assert_eq!(read_props(&id_rewritten, &mce_limits).unwrap(), id_only);
     let after = Props {
         id: "{33333333-3333-3333-3333-333333333333}".into(),
         schemas: vec!["urn:changed".into(), "urn:added".into()],
@@ -203,7 +200,7 @@ fn mce_schema_rewrite_maps_the_selected_source_branch() {
     assert!(rewritten_text.contains("urn:inactive"));
     assert!(rewritten_text.contains("{11111111-1111-1111-1111-111111111111}"));
     assert!(rewritten_text.contains("{33333333-3333-3333-3333-333333333333}"));
-    assert_eq!(codec::read_props(&rewritten, &mce_limits).unwrap(), after);
+    assert_eq!(read_props(&rewritten, &mce_limits).unwrap(), after);
 }
 
 #[test]
@@ -743,7 +740,7 @@ fn schema_edits_retain_noncanonical_markup_and_expanded_attribute_identity() {
     assert!(xml.contains("<!-- p:itemID='{fake}' -->"));
     assert!(xml.contains("x:uri='foreign' p:uri='urn:changed'"));
     assert!(xml.contains("p:itemID='{22222222-2222-2222-2222-222222222222}'"));
-    assert_eq!(discover(&package).unwrap()[0].props().unwrap(), updated);
+    assert_eq!(*discover(&package).unwrap()[0].props().unwrap(), updated);
 }
 
 #[test]
@@ -771,10 +768,7 @@ fn schema_insertion_does_not_clone_foreign_schema_ref_markup() {
     let rewritten_text = std::str::from_utf8(&rewritten).unwrap();
     assert_eq!(rewritten_text.matches("x:marker=\"keep\"").count(), 1);
     assert!(rewritten_text.contains("ds:uri=\"urn:new\""));
-    assert_eq!(
-        codec::read_props(&rewritten, &source_limits()).unwrap(),
-        after
-    );
+    assert_eq!(read_props(&rewritten, &source_limits()).unwrap(), after);
 }
 
 #[test]
@@ -801,10 +795,7 @@ fn schema_insertion_expands_an_empty_root_with_a_schema_refs_wrapper() {
     .unwrap();
     let rewritten_text = std::str::from_utf8(&rewritten).unwrap();
     assert!(rewritten_text.contains("<ds:schemaRefs>"));
-    assert_eq!(
-        codec::read_props(&rewritten, &source_limits()).unwrap(),
-        after
-    );
+    assert_eq!(read_props(&rewritten, &source_limits()).unwrap(), after);
 }
 
 #[test]
@@ -842,7 +833,7 @@ fn schema_edits_preserve_unknown_schema_refs_children_when_shape_changes() {
     let package = edit.commit().unwrap().into_package();
     let xml = std::str::from_utf8(package.get_part(&props_part).unwrap().blob()).unwrap();
     assert!(xml.contains("<x:future/>"));
-    assert_eq!(discover(&package).unwrap()[0].props().unwrap(), updated);
+    assert_eq!(*discover(&package).unwrap()[0].props().unwrap(), updated);
 }
 
 #[test]

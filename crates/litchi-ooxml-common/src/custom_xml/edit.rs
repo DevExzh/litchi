@@ -343,7 +343,7 @@ fn new_item(package: &OpcPackage, value: NewItem) -> Result<Item> {
     match package.get_part(&value.source) {
         Ok(_) => {},
         Err(OpcError::PartNotFound(_)) => {
-            return Err(super::errors::not_found("custom_xml.insert"));
+            return Err(not_found("custom_xml.insert"));
         },
         Err(error) => return Err(error.into()),
     }

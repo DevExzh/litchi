@@ -513,7 +513,7 @@ fn scan_source_elements_mode(
     loop {
         let event_start = usize::try_from(reader.buffer_position())
             .map_err(|_| Error::Internal("custom XML properties event offset overflow"))?;
-        let (resolved, event) = reader.read_resolved_event_into(&mut buffer)?;
+        let event = reader.read_event_into(&mut buffer)?;
         let event_end = usize::try_from(reader.buffer_position())
             .map_err(|_| Error::Internal("custom XML properties event offset overflow"))?;
         if !matches!(&event, Event::Eof) {
@@ -533,6 +533,7 @@ fn scan_source_elements_mode(
                 version = validate_declaration(&declaration)?;
             },
             Event::Start(element) => {
+                let (resolved, _) = reader.resolver().resolve_element(element.name());
                 check_source_element_bounds(
                     source_limits,
                     stack.len(),
@@ -583,6 +584,7 @@ fn scan_source_elements_mode(
                 }
             },
             Event::Empty(element) => {
+                let (resolved, _) = reader.resolver().resolve_element(element.name());
                 check_source_element_bounds(
                     source_limits,
                     stack.len(),
@@ -783,9 +785,10 @@ fn scan_properties_layout(source: &[u8], source_limits: &SourceLimits) -> Result
     };
 
     loop {
-        let (resolved, event) = reader.read_resolved_event_into(&mut buffer)?;
+        let event = reader.read_event_into(&mut buffer)?;
         match event {
             Event::Start(element) => {
+                let (resolved, _) = reader.resolver().resolve_element(element.name());
                 let namespace = resolved_namespace(resolved, "element")?;
                 let local_name = element.local_name();
                 let source_element = if is_layout_candidate(local_name.as_ref()) {
@@ -870,6 +873,7 @@ fn scan_properties_layout(source: &[u8], source_limits: &SourceLimits) -> Result
                 });
             },
             Event::Empty(element) => {
+                let (resolved, _) = reader.resolver().resolve_element(element.name());
                 let namespace = resolved_namespace(resolved, "element")?;
                 let local_name = element.local_name();
                 let source_element = if is_layout_candidate(local_name.as_ref()) {
@@ -1267,7 +1271,7 @@ fn replacement_len(replacement: &Replacement<'_>) -> Result<usize> {
             if let Some((attribute_start, attribute_end, value)) = attribute {
                 if *attribute_start < *start
                     || *attribute_end < *attribute_start
-                    || *attribute_end > *slash
+                    || *attribute_end > slash
                 {
                     return Err(Error::Internal(
                         "custom XML empty-element attribute range is invalid",
