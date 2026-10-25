@@ -5352,3 +5352,27 @@ See [0063](0063-source-pptx-modern-comments.md).
   Final full formatting, gate/docs, fresh inventories and dispositions,
   corpus/native and quiet ABBA remain open. Only audit22 is deferred.
   Nothing is pushed.
+
+- Coordinator formatting, shared-error and cleanup checkpoint (2026-10-25):
+  Formatting leaf `ad8f6465c7` merges at `ad15b44bff` after independent
+  parent-preimage proof and an actual full `cargo fmt --all -- --check` PASS.
+  The retained first retry found ten post-capture Numbers paths; record
+  0362ul93a fixes them. Final formatting is still required after pending
+  source merges. Census tooling registration merges at `16d3ea672b` and
+  all 28 focused Python checks pass; the external gate row is updated.
+
+  Private PPTX `237d6801a6` commits the reviewed compiler repairs and every
+  caller. Its fresh isolated check clears prior type/borrow errors and
+  exposes 113 dead-code errors; helpers are being audited for removal or
+  test-only gating with every public capability preserved. Shared OOXML
+  composition `6bf2a5f68a` joins Web/Ribbon and VBA. A coherent typed error
+  return must fix visible corrupt_file misclassification. Properties
+  `15863b6354` is returned for remaining source/invariant distinctions,
+  tolerated-content refusal, stale XLSB assertions and canonical docs.
+
+  Cleanup65 removes the merged census worktree without force, preserving
+  its branch, ignored payload and external evidence. Actual restoration and
+  root verification pass; net allocation reclaimed is 1,555,513,344 bytes.
+  Holds are released and the constructor probe is unchanged. Record 0362ul95
+  binds these results. Final gate/docs, inventories/dispositions, corpus/native
+  and quiet ABBA remain open. Only audit22 is deferred. Nothing is pushed.
