@@ -113,7 +113,114 @@
       "package": "litchi-docx",
       "default_features": false,
       "features": [],
+      "required_signatures": [
+        {
+          "method": "litchi_docx::mail_merge::parse_settings_mail_merge",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::mail_merge::Settings::to_xml",
+          "inputs": ["self", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::mail_merge::Recipients::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::mail_merge::Recipients::to_xml",
+          "inputs": ["self", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::mail_merge::Recipients::extract_from_part",
+          "inputs": ["part", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::mail_merge::Snapshot::from_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::mail_merge::Snapshot::from_parts",
+          "inputs": ["xml", "recipients_xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::parse_comments_extended",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::parse_comments_ids",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::parse_comments_extensible",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::parse_people",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::write_comments_extended",
+          "inputs": ["items", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::write_comments_ids",
+          "inputs": ["items", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::write_comments_extensible",
+          "inputs": ["comments", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::write_people",
+          "inputs": ["people", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        }
+      ],
       "banned_names": [
+        {
+          "name": "DEFAULT_DOCX_VALIDATION_LIMITS",
+          "scope": "litchi_docx::validation",
+          "replacement": "use validation::DEFAULT_LIMITS (record 0362ul42)"
+        },
+        {
+          "name": "DocxValidationLimits",
+          "scope": "litchi_docx::validation",
+          "replacement": "use validation::Limits (record 0362ul42)"
+        },
+        {
+          "name": "DocxValidationError",
+          "scope": "litchi_docx::validation",
+          "replacement": "use validation::Error (record 0362ul42)"
+        },
         {
           "name": "edit_document",
           "scope": "litchi_docx",
@@ -776,7 +883,114 @@
         "sign",
         "vba-inspection"
       ],
+      "required_signatures": [
+        {
+          "method": "litchi_docx::mail_merge::parse_settings_mail_merge",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::mail_merge::Settings::to_xml",
+          "inputs": ["self", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::mail_merge::Recipients::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::mail_merge::Recipients::to_xml",
+          "inputs": ["self", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::mail_merge::Recipients::extract_from_part",
+          "inputs": ["part", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::mail_merge::Snapshot::from_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::mail_merge::Snapshot::from_parts",
+          "inputs": ["xml", "recipients_xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::parse_comments_extended",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::parse_comments_ids",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::parse_comments_extensible",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::parse_people",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::write_comments_extended",
+          "inputs": ["items", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::write_comments_ids",
+          "inputs": ["items", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::write_comments_extensible",
+          "inputs": ["comments", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        },
+        {
+          "method": "litchi_docx::modern_comments::write_people",
+          "inputs": ["people", "conformance", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ooxml_common::mce::Limits"
+        }
+      ],
       "banned_names": [
+        {
+          "name": "DEFAULT_DOCX_VALIDATION_LIMITS",
+          "scope": "litchi_docx::validation",
+          "replacement": "use validation::DEFAULT_LIMITS (record 0362ul42)"
+        },
+        {
+          "name": "DocxValidationLimits",
+          "scope": "litchi_docx::validation",
+          "replacement": "use validation::Limits (record 0362ul42)"
+        },
+        {
+          "name": "DocxValidationError",
+          "scope": "litchi_docx::validation",
+          "replacement": "use validation::Error (record 0362ul42)"
+        },
         {
           "name": "edit_document",
           "scope": "litchi_docx",
@@ -1752,6 +1966,26 @@
       "package": "litchi-ooxml-common",
       "default_features": false,
       "features": [],
+      "required_signatures": [
+        {
+          "method": "litchi_ooxml_common::custom_xml::read_props",
+          "inputs": ["xml", "source_limits"],
+          "limits_argument": "source_limits",
+          "limits_type": "litchi_opc::SourceLimits"
+        },
+        {
+          "method": "litchi_ooxml_common::custom_xml::write_props",
+          "inputs": ["props", "conformance", "source_limits"],
+          "limits_argument": "source_limits",
+          "limits_type": "litchi_opc::SourceLimits"
+        },
+        {
+          "method": "litchi_ooxml_common::custom_xml::validate_payload",
+          "inputs": ["xml", "source_limits"],
+          "limits_argument": "source_limits",
+          "limits_type": "litchi_opc::SourceLimits"
+        }
+      ],
       "banned_names": [
         {
           "name": "ReadLimits",
@@ -2020,6 +2254,26 @@
         "encryption",
         "vba-inspection"
       ],
+      "required_signatures": [
+        {
+          "method": "litchi_ooxml_common::custom_xml::read_props",
+          "inputs": ["xml", "source_limits"],
+          "limits_argument": "source_limits",
+          "limits_type": "litchi_opc::SourceLimits"
+        },
+        {
+          "method": "litchi_ooxml_common::custom_xml::write_props",
+          "inputs": ["props", "conformance", "source_limits"],
+          "limits_argument": "source_limits",
+          "limits_type": "litchi_opc::SourceLimits"
+        },
+        {
+          "method": "litchi_ooxml_common::custom_xml::validate_payload",
+          "inputs": ["xml", "source_limits"],
+          "limits_argument": "source_limits",
+          "limits_type": "litchi_opc::SourceLimits"
+        }
+      ],
       "banned_names": [
         {
           "name": "ReadLimits",
@@ -2286,6 +2540,16 @@
       "default_features": false,
       "features": [],
       "banned_names": [
+        {
+          "name": "PptxValidationLimits",
+          "scope": "litchi_pptx::validation",
+          "replacement": "use validation::Limits (record 0362ul42)"
+        },
+        {
+          "name": "PptxValidationError",
+          "scope": "litchi_pptx::validation",
+          "replacement": "use validation::Error (record 0362ul42)"
+        },
         {
           "name": "ReadLimits",
           "scope": "litchi_pptx",
@@ -3198,6 +3462,16 @@
         "vba-inspection"
       ],
       "banned_names": [
+        {
+          "name": "PptxValidationLimits",
+          "scope": "litchi_pptx::validation",
+          "replacement": "use validation::Limits (record 0362ul42)"
+        },
+        {
+          "name": "PptxValidationError",
+          "scope": "litchi_pptx::validation",
+          "replacement": "use validation::Error (record 0362ul42)"
+        },
         {
           "name": "ReadLimits",
           "scope": "litchi_pptx",
@@ -19652,6 +19926,11 @@
         "yaml"
       ],
       "banned_names": [
+        {
+          "name": "PptxSlide",
+          "scope": "litchi_ops::format::pptx",
+          "replacement": "use format::pptx::Slide (record 0362ul42)"
+        },
         {
           "name": "_with_limits",
           "scope": "litchi_ops",

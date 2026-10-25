@@ -79,7 +79,7 @@ impl Default for PackageLimits {
 }
 
 impl PackageLimits {
-    fn validate(&self) -> Result<()> {
+    pub(crate) fn validate(&self) -> Result<()> {
         self.controls.validate()?;
         if [
             self.max_content_controls,

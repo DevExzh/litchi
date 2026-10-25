@@ -66,7 +66,8 @@ impl Package {
             return Ok(None);
         }
         let part = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        Ok(DocumentSettings::extract_from_part(&part)?
+        let limits = crate::mail_merge::mce_limits_for_source(&self.opc.read_limits());
+        Ok(DocumentSettings::extract_from_part_with_mce_limits(&part, &limits)?
             .attached_template()
             .cloned())
     }
@@ -88,7 +89,8 @@ impl Package {
         validate_attached_template_target(&target_uri)?;
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        let settings = DocumentSettings::extract_from_part(&original)?;
+        let limits = crate::mail_merge::mce_limits_for_source(&self.opc.read_limits());
+        let settings = DocumentSettings::extract_from_part_with_mce_limits(&original, &limits)?;
         let old_id = settings
             .attached_template()
             .map(|template| template.relationship_id().to_owned());
@@ -109,8 +111,9 @@ impl Package {
         replacement.set_blob(patch_attached_template(
             &snapshot.xml,
             Some(&relationship_id),
+            &limits,
         )?);
-        DocumentSettings::extract_from_part(&replacement)?;
+        DocumentSettings::extract_from_part_with_mce_limits(&replacement, &limits)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(self)
     }
@@ -126,16 +129,17 @@ impl Package {
             return Ok(None);
         }
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        let settings = DocumentSettings::extract_from_part(&original)?;
+        let limits = crate::mail_merge::mce_limits_for_source(&self.opc.read_limits());
+        let settings = DocumentSettings::extract_from_part_with_mce_limits(&original, &limits)?;
         let Some(attached_template) = settings.attached_template().cloned() else {
             return Ok(None);
         };
         let replacement = settings_part_from_snapshot(
             &snapshot,
-            patch_attached_template(&snapshot.xml, None)?,
+            patch_attached_template(&snapshot.xml, None, &limits)?,
             Some(attached_template.relationship_id()),
         );
-        DocumentSettings::extract_from_part(&replacement)?;
+        DocumentSettings::extract_from_part_with_mce_limits(&replacement, &limits)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(Some(attached_template))
     }
@@ -151,7 +155,8 @@ impl Package {
             return Ok(None);
         }
         let part = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        Ok(Some(extract_document_variables(&part)?))
+        let limits = crate::mail_merge::mce_limits_for_source(&self.opc.read_limits());
+        Ok(Some(extract_document_variables(&part, &limits)?))
     }
 
     /// Insert or replace one document variable atomically.
@@ -166,13 +171,14 @@ impl Package {
     ) -> Result<Option<String>> {
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        DocumentSettings::extract_from_part(&original)?;
-        let mut variables = extract_document_variables(&original)?;
+        let limits = crate::mail_merge::mce_limits_for_source(&self.opc.read_limits());
+        DocumentSettings::extract_from_part_with_mce_limits(&original, &limits)?;
+        let mut variables = extract_document_variables(&original, &limits)?;
         let previous = variables.insert(name, value)?;
-        let xml = patch_document_variables(&snapshot.xml, &variables)?;
+        let xml = patch_document_variables(&snapshot.xml, &variables, &limits)?;
         let replacement = settings_part_from_snapshot(&snapshot, xml, None);
-        DocumentSettings::extract_from_part(&replacement)?;
-        extract_document_variables(&replacement)?;
+        DocumentSettings::extract_from_part_with_mce_limits(&replacement, &limits)?;
+        extract_document_variables(&replacement, &limits)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(previous)
     }
@@ -188,15 +194,16 @@ impl Package {
             return Ok(None);
         }
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        DocumentSettings::extract_from_part(&original)?;
-        let mut variables = extract_document_variables(&original)?;
+        let limits = crate::mail_merge::mce_limits_for_source(&self.opc.read_limits());
+        DocumentSettings::extract_from_part_with_mce_limits(&original, &limits)?;
+        let mut variables = extract_document_variables(&original, &limits)?;
         let Some(previous) = variables.remove(name) else {
             return Ok(None);
         };
-        let xml = patch_document_variables(&snapshot.xml, &variables)?;
+        let xml = patch_document_variables(&snapshot.xml, &variables, &limits)?;
         let replacement = settings_part_from_snapshot(&snapshot, xml, None);
-        DocumentSettings::extract_from_part(&replacement)?;
-        extract_document_variables(&replacement)?;
+        DocumentSettings::extract_from_part_with_mce_limits(&replacement, &limits)?;
+        extract_document_variables(&replacement, &limits)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(Some(previous))
     }
@@ -212,17 +219,18 @@ impl Package {
             return Ok(0);
         }
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        DocumentSettings::extract_from_part(&original)?;
-        let mut variables = extract_document_variables(&original)?;
+        let limits = crate::mail_merge::mce_limits_for_source(&self.opc.read_limits());
+        DocumentSettings::extract_from_part_with_mce_limits(&original, &limits)?;
+        let mut variables = extract_document_variables(&original, &limits)?;
         let count = variables.count();
         if count == 0 {
             return Ok(0);
         }
         variables.clear();
-        let xml = patch_document_variables(&snapshot.xml, &variables)?;
+        let xml = patch_document_variables(&snapshot.xml, &variables, &limits)?;
         let replacement = settings_part_from_snapshot(&snapshot, xml, None);
-        DocumentSettings::extract_from_part(&replacement)?;
-        extract_document_variables(&replacement)?;
+        DocumentSettings::extract_from_part_with_mce_limits(&replacement, &limits)?;
+        extract_document_variables(&replacement, &limits)?;
         self.commit_settings_part(&snapshot, replacement)?;
         Ok(count)
     }

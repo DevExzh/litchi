@@ -34711,7 +34711,7 @@ fn run_docx_validation_report(
         warmup_iterations,
         samples,
         |source| {
-            Ok(litchi_docx::validate_read_at(
+            Ok(litchi_docx::validation::validate_read_at(
                 source,
                 Default::default(),
                 Default::default(),
@@ -34734,7 +34734,7 @@ fn run_pptx_validation_report(
         |source| {
             Ok(litchi_pptx::validate_source(
                 source,
-                litchi_pptx::PptxValidationLimits::default(),
+                litchi_pptx::validation::Limits::default(),
                 litchi_core::ValidationLimits::default(),
             )?)
         },

@@ -59,10 +59,10 @@ pub enum Error {
     Opc(litchi_opc::OpcError),
     /// The DOCX validator.
     #[cfg(feature = "docx")]
-    Docx(litchi_docx::DocxValidationError),
+    Docx(litchi_docx::validation::Error),
     /// The PPTX validator.
     #[cfg(feature = "pptx")]
-    Pptx(litchi_pptx::PptxValidationError),
+    Pptx(litchi_pptx::validation::Error),
     /// The XLS validator.
     #[cfg(feature = "xls")]
     Xls(litchi_xls::validation::XlsValidationError),
@@ -136,10 +136,10 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
         FileFormat::Docx => {
             let limits = file.ooxml_read_limits();
             let bytes = Arc::new(file.to_bytes()?);
-            let leaf = litchi_docx::validate_read_at(
+            let leaf = litchi_docx::validation::validate_read_at(
                 Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&bytes))),
                 limits,
-                litchi_docx::DocxValidationLimits::default(),
+                litchi_docx::validation::Limits::default(),
                 ValidationLimits::default(),
             )
             .map_err(Error::Docx)?;
@@ -149,9 +149,9 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
         FileFormat::Pptx => {
             let limits = file.ooxml_read_limits();
             let bytes = Arc::new(file.to_bytes()?);
-            let leaf = litchi_pptx::validate_source(
+            let leaf = litchi_pptx::validation::validate_source(
                 Arc::new(litchi_core::OwnedSource::from_arc(Arc::clone(&bytes))),
-                litchi_pptx::PptxValidationLimits::default().with_read_limits(limits),
+                litchi_pptx::validation::Limits::default().with_read_limits(limits),
                 ValidationLimits::default(),
             )
             .map_err(Error::Pptx)?;

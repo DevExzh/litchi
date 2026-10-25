@@ -5,6 +5,10 @@ use crate::Error;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI, Part};
 
+fn source_limits() -> litchi_opc::SourceLimits {
+    litchi_opc::SourceLimits::default()
+}
+
 const POI_XLSX: &[u8] =
     include_bytes!("../../../../test-data/poi/test-data/spreadsheet/customIndexedColors.xlsx");
 const LO_DOCX: &[u8] = include_bytes!(
@@ -32,23 +36,68 @@ fn loads_poi_and_libreoffice_reference_fixtures() {
 #[test]
 fn strict_writer_is_deterministic_and_round_trips() {
     let props = sample_props();
-    let first = write_props(&props, Conformance::Strict).unwrap();
-    let second = write_props(&props, Conformance::Strict).unwrap();
+    let first = write_props(&props, Conformance::Strict, &source_limits()).unwrap();
+    let second = write_props(&props, Conformance::Strict, &source_limits()).unwrap();
     assert_eq!(first, second);
     assert!(
         std::str::from_utf8(&first)
             .unwrap()
             .contains(STRICT_NAMESPACE)
     );
-    assert_eq!(read_props(&first).unwrap(), props);
+    assert_eq!(read_props(&first, &source_limits()).unwrap(), props);
+}
+
+#[test]
+fn properties_codec_refuses_when_the_retained_part_budget_is_tight() {
+    let limits = litchi_opc::SourceLimits::builder()
+        .max_part_bytes(64)
+        .unwrap()
+        .build()
+        .unwrap();
+    let props = sample_props();
+    let error = write_props(&props, Conformance::Strict, &limits).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::SerializedPropertiesBytes),
+            observed,
+            maximum: 64,
+        } if observed > 64
+    ));
+
+    let xml = write_props(&props, Conformance::Strict, &source_limits()).unwrap();
+    let error = read_props(&xml, &limits).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::PropertiesBytes),
+            observed,
+            maximum: 64,
+        } if observed > 64
+    ));
+
+    let depth_limited = litchi_opc::SourceLimits::builder()
+        .max_depth(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = read_props(&xml, &depth_limited).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::Depth),
+            maximum: 1,
+            ..
+        }
+    ));
 }
 
 #[test]
 fn attribute_whitespace_round_trips_without_normalization_loss() {
     let mut props = sample_props();
     props.schemas = vec!["urn:line\nnext\tlast\rreturn".into()];
-    let xml = write_props(&props, Conformance::Transitional).unwrap();
-    assert_eq!(read_props(&xml).unwrap(), props);
+    let xml = write_props(&props, Conformance::Transitional, &source_limits()).unwrap();
+    assert_eq!(read_props(&xml, &source_limits()).unwrap(), props);
 }
 
 #[test]
@@ -56,7 +105,10 @@ fn mce_selects_fallback_schema_reference() {
     let xml = format!(
         r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_NAMESPACE}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported" ds:itemID="{{11111111-1111-1111-1111-111111111111}}"><ds:schemaRefs><mc:AlternateContent><mc:Choice Requires="x"><ds:schemaRef ds:uri="urn:wrong"/></mc:Choice><mc:Fallback><ds:schemaRef ds:uri="urn:right"/></mc:Fallback></mc:AlternateContent></ds:schemaRefs></ds:datastoreItem>"#
     );
-    assert_eq!(read_props(xml.as_bytes()).unwrap().schemas, ["urn:right"]);
+    assert_eq!(
+        read_props(xml.as_bytes(), &source_limits()).unwrap().schemas,
+        ["urn:right"]
+    );
 }
 
 #[test]
@@ -151,21 +203,21 @@ fn failed_add_is_transactional() {
 
 #[test]
 fn rejects_malformed_properties_payloads_and_package_graphs() {
-    assert!(read_props(br#"<!DOCTYPE x><x/>"#).is_err());
+    assert!(read_props(br#"<!DOCTYPE x><x/>"#, &source_limits()).is_err());
     let missing_id = format!(r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_NAMESPACE}"/>"#);
-    assert!(read_props(missing_id.as_bytes()).is_err());
+    assert!(read_props(missing_id.as_bytes(), &source_limits()).is_err());
     let duplicate_refs = format!(
         r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_NAMESPACE}" ds:itemID="{{11111111-1111-1111-1111-111111111111}}"><ds:schemaRefs/><ds:schemaRefs/></ds:datastoreItem>"#
     );
-    assert!(read_props(duplicate_refs.as_bytes()).is_err());
-    assert!(validate_payload(br#"<!DOCTYPE x><x/>"#).is_err());
-    assert!(validate_payload(b"<a><b></a>").is_err());
-    assert!(validate_payload(b"&#32;<root/>").is_err());
-    assert!(validate_payload(b"<![CDATA[ ]]><root/>").is_err());
-    assert!(validate_payload(b"<root>&unknown;</root>").is_err());
-    assert!(validate_payload(b"<root>&#x110000;</root>").is_err());
-    assert!(validate_payload(b"<root>\0</root>").is_err());
-    assert!(validate_payload(b"<1root/>").is_err());
+    assert!(read_props(duplicate_refs.as_bytes(), &source_limits()).is_err());
+    assert!(validate_payload(br#"<!DOCTYPE x><x/>"#, &source_limits()).is_err());
+    assert!(validate_payload(b"<a><b></a>", &source_limits()).is_err());
+    assert!(validate_payload(b"&#32;<root/>", &source_limits()).is_err());
+    assert!(validate_payload(b"<![CDATA[ ]]><root/>", &source_limits()).is_err());
+    assert!(validate_payload(b"<root>&unknown;</root>", &source_limits()).is_err());
+    assert!(validate_payload(b"<root>&#x110000;</root>", &source_limits()).is_err());
+    assert!(validate_payload(b"<root>\0</root>", &source_limits()).is_err());
+    assert!(validate_payload(b"<1root/>", &source_limits()).is_err());
 
     let mut package = OpcPackage::new();
     let mut source = BlobPart::new(
@@ -187,14 +239,14 @@ fn rejects_malformed_properties_payloads_and_package_graphs() {
 fn enforces_guid_depth_size_and_content_type_caps() {
     let mut invalid_guid = sample_props();
     invalid_guid.id = "not-a-guid".into();
-    assert!(write_props(&invalid_guid, Conformance::Transitional).is_err());
+    assert!(write_props(&invalid_guid, Conformance::Transitional, &source_limits()).is_err());
 
     let too_deep = format!(
         "{}<leaf/>{}",
         "<x>".repeat(MAX_DEPTH),
         "</x>".repeat(MAX_DEPTH)
     );
-    let error = validate_payload(too_deep.as_bytes()).unwrap_err();
+    let error = validate_payload(too_deep.as_bytes(), &source_limits()).unwrap_err();
     assert!(matches!(
         error,
         Error::Limit {
@@ -202,28 +254,121 @@ fn enforces_guid_depth_size_and_content_type_caps() {
             ..
         }
     ));
-    assert!(validate_payload(&vec![b' '; MAX_PART_BYTES + 1]).is_err());
+    assert!(validate_payload(&vec![b' '; MAX_PART_BYTES + 1], &source_limits()).is_err());
     assert!(validate_content_type("not-a-media-type+xml").is_err());
     assert!(validate_content_type("application/vnd.example+xml").is_ok());
 }
 
 #[test]
+fn payload_caps_follow_the_retained_source_profile() {
+    let payload = b"<root><child/></root>";
+    let tight_bytes = litchi_opc::SourceLimits::builder()
+        .max_part_bytes((payload.len() - 1) as u64)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        validate_payload(payload, &tight_bytes),
+        Err(Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::PayloadBytes),
+            ..
+        })
+    ));
+
+    let tight_depth = litchi_opc::SourceLimits::builder()
+        .max_depth(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        validate_payload(payload, &tight_depth),
+        Err(Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::Depth),
+            ..
+        })
+    ));
+
+    let tight_events = litchi_opc::SourceLimits::builder()
+        .max_events(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        validate_payload(payload, &tight_events),
+        Err(Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::Elements),
+            ..
+        })
+    ));
+}
+
+#[test]
+fn properties_writer_checks_before_allocating_and_noop_retain_budget() {
+    let props = sample_props();
+    let output = write_props(&props, Conformance::Strict, &source_limits()).unwrap();
+    let tight = litchi_opc::SourceLimits::builder()
+        .max_part_bytes((output.len() - 1) as u64)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        write_props(&props, Conformance::Strict, &tight),
+        Err(Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::SerializedPropertiesBytes),
+            ..
+        })
+    ));
+    assert!(matches!(
+        codec::rewrite_props(
+            &output,
+            &props,
+            &props,
+            Conformance::Strict,
+            &tight,
+        ),
+        Err(Error::Limit {
+            kind: crate::LimitKind::CustomXml(LimitKind::SerializedPropertiesBytes),
+            ..
+        })
+    ));
+}
+
+#[test]
 fn rejects_invalid_declarations_attributes_and_xml_characters() {
-    assert!(validate_payload(br#" <!--before--><?xml version="1.0"?><root/>"#).is_err());
-    assert!(validate_payload(br#"<?xml version="1.0" bad="x"?><root/>"#).is_err());
+    assert!(validate_payload(
+        br#" <!--before--><?xml version="1.0"?><root/>"#,
+        &source_limits()
+    )
+    .is_err());
+    assert!(validate_payload(
+        br#"<?xml version="1.0" bad="x"?><root/>"#,
+        &source_limits()
+    )
+    .is_err());
     assert!(
-        validate_payload(br#"<?xml version="1.0" standalone="yes" encoding="UTF-8"?><root/>"#)
-            .is_err()
+        validate_payload(
+            br#"<?xml version="1.0" standalone="yes" encoding="UTF-8"?><root/>"#,
+            &source_limits()
+        )
+        .is_err()
     );
-    assert!(validate_payload(br#"<?xml version="1.0" standalone="maybe"?><root/>"#).is_err());
-    assert!(validate_payload(br#"<p:root/>"#).is_err());
-    assert!(validate_payload(br#"<root 1id="value"/>"#).is_err());
+    assert!(validate_payload(
+        br#"<?xml version="1.0" standalone="maybe"?><root/>"#,
+        &source_limits()
+    )
+    .is_err());
+    assert!(validate_payload(br#"<p:root/>"#, &source_limits()).is_err());
+    assert!(validate_payload(br#"<root 1id="value"/>"#, &source_limits()).is_err());
     assert!(
-        validate_payload(br#"<root xmlns:a="urn:x" xmlns:b="urn:x" a:id="1" b:id="2"/>"#).is_err()
+        validate_payload(
+            br#"<root xmlns:a="urn:x" xmlns:b="urn:x" a:id="1" b:id="2"/>"#,
+            &source_limits()
+        )
+        .is_err()
     );
     let mut props = sample_props();
     props.schemas = vec!["urn:\0bad".into()];
-    assert!(write_props(&props, Conformance::Transitional).is_err());
+    assert!(write_props(&props, Conformance::Transitional, &source_limits()).is_err());
 }
 
 #[test]

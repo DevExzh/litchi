@@ -189,9 +189,6 @@ pub use statistics::{
     Statistics, count_characters, count_characters_no_spaces, count_words, estimate_line_count,
     estimate_page_count,
 };
-pub use validation::{
-    DEFAULT_DOCX_VALIDATION_LIMITS, DocxValidationError, DocxValidationLimits, validate_read_at,
-};
 pub use variables::{Variables, parse_variables};
 
 // Concrete document entry points are available through their contextual

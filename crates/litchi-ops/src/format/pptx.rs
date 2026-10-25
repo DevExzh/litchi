@@ -364,12 +364,12 @@ impl SlideDescriptor {
 
 /// The text and name of one slide, as the facade's `Slide::Pptx` carries them.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PptxSlide {
+pub struct Slide {
     text: String,
     name: String,
 }
 
-impl PptxSlide {
+impl Slide {
     /// The slide's text, in reading order.
     #[must_use]
     pub fn text(&self) -> &str {
@@ -770,7 +770,7 @@ impl Pptx {
     /// # Errors
     ///
     /// As [`Self::text`].
-    pub fn slides(&self) -> Result<Vec<PptxSlide>> {
+    pub fn slides(&self) -> Result<Vec<Slide>> {
         self.finish(|| {
             if self.0.revision.is_some() {
                 return (0..self.slide_count()?)
@@ -787,7 +787,7 @@ impl Pptx {
                         .slides()
                         .map(|slide| {
                             let (text, name) = slide.text_and_name()?;
-                            Ok(PptxSlide { text, name })
+                            Ok(Slide { text, name })
                         })
                         .collect()
                 },
@@ -800,7 +800,7 @@ impl Pptx {
                                     "validated eager slide catalog lost its selected part".into(),
                                 ))
                             })?;
-                            Ok(PptxSlide {
+                            Ok(Slide {
                                 text: slide.text()?,
                                 name: slide.name()?,
                             })
@@ -817,7 +817,7 @@ impl Pptx {
     /// # Errors
     ///
     /// As [`Self::text`], for the selected slide only.
-    pub fn slide(&self, position: impl Into<litchi_core::Position>) -> Result<Option<PptxSlide>> {
+    pub fn slide(&self, position: impl Into<litchi_core::Position>) -> Result<Option<Slide>> {
         let position = position.into().get();
         self.finish(|| {
             if let Some(revision) = &self.0.revision {
@@ -827,7 +827,7 @@ impl Pptx {
                         return Ok(None);
                     }
                     let (text, name) = presentation.slide(position)?.text_and_name()?;
-                    Ok(Some(PptxSlide { text, name }))
+                    Ok(Some(Slide { text, name }))
                 });
             }
             match &self.0.owner {
@@ -837,13 +837,13 @@ impl Pptx {
                         return Ok(None);
                     };
                     let (text, name) = slide.text_and_name()?;
-                    Ok(Some(PptxSlide { text, name }))
+                    Ok(Some(Slide { text, name }))
                 },
                 PptxOwner::Eager(package) => {
                     let Some(slide) = eager_slide(self, package, position)? else {
                         return Ok(None);
                     };
-                    Ok(Some(PptxSlide {
+                    Ok(Some(Slide {
                         text: slide.text()?,
                         name: slide.name()?,
                     }))

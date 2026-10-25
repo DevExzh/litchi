@@ -104,7 +104,10 @@ impl Edit<Package> {
                 let xml = self
                     .part_payload(&name)?
                     .ok_or_else(|| crate::Error::PartNotFound(name.clone()))?;
-                let updated = upsert_entries(&xml, entries)?;
+                let limits = crate::mail_merge::mce_limits_for_source(
+                    &self.package.opc_package().read_limits(),
+                );
+                let updated = upsert_entries(&xml, entries, &limits)?;
                 if updated.as_slice() != xml.as_slice() {
                     self.replace_part(&name, updated)?;
                     changed = true;
@@ -124,8 +127,15 @@ impl Edit<Package> {
                 } else {
                     Conformance::Transitional
                 };
-                let xml = crate::modern_comments::write_comments_extended(&items, conformance)
-                    .map_err(|error| invalid(&error.to_string()))?;
+                let limits = crate::mail_merge::mce_limits_for_source(
+                    &self.package.opc_package().read_limits(),
+                );
+                let xml = crate::modern_comments::write_comments_extended(
+                    &items,
+                    conformance,
+                    &limits,
+                )
+                    .map_err(Error::Document)?;
                 self.stage_related_part(
                     COMMENTS_EXTENDED_RELATIONSHIP,
                     ("", "commentsExtended", ".xml"),
@@ -140,7 +150,10 @@ impl Edit<Package> {
             && let Some((name, _)) = self.related_part(COMMENTS_IDS_RELATIONSHIP)?
             && let Some(xml) = self.part_payload(&name)?
         {
-            let updated = map_durable_ids(&xml, assigned)?;
+            let limits = crate::mail_merge::mce_limits_for_source(
+                &self.package.opc_package().read_limits(),
+            );
+            let updated = map_durable_ids(&xml, assigned, &limits)?;
             if updated.as_slice() != xml.as_slice() {
                 self.replace_part(&name, updated)?;
                 changed = true;
@@ -248,7 +261,12 @@ pub(super) fn keyed_paragraph_id(
 /// The `commentsExtended` part with each entry written: an existing
 /// `commentEx` for the entry's paragraph has its parent and state
 /// rewritten in place; a new one is appended.
-fn upsert_entries(xml: &[u8], entries: &[Entry]) -> Result<Vec<u8>> {
+fn upsert_entries(
+    xml: &[u8],
+    entries: &[Entry],
+    limits: &litchi_ooxml_common::mce::Limits,
+) -> Result<Vec<u8>> {
+    ensure_output_bytes(xml.len(), limits)?;
     let tree = part_scan::scan(xml, 1).map_err(Error::Document)?;
     let root = tree.root().map_err(Error::Document)?;
     if root.empty {
@@ -321,7 +339,14 @@ fn upsert_entries(xml: &[u8], entries: &[Entry]) -> Result<Vec<u8>> {
         edits.push((close, close, appended));
     }
     edits.sort_by_key(|(start, end, _)| (*start, *end));
-    let mut output = Vec::with_capacity(xml.len() + 128);
+    let output_len = edits.iter().try_fold(xml.len(), |length, (start, end, bytes)| {
+        length
+            .checked_sub(end.saturating_sub(*start))
+            .and_then(|length| length.checked_add(bytes.len()))
+            .ok_or_else(|| invalid("commentsExtended output length overflow"))
+    })?;
+    ensure_output_bytes(output_len, limits)?;
+    let mut output = Vec::with_capacity(output_len);
     let mut cursor = 0usize;
     for (start, end, bytes) in edits {
         output.extend_from_slice(&xml[cursor..start]);
@@ -334,7 +359,12 @@ fn upsert_entries(xml: &[u8], entries: &[Entry]) -> Result<Vec<u8>> {
 
 /// The `commentsIds` part with a `commentId` for every paragraph of
 /// `assigned` it does not map, each with the next durable identifier.
-fn map_durable_ids(xml: &[u8], assigned: &[u32]) -> Result<Vec<u8>> {
+fn map_durable_ids(
+    xml: &[u8],
+    assigned: &[u32],
+    limits: &litchi_ooxml_common::mce::Limits,
+) -> Result<Vec<u8>> {
+    ensure_output_bytes(xml.len(), limits)?;
     let tree = part_scan::scan(xml, 1).map_err(Error::Document)?;
     let root = tree.root().map_err(Error::Document)?;
     if root.empty {
@@ -355,7 +385,42 @@ fn map_durable_ids(xml: &[u8], assigned: &[u32]) -> Result<Vec<u8>> {
         }
     }
     let prefix = root.prefix.clone();
-    let mut appended = Vec::new();
+    let comment_id = qualified(&prefix, "commentId");
+    let para_id = qualified(&prefix, "paraId");
+    let durable_id = qualified(&prefix, "durableId");
+    let initial_durable = durable;
+    let mut appended_len = 0usize;
+    for _ in assigned
+        .iter()
+        .filter(|paragraph| !mapped.contains(paragraph))
+    {
+        durable = durable
+            .checked_add(1)
+            .filter(|id| *id < MAX_PARAGRAPH_ID)
+            .ok_or_else(|| invalid("commentsIds has no free durable identifier"))?;
+        let element_len = 1usize
+            .checked_add(comment_id.len())
+            .and_then(|size| size.checked_add(1))
+            .and_then(|size| size.checked_add(para_id.len()))
+            .and_then(|size| size.checked_add(2))
+            .and_then(|size| size.checked_add(8))
+            .and_then(|size| size.checked_add(2))
+            .and_then(|size| size.checked_add(durable_id.len()))
+            .and_then(|size| size.checked_add(2))
+            .and_then(|size| size.checked_add(8))
+            .and_then(|size| size.checked_add(3))
+            .ok_or_else(|| invalid("commentsIds output length overflow"))?;
+        appended_len = appended_len
+            .checked_add(element_len)
+            .ok_or_else(|| invalid("commentsIds output length overflow"))?;
+    }
+    let output_len = xml
+        .len()
+        .checked_add(appended_len)
+        .ok_or_else(|| invalid("commentsIds output length overflow"))?;
+    ensure_output_bytes(output_len, limits)?;
+    let mut appended = Vec::with_capacity(appended_len);
+    durable = initial_durable;
     for paragraph in assigned
         .iter()
         .filter(|paragraph| !mapped.contains(paragraph))
@@ -367,16 +432,31 @@ fn map_durable_ids(xml: &[u8], assigned: &[u32]) -> Result<Vec<u8>> {
         appended.extend_from_slice(
             format!(
                 r#"<{} {}="{}" {}="{}"/>"#,
-                qualified(&prefix, "commentId"),
-                qualified(&prefix, "paraId"),
+                comment_id,
+                para_id,
                 hex(*paragraph),
-                qualified(&prefix, "durableId"),
+                durable_id,
                 hex(durable)
             )
             .as_bytes(),
         );
     }
+    debug_assert_eq!(appended.len(), appended_len);
     Ok(part_scan::splice(xml, root.close, root.close, &appended))
+}
+
+fn ensure_output_bytes(actual: usize, limits: &litchi_ooxml_common::mce::Limits) -> Result<()> {
+    let maximum = limits
+        .max_output_bytes
+        .min(crate::modern_comments::MAX_MODERN_COMMENT_PART_BYTES);
+    if actual > maximum {
+        return Err(Error::Document(crate::Error::ModernCommentLimit {
+            kind: crate::modern_comments::LimitKind::OutputBytes,
+            actual,
+            maximum,
+        }));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -396,6 +476,7 @@ mod tests {
     #[test]
     fn entries_are_upserted_and_appended() {
         let xml = br#"<w15:commentsEx xmlns:w15="urn:w15"><w15:commentEx w15:paraId="0000000A" w15:done="0"/></w15:commentsEx>"#;
+        let limits = litchi_ooxml_common::mce::Limits::default();
         let updated = upsert_entries(
             xml,
             &[
@@ -410,6 +491,7 @@ mod tests {
                     done: Some(false),
                 },
             ],
+            &limits,
         )
         .unwrap();
         assert_eq!(
@@ -424,9 +506,36 @@ mod tests {
                 parent: None,
                 done: Some(false),
             }],
+            &limits,
         )
         .unwrap();
         assert_eq!(same, xml);
+    }
+
+    #[test]
+    fn existing_part_updates_refuse_over_budget_before_publication() {
+        let xml = br#"<w15:commentsEx xmlns:w15="urn:w15"><w15:commentEx w15:paraId="0000000A" w15:done="0"/></w15:commentsEx>"#;
+        let limits = litchi_ooxml_common::mce::Limits {
+            max_output_bytes: xml.len() - 1,
+            ..litchi_ooxml_common::mce::Limits::default()
+        };
+        let error = upsert_entries(
+            xml,
+            &[Entry {
+                paragraph: 0xA,
+                parent: None,
+                done: Some(true),
+            }],
+            &limits,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Document(crate::Error::ModernCommentLimit {
+                kind: crate::modern_comments::LimitKind::OutputBytes,
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -452,9 +561,16 @@ mod tests {
         assert_eq!(keyed_paragraph_id(&mut two, 1, &mut ids).unwrap(), Some(2));
 
         let durable = br#"<w16cid:commentsIds xmlns:w16cid="urn:c"><w16cid:commentId w16cid:paraId="00000011" w16cid:durableId="00000005"/></w16cid:commentsIds>"#;
-        let mapped = map_durable_ids(durable, &[0x11, 0x12]).unwrap();
+        let limits = litchi_ooxml_common::mce::Limits::default();
+        let mapped = map_durable_ids(durable, &[0x11, 0x12], &limits).unwrap();
         assert!(String::from_utf8(mapped).unwrap().contains(
             r#"<w16cid:commentId w16cid:paraId="00000012" w16cid:durableId="00000006"/></w16cid:commentsIds>"#
         ));
+        let expected = map_durable_ids(durable, &[0x11, 0x12], &limits).unwrap();
+        let bounded = litchi_ooxml_common::mce::Limits {
+            max_output_bytes: expected.len() - 1,
+            ..limits
+        };
+        assert!(map_durable_ids(durable, &[0x11, 0x12], &bounded).is_err());
     }
 }

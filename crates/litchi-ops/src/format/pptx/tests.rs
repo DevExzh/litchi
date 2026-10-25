@@ -5,7 +5,7 @@ use std::sync::Arc;
 use litchi_core::detection::FileFormat;
 use litchi_core::{Metadata, Position, ReadAt};
 
-use super::{Editable, Pptx, PptxSlide, SlideDescriptor};
+use super::{Editable, Pptx, Slide, SlideDescriptor};
 use crate::error::{Code, Error, Source};
 use crate::options::OpenOptions;
 use crate::{IntoTarget, opc, pptx};
@@ -108,7 +108,7 @@ fn every_route(name: &str) -> Vec<(&'static str, Pptx)> {
 
 struct Expected {
     text: String,
-    slides: Vec<PptxSlide>,
+    slides: Vec<Slide>,
     catalog: Vec<SlideDescriptor>,
     size: (i64, i64),
     metadata: Option<Metadata>,
@@ -130,7 +130,7 @@ fn expected(name: &str) -> Expected {
         slide
             .text_with_tolerance(&mut eager_tolerance)
             .expect("eager slide repairs");
-        slides.push(PptxSlide {
+        slides.push(Slide {
             text: text.clone(),
             name: slide.name().expect("eager slide name"),
         });

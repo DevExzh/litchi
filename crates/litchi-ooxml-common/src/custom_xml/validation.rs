@@ -1,11 +1,12 @@
 //! Bounded semantic and package-graph validation for Custom XML edits.
 
 use crate::{Error, Result};
+use litchi_opc::SourceLimits;
 
 use super::codec::{require_rel_id, validate_content_type, validate_payload, validate_props};
 use super::model::{Item, MAX_ITEMS};
 
-pub(super) fn items(values: &[Item]) -> Result<()> {
+pub(super) fn items(values: &[Item], source_limits: &SourceLimits) -> Result<()> {
     if values.len() > MAX_ITEMS {
         return Err(Error::Limit {
             kind: crate::LimitKind::CustomXml(super::LimitKind::Items),
@@ -15,7 +16,7 @@ pub(super) fn items(values: &[Item]) -> Result<()> {
     }
 
     for (index, value) in values.iter().enumerate() {
-        item(index, value)?;
+        item(index, value, source_limits)?;
         if values[..index]
             .iter()
             .any(|other| other.source() == value.source() && other.rel_id() == value.rel_id())
@@ -42,9 +43,9 @@ pub(super) fn items(values: &[Item]) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn item(index: usize, value: &Item) -> Result<()> {
+pub(super) fn item(index: usize, value: &Item, source_limits: &SourceLimits) -> Result<()> {
     validate_content_type(value.content_type())?;
-    validate_payload(value.xml())?;
+    validate_payload(value.xml(), source_limits)?;
     require_rel_id(value.rel_id(), "custom XML relationship")?;
     if value.source_relationship().id != value.rel_id() {
         return Err(Error::Relationship(format!(
@@ -60,7 +61,7 @@ pub(super) fn item(index: usize, value: &Item) -> Result<()> {
                 "custom XML item {index} has typed properties without source XML"
             )));
         };
-        let parsed = super::codec::read_props(props_xml)?;
+        let parsed = super::codec::read_props(props_xml, source_limits)?;
         if &parsed != props {
             return Err(Error::Invalid(format!(
                 "custom XML item {index} properties projection is stale"

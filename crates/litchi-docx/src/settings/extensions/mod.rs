@@ -15,4 +15,6 @@ pub use model::{
 };
 pub use transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Snapshot};
 
-pub(crate) use package::{process_bytes_with_limits, process_part};
+pub(crate) use package::process_bytes_with_limits;
+#[cfg(test)]
+pub(crate) use package::process_part;

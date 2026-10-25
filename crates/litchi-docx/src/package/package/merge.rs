@@ -21,9 +21,10 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn mail_merge_settings(&self) -> Result<Option<MailMergeSettings>> {
+        let mce_limits = mail_merge::mce_limits_for_source(&self.opc.read_limits());
         let snapshot = self.settings_part_snapshot()?;
         let part = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        Ok(DocumentSettings::extract_from_part(&part)?
+        Ok(DocumentSettings::extract_from_part_with_mce_limits(&part, &mce_limits)?
             .mail_merge()
             .cloned())
     }
@@ -85,9 +86,10 @@ impl Package {
         recipients: Option<Recipients>,
         conformance: mail_merge::Conformance,
     ) -> Result<()> {
+        let mce_limits = mail_merge::mce_limits_for_source(&self.opc.read_limits());
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        DocumentSettings::extract_from_part(&original)?;
+        DocumentSettings::extract_from_part_with_mce_limits(&original, &mce_limits)?;
         let old_targets = self.mail_merge_internal_targets(&snapshot)?;
         let mut used_ids = snapshot
             .relationships
@@ -134,7 +136,7 @@ impl Package {
         };
         let recipient_id = if let Some(recipients) = recipients {
             let xml = recipients
-                .to_xml(conformance)
+                .to_xml(conformance, &mce_limits)
                 .map_err(map_docx_error)?
                 .into_bytes();
             let id = allocate_mail_merge_relationship_id("Recipients", &mut used_ids)?;
@@ -156,7 +158,12 @@ impl Package {
             None
         };
         settings.assign_package_relationships(data_id, header_id, recipient_id);
-        let patched = patch_mail_merge(&snapshot.xml, Some(&settings), conformance)?;
+        let patched = patch_mail_merge(
+            &snapshot.xml,
+            Some(&settings),
+            conformance,
+            &mce_limits,
+        )?;
         let mut replacement = settings_part_from_snapshot(&snapshot, patched, None);
         let old_ids = replacement
             .rels()
@@ -175,7 +182,7 @@ impl Package {
                 relationship.external,
             );
         }
-        DocumentSettings::extract_from_part(&replacement)?;
+        DocumentSettings::extract_from_part_with_mce_limits(&replacement, &mce_limits)?;
 
         crate::signature_policy::ensure_unsigned(&self.opc)?;
         let mut installed = Vec::new();
@@ -277,16 +284,22 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn clear_mail_merge(&mut self) -> Result<bool> {
+        let mce_limits = mail_merge::mce_limits_for_source(&self.opc.read_limits());
         let snapshot = self.settings_part_snapshot()?;
         let original = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        if DocumentSettings::extract_from_part(&original)?
+        if DocumentSettings::extract_from_part_with_mce_limits(&original, &mce_limits)?
             .mail_merge()
             .is_none()
         {
             return Ok(false);
         }
         let old_targets = self.mail_merge_internal_targets(&snapshot)?;
-        let patched = patch_mail_merge(&snapshot.xml, None, mail_merge::Conformance::Transitional)?;
+        let patched = patch_mail_merge(
+            &snapshot.xml,
+            None,
+            mail_merge::Conformance::Transitional,
+            &mce_limits,
+        )?;
         let mut replacement = settings_part_from_snapshot(&snapshot, patched, None);
         let ids = replacement
             .rels()
@@ -297,7 +310,7 @@ impl Package {
         for id in ids {
             replacement.rels_mut().remove(&id);
         }
-        DocumentSettings::extract_from_part(&replacement)?;
+        DocumentSettings::extract_from_part_with_mce_limits(&replacement, &mce_limits)?;
         crate::signature_policy::ensure_unsigned(&self.opc)?;
         self.commit_settings_part(&snapshot, replacement)?;
         for old_target in old_targets {

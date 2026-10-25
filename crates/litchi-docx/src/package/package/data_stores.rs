@@ -190,8 +190,9 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn add_custom_xml(&mut self, store: NewStore) -> Result<CustomXmlItem> {
+        let source_limits = self.opc.read_limits();
         custom_xml::validate_content_type(&store.content_type)?;
-        custom_xml::validate_payload(&store.xml)?;
+        custom_xml::validate_payload(&store.xml, &source_limits)?;
         let props = CustomXmlProps {
             id: store.id,
             schemas: store.schemas,
@@ -202,7 +203,8 @@ impl Package {
         ensure_store_absent(&self.opc, &item_id)?;
         self.refuse_signed_custom_xml_change("add_custom_xml")?;
         let payload = store.xml;
-        let limits = PackageLimits::default();
+        let limits = self.semantic_limits().content_controls_value().clone();
+        limits.validate()?;
         self.edit_semantic_opc("add_custom_xml", move |candidate| {
             ensure_store_absent(candidate, &item_id)?;
             let source_part = candidate.main_document_part()?.partname().clone();
@@ -272,7 +274,8 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn set_custom_xml(&mut self, id: &str, xml: Vec<u8>) -> Result<()> {
-        custom_xml::validate_payload(&xml)?;
+        let source_limits = self.opc.read_limits();
+        custom_xml::validate_payload(&xml, &source_limits)?;
         self.mutate_custom_xml(
             id,
             "set_custom_xml",
@@ -289,8 +292,9 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn replace_custom_xml(&mut self, id: &str, replacement: NewStore) -> Result<()> {
+        let source_limits = self.opc.read_limits();
         custom_xml::validate_content_type(&replacement.content_type)?;
-        custom_xml::validate_payload(&replacement.xml)?;
+        custom_xml::validate_payload(&replacement.xml, &source_limits)?;
         if !replacement.id.eq_ignore_ascii_case(id) {
             return Err(Error::InvalidFormat(
                 "replacement itemID must identify the existing data store".into(),
@@ -300,7 +304,7 @@ impl Package {
             id: replacement.id,
             schemas: replacement.schemas,
         };
-        let props_xml = custom_xml::write_props(&props, replacement.conformance)?;
+        let props_xml = custom_xml::write_props(&props, replacement.conformance, &source_limits)?;
         self.mutate_custom_xml(
             id,
             "replace_custom_xml",
@@ -319,6 +323,8 @@ impl Package {
         mutation: StoreMutation,
     ) -> Result<()> {
         self.ensure_story_opc_current(operation)?;
+        let limits = self.semantic_limits().content_controls_value().clone();
+        limits.validate()?;
         let item = unique_store(&self.opc, id)?;
         if mutation.is_noop(&self.opc, &item)? {
             return Ok(());
@@ -326,7 +332,6 @@ impl Package {
         self.refuse_signed_custom_xml_change(operation)?;
         let expected_part = item.part().clone();
         let item_id = id.to_owned();
-        let limits = PackageLimits::default();
         self.edit_semantic_opc(operation, move |candidate| {
             let item = unique_store(candidate, &item_id)?;
             if item.part() != &expected_part {
@@ -365,6 +370,8 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub(crate) fn remove_custom_xml(&mut self, id: &str) -> Result<bool> {
         self.ensure_story_opc_current("remove_custom_xml")?;
+        let limits = self.semantic_limits().content_controls_value().clone();
+        limits.validate()?;
         let present = custom_xml::discover(&self.opc)?.iter().any(|item| {
             item.props()
                 .is_some_and(|props| props.id.eq_ignore_ascii_case(id))
@@ -374,7 +381,6 @@ impl Package {
         }
         self.refuse_signed_custom_xml_change("remove_custom_xml")?;
         let id = id.to_owned();
-        let limits = PackageLimits::default();
         self.edit_semantic_opc("remove_custom_xml", move |candidate| {
             let items = custom_xml::discover(candidate)?;
             let matching = items
@@ -560,7 +566,8 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn custom_xml_bindings(&self) -> Result<Vec<Binding>> {
-        let limits = PackageLimits::default();
+        let limits = self.semantic_limits().content_controls_value().clone();
+        limits.validate()?;
         let stories = self.story_inventory_bounded(limits.stories)?;
         let mut bindings = Vec::new();
         visit_bindings(

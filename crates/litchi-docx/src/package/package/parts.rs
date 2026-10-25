@@ -161,7 +161,8 @@ impl Package {
     pub(crate) fn update_settings_part(&mut self, xml: Vec<u8>) -> Result<()> {
         let snapshot = self.settings_part_snapshot()?;
         let part = settings_part_from_snapshot(&snapshot, xml, None);
-        DocumentSettings::extract_from_part(&part)?;
+        let limits = crate::mail_merge::mce_limits_for_source(&self.opc.read_limits());
+        DocumentSettings::extract_from_part_with_mce_limits(&part, &limits)?;
         self.commit_settings_part(&snapshot, part)
     }
 

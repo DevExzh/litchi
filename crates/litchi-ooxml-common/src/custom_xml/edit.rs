@@ -75,7 +75,8 @@ impl Edit {
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
     pub fn set_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
-        let root = validate_payload(&xml)?;
+        let source_limits = self.source.read_limits();
+        let root = validate_payload(&xml, &source_limits)?;
         let current = self
             .draft
             .get(index)
@@ -133,7 +134,8 @@ impl Edit {
     /// Returns an error when input violates OOXML constraints, exceeds a configured
     /// bound, or an underlying XML or package operation fails.
     pub fn set_properties_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
-        let props = read_props(&xml)?;
+        let source_limits = self.source.read_limits();
+        let props = read_props(&xml, &source_limits)?;
         let current = self
             .draft
             .get(index)
@@ -186,7 +188,8 @@ impl Edit {
         } else {
             Conformance::Transitional
         };
-        let xml = rewrite_props(source, before, &props, conformance)?;
+        let source_limits = self.source.read_limits();
+        let xml = rewrite_props(source, before, &props, conformance, &source_limits)?;
         drop(props);
         self.set_properties_xml(index, xml)
     }
@@ -260,7 +263,8 @@ impl Edit {
             self.before = Snapshot::load_scoped(&self.source, &hints)?;
         }
         self.draft.push(item);
-        validation::items(&self.draft)?;
+        let source_limits = self.source.read_limits();
+        validation::items(&self.draft, &source_limits)?;
         Ok(self.draft.len() - 1)
     }
 
@@ -299,7 +303,8 @@ impl Edit {
             let patch = Patch::new(self.before.clone(), self.before);
             return Ok(Commit::new(self.source, patch, Diagnostics::UNCHANGED));
         }
-        validation::items(&self.draft)?;
+        let source_limits = self.source.read_limits();
+        validation::items(&self.draft, &source_limits)?;
         refuse_signed_change(&self.source)?;
 
         let mut candidate = self.source;
@@ -324,8 +329,9 @@ impl Edit {
 }
 
 fn new_item(package: &OpcPackage, value: NewItem) -> Result<Item> {
+    let source_limits = package.read_limits();
     validate_content_type(&value.content_type)?;
-    let root = validate_payload(&value.xml)?;
+    let root = validate_payload(&value.xml, &source_limits)?;
     require_rel_id(&value.rel_id, "custom XML relationship")?;
     match package.get_part(&value.source) {
         Ok(_) => {},
@@ -346,7 +352,7 @@ fn new_item(package: &OpcPackage, value: NewItem) -> Result<Item> {
         validate_props(&new_props.value)?;
         require_rel_id(&new_props.rel_id, "custom XML properties relationship")?;
         package.validate_new_part_name(&new_props.part)?;
-        let props_xml = write_props(&new_props.value, value.conformance)?;
+        let props_xml = write_props(&new_props.value, value.conformance, &source_limits)?;
         let relationship = Relationship {
             id: new_props.rel_id,
             relationship_type: value.conformance.props_relationship().into(),

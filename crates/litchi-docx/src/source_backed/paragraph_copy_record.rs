@@ -1215,7 +1215,10 @@ impl Package {
                     )
                     .map_err(crate::Error::from)?;
             }
-            let parsed = DocumentSettings::extract_from_part(&staged)?;
+            let limits = crate::mail_merge::mce_limits_for_source(
+                &self.physical_package()?.read_limits(),
+            );
+            let parsed = DocumentSettings::extract_from_part_with_mce_limits(&staged, &limits)?;
             if parsed.is_protected() || parsed.is_write_protected() || parsed.track_revisions() {
                 return Err(Error::Refused(Refusal::Protection));
             }
