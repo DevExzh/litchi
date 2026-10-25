@@ -22,3 +22,26 @@ instead of constructing an impossible policy.
 Source inspection, formatting, and repository-size/binary checks passed in this
 leaf.  Cargo, compiler, and runtime execution remain intentionally pending for
 the coordinator's focused and common runtime rerun.
+
+## Return 0362ul119a
+
+This source-only return starts from the frozen runtime candidate
+a8d32513b8e427c6d234ddd17fb836b0e8d2477b (tree
+0251ddc8aeef84702604f340406eda671c9b6c54).  The common runtime receipt
+reported a relationship-total assertion that compared the complete fixture
+graph with only its root .rels member, and a replay fixture that attempted to
+publish a topology addition beside opaque directory entries.
+
+The structural assertion now independently sums the root and every present
+part relationship token.  The replay test uses a small authored package whose
+VBA graph and both custom replacement parts are already source members, then
+rewrites it through the existing ZIP reader/writer to add a real custom/
+directory entry.  Removing and re-adding known parts, followed by replaying a
+known VBA graph update, keeps the targeted preservation route eligible while
+still exercising independent ZIP member/entry counts and exact/one-under
+archive limits.  No production preservation refusal was weakened.
+
+No Cargo, compiler, rustdoc, native, or performance command was run in this
+leaf.  Source inspection, formatting, and repository-size/binary checks were
+the only validation performed; the coordinator owns the focused and common
+runtime reruns.

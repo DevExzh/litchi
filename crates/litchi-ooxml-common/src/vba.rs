@@ -3084,6 +3084,21 @@ mod tests {
         (members, entries)
     }
 
+    fn add_directory_entry(bytes: &[u8]) -> Vec<u8> {
+        let archive = soapberry_zip::office::ArchiveReader::new(
+            bytes,
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        let mut writer = soapberry_zip::ZipArchiveWriter::new(Vec::new());
+        writer.new_dir("custom/").create().unwrap();
+        for name in archive.file_names() {
+            let payload = archive.read(name).unwrap();
+            writer.write_stored_file(name, &payload).unwrap();
+        }
+        writer.finish().unwrap()
+    }
+
     fn word_package() -> OpcPackage {
         let source_name = PackURI::new("/word/document.xml").unwrap();
         let mut package = OpcPackage::new();
@@ -3555,14 +3570,22 @@ mod tests {
         let content_types = package.source_content_types(limits).unwrap();
         let relationships = relationship_totals(&package, limits).unwrap();
         let root = PackURI::new("/").unwrap();
-        assert_eq!(
-            relationships.xml_bytes,
-            package
-                .source_relationships(&root, limits)
-                .unwrap()
-                .bytes()
-                .len() as u64
-        );
+        let mut expected_relationship_bytes = package
+            .source_relationships(&root, limits)
+            .unwrap()
+            .bytes()
+            .len() as u64;
+        for metadata in package.iter_parts() {
+            let relationships = package
+                .source_relationships(metadata.partname(), limits)
+                .unwrap();
+            if relationships.member_present() {
+                expected_relationship_bytes = expected_relationship_bytes
+                    .checked_add(relationships.bytes().len() as u64)
+                    .unwrap();
+            }
+        }
+        assert_eq!(relationships.xml_bytes, expected_relationship_bytes);
         let projected = {
             let mut edit = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
             edit.store(b"project".to_vec(), None).unwrap();
@@ -3812,7 +3835,17 @@ mod tests {
     fn replay_projects_serialized_source_namespace_after_unrelated_remove_add() {
         let old_name = PackURI::new("/custom/old.bin").unwrap();
         let new_name = PackURI::new("/custom/new.bin").unwrap();
-        let mut source = excel_source_package_with_directory_entries();
+        let package = excel_package();
+        let mut initial = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
+        initial.store(b"source".to_vec(), None).unwrap();
+        let stored = initial.commit().unwrap().into_package();
+
+        // Build a small authored source with both replacement candidates
+        // already present. The ZIP rewrite adds a real directory entry, but
+        // keeps every subsequently edited member modeled by OPC provenance:
+        // replay can therefore exercise source-backed preservation without
+        // asking the writer to append beside an opaque directory member.
+        let mut source = stored.clone();
         let mut old = BlobPart::new(
             old_name.clone(),
             "application/octet-stream".to_owned(),
@@ -3827,15 +3860,32 @@ mod tests {
             )
             .unwrap();
         source.try_add_part(Box::new(old)).unwrap();
+        let mut source_new = BlobPart::new(
+            new_name.clone(),
+            "application/octet-stream".to_owned(),
+            b"source-new".to_vec(),
+        );
+        source_new
+            .rels_mut()
+            .try_add_relationship(
+                "urn:unrelated".to_owned(),
+                "../xl/workbook.xml".to_owned(),
+                "sourceNewEdge".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        source.try_add_part(Box::new(source_new)).unwrap();
 
         // Reopen a real source archive so the recipient retains immutable
         // provenance for the part and its relationships. Then replace that
         // known source part with a new known part carrying its own `.rels`.
-        let source_bytes = PackageWriter::to_bytes(&source).unwrap();
+        let authored_bytes = PackageWriter::to_bytes(&source).unwrap();
+        let source_bytes = add_directory_entry(&authored_bytes);
         let mut recipient = OpcPackage::from_vec(source_bytes, SourceLimits::default()).unwrap();
         assert!(recipient.remove_part(&old_name));
+        assert!(recipient.remove_part(&new_name));
         let mut replacement = BlobPart::new(
-            new_name,
+            new_name.clone(),
             "application/octet-stream".to_owned(),
             b"new".to_vec(),
         );
@@ -3851,8 +3901,7 @@ mod tests {
         recipient.try_add_part(Box::new(replacement)).unwrap();
         assert!(recipient.source_read_limits().is_some());
 
-        let package = excel_package();
-        let mut edit = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
+        let mut edit = Edit::new(&stored, Host::Excel, EditOptions::new()).unwrap();
         edit.store(b"project".to_vec(), None).unwrap();
         let patch = edit.commit().unwrap().patch().clone();
 
