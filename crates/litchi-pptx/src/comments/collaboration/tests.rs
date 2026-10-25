@@ -27,6 +27,29 @@ fn replay_presence_validator_applies_recipient_extension_limits() {
 }
 
 #[test]
+fn replay_presence_validator_enforces_active_aggregate_at_exact_boundary() {
+    let source = author_source();
+    let budget = super::codec::selected_string_budget(
+        &source,
+        super::codec::Kind::Presence,
+        crate::comments::Limits::DEFAULT,
+    )
+    .unwrap();
+    let mut exact = crate::comments::Limits::DEFAULT;
+    exact.max_string_bytes = budget;
+    assert!(super::validate_presence_replay(&source, exact).is_ok());
+
+    let mut one_under = exact;
+    one_under.max_string_bytes = budget.saturating_sub(1);
+    assert!(super::validate_presence_replay(&source, one_under).is_err());
+
+    let active_name = String::from_utf8(source)
+        .unwrap()
+        .replace(r#"name="A""#, r#"name="AA""#);
+    assert!(super::validate_presence_replay(active_name.as_bytes(), exact).is_err());
+}
+
+#[test]
 fn replay_presence_validator_accepts_partial_multi_author_extensions() {
     let mut source = author_source();
     let closing = b"</p:cmAuthorLst>";
@@ -59,6 +82,28 @@ fn replay_presence_validator_ignores_inactive_typed_uri_bytes() {
 }
 
 #[test]
+fn replay_presence_validator_keeps_physical_attribute_cap_independent() {
+    let inactive_user = "x".repeat(129);
+    let source = format!(
+        r#"<p:cmAuthorLst xmlns:p="{PML}" xmlns:p15="{P15}" xmlns:mc="{MCE}"><p:cmAuthor id="7" name="A" initials="A" lastIdx="0" clrIdx="0"><p:extLst><mc:AlternateContent><mc:Choice Requires="p15"><p:ext uri="urn:other-extension"/></mc:Choice><mc:Fallback><p:ext uri="{uri}"><p15:presenceInfo userId="{inactive_user}" providerId="provider"/></p:ext></mc:Fallback></mc:AlternateContent></p:extLst></p:cmAuthor></p:cmAuthorLst>"#,
+        uri = super::PRESENCE_EXTENSION_URI,
+        inactive_user = inactive_user,
+    );
+    let mut limits = crate::comments::Limits::DEFAULT;
+    limits.max_string_bytes = 128;
+    limits.max_attribute_bytes = 128;
+    let error = super::validate_presence_replay(source.as_bytes(), limits).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlAttributeBytes),
+            observed,
+            maximum: 128,
+        } if observed > 128
+    ));
+}
+
+#[test]
 fn replay_threading_validator_checks_typed_extension_children() {
     let source = String::from_utf8(comment_source())
         .unwrap()
@@ -69,12 +114,72 @@ fn replay_threading_validator_checks_typed_extension_children() {
     );
 }
 
+#[test]
+fn replay_threading_validator_enforces_active_text_at_exact_boundary() {
+    let source = comment_source();
+    let budget = super::codec::selected_string_budget(
+        &source,
+        super::codec::Kind::Threading,
+        crate::comments::Limits::DEFAULT,
+    )
+    .unwrap();
+    let mut exact = crate::comments::Limits::DEFAULT;
+    exact.max_string_bytes = budget;
+    assert!(super::validate_threading_replay(&source, exact).is_ok());
+
+    let mut one_under = exact;
+    one_under.max_string_bytes = budget.saturating_sub(1);
+    assert!(super::validate_threading_replay(&source, one_under).is_err());
+
+    let active_text = String::from_utf8(source)
+        .unwrap()
+        .replace(">hello</p:text>", ">helloo</p:text>");
+    assert!(super::validate_threading_replay(active_text.as_bytes(), exact).is_err());
+}
+
+#[test]
+fn replay_threading_validator_applies_string_budget_to_date_time() {
+    let source = comment_source_with_date_time("2026-10-25T00:00:00Z");
+    let budget = super::codec::selected_string_budget(
+        &source,
+        super::codec::Kind::Threading,
+        crate::comments::Limits::DEFAULT,
+    )
+    .unwrap();
+    let mut exact = crate::comments::Limits::DEFAULT;
+    exact.max_string_bytes = budget;
+    assert!(super::validate_threading_replay(&source, exact).is_ok());
+
+    let over = comment_source_with_date_time("2026-10-25T00:00:00.0Z");
+    assert!(super::validate_threading_replay(over.as_bytes(), exact).is_err());
+}
+
 fn comment_source() -> Vec<u8> {
     format!(
         r#"<p:cmLst xmlns:p="{PML}" xmlns:p15="{P15}" xmlns:mc="{MCE}"><p:cm authorId="7" idx="2"><p:pos x="1" y="2"/><p:text>hello</p:text><p:extLst><!-- before --><p:ext uri="{uri}"><p15:threadingInfo timeZoneBias="-60"><p15:parentCm authorId="7" idx="1"/></p15:threadingInfo></p:ext><!-- after --></p:extLst></p:cm></p:cmLst>"#,
         uri = super::THREADING_EXTENSION_URI,
     )
     .into_bytes()
+}
+
+fn comment_source_with_date_time(date_time: &str) -> String {
+    format!(
+        r#"<p:cmLst xmlns:p="{PML}" xmlns:p15="{P15}" xmlns:mc="{MCE}"><p:cm authorId="7" dt="{date_time}" idx="2"><p:pos x="1" y="2"/><p:text>hello</p:text><p:extLst><p:ext uri="{uri}"><p15:threadingInfo timeZoneBias="-60"><p15:parentCm authorId="7" idx="1"/></p15:threadingInfo></p:ext></p:extLst></p:cm></p:cmLst>"#,
+        uri = super::THREADING_EXTENSION_URI,
+    )
+}
+
+#[test]
+fn replay_threading_validator_ignores_inactive_ordinary_values_after_mce() {
+    let inactive = "x".repeat(1024);
+    let source = format!(
+        r#"<p:cmLst xmlns:p="{PML}" xmlns:p15="{P15}" xmlns:mc="{MCE}"><mc:AlternateContent><mc:Choice Requires="p15"><p:cm authorId="7" idx="2"><p:pos x="1" y="2"/><p:text>hello</p:text><p:extLst><p:ext uri="{uri}"><p15:threadingInfo timeZoneBias="-60"><p15:parentCm authorId="7" idx="1"/></p15:threadingInfo></p:ext></p:extLst></p:cm></mc:Choice><mc:Fallback><p:cm authorId="7" dt="{inactive}" idx="0"><p:pos x="1" y="2"/><p:text>{inactive}</p:text></p:cm></mc:Fallback></mc:AlternateContent></p:cmLst>"#,
+        uri = super::THREADING_EXTENSION_URI,
+        inactive = inactive,
+    );
+    let mut limits = crate::comments::Limits::DEFAULT;
+    limits.max_string_bytes = 128;
+    assert!(super::validate_threading_replay(source.as_bytes(), limits).is_ok());
 }
 
 fn package_with_sources() -> OpcPackage {

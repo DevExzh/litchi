@@ -29,6 +29,7 @@ pub(crate) use package::{
     update_presentation_comment_author_with_limits, update_presentation_comment_with_limits,
     validate_replay_part,
 };
+pub(crate) use codec::{parse_comment_authors_processed, parse_slide_comments_processed};
 pub use package::{
     find_presentation_comment, find_presentation_comment_author, load_presentation_comments,
     load_presentation_comments_strict, load_presentation_comments_with_tolerance,
@@ -71,6 +72,13 @@ pub struct Limits {
     pub max_output_bytes: usize,
     pub max_depth: usize,
     pub max_nodes: usize,
+    /// Raw bytes in one XML attribute value, charged before decoding.
+    ///
+    /// This is the physical source ceiling.  It is deliberately separate
+    /// from `max_string_bytes`, which is the selected semantic aggregate and
+    /// may be tightened for a replay recipient without rejecting inactive
+    /// MCE branches at the physical admission boundary.
+    pub max_attribute_bytes: usize,
     pub max_string_bytes: usize,
 }
 
@@ -80,6 +88,7 @@ impl Limits {
         max_output_bytes: MAX_PART_BYTES,
         max_depth: MAX_DEPTH,
         max_nodes: MAX_NODES,
+        max_attribute_bytes: MAX_STRING_BYTES,
         max_string_bytes: MAX_STRING_BYTES,
     };
 
@@ -97,6 +106,10 @@ impl Limits {
             max_output_bytes: min_usize(self.max_output_bytes, part),
             max_depth: min_usize(self.max_depth, source.max_depth()),
             max_nodes: min_usize(self.max_nodes, source.max_events()),
+            max_attribute_bytes: min_usize(
+                self.max_attribute_bytes,
+                source.max_xml_attribute_bytes(),
+            ),
             max_string_bytes: min_usize(self.max_string_bytes, source.max_xml_attribute_bytes()),
         }
     }

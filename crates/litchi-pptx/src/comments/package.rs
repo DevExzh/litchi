@@ -1204,7 +1204,10 @@ fn is_authors_relationship(value: &str) -> bool {
     reason = "test assertions panic on failure by design"
 )]
 mod tests {
-    use super::super::codec::parse_slide_comments;
+    use super::super::codec::{
+        measured_comment_authors_string_bytes, measured_slide_comments_string_bytes,
+        parse_slide_comments,
+    };
     use super::super::{MAX_AUTHORS, MAX_DEPTH, MAX_PART_BYTES, PML, STRICT_PML};
     use super::*;
 
@@ -1334,6 +1337,222 @@ mod tests {
     }
 
     #[test]
+    fn writer_enforces_date_time_string_limit() {
+        let mut comment = comment();
+        comment.date_time = Some("2026-10-25T00:00:00Z".into());
+        let mut limits = Limits::DEFAULT;
+        limits.max_string_bytes = 4;
+        let error = write_slide_comments(&[comment], Conformance::Strict, limits).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
+                observed,
+                maximum: 4,
+            } if observed > 4
+        ));
+    }
+
+    #[test]
+    fn writers_charge_the_selected_string_budget_exactly() {
+        let author_budget =
+            measured_comment_authors_string_bytes(&[], Conformance::Strict).unwrap();
+        assert!(author_budget > 1);
+        assert!(
+            write_comment_authors(
+                &[],
+                Conformance::Strict,
+                Limits {
+                    max_string_bytes: author_budget,
+                    ..Limits::DEFAULT
+                }
+            )
+            .is_ok()
+        );
+        let author_error = write_comment_authors(
+            &[],
+            Conformance::Strict,
+            Limits {
+                max_string_bytes: author_budget - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            author_error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
+                observed,
+                maximum,
+            } if observed == author_budget && maximum == author_budget - 1
+        ));
+
+        let comment_budget =
+            measured_slide_comments_string_bytes(&[], Conformance::Strict).unwrap();
+        assert!(comment_budget > 1);
+        assert!(
+            write_slide_comments(
+                &[],
+                Conformance::Strict,
+                Limits {
+                    max_string_bytes: comment_budget,
+                    ..Limits::DEFAULT
+                }
+            )
+            .is_ok()
+        );
+        let comment_error = write_slide_comments(
+            &[],
+            Conformance::Strict,
+            Limits {
+                max_string_bytes: comment_budget - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            comment_error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
+                observed,
+                maximum,
+            } if observed == comment_budget && maximum == comment_budget - 1
+        ));
+
+        let authors = [author()];
+        let comments = [comment()];
+        let author_budget =
+            measured_comment_authors_string_bytes(&authors, Conformance::Strict).unwrap();
+        assert!(
+            write_comment_authors(
+                &authors,
+                Conformance::Strict,
+                Limits {
+                    max_string_bytes: author_budget,
+                    ..Limits::DEFAULT
+                }
+            )
+            .is_ok()
+        );
+        let author_error = write_comment_authors(
+            &authors,
+            Conformance::Strict,
+            Limits {
+                max_string_bytes: author_budget - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            author_error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
+                observed,
+                maximum,
+            } if observed == author_budget && maximum == author_budget - 1
+        ));
+        let comment_budget =
+            measured_slide_comments_string_bytes(&comments, Conformance::Strict).unwrap();
+        assert!(
+            write_slide_comments(
+                &comments,
+                Conformance::Strict,
+                Limits {
+                    max_string_bytes: comment_budget,
+                    ..Limits::DEFAULT
+                }
+            )
+            .is_ok()
+        );
+        let comment_error = write_slide_comments(
+            &comments,
+            Conformance::Strict,
+            Limits {
+                max_string_bytes: comment_budget - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            comment_error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
+                observed,
+                maximum,
+            } if observed == comment_budget && maximum == comment_budget - 1
+        ));
+    }
+
+    #[test]
+    fn writer_enforces_escaped_attribute_wire_limit_before_output() {
+        let mut value = author();
+        value.name = "&".repeat(10);
+        let physical = value.name.len() * b"&amp;".len();
+        assert!(physical > Conformance::Strict.namespace().len());
+        let exact = Limits {
+            max_attribute_bytes: physical,
+            ..Limits::DEFAULT
+        };
+        let xml = write_comment_authors(&[value.clone()], Conformance::Strict, exact).unwrap();
+        assert_eq!(
+            parse_comment_authors(&xml, exact).unwrap(),
+            vec![value.clone()]
+        );
+        let error = write_comment_authors(
+            &[value],
+            Conformance::Strict,
+            Limits {
+                max_attribute_bytes: physical - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(
+                    crate::error::CodecLimitKind::XmlAttributeBytes
+                ),
+                observed,
+                maximum,
+            } if observed == physical && maximum == physical - 1
+        ));
+    }
+
+    #[test]
+    fn writer_counts_numeric_whitespace_escapes_exactly() {
+        let mut value = author();
+        value.name = "\n\r".repeat(6);
+        let physical = value.name.len() * b"&#xA;".len();
+        assert!(physical > Conformance::Strict.namespace().len());
+        let exact = Limits {
+            max_attribute_bytes: physical,
+            ..Limits::DEFAULT
+        };
+        let xml = write_comment_authors(&[value.clone()], Conformance::Strict, exact).unwrap();
+        assert_eq!(parse_comment_authors(&xml, exact).unwrap(), vec![value.clone()]);
+        let error = write_comment_authors(
+            &[value],
+            Conformance::Strict,
+            Limits {
+                max_attribute_bytes: physical - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(
+                    crate::error::CodecLimitKind::XmlAttributeBytes
+                ),
+                observed,
+                maximum,
+            } if observed == physical && maximum == physical - 1
+        ));
+    }
+
+    #[test]
     fn raw_policy_admits_exact_wire_and_refuses_one_byte_under() {
         let authors = vec![author()];
         let comments = vec![comment()];
@@ -1403,6 +1622,25 @@ mod tests {
             parse_slide_comments(xml.as_bytes(), Limits::DEFAULT).unwrap()[0].text,
             "fallback"
         );
+    }
+
+    #[test]
+    fn raw_attribute_cap_applies_before_mce_discards_inactive_choice() {
+        let oversized = "x".repeat(129);
+        let xml = format!(
+            r#"<p:cmLst xmlns:p="{PML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future"><mc:AlternateContent><mc:Choice Requires="x"><x:cm payload="{oversized}"/></mc:Choice><mc:Fallback><p:cm authorId="7" idx="1"><p:pos x="1" y="2"/><p:text>fallback</p:text></p:cm></mc:Fallback></mc:AlternateContent></p:cmLst>"#
+        );
+        let mut limits = Limits::DEFAULT;
+        limits.max_attribute_bytes = 128;
+        let error = parse_slide_comments(xml.as_bytes(), limits).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlAttributeBytes),
+                observed,
+                maximum: 128,
+            } if observed > 128
+        ));
     }
 
     #[test]

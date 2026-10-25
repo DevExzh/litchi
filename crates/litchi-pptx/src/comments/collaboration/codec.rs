@@ -172,35 +172,15 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
             "legacy comment collaboration owner has the wrong root",
         ));
     }
-
+    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
     let capabilities = capabilities();
     let mce_limits = mce_limits(limits);
+    let processed = process_semantic_source(&mce_source, &capabilities, &mce_limits)?;
+    validate_processed_part(processed.as_ref(), kind, limits, false)?;
+
     // The common MCE selector intentionally rejects processing instructions.
     // They are inert in this owner, so remove them only from the temporary
     // MCE input while retaining a mapping back to the original source offsets.
-    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
-    let processed = process_markup_compatibility(mce_source.bytes(), &capabilities, &mce_limits)
-        .map_err(Error::MarkupCompatibility)?
-        .xml;
-    if processed.len() > limits.max_input_bytes {
-        return Err(limit(
-            crate::error::CodecLimitKind::XmlBytes,
-            processed.len(),
-            limits.max_input_bytes,
-        ));
-    }
-    // The existing comment parser validates the surrounding legacy comment
-    // grammar and required fields. It is intentionally only a validator here;
-    // all bytes used for the source-bound owner remain in `source`.
-    match kind {
-        Kind::Presence => {
-            let _ = crate::comments::parse_comment_authors(&processed, limits)?;
-        },
-        Kind::Threading => {
-            let _ = crate::comments::parse_slide_comments(&processed, limits)?;
-        },
-    }
-
     let item_indices = item_indices(&scan, root_index, kind, owner)?;
     let offsets = collect_offsets(&scan, &item_indices, limits)?;
     let active = if offsets.is_empty() {
@@ -389,13 +369,333 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
     })
 }
 
+/// Validate the ordinary comment grammar after MCE has selected the semantic
+/// branches.  The processed parser admits each borrowed event's aggregate
+/// decoded-string bytes before it owns that event's attribute or text value,
+/// then checks the complete comment grammar and stores only values that have
+/// already passed those bounds.
+///
+/// The aggregate includes every selected attribute name/value and text byte,
+/// including extension and namespace markup, while the per-field checks cover
+/// author names/initials, comment text, and `dt`.  MCE-inactive bytes are not
+/// in `source` here and therefore do not consume this semantic budget.  The
+/// raw source scan still charges those bytes against the independent physical
+/// input, event, depth, node, and per-attribute ceilings.
+fn validate_processed_part(
+    source: &[u8],
+    kind: Kind,
+    limits: Limits,
+    strict_threading: bool,
+) -> Result<()> {
+    match kind {
+        Kind::Presence => crate::comments::parse_comment_authors_processed(source, limits).map(drop),
+        Kind::Threading => {
+            crate::comments::parse_slide_comments_processed(source, limits, strict_threading)
+                .map(drop)
+        },
+    }
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SemanticElement {
+    Author,
+    Comment,
+    Text,
+    Other,
+}
+
+#[cfg(test)]
+struct SemanticFrame {
+    element: SemanticElement,
+    text_bytes: usize,
+}
+
+#[cfg(test)]
+fn preflight_processed_strings(source: &[u8], kind: Kind, limits: Limits) -> Result<usize> {
+    if source.len() > limits.max_input_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            source.len(),
+            limits.max_input_bytes,
+        ));
+    }
+    let mut reader = NsReader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    let mut stack = Vec::new();
+    let mut nodes = 0usize;
+    let mut strings = 0usize;
+    loop {
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        match event {
+            Event::Start(element) => {
+                let depth = stack.len().checked_add(1).unwrap_or(usize::MAX);
+                if depth > limits.max_depth {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth,
+                    ));
+                }
+                let semantic = semantic_element(&namespace, element.local_name().as_ref());
+                preflight_element_attributes(
+                    &element,
+                    semantic,
+                    kind,
+                    &mut strings,
+                    limits,
+                )?;
+                nodes = checked_preflight_count(
+                    nodes,
+                    limits.max_nodes,
+                    crate::error::CodecLimitKind::XmlNodes,
+                )?;
+                stack.push(SemanticFrame {
+                    element: semantic,
+                    text_bytes: 0,
+                });
+            },
+            Event::Empty(element) => {
+                let semantic = semantic_element(&namespace, element.local_name().as_ref());
+                preflight_element_attributes(
+                    &element,
+                    semantic,
+                    kind,
+                    &mut strings,
+                    limits,
+                )?;
+                nodes = checked_preflight_count(
+                    nodes,
+                    limits.max_nodes,
+                    crate::error::CodecLimitKind::XmlNodes,
+                )?;
+            },
+            Event::End(_) => {
+                if stack.pop().is_none() {
+                    return Err(invalid("unexpected XML end element"));
+                }
+            },
+            Event::Text(text) => {
+                let length = decoded_xml_len(text.as_ref())?;
+                add_preflight_strings(&mut strings, length, limits.max_string_bytes)?;
+                if let Some(frame) = stack.last_mut()
+                    && frame.element == SemanticElement::Text
+                {
+                    frame.text_bytes = frame
+                        .text_bytes
+                        .checked_add(length)
+                        .ok_or_else(|| limit_string(usize::MAX, limits.max_string_bytes))?;
+                    ensure_preflight_string(frame.text_bytes, limits.max_string_bytes)?;
+                }
+            },
+            Event::GeneralRef(reference) => {
+                let length = entity_value_len(reference.as_ref())?;
+                add_preflight_strings(&mut strings, length, limits.max_string_bytes)?;
+                if let Some(frame) = stack.last_mut()
+                    && frame.element == SemanticElement::Text
+                {
+                    frame.text_bytes = frame
+                        .text_bytes
+                        .checked_add(length)
+                        .ok_or_else(|| limit_string(usize::MAX, limits.max_string_bytes))?;
+                    ensure_preflight_string(frame.text_bytes, limits.max_string_bytes)?;
+                }
+            },
+            Event::CData(_) => {
+                return Err(invalid("CDATA is rejected in presentation comment parts"));
+            },
+            Event::DocType(_) => {
+                return Err(invalid("DTD is rejected in presentation comment parts"));
+            },
+            Event::PI(_) | Event::Decl(_) | Event::Comment(_) => {},
+            Event::Eof => break,
+        }
+    }
+    if !stack.is_empty() {
+        return Err(invalid("unterminated presentation comment XML"));
+    }
+    Ok(strings)
+}
+
+#[cfg(test)]
+pub(super) fn selected_string_budget(
+    source: &[u8],
+    kind: Kind,
+    limits: Limits,
+) -> Result<usize> {
+    let scan = scan_raw(source, limits)?;
+    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
+    let capabilities = capabilities();
+    let mce_limits = mce_limits(limits);
+    let processed = process_semantic_source(&mce_source, &capabilities, &mce_limits)?;
+    preflight_processed_strings(processed.as_ref(), kind, limits)
+}
+
+#[cfg(test)]
+fn preflight_element_attributes(
+    element: &BytesStart<'_>,
+    semantic: SemanticElement,
+    kind: Kind,
+    strings: &mut usize,
+    limits: Limits,
+) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        if attribute.value.len() > limits.max_attribute_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.len(),
+                limits.max_attribute_bytes,
+            ));
+        }
+        let key = std::str::from_utf8(attribute.key.as_ref())
+            .map_err(|_| invalid("legacy comment collaboration attribute is not UTF-8"))?;
+        let value_length = decoded_xml_len(attribute.value.as_ref())?;
+        let attribute_length = key
+            .len()
+            .checked_add(value_length)
+            .ok_or_else(|| limit_string(usize::MAX, limits.max_string_bytes))?;
+        add_preflight_strings(strings, attribute_length, limits.max_string_bytes)?;
+        let field = match (kind, semantic, attribute.key.as_ref()) {
+            (Kind::Presence, SemanticElement::Author, b"name")
+            | (Kind::Presence, SemanticElement::Author, b"initials")
+            | (Kind::Threading, SemanticElement::Comment, b"dt") => Some(value_length),
+            _ => None,
+        };
+        if let Some(length) = field {
+            ensure_preflight_string(length, limits.max_string_bytes)?;
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+fn semantic_element(namespace: &ResolveResult<'_>, local: &[u8]) -> SemanticElement {
+    let ResolveResult::Bound(Namespace(value)) = namespace else {
+        return SemanticElement::Other;
+    };
+    if !pml_namespace(value.as_ref()) {
+        return SemanticElement::Other;
+    }
+    match local {
+        b"cmAuthor" => SemanticElement::Author,
+        b"cm" => SemanticElement::Comment,
+        b"text" => SemanticElement::Text,
+        _ => SemanticElement::Other,
+    }
+}
+
+#[cfg(test)]
+fn checked_preflight_count(
+    current: usize,
+    maximum: usize,
+    kind: crate::error::CodecLimitKind,
+) -> Result<usize> {
+    let next = current.checked_add(1).unwrap_or(usize::MAX);
+    if next > maximum {
+        Err(limit(kind, next, maximum))
+    } else {
+        Ok(next)
+    }
+}
+
+#[cfg(test)]
+fn add_preflight_strings(current: &mut usize, amount: usize, maximum: usize) -> Result<()> {
+    *current = current
+        .checked_add(amount)
+        .ok_or_else(|| limit_string(usize::MAX, maximum))?;
+    ensure_preflight_string(*current, maximum)
+}
+
+#[cfg(test)]
+fn ensure_preflight_string(observed: usize, maximum: usize) -> Result<()> {
+    if observed > maximum {
+        Err(limit_string(observed, maximum))
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+fn limit_string(observed: usize, maximum: usize) -> Error {
+    limit(
+        crate::error::CodecLimitKind::StringBytes,
+        observed,
+        maximum,
+    )
+}
+
+/// Count the bytes produced by XML entity decoding without constructing the
+/// decoded value.  Attribute whitespace normalization does not change its
+/// byte length, so the same bounded scanner covers attributes and text.
+#[cfg(test)]
+fn decoded_xml_len(value: &[u8]) -> Result<usize> {
+    let mut length = 0usize;
+    let mut start = 0usize;
+    while let Some(relative) = value[start..].iter().position(|&byte| byte == b'&') {
+        let ampersand = start + relative;
+        length = length
+            .checked_add(
+                std::str::from_utf8(&value[start..ampersand])
+                    .map_err(xml_error)?
+                    .len(),
+            )
+            .ok_or_else(|| invalid("legacy comment collaboration XML string length overflow"))?;
+        let end = value[ampersand + 1..]
+            .iter()
+            .position(|&byte| byte == b';')
+            .map(|offset| ampersand + 1 + offset)
+            .ok_or_else(|| invalid("legacy comment collaboration XML entity is unterminated"))?;
+        length = length
+            .checked_add(entity_value_len(&value[ampersand + 1..end])?)
+            .ok_or_else(|| invalid("legacy comment collaboration XML string length overflow"))?;
+        start = end + 1;
+    }
+    length = length
+        .checked_add(std::str::from_utf8(&value[start..]).map_err(xml_error)?.len())
+        .ok_or_else(|| invalid("legacy comment collaboration XML string length overflow"))?;
+    Ok(length)
+}
+
+#[cfg(test)]
+fn entity_value_len(value: &[u8]) -> Result<usize> {
+    match value {
+        b"amp" | b"lt" | b"gt" | b"apos" | b"quot" => Ok(1),
+        value if value.starts_with(b"#x") || value.starts_with(b"#X") => {
+            let number = u32::from_str_radix(
+                std::str::from_utf8(&value[2..]).map_err(xml_error)?,
+                16,
+            )
+                .map_err(|_| invalid("legacy comment collaboration XML character reference is invalid"))?;
+            char::from_u32(number)
+                .map(char::len_utf8)
+                .ok_or_else(|| invalid("legacy comment collaboration XML character reference is invalid"))
+        },
+        value if value.starts_with(b"#") => {
+            let number = std::str::from_utf8(&value[1..])
+                .ok()
+                .and_then(|digits| digits.parse::<u32>().ok())
+                .ok_or_else(|| invalid("legacy comment collaboration XML character reference is invalid"))?;
+            char::from_u32(number)
+                .map(char::len_utf8)
+                .ok_or_else(|| invalid("legacy comment collaboration XML character reference is invalid"))
+        },
+        _ => Err(invalid("custom XML entity is rejected in presentation comment parts")),
+    }
+}
+
 /// Validate the active typed collaboration extensions in one changed part
 /// under the recipient's selected policy. The ordinary comment codec accepts
 /// extension lists as opaque; replay must additionally apply the typed
 /// payload grammar. One source scan and one MCE selection are shared by all
 /// owners, so a large multi-owner part remains linear rather than invoking
 /// [`locate`] once per author or comment.
-fn validate_replay_extensions(source: &[u8], kind: Kind, limits: Limits) -> Result<()> {
+fn validate_replay_extensions(
+    source: &[u8],
+    kind: Kind,
+    limits: Limits,
+    strict_threading: bool,
+) -> Result<()> {
     if source.len() > limits.max_input_bytes {
         return Err(limit(
             crate::error::CodecLimitKind::XmlBytes,
@@ -417,28 +717,11 @@ fn validate_replay_extensions(source: &[u8], kind: Kind, limits: Limits) -> Resu
             "legacy comment collaboration owner has the wrong root",
         ));
     }
-
+    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
     let capabilities = capabilities();
     let mce_limits = mce_limits(limits);
-    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
-    let processed = process_markup_compatibility(mce_source.bytes(), &capabilities, &mce_limits)
-        .map_err(Error::MarkupCompatibility)?
-        .xml;
-    if processed.len() > limits.max_input_bytes {
-        return Err(limit(
-            crate::error::CodecLimitKind::XmlBytes,
-            processed.len(),
-            limits.max_input_bytes,
-        ));
-    }
-    match kind {
-        Kind::Presence => {
-            let _ = crate::comments::parse_comment_authors(&processed, limits)?;
-        },
-        Kind::Threading => {
-            let _ = crate::comments::parse_slide_comments(&processed, limits)?;
-        },
-    }
+    let processed = process_semantic_source(&mce_source, &capabilities, &mce_limits)?;
+    validate_processed_part(processed.as_ref(), kind, limits, strict_threading)?;
 
     let mut candidate_items = Vec::new();
     let mut candidate_set = HashSet::new();
@@ -622,13 +905,12 @@ fn validate_active_extension(
 
 /// Validate active presence extensions in one changed author part.
 pub(crate) fn validate_presence_replay(source: &[u8], limits: Limits) -> Result<()> {
-    validate_replay_extensions(source, Kind::Presence, limits)
+    validate_replay_extensions(source, Kind::Presence, limits, false)
 }
 
 /// Validate active threading extensions in one changed comment part.
 pub(crate) fn validate_threading_replay(source: &[u8], limits: Limits) -> Result<()> {
-    crate::comments::parse_slide_comments_strict(source, limits)?;
-    validate_replay_extensions(source, Kind::Threading, limits)
+    validate_replay_extensions(source, Kind::Threading, limits, true)
 }
 
 /// Source-splice a typed value. A `None` value removes every recognized
@@ -1111,10 +1393,11 @@ fn scan_raw(source: &[u8], limits: Limits) -> Result<Scan> {
     let mut nodes_seen = 0usize;
     loop {
         let before = position(&reader, origin)?;
-        let event = reader
-            .read_event_into(&mut buffer)
-            .map_err(xml_error)?
-            .into_owned();
+        let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
+        if let Event::Start(element) | Event::Empty(element) = &event {
+            check_raw_attribute_bytes(element, limits.max_attribute_bytes)?;
+        }
+        let event = event.into_owned();
         let after = position(&reader, origin)?;
         let resolver = reader.resolver().clone();
         let (namespace, event) = resolver.resolve_event(event);
@@ -1135,6 +1418,7 @@ fn scan_raw(source: &[u8], limits: Limits) -> Result<Scan> {
                     before,
                     after,
                     stack.last().copied(),
+                    limits.max_attribute_bytes,
                 )?;
                 nodes_seen = nodes_seen.checked_add(1).ok_or_else(|| {
                     limit(
@@ -1163,6 +1447,7 @@ fn scan_raw(source: &[u8], limits: Limits) -> Result<Scan> {
                     before,
                     after,
                     stack.last().copied(),
+                    limits.max_attribute_bytes,
                 )?;
                 node.span.empty = true;
                 nodes_seen = nodes_seen.checked_add(1).ok_or_else(|| {
@@ -1424,6 +1709,7 @@ fn make_node(
     before: usize,
     after: usize,
     parent: Option<usize>,
+    max_attribute_bytes: usize,
 ) -> Result<Node> {
     let namespace = match namespace {
         ResolveResult::Bound(Namespace(value)) => value.to_vec(),
@@ -1440,6 +1726,13 @@ fn make_node(
     let mut seen = HashSet::new();
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
+        if attribute.value.len() > max_attribute_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.len(),
+                max_attribute_bytes,
+            ));
+        }
         let key = String::from_utf8(attribute.key.as_ref().to_vec())
             .map_err(|_| invalid("legacy comment collaboration attribute is not UTF-8"))?;
         if key != "xmlns"
@@ -1489,6 +1782,20 @@ fn make_node(
         parent,
         children: Vec::new(),
     })
+}
+
+fn check_raw_attribute_bytes(element: &BytesStart<'_>, maximum: usize) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        if attribute.value.len() > maximum {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.len(),
+                maximum,
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn item_indices(scan: &Scan, root: usize, kind: Kind, owner: Owner) -> Result<Vec<usize>> {
@@ -2219,6 +2526,27 @@ fn capabilities() -> Capabilities {
     let mut capabilities = Capabilities::ooxml_baseline();
     capabilities.understand_namespace(NAMESPACE);
     capabilities
+}
+
+fn process_semantic_source<'a>(
+    source: &'a MceSource<'_>,
+    capabilities: &Capabilities,
+    limits: &MceLimits,
+) -> Result<Cow<'a, [u8]>> {
+    // PIs are inert for this owner.  The raw scan already validated and
+    // recorded them, and `MceSource` supplies the single filtered view for
+    // both semantic parsing and offset translation.
+    let processed = process_markup_compatibility(source.bytes(), capabilities, limits)
+        .map_err(Error::MarkupCompatibility)?
+        .xml;
+    if processed.len() > limits.max_input_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            processed.len(),
+            limits.max_input_bytes,
+        ));
+    }
+    Ok(processed)
 }
 
 fn mce_limits(limits: Limits) -> MceLimits {

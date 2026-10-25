@@ -45,6 +45,27 @@ pub(super) fn parse_comment_authors_with(
     tolerance: Option<&mut ToleranceReport>,
 ) -> Result<Vec<Author>> {
     let (root, instructions) = parse_document(xml, limits)?;
+    parse_comment_authors_document(root, instructions, limits, tolerance)
+}
+
+/// Parse a comment-author document whose MCE branches have already been
+/// selected by a source-bound owner.  Keeping this entry point separate avoids
+/// running the baseline MCE processor a second time after the collaboration
+/// codec has applied its p15 capability set.
+pub(crate) fn parse_comment_authors_processed(
+    xml: &[u8],
+    limits: Limits,
+) -> Result<Vec<Author>> {
+    let (root, instructions) = parse_document_processed(xml, false, limits)?;
+    parse_comment_authors_document(root, instructions, limits, None)
+}
+
+fn parse_comment_authors_document(
+    root: Node,
+    instructions: bool,
+    limits: Limits,
+    tolerance: Option<&mut ToleranceReport>,
+) -> Result<Vec<Author>> {
     if instructions && let Some(tolerance) = tolerance {
         tolerance.record(MarkupDefect::ProcessingInstruction, 0);
     }
@@ -150,6 +171,26 @@ fn parse_slide_comments_inner(
     mut tolerance: Option<&mut ToleranceReport>,
 ) -> Result<Vec<Comment>> {
     let (root, instructions) = parse_document(xml, limits)?;
+    parse_slide_comments_document(root, instructions, limits, tolerance)
+}
+
+/// Parse a selected comment projection without applying baseline MCE again.
+pub(crate) fn parse_slide_comments_processed(
+    xml: &[u8],
+    limits: Limits,
+    strict: bool,
+) -> Result<Vec<Comment>> {
+    let (root, instructions) = parse_document_processed(xml, false, limits)?;
+    let mut tolerance = (!strict).then(ToleranceReport::default);
+    parse_slide_comments_document(root, instructions, limits, tolerance.as_mut())
+}
+
+fn parse_slide_comments_document(
+    root: Node,
+    instructions: bool,
+    limits: Limits,
+    mut tolerance: Option<&mut ToleranceReport>,
+) -> Result<Vec<Comment>> {
     if instructions && let Some(tolerance) = tolerance.as_deref_mut() {
         tolerance.record(MarkupDefect::ProcessingInstruction, 0);
     }
@@ -196,6 +237,7 @@ fn parse_slide_comments_inner(
         }
         let date_time = optional(node, "dt").map(ToOwned::to_owned);
         if let Some(value) = &date_time {
+            validate_string_with_limit("comment date time", value, limits.max_string_bytes)?;
             validate_date_time(value)?;
         }
         let comment = Comment {
@@ -237,10 +279,23 @@ pub fn write_comment_authors(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     validate_authors_with_limit(authors, limits.max_string_bytes, limits.max_nodes)?;
-    let mut output = BoundedOutput::new(limits.max_output_bytes);
+    let mut output = BoundedOutput::new(
+        limits.max_output_bytes,
+        limits.max_string_bytes,
+        limits.max_attribute_bytes,
+    );
+    write_comment_authors_output(&mut output, authors, conformance)?;
+    output.finish()
+}
+
+fn write_comment_authors_output(
+    output: &mut BoundedOutput,
+    authors: &[Author],
+    conformance: Conformance,
+) -> Result<()> {
     output.write(declaration())?;
-    output.write(b"<p:cmAuthorLst xmlns:p=\"")?;
-    output.escape(conformance.namespace())?;
+    output.write(b"<p:cmAuthorLst")?;
+    output.attribute("xmlns:p", conformance.namespace())?;
     output.write(b"\">")?;
     for author in authors {
         output.write(b"<p:cmAuthor")?;
@@ -252,7 +307,7 @@ pub fn write_comment_authors(
         output.write(b"/>")?;
     }
     output.write(b"</p:cmAuthorLst>")?;
-    output.finish()
+    Ok(())
 }
 
 /// # Errors
@@ -264,10 +319,23 @@ pub fn write_slide_comments(
     limits: Limits,
 ) -> Result<Vec<u8>> {
     validate_comment_list_with_limit(comments, limits.max_string_bytes, limits.max_nodes)?;
-    let mut output = BoundedOutput::new(limits.max_output_bytes);
+    let mut output = BoundedOutput::new(
+        limits.max_output_bytes,
+        limits.max_string_bytes,
+        limits.max_attribute_bytes,
+    );
+    write_slide_comments_output(&mut output, comments, conformance)?;
+    output.finish()
+}
+
+fn write_slide_comments_output(
+    output: &mut BoundedOutput,
+    comments: &[Comment],
+    conformance: Conformance,
+) -> Result<()> {
     output.write(declaration())?;
-    output.write(b"<p:cmLst xmlns:p=\"")?;
-    output.escape(conformance.namespace())?;
+    output.write(b"<p:cmLst")?;
+    output.attribute("xmlns:p", conformance.namespace())?;
     output.write(b"\">")?;
     for comment in comments {
         output.write(b"<p:cm")?;
@@ -280,11 +348,31 @@ pub fn write_slide_comments(
         output.attribute("x", &comment.x.to_string())?;
         output.attribute("y", &comment.y.to_string())?;
         output.write(b"/><p:text>")?;
-        output.escape(&comment.text)?;
+        output.text(&comment.text)?;
         output.write(b"</p:text></p:cm>")?;
     }
     output.write(b"</p:cmLst>")?;
-    output.finish()
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn measured_comment_authors_string_bytes(
+    authors: &[Author],
+    conformance: Conformance,
+) -> Result<usize> {
+    let mut output = BoundedOutput::new(usize::MAX, usize::MAX, usize::MAX);
+    write_comment_authors_output(&mut output, authors, conformance)?;
+    Ok(output.string_bytes)
+}
+
+#[cfg(test)]
+pub(crate) fn measured_slide_comments_string_bytes(
+    comments: &[Comment],
+    conformance: Conformance,
+) -> Result<usize> {
+    let mut output = BoundedOutput::new(usize::MAX, usize::MAX, usize::MAX);
+    write_slide_comments_output(&mut output, comments, conformance)?;
+    Ok(output.string_bytes)
 }
 
 pub(super) fn validate_authors_with_limit(
@@ -338,6 +426,7 @@ pub(super) fn validate_comment_list_with_limit(
         }
         validate_string_with_limit("comment text", &comment.text, max_string_bytes)?;
         if let Some(date_time) = &comment.date_time {
+            validate_string_with_limit("comment date time", date_time, max_string_bytes)?;
             validate_date_time(date_time)?;
         }
         if !keys.insert((comment.author_id, comment.index)) {
@@ -357,6 +446,7 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
             maximum: limits.max_input_bytes,
         });
     }
+    admit_raw_attribute_limits(xml, limits)?;
     let (processed, instructions) = process_comment_mce(xml, limits)?;
     if processed.len() > limits.max_input_bytes {
         return Err(Error::Limit {
@@ -365,18 +455,57 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
             maximum: limits.max_input_bytes,
         });
     }
-    let mut reader = NsReader::from_reader(processed.as_ref());
+    parse_document_processed(processed.as_ref(), instructions, limits)
+}
+
+/// Admit raw attribute values before MCE can discard an inactive branch.
+/// This pass borrows quick-XML events and does not decode or own values; the
+/// selected parser applies its semantic aggregate after MCE has chosen a
+/// projection.
+fn admit_raw_attribute_limits(xml: &[u8], limits: Limits) -> Result<()> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        let (_namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                for attribute in element.checked_attributes() {
+                    let attribute = attribute.map_err(xml_error)?;
+                    if attribute.value.len() > limits.max_attribute_bytes {
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlAttributeBytes,
+                            attribute.value.len(),
+                            limits.max_attribute_bytes,
+                        ));
+                    }
+                }
+            },
+            Event::Eof => return Ok(()),
+            _ => {},
+        }
+    }
+}
+
+fn parse_document_processed(
+    xml: &[u8],
+    instructions: bool,
+    limits: Limits,
+) -> Result<(Node, bool)> {
+    if xml.len() > limits.max_input_bytes {
+        return Err(Error::Limit {
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: limits.max_input_bytes,
+        });
+    }
+    let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
-    let mut buffer = Vec::new();
     let mut stack = Vec::new();
     let mut root = None;
     let mut nodes = 0usize;
     let mut strings = 0usize;
     loop {
         let decoder = reader.decoder();
-        let (namespace, event) = reader
-            .read_resolved_event_into(&mut buffer)
-            .map_err(xml_error)?;
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
                 if stack.len() >= limits.max_depth {
@@ -391,6 +520,7 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
                     namespace,
                     decoder,
                     &mut strings,
+                    limits.max_attribute_bytes,
                     limits.max_string_bytes,
                 )?;
                 nodes = nodes.checked_add(1).ok_or_else(|| {
@@ -415,6 +545,7 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
                     namespace,
                     decoder,
                     &mut strings,
+                    limits.max_attribute_bytes,
                     limits.max_string_bytes,
                 )?;
                 nodes = nodes.checked_add(1).ok_or_else(|| {
@@ -443,9 +574,8 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
                 attach(node, &mut stack, &mut root)?;
             },
             Event::Text(text) => {
-                let decoded = text.decode().map_err(xml_error)?;
-                let decoded = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
-                strings = strings.checked_add(decoded.len()).ok_or_else(|| {
+                let decoded_length = decoded_xml_len(text.as_ref())?;
+                strings = strings.checked_add(decoded_length).ok_or_else(|| {
                     limit(
                         crate::error::CodecLimitKind::StringBytes,
                         usize::MAX,
@@ -459,6 +589,8 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
                         limits.max_string_bytes,
                     ));
                 }
+                let decoded = text.decode().map_err(xml_error)?;
+                let decoded = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
                 if let Some(node) = stack.last_mut() {
                     node.text.push_str(&decoded);
                 } else if !decoded.trim().is_empty() {
@@ -476,6 +608,21 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
             // surrounding bytes.
             Event::PI(_) => {},
             Event::GeneralRef(reference) => {
+                let decoded_length = entity_value_len(reference.as_ref())?;
+                strings = strings.checked_add(decoded_length).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::StringBytes,
+                        usize::MAX,
+                        limits.max_string_bytes,
+                    )
+                })?;
+                if strings > limits.max_string_bytes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::StringBytes,
+                        strings,
+                        limits.max_string_bytes,
+                    ));
+                }
                 let name = reference.decode().map_err(xml_error)?;
                 let value =
                     if let Some(character) = reference.resolve_char_ref().map_err(xml_error)? {
@@ -494,20 +641,6 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
                             },
                         }
                     };
-                strings = strings.checked_add(value.len()).ok_or_else(|| {
-                    limit(
-                        crate::error::CodecLimitKind::StringBytes,
-                        usize::MAX,
-                        limits.max_string_bytes,
-                    )
-                })?;
-                if strings > limits.max_string_bytes {
-                    return Err(limit(
-                        crate::error::CodecLimitKind::StringBytes,
-                        strings,
-                        limits.max_string_bytes,
-                    ));
-                }
                 if let Some(node) = stack.last_mut() {
                     node.text.push_str(&value);
                 } else {
@@ -517,7 +650,6 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
             Event::Decl(_) | Event::Comment(_) => {},
             Event::Eof => break,
         }
-        buffer.clear();
     }
     if !stack.is_empty() {
         return Err(invalid("unterminated presentation comment XML"));
@@ -557,6 +689,7 @@ fn make_node(
     namespace: ResolveResult<'_>,
     decoder: Decoder,
     strings: &mut usize,
+    max_attribute_bytes: usize,
     max_string_bytes: usize,
 ) -> Result<Node> {
     let namespace = match namespace {
@@ -578,17 +711,21 @@ fn make_node(
     let mut seen = HashSet::new();
     for attribute_value in element.checked_attributes() {
         let attribute_value = attribute_value.map_err(xml_error)?;
+        if attribute_value.value.len() > max_attribute_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                attribute_value.value.len(),
+                max_attribute_bytes,
+            ));
+        }
         let name = std::str::from_utf8(attribute_value.key.as_ref())
             .map_err(xml_error)?
             .to_owned();
         if !seen.insert(name.clone()) {
             return Err(invalid("duplicate XML attribute"));
         }
-        let value = attribute_value
-            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
-            .map_err(xml_error)?
-            .into_owned();
-        let attribute_bytes = name.len().checked_add(value.len()).ok_or_else(|| {
+        let value_length = decoded_xml_len(attribute_value.value.as_ref())?;
+        let attribute_bytes = name.len().checked_add(value_length).ok_or_else(|| {
             limit(
                 crate::error::CodecLimitKind::StringBytes,
                 usize::MAX,
@@ -609,6 +746,10 @@ fn make_node(
                 max_string_bytes,
             ));
         }
+        let value = attribute_value
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(xml_error)?
+            .into_owned();
         if name != "xmlns" && !name.starts_with("xmlns:") {
             attributes.push(Attribute { name, value });
         }
@@ -620,6 +761,63 @@ fn make_node(
         children: Vec::new(),
         text: String::new(),
     })
+}
+
+/// Count decoded XML bytes without constructing an owned value.  The parser
+/// uses this before decoding attributes, text, or references so the aggregate
+/// string ceiling is an admission check rather than a post-allocation check.
+fn decoded_xml_len(value: &[u8]) -> Result<usize> {
+    let mut length = 0usize;
+    let mut start = 0usize;
+    while let Some(relative) = value[start..].iter().position(|&byte| byte == b'&') {
+        let ampersand = start + relative;
+        length = length
+            .checked_add(
+                std::str::from_utf8(&value[start..ampersand])
+                    .map_err(xml_error)?
+                    .len(),
+            )
+            .ok_or_else(|| invalid("presentation comment XML string length overflow"))?;
+        let end = value[ampersand + 1..]
+            .iter()
+            .position(|&byte| byte == b';')
+            .map(|offset| ampersand + 1 + offset)
+            .ok_or_else(|| invalid("presentation comment XML entity is unterminated"))?;
+        length = length
+            .checked_add(entity_value_len(&value[ampersand + 1..end])?)
+            .ok_or_else(|| invalid("presentation comment XML string length overflow"))?;
+        start = end + 1;
+    }
+    length = length
+        .checked_add(std::str::from_utf8(&value[start..]).map_err(xml_error)?.len())
+        .ok_or_else(|| invalid("presentation comment XML string length overflow"))?;
+    Ok(length)
+}
+
+fn entity_value_len(value: &[u8]) -> Result<usize> {
+    match value {
+        b"amp" | b"lt" | b"gt" | b"apos" | b"quot" => Ok(1),
+        value if value.starts_with(b"#x") || value.starts_with(b"#X") => {
+            let number = u32::from_str_radix(
+                std::str::from_utf8(&value[2..]).map_err(xml_error)?,
+                16,
+            )
+            .map_err(|_| invalid("presentation comment XML character reference is invalid"))?;
+            char::from_u32(number)
+                .map(char::len_utf8)
+                .ok_or_else(|| invalid("presentation comment XML character reference is invalid"))
+        },
+        value if value.starts_with(b"#") => {
+            let number = std::str::from_utf8(&value[1..])
+                .ok()
+                .and_then(|digits| digits.parse::<u32>().ok())
+                .ok_or_else(|| invalid("presentation comment XML character reference is invalid"))?;
+            char::from_u32(number)
+                .map(char::len_utf8)
+                .ok_or_else(|| invalid("presentation comment XML character reference is invalid"))
+        },
+        _ => Err(invalid("custom XML entity is rejected in presentation comment parts")),
+    }
 }
 
 fn attach(node: Node, stack: &mut [Node], root: &mut Option<Node>) -> Result<()> {
@@ -735,13 +933,19 @@ fn declaration() -> &'static [u8] {
 struct BoundedOutput {
     bytes: Vec<u8>,
     limit: usize,
+    string_limit: usize,
+    string_bytes: usize,
+    attribute_limit: usize,
 }
 
 impl BoundedOutput {
-    fn new(limit: usize) -> Self {
+    fn new(limit: usize, string_limit: usize, attribute_limit: usize) -> Self {
         Self {
             bytes: Vec::new(),
             limit,
+            string_limit,
+            string_bytes: 0,
+            attribute_limit,
         }
     }
 
@@ -767,6 +971,25 @@ impl BoundedOutput {
         Ok(())
     }
 
+    fn charge_string(&mut self, amount: usize) -> Result<()> {
+        let next = self.string_bytes.checked_add(amount).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::StringBytes,
+                usize::MAX,
+                self.string_limit,
+            )
+        })?;
+        if next > self.string_limit {
+            return Err(limit(
+                crate::error::CodecLimitKind::StringBytes,
+                next,
+                self.string_limit,
+            ));
+        }
+        self.string_bytes = next;
+        Ok(())
+    }
+
     fn escape(&mut self, value: &str) -> Result<()> {
         for character in value.chars() {
             match character {
@@ -786,7 +1009,33 @@ impl BoundedOutput {
         Ok(())
     }
 
+    fn text(&mut self, value: &str) -> Result<()> {
+        self.charge_string(value.len())?;
+        self.escape(value)
+    }
+
     fn attribute(&mut self, name: &str, value: &str) -> Result<()> {
+        let escaped_length = escaped_attribute_length(value).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                usize::MAX,
+                self.attribute_limit,
+            )
+        })?;
+        if escaped_length > self.attribute_limit {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                escaped_length,
+                self.attribute_limit,
+            ));
+        }
+        self.charge_string(name.len().checked_add(value.len()).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::StringBytes,
+                usize::MAX,
+                self.string_limit,
+            )
+        })?)?;
         self.write(b" ")?;
         self.write(name.as_bytes())?;
         self.write(b"=\"")?;
@@ -797,6 +1046,20 @@ impl BoundedOutput {
     fn finish(self) -> Result<Vec<u8>> {
         Ok(self.bytes)
     }
+}
+
+fn escaped_attribute_length(value: &str) -> Option<usize> {
+    value.chars().try_fold(0usize, |length, character| {
+        let encoded = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '"' => 6,
+            '\t' => 5,
+            '\n' | '\r' => 5,
+            _ => character.len_utf8(),
+        };
+        length.checked_add(encoded)
+    })
 }
 
 fn output_limit(observed: usize, maximum: usize) -> Error {
