@@ -752,12 +752,112 @@ def shell(name: str, command: str, *, isolated: bool = False, env: dict[str, str
     return {"name": name, "kind": "shell", "command": command, "isolated": isolated, "env": env or {}}
 
 
+PPT_AUXILIARY_NAMES = (
+    "ppt-scoped-build",
+    "ppt-scoped-correctness-suite",
+    "ppt-scoped-correctness",
+    "ppt-scoped-correctness-validate",
+)
+PPT_CANDIDATE_LOCK_SHA256 = (
+    "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
+)
+
+
 def feature_names(root: Path) -> tuple[list[str], list[str]]:
     with (root / "crates/litchi-ops/Cargo.toml").open("rb") as stream:
         ops = tomllib.load(stream).get("features", {})
     all_features = [name for name in ops if name not in {"default", "encryption"}]
     formats = [name for name in ("xlsx", "pptx", "docx", "xls", "xlsb", "doc", "ppt", "rtf", "odt", "ods", "odp", "oth", "odm", "odg", "odc", "odi", "odb", "odf-formula", "pages", "keynote", "numbers") if name in ops]
     return all_features, formats
+
+
+def make_ppt_steps(root: Path, state_dir: Path, target: Path) -> list[dict]:
+    """Return the opt-in PPT qualification steps.
+
+    These steps are intentionally separate from make_steps(): an ordinary
+    full gate must retain its historical plan and count.  The coordinator
+    selects this four-step auxiliary plan explicitly with --only or --start-at.
+    """
+    ppt_fixture = root / "test-data/unified-ops/0294/video.ppt"
+    ppt_host_guard = root / "docs/unified-ops/results/0362g/ppt_host_process_guard.py"
+    ppt_lock_guard = root / "docs/unified-ops/results/0362g/validate_ppt_candidate_lock.py"
+    ppt_correctness_validator = root / "docs/unified-ops/results/0362g/validate_ppt_correctness_receipt.py"
+    ppt_correctness_binary = target / "release/examples/scoped_patch_correctness"
+    ppt_correctness_receipt = state_dir / "ppt-scoped-correctness.json"
+    lock = root / "Cargo.lock"
+    guarded_cargo = [
+        "python3",
+        str(ppt_lock_guard),
+        str(lock),
+        PPT_CANDIDATE_LOCK_SHA256,
+        "--",
+        "python3",
+        str(ppt_host_guard),
+        "--",
+    ]
+    correctness_commands = (
+        "set -eu; "
+        "cargo test --offline --locked -p litchi-ppt --all-features --lib scoped::tests -- --test-threads=1; "
+        "cargo test --offline --locked -p litchi-ppt --all-features --lib -- --test-threads=1; "
+        "cargo test --offline --locked -p litchi-cfb --all-features --lib -- --test-threads=1; "
+        "cargo test --offline --locked -p litchi-ppt --all-features --tests -- --test-threads=1; "
+        "cargo test --offline --locked -p litchi-cfb --all-features --tests -- --test-threads=1; "
+        "cargo clippy --offline --locked -p litchi-ppt --all-features --all-targets -- -D warnings; "
+        "cargo clippy --offline --locked -p litchi-cfb --all-features --all-targets -- -D warnings"
+    )
+    return [
+        direct(
+            "ppt-scoped-build",
+            [
+                *guarded_cargo,
+                "cargo",
+                "build",
+                "--offline",
+                "--locked",
+                "--release",
+                "-p",
+                "litchi-ppt",
+                "--example",
+                "scoped_patch_probe",
+                "--example",
+                "scoped_patch_correctness",
+            ],
+            isolated=True,
+        ),
+        direct(
+            "ppt-scoped-correctness-suite",
+            [
+                *guarded_cargo,
+                "sh",
+                "-c",
+                correctness_commands,
+            ],
+            isolated=True,
+            env={"RUST_TEST_THREADS": "1"},
+        ),
+        direct(
+            "ppt-scoped-correctness",
+            [
+                "python3",
+                str(ppt_host_guard),
+                "--",
+                str(ppt_correctness_binary),
+                str(ppt_fixture),
+                str(ppt_correctness_receipt),
+            ],
+            isolated=True,
+        ),
+        direct(
+            "ppt-scoped-correctness-validate",
+            [
+                "python3",
+                str(ppt_correctness_validator),
+                str(ppt_correctness_receipt),
+                str(ppt_fixture),
+            ],
+            isolated=True,
+        ),
+    ]
 
 
 def make_steps(root: Path, state_dir: Path, target: Path) -> list[dict]:
@@ -802,12 +902,25 @@ def make_steps(root: Path, state_dir: Path, target: Path) -> list[dict]:
         shell("native-resave-check", "cd tools/native-resave && cargo check --locked --all-targets"),
         direct("api-glossary", ["python3", "tools/check_api_glossary.py", "--target-dir", str(target)], env={"RUSTC_BOOTSTRAP": "1"}),
         direct("iwork-leaf-api", ["python3", "-m", "unittest", "tools.test_check_iwork_leaf_public_api"]),
-        direct("tooling-unit", ["python3", "-m", "unittest", "tools.test_check_api_glossary", "tools.test_api_debt_inventory", "tools.test_validate_api_disposition", "tools.test_final_api_inventory", "tools.test_w8_file_provenance", "tools.test_w8_original_baseline", "tools.test_w8_projection_policy", "tools.test_officecli_corpus", "tools.test_officecli_capability_delta", "tools.test_no_3rdparty_references", "tools.test_check_crate_boundaries", "tools.test_non_iwork_gate", "tools.test_unified_bench_matrix", "tools.test_check_iwork_leaf_public_api", "tools.test_native_qualification_runner", "tools.test_legacy_native_qualification", "tools.test_prepare_xlsx_raw_inputs", "tools.test_xlsx_raw_native_qualification", "tools.test_prepare_ole_owner_inputs", "tools.test_ole_owner_paired_runner", "tools.test_validate_ole_owner_run", "tools.test_ppt_lazy_build_receipt_adapter", "tools.test_ppt_lazy_cold_first_commit", "tools.test_ppt_lazy_native_qualification", "tools.test_prepare_ppt_lazy_native_inputs", "tools.test_drawingml_compile_driver", "tools.test_drawingml_raw_qualification", "docs/unified-ops/results/0362ul29/tooling/test_safe_chunked_tests.py", "tools.test_ink_safe_runner", "docs/unified-ops/results/0362ul24/test_prepare_signed_native_consumer.py", "tools.test_opc_read_ahead_timing_guard", "tools.test_xls_f3_qualification_abba", "docs/unified-ops/results/0362ul24/test_validate_signed_native.py"], target_guard=False),
+        direct("tooling-unit", ["python3", "-m", "unittest", "tools.test_check_api_glossary", "tools.test_api_debt_inventory", "tools.test_validate_api_disposition", "tools.test_final_api_inventory", "tools.test_w8_file_provenance", "tools.test_w8_original_baseline", "tools.test_w8_projection_policy", "tools.test_w8_quiet_abba", "tools.test_officecli_corpus", "tools.test_officecli_capability_delta", "tools.test_no_3rdparty_references", "tools.test_check_crate_boundaries", "tools.test_non_iwork_gate", "tools.test_unified_bench_matrix", "tools.test_check_iwork_leaf_public_api", "tools.test_native_qualification_runner", "tools.test_legacy_native_qualification", "tools.test_prepare_xlsx_raw_inputs", "tools.test_xlsx_raw_native_qualification", "tools.test_prepare_ole_owner_inputs", "tools.test_ole_owner_paired_runner", "tools.test_validate_ole_owner_run", "tools.test_ppt_lazy_build_receipt_adapter", "tools.test_ppt_lazy_cold_first_commit", "tools.test_ppt_lazy_native_qualification", "tools.test_prepare_ppt_lazy_native_inputs", "tools.test_drawingml_compile_driver", "tools.test_drawingml_raw_qualification", "docs/unified-ops/results/0362ul29/tooling/test_safe_chunked_tests.py", "docs/unified-ops/results/0362ul29/tooling/test_run_safe_gate_ppt.py", "tools.test_ink_safe_runner", "docs/unified-ops/results/0362ul24/test_prepare_signed_native_consumer.py", "tools.test_opc_read_ahead_timing_guard", "tools.test_xls_f3_qualification_abba", "docs/unified-ops/results/0362ul24/test_validate_signed_native.py"], target_guard=False),
         direct("crate-boundaries", ["python3", "tools/check_crate_boundaries.py"]),
         direct("non-iwork-gate", ["python3", "tools/non_iwork_gate.py", "verify"]),
         direct("bench-matrix", ["python3", "tools/unified_bench_matrix.py", "--check"]),
         shell("corpus-dispositions", "python3 tools/officecli_capability_delta.py --check && python3 tools/officecli_corpus.py --check"),
     ]
+    return steps
+
+
+def plan_steps(
+    root: Path,
+    state_dir: Path,
+    target: Path,
+    requested_auxiliary: set[str] | None = None,
+) -> list[dict]:
+    """Compose the normal plan and explicitly requested auxiliary steps."""
+    steps = make_steps(root, state_dir, target)
+    if requested_auxiliary and requested_auxiliary.intersection(PPT_AUXILIARY_NAMES):
+        steps.extend(make_ppt_steps(root, state_dir, target))
     return steps
 
 
@@ -975,11 +1088,14 @@ def main() -> int:
     source = source_state(root)
     if source["status"]:
         raise SystemExit(f"source worktree must be clean: {source['status']!r}")
-    all_steps = make_steps(root, state_dir, target)
+    only = None if args.only is None else [name for name in args.only.split(",") if name]
+    requested_auxiliary = set(only or ())
+    if args.start_at is not None:
+        requested_auxiliary.add(args.start_at)
+    all_steps = plan_steps(root, state_dir, target, requested_auxiliary)
     by_name = {step["name"]: index for index, step in enumerate(all_steps)}
     if len(by_name) != len(all_steps):
         raise SystemExit("gate plan contains duplicate step names")
-    only = None if args.only is None else [name for name in args.only.split(",") if name]
     if only is not None:
         unknown = sorted(set(only) - set(by_name))
         if unknown:
