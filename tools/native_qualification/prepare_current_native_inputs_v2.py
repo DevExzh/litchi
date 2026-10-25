@@ -51,6 +51,11 @@ def _load_canonical(path: Path, label: str) -> tuple[dict[str, Any], str, int]:
 
 def _external_output(output: Path, roots: tuple[Path, ...]) -> Path:
     lexical = output.absolute()
+    cursor = Path(lexical.anchor)
+    for component in lexical.parts[1:]:
+        cursor /= component
+        if cursor.is_symlink():
+            raise PreparationError(f"preparation receipt path contains a symlink component: {cursor}")
     if lexical.exists() or lexical.is_symlink():
         raise PreparationError(f"refusing to overwrite preparation receipt: {output}")
     resolved = lexical.parent.resolve() / lexical.name
@@ -62,6 +67,27 @@ def _external_output(output: Path, roots: tuple[Path, ...]) -> Path:
     return resolved
 
 
+def _tooling_identity(path: Path, label: str) -> dict[str, Any]:
+    lexical = path.absolute()
+    cursor = Path(lexical.anchor)
+    for component in lexical.parts[1:]:
+        cursor /= component
+        if cursor.is_symlink():
+            raise PreparationError(f"{label} contains a symlink component: {cursor}")
+    if path.is_symlink() or not path.is_file():
+        raise PreparationError(f"{label} is not a regular file: {path}")
+    payload = path.read_bytes()
+    return {"path": str(path.resolve()), "sha256": hashlib.sha256(payload).hexdigest(), "bytes": len(payload)}
+
+
+def _disjoint(paths: list[tuple[str, Path]]) -> None:
+    resolved = [(label, path.absolute().resolve()) for label, path in paths]
+    for index, (left_label, left) in enumerate(resolved):
+        for right_label, right in resolved[index + 1 :]:
+            if left == right or left in right.parents or right in left.parents:
+                raise PreparationError(f"paths must be pairwise disjoint: {left_label}={left}, {right_label}={right}")
+
+
 def prepare(
     *,
     lane: str,
@@ -69,6 +95,8 @@ def prepare(
     before: Path,
     after: Path,
     output: Path,
+    before_archive: Path | None = None,
+    after_archive: Path | None = None,
 ) -> dict[str, Any]:
     """Write a blocked or ready source receipt without invoking Cargo.
 
@@ -98,8 +126,15 @@ def prepare(
 
     before_path = Path(before).absolute()
     after_path = Path(after).absolute()
-    before_observed = observe_source(before_path, "baseline")
-    after_observed = observe_source(after_path, "candidate")
+    disjoint = [("baseline source", before_path), ("candidate source", after_path)]
+    if before_archive is not None:
+        disjoint.append(("baseline source archive", Path(before_archive)))
+    if after_archive is not None:
+        disjoint.append(("candidate source archive", Path(after_archive)))
+    disjoint.append(("preparation receipt", Path(output)))
+    _disjoint(disjoint)
+    before_observed = observe_source(before_path, "baseline", before_archive)
+    after_observed = observe_source(after_path, "candidate", after_archive)
     if before_observed["source_root"] == after_observed["source_root"]:
         raise PreparationError("baseline and candidate source roots must be distinct")
 
@@ -110,8 +145,8 @@ def prepare(
         # observation for an accepted identity.
         from native_qualification.current_native_policy_v2 import validate_source
 
-        validate_source(before_path, "baseline")
-        validate_source(after_path, "candidate")
+        before_observed = validate_source(before_path, "baseline", before_archive)
+        after_observed = validate_source(after_path, "candidate", after_archive)
         status = "ready"
         reason = None
     else:
@@ -119,7 +154,11 @@ def prepare(
         reason = "exact candidate source/tree/lock/probe/fixture pins are not frozen"
 
     preparer = Path(__file__).resolve()
-    preparer_bytes = preparer.read_bytes()
+    tooling = {
+        "policy": _tooling_identity(preparer.with_name("current_native_policy_v2.py"), "policy module"),
+        "preparer": _tooling_identity(preparer, "preparer"),
+        "validator": _tooling_identity(preparer.with_name("validate_current_native_v2.py"), "validator"),
+    }
     receipt: dict[str, Any] = {
         "schema": PREPARATION_SCHEMA,
         "policy_schema": POLICY_SCHEMA,
@@ -129,14 +168,17 @@ def prepare(
         "execution_admitted": ready,
         "blocked_reason": reason,
         "manifest": {"path": str(Path(manifest).absolute()), "sha256": manifest_sha256, "bytes": manifest_bytes},
-        "preparer": {"path": str(preparer), "sha256": hashlib.sha256(preparer_bytes).hexdigest(), "bytes": len(preparer_bytes)},
+        "preparer": tooling["preparer"],
+        "tooling": tooling,
         "protocol": TRUSTED_POLICY.json()["protocol"],
         "source_transitions": list(TRUSTED_POLICY.json()["source_transitions"]),
         "candidate_hints": dict(TRUSTED_POLICY.json()["candidate_hints"]),
         "identities": {"before": before_observed, "after": after_observed},
         "routes": routes,
     }
-    destination = _external_output(Path(output), (Path(before), Path(after)))
+    destination = _external_output(
+        Path(output), tuple(path for label, path in disjoint if label != "preparation receipt")
+    )
     destination.write_bytes(_canonical(receipt))
     return receipt
 
@@ -147,6 +189,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--before", type=Path, required=True)
     parser.add_argument("--after", type=Path, required=True)
+    parser.add_argument("--before-archive", type=Path)
+    parser.add_argument("--after-archive", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
@@ -156,6 +200,8 @@ def main(argv: list[str] | None = None) -> int:
             before=args.before,
             after=args.after,
             output=args.output,
+            before_archive=args.before_archive,
+            after_archive=args.after_archive,
         )
     except (OSError, PolicyError, PreparationError) as error:
         print(f"current-native preparation refused: {error}", file=sys.stderr)

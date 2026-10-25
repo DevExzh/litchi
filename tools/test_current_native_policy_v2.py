@@ -6,6 +6,7 @@ import copy
 import hashlib
 import inspect
 import json
+import os
 from pathlib import Path
 import subprocess
 import tempfile
@@ -85,6 +86,109 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                     after=after,
                     output=Path(directory) / "receipt.json",
                 )
+
+    def test_sparse_omission_is_rejected_even_with_the_same_head(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = self._fake_source(Path(directory) / "source", "sparse")
+            (source / "tracked.txt").write_text("tracked payload\n")
+            subprocess.run(["git", "add", "tracked.txt"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "tracked"], cwd=source, check=True)
+            subprocess.run(["git", "update-index", "--skip-worktree", "tracked.txt"], cwd=source, check=True)
+            (source / "tracked.txt").unlink()
+            with self.assertRaises(policy.PolicyMismatch):
+                policy.observe_source(source, "candidate")
+
+    def test_ignored_overlay_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = self._fake_source(Path(directory) / "source", "ignored")
+            (source / ".gitignore").write_text("overlay.bin\n")
+            subprocess.run(["git", "add", ".gitignore"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "ignore"], cwd=source, check=True)
+            (source / "overlay.bin").write_bytes(b"unreviewed overlay")
+            with self.assertRaises(policy.PolicyMismatch):
+                policy.observe_source(source, "candidate")
+
+    def test_tracked_symlink_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = self._fake_source(Path(directory) / "source", "symlink")
+            (source / "link").symlink_to("Cargo.toml")
+            subprocess.run(["git", "add", "link"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "symlink"], cwd=source, check=True)
+            with self.assertRaises(policy.PolicyMismatch):
+                policy.observe_source(source, "candidate")
+
+    def test_preparation_rejects_ancestor_and_descendant_roots(self) -> None:
+        manifest = ROOT / "tools/native_qualification/manifests/ppt-current-v2.json"
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            before = self._fake_source(parent / "before", "ancestor")
+            nested = before / "nested"
+            nested.mkdir()
+            with self.assertRaises(preparer.PreparationError):
+                preparer.prepare(
+                    lane="ppt-auxiliary",
+                    manifest=manifest,
+                    before=before,
+                    after=nested,
+                    output=parent / "receipt.json",
+                )
+
+    def test_ppt_plan_rejects_source_output_archive_overlap(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = self._fake_source(Path(directory) / "source", "plan")
+            with self.assertRaises(policy.PolicyMismatch):
+                policy._check_plan_paths(source, source / "state", Path(directory) / "target", None)
+            with self.assertRaises(policy.PolicyMismatch):
+                policy._check_plan_paths(source, Path(directory) / "state", Path(directory) / "target", source / "archive.tar")
+
+    def test_manifest_mutation_is_checked_before_pending_admission(self) -> None:
+        source_manifest = ROOT / "tools/native_qualification/manifests/ppt-current-v2.json"
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            manifest = parent / "manifest.json"
+            manifest.write_bytes(source_manifest.read_bytes())
+            before = self._fake_source(parent / "before", "manifest-before")
+            after = self._fake_source(parent / "after", "manifest-after")
+            receipt_path = parent / "receipt.json"
+            preparer.prepare(
+                lane="ppt-auxiliary",
+                manifest=manifest,
+                before=before,
+                after=after,
+                output=receipt_path,
+            )
+            value = json.loads(manifest.read_text())
+            value["status"] = "caller-rewritten"
+            manifest.write_bytes((json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode())
+            with self.assertRaises(validator.ValidationError):
+                validator.validate_preparation(receipt_path)
+
+    def test_tooling_identity_mutation_is_checked_before_pending_admission(self) -> None:
+        manifest = ROOT / "tools/native_qualification/manifests/ppt-current-v2.json"
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            before = self._fake_source(parent / "before", "tooling-before")
+            after = self._fake_source(parent / "after", "tooling-after")
+            receipt_path = parent / "receipt.json"
+            preparer.prepare(
+                lane="ppt-auxiliary",
+                manifest=manifest,
+                before=before,
+                after=after,
+                output=receipt_path,
+            )
+            value = json.loads(receipt_path.read_text())
+            value["tooling"]["validator"]["sha256"] = "0" * 64
+            receipt_path.write_bytes((json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode())
+            with self.assertRaises(validator.ValidationError):
+                validator.validate_preparation(receipt_path)
+
+    def test_fabricated_qualification_cannot_bypass_pending_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            qualification = Path(directory) / "qualification.json"
+            qualification.write_bytes(b"{}\n")
+            with self.assertRaises(validator.ValidationError):
+                validator.validate_qualification(qualification, qualification)
 
     @staticmethod
     def _fake_source(path: Path, marker: str) -> Path:

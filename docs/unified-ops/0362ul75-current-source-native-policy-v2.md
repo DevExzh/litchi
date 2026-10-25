@@ -33,8 +33,10 @@ qualification validation all fail closed until a later reviewed commit fills
 the exact pins.  There is no caller-provided expected digest or candidate
 overlay escape hatch.
 
-The pending trusted-policy document digest is
+The pending trusted-policy document digest at the initial implementation was
 `9d4762c41ad20ecbc409dcc2014c92828da5847eb94399387ab2000eca3c2cdf`.
+The follow-up archive/route/tooling hardening changes this digest; the current
+value is recorded by 0362ul75a.
 
 The receipt envelope uses
 `litchi.current-native-policy.v2`,
