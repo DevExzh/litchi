@@ -6,7 +6,9 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
+import os
 import tempfile
+import subprocess
 import unittest
 from unittest import mock
 
@@ -83,7 +85,13 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
             self.assertEqual(profile["drawingml_protocol_version"], 2)
             self.assertEqual(profile["shared"]["probe_paths"], list(policy.PROBE_COPY_PATHS))
             self.assertEqual(profile["legs"]["before"]["lock_paths"], list(policy.ROLE_LOCK_PATHS))
-            paired.generic._validate_drawingml_raw_workload(profile)
+            with (
+                mock.patch.object(policy, "_require_candidate_binding", return_value=binding),
+                mock.patch.object(policy, "validate_preparation_receipt", return_value={}),
+            ):
+                paired.generic._validate_drawingml_raw_workload(profile)
+            with self.assertRaisesRegex(paired.generic.RunnerError, "candidate policy is incomplete"):
+                paired.generic._validate_drawingml_raw_workload(profile)
 
     def test_candidate_identity_cannot_be_overridden_by_manifest(self) -> None:
         with tempfile.TemporaryDirectory(prefix="drawingml-v2-identity-") as name:
@@ -106,6 +114,16 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
                 bad_route["owner_profiles"][0]["owner_route"] = "drawingml-transform"
                 with self.assertRaisesRegex(paired.RunnerError, "owner route"):
                     paired._validate_master(bad_route)
+
+                missing_route = copy.deepcopy(data)
+                missing_route["route_profiles"] = []
+                with self.assertRaisesRegex(paired.RunnerError, "route_profiles"):
+                    paired._validate_master(missing_route)
+
+                missing_owner = copy.deepcopy(data)
+                missing_owner["owner_profiles"] = missing_owner["owner_profiles"][:-1]
+                with self.assertRaisesRegex(paired.RunnerError, "owner_profiles"):
+                    paired._validate_master(missing_owner)
 
     def test_pending_manifest_fails_before_any_source_path_is_used(self) -> None:
         manifest = json.loads(
@@ -175,6 +193,198 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
         # A reviewed historical fence is admissible for the baseline compile
         # path without pretending that it is the final current candidate.
         compile_driver._policy_revision(next(iter(policy.APPROVED_BASELINE_REVISIONS)), "baseline")
+
+    def test_v2_compile_requires_preparation_before_legacy_driver(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="drawingml-v2-compile-gate-") as name:
+            root = Path(name)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            trusted = root / "trusted"
+            for path in (baseline, candidate, trusted):
+                path.mkdir()
+            arguments = type(
+                "Arguments",
+                (),
+                {
+                    "role": "candidate",
+                    "preparation_receipt": str(root / "preparation.json"),
+                    "baseline_root": str(baseline),
+                    "candidate_root": str(candidate),
+                    "baseline_revision": next(iter(policy.APPROVED_BASELINE_REVISIONS)),
+                    "candidate_revision": "a" * 40,
+                    "trusted_root": str(trusted),
+                    "source_root": str(candidate),
+                    "source_revision": "a" * 40,
+                },
+            )()
+            with (
+                mock.patch.object(
+                    policy,
+                    "validate_preparation_receipt",
+                    side_effect=policy.PreparationError("role lock identity differs"),
+                ),
+                mock.patch.object(compile_driver.legacy, "_compile") as legacy_compile,
+            ):
+                with self.assertRaisesRegex(compile_driver.DriverError, "preparation receipt validation"):
+                    compile_driver._compile(arguments)
+            legacy_compile.assert_not_called()
+
+    def test_v2_compile_receipt_consumes_full_policy_projection(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="drawingml-v2-compile-receipt-") as name:
+            root = Path(name)
+            baseline = root / "baseline"
+            candidate = root / "candidate"
+            trusted = root / "trusted"
+            for path in (baseline, candidate, trusted):
+                path.mkdir()
+            preparation_receipt = root / "preparation.json"
+            preparation_receipt.write_text(
+                json.dumps({"schema": policy.SCHEMA, "protocol_version": 2}) + "\n",
+                encoding="utf-8",
+            )
+            baseline_revision = next(iter(policy.APPROVED_BASELINE_REVISIONS))
+            candidate_revision = "a" * 40
+            prepared = {
+                "baseline": {"root": str(baseline.resolve()), "head": baseline_revision},
+                "candidate": {"root": str(candidate.resolve()), "head": candidate_revision},
+            }
+            arguments = type(
+                "Arguments",
+                (),
+                {
+                    "role": "candidate",
+                    "preparation_receipt": str(preparation_receipt),
+                    "baseline_root": str(baseline),
+                    "candidate_root": str(candidate),
+                    "baseline_revision": baseline_revision,
+                    "candidate_revision": candidate_revision,
+                    "trusted_root": str(trusted),
+                    "source_root": str(candidate),
+                    "source_revision": candidate_revision,
+                    "output": str(root / "compile.json"),
+                },
+            )()
+
+            def fake_compile(value: object) -> int:
+                Path(arguments.output).write_text(
+                    json.dumps(
+                        {
+                            "schema": compile_driver.SCHEMA,
+                            "operation": "compile",
+                            "role": arguments.role,
+                            "source": {
+                                "root": str(Path(arguments.source_root).resolve()),
+                                "revision": arguments.source_revision,
+                            },
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+                return 0
+
+            with (
+                mock.patch.object(policy, "validate_preparation_receipt", return_value=prepared),
+                mock.patch.object(compile_driver, "_policy_revision"),
+                mock.patch.object(compile_driver.legacy, "_compile", side_effect=fake_compile),
+            ):
+                self.assertEqual(compile_driver._compile(arguments), 0)
+
+            with (
+                mock.patch.object(policy, "validate_preparation_receipt", return_value=prepared),
+            ):
+                consumed = compile_driver.validate_compile_receipt(
+                    Path(arguments.output),
+                    preparation_receipt=preparation_receipt,
+                    baseline_root=baseline,
+                    candidate_root=candidate,
+                    baseline_revision=baseline_revision,
+                    candidate_revision=candidate_revision,
+                    trusted_root=trusted,
+                    role="candidate",
+                )
+            self.assertEqual(consumed["policy"], compile_driver._receipt_policy("compile", "candidate"))
+
+            tampered = json.loads(Path(arguments.output).read_text(encoding="utf-8"))
+            tampered["policy"]["toolchain_paths"] = []
+            Path(arguments.output).write_text(json.dumps(tampered) + "\n", encoding="utf-8")
+            with mock.patch.object(policy, "validate_preparation_receipt", return_value=prepared):
+                with self.assertRaisesRegex(compile_driver.DriverError, "policy projection"):
+                    compile_driver.validate_compile_receipt(
+                        Path(arguments.output),
+                        preparation_receipt=preparation_receipt,
+                        baseline_root=baseline,
+                        candidate_root=candidate,
+                        baseline_revision=baseline_revision,
+                        candidate_revision=candidate_revision,
+                        trusted_root=trusted,
+                        role="candidate",
+                    )
+
+    def test_executable_v2_entrypoints_bootstrap_tools_and_pending_policy(self) -> None:
+        clean_env = os.environ.copy()
+        clean_env.pop("PYTHONPATH", None)
+        scripts = (
+            ROOT / "tools/native_qualification/drawingml_raw_paired_runner_v2.py",
+            ROOT / "tools/native_qualification/drawingml_raw_validator_v2.py",
+            ROOT / "tools/native_qualification/drawingml_compile_driver_v2.py",
+        )
+        for script in scripts:
+            result = subprocess.run(
+                [sys.executable, str(script), "--help"],
+                cwd=ROOT,
+                env=clean_env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+        pending_manifest = ROOT / "tools/native_qualification/manifests/drawingml-raw-v2.json"
+        with tempfile.TemporaryDirectory(prefix="drawingml-v2-cli-") as name:
+            env = clean_env.copy()
+            for key in (
+                "DRAWINGML_CANDIDATE_ROOT",
+                "DRAWINGML_CANDIDATE_REVISION",
+                "DRAWINGML_TRUSTED_ROOT",
+                "DRAWINGML_OUTPUT_DIR",
+                "DRAWINGML_TARGET_ROOT",
+                "DRAWINGML_CHART_BASELINE_ROOT",
+                "DRAWINGML_DIAGRAM_BASELINE_ROOT",
+                "DRAWINGML_TEXT_MEDIA_BASELINE_ROOT",
+                "DRAWINGML_THEME_INK_BASELINE_ROOT",
+                "DRAWINGML_GEOMETRY_BASELINE_ROOT",
+                "DRAWINGML_THEME_FAMILY_BASELINE_ROOT",
+                "DRAWINGML_OWNER_CHART_BASELINE_ROOT",
+                "DRAWINGML_OWNER_THEME_BASELINE_ROOT",
+                "DRAWINGML_OWNER_INK_BASELINE_ROOT",
+                "DRAWINGML_OWNER_TRANSFORM_BASELINE_ROOT",
+            ):
+                env[key] = name
+            for key in (
+                "DRAWINGML_CHART_PREPARATION",
+                "DRAWINGML_DIAGRAM_PREPARATION",
+                "DRAWINGML_TEXT_MEDIA_PREPARATION",
+                "DRAWINGML_THEME_INK_PREPARATION",
+                "DRAWINGML_GEOMETRY_PREPARATION",
+                "DRAWINGML_THEME_FAMILY_PREPARATION",
+                "DRAWINGML_OWNER_CHART_PREPARATION",
+                "DRAWINGML_OWNER_THEME_PREPARATION",
+                "DRAWINGML_OWNER_INK_PREPARATION",
+                "DRAWINGML_OWNER_TRANSFORM_PREPARATION",
+            ):
+                env[key] = str(Path(name) / f"{key}.json")
+            result = subprocess.run(
+                [sys.executable, str(scripts[0]), "--manifest", str(pending_manifest), "--phase", "build"],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("pending final candidate binding", result.stderr)
 
 
 if __name__ == "__main__":

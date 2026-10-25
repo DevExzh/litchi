@@ -730,6 +730,64 @@ def _validate_xlsx_raw_workload(data: Mapping[str, Any]) -> None:
         raise RunnerError("XLSX raw validator must run from the output directory")
 
 
+def _validate_drawingml_v2_policy(data: Mapping[str, Any]) -> None:
+    """Recheck the v2 pair before allowing direct generic-runner execution.
+
+    The paired coordinator performs this check too, but the generic runner is
+    an exposed executable boundary.  Without this guard a caller could feed a
+    hand-written protocol-v2 profile directly to ``SafeRunner`` and bypass
+    candidate binding, trusted-source ordering, role locks, and probe-route
+    receipt validation.
+    """
+
+    from native_qualification import prepare_drawingml_raw_inputs_v2 as preparation
+
+    shared = data.get("shared")
+    legs = data.get("legs")
+    if not isinstance(shared, Mapping) or not isinstance(legs, Mapping):
+        raise RunnerError("DrawingML v2 policy needs shared and legs objects")
+    receipt_value = shared.get("preparation_receipt")
+    trusted_root = data.get("drawingml_trusted_root")
+    before = legs.get("before")
+    after = legs.get("after")
+    if not isinstance(before, Mapping) or not isinstance(after, Mapping):
+        raise RunnerError("DrawingML v2 policy needs before and after legs")
+    if set(legs) != {"before", "after"}:
+        raise RunnerError("DrawingML v2 policy needs exactly before and after legs")
+    if shared.get("probe_paths") != list(preparation.PROBE_COPY_PATHS):
+        raise RunnerError("DrawingML v2 policy probe paths differ from the preparation receipt")
+    if shared.get("fixture_paths") != [
+        "tools/native_qualification/fixtures/drawingml_raw_fixtures.json"
+    ]:
+        raise RunnerError("DrawingML v2 policy fixture paths differ from the preparation receipt")
+    values = (
+        receipt_value,
+        trusted_root,
+        before.get("source_root"),
+        after.get("source_root"),
+        before.get("source_revision"),
+        after.get("source_revision"),
+    )
+    if not all(isinstance(value, str) and value for value in values):
+        raise RunnerError("DrawingML v2 policy is missing a bound source/receipt identity")
+    for leg_name, leg in (("before", before), ("after", after)):
+        if leg.get("allowed_dirty_paths") != list(preparation.PROBE_COPY_PATHS):
+            raise RunnerError(f"DrawingML v2 {leg_name} dirty-path policy differs")
+        if leg.get("lock_paths") != list(preparation.ROLE_LOCK_PATHS):
+            raise RunnerError(f"DrawingML v2 {leg_name} lock-path policy differs")
+    try:
+        preparation.validate_preparation_receipt(
+            Path(receipt_value),
+            baseline_root=Path(str(before["source_root"])),
+            candidate_root=Path(str(after["source_root"])),
+            baseline_revision=str(before["source_revision"]),
+            candidate_revision=str(after["source_revision"]),
+            trusted_root=Path(str(trusted_root)),
+        )
+    except (OSError, ValueError) as error:
+        raise RunnerError(f"DrawingML v2 policy refused direct generic execution: {error}") from error
+
+
 def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
     """Validate one source-fenced DrawingML raw profile.
 
@@ -744,6 +802,8 @@ def _validate_drawingml_raw_workload(data: Mapping[str, Any]) -> None:
     protocol_version = data.get("drawingml_protocol_version", 1)
     if protocol_version not in {1, 2}:
         raise RunnerError("DrawingML raw protocol version is not reviewed")
+    if protocol_version == 2:
+        _validate_drawingml_v2_policy(data)
     validator_relative = (
         "tools/native_qualification/drawingml_raw_validator_v2.py"
         if protocol_version == 2

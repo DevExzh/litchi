@@ -19,6 +19,13 @@ from pathlib import Path
 import sys
 from typing import Any, Mapping
 
+# Executing this file directly (the production runner path) does not add the
+# repository's ``tools`` directory to ``sys.path``.  Keep the import boundary
+# identical for ``python -m`` and ``python tools/..._v2.py`` invocations.
+TOOLS_ROOT = Path(__file__).resolve().parents[1]
+if str(TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ROOT))
+
 from native_qualification import drawingml_raw_paired_runner as legacy
 from native_qualification import prepare_drawingml_raw_inputs_v2 as preparation
 
@@ -52,6 +59,13 @@ DRAWINGML_PROBE_FEATURE = legacy.DRAWINGML_PROBE_FEATURE
 ADAPTER_PATHS = tuple(preparation.PROBE_COPY_PATHS)
 PROBE_PATHS = tuple(ADAPTER_PATHS)
 ROLE_LOCK_PATHS = tuple(preparation.ROLE_LOCK_PATHS)
+ROUTE_PROFILE_IDS = ("drawingml-theme-family-raw",)
+OWNER_PROFILE_IDS = (
+    "drawingml-chart-owner",
+    "drawingml-theme-family-owner",
+    "drawingml-ink-actions-owner",
+    "drawingml-transform-owner",
+)
 
 
 def _require_policy_binding(data: Mapping[str, Any]) -> dict[str, Any]:
@@ -144,11 +158,22 @@ def _validate_master(data: Mapping[str, Any]) -> dict[str, Any]:
 
     profiles: list[dict[str, Any]] = []
     profile_specs = list(profile_values)
-    for key in ("route_profiles", "owner_profiles"):
-        extra = data.get(key, [])
-        if not isinstance(extra, list):
+    route_values = data.get("route_profiles")
+    owner_values = data.get("owner_profiles")
+    for key, values, expected in (
+        ("route_profiles", route_values, ROUTE_PROFILE_IDS),
+        ("owner_profiles", owner_values, OWNER_PROFILE_IDS),
+    ):
+        if not isinstance(values, list):
             raise RunnerError(f"{key} must be a list")
-        profile_specs.extend(extra)
+        observed = tuple(
+            profile.get("id") for profile in values if isinstance(profile, dict)
+        )
+        if observed != expected:
+            raise RunnerError(
+                f"{key} must contain exactly the reviewed profiles {list(expected)!r}"
+            )
+        profile_specs.extend(values)
     profile_ids: set[str] = set()
     source_paths = {"candidate": candidate_root, "trusted": trusted_root, "output": output, "target": target_root}
     for profile in profile_specs:
@@ -249,6 +274,11 @@ def _profile_manifest(master: Mapping[str, Any], profile: Mapping[str, Any], out
     value["shared"]["probe_paths"] = list(PROBE_PATHS)
     value["shared"]["preparation_receipt"] = str(profile["preparation_receipt"])
     for leg in ("before", "after"):
+        value["legs"][leg]["source_revision"] = (
+            str(profile["baseline_revision"])
+            if leg == "before"
+            else str(master["candidate_revision"])
+        )
         value["legs"][leg]["allowed_dirty_paths"] = list(ADAPTER_PATHS)
         value["legs"][leg]["lock_paths"] = list(ROLE_LOCK_PATHS)
     validator = value["validators"][0]

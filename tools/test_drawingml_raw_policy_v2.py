@@ -207,6 +207,7 @@ class DrawingMlRawPolicyV2Tests(unittest.TestCase):
         self.assertEqual(
             manifest["historical_source"]["sha256"], policy.HISTORICAL_SOURCE_SHA256
         )
+        self.assertEqual(manifest["toolchain_paths"], list(policy.TOOLCHAIN_PATHS))
 
     def test_candidate_policy_has_no_user_supplied_hash_parameter(self) -> None:
         self.assertNotIn("candidate_workspace_lock_sha256", policy.prepare.__annotations__)

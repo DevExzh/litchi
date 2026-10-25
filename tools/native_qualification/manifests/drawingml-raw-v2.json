@@ -80,6 +80,10 @@
     "tools/perf-baseline/Cargo.toml",
     "tools/native-resave/Cargo.toml"
   ],
+  "toolchain_paths": [
+    "rust-toolchain.toml",
+    ".cargo/config.toml"
+  ],
   "vendor_roots": [
     "vendor/allsorts",
     "vendor/flate2",

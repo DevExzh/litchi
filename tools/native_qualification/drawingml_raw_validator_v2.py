@@ -20,6 +20,12 @@ from pathlib import Path
 import sys
 from typing import Any
 
+# The validator is launched by the generic runner as a file path.  Bootstrap
+# the checked-in tools package before importing the v2 policy modules.
+TOOLS_ROOT = Path(__file__).resolve().parents[1]
+if str(TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ROOT))
+
 from native_qualification import drawingml_raw_validator as legacy
 from native_qualification import prepare_drawingml_raw_inputs_v2 as preparation
 
