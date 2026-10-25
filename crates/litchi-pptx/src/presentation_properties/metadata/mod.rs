@@ -734,29 +734,6 @@ pub(crate) fn checked_output_len(
     Ok(output_len)
 }
 
-#[cfg(test)]
-mod bounded_output_tests {
-    use super::*;
-
-    #[test]
-    fn escaped_chunks_are_preflighted_before_growth() {
-        let limits = Limits::DEFAULT.with_output_bytes(4).unwrap();
-        let mut output = BoundedString::new(limits, "test output");
-        assert!(output.push_escaped_xml("&").is_err());
-        assert!(output.finish().is_empty());
-    }
-
-    #[test]
-    fn replacement_size_is_checked_before_reservation() {
-        let limits = Limits::DEFAULT.with_output_bytes(4).unwrap();
-        assert!(checked_output_len(4, 0, 1, limits, "test output").is_err());
-        assert_eq!(
-            checked_output_len(4, 1, 1, limits, "test output").unwrap(),
-            4
-        );
-    }
-}
-
 pub(crate) fn new_guid() -> String {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -795,5 +772,28 @@ pub(crate) fn is_presentationml_name(
         quick_xml::name::ResolveResult::Unknown(_) | quick_xml::name::ResolveResult::Unbound => {
             false
         },
+    }
+}
+
+#[cfg(test)]
+mod bounded_output_tests {
+    use super::*;
+
+    #[test]
+    fn escaped_chunks_are_preflighted_before_growth() {
+        let limits = Limits::DEFAULT.with_output_bytes(4).unwrap();
+        let mut output = BoundedString::new(limits, "test output");
+        assert!(output.push_escaped_xml("&").is_err());
+        assert!(output.finish().is_empty());
+    }
+
+    #[test]
+    fn replacement_size_is_checked_before_reservation() {
+        let limits = Limits::DEFAULT.with_output_bytes(4).unwrap();
+        assert!(checked_output_len(4, 0, 1, limits, "test output").is_err());
+        assert_eq!(
+            checked_output_len(4, 1, 1, limits, "test output").unwrap(),
+            4
+        );
     }
 }

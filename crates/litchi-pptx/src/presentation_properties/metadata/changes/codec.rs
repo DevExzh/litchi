@@ -1731,6 +1731,6 @@ mod tests {
         assert_eq!(mce.max_depth, 7);
         assert_eq!(mce.max_namespace_bindings, 19);
         assert_eq!(mce.max_directive_tokens, 19);
-        assert_eq!(mce.max_choices_per_alternate, 19.min(1024));
+        assert_eq!(mce.max_choices_per_alternate, 19);
     }
 }
