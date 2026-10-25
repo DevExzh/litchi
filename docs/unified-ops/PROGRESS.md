@@ -5415,3 +5415,25 @@ See [0063](0063-source-pptx-modern-comments.md).
   downstream-consumer and performance qualification remain open. Custom XML
   94cb remains returned for paired-element indexing, typed limits and bounded
   MCE/attribute handling; 94cc is active and uncomposed.
+
+- Coordinator qualification, typed-consumer and cleanup checkpoint (2026-10-25):
+  PPTX 89x/89y/89z passes independent source review and composes at
+  `3181342f0c` (records `2da172ece2`). Actual qualification clears the original
+  76 Clippy findings, then reports three test-only findings. Independently
+  reviewed `ae6f32d202` fixes them; fresh qualification is running. Prior
+  failed captures and complete root receipt verification remain retained.
+
+  Shared OOXML `95973e8c6a` composes reviewed Custom XML through 94ce,
+  DOCX through 94gb and XLSX through 94hc, with all consumers. It preserves
+  lexical/MCE fidelity, exact nested property-limit kinds and classification
+  through XLSX joins. Intermediate classification, coverage and offset-type
+  gaps are returned and fixed before composition. Actual combined validation
+  remains required; neither private candidate is accepted yet.
+
+  Cleanup67 removes two retired PPTX compiler/test worktrees without force,
+  preserving their branches and exact changed blobs. Sparse restoration and
+  root verification pass; full-wave net recovery is 61,091,840 bytes. Holds
+  are released and the protected constructor probe is unchanged. Record
+  0362ul97 binds this checkpoint. Final gates, census/dispositions,
+  corpus/native and quiet ABBA remain open. Only audit22 is deferred.
+  Nothing is pushed.
