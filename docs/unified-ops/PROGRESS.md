@@ -4831,3 +4831,18 @@ See [0063](0063-source-pptx-modern-comments.md).
   and separate historical/current locks; historical evidence stays unchanged.
   The integrated gate, actual native/performance qualification and pending
   signed-batch contract choice remain open. Nothing is pushed.
+
+- Coordinator standalone consumer verification (2026-10-25):
+  The actual guarded standalone `perf-baseline` all-target check passes on
+  clean composed `805c08facf`. Root verifies source, locks, log/trace hashes,
+  target size of 368,735,177 bytes and completed process cleanup. Record
+  0362ul64 closes the compiler check queued for XLS and DOCX; it does not
+  claim coverage of the later PPT, crypto, font or new PPTX source. Slot 3
+  is released. Native timings and the final integrated gate remain open.
+
+  PPTX 0362ul61 is source-ready for independent review. The other two PPTX
+  raw returns remain in source work. Font vendor compile repairs through
+  `06aa4f8897` and crypto retention/classification repairs through
+  `106e48ea98` pass independent source review; their actual guarded runs
+  continue. ODF's latest retained-profile and opaque-vendor XML changes are
+  under review. Nothing is pushed.
