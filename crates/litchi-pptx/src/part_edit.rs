@@ -15,9 +15,32 @@
 
 use std::sync::Arc;
 
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships, SourceLimitKind, TargetMode};
 
 use crate::{Error, Package, Result};
+
+fn source_limit(kind: SourceLimitKind, observed: u64, maximum: u64) -> Error {
+    Error::Opc(litchi_opc::OpcError::Limit {
+        kind,
+        observed,
+        maximum,
+    })
+}
+
+fn check_source_limit(kind: SourceLimitKind, observed: usize, maximum: u64) -> Result<()> {
+    let observed = u64::try_from(observed).unwrap_or(u64::MAX);
+    if observed > maximum {
+        return Err(source_limit(kind, observed, maximum));
+    }
+    Ok(())
+}
+
+fn check_source_limit_u64(kind: SourceLimitKind, observed: u64, maximum: u64) -> Result<()> {
+    if observed > maximum {
+        return Err(source_limit(kind, observed, maximum));
+    }
+    Ok(())
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Relationship {
@@ -413,6 +436,7 @@ impl PartPatch {
             }
         }
         crate::package::signature::refuse_signed_change(source)?;
+        self.validate_destination_source_limits(source)?;
         let mut target = (**source).clone();
         for delta in &self.deltas {
             if let (Some(before), Some(after)) = (&delta.before, &delta.after)
@@ -477,6 +501,121 @@ impl PartPatch {
         }
         crate::package::signature::settle_unsigned_change(&mut target)?;
         Ok(package.derive(target))
+    }
+
+    /// Admit the replay candidate against the recipient's physical part
+    /// policy before cloning or mutating the target graph.  Existing source
+    /// parts were admitted at ingress, so only changed payload sizes need an
+    /// individual check.  The aggregate total is measured only when a
+    /// payload-size delta can change it; relationship-only patches therefore
+    /// retain their O(changed-parts) replay path.
+    fn validate_destination_source_limits(&self, source: &OpcPackage) -> Result<()> {
+        let limits = source.read_limits();
+        let mut part_count = source.part_count();
+        let mut total_delta = 0_i128;
+        let mut total_changed = false;
+        for delta in &self.deltas {
+            match (&delta.before, &delta.after) {
+                (None, Some(after)) => {
+                    part_count = part_count.checked_add(1).ok_or_else(|| {
+                        source_limit(SourceLimitKind::Parts, u64::MAX, limits.max_parts() as u64)
+                    })?;
+                    check_source_limit(
+                        SourceLimitKind::PartBytes,
+                        after.blob.len(),
+                        limits.max_part_bytes(),
+                    )?;
+                    total_delta = total_delta
+                        .checked_add(i128::try_from(after.blob.len()).unwrap_or(i128::MAX))
+                        .ok_or_else(|| {
+                            source_limit(
+                                SourceLimitKind::TotalPartBytes,
+                                u64::MAX,
+                                limits.max_total_part_bytes(),
+                            )
+                        })?;
+                    total_changed = true;
+                },
+                (Some(before), Some(after)) => {
+                    check_source_limit(
+                        SourceLimitKind::PartBytes,
+                        after.blob.len(),
+                        limits.max_part_bytes(),
+                    )?;
+                    let before_len = i128::try_from(before.blob.len()).unwrap_or(i128::MAX);
+                    let after_len = i128::try_from(after.blob.len()).unwrap_or(i128::MAX);
+                    if before_len != after_len {
+                        total_delta =
+                            total_delta
+                                .checked_add(after_len - before_len)
+                                .ok_or_else(|| {
+                                    source_limit(
+                                        SourceLimitKind::TotalPartBytes,
+                                        u64::MAX,
+                                        limits.max_total_part_bytes(),
+                                    )
+                                })?;
+                        total_changed = true;
+                    }
+                },
+                (Some(before), None) => {
+                    part_count = part_count.checked_sub(1).ok_or_else(|| {
+                        source_limit(SourceLimitKind::Parts, 0, limits.max_parts() as u64)
+                    })?;
+                    let before_len = i128::try_from(before.blob.len()).unwrap_or(i128::MAX);
+                    total_delta = total_delta.checked_sub(before_len).ok_or_else(|| {
+                        source_limit(
+                            SourceLimitKind::TotalPartBytes,
+                            0,
+                            limits.max_total_part_bytes(),
+                        )
+                    })?;
+                    total_changed = true;
+                },
+                (None, None) => {},
+            }
+        }
+        check_source_limit(
+            SourceLimitKind::Parts,
+            part_count,
+            limits.max_parts() as u64,
+        )?;
+        if total_changed {
+            let total = source.iter_parts().try_fold(0_u64, |total, part| {
+                let bytes = u64::try_from(part.payload_len()?).map_err(|_| {
+                    source_limit(
+                        SourceLimitKind::TotalPartBytes,
+                        u64::MAX,
+                        limits.max_total_part_bytes(),
+                    )
+                })?;
+                total.checked_add(bytes).ok_or_else(|| {
+                    source_limit(
+                        SourceLimitKind::TotalPartBytes,
+                        u64::MAX,
+                        limits.max_total_part_bytes(),
+                    )
+                })
+            })?;
+            let candidate = if total_delta >= 0 {
+                total.checked_add(u64::try_from(total_delta).unwrap_or(u64::MAX))
+            } else {
+                total.checked_sub(u64::try_from(total_delta.unsigned_abs()).unwrap_or(u64::MAX))
+            }
+            .ok_or_else(|| {
+                source_limit(
+                    SourceLimitKind::TotalPartBytes,
+                    u64::MAX,
+                    limits.max_total_part_bytes(),
+                )
+            })?;
+            check_source_limit_u64(
+                SourceLimitKind::TotalPartBytes,
+                candidate,
+                limits.max_total_part_bytes(),
+            )?;
+        }
+        Ok(())
     }
 
     /// Visit only added or byte-replaced parts in the assembled replay target.

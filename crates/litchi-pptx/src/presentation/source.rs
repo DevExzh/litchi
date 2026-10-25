@@ -2034,6 +2034,7 @@ impl SourceBackedPresentationEditor {
             },
         };
         self.package.check_execution()?;
+        crate::source_limits::validate_xml_limits(target.xml.as_bytes(), self.limits)?;
         if let Some(replacement) = target.xml.edited_bytes() {
             self.package.write_part_overlay_shared_to_stream(
                 writer,
@@ -2132,6 +2133,9 @@ impl SourceBackedPresentationEditor {
             },
         };
         self.package.check_execution()?;
+        for slide in target.slides() {
+            crate::source_limits::validate_xml_limits(slide.xml.as_bytes(), self.limits)?;
+        }
         let mut replacements = Vec::new();
         let changed_slides = target
             .slides()
@@ -2590,8 +2594,55 @@ impl SourceBackedSlideSnapshot {
             && self.closure.presentation == other.closure.presentation
             && self.closure.presentation_xml.as_bytes() == other.closure.presentation_xml.as_bytes()
             && self.closure.slide == other.closure.slide
-            && self.max_output_bytes == other.max_output_bytes
-            && self.semantic_limits == other.semantic_limits
+    }
+
+    /// Rebase an edited source image onto the recipient's retained policy.
+    /// Equal source bytes are the patch scope; a profile difference is a
+    /// destination admission question, never a source conflict.
+    fn rebase_policy(&self, recipient: &Self) -> Result<Self> {
+        let mut usage = crate::laser::Usage::default();
+        self.rebase_policy_with_usage(recipient, &mut usage)
+    }
+
+    fn rebase_policy_with_usage(
+        &self,
+        recipient: &Self,
+        usage: &mut crate::laser::Usage,
+    ) -> Result<Self> {
+        let semantic_changed = self.semantic_limits != recipient.semantic_limits;
+        let output_changed = self.max_output_bytes != recipient.max_output_bytes;
+        let mut target = self.clone();
+        if semantic_changed || output_changed {
+            target.max_output_bytes = recipient.max_output_bytes;
+            target.semantic_limits = recipient.semantic_limits.clone();
+            target.context = recipient.context.clone();
+            // A managed reservation belongs to the source edit's budget. A
+            // replay onto another policy must not charge that budget to the
+            // recipient, so retain the bytes but drop only the old reservation.
+            if let SourcePayload::ReservedEdit { bytes, .. } = target.xml {
+                target.xml = SourcePayload::Edited(bytes);
+            }
+        }
+        if target.xml.as_bytes().len() > recipient.max_output_bytes {
+            return Err(Error::Limit {
+                resource: "source-backed primary slide output bytes",
+                limit: recipient.max_output_bytes,
+            });
+        }
+        let semantic = crate::open_options::selected(recipient.semantic_limits.as_ref());
+        target.mce = crate::presentation::transition::admit_source_with_limits(
+            target.xml.as_bytes(),
+            "apply",
+            semantic.shape(),
+            semantic.transition(),
+        )?;
+        crate::laser::read(
+            target.position,
+            target.xml.as_bytes(),
+            &semantic.laser(),
+            usage,
+        )?;
+        Ok(target)
     }
 }
 
@@ -3256,7 +3307,7 @@ impl SourceBackedSlidePatch {
             return Err(Error::PatchConflict);
         }
         Ok(if self.is_changed() {
-            self.after.clone()
+            self.after.rebase_policy(source)?
         } else {
             source.clone()
         })
@@ -3369,7 +3420,6 @@ impl SvgImage {
             && self.raster_part_uri == other.raster_part_uri
             && self.svg.as_bytes() == other.svg.as_bytes()
             && self.raster.as_bytes() == other.raster.as_bytes()
-            && self.limits == other.limits
     }
 }
 
@@ -3510,11 +3560,15 @@ impl SourceBackedSvgPatch {
         if !source.same_source(&self.before) {
             return Err(Error::PatchConflict);
         }
-        Ok(if self.is_changed() {
-            self.after.clone()
-        } else {
-            source.clone()
-        })
+        if !self.is_changed() {
+            return Ok(source.clone());
+        }
+        let mut target = self.after.clone();
+        target.slide = self.after.slide.rebase_policy(&source.slide)?;
+        target.limits = source.limits;
+        check_svg_replacement_payload(&target.limits, target.svg.as_bytes().len(), true)?;
+        check_svg_replacement_payload(&target.limits, target.raster.as_bytes().len(), false)?;
+        Ok(target)
     }
 }
 
@@ -3752,10 +3806,22 @@ impl SourceBackedSlideBatchPatch {
         if !source.same_source(&self.before) {
             return Err(Error::PatchConflict);
         }
-        Ok(if self.is_changed() {
-            self.after.clone()
-        } else {
-            source.clone()
+        if !self.is_changed() {
+            return Ok(source.clone());
+        }
+        let mut slides = Vec::new();
+        slides
+            .try_reserve_exact(self.after.slides.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed slide batch replay snapshots",
+                source,
+            })?;
+        let mut usage = crate::laser::Usage::default();
+        for (after, recipient) in self.after.slides.iter().zip(source.slides.iter()) {
+            slides.push(after.rebase_policy_with_usage(recipient, &mut usage)?);
+        }
+        Ok(SourceBackedSlideBatchSnapshot {
+            slides: slides.into_boxed_slice(),
         })
     }
 }
@@ -6828,6 +6894,69 @@ mod tests {
         assert_eq!(test_semantic_scene_reads(), 1);
         assert_eq!(test_semantic_slide_part_reads(), 1);
         assert!(output.is_empty());
+    }
+
+    #[test]
+    fn local_replay_matches_content_across_profiles_and_revalidates_the_recipient() {
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let source_len = editor.slide_snapshot(0).unwrap().xml.as_bytes().len();
+        let replacement = "x".repeat(source_len);
+        let (before, after) = changed_slide_snapshots(&editor, 0, "First slide", &replacement);
+        let patch = SourceBackedSlidePatch {
+            before: before.clone(),
+            after: after.clone(),
+        };
+
+        let defaults = crate::shape::Limits::DEFAULT;
+        let tight_shape = crate::shape::Limits::new(
+            source_len,
+            defaults.output_bytes(),
+            defaults.depth(),
+            defaults.nodes(),
+            defaults.shapes(),
+            defaults.retained_text_bytes(),
+        )
+        .unwrap();
+        let tight_options = crate::OpenOptions::default().shape_limits(tight_shape);
+        let mut tight_recipient = before.clone();
+        tight_recipient.semantic_limits = tight_options.semantic_limits.clone();
+        assert!(matches!(
+            patch.apply(&tight_recipient),
+            Err(Error::Limit {
+                resource: "shape owner input bytes",
+                limit,
+            }) if limit == source_len
+        ));
+
+        let loose_shape = crate::shape::Limits::new(
+            source_len.saturating_mul(4),
+            defaults.output_bytes(),
+            defaults.depth(),
+            defaults.nodes(),
+            defaults.shapes(),
+            defaults.retained_text_bytes(),
+        )
+        .unwrap();
+        let loose_options = crate::OpenOptions::default().shape_limits(loose_shape);
+        let mut loose_recipient = before.clone();
+        loose_recipient.semantic_limits = loose_options.semantic_limits.clone();
+        let applied = patch.apply(&loose_recipient).unwrap();
+        assert_eq!(applied.xml.as_bytes(), after.xml.as_bytes());
+        assert_eq!(applied.semantic_limits, loose_recipient.semantic_limits);
+
+        let noop = SourceBackedSlidePatch {
+            before: before.clone(),
+            after: before,
+        };
+        let replayed_noop = noop.apply(&tight_recipient).unwrap();
+        assert_eq!(replayed_noop.xml.as_bytes(), tight_recipient.xml.as_bytes());
+        assert_eq!(
+            replayed_noop.semantic_limits,
+            tight_recipient.semantic_limits
+        );
     }
 
     #[test]
