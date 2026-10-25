@@ -13,7 +13,7 @@ or acceptance claim. The candidate has:
 | `tools/final_api_inventory.py` | direct-library package guard is `68`; SHA-256 `82b3bb35567c4074c7eaf51da2977b603bbb432c46794b22eb1db486478bd98a` |
 | direct `crates/*` library packages | 68; current package-set SHA-256 `f31dcf7d58ea9845f8f7585c077d4fcbc48f6fa3dd4c3dd2a837ce51bf23d703` |
 | `rust-toolchain.toml` | pinned to Rust 1.95.0; SHA-256 `e3a213e0d222e94d213cafbc20932eb3f76c643b4dd63756acf95192df2aa310` |
-| root `Cargo.lock` | absent from the assembled tree (ignored by `*.lock`); this must be supplied and hashed before any locked Cargo run |
+| root `Cargo.lock` | ignored by `*.lock` and therefore absent from the Git tree; the verified integration working tree has the approved lock at SHA-256 `efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811` |
 
 The `final_api_inventory.py` package count and the 68-package set are the
 workspace coverage guard. The raw census must additionally cover every
@@ -130,9 +130,13 @@ After the last source wave merges, freeze a clean candidate `S` and record:
 - a fresh external output directory and target directory, both outside the
   checkout and not under `/tmp`.
 
-The root lockfile is currently absent at `0dc6...`; stop before any Cargo
-command until the coordinator supplies the reviewed lockfile and records its
-hash. Do not generate an unreviewed lock during capture.
+The Git tree does not contain the ignored root lockfile, so the capture must
+seed the exact approved ignored lock before any Cargo command. The current
+integration working tree was verified with SHA-256
+`efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811`;
+the coordinator may copy that exact file (or an independently validated
+approved source lock) into the frozen checkout and must record the resulting
+hash. Do not generate or resolve a new lock during capture.
 
 First run the existing all-features package guard sequentially:
 
