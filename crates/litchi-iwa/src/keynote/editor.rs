@@ -299,7 +299,7 @@ impl SlideTextInfo {
 
 /// A Keynote text box removed from a slide with its final text state.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RemovedKeynoteTextBox {
+pub struct RemovedTextBox {
     pub text: SlideTextInfo,
 }
 
@@ -4074,7 +4074,7 @@ impl Draft {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<RemovedKeynoteTextBox> {
+    ) -> Result<RemovedTextBox> {
         let graph = self.text_box_graph(slide_index, drawable_object_id)?;
         let text = self
             .slide_text_storages(slide_index)?
@@ -4120,7 +4120,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedKeynoteTextBox { text })
+        Ok(RemovedTextBox { text })
     }
 
     /// List supported direct-comment drawables owned by one slide.
@@ -5183,12 +5183,12 @@ mod text_box_create;
 use builds::*;
 pub use litchi_keynote::slide::media::MovieKind;
 pub use litchi_keynote::transition::Effect;
-pub use slide_charts::{RemovedKeynoteSlideChart, SlideChartInfo};
+pub use slide_charts::{RemovedSlideChart, SlideChartInfo};
 use slide_graph::*;
-pub use slide_images::{RemovedKeynoteSlideImage, SlideImageInfo, SlideImageKind};
-pub use slide_shapes::{RemovedKeynoteSlideShape, SlideShapeInfo};
+pub use slide_images::{RemovedSlideImage, SlideImageInfo, SlideImageKind};
+pub use slide_shapes::{RemovedSlideShape, SlideShapeInfo};
 pub use slide_tables::{
-    RemovedKeynoteSlideTable, SlideTable, SlideTableInfo, TableCellConditionalHighlightInfo,
+    RemovedSlideTable, SlideTable, SlideTableInfo, TableCellConditionalHighlightInfo,
     TableCellInset, TableCellInsets, TableCellLayout, TableCellParagraphList,
     TableCellParagraphListBullet, TableCellParagraphListBulletGeometry,
     TableCellParagraphListIndentation, TableCellParagraphListLabelColor,

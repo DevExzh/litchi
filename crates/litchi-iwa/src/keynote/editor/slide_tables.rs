@@ -160,7 +160,7 @@ impl SlideTable {
 
 /// Result of removing a slide table and its private storage graph.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedKeynoteSlideTable {
+pub struct RemovedSlideTable {
     pub table: SlideTableInfo,
 }
 
@@ -4221,7 +4221,7 @@ impl Draft {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<RemovedKeynoteSlideTable> {
+    ) -> Result<RemovedSlideTable> {
         let source = slide_table_graph(self, slide_index, drawable_object_id)?;
         let object_catalog =
             KeynoteObjectCatalog::build(self.package()).map_err(map_catalog_error)?;
@@ -4274,7 +4274,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedKeynoteSlideTable { table: source.info })
+        Ok(RemovedSlideTable { table: source.info })
     }
 }
 

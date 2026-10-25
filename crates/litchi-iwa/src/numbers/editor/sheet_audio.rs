@@ -55,7 +55,7 @@ impl SheetAudioOptions {
 
 /// Result of removing one sheet-owned audio clip and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedNumbersSheetAudio {
+pub struct RemovedSheetAudio {
     pub audio: SheetAudioInfo,
     /// Assets culled because the removed clip held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
@@ -464,7 +464,7 @@ impl Draft {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<RemovedNumbersSheetAudio> {
+    ) -> Result<RemovedSheetAudio> {
         let source = audio_graph(self, sheet_id, drawable_object_id)?;
         let mut comments = crate::comments::Draft::from_package(self.package.clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
@@ -548,7 +548,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedNumbersSheetAudio {
+        Ok(RemovedSheetAudio {
             audio: source.info,
             removed_data_identifiers,
         })

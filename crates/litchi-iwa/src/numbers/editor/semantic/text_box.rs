@@ -2082,7 +2082,7 @@ impl Draft {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<RemovedNumbersTextBox> {
+    ) -> Result<RemovedTextBox> {
         let graph = numbers_text_box_graph(&self.package, sheet_id, drawable_object_id)?;
         let text_box = self
             .sheet_text_boxes(sheet_id)?
@@ -2138,6 +2138,6 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedNumbersTextBox { text_box })
+        Ok(RemovedTextBox { text_box })
     }
 }

@@ -116,7 +116,7 @@ pub struct SlideChartInfo {
 
 /// Result of removing a standalone Keynote chart and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedKeynoteSlideChart {
+pub struct RemovedSlideChart {
     pub chart: SlideChartInfo,
 }
 
@@ -624,7 +624,7 @@ impl Draft {
         &mut self,
         slide_index: usize,
         selector: ChartSelector<'_>,
-    ) -> Result<RemovedKeynoteSlideChart> {
+    ) -> Result<RemovedSlideChart> {
         let drawable_object_id = self.resolve_chart_selector(slide_index, selector)?;
         let mut source = chart_graph(self, slide_index, drawable_object_id)?;
         source.info.arrangement = arrangement::focused_chart_arrangement_at(
@@ -704,7 +704,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedKeynoteSlideChart { chart: source.info })
+        Ok(RemovedSlideChart { chart: source.info })
     }
 
     fn resolve_chart_selector(

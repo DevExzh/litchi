@@ -57,7 +57,7 @@ pub struct SheetShapeInfo {
 
 /// Result of removing an ordinary Numbers shape and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedNumbersSheetShape {
+pub struct RemovedSheetShape {
     pub shape: SheetShapeInfo,
 }
 
@@ -984,7 +984,7 @@ impl Draft {
         &mut self,
         sheet_id: u64,
         drawable_object_id: u64,
-    ) -> Result<RemovedNumbersSheetShape> {
+    ) -> Result<RemovedSheetShape> {
         let source = shape_graph(self, sheet_id, drawable_object_id)?;
         let mut comments = crate::comments::Draft::from_package(self.package.clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
@@ -1035,7 +1035,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedNumbersSheetShape { shape: source.info })
+        Ok(RemovedSheetShape { shape: source.info })
     }
 }
 

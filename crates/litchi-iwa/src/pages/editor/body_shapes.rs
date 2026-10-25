@@ -52,7 +52,7 @@ pub struct BodyShapeInfo {
 
 /// Result of removing an ordinary body shape and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedPagesBodyShape {
+pub struct RemovedBodyShape {
     pub shape: BodyShapeInfo,
 }
 
@@ -860,7 +860,7 @@ impl Draft {
     }
 
     /// Remove an ordinary body shape and its private text-bearing graph.
-    pub fn remove_body_shape(&mut self, drawable_object_id: u64) -> Result<RemovedPagesBodyShape> {
+    pub fn remove_body_shape(&mut self, drawable_object_id: u64) -> Result<RemovedBodyShape> {
         let graph = body_shape_graph(self, drawable_object_id)?;
         let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
@@ -911,7 +911,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedPagesBodyShape { shape: graph.info })
+        Ok(RemovedBodyShape { shape: graph.info })
     }
 }
 

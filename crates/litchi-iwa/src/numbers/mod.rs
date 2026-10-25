@@ -69,9 +69,9 @@ impl From<litchi_numbers::table::merge::Error> for crate::Error {
 
 pub use creation::Builder;
 pub use editor::{
-    Direction, Draft, PivotCategoryInfo, RemovedNumbersSheetAudio, RemovedNumbersSheetChart,
-    RemovedNumbersSheetImage, RemovedNumbersSheetMovie, RemovedNumbersSheetShape,
-    RemovedNumbersTextBox, SheetAudioInfo, SheetAudioOptions, SheetChartInfo, SheetImageInfo,
+    Direction, Draft, PivotCategoryInfo, RemovedSheetAudio, RemovedSheetChart, RemovedSheetImage,
+    RemovedSheetMovie, RemovedSheetShape, RemovedTextBox, SheetAudioInfo, SheetAudioOptions,
+    SheetChartInfo, SheetImageInfo,
     SheetImageOptions, SheetInfo, SheetMovieInfo, SheetMovieOptions, SheetShapeInfo,
     TableCellConditionalHighlightInfo, TableCellParagraphIndents, TableCellParagraphLineSpacing,
     TableCellParagraphList, TableCellParagraphListBullet, TableCellParagraphListBulletGeometry,

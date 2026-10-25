@@ -61,7 +61,7 @@ pub struct TextBoxInfo {
 
 /// A Numbers text box removed from a sheet with its final text state.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct RemovedNumbersTextBox {
+pub struct RemovedTextBox {
     pub text_box: TextBoxInfo,
 }
 

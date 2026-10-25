@@ -1,0 +1,199 @@
+{
+  "record": "0362ul48",
+  "format": "selected-run-step-output-v1",
+  "provenance": {
+    "source_worktree": "/home/zhuhe/code/litchi-worktrees/uo2-iwa-removal-result-names",
+    "source_commit": "375f55e8dfcea343836179166ca059da93e747ee",
+    "runner": "/home/zhuhe/code/litchi-worktrees/uo2-gate-runner-self-attribution/docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py",
+    "runner_sha256": "1904177040fc7c523582433028d9bba56efc30fe0d9d96beb554a2fab343691e",
+    "captured_from": "The JSON objects printed to the terminal by the run_step wrapper on 2026-10-25; no Cargo command was rerun to create this file.",
+    "captured_keys": [
+      "name",
+      "attempt",
+      "command",
+      "exit",
+      "effective_exit",
+      "status",
+      "seconds",
+      "log",
+      "log_sha256",
+      "target_bytes_after",
+      "free_bytes_after",
+      "source_after",
+      "cargo_locks_before",
+      "cargo_locks_after",
+      "target_live_guard"
+    ],
+    "omitted_from_persisted_selection": [
+      "preflight"
+    ],
+    "omission_note": "The wrapper printed preflight in the terminal selection, but no standalone state.json was written and the complete large preflight value was not recoverable from the external state directory. It is not reconstructed or claimed here. The receipt logs and cargo-target TSV files remain at the paths recorded in each row."
+  },
+  "rows": [
+    {
+      "name": "iwa-clippy-all-targets-pinned",
+      "attempt": "1792888372194569321-341904",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-q",
+        "-p",
+        "litchi-iwa",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "effective_exit": 0,
+      "status": "passed",
+      "seconds": 148.24252486228943,
+      "log": "/home/zhuhe/.cache/litchi-api-contract/iwa-names-375f55e8df-validation-20261025j/state/104-iwa-clippy-all-targets-pinned-attempt-1792888372194569321-341904.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "cargo_targets_tsv": "/home/zhuhe/.cache/litchi-api-contract/iwa-names-375f55e8df-validation-20261025j/state/104-iwa-clippy-all-targets-pinned-attempt-1792888372194569321-341904-cargo-targets.tsv",
+      "cargo_targets_tsv_sha256": "268ed204d24b68f69cb3477551edadb9b1e6b66799bf33aa8f127937344ef54e",
+      "target_bytes_after": 369331620,
+      "free_bytes_after": 660913053696,
+      "target_live_guard": {
+        "live_target": 19000000000,
+        "max_sampled_bytes": 369331620,
+        "samples": 8538
+      },
+      "source_after": {
+        "branch": "uo2/iwa-removal-result-names-0362ul48",
+        "commit": "375f55e8dfcea343836179166ca059da93e747ee",
+        "status": "",
+        "cargo_locks": {
+          "Cargo.lock": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+          "tools/perf-baseline/Cargo.lock": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+        }
+      },
+      "cargo_locks_before": {
+        "Cargo.lock": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+        "tools/perf-baseline/Cargo.lock": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+      },
+      "cargo_locks_after": {
+        "Cargo.lock": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+        "tools/perf-baseline/Cargo.lock": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+      }
+    },
+    {
+      "name": "iwa-consumer-clippy-all-targets-pinned",
+      "attempt": "1792888524713019272-418910",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-q",
+        "-p",
+        "litchi-ops",
+        "-p",
+        "litchi",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 101,
+      "effective_exit": 101,
+      "status": "failed",
+      "seconds": 301.8678343296051,
+      "log": "/home/zhuhe/.cache/litchi-api-contract/iwa-names-375f55e8df-validation-20261025j/state/105-iwa-consumer-clippy-all-targets-pinned-attempt-1792888524713019272-418910.log",
+      "log_sha256": "340f94a4d3a361cd317d7825812b8f3862fb8580a48b8b79c6e31fe73a2f36ef",
+      "cargo_targets_tsv": "/home/zhuhe/.cache/litchi-api-contract/iwa-names-375f55e8df-validation-20261025j/state/105-iwa-consumer-clippy-all-targets-pinned-attempt-1792888524713019272-418910-cargo-targets.tsv",
+      "cargo_targets_tsv_sha256": "ac81e379a856ec2ba063d77d5ffbbc5019df112f82695b8a152f8884126d412c",
+      "failure": {
+        "kind": "sparse_fixture_setup",
+        "detail": "missing tracked test-data/iwork/pages/body-table-catalog-native.pages",
+        "not_source_diagnostic": true
+      },
+      "target_bytes_after": 1023882769,
+      "free_bytes_after": 653290881024,
+      "target_live_guard": {
+        "live_target": 19000000000,
+        "max_sampled_bytes": 1023882769,
+        "samples": 10259
+      },
+      "source_after": {
+        "branch": "uo2/iwa-removal-result-names-0362ul48",
+        "commit": "375f55e8dfcea343836179166ca059da93e747ee",
+        "status": "",
+        "cargo_locks": {
+          "Cargo.lock": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+          "tools/perf-baseline/Cargo.lock": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+        }
+      },
+      "cargo_locks_before": {
+        "Cargo.lock": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+        "tools/perf-baseline/Cargo.lock": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+      },
+      "cargo_locks_after": {
+        "Cargo.lock": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+        "tools/perf-baseline/Cargo.lock": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+      }
+    },
+    {
+      "name": "iwa-consumer-clippy-all-targets-pinned",
+      "attempt": "1792888850858631436-584060",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "-q",
+        "-p",
+        "litchi-ops",
+        "-p",
+        "litchi",
+        "--all-features",
+        "--all-targets",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "exit": 0,
+      "effective_exit": 0,
+      "status": "passed",
+      "seconds": 79.06645321846008,
+      "log": "/home/zhuhe/.cache/litchi-api-contract/iwa-names-375f55e8df-validation-20261025k/state/105-iwa-consumer-clippy-all-targets-pinned-attempt-1792888850858631436-584060.log",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "cargo_targets_tsv": "/home/zhuhe/.cache/litchi-api-contract/iwa-names-375f55e8df-validation-20261025k/state/105-iwa-consumer-clippy-all-targets-pinned-attempt-1792888850858631436-584060-cargo-targets.tsv",
+      "cargo_targets_tsv_sha256": "e75daf7bbb19c203499a817d8e3d6eca9ae492e70a471d204e1e95c26d34f85f",
+      "target_bytes_after": 1026071993,
+      "free_bytes_after": 653148135424,
+      "target_live_guard": {
+        "live_target": 19000000000,
+        "max_sampled_bytes": 1026071993,
+        "samples": 2282
+      },
+      "source_after": {
+        "branch": "uo2/iwa-removal-result-names-0362ul48",
+        "commit": "375f55e8dfcea343836179166ca059da93e747ee",
+        "status": "",
+        "cargo_locks": {
+          "Cargo.lock": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+          "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+          "tools/perf-baseline/Cargo.lock": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+        }
+      },
+      "cargo_locks_before": {
+        "Cargo.lock": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+        "tools/perf-baseline/Cargo.lock": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+      },
+      "cargo_locks_after": {
+        "Cargo.lock": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        "tools/native-resave/Cargo.lock": "51c25d3d6f36e20b50f0b19e39b1aa9c7b49777154122ecc95d3acd05c041378",
+        "tools/perf-baseline/Cargo.lock": "eac86284f67136aa856a8dcb6f383178b89ca92b26434a3de1d7408d68f2690c"
+      }
+    }
+  ]
+}

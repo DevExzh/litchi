@@ -51,7 +51,7 @@ pub struct SlideImageInfo {
 
 /// Result of removing one slide-owned image and its private object graph.
 #[derive(Debug, Clone, PartialEq)]
-pub struct RemovedKeynoteSlideImage {
+pub struct RemovedSlideImage {
     pub image: SlideImageInfo,
     /// Assets culled because the removed image held their final package reference.
     pub removed_data_identifiers: Vec<MediaAssetId>,
@@ -501,7 +501,7 @@ impl Draft {
         &mut self,
         slide_index: usize,
         drawable_object_id: u64,
-    ) -> Result<RemovedKeynoteSlideImage> {
+    ) -> Result<RemovedSlideImage> {
         let source = require_file_image(self, slide_index, drawable_object_id)?;
         let mut comments = crate::comments::Draft::from_package(self.package().clone())?;
         comments.clear_comment(litchi_iwa_common::comment::DrawableId::from_raw(
@@ -572,7 +572,7 @@ impl Draft {
             ));
         }
         *self = verified;
-        Ok(RemovedKeynoteSlideImage {
+        Ok(RemovedSlideImage {
             image: source.info,
             removed_data_identifiers,
         })
