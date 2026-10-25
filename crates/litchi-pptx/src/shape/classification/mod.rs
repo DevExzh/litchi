@@ -26,6 +26,7 @@ mod tests;
 
 pub use model::{Opaque, Outcome, Snapshot};
 
+pub(crate) use package::{load_with_limits, put_with_limits, remove_with_limits};
 mod edit;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 

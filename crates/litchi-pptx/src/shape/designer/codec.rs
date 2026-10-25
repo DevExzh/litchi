@@ -727,6 +727,11 @@ pub(super) fn write_extension_list(conformance: Conformance, value: bool) -> Res
     Ok(xml)
 }
 
-pub(super) fn replace(xml: &[u8], range: Range<usize>, value: &[u8]) -> Result<Vec<u8>> {
-    replace_xml(xml, range, value)
+pub(super) fn replace(
+    xml: &[u8],
+    range: Range<usize>,
+    value: &[u8],
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
+    replace_xml(xml, range, value, max_bytes)
 }

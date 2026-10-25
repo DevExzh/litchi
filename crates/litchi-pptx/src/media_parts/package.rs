@@ -130,7 +130,7 @@ pub(crate) fn validate_replay_references(
     let mut changed_slide_set = HashSet::new();
     changed_slide_set
         .try_reserve(changed_slides.len())
-        .map_err(|source| crate::Error::Allocation {
+        .map_err(|source| Error::Allocation {
             resource: "media replay changed slide names",
             source,
         })?;
@@ -138,7 +138,7 @@ pub(crate) fn validate_replay_references(
     let mut affected_slides = HashSet::new();
     affected_slides
         .try_reserve(changed_resources.len())
-        .map_err(|source| crate::Error::Allocation {
+        .map_err(|source| Error::Allocation {
             resource: "media replay affected slide names",
             source,
         })?;
@@ -152,7 +152,7 @@ pub(crate) fn validate_replay_references(
             }
             affected_slides
                 .try_reserve(1)
-                .map_err(|source| crate::Error::Allocation {
+                .map_err(|source| Error::Allocation {
                     resource: "media replay affected slide names",
                     source,
                 })?;
@@ -162,7 +162,7 @@ pub(crate) fn validate_replay_references(
     let mut affected_slides_ordered = Vec::new();
     affected_slides_ordered
         .try_reserve(affected_slides.len())
-        .map_err(|source| crate::Error::Allocation {
+        .map_err(|source| Error::Allocation {
             resource: "media replay affected slide names",
             source,
         })?;

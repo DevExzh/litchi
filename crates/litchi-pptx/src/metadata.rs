@@ -224,7 +224,11 @@ impl Package {
 
     /// This package with `opc`, whose document properties changed.
     fn with_metadata_opc(&self, opc: litchi_opc::OpcPackage) -> Result<Self> {
-        let part_bytes = Self::part_bytes_for(&opc)?;
+        let part_bytes = Self::part_bytes_for(&opc).map_err(|error| match error {
+            crate::Error::Opc(source) => Error::from(litchi_ooxml_common::Error::Opc(source)),
+            crate::Error::Internal { reason, .. } => Error::Internal(reason),
+            _ => Error::Internal("unexpected PPTX metadata owner byte-accounting failure"),
+        })?;
         Ok(self.derive_with_part_bytes(std::sync::Arc::new(opc), part_bytes))
     }
 }

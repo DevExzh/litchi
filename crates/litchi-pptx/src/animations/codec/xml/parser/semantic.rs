@@ -1277,7 +1277,7 @@ impl TimingParser {
                 ));
             }
             if raw.len() > limits.max_output_bytes {
-                return Err(crate::Error::Limit {
+                return Err(Error::Limit {
                     kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
                     observed: raw.len(),
                     maximum: limits.max_output_bytes,

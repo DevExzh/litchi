@@ -82,10 +82,25 @@ impl Limits {
     /// Intersect a selected semantic policy with the physical source ceiling.
     #[must_use]
     pub const fn constrained_by_source(self, source: litchi_opc::SourceLimits) -> Self {
-        let max_part_bytes = source.max_part_bytes().min(usize::MAX as u64) as usize;
+        let source_max_part_bytes = source.max_part_bytes();
+        let max_part_bytes = if source_max_part_bytes > usize::MAX as u64 {
+            usize::MAX
+        } else {
+            source_max_part_bytes as usize
+        };
+        let max_input_bytes = if self.max_input_bytes < max_part_bytes {
+            self.max_input_bytes
+        } else {
+            max_part_bytes
+        };
+        let max_output_bytes = if self.max_output_bytes < max_part_bytes {
+            self.max_output_bytes
+        } else {
+            max_part_bytes
+        };
         Self {
-            max_input_bytes: self.max_input_bytes.min(max_part_bytes),
-            max_output_bytes: self.max_output_bytes.min(max_part_bytes),
+            max_input_bytes,
+            max_output_bytes,
         }
     }
 }
@@ -111,11 +126,10 @@ pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub(crate) use codec::{bounded_text, is_namespace, pml, validate_qname};
 pub(crate) use package::{
     Anchor, available_part_name, available_relationship_id, discover_with_limits,
-    has_other_inbound, load_with_limits, relationship_namespace, replace_xml, resolve_anchor,
+    has_other_inbound, load_with_limits, relationship_namespace, replace_xml,
     resolve_anchor_with_limits, staged_xml, validate_relative_target, validate_replay_part,
     validate_selected_relationship,
 };
-
 pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
@@ -126,4 +140,4 @@ pub(crate) fn allocation(
 ) -> Error {
     Error::Allocation { resource, source }
 }
-pub(crate) use package::{put, put_with_limits, remove, remove_with_limits};
+pub(crate) use package::{put_with_limits, remove_with_limits};

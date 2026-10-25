@@ -7,7 +7,7 @@
 use litchi_opc::{OpcPackage, PackURI, XmlPart};
 
 use super::model::escaped_len;
-use super::package::process_owner_ooxml;
+use super::package::{process_owner_ooxml, put, remove};
 use super::*;
 
 fn parse(xml: &[u8]) -> Result<List> {

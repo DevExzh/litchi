@@ -2,9 +2,11 @@
 
 use super::model::{Conformance, Slide};
 use super::{
-    Limits, MAX_ATTRIBUTE_BYTES, MAX_ATTRIBUTES, MAX_DEPTH, MAX_NODES, MAX_NOTES_XML,
-    MAX_SLIDE_ROOT_NODES, allocation, checked_add, invalid, limit, resolved, xml_error,
+    Limits, MAX_ATTRIBUTES, MAX_NODES, MAX_SLIDE_ROOT_NODES, allocation, checked_add, invalid,
+    limit, resolved, xml_error,
 };
+#[cfg(test)]
+use super::{MAX_ATTRIBUTE_BYTES, MAX_DEPTH, MAX_NOTES_XML};
 use crate::{Error, Result};
 #[cfg(test)]
 use litchi_ooxml_common::mce::process_ooxml;

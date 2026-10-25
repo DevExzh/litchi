@@ -1125,7 +1125,8 @@ fn make_node(
     stack: &[Node],
     limits: Limits,
 ) -> Result<Node> {
-    let qname = std::str::from_utf8(element.name().as_ref()).map_err(xml_error)?;
+    let raw_name = element.name();
+    let qname = std::str::from_utf8(raw_name.as_ref()).map_err(xml_error)?;
     bounded_string(qname, limits)?;
     let qname = qname.to_owned();
     let mut bindings = stack
@@ -1343,7 +1344,7 @@ fn parse_guide(node: &Node, limits: Limits) -> Result<Guide> {
     })
 }
 
-fn parse_color(node: &Node, limits: Limits) -> Result<Color> {
+fn parse_color(node: &Node, _limits: Limits) -> Result<Color> {
     no_attributes(node)?;
     let colors = children(node)?;
     if colors.len() != 1 {

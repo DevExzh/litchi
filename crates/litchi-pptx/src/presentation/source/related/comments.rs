@@ -216,7 +216,7 @@ fn author_index(authors: Option<&[ParsedAuthor]>) -> Result<Option<AuthorIndex>>
 pub(crate) fn load_eager<'a>(
     package: &'a OpcPackage,
     slide: &SlidePart<'a>,
-    limits: crate::comments::Limits,
+    limits: comments::Limits,
 ) -> Result<Option<Comments>> {
     let Some((relationship, part)) = related_by_type(
         package,
@@ -256,7 +256,7 @@ pub(crate) fn load_eager<'a>(
 fn selected_eager_authors(
     package: &OpcPackage,
     parsed_comments: &[ParsedComment],
-    limits: crate::comments::Limits,
+    limits: comments::Limits,
 ) -> Result<Option<(RelatedPart, Vec<ParsedAuthor>)>> {
     // A comments part with no entries does not need the presentation author
     // graph. A non-empty part requires the selected author closure.

@@ -168,10 +168,14 @@ impl Limits {
     #[inline]
     #[must_use]
     pub const fn with_input_bytes(self, value: usize) -> Option<Self> {
-        (value > 0 && value <= Self::DEFAULT.max_input_bytes).then_some(Self {
-            max_input_bytes: value,
-            ..self
-        })
+        if value > 0 && value <= Self::DEFAULT.max_input_bytes {
+            Some(Self {
+                max_input_bytes: value,
+                ..self
+            })
+        } else {
+            None
+        }
     }
     #[inline]
     #[must_use]
@@ -181,10 +185,14 @@ impl Limits {
     #[inline]
     #[must_use]
     pub const fn with_output_bytes(self, value: usize) -> Option<Self> {
-        (value > 0 && value <= Self::DEFAULT.max_output_bytes).then_some(Self {
-            max_output_bytes: value,
-            ..self
-        })
+        if value > 0 && value <= Self::DEFAULT.max_output_bytes {
+            Some(Self {
+                max_output_bytes: value,
+                ..self
+            })
+        } else {
+            None
+        }
     }
     #[inline]
     #[must_use]
@@ -194,10 +202,14 @@ impl Limits {
     #[inline]
     #[must_use]
     pub const fn with_depth(self, value: usize) -> Option<Self> {
-        (value > 0 && value <= Self::DEFAULT.max_depth).then_some(Self {
-            max_depth: value,
-            ..self
-        })
+        if value > 0 && value <= Self::DEFAULT.max_depth {
+            Some(Self {
+                max_depth: value,
+                ..self
+            })
+        } else {
+            None
+        }
     }
     #[inline]
     #[must_use]
@@ -207,10 +219,14 @@ impl Limits {
     #[inline]
     #[must_use]
     pub const fn with_nodes(self, value: usize) -> Option<Self> {
-        (value > 0 && value <= Self::DEFAULT.max_nodes).then_some(Self {
-            max_nodes: value,
-            ..self
-        })
+        if value > 0 && value <= Self::DEFAULT.max_nodes {
+            Some(Self {
+                max_nodes: value,
+                ..self
+            })
+        } else {
+            None
+        }
     }
     #[inline]
     #[must_use]
@@ -220,10 +236,14 @@ impl Limits {
     #[inline]
     #[must_use]
     pub const fn with_string_bytes(self, value: usize) -> Option<Self> {
-        (value > 0 && value <= Self::DEFAULT.max_string_bytes).then_some(Self {
-            max_string_bytes: value,
-            ..self
-        })
+        if value > 0 && value <= Self::DEFAULT.max_string_bytes {
+            Some(Self {
+                max_string_bytes: value,
+                ..self
+            })
+        } else {
+            None
+        }
     }
     #[inline]
     #[must_use]
@@ -233,10 +253,14 @@ impl Limits {
     #[inline]
     #[must_use]
     pub const fn with_extensions(self, value: usize) -> Option<Self> {
-        (value > 0 && value <= Self::DEFAULT.max_extensions).then_some(Self {
-            max_extensions: value,
-            ..self
-        })
+        if value > 0 && value <= Self::DEFAULT.max_extensions {
+            Some(Self {
+                max_extensions: value,
+                ..self
+            })
+        } else {
+            None
+        }
     }
     #[inline]
     #[must_use]
@@ -246,10 +270,14 @@ impl Limits {
     #[inline]
     #[must_use]
     pub const fn with_custom_shows(self, value: usize) -> Option<Self> {
-        (value > 0 && value <= Self::DEFAULT.max_custom_shows).then_some(Self {
-            max_custom_shows: value,
-            ..self
-        })
+        if value > 0 && value <= Self::DEFAULT.max_custom_shows {
+            Some(Self {
+                max_custom_shows: value,
+                ..self
+            })
+        } else {
+            None
+        }
     }
     #[inline]
     #[must_use]
@@ -259,10 +287,14 @@ impl Limits {
     #[inline]
     #[must_use]
     pub const fn with_guides(self, value: usize) -> Option<Self> {
-        (value > 0 && value <= Self::DEFAULT.max_guides).then_some(Self {
-            max_guides: value,
-            ..self
-        })
+        if value > 0 && value <= Self::DEFAULT.max_guides {
+            Some(Self {
+                max_guides: value,
+                ..self
+            })
+        } else {
+            None
+        }
     }
     #[inline]
     #[must_use]
@@ -272,10 +304,14 @@ impl Limits {
     #[inline]
     #[must_use]
     pub const fn with_sections(self, value: usize) -> Option<Self> {
-        (value > 0 && value <= Self::DEFAULT.max_sections).then_some(Self {
-            max_sections: value,
-            ..self
-        })
+        if value > 0 && value <= Self::DEFAULT.max_sections {
+            Some(Self {
+                max_sections: value,
+                ..self
+            })
+        } else {
+            None
+        }
     }
     #[inline]
     #[must_use]
@@ -285,10 +321,14 @@ impl Limits {
     #[inline]
     #[must_use]
     pub const fn with_slide_references(self, value: usize) -> Option<Self> {
-        (value > 0 && value <= Self::DEFAULT.max_slide_references).then_some(Self {
-            max_slide_references: value,
-            ..self
-        })
+        if value > 0 && value <= Self::DEFAULT.max_slide_references {
+            Some(Self {
+                max_slide_references: value,
+                ..self
+            })
+        } else {
+            None
+        }
     }
     #[inline]
     #[must_use]
@@ -298,10 +338,14 @@ impl Limits {
     #[inline]
     #[must_use]
     pub const fn with_attributes(self, value: usize) -> Option<Self> {
-        (value > 0 && value <= Self::DEFAULT.max_attributes).then_some(Self {
-            max_attributes: value,
-            ..self
-        })
+        if value > 0 && value <= Self::DEFAULT.max_attributes {
+            Some(Self {
+                max_attributes: value,
+                ..self
+            })
+        } else {
+            None
+        }
     }
     #[inline]
     #[must_use]
@@ -311,10 +355,14 @@ impl Limits {
     #[inline]
     #[must_use]
     pub const fn with_relationships(self, value: usize) -> Option<Self> {
-        (value > 0 && value <= Self::DEFAULT.max_relationships).then_some(Self {
-            max_relationships: value,
-            ..self
-        })
+        if value > 0 && value <= Self::DEFAULT.max_relationships {
+            Some(Self {
+                max_relationships: value,
+                ..self
+            })
+        } else {
+            None
+        }
     }
 }
 
@@ -446,14 +494,10 @@ pub(crate) fn validate_replay_part_policy(
                 .constrained_by_source(source_limits),
         ),
         ReplayFamily::Guides if is_presentation_content_type(part.content_type()) => {
-            guides::load(package, guides::Limits::from_source_limits(source_limits)).map(drop)
+            guides::load(package, Limits::from_source_limits(source_limits)).map(drop)
         },
         ReplayFamily::Structure if is_presentation_content_type(part.content_type()) => {
-            structure::load(
-                package,
-                structure::Limits::from_source_limits(source_limits),
-            )
-            .map(drop)
+            structure::load(package, Limits::from_source_limits(source_limits)).map(drop)
         },
         // Designer-tag ownership is selected by a stable slide ID inside the
         // presentation owner.  Its changed-payload source scan above still

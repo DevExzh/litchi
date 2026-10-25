@@ -431,7 +431,7 @@ impl Revision {
             lineage: package.owner.package.source_lineage(),
             context,
             laser_limits,
-            laser_usage: Arc::new(std::sync::OnceLock::new()),
+            laser_usage: Arc::new(OnceLock::new()),
             // A prepared slide that encloses markup compatibility in shape
             // children admits only whole-shape removal (record 0303); other
             // slides keep the edit-time guards of each operation.

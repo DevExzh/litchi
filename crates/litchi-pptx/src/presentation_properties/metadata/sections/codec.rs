@@ -339,7 +339,8 @@ fn make_node(
     stack: &[Node],
     limits: Limits,
 ) -> Result<Node> {
-    let qname = std::str::from_utf8(element.name().as_ref()).map_err(xml_error)?;
+    let raw_name = element.name();
+    let qname = std::str::from_utf8(raw_name.as_ref()).map_err(xml_error)?;
     bounded_string(qname, limits)?;
     let qname = qname.to_owned();
     let mut bindings = stack

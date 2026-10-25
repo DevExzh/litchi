@@ -351,12 +351,25 @@ impl Usage {
     /// this keeps aggregate scope explicit when a batch preserves unchanged
     /// slide snapshots without rescanning their XML.
     pub(crate) const fn checked_add(self, other: Self) -> Option<Self> {
+        let total_slide_xml_bytes = match self
+            .total_slide_xml_bytes
+            .checked_add(other.total_slide_xml_bytes)
+        {
+            Some(value) => value,
+            None => return None,
+        };
+        let trace_count = match self.trace_count.checked_add(other.trace_count) {
+            Some(value) => value,
+            None => return None,
+        };
+        let point_count = match self.point_count.checked_add(other.point_count) {
+            Some(value) => value,
+            None => return None,
+        };
         Some(Self {
-            total_slide_xml_bytes: self
-                .total_slide_xml_bytes
-                .checked_add(other.total_slide_xml_bytes)?,
-            trace_count: self.trace_count.checked_add(other.trace_count)?,
-            point_count: self.point_count.checked_add(other.point_count)?,
+            total_slide_xml_bytes,
+            trace_count,
+            point_count,
         })
     }
 }

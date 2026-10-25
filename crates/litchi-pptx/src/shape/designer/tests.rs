@@ -45,7 +45,13 @@ fn reads_schema_boolean_forms_and_replaces_only_the_typed_range() {
         Some(true)
     );
 
-    let updated = transaction::set(&original, &source, false).expect("set");
+    let updated = transaction::set(
+        &original,
+        &source,
+        false,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("set");
     let parsed = codec::read(&updated).expect("updated source");
     assert_eq!(
         parsed.snapshot.as_ref().and_then(Snapshot::value),
@@ -80,12 +86,22 @@ fn unknown_extension_entries_and_known_extension_children_are_lossless() {
         2
     );
 
-    let updated = transaction::set(&xml, &source, false).expect("set");
+    let updated = transaction::set(
+        &xml,
+        &source,
+        false,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("set");
     assert!(contains(&updated, b"<f:payload answer=\"42\"/>"));
     assert!(contains(&updated, b"<f:future keep=\"yes\"/>"));
-    let removed = transaction::remove(&updated, &codec::read(&updated).expect("updated source"))
-        .expect("remove")
-        .expect("removed value");
+    let removed = transaction::remove(
+        &updated,
+        &codec::read(&updated).expect("updated source"),
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("remove")
+    .expect("removed value");
     assert_eq!(
         codec::read(&removed).expect("removed source").snapshot,
         None
@@ -98,7 +114,13 @@ fn unknown_extension_entries_and_known_extension_children_are_lossless() {
 fn creates_and_removes_extension_lists_without_touching_the_shape_tail() {
     let xml = br#"<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:nvSpPr><p:cNvPr id="1" name="Box"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/></p:sp>"#;
     let source = codec::read(xml).expect("source");
-    let updated = transaction::set(xml, &source, true).expect("set");
+    let updated = transaction::set(
+        xml,
+        &source,
+        true,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("set");
     let parsed = codec::read(&updated).expect("updated source");
     assert_eq!(
         parsed.snapshot.as_ref().and_then(Snapshot::value),
@@ -107,9 +129,13 @@ fn creates_and_removes_extension_lists_without_touching_the_shape_tail() {
     assert!(contains(&updated, b"<p:spPr/>"));
 
     let source = codec::read(&updated).expect("updated source");
-    let removed = transaction::remove(&updated, &source)
-        .expect("remove")
-        .expect("removed value");
+    let removed = transaction::remove(
+        &updated,
+        &source,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("remove")
+    .expect("removed value");
     assert_eq!(
         codec::read(&removed).expect("removed source").snapshot,
         None
@@ -216,7 +242,13 @@ fn validation_rejects_invalid_values_and_duplicate_known_extensions() {
 fn strict_profile_uses_the_strict_presentation_namespace() {
     let xml = br#"<p:sp xmlns:p="http://purl.oclc.org/ooxml/presentationml/main"><p:nvSpPr><p:cNvPr id="1" name="Box"/><p:cNvSpPr/><p:nvPr><p:extLst/></p:nvPr></p:nvSpPr><p:spPr/></p:sp>"#;
     let source = codec::read(xml).expect("source");
-    let updated = transaction::set(xml, &source, true).expect("set");
+    let updated = transaction::set(
+        xml,
+        &source,
+        true,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("set");
     assert!(contains(
         &updated,
         b"http://purl.oclc.org/ooxml/presentationml/main"

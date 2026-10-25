@@ -67,7 +67,7 @@ pub(crate) fn validate_parts_with_limits(parts: &[PartState], limits: Limits) ->
                 MAX_RELATIONSHIP_FIELD_BYTES,
             ));
         }
-        PackURI::new(name).map_err(crate::Error::Invalid)?;
+        PackURI::new(name).map_err(Error::Invalid)?;
         if part.content_type.is_empty() {
             return Err(invalid("notes part content type is empty"));
         }

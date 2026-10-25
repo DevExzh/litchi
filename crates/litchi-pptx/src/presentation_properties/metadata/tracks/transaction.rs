@@ -135,11 +135,12 @@ impl Draft {
         id: impl Into<String>,
         label: impl Into<String>,
     ) -> Result<()> {
+        let limits = self.original.limits;
         let caption = self.caption_mut(index)?;
         let mut candidate = caption.clone();
         candidate.id = id.into();
         candidate.label = label.into();
-        validate_caption(&candidate, self.original.limits)?;
+        validate_caption(&candidate, limits)?;
         *caption = candidate;
         Ok(())
     }
@@ -150,10 +151,11 @@ impl Draft {
     ///
     /// Returns an error if the operation fails.
     pub fn set_caption_language(&mut self, index: usize, language: Option<String>) -> Result<()> {
+        let limits = self.original.limits;
         let caption = self.caption_mut(index)?;
         let mut candidate = caption.clone();
         candidate.language = language;
-        validate_caption(&candidate, self.original.limits)?;
+        validate_caption(&candidate, limits)?;
         *caption = candidate;
         Ok(())
     }

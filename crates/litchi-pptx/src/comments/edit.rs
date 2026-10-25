@@ -14,7 +14,6 @@
     reason = "the delegated signatures name the module's values"
 )]
 
-use super::package as raw;
 use super::*;
 use crate::part_edit::{Staged, family};
 use crate::{Package, Result};
@@ -57,9 +56,7 @@ impl Package {
                     .semantic_limits()
                     .comments()
                     .constrained_by_source(target.read_limits());
-                patch.validate_changed_parts(target, |_, part| {
-                    super::validate_replay_part(part, limits)
-                })
+                patch.validate_changed_parts(target, |_, part| validate_replay_part(part, limits))
             },
         )?;
         Ok(commit_of((package, patch.0.clone())))
@@ -67,7 +64,7 @@ impl Package {
 }
 
 impl Edit<'_> {
-    fn limits(&self) -> super::Limits {
+    fn limits(&self) -> Limits {
         self.staged
             .semantic_limits()
             .comments()
@@ -139,7 +136,7 @@ impl Edit<'_> {
             graph
                 .slides
                 .into_iter()
-                .find(|slide| slide.slide_part_name == slide_part_name)
+                .find(|slide| slide.slide_part_name == slide_part_name.as_str())
                 .and_then(|slide| {
                     slide
                         .comments
@@ -200,7 +197,7 @@ impl Edit<'_> {
     ) -> Result<()> {
         let limits = self.limits();
         self.staged.update(move |opc| {
-            raw::update_presentation_comment_author_with_limits(
+            update_presentation_comment_author_with_limits(
                 opc,
                 author_id,
                 author,
@@ -225,7 +222,7 @@ impl Edit<'_> {
     pub fn remove_author(&mut self, author_id: u32, conformance: Conformance) -> Result<bool> {
         let limits = self.limits();
         self.staged.update(move |opc| {
-            raw::remove_presentation_comment_author_with_limits(opc, author_id, conformance, limits)
+            remove_presentation_comment_author_with_limits(opc, author_id, conformance, limits)
         })
     }
 
@@ -244,12 +241,7 @@ impl Edit<'_> {
     pub fn reorder_authors(&mut self, ordered_ids: &[u32], conformance: Conformance) -> Result<()> {
         let limits = self.limits();
         self.staged.update(move |opc| {
-            raw::reorder_presentation_comment_authors_with_limits(
-                opc,
-                ordered_ids,
-                conformance,
-                limits,
-            )
+            reorder_presentation_comment_authors_with_limits(opc, ordered_ids, conformance, limits)
         })
     }
 
@@ -373,7 +365,7 @@ impl Edit<'_> {
         let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let limits = self.limits();
         self.staged.update(move |opc| {
-            raw::reorder_presentation_comments_with_limits(
+            reorder_presentation_comments_with_limits(
                 opc,
                 slide_part_name.as_str(),
                 ordered_keys,

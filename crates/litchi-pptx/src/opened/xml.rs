@@ -2207,13 +2207,6 @@ pub(super) fn shape_removal_plan_in(
     Ok((root_span, removed_identities, scene.len()))
 }
 
-/// Return the raw span of one removable top-level shape after semantic and
-/// identity validation. The eager editor uses this before its relationship
-/// cleanup; source-backed staging uses the complete plan below.
-pub(crate) fn shape_removal_span(xml: &[u8], key: crate::shape::Key<'_>) -> Result<Range<usize>> {
-    shape_removal_span_with_limits(xml, key, crate::shape::Limits::DEFAULT)
-}
-
 pub(crate) fn shape_removal_span_with_limits(
     xml: &[u8],
     key: crate::shape::Key<'_>,

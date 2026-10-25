@@ -30,7 +30,7 @@ pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 // selector-to-byte-span mapping as programmable tags. Keep the scanner
 // implementation private while exposing this crate-internal seam to sibling
 // shape owners.
-pub(crate) use codec::selected_raw_span_with_limits;
+pub(crate) use codec::{selected_raw_span_for_shape, selected_raw_span_with_limits};
 
 // `tag::package` uses this narrow lexical seam while discovering package-level
 // tag anchors. The implementation remains private to the tag subsystem.

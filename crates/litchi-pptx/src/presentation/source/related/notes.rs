@@ -94,19 +94,14 @@ impl PartLoader for EagerLoader<'_> {
 
 /// Validate the selected source-backed notes part and its targeted closure.
 pub(super) fn validate(owner: &SourceInner, slide: &PackURI, part: &SourcePart) -> Result<()> {
-    validate_with_limits(
-        owner,
-        slide,
-        part,
-        crate::notes::Limits::from_source(owner.limits),
-    )
+    validate_with_limits(owner, slide, part, Limits::from_source(owner.limits))
 }
 
 pub(super) fn validate_with_limits(
     owner: &SourceInner,
     slide: &PackURI,
     part: &SourcePart,
-    limits: crate::notes::Limits,
+    limits: Limits,
 ) -> Result<()> {
     let presentation_uri = owner._presentation.source_partname().clone();
     let presentation_content_type = owner._presentation.content_type().to_owned();
@@ -131,7 +126,7 @@ pub(super) fn validate_eager(
         package,
         slide,
         part,
-        crate::notes::Limits::from_source(package.read_limits()),
+        Limits::from_source(package.read_limits()),
     )
 }
 
@@ -139,7 +134,7 @@ pub(super) fn validate_eager_with_limits(
     package: &OpcPackage,
     slide: &dyn Part,
     part: &dyn Part,
-    limits: crate::notes::Limits,
+    limits: Limits,
 ) -> Result<()> {
     let presentation_part = package.main_document_part()?;
     let presentation_uri = presentation_part.partname().clone();
@@ -170,17 +165,13 @@ pub(super) fn processed_eager_notes(
     part: &dyn Part,
     source_limits: litchi_opc::SourceLimits,
 ) -> Result<Arc<Vec<u8>>> {
-    processed_eager_notes_with_limits(
-        part,
-        source_limits,
-        crate::notes::Limits::from_source(source_limits),
-    )
+    processed_eager_notes_with_limits(part, source_limits, Limits::from_source(source_limits))
 }
 
 pub(super) fn processed_eager_notes_with_limits(
     part: &dyn Part,
     source_limits: litchi_opc::SourceLimits,
-    limits: crate::notes::Limits,
+    limits: Limits,
 ) -> Result<Arc<Vec<u8>>> {
     Ok(super::process_eager_part(
         part,
@@ -196,7 +187,7 @@ fn validate_selected<L: PartLoader>(
     presentation_uri: &PackURI,
     presentation_content_type: &str,
     part: &dyn Part,
-    limits: crate::notes::Limits,
+    limits: Limits,
 ) -> Result<()> {
     require_content_type(part, ct::PML_NOTES_SLIDE)?;
     validate_leaf_path(part.partname(), "/ppt/notesSlides/")?;

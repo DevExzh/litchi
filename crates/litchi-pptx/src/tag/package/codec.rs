@@ -12,8 +12,8 @@ use super::validation::{
     anchor_relationship_id, available_part_name, available_relationship_id, bump_graph_link,
     bump_owner_node, checked_owner_depth, has_non_namespace_attrs, has_other_inbound,
     observe_common_slide_child, observe_customer_data_child, owner_anchor_uses, owner_kind,
-    presentation_later, resolve_anchor, validate_relative_target, validate_selected_relationship,
-    xml_position,
+    presentation_later, resolve_anchor_with_limits, validate_relative_target,
+    validate_selected_relationship, xml_position,
 };
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use litchi_core::xml::ReaderOrigin;

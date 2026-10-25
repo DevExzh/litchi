@@ -11,6 +11,7 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use codec::validate_slide_xml;
 pub use codec::{EXTENSION_URI, Limits};
 pub use model::{Draft, Event, Kind, Trigger};
 pub use package::{load, load_snapshot};

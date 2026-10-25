@@ -7,7 +7,7 @@ use super::super::{BoundedString, Limits, process_str};
 use super::model::Master;
 use crate::presentation_properties::metadata::new_guid;
 use crate::{Error, Result};
-use litchi_ooxml_common::xml::attributes::first_wins;
+use litchi_ooxml_common::xml::attributes::{BytesStartExt as _, first_wins};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 

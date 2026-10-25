@@ -107,7 +107,13 @@ fn maps_all_five_families_and_nested_groups_to_raw_source() {
 
         let layout =
             scan_layout(&xml, by_index, crate::shape::Limits::DEFAULT).expect("shape layout");
-        let staged = add_anchor(&xml, &layout, "rId9").expect("anchor insertion");
+        let staged = add_anchor(
+            &xml,
+            &layout,
+            "rId9",
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )
+        .expect("anchor insertion");
         let staged_span =
             selected_raw_span(&staged, crate::shape::Key::Name(name)).expect("staged shape maps");
         let staged_layout = scan_layout(&staged, staged_span, crate::shape::Limits::DEFAULT)
@@ -119,7 +125,12 @@ fn maps_all_five_families_and_nested_groups_to_raw_source() {
                 .map(|anchor| anchor.id.as_str()),
             Some("rId9")
         );
-        let removed = remove_anchor(&staged, &staged_layout).expect("anchor removal");
+        let removed = remove_anchor(
+            &staged,
+            &staged_layout,
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )
+        .expect("anchor removal");
         let removed_span =
             selected_raw_span(&removed, crate::shape::Key::Name(name)).expect("removed shape maps");
         assert!(
@@ -184,7 +195,13 @@ fn preserves_customer_data_and_inserts_before_extensions() {
         .into_bytes();
     let span = selected_raw_span(&xml, crate::shape::Key::Name("Ordered")).expect("shape");
     let layout = scan_layout(&xml, span, crate::shape::Limits::DEFAULT).expect("layout");
-    let staged = add_anchor(&xml, &layout, "rIdTags").expect("insert");
+    let staged = add_anchor(
+        &xml,
+        &layout,
+        "rIdTags",
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("insert");
     let text = std::str::from_utf8(&staged).expect("UTF-8 fixture");
     assert!(text.find("<p:custData ").unwrap() < text.find("<p:tags ").unwrap());
     assert!(text.find("<p:tags ").unwrap() < text.find("</p:custDataLst>").unwrap());
@@ -195,7 +212,12 @@ fn preserves_customer_data_and_inserts_before_extensions() {
         selected_raw_span(&staged, crate::shape::Key::Name("Ordered")).expect("shape");
     let staged_layout =
         scan_layout(&staged, staged_span, crate::shape::Limits::DEFAULT).expect("layout");
-    let removed = remove_anchor(&staged, &staged_layout).expect("remove");
+    let removed = remove_anchor(
+        &staged,
+        &staged_layout,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("remove");
     assert_eq!(removed, xml);
 }
 
@@ -225,7 +247,13 @@ fn mce_mapping_edits_only_the_active_raw_branch() {
     );
     let layout =
         scan_layout(&xml, active_span, crate::shape::Limits::DEFAULT).expect("active layout");
-    let staged = add_anchor(&xml, &layout, "rIdTags").expect("active insertion");
+    let staged = add_anchor(
+        &xml,
+        &layout,
+        "rIdTags",
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .expect("active insertion");
     let text = std::str::from_utf8(&staged).expect("UTF-8 fixture");
     assert_eq!(text.matches("<p:tags ").count(), 2);
     assert!(text.contains(r#"<p:tags r:id="rIdInactive"/>"#));

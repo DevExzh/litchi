@@ -2340,6 +2340,4 @@ fn rewrite_body_text(
 #[path = "text_structure.rs"]
 mod structure;
 pub use structure::TextBody;
-pub(crate) use structure::{
-    Change as TextChange, stage_text_structure, stage_text_structure_with_limits,
-};
+pub(crate) use structure::{Change as TextChange, stage_text_structure_with_limits};

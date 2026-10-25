@@ -124,9 +124,9 @@ pub(crate) use transaction::{
     validate_text_box_input,
 };
 pub(crate) use xml::{
-    insert_slide_binding, reorder_slide_bindings, shape_removal_span_with_limits,
-    shape_text_skeleton_with_limits, stage_shape_removal_with_limits,
-    stage_shape_texts_with_limits, strip_appended_text_boxes_with_limits, validate_slide_bindings,
+    insert_slide_binding, reorder_slide_bindings, shape_text_skeleton_with_limits,
+    stage_shape_removal_with_limits, stage_shape_texts_with_limits,
+    strip_appended_text_boxes_with_limits, validate_slide_bindings,
 };
 pub(crate) use xml::{
     remove_slide_binding, slide_binding_removal_spans, validate_slide_catalog_delta,

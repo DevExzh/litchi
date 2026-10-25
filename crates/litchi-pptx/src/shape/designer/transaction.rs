@@ -5,49 +5,52 @@ use super::validation::validate_value;
 use crate::Result;
 
 /// Stage a value into one selected raw shape while preserving unrelated XML.
-pub(super) fn set(xml: &[u8], source: &Source, value: bool) -> Result<Vec<u8>> {
+pub(super) fn set(xml: &[u8], source: &Source, value: bool, max_bytes: usize) -> Result<Vec<u8>> {
     validate_value(value)?;
     let generated = codec::write_design_element(value);
     if let Some(known) = &source.layout.known {
         if let Some(element) = &known.design {
-            return codec::replace(xml, element.span.clone(), &generated);
+            return codec::replace(xml, element.span.clone(), &generated, max_bytes);
         }
         if known.element.empty {
-            return expand_empty(xml, &known.element, &generated);
+            return expand_empty(xml, &known.element, &generated, max_bytes);
         }
         return codec::replace(
             xml,
             known.element.close_start..known.element.close_start,
             &generated,
+            max_bytes,
         );
     }
 
     if let Some(ext_lst) = &source.layout.ext_lst {
         let extension = codec::write_extension(source.layout.conformance, value)?;
         if ext_lst.element.empty {
-            return expand_empty(xml, &ext_lst.element, &extension);
+            return expand_empty(xml, &ext_lst.element, &extension, max_bytes);
         }
         return codec::replace(
             xml,
             ext_lst.element.close_start..ext_lst.element.close_start,
             &extension,
+            max_bytes,
         );
     }
 
     let list = codec::write_extension_list(source.layout.conformance, value)?;
     if source.layout.nv_pr.empty {
-        expand_empty(xml, &source.layout.nv_pr, &list)
+        expand_empty(xml, &source.layout.nv_pr, &list, max_bytes)
     } else {
         codec::replace(
             xml,
             source.layout.nv_pr.close_start..source.layout.nv_pr.close_start,
             &list,
+            max_bytes,
         )
     }
 }
 
 /// Remove the typed design element while retaining unrelated extension bytes.
-pub(super) fn remove(xml: &[u8], source: &Source) -> Result<Option<Vec<u8>>> {
+pub(super) fn remove(xml: &[u8], source: &Source, max_bytes: usize) -> Result<Option<Vec<u8>>> {
     let Some(known) = &source.layout.known else {
         return Ok(None);
     };
@@ -62,17 +65,17 @@ pub(super) fn remove(xml: &[u8], source: &Source) -> Result<Option<Vec<u8>>> {
             .as_ref()
             .is_some_and(|list| list.child_elements == 1 && !list.other_content)
     {
-        return Ok(Some(collapse_empty(xml, &source.layout.nv_pr)?));
+        return Ok(Some(collapse_empty(xml, &source.layout.nv_pr, max_bytes)?));
     }
     let replacement = if known.other_content {
         design.span.clone()
     } else {
         known.element.span.clone()
     };
-    Ok(Some(codec::replace(xml, replacement, &[])?))
+    Ok(Some(codec::replace(xml, replacement, &[], max_bytes)?))
 }
 
-fn collapse_empty(xml: &[u8], element: &codec::Element) -> Result<Vec<u8>> {
+fn collapse_empty(xml: &[u8], element: &codec::Element, max_bytes: usize) -> Result<Vec<u8>> {
     let raw = xml
         .get(element.span.clone())
         .ok_or_else(|| crate::Error::Invalid("designer element range is invalid".into()))?;
@@ -83,10 +86,15 @@ fn collapse_empty(xml: &[u8], element: &codec::Element) -> Result<Vec<u8>> {
     let mut replacement = Vec::with_capacity(end + 2);
     replacement.extend_from_slice(&raw[..end]);
     replacement.extend_from_slice(b"/>");
-    codec::replace(xml, element.span.clone(), &replacement)
+    codec::replace(xml, element.span.clone(), &replacement, max_bytes)
 }
 
-fn expand_empty(xml: &[u8], element: &codec::Element, child: &[u8]) -> Result<Vec<u8>> {
+fn expand_empty(
+    xml: &[u8],
+    element: &codec::Element,
+    child: &[u8],
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
     let raw = xml
         .get(element.span.clone())
         .ok_or_else(|| crate::Error::Invalid("designer empty element range is invalid".into()))?;
@@ -115,7 +123,7 @@ fn expand_empty(xml: &[u8], element: &codec::Element, child: &[u8]) -> Result<Ve
     replacement.extend_from_slice(b"</");
     replacement.extend_from_slice(qname);
     replacement.push(b'>');
-    codec::replace(xml, element.span.clone(), &replacement)
+    codec::replace(xml, element.span.clone(), &replacement, max_bytes)
 }
 
 fn qualified_name(element: &[u8]) -> Result<&[u8]> {

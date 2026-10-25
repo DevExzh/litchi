@@ -325,25 +325,6 @@ fn insert_run(
     splices.apply(paragraph)
 }
 
-/// Apply `change` to the text body `body` of the part `xml` (a slide or a
-/// notes page), returning the candidate part.
-pub(crate) fn stage_text_structure(
-    xml: &[u8],
-    body: TextBody,
-    change: &Change<'_>,
-    max_text_bytes: usize,
-    max_output_bytes: usize,
-) -> Result<Vec<u8>> {
-    stage_text_structure_with_limits(
-        xml,
-        body,
-        change,
-        max_text_bytes,
-        max_output_bytes,
-        crate::shape::Limits::DEFAULT,
-    )
-}
-
 pub(crate) fn stage_text_structure_with_limits(
     xml: &[u8],
     body: TextBody,

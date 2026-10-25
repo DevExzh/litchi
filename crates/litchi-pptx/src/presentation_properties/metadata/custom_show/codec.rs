@@ -5,7 +5,7 @@
 use super::super::{BoundedString, Limits, check_string, process_str};
 use super::model::{List, Show};
 use crate::{Error, Result};
-use litchi_ooxml_common::xml::attributes::first_wins;
+use litchi_ooxml_common::xml::attributes::{BytesStartExt as _, first_wins};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 use std::collections::HashMap;

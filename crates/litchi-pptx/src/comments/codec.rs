@@ -351,7 +351,7 @@ pub(super) fn validate_comment_list_with_limit(
 /// instructions were skipped.
 fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
     if xml.len() > limits.max_input_bytes {
-        return Err(crate::Error::Limit {
+        return Err(Error::Limit {
             kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
             observed: xml.len(),
             maximum: limits.max_input_bytes,
@@ -359,7 +359,7 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
     }
     let (processed, instructions) = process_comment_mce(xml, limits)?;
     if processed.len() > limits.max_input_bytes {
-        return Err(crate::Error::Limit {
+        return Err(Error::Limit {
             kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
             observed: processed.len(),
             maximum: limits.max_input_bytes,
@@ -710,7 +710,7 @@ fn validate_string_with_limit(_label: &str, value: &str, max_string_bytes: usize
     if value.len() <= max_string_bytes {
         Ok(())
     } else {
-        Err(crate::Error::Limit {
+        Err(Error::Limit {
             kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
             observed: value.len(),
             maximum: max_string_bytes,

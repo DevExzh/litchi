@@ -7,6 +7,11 @@
 
 use crate::Error;
 
+use codec::{
+    MAX_TEMPLATE_TIME_NODE_BYTES, MAX_TIMING_ATTRIBUTES, MAX_TIMING_DEPTH, MAX_TIMING_NODES,
+    MAX_TIMING_TEXT_BYTES, MAX_TIMING_XML_BYTES,
+};
+
 mod codec;
 mod model;
 mod package;
@@ -42,13 +47,13 @@ pub struct Limits {
 
 impl Limits {
     pub const DEFAULT: Self = Self {
-        max_input_bytes: crate::animations::codec::validation::MAX_TIMING_XML_BYTES,
-        max_output_bytes: crate::animations::codec::validation::MAX_TIMING_XML_BYTES,
-        max_depth: crate::animations::codec::validation::MAX_TIMING_DEPTH,
-        max_nodes: crate::animations::codec::validation::MAX_TIMING_NODES,
-        max_text_bytes: crate::animations::codec::validation::MAX_TIMING_TEXT_BYTES,
-        max_template_bytes: crate::animations::codec::validation::MAX_TEMPLATE_TIME_NODE_BYTES,
-        max_attributes: crate::animations::codec::validation::MAX_TIMING_ATTRIBUTES,
+        max_input_bytes: MAX_TIMING_XML_BYTES,
+        max_output_bytes: MAX_TIMING_XML_BYTES,
+        max_depth: MAX_TIMING_DEPTH,
+        max_nodes: MAX_TIMING_NODES,
+        max_text_bytes: MAX_TIMING_TEXT_BYTES,
+        max_template_bytes: MAX_TEMPLATE_TIME_NODE_BYTES,
+        max_attributes: MAX_TIMING_ATTRIBUTES,
     };
 
     #[must_use]
@@ -59,17 +64,29 @@ impl Limits {
     /// Intersect a selected semantic policy with the physical source ceiling.
     #[must_use]
     pub const fn constrained_by_source(self, source: litchi_opc::SourceLimits) -> Self {
-        let part = source.max_part_bytes().min(usize::MAX as u64) as usize;
+        let part = cap_u64(source.max_part_bytes());
         Self {
-            max_input_bytes: self.max_input_bytes.min(part),
-            max_output_bytes: self.max_output_bytes.min(part),
-            max_depth: self.max_depth.min(source.max_depth()),
-            max_nodes: self.max_nodes.min(source.max_events()),
-            max_text_bytes: self.max_text_bytes.min(part),
-            max_template_bytes: self.max_template_bytes.min(part),
-            max_attributes: self.max_attributes.min(source.max_xml_attribute_bytes()),
+            max_input_bytes: min_usize(self.max_input_bytes, part),
+            max_output_bytes: min_usize(self.max_output_bytes, part),
+            max_depth: min_usize(self.max_depth, source.max_depth()),
+            max_nodes: min_usize(self.max_nodes, source.max_events()),
+            max_text_bytes: min_usize(self.max_text_bytes, part),
+            max_template_bytes: min_usize(self.max_template_bytes, part),
+            max_attributes: min_usize(self.max_attributes, source.max_xml_attribute_bytes()),
             ..self
         }
+    }
+}
+
+const fn min_usize(left: usize, right: usize) -> usize {
+    if left < right { left } else { right }
+}
+
+const fn cap_u64(value: u64) -> usize {
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
     }
 }
 

@@ -14,7 +14,6 @@
     reason = "the delegated signatures name the module's values"
 )]
 
-use super::package as raw;
 use super::*;
 use crate::part_edit::{Staged, family};
 use crate::{Package, Result};
@@ -60,28 +59,28 @@ impl Package {
                 let mut changed_resources = Vec::new();
                 let mut changed_slides = Vec::new();
                 patch.validate_changed_parts(target, |name, part| {
-                    raw::validate_replay_part(target, name, part, limits)?;
+                    validate_replay_part(target, name, part, limits)?;
                     if part.content_type() == litchi_opc::constants::content_type::PML_SLIDE {
-                        changed_slides.try_reserve(1).map_err(|source| {
-                            crate::Error::Allocation {
+                        changed_slides
+                            .try_reserve(1)
+                            .map_err(|source| Error::Allocation {
                                 resource: "media replay changed slide names",
                                 source,
-                            }
-                        })?;
+                            })?;
                         changed_slides.push(name.clone());
                     } else if name.as_str().starts_with("/ppt/media/") {
-                        changed_resources.try_reserve(1).map_err(|source| {
-                            crate::Error::Allocation {
+                        changed_resources
+                            .try_reserve(1)
+                            .map_err(|source| Error::Allocation {
                                 resource: "media replay changed resource names",
                                 source,
-                            }
-                        })?;
+                            })?;
                         changed_resources.push(name.clone());
                     }
                     Ok(())
                 })?;
                 let index = patch.replay_index_after(package, target)?;
-                raw::validate_replay_references(
+                validate_replay_references(
                     target,
                     &index,
                     &changed_resources,
@@ -95,7 +94,7 @@ impl Package {
 }
 
 impl Edit<'_> {
-    fn limits(&self) -> super::Limits {
+    fn limits(&self) -> Limits {
         self.staged
             .semantic_limits()
             .media_parts()
@@ -109,7 +108,7 @@ impl Edit<'_> {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn media<'s>(&self, slide: impl Into<crate::slide::Selector<'s>>) -> Result<List> {
         let slide_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
-        super::package::load_with_limits(self.staged.opc(), &slide_name, self.limits())
+        package::load_with_limits(self.staged.opc(), &slide_name, self.limits())
     }
 
     /// Adds a new set of media pictures and their inert internal resources to a Slide part.
@@ -126,7 +125,7 @@ impl Edit<'_> {
         let slide_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let limits = self.limits();
         self.staged.update(move |opc| {
-            raw::store_with_limits(opc, &slide_name, value, conformance, false, limits)
+            store_with_limits(opc, &slide_name, value, conformance, false, limits)
         })
     }
 

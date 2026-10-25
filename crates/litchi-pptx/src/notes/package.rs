@@ -336,9 +336,7 @@ pub(crate) fn validate_replay_part(part: &dyn Part, limits: Limits) -> Result<()
 /// replay write set.
 pub(crate) fn validate_replay_total(index: &ReplayIndex, limits: Limits) -> Result<()> {
     if let Some(theme) = index.missing_theme_name()? {
-        return Err(Error::Opc(litchi_opc::OpcError::PartNotFound(
-            theme.to_string(),
-        )));
+        return Err(Error::Opc(OpcError::PartNotFound(theme.to_string())));
     }
     let total = usize::try_from(index.notes_total_bytes())
         .map_err(|_| invalid("notes aggregate bytes overflow"))?;

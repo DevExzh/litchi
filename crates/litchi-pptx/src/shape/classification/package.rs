@@ -73,8 +73,9 @@ pub(crate) fn put_with_limits<'k>(
         )
     };
     let previous = source.snapshot.clone();
-    let staged_shape = transaction::set(&shape_blob, &source, outcome)?;
-    let staged_owner = codec::replace(&owner_blob, span.clone(), &staged_shape)?;
+    let max_output_bytes = shape_limits.output_bytes();
+    let staged_shape = transaction::set(&shape_blob, &source, outcome, max_output_bytes)?;
+    let staged_owner = codec::replace(&owner_blob, span.clone(), &staged_shape, max_output_bytes)?;
     validate_staged(&staged_owner, key, outcome, shape_limits)?;
     // An exact no-op returns before the package is borrowed mutably, so it
     // keeps the exact source, and with it a signature, byte for byte.
@@ -130,10 +131,11 @@ pub(crate) fn remove_with_limits<'k>(
     let Some(previous) = source.snapshot.clone() else {
         return Ok(None);
     };
-    let Some(staged_shape) = transaction::remove(&shape_blob, &source)? else {
+    let max_output_bytes = shape_limits.output_bytes();
+    let Some(staged_shape) = transaction::remove(&shape_blob, &source, max_output_bytes)? else {
         return Ok(None);
     };
-    let staged_owner = codec::replace(&owner_blob, span, &staged_shape)?;
+    let staged_owner = codec::replace(&owner_blob, span, &staged_shape, max_output_bytes)?;
     validate_removed(&staged_owner, key, shape_limits)?;
     // An exact no-op returns before the package is borrowed mutably, so it
     // keeps the exact source, and with it a signature, byte for byte.

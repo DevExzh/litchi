@@ -243,21 +243,6 @@ pub(super) fn owner_anchor_uses(xml: &[u8], relationship_id: &str) -> Result<usi
     Ok(uses)
 }
 
-pub(crate) fn resolve_anchor(
-    owner: &dyn OpcPart,
-    package: &OpcPackage,
-    anchor: &Anchor,
-    expected: super::super::Conformance,
-) -> Result<super::super::Source> {
-    resolve_anchor_with_limits(
-        owner,
-        package,
-        anchor,
-        expected,
-        Limits::from_source(package.read_limits()),
-    )
-}
-
 pub(crate) fn resolve_anchor_with_limits(
     owner: &dyn OpcPart,
     package: &OpcPackage,

@@ -9,20 +9,25 @@ mod validation;
 
 pub use codec::{master_xml, write_text, write_text_with};
 pub(crate) use codec::{
-    rewrite_text, root_conformance, root_conformance_from_processed, scan_xml,
-    validate_resource_xml, validate_resource_xml_with_limits,
+    rewrite_text, root_conformance_from_processed, root_conformance_with_limits,
+    scan_xml_with_limits, validate_resource_xml_with_limits,
 };
+#[cfg(test)]
+pub(crate) use codec::{root_conformance, scan_xml, validate_resource_xml};
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 pub use model::{Conformance, Graph, Link, Master, Slide, Theme};
 pub(crate) use package::{
-    SlideRootMemo, SlideRootProof, apply_commit, clear_checked, clear_checked_with_limits,
-    clear_with_limits, load, load_snapshot, load_snapshot_with_limits,
-    load_snapshot_with_slide_root_proofs, load_snapshot_with_slide_root_proofs_and_limits,
-    load_with_limits, remove_checked, remove_checked_with_limits, remove_with_limits,
-    validate_replay_part, validate_replay_total,
+    SlideRootMemo, SlideRootProof, apply_commit, clear_checked_with_limits,
+    load_snapshot_with_limits, load_snapshot_with_slide_root_proofs_and_limits, load_with_limits,
+    remove_checked_with_limits, validate_replay_part, validate_replay_total,
 };
 #[cfg(test)]
 pub(crate) use package::{clear, put, remove, with_refused_slide_root_reservation};
+#[cfg(test)]
+pub(crate) use package::{
+    clear_checked, clear_with_limits, load, load_snapshot, load_snapshot_with_slide_root_proofs,
+    remove_checked, remove_with_limits,
+};
 pub(crate) use transaction::Draft;
 pub use transaction::{Revision, Snapshot};
 pub(crate) use validation::validate_id;
@@ -84,21 +89,35 @@ impl Limits {
     /// Intersect a selected semantic policy with the physical source ceiling.
     #[must_use]
     pub const fn constrained_by_source(self, source: litchi_opc::SourceLimits) -> Self {
-        let part = source.max_part_bytes().min(usize::MAX as u64) as usize;
+        let part = cap_u64(source.max_part_bytes());
         Self {
-            max_input_bytes: self.max_input_bytes.min(part),
-            max_output_bytes: self.max_output_bytes.min(part),
-            max_depth: self.max_depth.min(source.max_depth()),
-            max_nodes: self.max_nodes.min(source.max_events()),
-            max_attribute_bytes: self
-                .max_attribute_bytes
-                .min(source.max_xml_attribute_bytes()),
-            max_text_bytes: self.max_text_bytes.min(part),
-            max_total_bytes: self
-                .max_total_bytes
-                .min(source.max_total_part_bytes().min(usize::MAX as u64) as usize),
+            max_input_bytes: min_usize(self.max_input_bytes, part),
+            max_output_bytes: min_usize(self.max_output_bytes, part),
+            max_depth: min_usize(self.max_depth, source.max_depth()),
+            max_nodes: min_usize(self.max_nodes, source.max_events()),
+            max_attribute_bytes: min_usize(
+                self.max_attribute_bytes,
+                source.max_xml_attribute_bytes(),
+            ),
+            max_text_bytes: min_usize(self.max_text_bytes, part),
+            max_total_bytes: min_usize(
+                self.max_total_bytes,
+                cap_u64(source.max_total_part_bytes()),
+            ),
             ..self
         }
+    }
+}
+
+const fn min_usize(left: usize, right: usize) -> usize {
+    if left < right { left } else { right }
+}
+
+const fn cap_u64(value: u64) -> usize {
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
     }
 }
 
@@ -133,7 +152,7 @@ pub(crate) fn allocation(
 
 pub(crate) fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        kind: crate::error::LimitKind::Codec(kind),
+        kind: LimitKind::Codec(kind),
         observed,
         maximum,
     }

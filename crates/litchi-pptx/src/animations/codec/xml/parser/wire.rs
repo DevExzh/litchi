@@ -363,16 +363,13 @@ pub(super) fn parse_recursive_timing_tree(xml: &str, limits: Limits) -> Result<T
         .get(range)
         .ok_or_else(|| invalid("animation timing range is invalid"))?;
     if source.len() > limits.max_output_bytes {
-        return Err(crate::Error::Limit {
+        return Err(Error::Limit {
             kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
             observed: source.len(),
             maximum: limits.max_output_bytes,
         });
     }
-    let source = std::str::from_utf8(source)
-        .map_err(|_err| invalid("animation timing XML is not UTF-8"))?
-        .to_owned()
-        .into_boxed_str();
+    let source = source.to_owned().into_boxed_str();
     let mut tree = TimingTree {
         roots,
         opaque_children: Vec::new(),

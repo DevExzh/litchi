@@ -1761,7 +1761,7 @@ pub(crate) fn validate_value_with_limit(
     }
 }
 
-fn validate_string_with_limit(value: &str, _label: &str, max_string_bytes: usize) -> Result<()> {
+fn validate_string_with_limit(value: &str, label: &str, max_string_bytes: usize) -> Result<()> {
     if value.len() > max_string_bytes {
         return Err(limit(
             crate::error::CodecLimitKind::StringBytes,

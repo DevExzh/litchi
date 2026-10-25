@@ -171,7 +171,12 @@ pub(crate) fn put_with_limits<'k>(
         let (relationship_id, owner_xml) = if shared_anchor {
             let owner = package.get_part(&owner_name)?;
             let relationship_id = available_relationship_id(owner)?;
-            let owner_xml = replace_anchor_id(owner.blob(), &layout, &relationship_id)?;
+            let owner_xml = replace_anchor_id(
+                owner.blob(),
+                &layout,
+                &relationship_id,
+                shape_limits.output_bytes(),
+            )?;
             validate_staged_anchor(owner, &owner_xml, key, Some(&relationship_id), shape_limits)?;
             (relationship_id, Some(owner_xml))
         } else {
@@ -220,7 +225,12 @@ pub(crate) fn put_with_limits<'k>(
         let part_name = available_part_name(package)?;
         let target_ref = part_name.relative_ref(owner_name.base_uri());
         validate_relative_target(&owner_name, &target_ref, &part_name)?;
-        let owner_xml = add_anchor(owner.blob(), &layout, &relationship_id)?;
+        let owner_xml = add_anchor(
+            owner.blob(),
+            &layout,
+            &relationship_id,
+            shape_limits.output_bytes(),
+        )?;
         validate_staged_anchor(owner, &owner_xml, key, Some(&relationship_id), shape_limits)?;
         (relationship_id, part_name, target_ref, owner_xml)
     };
@@ -305,7 +315,7 @@ pub(crate) fn remove_with_limits<'k>(
         let owner_name = owner.partname().clone();
         let retain_relationship =
             preserved_anchor_uses(owner.blob(), &anchor.id, shape_limits)? > 1;
-        let owner_xml = remove_anchor(owner.blob(), &layout)?;
+        let owner_xml = remove_anchor(owner.blob(), &layout, shape_limits.output_bytes())?;
         validate_staged_anchor(owner, &owner_xml, key, None, shape_limits)?;
         let orphan = !retain_relationship
             && !has_other_inbound(package, source.part(), &owner_name, source.rel())?;

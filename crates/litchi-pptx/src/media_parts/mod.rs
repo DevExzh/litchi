@@ -17,9 +17,9 @@ pub use model::{
     Resource, Transform, Trim,
 };
 pub use package::load;
-pub(crate) use package::{
-    store_with, store_with_limits, validate_replay_part, validate_replay_references,
-};
+#[cfg(test)]
+pub(crate) use package::store_with;
+pub(crate) use package::{store_with_limits, validate_replay_part, validate_replay_references};
 pub use summary::{Summary, summary};
 
 // These are crate-private seams shared by the XML and package layers and by
@@ -27,13 +27,16 @@ pub use summary::{Summary, summary};
 #[cfg(test)]
 pub(crate) use codec::{BoundedXml, write_picture};
 pub(crate) use codec::{
-    bounded, document_conformance, document_conformance_with_limits, validate_id, xml_error,
+    document_conformance, document_conformance_with_limits, validate_id, xml_error,
 };
 #[cfg(test)]
 pub(crate) use package::resource_uri;
-pub(crate) use package::{parse_time, validate_value, validate_value_with_limits};
+#[cfg(test)]
+pub(crate) use package::validate_value;
+pub(crate) use package::{parse_time, validate_value_with_limits};
 
 use crate::Result;
+use crate::error::CodecLimitKind;
 use crate::time::{Offset, ParseError as TimeParseError};
 use litchi_drawingml::coordinate::{Coordinate, Extent, ParseError as CoordinateParseError};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -107,22 +110,33 @@ impl Limits {
     /// event count; a caller-selected semantic policy can only narrow it.
     #[must_use]
     pub const fn constrained_by_source(self, source: litchi_opc::SourceLimits) -> Self {
-        let part = source.max_part_bytes().min(usize::MAX as u64) as usize;
+        let part = cap_u64(source.max_part_bytes());
         Self {
-            max_input_bytes: self.max_input_bytes.min(part),
-            max_output_bytes: self.max_output_bytes.min(part),
-            max_depth: self.max_depth.min(source.max_depth()),
-            max_nodes: self.max_nodes.min(source.max_events()),
-            max_string_bytes: self.max_string_bytes.min(source.max_xml_attribute_bytes()),
-            max_extension_bytes: self.max_extension_bytes.min(part),
-            max_payload_bytes: self
-                .max_payload_bytes
-                .min(source.max_entry_bytes().min(usize::MAX as u64) as usize),
-            max_total_payload_bytes: self
-                .max_total_payload_bytes
-                .min(source.max_total_part_bytes().min(usize::MAX as u64) as usize),
+            max_input_bytes: min_usize(self.max_input_bytes, part),
+            max_output_bytes: min_usize(self.max_output_bytes, part),
+            max_depth: min_usize(self.max_depth, source.max_depth()),
+            max_nodes: min_usize(self.max_nodes, source.max_events()),
+            max_string_bytes: min_usize(self.max_string_bytes, source.max_xml_attribute_bytes()),
+            max_extension_bytes: min_usize(self.max_extension_bytes, part),
+            max_payload_bytes: min_usize(self.max_payload_bytes, cap_u64(source.max_entry_bytes())),
+            max_total_payload_bytes: min_usize(
+                self.max_total_payload_bytes,
+                cap_u64(source.max_total_part_bytes()),
+            ),
             ..self
         }
+    }
+}
+
+const fn min_usize(left: usize, right: usize) -> usize {
+    if left < right { left } else { right }
+}
+
+const fn cap_u64(value: u64) -> usize {
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
     }
 }
 
@@ -130,9 +144,9 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(crate) fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+pub(crate) fn limit(kind: CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        kind: crate::error::LimitKind::Codec(kind),
+        kind: LimitKind::Codec(kind),
         observed,
         maximum,
     }
@@ -140,7 +154,7 @@ pub(crate) fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum
 
 pub(crate) fn output_limit(maximum: usize, observed: usize) -> Error {
     Error::Limit {
-        kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::OutputBytes),
+        kind: LimitKind::Codec(CodecLimitKind::OutputBytes),
         observed,
         maximum,
     }

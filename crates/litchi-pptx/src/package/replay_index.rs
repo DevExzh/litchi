@@ -343,14 +343,18 @@ impl ReplayIndex {
         let mut notes_total_bytes = 0_u64;
 
         for part in package.iter_parts() {
-            let name = part.partname().clone();
+            let name = part.partname();
             let bytes = metadata_bytes(part)?;
             match part.content_type() {
                 ct::PML_NOTES_SLIDE => {
                     notes_total_bytes = notes_total_bytes.checked_add(bytes).ok_or_else(|| {
                         Error::Invalid("PPTX replay notes index byte count overflow".into())
                     })?;
-                    insert_notes_entry(&mut notes_entries, name, NotesEntry::Slide { bytes })?;
+                    insert_notes_entry(
+                        &mut notes_entries,
+                        name.clone(),
+                        NotesEntry::Slide { bytes },
+                    )?;
                 },
                 ct::PML_NOTES_MASTER => {
                     let themes = notes_theme_targets(part.rels())?;
@@ -373,7 +377,7 @@ impl ReplayIndex {
                         },
                     )?;
                     for theme in themes {
-                        push_theme_user(&mut notes_theme_users, theme, name)?;
+                        push_theme_user(&mut notes_theme_users, theme, name.clone())?;
                     }
                 },
                 _ => {},

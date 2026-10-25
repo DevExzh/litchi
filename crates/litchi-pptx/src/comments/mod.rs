@@ -22,7 +22,7 @@ pub use model::{Author, Comment, Comments, Conformance, List};
 pub(crate) use package::{
     add_presentation_comment_author_with_limits, add_presentation_comment_with_limits,
     load_presentation_comments_strict_with_limits,
-    load_presentation_comments_with_tolerance_and_limits, reattribute_presentation_comment,
+    load_presentation_comments_with_tolerance_and_limits,
     reattribute_presentation_comment_with_limits, remove_presentation_comment_author_with_limits,
     remove_presentation_comment_with_limits, reorder_presentation_comment_authors_with_limits,
     reorder_presentation_comments_with_limits, store_presentation_comments_with_limits,
@@ -91,16 +91,26 @@ impl Limits {
     /// Intersect a selected semantic policy with the physical source ceiling.
     #[must_use]
     pub const fn constrained_by_source(self, source: litchi_opc::SourceLimits) -> Self {
-        let part = source.max_part_bytes().min(usize::MAX as u64) as usize;
+        let part = cap_u64(source.max_part_bytes());
         Self {
-            max_input_bytes: self.max_input_bytes.min(part),
-            max_output_bytes: self.max_output_bytes.min(part),
-            max_depth: self.max_depth.min(source.max_depth()),
-            max_nodes: self.max_nodes.min(source.max_events()),
-            max_string_bytes: self
-                .max_string_bytes
-                .min(source.max_xml_attribute_bytes().min(usize::MAX as u64) as usize),
+            max_input_bytes: min_usize(self.max_input_bytes, part),
+            max_output_bytes: min_usize(self.max_output_bytes, part),
+            max_depth: min_usize(self.max_depth, source.max_depth()),
+            max_nodes: min_usize(self.max_nodes, source.max_events()),
+            max_string_bytes: min_usize(self.max_string_bytes, source.max_xml_attribute_bytes()),
         }
+    }
+}
+
+const fn min_usize(left: usize, right: usize) -> usize {
+    if left < right { left } else { right }
+}
+
+const fn cap_u64(value: u64) -> usize {
+    if value > usize::MAX as u64 {
+        usize::MAX
+    } else {
+        value as usize
     }
 }
 
@@ -110,7 +120,7 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
 
 pub(crate) fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        kind: crate::error::LimitKind::Codec(kind),
+        kind: LimitKind::Codec(kind),
         observed,
         maximum,
     }
@@ -118,6 +128,7 @@ pub(crate) fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum
 
 mod edit;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+#[cfg(test)]
 pub(crate) use package::{
     add_presentation_comment, add_presentation_comment_author, remove_presentation_comment,
     store_presentation_comments, update_presentation_comment,

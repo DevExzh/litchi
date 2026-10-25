@@ -157,18 +157,6 @@ impl std::fmt::Debug for Edit {
 }
 
 impl Edit {
-    fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
-        self.source
-            .as_ref()
-            .and_then(|source| source.owner_state.semantic_limits.as_deref().copied())
-            .or_else(|| {
-                self.lazy
-                    .as_ref()
-                    .and_then(|lazy| lazy.owner_state.semantic_limits.as_deref().copied())
-            })
-            .unwrap_or_default()
-    }
-
     fn semantic_limits_ref(&self) -> Option<crate::open_options::SemanticLimitsRef> {
         self.source
             .as_ref()

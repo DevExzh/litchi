@@ -71,12 +71,13 @@ fn locate(xml: &[u8], source: Source, value: Value, limits: Limits) -> Result<Lo
 
     loop {
         let start = position(&reader, origin)?;
+        let decoder = reader.decoder();
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(element) => {
-                check_attributes(&element, reader.decoder(), limits)?;
+                check_attributes(&element, decoder, limits)?;
                 nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
                     kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
                     observed: usize::MAX,
@@ -104,7 +105,7 @@ fn locate(xml: &[u8], source: Source, value: Value, limits: Limits) -> Result<Lo
             },
             Event::Empty(element) => {
                 check_empty_depth(state.depth, limits)?;
-                check_attributes(&element, reader.decoder(), limits)?;
+                check_attributes(&element, decoder, limits)?;
                 nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
                     kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
                     observed: usize::MAX,
@@ -646,7 +647,7 @@ pub fn parse_master(xml: &[u8], limits: Limits) -> Result<Map> {
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(element) => {
-                check_attributes(&element, reader.decoder(), limits)?;
+                check_attributes(&element, decoder, limits)?;
                 nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
                     kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
                     observed: usize::MAX,
@@ -694,7 +695,7 @@ pub fn parse_master(xml: &[u8], limits: Limits) -> Result<Map> {
             },
             Event::Empty(element) => {
                 check_empty_depth(depth, limits)?;
-                check_attributes(&element, reader.decoder(), limits)?;
+                check_attributes(&element, decoder, limits)?;
                 nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
                     kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
                     observed: usize::MAX,
@@ -777,7 +778,7 @@ pub fn parse_override(
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(element) => {
-                check_attributes(&element, reader.decoder(), limits)?;
+                check_attributes(&element, decoder, limits)?;
                 nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
                     kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
                     observed: usize::MAX,
@@ -830,7 +831,7 @@ pub fn parse_override(
             },
             Event::Empty(element) => {
                 check_empty_depth(depth, limits)?;
-                check_attributes(&element, reader.decoder(), limits)?;
+                check_attributes(&element, decoder, limits)?;
                 nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
                     kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
                     observed: usize::MAX,

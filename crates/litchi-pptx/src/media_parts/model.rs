@@ -1,5 +1,5 @@
 use super::{
-    Arc, Coordinate, DML, Error, Extent, Offset, PML, REL, Result, STRICT_AUDIO_REL, STRICT_DML,
+    Arc, Coordinate, DML, Extent, Offset, PML, REL, Result, STRICT_AUDIO_REL, STRICT_DML,
     STRICT_PML, STRICT_REL, STRICT_VIDEO_REL, coordinate_error, rt,
 };
 
