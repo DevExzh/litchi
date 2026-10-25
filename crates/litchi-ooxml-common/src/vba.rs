@@ -1490,21 +1490,6 @@ fn validate_recipient_metadata_limits(
     let retained = package
         .retained_archive_metrics(limits)
         .map_err(Error::from)?;
-    let content_types = package.source_content_types(limits)?;
-    let content_type_bytes = u64::try_from(content_types.bytes().len()).unwrap_or(u64::MAX);
-    check_vba_limit(
-        LimitKind::ContentTypesBytes,
-        content_type_bytes,
-        limits.max_content_types_bytes() as u64,
-    )?;
-    check_vba_limit(
-        LimitKind::ContentTypeMappings,
-        u64::try_from(content_types.mapping_count()).unwrap_or(u64::MAX),
-        limits.max_content_type_mappings() as u64,
-    )?;
-    content_types
-        .preflight_under(limits)
-        .map_err(|error| map_source_limit_error(Error::from(error)))?;
 
     let mut parts = 0usize;
     let mut part_bytes = 0u64;
@@ -1538,6 +1523,27 @@ fn validate_recipient_metadata_limits(
             maximum: limit_observed(limits.max_total_part_bytes()),
         })?;
     }
+
+    // Check retained part metadata before parsing [Content_Types].xml.  This
+    // keeps a tighter selected-part policy deterministic for deferred source
+    // packages: the first physical payload violation is reported as
+    // `PartBytes` without hydrating the graph or making manifest parsing win
+    // merely because it happens to be the first metadata helper called.
+    let content_types = package.source_content_types(limits)?;
+    let content_type_bytes = u64::try_from(content_types.bytes().len()).unwrap_or(u64::MAX);
+    check_vba_limit(
+        LimitKind::ContentTypesBytes,
+        content_type_bytes,
+        limits.max_content_types_bytes() as u64,
+    )?;
+    check_vba_limit(
+        LimitKind::ContentTypeMappings,
+        u64::try_from(content_types.mapping_count()).unwrap_or(u64::MAX),
+        limits.max_content_type_mappings() as u64,
+    )?;
+    content_types
+        .preflight_under(limits)
+        .map_err(|error| map_source_limit_error(Error::from(error)))?;
     check_vba_limit(
         LimitKind::TotalPartBytes,
         part_bytes,
@@ -3136,6 +3142,20 @@ mod tests {
             )
             .unwrap();
         let noncanonical_content_types = add_noncanonical_content_types(&mut package);
+        let source_content_types = package.source_content_types(limits).unwrap();
+        let expected_stored_content_types = content_types_after_graph_store(
+            &source_content_types,
+            &source_name,
+            Host::Excel,
+            inspect_existing_graph(&package, &source_name, Host::Excel)
+                .unwrap()
+                .as_ref(),
+            ct::SML_SHEET_MACRO_MAIN,
+            limits,
+        )
+        .unwrap()
+        .bytes()
+        .to_vec();
 
         let mut edit = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
         edit.store(b"project".to_vec(), None).unwrap();
@@ -3148,7 +3168,15 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .as_slice(),
-            noncanonical_content_types.as_slice()
+            expected_stored_content_types.as_slice()
+        );
+        assert!(
+            stored
+                .retained_content_types_xml()
+                .unwrap()
+                .unwrap()
+                .windows(b"retained VBA manifest spelling".len())
+                .any(|window| window == b"retained VBA manifest spelling")
         );
         let recipient_bytes = PackageWriter::to_bytes(&package).unwrap();
         let recipient = OpcPackage::from_bytes(&recipient_bytes, package.read_limits()).unwrap();
@@ -3171,7 +3199,7 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .as_slice(),
-            noncanonical_content_types.as_slice()
+            expected_stored_content_types.as_slice()
         );
 
         let mut divergent = recipient.clone();
@@ -3195,6 +3223,18 @@ mod tests {
                 limits,
             )
             .unwrap();
+        let divergent_source_content_types = divergent.source_content_types(limits).unwrap();
+        let divergent_existing =
+            inspect_existing_graph(&divergent, &source_name, Host::Excel).unwrap();
+        let expected_divergent_content_types = content_types_after_graph_replace(
+            &divergent_source_content_types,
+            commit.patch().after.as_ref().unwrap(),
+            divergent_existing.as_ref(),
+            limits,
+        )
+        .unwrap()
+        .bytes()
+        .to_vec();
         let divergent_replayed = commit.patch().apply(&divergent).unwrap();
         assert_eq!(
             divergent_replayed
@@ -3203,7 +3243,7 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .as_slice(),
-            divergent_content_types.as_slice()
+            expected_divergent_content_types.as_slice()
         );
 
         // The recipient's manifest is deliberately divergent.  Derive the
@@ -3226,7 +3266,7 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .as_slice(),
-            divergent_content_types.as_slice()
+            expected_divergent_content_types.as_slice()
         );
 
         let exact_limits = SourceLimits::builder()
@@ -3244,7 +3284,7 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .as_slice(),
-            divergent_content_types.as_slice()
+            expected_divergent_content_types.as_slice()
         );
 
         let before_too_tight = PackageWriter::to_bytes(&divergent).unwrap();
@@ -3523,6 +3563,10 @@ mod tests {
         );
         assert_refused(
             SourceLimits::builder()
+                .max_parts(package.part_count())
+                .unwrap()
+                .max_relationship_parts(relationships.members)
+                .unwrap()
                 .max_members(archive_members)
                 .unwrap()
                 .build()
@@ -3779,6 +3823,10 @@ mod tests {
 
         let limits = |members, entries, aggregate, metadata| {
             SourceLimits::builder()
+                .max_parts(reopened.part_count())
+                .unwrap()
+                .max_relationship_parts(final_relationships.members)
+                .unwrap()
                 .max_members(members)
                 .unwrap()
                 .max_archive_total_entries(entries)
