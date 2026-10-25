@@ -4524,3 +4524,37 @@ See [0063](0063-source-pptx-modern-comments.md).
   wave 55 remains in preflight; the owner has retired an obsolete scanner
   that pinned inactive leaves. No additional worktree has been removed, and
   nothing is pushed.
+
+- Coordinator raw-codec integration and cleanup update (2026-10-25):
+  Required raw-profile signature enforcement merges at `c51a539757` from
+  reviewed `939d401609`. The checker resolves local and external nominal
+  limits types, rejects ambiguous identities, and verifies exact required
+  arguments. All 55 composed checker tests pass. XLSX drawing limits and
+  every current consumer merge atomically at `b21bb1ff82` from `34e6b0c6c`;
+  its 20 unit tests, 12 integration tests and all-target/all-feature clippy
+  pass. Root verifies the final source tree matches the tested tree and the
+  composed glossary policy parses successfully.
+
+  Ink's fast-exit output/TMP cap repair merges at `267ea71526` from reviewed
+  `18da76e3fb`. All eleven composed boundary tests pass, including exact-cap
+  acceptance and final snapshots after child exit. The earlier systemd
+  preflight remains attributed to its original wrapper; this repair does
+  not claim a new native measurement.
+
+  Cleanup wave 55 removes the inactive, merged constructors checkout without
+  force and retains its branch. All 21,662 ignored/untracked files, including
+  its target, are preserved with exact identities. Sparse restoration passes.
+  Record 0362ul53 binds root review, the external manifest and a payload-based
+  regeneration command. The allocation difference after quarantine and its
+  supplements is 7,535,771,648 bytes; no isolated free-space delta is claimed.
+  No active source root, target or foreign process is removed.
+
+  Raw-codec repairs continue for DOCX/OOXML, PPT, DOC/OLE, XLS, ODF, image
+  codecs, fonts, SpreadsheetDrawing, crypto and RTF; iWork result names also
+  require consumer validation. DOC/OLE's scoped suites and clippy pass and
+  await independent source review. DOCX and ODF were returned for concrete
+  nested-budget and owner-policy defects; corrected commits are under review.
+  Four bounded build slots are allocated to DOCX, XLS, RTF and image codecs.
+  Tooling-row and PPT qualification repairs remain under review. Final source
+  capture, full gate, signed-batch contract choice and actual performance
+  qualification remain open. Nothing is pushed.
