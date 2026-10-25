@@ -329,7 +329,32 @@ fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Core, Dia
                     ));
                 },
                 Event::Eof => break,
-                _ => {},
+                Event::Comment(comment) => {
+                    validate_source_bytes(
+                        &reader,
+                        comment.as_ref(),
+                        "core properties XML comment",
+                    )?;
+                },
+                Event::Decl(declaration) => {
+                    validate_source_bytes(
+                        &reader,
+                        declaration.as_ref(),
+                        "core properties XML declaration",
+                    )?;
+                },
+                Event::PI(instruction) => {
+                    validate_source_bytes(
+                        &reader,
+                        instruction.target(),
+                        "core properties XML processing instruction",
+                    )?;
+                    validate_source_bytes(
+                        &reader,
+                        instruction.content(),
+                        "core properties XML processing instruction",
+                    )?;
+                },
             }
             buffer.clear();
             continue;
@@ -471,7 +496,26 @@ fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Core, Dia
                 ));
             },
             Event::Eof => break,
-            Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
+            Event::Comment(comment) => {
+                validate_source_bytes(&reader, comment.as_ref(), "core properties XML comment")?
+            },
+            Event::Decl(declaration) => validate_source_bytes(
+                &reader,
+                declaration.as_ref(),
+                "core properties XML declaration",
+            )?,
+            Event::PI(instruction) => {
+                validate_source_bytes(
+                    &reader,
+                    instruction.target(),
+                    "core properties XML processing instruction",
+                )?;
+                validate_source_bytes(
+                    &reader,
+                    instruction.content(),
+                    "core properties XML processing instruction",
+                )?;
+            },
         }
         buffer.clear();
     }
@@ -729,6 +773,14 @@ fn validate_source_attributes(reader: &NsReader<&[u8]>, element: &BytesStart<'_>
         validate_source_text(&value, "core properties XML attribute")?;
     }
     Ok(())
+}
+
+fn validate_source_bytes(reader: &NsReader<&[u8]>, bytes: &[u8], property: &str) -> Result<()> {
+    let value = reader
+        .decoder()
+        .decode(bytes)
+        .map_err(|error| Error::Xml(error.to_string()))?;
+    validate_source_text(&value, property)
 }
 
 fn validate_attributes(

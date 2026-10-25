@@ -613,7 +613,35 @@ fn scan(xml: &[u8]) -> Result<Layout> {
                 },
                 Event::DocType(_) => Scanned::DocType,
                 Event::Eof => Scanned::Eof,
-                Event::Comment(_) | Event::Decl(_) | Event::PI(_) => Scanned::Other,
+                Event::Comment(comment) => {
+                    validate_source_bytes(
+                        reader.decoder(),
+                        comment.as_ref(),
+                        "extended properties XML comment",
+                    )?;
+                    Scanned::Other
+                },
+                Event::Decl(declaration) => {
+                    validate_source_bytes(
+                        reader.decoder(),
+                        declaration.as_ref(),
+                        "extended properties XML declaration",
+                    )?;
+                    Scanned::Other
+                },
+                Event::PI(instruction) => {
+                    validate_source_bytes(
+                        reader.decoder(),
+                        instruction.target(),
+                        "extended properties XML processing instruction",
+                    )?;
+                    validate_source_bytes(
+                        reader.decoder(),
+                        instruction.content(),
+                        "extended properties XML processing instruction",
+                    )?;
+                    Scanned::Other
+                },
             }
         };
         let end = offset(origin, reader.buffer_position())?;
@@ -758,6 +786,13 @@ fn validate_source_attributes(element: &BytesStart<'_>, decoder: Decoder) -> Res
         validate_source_chars(&value, "extended properties XML attribute")?;
     }
     Ok(())
+}
+
+fn validate_source_bytes(decoder: Decoder, bytes: &[u8], context: &str) -> Result<()> {
+    let value = decoder
+        .decode(bytes)
+        .map_err(|error| Error::Xml(error.to_string()))?;
+    validate_source_chars(&value, context)
 }
 
 fn validate_source_chars(value: &str, context: &str) -> Result<()> {

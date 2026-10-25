@@ -168,6 +168,33 @@ fn source_xml_controls_are_rejected_at_the_decode_boundary() {
         '\u{1}'
     );
     assert!(decode(cdata.as_bytes()).is_err());
+
+    let comment = format!(
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Unknown><!--{}--></Unknown></Properties>"#,
+        '\u{1}'
+    );
+    assert!(
+        matches!(decode(comment.as_bytes()), Err(Error::Invalid(message)) if message.contains("U+0001")),
+        "source control in a comment was not rejected"
+    );
+
+    let pi = format!(
+        r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Unknown><?keep {}?></Unknown></Properties>"#,
+        '\u{1}'
+    );
+    assert!(
+        matches!(decode(pi.as_bytes()), Err(Error::Invalid(message)) if message.contains("U+0001")),
+        "source control in a processing instruction was not rejected"
+    );
+}
+
+#[test]
+fn splice_preserves_valid_inert_comment_and_processing_instruction_bytes() {
+    let source = r#"<?xml version="1.0" encoding="UTF-8"?><!--inert & opaque--><?keep data?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Company>Old</Company><?tail data?></Properties>"#;
+    let target = Props::new().company("New");
+    let output = splice(source.as_bytes(), &target).unwrap().unwrap();
+    let expected = source.replace("<Company>Old</Company>", "<Company>New</Company>");
+    assert_eq!(String::from_utf8(output).unwrap(), expected);
 }
 
 fn package_with(xml: &[u8]) -> OpcPackage {

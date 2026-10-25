@@ -1046,6 +1046,42 @@ fn source_xml_controls_are_corruption_but_authored_core_controls_are_invalid_val
             if message.contains("U+0001")
     ));
 
+    let mut package = full();
+    let core = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap())
+        .unwrap()
+        .replace(
+            "</cp:coreProperties>",
+            "<cp:opaque><!--\u{1}--></cp:opaque></cp:coreProperties>",
+        )
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(core);
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
+    let mut package = full();
+    let core = String::from_utf8(bytes(&package, "/docProps/core.xml").unwrap())
+        .unwrap()
+        .replace(
+            "</cp:coreProperties>",
+            "<cp:opaque><?keep \u{1}?></cp:opaque></cp:coreProperties>",
+        )
+        .into_bytes();
+    package
+        .get_part_mut(&PackURI::new("/docProps/core.xml").unwrap())
+        .unwrap()
+        .set_blob(core);
+    assert!(matches!(
+        Snapshot::read(&package, Host::Word),
+        Err(Error::Package(crate::Error::Invalid(message)))
+            if message.contains("U+0001")
+    ));
+
     let package = full();
     let mut edit = Edit::new(&package, Host::Word).unwrap();
     edit.update_metadata(|metadata| metadata.title = Some("bad\0value".to_owned()))

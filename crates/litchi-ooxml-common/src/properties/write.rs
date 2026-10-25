@@ -708,7 +708,7 @@ mod tests {
     fn preserves_strict_dialect_and_byte_identical_write_is_a_noop() {
         let props = Core::new().title("Strict");
         let original = format!(
-            "<?xml version=\"1.0\"?>\n<cp:coreProperties xmlns:cp=\"{}\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n  <dc:title>Strict</dc:title>\n</cp:coreProperties>",
+            "<?xml version=\"1.0\"?>\n<cp:coreProperties xmlns:cp=\"{}\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\">\n  <!--inert & opaque--><?keep data?>\n  <dc:title>Strict</dc:title>\n</cp:coreProperties>",
             Dialect::Strict.namespace()
         )
         .into_bytes();
