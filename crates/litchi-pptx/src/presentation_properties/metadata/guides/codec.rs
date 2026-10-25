@@ -218,7 +218,7 @@ pub(crate) fn rewrite_source(source: &[u8], value: &Guides, limits: Limits) -> R
         }
     }
 
-    ranges[..plan_count].sort_unstable_by_key(|(start, end, _, _)| (*start, *end));
+    ranges[..plan_count].sort_unstable_by_key(|(start, end, _, target)| (*start, *end, *target));
     let mut removed = 0usize;
     let mut added = 0usize;
     for pair in ranges[..plan_count].windows(2) {

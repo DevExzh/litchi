@@ -209,9 +209,22 @@ fn structure_parser_limits_ignored_event_payloads_before_ownership() {
     let limits = Limits::DEFAULT.with_string_bytes(64).unwrap();
     let xml = format!(
         r#"<p:presentation xmlns:p="{P}" xmlns:x="urn:future"><x:opaque>{}</x:opaque></p:presentation>"#,
-        "x".repeat(65)
+        " ".repeat(65)
     );
     assert!(codec::parse_core(xml.as_bytes(), limits).is_err());
+}
+
+#[test]
+fn structure_parser_rejects_dtd_and_pi_before_ownership() {
+    let limits = Limits::DEFAULT.with_string_bytes(64).unwrap();
+    let oversized = "x".repeat(128);
+    let cases = [
+        format!(r#"<!DOCTYPE x [<!ENTITY e "{oversized}">]><p:presentation xmlns:p="{P}"/>"#),
+        format!(r#"<?future {oversized}?><p:presentation xmlns:p="{P}"/>"#),
+    ];
+    for xml in cases {
+        assert!(codec::parse_core(xml.as_bytes(), limits).is_err());
+    }
 }
 
 #[test]

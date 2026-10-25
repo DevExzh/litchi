@@ -693,7 +693,11 @@ pub(super) fn parse_core(xml: &[u8], limits: Limits) -> Result<(Vec<(u32, String
         return Err(limit("presentation core XML", limits.max_output_bytes()));
     }
     let mut reader = NsReader::from_reader(xml);
-    reader.config_mut().trim_text(true);
+    // Keep raw text events intact until their selected string budget has been
+    // admitted.  `parse_core` ignores text semantically, so disabling
+    // quick-xml trimming preserves the graph result while preventing a long
+    // whitespace-only event from being shortened before preflight.
+    reader.config_mut().trim_text(false);
     let mut ancestors = Vec::<CoreElement>::new();
     let mut slides = Vec::new();
     let mut shows = Vec::new();
@@ -849,7 +853,12 @@ fn preflight_core_event(event: &Event<'_>, limits: Limits) -> Result<()> {
             limits,
             "presentation structure declaration",
         )?,
-        Event::DocType(_) | Event::PI(_) | Event::Eof => {},
+        Event::DocType(_) | Event::PI(_) => {
+            // Reject these borrowed events before `into_owned`; their payload
+            // is not allowed to reach an owned allocation on the error path.
+            return Err(invalid("DTDs and processing instructions are rejected"));
+        },
+        Event::Eof => {},
     }
     Ok(())
 }

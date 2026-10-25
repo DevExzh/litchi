@@ -194,3 +194,23 @@ fn absent_extension_lists_are_created_and_xml_inverse_is_exact() {
         .expect("inverse XML patch");
     assert_eq!(updated, source);
 }
+
+#[test]
+fn missing_slide_and_notes_targets_keep_their_source_order() {
+    let source = format!(
+        r#"<p:presentation xmlns:p="{P}" xmlns:a="{A}"><p:extLst><p:ext uri="urn:opaque"><v:data xmlns:v="urn:future"/></p:ext></p:extLst></p:presentation>"#
+    )
+    .into_bytes();
+    let snapshot = Snapshot::from_xml(&source, Limits::DEFAULT).expect("guide source parses");
+    let mut edit = snapshot.edit();
+    edit.push(ListKind::Slide, guide(3))
+        .expect("slide guide insertion is valid");
+    edit.push(ListKind::Notes, guide(4))
+        .expect("notes guide insertion is valid");
+    let output =
+        String::from_utf8_lossy(edit.commit().expect("guide commit").snapshot().source_xml())
+            .into_owned();
+    let slide = output.find(SLIDE_URI).expect("slide extension inserted");
+    let notes = output.find(NOTES_URI).expect("notes extension inserted");
+    assert!(slide < notes, "slide and notes insertions changed order");
+}
