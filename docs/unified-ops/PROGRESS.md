@@ -4888,3 +4888,29 @@ See [0063](0063-source-pptx-modern-comments.md).
   Final integrated capture, complete gates, actual native/performance
   qualification and the signed-batch contract choice remain open. Nothing
   is pushed.
+
+- Coordinator cleanup and composed consumer return (2026-10-25):
+  Cleanup wave 59 is complete. Root verifies all 18 preserved payloads,
+  actual sparse restoration, retained branches and absent registrations for
+  the merged XLS, SpreadsheetDrawing, DOCX and PPT leaves. Record 0362ul73
+  binds the receipts and the net allocation reduction of 8,465,526,784 bytes.
+  External evidence and the protected constructor probe remain unchanged;
+  the integration hold is released.
+
+  Fresh composed source `b8897649d6` passes check and Clippy for fonts,
+  crypto, DOC and DOCX, then fails PPT check because an integration-only
+  correctness example still calls the now-private snapshot constructor.
+  The failed capture and all nine receipts remain preserved and root-verified.
+  Return 0362ul50a migrates both reads to the public options-based constructor
+  at `200a3e5af3`; it preserves default parsing and outside-clock receipt
+  behavior. Slot 4 continues on a fresh corrected capture; downstream checks
+  and standalone compilation are still required. This failure is not accepted
+  as an exception or reported as a full composed pass.
+
+  Raw-coverage tooling 0362ul71b now passes independent review and eleven
+  synthetic tests. Its manifest deliberately remains incomplete, and final
+  mode rejects it. DrawingML's frozen-v1/current-v2 boundary passes review,
+  but 0362ul72b still requires review of trusted-input ordering and at-use
+  historical-library identity checks. Additional source workers prepare new
+  signed and legacy/PPT qualification policies (0362ul74–75); no actual native
+  execution or final source qualification is claimed. Nothing is pushed.
