@@ -141,13 +141,19 @@ impl Package {
         let mut failure = None;
         let published = package.edit_semantic_opc("edit_metadata", |opc| {
             if core {
+                let mut core_edit = families::Edit::new(opc, Host::Word)?;
                 match target {
-                    Some(props) => litchi_ooxml_common::properties::write(opc, props)?,
-                    None => litchi_ooxml_common::properties::clear(opc)?,
-                };
+                    Some(props) => {
+                        core_edit.set_metadata(props.clone());
+                    },
+                    None => {
+                        core_edit.clear_metadata();
+                    },
+                }
+                *opc = core_edit.commit()?.into_package();
             }
             if !parts_noop {
-                if let Err(error) = parts.apply(opc) {
+                if let Err(error) = parts.apply(opc).map(|commit| *opc = commit.into_package()) {
                     failure = Some(error);
                     return Err(crate::Error::InvalidFormat(
                         "document-property parts refused the patch".to_owned(),

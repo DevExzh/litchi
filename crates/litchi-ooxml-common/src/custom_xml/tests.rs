@@ -9,6 +9,13 @@ fn source_limits() -> litchi_opc::SourceLimits {
     litchi_opc::SourceLimits::default()
 }
 
+fn add_item(package: &mut OpcPackage, item: NewItem) -> crate::Result<()> {
+    let mut edit = Edit::new(package)?;
+    edit.insert(item)?;
+    *package = edit.commit()?.into_package();
+    Ok(())
+}
+
 const POI_XLSX: &[u8] =
     include_bytes!("../../../../test-data/poi/test-data/spreadsheet/customIndexedColors.xlsx");
 const LO_DOCX: &[u8] = include_bytes!(
@@ -136,7 +143,7 @@ fn package_writer_round_trips_without_interpreting_payload() {
     // part is inserted until the signature is removed explicitly (ADR 0006).
     let parts = package.part_count();
     assert!(matches!(
-        add(&mut package, item()),
+        add_item(&mut package, item()),
         Err(Error::Opc(
             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
         ))
@@ -144,7 +151,7 @@ fn package_writer_round_trips_without_interpreting_payload() {
     assert!(package.is_signed());
     assert_eq!(package.part_count(), parts);
     package.unsign();
-    add(&mut package, item()).unwrap();
+    add_item(&mut package, item()).unwrap();
     assert!(!package.is_signed());
     let items = discover(&package).unwrap();
     assert_eq!(items.len(), 1);
@@ -162,7 +169,7 @@ fn failed_add_is_transactional() {
     let before_parts = package.part_count();
     let before_rels = package.get_part(&source).unwrap().rels().len();
     let same_part = PackURI::new("/customXml/item1.xml").unwrap();
-    let error = add(
+    let error = add_item(
         &mut package,
         NewItem {
             source: source.clone(),
@@ -183,7 +190,7 @@ fn failed_add_is_transactional() {
     assert_eq!(package.part_count(), before_parts);
     assert_eq!(package.get_part(&source).unwrap().rels().len(), before_rels);
 
-    let error = add(
+    let error = add_item(
         &mut package,
         NewItem {
             source: source.clone(),
@@ -374,7 +381,7 @@ fn rejects_invalid_declarations_attributes_and_xml_characters() {
 #[test]
 fn transaction_preserves_opaque_payload_and_relationship_topology() {
     let mut package = package_with_source();
-    add(
+    add_item(
         &mut package,
         NewItem {
             source: PackURI::new("/word/document.xml").unwrap(),
@@ -440,7 +447,7 @@ fn transaction_preserves_opaque_payload_and_relationship_topology() {
 #[test]
 fn properties_edits_retain_future_markup() {
     let mut package = package_with_source();
-    add(
+    add_item(
         &mut package,
         NewItem {
             source: PackURI::new("/word/document.xml").unwrap(),
@@ -540,7 +547,7 @@ fn transaction_crud_is_source_checked_and_failure_atomic() {
 #[test]
 fn exact_noop_does_not_unsign_or_rewrite() {
     let mut package = package_with_source();
-    add(
+    add_item(
         &mut package,
         NewItem {
             source: PackURI::new("/word/document.xml").unwrap(),

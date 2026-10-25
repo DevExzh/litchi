@@ -237,22 +237,21 @@ impl Package {
                 Error::InvalidFormat("Custom XML part-name space is exhausted".into())
             })?;
             let plan = checksum_plan(candidate, &item_id, &payload, true, &limits)?;
-            custom_xml::add(
-                candidate,
-                NewCustomXmlItem {
-                    source: source_part,
-                    rel_id,
-                    part: data_part.clone(),
-                    content_type: store.content_type,
-                    xml: payload,
-                    props: Some(NewCustomXmlProps {
-                        part: props_part,
-                        rel_id: "rIdProps1".to_string(),
-                        value: props,
-                    }),
-                    conformance: store.conformance,
-                },
-            )?;
+            let mut custom_edit = custom_xml::Edit::new(candidate)?;
+            custom_edit.insert(NewCustomXmlItem {
+                source: source_part,
+                rel_id,
+                part: data_part.clone(),
+                content_type: store.content_type,
+                xml: payload,
+                props: Some(NewCustomXmlProps {
+                    part: props_part,
+                    rel_id: "rIdProps1".to_string(),
+                    value: props,
+                }),
+                conformance: store.conformance,
+            })?;
+            *candidate = custom_edit.commit()?.into_package();
             publish_checksum_plan(candidate, &plan)?;
             let published = unique_store(candidate, &item_id)?;
             if published.part() != &data_part {

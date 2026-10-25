@@ -112,7 +112,7 @@ impl Props {
     /// for a change to a signed package, and an error when input violates
     /// OOXML constraints, exceeds a configured bound, or an underlying XML or
     /// package operation fails.
-    pub fn write(&self, package: &mut OpcPackage) -> Result<()> {
+    pub(crate) fn write(&self, package: &mut OpcPackage) -> Result<()> {
         let graph = inspect_graph(package)?;
         if self.is_empty() {
             if graph.part_name.is_none() && graph.relationship_id.is_none() {
@@ -166,7 +166,7 @@ impl Props {
     /// for a change to a signed package, and an error when input violates
     /// OOXML constraints, exceeds a configured bound, or an underlying XML or
     /// package operation fails.
-    pub fn write_for(&self, package: &mut OpcPackage, host: Host) -> Result<()> {
+    pub(crate) fn write_for(&self, package: &mut OpcPackage, host: Host) -> Result<()> {
         self.validate_for(host)?;
         self.write(package)
     }

@@ -1136,7 +1136,7 @@ fn package_unsign_is_explicit_and_leaves_an_unsigned_package_untouched() {
 /// 0014a, F1b).
 mod shared_owners {
     use super::*;
-    use litchi_xlsx::custom::{Host, Props};
+    use litchi_xlsx::custom::Props;
 
     fn props() -> Props {
         let mut props = Props::new();
@@ -1186,9 +1186,9 @@ mod shared_owners {
 
     #[test]
     fn a_signed_package_keeps_equal_custom_properties_and_refuses_their_removal() {
-        let mut plain = unsigned_fixture(SIGNED[0]);
-        props().write_for(&mut plain, Host::Excel).unwrap();
-        let signed = sign(&plain);
+        let plain = Package::from_opc(unsigned_fixture(SIGNED[0])).unwrap();
+        let plain = set_custom_props(&plain, props()).unwrap();
+        let signed = sign(plain.opc());
         let package = Package::from_bytes(&signed).unwrap();
 
         let package = set_custom_props(&package, props()).unwrap();

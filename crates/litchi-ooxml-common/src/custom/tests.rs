@@ -31,6 +31,15 @@ fn document(body: &str) -> String {
     format!("{PREFIX}{body}</Properties>")
 }
 
+fn publish(package: &mut OpcPackage, props: Props, host: Host) -> crate::Result<bool> {
+    let mut edit = crate::properties::Edit::new(package, host)?;
+    edit.set_custom_props(props);
+    let commit = edit.commit()?;
+    let changed = commit.diagnostics().changed();
+    *package = commit.into_package();
+    Ok(changed)
+}
+
 #[test]
 fn concise_crud_moves_values_and_orders_names() {
     let mut props = Props::new();
@@ -279,7 +288,7 @@ fn package_write_read_and_clear_remove_the_complete_graph() {
     // Creating the graph changes the signed package, so it is refused until
     // the signature is removed explicitly (ADR 0006).
     assert!(matches!(
-        props.write(&mut package),
+        publish(&mut package, props.clone(), Host::Word),
         Err(Error::Opc(
             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
         ))
@@ -287,7 +296,7 @@ fn package_write_read_and_clear_remove_the_complete_graph() {
     assert!(package.is_signed());
     assert!(package.get_part(&custom_part_name().expect("URI")).is_err());
     package.unsign();
-    props.write(&mut package).expect("write");
+    publish(&mut package, props.clone(), Host::Word).expect("write");
     assert!(!package.is_signed());
     let first_blob = package
         .get_part(&custom_part_name().expect("URI"))
@@ -295,7 +304,7 @@ fn package_write_read_and_clear_remove_the_complete_graph() {
         .blob_arc();
     package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
     assert!(package.is_signed());
-    props.write(&mut package).expect("byte-identical no-op");
+    publish(&mut package, props.clone(), Host::Word).expect("byte-identical no-op");
     assert!(package.is_signed(), "a true no-op preserves signatures");
     let second_blob = package
         .get_part(&custom_part_name().expect("URI"))
@@ -317,7 +326,7 @@ fn package_write_read_and_clear_remove_the_complete_graph() {
     );
 
     assert!(matches!(
-        Props::new().write(&mut package),
+        publish(&mut package, Props::new(), Host::Word),
         Err(Error::Opc(
             litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
         ))
@@ -325,7 +334,7 @@ fn package_write_read_and_clear_remove_the_complete_graph() {
     assert!(package.is_signed());
     assert!(package.get_part(&custom_part_name().expect("URI")).is_ok());
     package.unsign();
-    Props::new().write(&mut package).expect("clear graph");
+    publish(&mut package, Props::new(), Host::Word).expect("clear graph");
     assert!(!package.is_signed());
     assert!(package.get_part(&custom_part_name().expect("URI")).is_err());
     assert!(
@@ -510,9 +519,7 @@ fn powerpoint_locations_require_escaped_names_and_host_boundaries() {
     );
 
     let mut package = OpcPackage::new();
-    properties
-        .write_for(&mut package, Host::PowerPoint)
-        .expect("host-aware write");
+    publish(&mut package, properties, Host::PowerPoint).expect("host-aware write");
     Props::read_for(&package, Host::PowerPoint).expect("host-aware read");
     // LENIENCY_AUDIT 8.4: on read the host scope is advisory.
     let word = Props::read_for(&package, Host::Word).expect("advisory on read");

@@ -20,8 +20,8 @@
 //!   ([`crate::custom::Props`]).
 //!
 //! [`read_with_report`] reads the core family alone and distinguishes an
-//! absent part from a present but empty one. [`write()`] stores the core
-//! fields of a [`Metadata`] and refuses any field core properties cannot
+//! absent part from a present but empty one. [`Edit::set_metadata`] stores the
+//! core fields of a [`Metadata`] and refuses any field core properties cannot
 //! carry. Hosts edit all three families at once through the shared
 //! transaction ([`Edit`], [`Commit`], [`Patch`], read through [`Snapshot`]), which each
 //! format re-exports as its `metadata` module.
@@ -37,15 +37,13 @@ mod write;
 #[cfg(test)]
 mod transaction_tests;
 
-pub use transaction::{
-    Change, Commit, Diagnostics, Edit, EditOptions, Error, Family, FamilyAdmission, LimitKind,
-    OwnerAdmission, Patch, Plan, Snapshot,
-};
-pub use write::clear;
-
 pub(crate) use litchi_core::metadata::{Keywords, keywords as keyword};
 pub(crate) use read::{
     read_core_prepared_with_report, read_core_source_backed_with_report, read_core_with_report,
+};
+pub use transaction::{
+    Change, Commit, Diagnostics, Edit, EditOptions, Error, Family, FamilyAdmission, LimitKind,
+    OwnerAdmission, Patch, Plan, Snapshot,
 };
 pub(crate) use write::write_core;
 
@@ -408,7 +406,7 @@ pub fn read_prepared_with_report(
 /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
 /// for a change to a signed package, and an error when a value violates
 /// OOXML constraints or a bound.
-pub fn write(package: &mut OpcPackage, metadata: &Metadata) -> Result<bool> {
+pub(crate) fn write(package: &mut OpcPackage, metadata: &Metadata) -> Result<bool> {
     ensure_core_only(metadata)?;
     let base = match graph::inspect(package)?.part {
         Some(part) => {
@@ -521,8 +519,8 @@ impl Slot {
     ///
     /// A failed flush leaves the slot dirty so the caller can repair the value
     /// and retry. A byte-identical write is a true no-op, which keeps a signed
-    /// package's signature; a change to a signed package is refused (see
-    /// [`write()`] and [`clear()`]).
+    /// package's signature; a change to a signed package is refused by the
+    /// shared properties edit.
     ///
     /// # Errors
     ///
@@ -532,7 +530,7 @@ impl Slot {
     /// for a change to a signed package, and an error when input violates
     /// OOXML constraints, exceeds a configured bound, or an underlying XML or
     /// package operation fails.
-    pub fn flush(&mut self, package: &mut OpcPackage) -> Result<bool> {
+    pub(crate) fn flush(&mut self, package: &mut OpcPackage) -> Result<bool> {
         let staged = self.stage(package)?;
         let changed = staged.changed();
         staged.commit();
@@ -549,7 +547,7 @@ impl Slot {
     /// # Errors
     ///
     /// The errors of [`Self::flush`].
-    pub fn stage(&mut self, package: &mut OpcPackage) -> Result<Stage<'_>> {
+    pub(crate) fn stage(&mut self, package: &mut OpcPackage) -> Result<Stage<'_>> {
         if !self.dirty {
             let staged = self.source.clone();
             return Ok(Stage {

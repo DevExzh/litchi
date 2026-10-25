@@ -525,6 +525,7 @@ impl Snapshot {
         Plan {
             base: self.clone(),
             metadata: None,
+            clear_core: false,
             app: None,
             custom: None,
             options,
@@ -780,6 +781,7 @@ fn snapshot_scope(snapshot: &Snapshot) -> Result<Box<[Change]>> {
 pub struct Plan {
     base: Snapshot,
     metadata: Option<Metadata>,
+    clear_core: bool,
     app: Option<Option<app::Props>>,
     custom: Option<custom::Props>,
     options: EditOptions,
@@ -951,6 +953,14 @@ impl Plan {
     /// nothing; a changed field lands in the family that stores it.
     pub fn set_metadata(&mut self, metadata: Metadata) -> &mut Self {
         self.metadata = Some(metadata);
+        self.clear_core = false;
+        self
+    }
+
+    /// Stage removal of the core-properties part.
+    pub fn clear_metadata(&mut self) -> &mut Self {
+        self.metadata = None;
+        self.clear_core = true;
         self
     }
 
@@ -963,6 +973,7 @@ impl Plan {
         let mut metadata = self.metadata()?;
         update(&mut metadata);
         self.metadata = Some(metadata);
+        self.clear_core = false;
         Ok(self)
     }
 
@@ -1012,68 +1023,84 @@ impl Plan {
         let Self {
             base,
             metadata,
+            clear_core,
             app: staged_app,
             custom,
             options: _,
         } = self;
-        let (core_metadata, app_target, changed_fields) = match metadata {
-            Some(target) => {
-                let before = base.metadata()?;
-                let changed_fields: Vec<_> = before.changed_fields(&target).collect();
-                if let Some(field) = changed_fields.iter().copied().find(|field| {
-                    !CORE_FIELDS.contains(field) && !app::METADATA_FIELDS.contains(field)
-                }) {
-                    return Err(Error::Unsupported { field });
-                }
-                let core_changed = changed_fields
-                    .iter()
-                    .any(|field| CORE_FIELDS.contains(field));
-                let app_changed = changed_fields
-                    .iter()
-                    .any(|field| app::METADATA_FIELDS.contains(field));
-                let app_base = match &staged_app {
-                    Some(staged) => staged.clone(),
-                    None => base.app_props()?,
-                };
-                let app_target = if app_changed {
-                    Some(Some(app::Props::merged(app_base.as_ref(), &target)?))
-                } else {
-                    staged_app
-                };
-                (core_changed.then_some(target), app_target, changed_fields)
-            },
-            None => (None, staged_app, Vec::new()),
+        let (core_metadata, app_target, changed_fields) = if clear_core {
+            (Some(None), staged_app, Vec::new())
+        } else {
+            match metadata {
+                Some(target) => {
+                    let before = base.metadata()?;
+                    let changed_fields: Vec<_> = before.changed_fields(&target).collect();
+                    if let Some(field) = changed_fields.iter().copied().find(|field| {
+                        !CORE_FIELDS.contains(field) && !app::METADATA_FIELDS.contains(field)
+                    }) {
+                        return Err(Error::Unsupported { field });
+                    }
+                    let core_changed = changed_fields
+                        .iter()
+                        .any(|field| CORE_FIELDS.contains(field));
+                    let app_changed = changed_fields
+                        .iter()
+                        .any(|field| app::METADATA_FIELDS.contains(field));
+                    let app_base = match &staged_app {
+                        Some(staged) => staged.clone(),
+                        None => base.app_props()?,
+                    };
+                    let app_target = if app_changed {
+                        Some(Some(app::Props::merged(app_base.as_ref(), &target)?))
+                    } else {
+                        staged_app
+                    };
+                    (
+                        core_changed.then_some(Some(target)),
+                        app_target,
+                        changed_fields,
+                    )
+                },
+                None => (None, staged_app, Vec::new()),
+            }
         };
 
-        let core = if let Some(target) = core_metadata {
-            let (current, dialect) = match &base.core.present {
-                Some(present) => {
-                    let xml = std::str::from_utf8(&present.bytes).map_err(|error| {
-                        Error::Invalid(format!("invalid UTF-8 in core properties: {error}"))
-                    })?;
-                    let (current, dialect) = read::decode(xml)?;
-                    if Some(dialect) != base.core_dialect {
-                        return Err(Error::Invalid(
+        let core = match core_metadata {
+            Some(Some(target)) => {
+                let (current, dialect) = match &base.core.present {
+                    Some(present) => {
+                        let xml = std::str::from_utf8(&present.bytes).map_err(|error| {
+                            Error::Invalid(format!("invalid UTF-8 in core properties: {error}"))
+                        })?;
+                        let (current, dialect) = read::decode(xml)?;
+                        if Some(dialect) != base.core_dialect {
+                            return Err(Error::Invalid(
                             "core-properties XML namespace does not match its relationship dialect"
                                 .to_owned(),
                         ));
-                    }
-                    (current, dialect)
-                },
-                None => (Core::default(), Dialect::Transitional),
-            };
-            let merged = Core::merged(base.core.present.as_ref().map(|_| &current), &target)?;
-            (merged != current).then(|| {
-                super::write::encoded_len(&merged, dialect).map(|after_len| PreparedCore {
-                    target: merged,
-                    dialect,
-                    after_len,
-                })
-            })
-        } else {
-            None
-        }
-        .transpose()?;
+                        }
+                        (current, dialect)
+                    },
+                    None => (Core::default(), Dialect::Transitional),
+                };
+                let merged = Core::merged(base.core.present.as_ref().map(|_| &current), &target)?;
+                (merged != current)
+                    .then(|| {
+                        super::write::encoded_len(&merged, dialect).map(|after_len| PreparedCore {
+                            target: Some(merged),
+                            dialect,
+                            after_len: Some(after_len),
+                        })
+                    })
+                    .transpose()?
+            },
+            Some(None) if base.core.present.is_some() => Some(PreparedCore {
+                target: None,
+                dialect: base.core_dialect.unwrap_or(Dialect::Transitional),
+                after_len: None,
+            }),
+            _ => None,
+        };
 
         let app = if let Some(target) = app_target {
             let current = base.app_props()?;
@@ -1120,12 +1147,8 @@ impl Plan {
         let mut changed = false;
         let mut planned_changes = std::array::from_fn(|_| None);
         if let Some(core) = &core {
-            let (bytes, change) = planned_change_bytes(
-                &base,
-                Family::Core,
-                Some(core.after_len),
-                &mut relationship_ids,
-            )?;
+            let (bytes, change) =
+                planned_change_bytes(&base, Family::Core, core.after_len, &mut relationship_ids)?;
             retained_changes = retained_changes.saturating_add(bytes);
             planned_changes[family_index(Family::Core)] = Some(change);
             changed = true;
@@ -1219,9 +1242,9 @@ struct PreparedPlan {
 
 #[derive(Debug)]
 struct PreparedCore {
-    target: Core,
+    target: Option<Core>,
     dialect: Dialect,
-    after_len: usize,
+    after_len: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -1292,14 +1315,32 @@ impl PreparedPlan {
         let mut changes = Vec::new();
         if let Some(core) = core {
             let planned = take_planned_change(&mut planned_changes, Family::Core)?;
-            let merged = core.target;
-            let bytes = super::write::encode_preflighted(&merged, core.dialect, core.after_len)?
-                .into_bytes();
-            if let Some(change) = stage_prepared_change(&mut after, planned, Some(bytes))? {
+            let (after_bytes, merged) = match (core.target, core.after_len) {
+                (Some(merged), Some(after_len)) => (
+                    Some(
+                        super::write::encode_preflighted(&merged, core.dialect, after_len)?
+                            .into_bytes(),
+                    ),
+                    Some(merged),
+                ),
+                (None, None) => (None, None),
+                _ => {
+                    return Err(Error::Invalid(
+                        "core-properties prepared target and length disagree".to_owned(),
+                    ));
+                },
+            };
+            if let Some(change) = stage_prepared_change(&mut after, planned, after_bytes)? {
                 changes.push(change);
-                after.core_dialect = after.core_dialect.or(Some(core.dialect));
-                after.core_value = Some(merged);
-                after.core_report = ToleranceReport::default();
+                if let Some(merged) = merged {
+                    after.core_dialect = after.core_dialect.or(Some(core.dialect));
+                    after.core_value = Some(merged);
+                    after.core_report = ToleranceReport::default();
+                } else {
+                    after.core_dialect = None;
+                    after.core_value = None;
+                    after.core_report = ToleranceReport::default();
+                }
             }
         }
 
@@ -1646,6 +1687,12 @@ impl Edit {
         self
     }
 
+    /// Stage removal of the core-properties part.
+    pub fn clear_metadata(&mut self) -> &mut Self {
+        self.plan.clear_metadata();
+        self
+    }
+
     /// Stage a change of the metadata, starting from the staged value.
     ///
     /// # Errors
@@ -1712,8 +1759,7 @@ impl Edit {
     /// signed package.
     pub fn commit(self) -> Result<Commit> {
         let (_, patch, diagnostics) = self.plan.finish()?;
-        let mut package = self.package;
-        patch.apply(&mut package)?;
+        let package = patch.apply(&self.package)?.into_package();
         Ok(Commit::new(package, patch, diagnostics))
     }
 }
@@ -1953,25 +1999,41 @@ impl Patch {
         Ok(())
     }
 
-    /// Check and apply the patch to an owning package. Returns whether the
-    /// package changed.
+    /// Check and apply the patch to an owning package, publishing a new
+    /// package together with the patch and diagnostics.
     ///
     /// An empty patch changes nothing, so a signed package keeps its
     /// signature. A changed patch refuses a signed package before anything is
-    /// mutated (ADR 0006). The package changes atomically: a failure leaves
-    /// it as it was.
+    /// mutated (ADR 0006). The source package is unchanged.
     ///
     /// # Errors
     ///
     /// Returns [`Error::Signed`] for a signed package, and the errors of
     /// [`Self::check`].
-    pub fn apply(&self, package: &mut OpcPackage) -> Result<bool> {
+    pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
         self.check(package)?;
         if self.is_noop() {
-            return Ok(false);
+            return Ok(Commit::new(
+                package.clone(),
+                self.clone(),
+                self.diagnostics(),
+            ));
         }
         refuse_signed_change(package)?;
         let mut candidate = package.clone();
+        self.apply_changes(&mut candidate)?;
+        Ok(Commit::new(candidate, self.clone(), self.diagnostics()))
+    }
+
+    #[cfg(test)]
+    pub(super) fn apply_in_place(&self, package: &mut OpcPackage) -> Result<bool> {
+        let commit = self.apply(package)?;
+        let changed = commit.diagnostics().changed();
+        *package = commit.into_package();
+        Ok(changed)
+    }
+
+    fn apply_changes(&self, candidate: &mut OpcPackage) -> Result<()> {
         for change in &self.changes {
             match (&change.before, &change.after) {
                 (Some(_), Some(after)) => {
@@ -2012,9 +2074,8 @@ impl Patch {
                 (None, None) => {},
             }
         }
-        settle_unsigned_change(&mut candidate)?;
-        *package = candidate;
-        Ok(true)
+        settle_unsigned_change(candidate)?;
+        Ok(())
     }
 }
 

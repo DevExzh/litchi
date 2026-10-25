@@ -32,8 +32,9 @@ fn full() -> OpcPackage {
     package.relate_to("docProps/app.xml", rt::EXTENDED_PROPERTIES);
     let mut props = custom::Props::new();
     props.insert("Project", "Litchi").unwrap();
-    props.write_for(&mut package, Host::Word).unwrap();
-    package
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.set_custom_props(props);
+    edit.commit().unwrap().into_package()
 }
 
 fn sign(package: &mut OpcPackage) {
@@ -201,7 +202,7 @@ fn keyword_lists_round_trip_the_source_bytes_until_they_change() {
     .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(commit.diagnostics().fields(), [Field::Keywords]);
-    assert!(commit.patch().apply(&mut package).unwrap());
+    assert!(commit.patch().apply_in_place(&mut package).unwrap());
     assert_eq!(
         bytes(commit.package(), "/docProps/core.xml"),
         bytes(&package, "/docProps/core.xml")
@@ -233,7 +234,7 @@ fn metadata_edit_routes_fields_to_their_families_and_inverts_exactly() {
         [Field::Title, Field::Created, Field::Manager]
     );
     let patch = commit.patch().clone();
-    assert!(patch.apply(&mut package).unwrap());
+    assert!(patch.apply_in_place(&mut package).unwrap());
 
     let after = Snapshot::read(&package, Host::Word).unwrap();
     let metadata = after.metadata().unwrap();
@@ -250,7 +251,7 @@ fn metadata_edit_routes_fields_to_their_families_and_inverts_exactly() {
         APP.replace("</Properties>", "<Manager>Lin</Manager></Properties>")
     );
 
-    assert!(patch.inverse().apply(&mut package).unwrap());
+    assert!(patch.inverse().apply_in_place(&mut package).unwrap());
     assert_eq!(bytes(&package, "/docProps/core.xml").unwrap(), core_before);
     assert_eq!(
         bytes(&package, "/docProps/app.xml").unwrap(),
@@ -269,7 +270,7 @@ fn equal_values_commit_nothing_even_on_a_signed_package() {
     assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
     assert!(commit.package().is_signed());
-    assert!(!commit.patch().apply(&mut package).unwrap());
+    assert!(!commit.patch().apply_in_place(&mut package).unwrap());
 
     // A changed edit of a signed package is refused at commit; its planned
     // patch is refused by the replay.
@@ -281,7 +282,10 @@ fn equal_values_commit_nothing_even_on_a_signed_package() {
     plan.update_metadata(|metadata| metadata.title = Some("Changed".into()))
         .unwrap();
     let (_, patch, _) = plan.finish().unwrap();
-    assert!(matches!(patch.apply(&mut package), Err(Error::Signed)));
+    assert!(matches!(
+        patch.apply_in_place(&mut package),
+        Err(Error::Signed)
+    ));
 }
 
 #[test]
@@ -299,14 +303,14 @@ fn an_exact_no_op_patch_rejects_a_different_property_owner() {
     let (_, changed, diagnostics) = changed_plan.finish().unwrap();
     assert!(diagnostics.changed());
     let mut different = source.clone();
-    changed.apply(&mut different).unwrap();
+    changed.apply_in_place(&mut different).unwrap();
     assert!(matches!(
-        no_op.apply(&mut different),
+        no_op.apply_in_place(&mut different),
         Err(Error::PatchConflict)
     ));
 
     let mut exact = source.clone();
-    assert!(!no_op.apply(&mut exact).unwrap());
+    assert!(!no_op.apply_in_place(&mut exact).unwrap());
 }
 
 #[test]
@@ -322,9 +326,9 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     // reducing authentication to the changed family.
     let no_op_then_changed = no_op.compose(&changed).unwrap();
     let mut direct = source.clone();
-    no_op_then_changed.apply(&mut direct).unwrap();
+    no_op_then_changed.apply_in_place(&mut direct).unwrap();
     let mut sequential = source.clone();
-    changed.apply(&mut sequential).unwrap();
+    changed.apply_in_place(&mut sequential).unwrap();
     assert_eq!(
         bytes(&direct, "/docProps/core.xml"),
         bytes(&sequential, "/docProps/core.xml")
@@ -332,7 +336,7 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
 
     let changed_then_no_op = changed.compose(&changed_no_op).unwrap();
     let mut direct = source.clone();
-    changed_then_no_op.apply(&mut direct).unwrap();
+    changed_then_no_op.apply_in_place(&mut direct).unwrap();
     assert_eq!(
         bytes(&direct, "/docProps/core.xml"),
         bytes(&sequential, "/docProps/core.xml")
@@ -347,9 +351,9 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     }));
     let (_app_state, app_patch, _) = app_plan.finish().unwrap();
     let mut different = source.clone();
-    app_patch.apply(&mut different).unwrap();
+    app_patch.apply_in_place(&mut different).unwrap();
     assert!(matches!(
-        no_op_then_changed.apply(&mut different),
+        no_op_then_changed.apply_in_place(&mut different),
         Err(Error::PatchConflict)
     ));
 
@@ -366,11 +370,11 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     // no-op on the original owner only.
     let round_trip = changed.compose(&changed.inverse()).unwrap();
     let mut exact = source.clone();
-    assert!(!round_trip.apply(&mut exact).unwrap());
+    assert!(!round_trip.apply_in_place(&mut exact).unwrap());
     let mut after = source.clone();
-    changed.apply(&mut after).unwrap();
+    changed.apply_in_place(&mut after).unwrap();
     assert!(matches!(
-        round_trip.apply(&mut after),
+        round_trip.apply_in_place(&mut after),
         Err(Error::PatchConflict)
     ));
 
@@ -385,17 +389,17 @@ fn composed_no_op_scopes_are_checked_instead_of_dropped() {
     let (_, app_patch, _) = app_plan.finish().unwrap();
     let disjoint = round_trip.compose(&app_patch).unwrap();
     let mut composed = source.clone();
-    disjoint.apply(&mut composed).unwrap();
+    disjoint.apply_in_place(&mut composed).unwrap();
     let mut expected = source.clone();
-    app_patch.apply(&mut expected).unwrap();
+    app_patch.apply_in_place(&mut expected).unwrap();
     assert_eq!(
         bytes(&composed, "/docProps/app.xml"),
         bytes(&expected, "/docProps/app.xml")
     );
     let mut wrong = source.clone();
-    changed.apply(&mut wrong).unwrap();
+    changed.apply_in_place(&mut wrong).unwrap();
     assert!(matches!(
-        disjoint.apply(&mut wrong),
+        disjoint.apply_in_place(&mut wrong),
         Err(Error::PatchConflict)
     ));
 }
@@ -407,22 +411,27 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
     let (_, no_op, _) = snapshot.plan().finish().unwrap();
     assert!(no_op.compose(&no_op).unwrap().is_noop());
     let mut exact = empty.clone();
-    assert!(!no_op.apply(&mut exact).unwrap());
+    assert!(!no_op.apply_in_place(&mut exact).unwrap());
 
     let (changed_state, changed) = edited(&snapshot, "Created");
     let (_, changed_no_op, _) = changed_state.plan().finish().unwrap();
     let composed = no_op.compose(&changed).unwrap();
     let mut composed_package = empty.clone();
-    composed.apply(&mut composed_package).unwrap();
+    composed.apply_in_place(&mut composed_package).unwrap();
     let mut expected = empty.clone();
-    changed.apply(&mut expected).unwrap();
+    changed.apply_in_place(&mut expected).unwrap();
     assert_eq!(
         bytes(&composed_package, "/docProps/core.xml"),
         bytes(&expected, "/docProps/core.xml")
     );
     // The untouched absent families retain diagnostic placeholders, but replay
     // authenticates their actual absence independently of those IDs.
-    assert!(composed.inverse().apply(&mut composed_package).unwrap());
+    assert!(
+        composed
+            .inverse()
+            .apply_in_place(&mut composed_package)
+            .unwrap()
+    );
     assert_eq!(composed_package.iter_parts().count(), 0);
 
     // The same wildcard absence guard composes with an application-only or
@@ -435,8 +444,11 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
     let (_, app_creation, _) = app_plan.finish().unwrap();
     let app_composed = no_op.compose(&app_creation).unwrap();
     let mut app_package = empty.clone();
-    app_composed.apply(&mut app_package).unwrap();
-    app_composed.inverse().apply(&mut app_package).unwrap();
+    app_composed.apply_in_place(&mut app_package).unwrap();
+    app_composed
+        .inverse()
+        .apply_in_place(&mut app_package)
+        .unwrap();
     assert_eq!(app_package.iter_parts().count(), 0);
 
     let mut custom_plan = snapshot.plan();
@@ -446,23 +458,26 @@ fn composed_no_op_scope_authenticates_absent_property_families() {
     let (_, custom_creation, _) = custom_plan.finish().unwrap();
     let custom_composed = no_op.compose(&custom_creation).unwrap();
     let mut custom_package = empty.clone();
-    custom_composed.apply(&mut custom_package).unwrap();
+    custom_composed.apply_in_place(&mut custom_package).unwrap();
     custom_composed
         .inverse()
-        .apply(&mut custom_package)
+        .apply_in_place(&mut custom_package)
         .unwrap();
     assert_eq!(custom_package.iter_parts().count(), 0);
 
     // A creation followed by an independently captured exact-after no-op
     // keeps its creation relationship and still composes to one patch.
     let mut created = empty.clone();
-    changed.apply(&mut created).unwrap();
+    changed.apply_in_place(&mut created).unwrap();
     let after_snapshot = Snapshot::read(&created, Host::Excel).unwrap();
     let (_, after_no_op, _) = after_snapshot.plan().finish().unwrap();
     let creation_then_no_op = changed.compose(&after_no_op).unwrap();
     let mut recreated = empty.clone();
-    creation_then_no_op.apply(&mut recreated).unwrap();
-    creation_then_no_op.inverse().apply(&mut recreated).unwrap();
+    creation_then_no_op.apply_in_place(&mut recreated).unwrap();
+    creation_then_no_op
+        .inverse()
+        .apply_in_place(&mut recreated)
+        .unwrap();
     assert_eq!(recreated.iter_parts().count(), 0);
     assert!(matches!(
         no_op.compose(&changed_no_op),
@@ -497,7 +512,7 @@ fn composed_creation_authenticates_its_actual_relationship_id() {
         )
         .unwrap();
     assert!(matches!(
-        composed.apply(&mut occupied),
+        composed.apply_in_place(&mut occupied),
         Err(Error::PatchConflict)
     ));
 
@@ -517,13 +532,13 @@ fn removal_composes_only_with_a_no_op_from_its_exact_after_graph() {
     let (_, removal, _) = remove_plan.finish().unwrap();
 
     let mut removed = source.clone();
-    assert!(removal.apply(&mut removed).unwrap());
+    assert!(removal.apply_in_place(&mut removed).unwrap());
     let removed_snapshot = Snapshot::read(&removed, Host::Word).unwrap();
     let (_, exact_no_op, _) = removed_snapshot.plan().finish().unwrap();
     let composed = removal.compose(&exact_no_op).unwrap();
     let mut round_trip = source.clone();
-    assert!(composed.apply(&mut round_trip).unwrap());
-    assert!(composed.inverse().apply(&mut round_trip).unwrap());
+    assert!(composed.apply_in_place(&mut round_trip).unwrap());
+    assert!(composed.inverse().apply_in_place(&mut round_trip).unwrap());
     assert_eq!(
         bytes(&round_trip, "/docProps/custom.xml"),
         bytes(&source, "/docProps/custom.xml")
@@ -560,11 +575,11 @@ fn removal_composes_only_with_a_no_op_from_its_exact_after_graph() {
     let composed_with_different_gap = removal.compose(&different_no_op).unwrap();
     let mut different_gap_result = source.clone();
     composed_with_different_gap
-        .apply(&mut different_gap_result)
+        .apply_in_place(&mut different_gap_result)
         .unwrap();
     composed_with_different_gap
         .inverse()
-        .apply(&mut different_gap_result)
+        .apply_in_place(&mut different_gap_result)
         .unwrap();
     assert_eq!(
         bytes(&different_gap_result, "/docProps/custom.xml"),
@@ -581,7 +596,7 @@ fn composed_removal_authenticates_all_inbound_relationships() {
     let (_, removal, _) = remove_plan.finish().unwrap();
 
     let mut removed = source.clone();
-    removal.apply(&mut removed).unwrap();
+    removal.apply_in_place(&mut removed).unwrap();
     let removed_snapshot = Snapshot::read(&removed, Host::Word).unwrap();
     let (_, exact_no_op, _) = removed_snapshot.plan().finish().unwrap();
     let composed = removal.compose(&exact_no_op).unwrap();
@@ -600,7 +615,7 @@ fn composed_removal_authenticates_all_inbound_relationships() {
         )
         .unwrap();
     assert!(matches!(
-        composed.apply(&mut extra_inbound),
+        composed.apply_in_place(&mut extra_inbound),
         Err(Error::Package(crate::Error::Relationship(_)))
     ));
 
@@ -655,7 +670,7 @@ fn an_empty_package_gains_canonical_parts() {
             .iter()
             .all(|change| change.before().is_none() && change.after().is_some())
     );
-    assert!(patch.apply(&mut package).unwrap());
+    assert!(patch.apply_in_place(&mut package).unwrap());
     let metadata = super::read_with_report(&package, &mut ToleranceReport::default())
         .unwrap()
         .unwrap();
@@ -664,7 +679,7 @@ fn an_empty_package_gains_canonical_parts() {
         app::read(&package).unwrap().unwrap().company.as_deref(),
         Some("Litchi")
     );
-    assert!(patch.inverse().apply(&mut package).unwrap());
+    assert!(patch.inverse().apply_in_place(&mut package).unwrap());
     assert_eq!(package.iter_parts().count(), 0);
     assert_eq!(package.rels().iter().count(), 0);
 }
@@ -680,10 +695,10 @@ fn a_stale_patch_conflicts_without_mutation() {
     edit.update_metadata(|metadata| metadata.title = Some("Two".into()))
         .unwrap();
     let second = edit.commit().unwrap().patch().clone();
-    assert!(first.apply(&mut package).unwrap());
+    assert!(first.apply_in_place(&mut package).unwrap());
     let before = bytes(&package, "/docProps/core.xml");
     assert!(matches!(
-        second.apply(&mut package),
+        second.apply_in_place(&mut package),
         Err(Error::PatchConflict)
     ));
     assert_eq!(bytes(&package, "/docProps/core.xml"), before);
@@ -716,10 +731,10 @@ fn composed_patches_apply_as_their_sequence_and_an_inverse_composes_to_a_no_op()
     let (_, second) = edited(&once, "Two");
     let composed = first.compose(&second).unwrap();
     let mut sequential = package.clone();
-    first.apply(&mut sequential).unwrap();
-    second.apply(&mut sequential).unwrap();
+    first.apply_in_place(&mut sequential).unwrap();
+    second.apply_in_place(&mut sequential).unwrap();
     let mut direct = package.clone();
-    composed.apply(&mut direct).unwrap();
+    composed.apply_in_place(&mut direct).unwrap();
     assert_eq!(
         bytes(&direct, "/docProps/core.xml"),
         bytes(&sequential, "/docProps/core.xml")
@@ -757,7 +772,7 @@ fn a_patch_prepares_over_a_source_backed_package_without_materializing_it() {
 
     // The same patch on the owning package stores the same parts.
     let mut owning = package.clone();
-    patch.apply(&mut owning).unwrap();
+    patch.apply_in_place(&mut owning).unwrap();
     for name in [
         "/docProps/core.xml",
         "/docProps/app.xml",
@@ -818,6 +833,6 @@ fn an_edit_publishes_a_new_package_and_leaves_its_source_unchanged() {
     assert_eq!(after.metadata().unwrap().title.as_deref(), Some("After"));
     let (published, patch) = commit.into_parts();
     let mut restored = published.clone();
-    assert!(patch.inverse().apply(&mut restored).unwrap());
+    assert!(patch.inverse().apply_in_place(&mut restored).unwrap());
     assert_eq!(bytes(&restored, "/docProps/core.xml").unwrap(), core_before);
 }

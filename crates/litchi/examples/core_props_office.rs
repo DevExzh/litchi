@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use litchi::{docx, pptx, xlsx};
 use litchi_core::Metadata;
+use litchi_ooxml_common::custom::Host;
 use litchi_ooxml_common::properties;
 use litchi_opc::OpcPackage;
 
@@ -58,8 +59,7 @@ fn create_pptx(directory: &Path) -> Result<()> {
         914_400,
     );
     let package = builder.build()?;
-    let mut graph = package.opc()?.clone();
-    let _ = properties::write(&mut graph, &smoke_props("PPTX"))?;
+    let graph = publish_core(package.opc()?, Host::PowerPoint, Some(smoke_props("PPTX")))?;
     let package = pptx::Package::from_opc_package(graph)?;
     package.save(&authored)?;
 
@@ -67,8 +67,7 @@ fn create_pptx(directory: &Path) -> Result<()> {
     if read_clean(package.opc()?)?.is_none() {
         return Err("PPTX core properties were not published".into());
     }
-    let mut graph = package.opc()?.clone();
-    let _ = properties::clear(&mut graph)?;
+    let graph = publish_core(package.opc()?, Host::PowerPoint, None)?;
     let package = pptx::Package::from_opc_package(graph)?;
     package.save(&cleared)?;
     Ok(())
@@ -80,8 +79,8 @@ fn create_xlsx(directory: &Path) -> Result<()> {
     let package = xlsx::Package::new()?;
     package.save(&authored)?;
 
-    let mut graph = OpcPackage::open(&authored, litchi_opc::SourceLimits::default())?;
-    let _ = properties::write(&mut graph, &smoke_props("XLSX"))?;
+    let graph = OpcPackage::open(&authored, litchi_opc::SourceLimits::default())?;
+    let graph = publish_core(&graph, Host::Excel, Some(smoke_props("XLSX")))?;
     let package = xlsx::Package::from_opc(graph)?;
     package.save(&authored)?;
 
@@ -89,11 +88,24 @@ fn create_xlsx(directory: &Path) -> Result<()> {
     if read_clean(&graph)?.is_none() {
         return Err("XLSX core properties were not published".into());
     }
-    let mut graph = OpcPackage::open(&authored, litchi_opc::SourceLimits::default())?;
-    let _ = properties::clear(&mut graph)?;
+    let graph = OpcPackage::open(&authored, litchi_opc::SourceLimits::default())?;
+    let graph = publish_core(&graph, Host::Excel, None)?;
     let package = xlsx::Package::from_opc(graph)?;
     package.save(&cleared)?;
     Ok(())
+}
+
+fn publish_core(package: &OpcPackage, host: Host, value: Option<Metadata>) -> Result<OpcPackage> {
+    let mut edit = properties::Edit::new(package, host)?;
+    match value {
+        Some(value) => {
+            edit.set_metadata(value);
+        },
+        None => {
+            edit.clear_metadata();
+        },
+    }
+    Ok(edit.commit()?.into_package())
 }
 
 /// Read core properties the example just authored; a freshly written part

@@ -197,7 +197,7 @@ pub fn read_source_backed(package: &SourceBackedPackage) -> Result<Option<Props>
 /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
 /// for a change to a signed package, the errors of [`read`], and an error
 /// when a value cannot be written.
-pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
+pub(crate) fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
     let graph = inspect(package)?;
     if let Some(part) = graph.part {
         let current = package.get_part(&part)?.blob();
@@ -248,7 +248,7 @@ pub fn write(package: &mut OpcPackage, props: Props) -> Result<bool> {
 /// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
 /// for a signed package, [`Error::Relationship`] for a shared part, and the
 /// graph errors of [`read`].
-pub fn clear(package: &mut OpcPackage) -> Result<bool> {
+pub(crate) fn clear(package: &mut OpcPackage) -> Result<bool> {
     let graph = inspect(package)?;
     let (Some(part), Some(id)) = (graph.part, graph.relationship_id) else {
         return Ok(false);

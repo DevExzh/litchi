@@ -32,8 +32,8 @@ pub(crate) use codec::{
     SplicePlan, decode, encode_new, encode_new_len, encode_new_preflighted, plan_splice,
     splice_planned,
 };
-pub use package::{clear, read, read_source_backed, write};
 pub(crate) use package::{inspect, inspect_source};
+pub use package::{read, read_source_backed};
 
 /// Transitional extended-properties namespace.
 pub(crate) const NAMESPACE: &str =

@@ -78,7 +78,7 @@ pub fn discover(package: &OpcPackage) -> Result<Vec<Item>> {
 /// for a signed package, and an error when input violates OOXML constraints,
 /// exceeds a configured bound, or an underlying XML or package operation
 /// fails.
-pub fn add(package: &mut OpcPackage, item: NewItem) -> Result<()> {
+pub(crate) fn add(package: &mut OpcPackage, item: NewItem) -> Result<()> {
     let source_limits = package.read_limits();
     validate_content_type(&item.content_type)?;
     validate_payload(&item.xml, &source_limits)?;

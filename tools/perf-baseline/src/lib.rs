@@ -62106,7 +62106,13 @@ mod tests {
             title: Some("Benchmark title".to_owned()),
             ..litchi_core::Metadata::default()
         };
-        litchi_ooxml_common::properties::write(&mut package, &expected).unwrap();
+        let mut edit = litchi_ooxml_common::properties::Edit::new(
+            &package,
+            litchi_ooxml_common::custom::Host::Word,
+        )
+        .unwrap();
+        edit.set_metadata(expected.clone());
+        package = edit.commit().unwrap().into_package();
         assert_eq!(
             super::xlsx_root_metadata_digest(&super::xlsx_root_metadata_oracle(&package).unwrap())
                 .unwrap(),

@@ -54,7 +54,7 @@ pub(crate) fn write_core(package: &mut OpcPackage, props: Core) -> Result<bool> 
 /// for a change to a signed package, and an error when input violates OOXML
 /// constraints, exceeds a configured bound, or an underlying XML or package
 /// operation fails.
-pub fn clear(package: &mut OpcPackage) -> Result<bool> {
+pub(crate) fn clear(package: &mut OpcPackage) -> Result<bool> {
     let graph = graph::inspect(package)?;
     let Some(part_name) = graph.part else {
         return Ok(false);
