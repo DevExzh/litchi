@@ -5959,3 +5959,11 @@ See [0063](0063-source-pptx-modern-comments.md).
   corrected executable driver. A separate sparse protocol worktree holds
   further native qualification fixes while C stays immutable. No acceptance
   or performance result is inferred; nothing is pushed.
+
+  The C-bound raw census stops at inventory preflight after its two rustc
+  identity steps pass (147). It supplied the outer tracing wrapper where
+  inventory requires the coordinator cap shim; no profiles are captured.
+  Root verifies the failed terminal receipts, unchanged source/locks and
+  empty owned processes. Adapter v10 must repair the actual admission seam;
+  the failed packet stays preserved and C stays frozen. All final gates and
+  acceptance work remain open. Nothing is pushed.
