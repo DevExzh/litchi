@@ -562,8 +562,10 @@ impl Snapshot {
             base: self.clone(),
             metadata: None,
             clear_core: false,
+            force_core: false,
             app: None,
             custom: None,
+            remove_custom: false,
             options,
         }
     }
@@ -818,8 +820,15 @@ pub struct Plan {
     base: Snapshot,
     metadata: Option<Metadata>,
     clear_core: bool,
+    /// Whether an explicit metadata set must create a core part even when
+    /// the requested value is the empty semantic projection.
+    force_core: bool,
     app: Option<Option<app::Props>>,
     custom: Option<custom::Props>,
+    /// Whether an explicit custom-family removal was requested. This is
+    /// distinct from setting an equal empty collection, which is a semantic
+    /// no-op and preserves a present raw part.
+    remove_custom: bool,
     options: EditOptions,
 }
 
@@ -994,6 +1003,7 @@ impl Plan {
     pub fn set_metadata(&mut self, metadata: Metadata) -> &mut Self {
         self.metadata = Some(metadata);
         self.clear_core = false;
+        self.force_core = self.base.core.present.is_none();
         self
     }
 
@@ -1009,6 +1019,7 @@ impl Plan {
         merge_core_metadata(&mut target, &metadata);
         self.metadata = Some(target);
         self.clear_core = false;
+        self.force_core = self.base.core.present.is_none();
         Ok(self)
     }
 
@@ -1016,6 +1027,7 @@ impl Plan {
     pub fn clear_metadata(&mut self) -> &mut Self {
         self.metadata = None;
         self.clear_core = true;
+        self.force_core = false;
         self
     }
 
@@ -1069,9 +1081,22 @@ impl Plan {
     }
 
     /// Stage the complete custom properties; an empty collection removes the
-    /// part.
+    /// part when it changes the semantic collection. Setting an equal empty
+    /// collection is an exact no-op, preserving a present raw part.
     pub fn set_custom_props(&mut self, props: custom::Props) -> &mut Self {
         self.custom = Some(props);
+        self.remove_custom = false;
+        self
+    }
+
+    /// Stage explicit removal of the custom-properties part and relationship.
+    ///
+    /// This is distinct from setting an equal empty collection: it removes a
+    /// present raw part even when its tolerant semantic projection is empty.
+    /// An absent graph remains an exact no-op.
+    pub fn remove_custom_props(&mut self) -> &mut Self {
+        self.custom = Some(custom::Props::new());
+        self.remove_custom = true;
         self
     }
 
@@ -1086,8 +1111,10 @@ impl Plan {
             base,
             metadata,
             clear_core,
+            force_core,
             app: staged_app,
             custom,
+            remove_custom,
             options: _,
         } = self;
         let (core_metadata, app_target, changed_fields) = if clear_core {
@@ -1134,6 +1161,7 @@ impl Plan {
                     let core_changed = changed_fields
                         .iter()
                         .any(|field| CORE_FIELDS.contains(field));
+                    let core_requested = core_changed || force_core;
                     let app_changed = changed_fields
                         .iter()
                         .any(|field| app::METADATA_FIELDS.contains(field));
@@ -1147,7 +1175,7 @@ impl Plan {
                         staged_app
                     };
                     (
-                        core_changed.then_some(Some(target)),
+                        core_requested.then_some(Some(target)),
                         app_target,
                         changed_fields,
                     )
@@ -1175,7 +1203,7 @@ impl Plan {
                     None => (Core::default(), Dialect::Transitional),
                 };
                 let merged = Core::merged(base.core.present.as_ref().map(|_| &current), &target)?;
-                (merged != current)
+                (force_core || merged != current)
                     .then(|| {
                         super::write::encoded_len(&merged, dialect).map(|after_len| PreparedCore {
                             target: Some(merged),
@@ -1218,18 +1246,20 @@ impl Plan {
 
         let custom = custom
             .filter(|target| {
-                !target.same_values(&base.custom_value)
-                    || (target.is_empty() && base.custom.present.is_some())
+                (remove_custom && base.custom.present.is_some())
+                    || (!remove_custom && !target.same_values(&base.custom_value))
             })
             .map(|target| {
-                target.validate_for(base.host)?;
-                if !base.custom_value.tolerance_report().is_clean() {
+                if !remove_custom {
+                    target.validate_for(base.host)?;
+                }
+                if !remove_custom && !base.custom_value.tolerance_report().is_clean() {
                     return Err(Error::Invalid(
                         "the custom properties were repaired when they were read; rewriting them would drop the properties that were skipped"
                             .to_owned(),
                     ));
                 }
-                let after_len = (!target.is_empty())
+                let after_len = (!remove_custom && !target.is_empty())
                     .then(|| custom::encoded_len(&target))
                     .transpose()?;
                 Ok(PreparedCustom { target, after_len })
@@ -1831,9 +1861,20 @@ impl Edit {
     }
 
     /// Stage the complete custom properties; an empty collection removes the
-    /// part.
+    /// part when it changes the semantic collection. Setting an equal empty
+    /// collection is an exact no-op, preserving a present raw part.
     pub fn set_custom_props(&mut self, props: custom::Props) -> &mut Self {
         self.plan.set_custom_props(props);
+        self
+    }
+
+    /// Stage explicit removal of the custom-properties part and relationship.
+    ///
+    /// This is distinct from setting an equal empty collection: it removes a
+    /// present raw part even when its tolerant semantic projection is empty.
+    /// An absent graph remains an exact no-op.
+    pub fn remove_custom_props(&mut self) -> &mut Self {
+        self.plan.remove_custom_props();
         self
     }
 

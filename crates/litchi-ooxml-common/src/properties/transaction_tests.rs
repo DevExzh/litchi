@@ -90,16 +90,36 @@ fn core_only_staging_preserves_application_properties() {
 }
 
 #[test]
-fn staging_empty_custom_properties_removes_an_existing_empty_part() {
+fn setting_empty_custom_properties_preserves_an_existing_empty_part() {
     const EMPTY_CUSTOM: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"></Properties>"#;
     let mut package = full();
     package
         .get_part_mut(&PackURI::new("/docProps/custom.xml").unwrap())
         .unwrap()
         .set_blob(EMPTY_CUSTOM.to_vec());
+    let raw_before = bytes(&package, "/docProps/custom.xml").unwrap();
 
     let mut edit = Edit::new(&package, Host::Word).unwrap();
     edit.set_custom_props(custom::Props::new());
+    let commit = edit.commit().unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    let preserved = commit.into_package();
+    assert_eq!(
+        bytes(&preserved, "/docProps/custom.xml").unwrap(),
+        raw_before
+    );
+
+    let mut signed_noop = package.clone();
+    sign(&mut signed_noop);
+    let mut edit = Edit::new(&signed_noop, Host::Word).unwrap();
+    edit.set_custom_props(custom::Props::new());
+    let kept = edit.commit().unwrap();
+    assert!(!kept.diagnostics().changed());
+    assert!(kept.package().is_signed());
+
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.remove_custom_props();
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     let cleared = commit.into_package();
@@ -112,8 +132,31 @@ fn staging_empty_custom_properties_removes_an_existing_empty_part() {
     let mut signed = package;
     sign(&mut signed);
     let mut edit = Edit::new(&signed, Host::Word).unwrap();
-    edit.set_custom_props(custom::Props::new());
+    edit.remove_custom_props();
     assert!(matches!(edit.commit(), Err(Error::Signed)));
+}
+
+#[test]
+fn explicit_custom_removal_keeps_dirty_raw_graphs_removable() {
+    const DIRTY_CUSTOM: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/custom-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="2" name="Keep"><vt:lpwstr>value</vt:lpwstr></property><property fmtid="{D5CDD505-2E9C-101B-9397-08002B2CF9AE}" pid="3" name="Skip"><vt:date>2026-01-01</vt:date></property></Properties>"#;
+    let mut package = full();
+    package
+        .get_part_mut(&PackURI::new("/docProps/custom.xml").unwrap())
+        .unwrap()
+        .set_blob(DIRTY_CUSTOM.to_vec());
+
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    assert!(!snapshot.custom_props().tolerance_report().is_clean());
+    let mut edit = Edit::new(&package, Host::Word).unwrap();
+    edit.remove_custom_props();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert!(
+        commit
+            .into_package()
+            .get_part(&PackURI::new("/docProps/custom.xml").unwrap())
+            .is_err()
+    );
 }
 
 #[test]
@@ -606,7 +649,7 @@ fn removal_composes_only_with_a_no_op_from_its_exact_after_graph() {
     let source = full();
     let snapshot = Snapshot::read(&source, Host::Word).unwrap();
     let mut remove_plan = snapshot.plan();
-    remove_plan.set_custom_props(custom::Props::new());
+    remove_plan.remove_custom_props();
     let (_, removal, _) = remove_plan.finish().unwrap();
 
     let mut removed = source.clone();
@@ -670,7 +713,7 @@ fn composed_removal_authenticates_all_inbound_relationships() {
     let source = full();
     let snapshot = Snapshot::read(&source, Host::Word).unwrap();
     let mut remove_plan = snapshot.plan();
-    remove_plan.set_custom_props(custom::Props::new());
+    remove_plan.remove_custom_props();
     let (_, removal, _) = remove_plan.finish().unwrap();
 
     let mut removed = source.clone();

@@ -131,9 +131,20 @@ impl Edit {
     }
 
     /// Stage the complete custom properties; an empty collection removes the
-    /// part.
+    /// part when it changes the semantic collection. Setting an equal empty
+    /// collection is an exact no-op, preserving a present raw part.
     pub fn set_custom_props(&mut self, props: custom::Props) -> &mut Self {
         self.inner.set_custom_props(props);
+        self
+    }
+
+    /// Stage explicit removal of the custom-properties part and relationship.
+    ///
+    /// This is distinct from setting an equal empty collection: it removes a
+    /// present raw part even when its tolerant semantic projection is empty.
+    /// An absent graph remains an exact no-op.
+    pub fn remove_custom_props(&mut self) -> &mut Self {
+        self.inner.remove_custom_props();
         self
     }
 
@@ -271,6 +282,7 @@ impl Package {
     /// workbook.
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Commit> {
         let package = if patch.is_noop() {
+            patch.check(self.opc_package())?;
             self.clone()
         } else {
             let candidate = patch.apply(self.opc_package())?.into_package();
@@ -334,6 +346,21 @@ mod tests {
         assert!(!replayed.diagnostics().changed());
         assert!(replayed.patch().is_noop());
         assert_eq!(replayed.package().to_bytes().unwrap(), original);
+    }
+
+    #[test]
+    fn a_foreign_noop_metadata_patch_conflicts_instead_of_bypassing_scope() {
+        let package = Package::new().unwrap();
+        let mut edit = package.edit_metadata().unwrap();
+        edit.update(|metadata| metadata.title = Some("foreign".to_owned()))
+            .unwrap();
+        let foreign = edit.commit().unwrap().into_package();
+        let foreign_noop = foreign.edit_metadata().unwrap().commit().unwrap();
+
+        assert!(matches!(
+            package.apply_metadata(foreign_noop.patch()),
+            Err(Error::PatchConflict)
+        ));
     }
 
     #[test]

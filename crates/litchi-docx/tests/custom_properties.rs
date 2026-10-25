@@ -50,6 +50,12 @@ fn edit_custom_props(
     Ok(edit.commit()?.into_package())
 }
 
+fn remove_custom_props(package: &Package) -> litchi_docx::metadata::Result<Package> {
+    let mut edit = package.edit_metadata();
+    edit.remove_custom_props();
+    Ok(edit.commit()?.into_package())
+}
+
 struct FailingSink {
     remaining: usize,
 }
@@ -93,8 +99,7 @@ fn custom_props_round_trip_and_clear_remove_the_package_graph() {
         reopened.custom_props().get("VERSION"),
         Some(&Value::I32(38))
     );
-    let reopened =
-        edit_custom_props(&reopened, CustomProps::clear).expect("clear custom properties");
+    let reopened = remove_custom_props(&reopened).expect("clear custom properties");
     reopened.save(&path).expect("save cleared properties");
 
     let graph = OpcPackage::open(&path, litchi_opc::SourceLimits::default())
@@ -315,6 +320,26 @@ fn raw_opc_empty_custom_properties_part_is_preserved_until_explicit_clear() {
     // 0355): the empty part is kept byte for byte. Removing the part itself
     // is a raw graph change.
     assert_eq!(custom_properties_xml(&cleared_output), replacement);
+
+    let removed = remove_custom_props(&cleared).expect("explicitly remove custom graph");
+    let mut removed_output = Vec::new();
+    removed
+        .write_to(&mut removed_output)
+        .expect("save explicitly removed custom properties");
+    let removed_graph =
+        OpcPackage::from_bytes(&removed_output, litchi_opc::SourceLimits::default())
+            .expect("open explicitly removed OPC graph");
+    assert!(
+        removed_graph
+            .rels()
+            .iter()
+            .all(|relationship| relationship.reltype() != rt::CUSTOM_PROPERTIES)
+    );
+    assert!(
+        removed_graph
+            .iter_parts()
+            .all(|part| part.content_type() != ct::OFC_CUSTOM_PROPERTIES)
+    );
 }
 
 #[test]

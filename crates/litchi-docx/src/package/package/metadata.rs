@@ -97,6 +97,7 @@ impl Package {
         &self,
         app: Option<Option<app::Props>>,
         custom: Option<CustomProps>,
+        remove_custom: bool,
     ) -> Result<families::Patch> {
         // A dirty cached value would make the part bytes stale.
         self.ensure_opc_current("edit_metadata")?;
@@ -106,7 +107,11 @@ impl Package {
             plan.set_app_props(app);
         }
         if let Some(custom) = custom {
-            plan.set_custom_props(custom);
+            if remove_custom {
+                plan.remove_custom_props();
+            } else {
+                plan.set_custom_props(custom);
+            }
         }
         Ok(plan.finish()?.1)
     }

@@ -22,7 +22,9 @@
 //! [`read_with_report`] reads the core family alone and distinguishes an
 //! absent part from a present but empty one. [`Edit::set_metadata`] stores the
 //! core fields of a [`Metadata`] and refuses any field core properties cannot
-//! carry. Hosts edit all three families at once through the shared
+//! carry. [`Edit::set_custom_props`] preserves a present raw part when its
+//! equal semantic collection is staged; [`Edit::remove_custom_props`] is the
+//! explicit graph-removal intent. Hosts edit all three families at once through the shared
 //! transaction ([`Edit`], [`Commit`], [`Patch`], read through [`Snapshot`]), which each
 //! format re-exports as its `metadata` module.
 

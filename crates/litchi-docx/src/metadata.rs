@@ -17,7 +17,8 @@
 //! publishes nothing for a value equal to the stored one.
 //!
 //! [`Edit::set_app_props`] and [`Edit::set_custom_props`] stage the
-//! application and custom properties (record 0342). They are written by the
+//! application and custom properties (record 0342). [`Edit::remove_custom_props`]
+//! explicitly removes the custom-properties graph. They are written by the
 //! shared engine's exact part patch ([`litchi_ooxml_common::properties::Patch`]):
 //! the application part is spliced, so every element the typed model does
 //! not carry keeps its bytes, and an unchanged value publishes nothing.
@@ -185,6 +186,9 @@ pub struct Edit {
     app: Option<Option<app::Props>>,
     /// Staged custom properties; `None` leaves the part untouched.
     custom: Option<CustomProps>,
+    /// Explicit custom-properties graph removal, distinct from setting an
+    /// equal empty semantic collection.
+    remove_custom: bool,
 }
 
 impl Edit {
@@ -195,6 +199,7 @@ impl Edit {
             base,
             app: None,
             custom: None,
+            remove_custom: false,
         }
     }
 
@@ -252,9 +257,22 @@ impl Edit {
     }
 
     /// Stage the complete custom properties; an empty collection removes the
-    /// part.
+    /// part when it changes the semantic collection. Setting an equal empty
+    /// collection is an exact no-op, preserving a present raw part.
     pub fn set_custom_props(&mut self, props: CustomProps) -> &mut Self {
         self.custom = Some(props);
+        self.remove_custom = false;
+        self
+    }
+
+    /// Stage explicit removal of the custom-properties part and relationship.
+    ///
+    /// This is distinct from setting an equal empty collection: it removes a
+    /// present raw part even when its tolerant semantic projection is empty.
+    /// An absent graph remains an exact no-op.
+    pub fn remove_custom_props(&mut self) -> &mut Self {
+        self.custom = Some(CustomProps::new());
+        self.remove_custom = true;
         self
     }
 
@@ -271,8 +289,9 @@ impl Edit {
     /// cannot be written, and [`Error::Package`] when the codec or package
     /// graph refuses the value.
     pub fn commit(self) -> Result<Commit> {
-        let parts = if self.app.is_some() || self.custom.is_some() {
-            self.source.property_parts_patch(self.app, self.custom)?
+        let parts = if self.app.is_some() || self.custom.is_some() || self.remove_custom {
+            self.source
+                .property_parts_patch(self.app, self.custom, self.remove_custom)?
         } else {
             families::Patch::default()
         };
@@ -342,11 +361,39 @@ pub(crate) fn admit(props: &Metadata) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use litchi_opc::{PackURI, Part as _};
+
+    fn package_with_opaque_app() -> Result<Package> {
+        let package = Package::new()?;
+        let mut opc = package.opc_package().clone();
+        let app = PackURI::new("/docProps/app.xml").expect("static app URI");
+        let part = opc.get_part_mut(&app)?;
+        let mut bytes = part.blob().to_vec();
+        let close = b"</Properties>";
+        let offset = bytes
+            .windows(close.len())
+            .position(|window| window == close)
+            .expect("default app root");
+        bytes.splice(offset..offset, br#"<Opaque keep="yes"/>"#.iter().copied());
+        part.set_blob(bytes);
+        Ok(Package::from_opc_package(opc)?)
+    }
+
+    fn app_bytes(package: &Package) -> Vec<u8> {
+        package
+            .opc_package()
+            .get_part(&PackURI::new("/docProps/app.xml").expect("static app URI"))
+            .expect("app properties")
+            .blob()
+            .to_vec()
+    }
 
     #[test]
     fn edit_commit_publishes_a_new_package_and_keeps_the_source() -> Result<()> {
-        let package = Package::new()?;
+        let package = package_with_opaque_app()?;
         let before = package.metadata().cloned();
+        let app_before = package.app_props()?.expect("app properties");
+        let app_bytes_before = app_bytes(&package);
         let mut edit = package.edit_metadata();
         edit.update(|props| {
             props.title = Some("T".to_owned());
@@ -361,6 +408,10 @@ mod tests {
             next.metadata().and_then(|props| props.title.as_deref()),
             Some("T")
         );
+        let app_after = next.app_props()?.expect("app properties");
+        assert_eq!(app_after.application, app_before.application);
+        assert_eq!(app_after.template, app_before.template);
+        assert_eq!(app_bytes(&next), app_bytes_before);
 
         let bytes = next.to_bytes()?;
         let reopened = Package::from_bytes(&bytes)?;
@@ -403,6 +454,32 @@ mod tests {
     }
 
     #[test]
+    fn clear_then_set_default_creates_core_and_inverse_removes_it() -> Result<()> {
+        let package = Package::new()?;
+        let (cleared, clear_patch) = package.edit_metadata().clear().commit()?.into_parts();
+        assert!(clear_patch.target().is_none());
+        assert!(cleared.metadata().is_none());
+
+        let mut edit = cleared.edit_metadata();
+        edit.set(Metadata::default());
+        let (created, set_patch) = edit.commit()?.into_parts();
+        let default = Metadata::default();
+        assert!(set_patch.base().is_none());
+        assert_eq!(set_patch.target(), Some(&default));
+        assert!(set_patch.parts().changes().iter().any(|change| {
+            change.family() == families::Family::Core
+                && change.before().is_none()
+                && change.after().is_some()
+        }));
+        assert_eq!(created.metadata(), Some(&default));
+
+        let restored = created.apply_metadata(&set_patch.inverse())?.into_package();
+        assert!(restored.metadata().is_none());
+        assert_eq!(restored.to_bytes()?, cleared.to_bytes()?);
+        Ok(())
+    }
+
+    #[test]
     fn apply_refuses_a_conflicting_base() -> Result<()> {
         let package = Package::new()?;
         let mut first = package.edit_metadata();
@@ -427,8 +504,9 @@ mod tests {
 
     #[test]
     fn app_and_custom_props_publish_replay_and_invert() -> Result<()> {
-        let package = Package::new()?;
+        let package = package_with_opaque_app()?;
         let original = package.clone().to_bytes()?;
+        let app_before = package.app_props()?.expect("app properties");
         let mut edit = package.edit_metadata();
         edit.update(|props| props.title = Some("Quarterly".to_owned()));
         let mut app = edit.app_props()?.unwrap_or_default();
@@ -447,6 +525,13 @@ mod tests {
         let app = next.app_props()?.unwrap_or_default();
         assert_eq!(app.company.as_deref(), Some("Acme"));
         assert_eq!(app.manager.as_deref(), Some("Dana"));
+        assert_eq!(app.application, app_before.application);
+        assert_eq!(app.template, app_before.template);
+        assert!(
+            app_bytes(&next)
+                .windows(b"<Opaque keep=\"yes\"/>")
+                .any(|window| { window == b"<Opaque keep=\"yes\"/>" })
+        );
         assert_eq!(
             next.custom_props().get("Reviewed"),
             Some(&litchi_ooxml_common::custom::Value::Bool(true))

@@ -142,6 +142,40 @@ fn an_exact_no_op_keeps_the_source_owner_and_its_bytes() {
 }
 
 #[test]
+fn source_noop_replay_checks_equal_and_foreign_recorded_bases() {
+    let bytes = fixture("Simple.xlsb");
+    let workbook = source(&bytes);
+    let equal = workbook.edit_metadata().unwrap().commit().unwrap();
+    let replayed = workbook.apply_metadata(equal.patch()).unwrap();
+    assert!(!replayed.diagnostics().changed());
+    assert_eq!(published(&replayed.into_package()), bytes);
+
+    let mut edit = workbook.edit_metadata().unwrap();
+    edit.update(|metadata| metadata.title = Some("current".to_owned()))
+        .unwrap();
+    let current = edit.commit().unwrap().into_package();
+    let current_noop = current.edit_metadata().unwrap().commit().unwrap();
+    let replayed = current.apply_metadata(current_noop.patch()).unwrap();
+    assert_eq!(
+        published(replayed.package()),
+        published(&current),
+        "a no-op from a revised source owner must authenticate its current state"
+    );
+
+    let eager = Package::from_bytes(&bytes).unwrap();
+    let mut changed = eager.edit_metadata().unwrap();
+    changed
+        .update(|metadata| metadata.title = Some("foreign".to_owned()))
+        .unwrap();
+    let foreign = changed.commit().unwrap().into_package();
+    let foreign_noop = foreign.edit_metadata().unwrap().commit().unwrap();
+    assert!(matches!(
+        workbook.apply_metadata(foreign_noop.patch()),
+        Err(Error::PatchConflict)
+    ));
+}
+
+#[test]
 fn sequential_edits_compose_and_an_undo_restores_the_source_values() {
     let bytes = fixture("Simple.xlsb");
     let workbook = source(&bytes);
