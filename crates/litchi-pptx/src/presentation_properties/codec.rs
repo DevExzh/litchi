@@ -45,7 +45,7 @@ impl XmlSink {
         }
     }
 
-    fn output(capacity: usize, limit: usize) -> Result<Self> {
+    pub(crate) fn output(capacity: usize, limit: usize) -> Result<Self> {
         let mut value = String::new();
         value
             .try_reserve_exact(capacity)
@@ -110,7 +110,7 @@ impl XmlSink {
         }
     }
 
-    fn finish(mut self) -> Result<Vec<u8>> {
+    pub(crate) fn finish(mut self) -> Result<Vec<u8>> {
         self.check()?;
         Ok(self
             .value

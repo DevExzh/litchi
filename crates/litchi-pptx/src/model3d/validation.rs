@@ -18,7 +18,7 @@ use crate::{Error, Result};
 /// Returns an error if the input cannot be read or is malformed.
 pub fn validate(model: &Model, limits: Limits) -> Result<()> {
     validate_selected_structure(&model.scene.wire, limits)?;
-    drawing::validate(&model.scene.wire).map_err(super::model::drawing_error)?;
+    drawing::validate(&model.scene.wire).map_err(super::model::drawing_model3d_error)?;
     validate_asset(&model.asset, limits)?;
     if let Some(preview) = &model.preview {
         validate_preview(preview, limits)?;
@@ -55,7 +55,7 @@ pub(crate) fn validate_loaded_graph(
     validate(model, limits)?;
     let resolver = Resolver { source };
     drawing::validate_relationships(&model.scene.wire, &resolver)
-        .map_err(super::model::drawing_error)?;
+        .map_err(super::model::drawing_model3d_error)?;
 
     let mut referenced = Vec::new();
     validate_reference(
@@ -189,6 +189,7 @@ fn validate_selected_structure(metadata: &drawing::Metadata, limits: Limits) -> 
                 }
             },
             drawing::Child::Opaque(inert) => validate_fragment_limits(inert, limits)?,
+            _ => return Err(invalid("unsupported model3d child variant")),
         }
     }
     Ok(())

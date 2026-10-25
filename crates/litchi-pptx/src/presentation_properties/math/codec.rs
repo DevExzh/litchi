@@ -160,7 +160,7 @@ pub(crate) fn write(
     out: &mut super::super::codec::XmlSink,
     value: &Properties,
     strict: bool,
-    limits: Limits,
+    _limits: Limits,
 ) -> Result<()> {
     value.validate()?;
     let omml = if strict {

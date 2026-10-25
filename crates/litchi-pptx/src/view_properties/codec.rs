@@ -1454,9 +1454,9 @@ fn limit(resource: &'static str, maximum: usize) -> Error {
 mod tests {
     use super::super::package::load_from_package;
     use super::*;
-    use litchi_opc::OpcPackage;
+    use litchi_opc::{OpcPackage, SourceLimits};
     fn f(b: &[u8]) -> ViewProperties {
-        let p = OpcPackage::from_bytes(b, litchi_opc::SourceLimits::default()).unwrap();
+        let p = OpcPackage::from_bytes(b, SourceLimits::default()).unwrap();
         load_from_package(&p, Limits::default()).unwrap().unwrap()
     }
     #[test]

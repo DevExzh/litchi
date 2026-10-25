@@ -21,23 +21,16 @@ fn typed_payload_round_trips_in_transitional_and_strict_omml() {
         .with_binary_subtraction_break(BinarySubtractionBreak::MinusPlus);
 
     for strict in [false, true] {
-        let mut xml = String::new();
-        super::codec::write(
-            &mut xml,
-            &value,
-            strict,
-            crate::presentation_properties::Limits::default(),
-        )
-        .unwrap();
-        assert_eq!(
-            super::codec::parse(
-                xml.as_bytes(),
-                crate::presentation_properties::Limits::default()
-            )
-            .unwrap(),
-            value
-        );
-        assert!(xml.contains(if strict { STRICT_OMML_NS } else { OMML_NS }));
+        let limits = crate::presentation_properties::Limits::default();
+        let mut xml = super::super::codec::XmlSink::output(0, limits.max_output_bytes()).unwrap();
+        super::codec::write(&mut xml, &value, strict, limits).unwrap();
+        let xml = xml.finish().unwrap();
+        assert_eq!(super::codec::parse(&xml, limits).unwrap(), value);
+        assert!(String::from_utf8_lossy(&xml).contains(if strict {
+            STRICT_OMML_NS
+        } else {
+            OMML_NS
+        }));
     }
 }
 
