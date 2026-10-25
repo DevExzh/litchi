@@ -6047,3 +6047,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   bindings still pending. The live C gate remains useful reference evidence;
   final gates/census/native acceptance must bind the corrected candidate.
   No additional deferral, capability-loss waiver or push.
+
+  The C gate then terminates with a real PPT hyperlink-add failure (154b):
+  row 25's CRUD matrix reports corrupt_file; six later hyperlink cells are
+  unreached. The same chunk's 13 DOC tests pass. Root verifies terminal logs,
+  unchanged C/locks, target bounds and empty owned processes. Repair 158 has
+  the single build slot for focused diagnosis. The three contract leaves and
+  their follow-ups are committed and entering candidate integration, with
+  compiler/fidelity/performance acceptance still required. Old-C packets
+  remain historical; final qualification must bind the corrected candidate.
