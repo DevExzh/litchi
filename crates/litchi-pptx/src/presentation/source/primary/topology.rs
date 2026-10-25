@@ -341,6 +341,16 @@ impl Revision {
         }
         let semantic = crate::open_options::selected(package.owner.semantic_limits.as_ref());
         let laser_limits = semantic.laser().constrained_by_source(limits);
+        // Refuse malformed or unsupported markup-compatibility and selected
+        // shape/transition policy failures before reserving or copying any
+        // edit-owned payload.  The admitted mode is retained by the snapshot
+        // so enclosed whole-shape removal keeps its supported capability.
+        let mce = crate::presentation::transition::admit_source_with_limits(
+            bytes,
+            "slide_snapshot",
+            semantic.shape(),
+            semantic.transition(),
+        )?;
 
         // Admission must precede the owned copy.  The source PartData remains
         // attached to the prepared candidate; this extra reservation covers
@@ -409,12 +419,7 @@ impl Revision {
             // A prepared slide that encloses markup compatibility in shape
             // children admits only whole-shape removal (record 0303); other
             // slides keep the edit-time guards of each operation.
-            mce: crate::presentation::transition::admit_source_with_limits(
-                bytes,
-                "slide_snapshot",
-                semantic.shape(),
-                semantic.transition(),
-            )?,
+            mce,
         })
     }
 }
