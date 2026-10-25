@@ -362,6 +362,22 @@ pub(crate) fn validate_replay_part(
     part_name: &PackURI,
     part: &dyn Part,
 ) -> crate::Result<()> {
+    validate_replay_part_policy(
+        package,
+        family,
+        part_name,
+        part,
+        crate::open_options::SemanticLimits::default(),
+    )
+}
+
+pub(crate) fn validate_replay_part_policy(
+    package: &OpcPackage,
+    family: ReplayFamily,
+    _part_name: &PackURI,
+    part: &dyn Part,
+    semantic_limits: crate::open_options::SemanticLimits,
+) -> crate::Result<()> {
     let source_limits = package.read_limits();
     if part.content_type() == crate::presentation_properties::CONTENT_TYPE {
         return crate::presentation_properties::validate_replay_part(
@@ -376,17 +392,45 @@ pub(crate) fn validate_replay_part(
 
     match family {
         ReplayFamily::Changes if part.content_type() == changes::CONTENT_TYPE => {
-            changes::Info::parse(part.blob()).map(drop)
+            changes::Info::parse(
+                part.blob(),
+                semantic_limits
+                    .changes()
+                    .constrained_by_source(source_limits),
+            )
+            .map(drop)
         },
         ReplayFamily::Revision if part.content_type() == revision::CONTENT_TYPE => {
-            revision::Info::parse(part.blob()).map(drop)
+            revision::Info::parse(
+                part.blob(),
+                semantic_limits
+                    .revision()
+                    .constrained_by_source(source_limits),
+            )
+            .map(drop)
         },
         ReplayFamily::SlideSync if part.content_type() == slide_sync::CONTENT_TYPE => {
-            slide_sync::Properties::parse(part.blob()).map(drop)
+            slide_sync::Properties::parse(
+                part.blob(),
+                semantic_limits
+                    .slide_sync()
+                    .constrained_by_source(source_limits),
+            )
+            .map(drop)
         },
-        ReplayFamily::Tracks if part.content_type() == tracks::CONTENT_TYPE => {
-            tracks::File::parse(part.blob()).map(drop)
-        },
+        ReplayFamily::Tracks if part.content_type() == ct::PML_SLIDE => tracks::validate_slide_xml(
+            part.blob(),
+            semantic_limits
+                .tracks()
+                .constrained_by_source(source_limits),
+        ),
+        ReplayFamily::Tracks if part.content_type() == tracks::CONTENT_TYPE => tracks::File::parse(
+            part.blob(),
+            semantic_limits
+                .tracks()
+                .constrained_by_source(source_limits),
+        )
+        .map(drop),
         ReplayFamily::CustomShows if is_presentation_content_type(part.content_type()) => {
             let xml = std::str::from_utf8(part.blob())
                 .map_err(|_| crate::Error::Invalid("PresentationML is not UTF-8".into()))?;
@@ -395,9 +439,12 @@ pub(crate) fn validate_replay_part(
         ReplayFamily::ColorMaps => {
             validate_color_map(part, Limits::from_source_limits(source_limits))
         },
-        ReplayFamily::Events if part.content_type() == ct::PML_SLIDE => {
-            events::load(package, part_name).map(drop)
-        },
+        ReplayFamily::Events if part.content_type() == ct::PML_SLIDE => events::validate_slide_xml(
+            part,
+            semantic_limits
+                .events()
+                .constrained_by_source(source_limits),
+        ),
         ReplayFamily::Guides if is_presentation_content_type(part.content_type()) => {
             guides::load(package, guides::Limits::from_source_limits(source_limits)).map(drop)
         },

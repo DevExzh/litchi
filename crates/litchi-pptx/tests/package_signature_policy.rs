@@ -294,6 +294,7 @@ fn changes_part() -> ChangesPart {
         part_name: "/ppt/changesInfo.xml".into(),
         changes_information: Info::parse(
             br#"<pc:chgInfo xmlns:pc="http://schemas.microsoft.com/office/powerpoint/2013/main/command"><pc:docChgLst><pc:chgData name="Ada" userId="ada@example.test"/><pc:docChg xmlns:pc="http://schemas.microsoft.com/office/powerpoint/2013/main/command" chg="addSld"><pc:docMkLst><pc:docMk/></pc:docMkLst><pc:sldChg xmlns:pc="http://schemas.microsoft.com/office/powerpoint/2013/main/command" chg="modSld"><pc:sldMkLst><pc:docMk/><pc:sldMk cId="0" sldId="256"/></pc:sldMkLst><pc226:cmChg xmlns:pc226="http://schemas.microsoft.com/office/powerpoint/2022/06/main/command" xmlns:pc2="http://schemas.microsoft.com/office/powerpoint/2019/9/main/command" chg="mod"><pc2:cmMkLst xmlns:pc2="http://schemas.microsoft.com/office/powerpoint/2019/9/main/command"><pc2:cmMk id="{62A8A96D-E5A8-4BFC-B993-A6EAE3907CAD}"/></pc2:cmMkLst></pc226:cmChg></pc:sldChg></pc:docChg></pc:docChgLst></pc:chgInfo>"#,
+            changes::Limits::DEFAULT,
         )
         .unwrap(),
     }
@@ -632,7 +633,11 @@ fn families() -> Vec<Family> {
                         edit.set(0_usize, &[Draft::play(Offset::ms(1), 2)])
                     })
                 },
-                shows: |package| package.with_opc(|opc| Ok(events::load(opc, &slide())?.is_some())),
+                shows: |package| {
+                    package.with_opc(|opc| {
+                        Ok(events::load(opc, &slide(), events::Limits::DEFAULT)?.is_some())
+                    })
+                },
             }),
             no_op: Some(|package| {
                 package.edit_show_events_in_place(|edit| {
@@ -674,7 +679,10 @@ fn families() -> Vec<Family> {
                 edit: |package| {
                     package.edit_changes_info_in_place(|edit| edit.set(&changes_part()))
                 },
-                shows: |package| package.with_opc(|opc| Ok(changes::load(opc)?.is_some())),
+                shows: |package| {
+                    package
+                        .with_opc(|opc| Ok(changes::load(opc, changes::Limits::DEFAULT)?.is_some()))
+                },
             }),
             no_op: Some(|package| {
                 package.edit_changes_info_in_place(|edit| {

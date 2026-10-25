@@ -4,6 +4,7 @@ use litchi_opc::OpcPackage;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::part::BlobPart;
 
+use super::codec::Limits;
 use super::model::Part;
 use crate::{Error, Result};
 
@@ -14,9 +15,6 @@ pub const CONTENT_TYPE: &str =
 /// Relationship type from a slide to its synchronization data part.
 pub const RELATIONSHIP_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideSyncData";
-
-const MAX_TOTAL_XML_BYTES: usize = 64 * 1024 * 1024;
-const MAX_PARTS: usize = 4096;
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
@@ -31,7 +29,7 @@ fn limit(what: &str) -> Error {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
+pub fn load(package: &OpcPackage, limits: Limits) -> Result<Vec<Part>> {
     if package
         .rels()
         .iter()
@@ -69,7 +67,7 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
                 "slide synchronization relationship cannot be external",
             ));
         }
-        if loaded.len() >= MAX_PARTS {
+        if loaded.len() >= limits.max_parts() {
             return Err(limit("slide synchronization part count"));
         }
         let target = relationship.target_partname()?;
@@ -88,14 +86,14 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
         total_xml_bytes = total_xml_bytes
             .checked_add(part.blob().len())
             .ok_or_else(|| limit("total slide synchronization XML bytes"))?;
-        if total_xml_bytes > MAX_TOTAL_XML_BYTES {
+        if total_xml_bytes > limits.max_total_input_bytes() {
             return Err(limit("total slide synchronization XML bytes"));
         }
         loaded.push(Part::new(
             relationship.r_id().to_owned(),
             source.partname().clone(),
             target,
-            super::model::Properties::parse(part.blob())?,
+            super::model::Properties::parse(part.blob(), limits)?,
         ));
     }
 
@@ -129,7 +127,7 @@ pub fn load(package: &OpcPackage) -> Result<Vec<Part>> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub(crate) fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
+pub(crate) fn store(package: &mut OpcPackage, value: &Part, limits: Limits) -> Result<()> {
     validate_ncname(&value.relationship_id)?;
     let slide_name = &value.slide_part_name;
     let part_name = &value.part_name;
@@ -163,7 +161,7 @@ pub(crate) fn store(package: &mut OpcPackage, value: &Part) -> Result<()> {
         )));
     }
 
-    let xml = value.properties.to_xml()?;
+    let xml = value.properties.to_xml(limits)?;
     let target = part_name.relative_ref(slide_name.base_uri());
     package.try_add_part(Box::new(BlobPart::new(
         part_name.clone(),

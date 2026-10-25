@@ -135,11 +135,20 @@ impl<'a> Slide<'a> {
         part: SlidePart<'a>,
         shape_limits: crate::shape::Limits,
     ) -> Self {
+        Self::new_with_shape_and_semantic_limits(package, part, shape_limits, None)
+    }
+
+    pub(crate) fn new_with_shape_and_semantic_limits(
+        package: &'a OpcPackage,
+        part: SlidePart<'a>,
+        shape_limits: crate::shape::Limits,
+        semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    ) -> Self {
         Self {
             package,
             part,
             shape_limits,
-            semantic_limits: None,
+            semantic_limits,
         }
     }
 
@@ -656,7 +665,13 @@ impl<'a> Slide<'a> {
     pub fn slide_sync(
         &self,
     ) -> Result<Option<crate::presentation_properties::metadata::slide_sync::Properties>> {
-        package::slide_sync(self.package, &self.part)
+        package::slide_sync(
+            self.package,
+            &self.part,
+            crate::open_options::selected(self.semantic_limits.as_ref())
+                .slide_sync()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Resolve the slide's optional layout in package context.

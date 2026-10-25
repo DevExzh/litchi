@@ -3422,3 +3422,42 @@ profile and exact bytes without a second semantic rewrite.
 | `custom_show`, `guides`, `structure` and `color_map` replay | adopted (0362ul81); no-op patches preserve exact recipient content and policy, changed patches perform bounded recipient validation, and no public `_with_limits`/default twins remain; `Snapshot::read`, projection aliases and draft `snapshot` wrappers (including `color_map::Draft::snapshot`) are banned in these scopes |
 
 See [0362ul81](unified-ops/0362ul81-pptx-metadata-structural.md).
+
+## PPTX metadata history limits (record 0362ul82)
+
+The Changes Information, Revision Information, slide-synchronization,
+caption-track and slide-show-event codecs now take their module-local typed
+`Limits` at every raw parse, read, write and package-load boundary. Owners
+retain the selected profiles from `OpenOptions`; edits accept them through
+`EditOptions`, snapshots and patches retain them, projections use the same
+profile, and replay admits changed payloads under the recipient profile.
+Format constraints such as the slide-synchronization date lexical rules and
+the inert treatment of extension/MCE payloads remain unchanged. No default
+only twin, alias or `_with_limits` entry point was added.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::presentation_properties::metadata::{changes,revision}::{Info::{parse,to_xml},load}` | adopted (0362ul82); explicit typed limits at raw XML and package boundaries |
+| `litchi_pptx::presentation_properties::metadata::slide_sync::{Properties::{parse,to_xml},load}` | adopted (0362ul82); selected profile retains the existing date/year constraints |
+| `litchi_pptx::presentation_properties::metadata::tracks::{File::{parse,to_bytes},load,load_media}` | adopted (0362ul82); WebVTT and slide metadata bounds share the retained profile |
+| `litchi_pptx::presentation_properties::metadata::events::{load,load_snapshot}` | adopted (0362ul82); slide XML event admission remains inert and opaque outside the typed island |
+| `OpenOptions::{changes_limits,revision_limits,slide_sync_limits,tracks_limits,events_limits}` and each family's `EditOptions::limits` | adopted (0362ul82); profiles survive owners, projections, edits, snapshots, patches and replay |
+
+See [0362ul82](unified-ops/0362ul82-pptx-metadata-history.md).
+
+## PPTX metadata history bounded admission (record 0362ul82a)
+
+The 82a correction applies the selected semantic profile before MCE
+expansion, keeps modern-comment Changes operations on the retained owner
+profile, and performs checked, fallible event-fragment and slide-splice
+allocation. Escaped slide-synchronization identifiers are counted before
+output admission. These are corrections to the 82 contracts, not aliases or
+additional default entry points.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::modern_comments::{load_modern_comment_changes, Edit::{changes, update_changes}}` | adopted (0362ul82a); selected Changes limits are intersected with physical source limits and used for reads and writes |
+| `litchi_pptx::presentation_properties::metadata::{changes,revision,slide_sync}::Limits` | adopted (0362ul82a); bounded MCE admission uses the selected profile before expansion |
+| `litchi_pptx::presentation_properties::metadata::events::store` and slide extension splice | adopted (0362ul82a); checked exact sizing and fallible reservation use the selected output ceiling |
+
+See [0362ul82a](unified-ops/0362ul82a-pptx-metadata-history-admission.md).

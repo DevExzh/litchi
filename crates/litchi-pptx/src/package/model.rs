@@ -1026,7 +1026,13 @@ impl Package {
     pub fn load_slide_sync(
         &self,
     ) -> Result<Vec<crate::presentation_properties::metadata::slide_sync::Part>> {
-        self.with_opc(crate::presentation_properties::metadata::slide_sync::load)
+        let limits = self.semantic_limits().slide_sync();
+        self.with_opc(|opc| {
+            crate::presentation_properties::metadata::slide_sync::load(
+                opc,
+                limits.constrained_by_source(opc.read_limits()),
+            )
+        })
     }
 
     /// A new package with every signature removed explicitly (ADR 0006);

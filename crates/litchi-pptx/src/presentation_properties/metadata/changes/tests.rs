@@ -44,20 +44,20 @@ fn value() -> Part {
     Part {
         relationship_id: "rIdChanges".into(),
         part_name: "/ppt/changesInfo.xml".into(),
-        changes_information: Info::parse(xml.as_bytes()).unwrap(),
+        changes_information: Info::parse(xml.as_bytes(), Limits::DEFAULT).unwrap(),
     }
 }
 
 fn stored_package() -> OpcPackage {
     let mut package = package();
-    store(&mut package, &value()).unwrap();
+    store(&mut package, &value(), Limits::DEFAULT).unwrap();
     package
 }
 
 #[test]
 fn no_op_commit_and_patch_preserve_exact_source() {
     let mut package = stored_package();
-    let before = load_snapshot(&package).unwrap().unwrap();
+    let before = load_snapshot(&package, Limits::DEFAULT).unwrap().unwrap();
     let source = before.source_xml().to_vec();
     let commit = before.edit().commit().unwrap();
     assert!(!commit.diagnostics().changed());
@@ -78,7 +78,7 @@ fn no_op_commit_and_patch_preserve_exact_source() {
 #[test]
 fn typed_edits_preserve_opaque_commands_and_relationship_looking_xml() {
     let mut package = stored_package();
-    let snapshot = load_snapshot(&package).unwrap().unwrap();
+    let snapshot = load_snapshot(&package, Limits::DEFAULT).unwrap().unwrap();
     let mut edit = snapshot.edit();
     edit.edit_author(0, |author| {
         author.name = Some("Grace".into());
@@ -122,7 +122,7 @@ fn typed_edits_preserve_opaque_commands_and_relationship_looking_xml() {
 #[test]
 fn stale_patch_rejection_is_atomic_and_inverse_restores_original_bytes() {
     let mut package = stored_package();
-    let original = load_snapshot(&package).unwrap().unwrap();
+    let original = load_snapshot(&package, Limits::DEFAULT).unwrap().unwrap();
     let mut edit = original.edit();
     edit.edit_author(0, |author| {
         author.name = Some("Grace".into());
@@ -169,7 +169,9 @@ fn stale_patch_rejection_is_atomic_and_inverse_restores_original_bytes() {
 
 #[test]
 fn failed_typed_edits_do_not_mutate_the_staged_snapshot() {
-    let snapshot = load_snapshot(&stored_package()).unwrap().unwrap();
+    let snapshot = load_snapshot(&stored_package(), Limits::DEFAULT)
+        .unwrap()
+        .unwrap();
     let mut edit = snapshot.edit();
     let before = edit.snapshot().clone();
     assert!(
@@ -190,12 +192,12 @@ fn failed_typed_edits_do_not_mutate_the_staged_snapshot() {
 #[test]
 fn create_read_update_delete_is_atomic_and_rejects_unexpected_inbound_edges() {
     let mut package = package();
-    assert!(load_snapshot(&package).unwrap().is_none());
-    store(&mut package, &value()).unwrap();
-    assert!(load_snapshot(&package).unwrap().is_some());
-    let removed = remove(&mut package).unwrap().unwrap();
+    assert!(load_snapshot(&package, Limits::DEFAULT).unwrap().is_none());
+    store(&mut package, &value(), Limits::DEFAULT).unwrap();
+    assert!(load_snapshot(&package, Limits::DEFAULT).unwrap().is_some());
+    let removed = remove(&mut package, Limits::DEFAULT).unwrap().unwrap();
     assert_eq!(removed.part_name, "/ppt/changesInfo.xml");
-    assert!(load_snapshot(&package).unwrap().is_none());
+    assert!(load_snapshot(&package, Limits::DEFAULT).unwrap().is_none());
 
     let mut package = stored_package();
     let target = PackURI::new("/ppt/changesInfo.xml").unwrap();
@@ -214,8 +216,8 @@ fn create_read_update_delete_is_atomic_and_rejects_unexpected_inbound_edges() {
             "rIdOther".into(),
             false,
         );
-    assert!(load_snapshot(&package).is_err());
+    assert!(load_snapshot(&package, Limits::DEFAULT).is_err());
     let part_count = package.part_count();
-    assert!(remove(&mut package).is_err());
+    assert!(remove(&mut package, Limits::DEFAULT).is_err());
     assert_eq!(package.part_count(), part_count);
 }

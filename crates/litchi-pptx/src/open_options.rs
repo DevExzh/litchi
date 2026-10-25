@@ -20,6 +20,11 @@ pub(crate) struct SemanticLimits {
     notes: crate::notes::Limits,
     animations: crate::animations::Limits,
     comments: crate::comments::Limits,
+    changes: crate::presentation_properties::metadata::changes::Limits,
+    revision: crate::presentation_properties::metadata::revision::Limits,
+    slide_sync: crate::presentation_properties::metadata::slide_sync::Limits,
+    tracks: crate::presentation_properties::metadata::tracks::Limits,
+    events: crate::presentation_properties::metadata::events::Limits,
 }
 
 pub(crate) type SemanticLimitsRef = Arc<SemanticLimits>;
@@ -41,6 +46,11 @@ impl SemanticLimits {
             notes: crate::notes::Limits::DEFAULT,
             animations: crate::animations::Limits::DEFAULT,
             comments: crate::comments::Limits::DEFAULT,
+            changes: crate::presentation_properties::metadata::changes::Limits::DEFAULT,
+            revision: crate::presentation_properties::metadata::revision::Limits::DEFAULT,
+            slide_sync: crate::presentation_properties::metadata::slide_sync::Limits::DEFAULT,
+            tracks: crate::presentation_properties::metadata::tracks::Limits::DEFAULT,
+            events: crate::presentation_properties::metadata::events::Limits::DEFAULT,
         }
     }
 
@@ -74,6 +84,30 @@ impl SemanticLimits {
 
     pub(crate) const fn comments(self) -> crate::comments::Limits {
         self.comments
+    }
+
+    pub(crate) const fn changes(self) -> crate::presentation_properties::metadata::changes::Limits {
+        self.changes
+    }
+
+    pub(crate) const fn revision(
+        self,
+    ) -> crate::presentation_properties::metadata::revision::Limits {
+        self.revision
+    }
+
+    pub(crate) const fn slide_sync(
+        self,
+    ) -> crate::presentation_properties::metadata::slide_sync::Limits {
+        self.slide_sync
+    }
+
+    pub(crate) const fn tracks(self) -> crate::presentation_properties::metadata::tracks::Limits {
+        self.tracks
+    }
+
+    pub(crate) const fn events(self) -> crate::presentation_properties::metadata::events::Limits {
+        self.events
     }
 
     const fn with_shape(mut self, limits: crate::shape::Limits) -> Self {
@@ -113,6 +147,46 @@ impl SemanticLimits {
 
     const fn with_comments(mut self, limits: crate::comments::Limits) -> Self {
         self.comments = limits;
+        self
+    }
+
+    const fn with_changes(
+        mut self,
+        limits: crate::presentation_properties::metadata::changes::Limits,
+    ) -> Self {
+        self.changes = limits;
+        self
+    }
+
+    const fn with_revision(
+        mut self,
+        limits: crate::presentation_properties::metadata::revision::Limits,
+    ) -> Self {
+        self.revision = limits;
+        self
+    }
+
+    const fn with_slide_sync(
+        mut self,
+        limits: crate::presentation_properties::metadata::slide_sync::Limits,
+    ) -> Self {
+        self.slide_sync = limits;
+        self
+    }
+
+    const fn with_tracks(
+        mut self,
+        limits: crate::presentation_properties::metadata::tracks::Limits,
+    ) -> Self {
+        self.tracks = limits;
+        self
+    }
+
+    const fn with_events(
+        mut self,
+        limits: crate::presentation_properties::metadata::events::Limits,
+    ) -> Self {
+        self.events = limits;
         self
     }
 
@@ -179,12 +253,7 @@ impl OpenOptions {
     /// Select the bounded shape-scene policy retained by the opened owner.
     #[must_use]
     pub fn shape_limits(mut self, limits: crate::shape::Limits) -> Self {
-        let profiles = self
-            .semantic_limits
-            .as_deref()
-            .copied()
-            .unwrap_or_default()
-            .with_shape(limits);
+        let profiles = selected(self.semantic_limits.as_ref()).with_shape(limits);
         self.semantic_limits = profiles.into_ref();
         self
     }
@@ -192,12 +261,7 @@ impl OpenOptions {
     /// Select the bounded transition policy retained by the opened owner.
     #[must_use]
     pub fn transition_limits(mut self, limits: crate::transition::Limits) -> Self {
-        let profiles = self
-            .semantic_limits
-            .as_deref()
-            .copied()
-            .unwrap_or_default()
-            .with_transition(limits);
+        let profiles = selected(self.semantic_limits.as_ref()).with_transition(limits);
         self.semantic_limits = profiles.into_ref();
         self
     }
@@ -205,12 +269,7 @@ impl OpenOptions {
     /// Select the bounded laser-trace policy retained by the opened owner.
     #[must_use]
     pub fn laser_limits(mut self, limits: crate::laser::Limits) -> Self {
-        let profiles = self
-            .semantic_limits
-            .as_deref()
-            .copied()
-            .unwrap_or_default()
-            .with_laser(limits);
+        let profiles = selected(self.semantic_limits.as_ref()).with_laser(limits);
         self.semantic_limits = profiles.into_ref();
         self
     }
@@ -219,6 +278,17 @@ impl OpenOptions {
     #[must_use]
     pub fn media_parts_limits(mut self, limits: crate::media_parts::Limits) -> Self {
         let profiles = selected(self.semantic_limits.as_ref()).with_media_parts(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded Changes Information policy retained by the opened owner.
+    #[must_use]
+    pub fn changes_limits(
+        mut self,
+        limits: crate::presentation_properties::metadata::changes::Limits,
+    ) -> Self {
+        let profiles = selected(self.semantic_limits.as_ref()).with_changes(limits);
         self.semantic_limits = profiles.into_ref();
         self
     }
@@ -232,10 +302,32 @@ impl OpenOptions {
         self
     }
 
+    /// Select the bounded revision policy retained by the opened owner.
+    #[must_use]
+    pub fn revision_limits(
+        mut self,
+        limits: crate::presentation_properties::metadata::revision::Limits,
+    ) -> Self {
+        let profiles = selected(self.semantic_limits.as_ref()).with_revision(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
     /// Select the bounded speaker-notes policy retained by the opened owner.
     #[must_use]
     pub fn notes_limits(mut self, limits: crate::notes::Limits) -> Self {
         let profiles = selected(self.semantic_limits.as_ref()).with_notes(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded slide-sync policy retained by the opened owner.
+    #[must_use]
+    pub fn slide_sync_limits(
+        mut self,
+        limits: crate::presentation_properties::metadata::slide_sync::Limits,
+    ) -> Self {
+        let profiles = selected(self.semantic_limits.as_ref()).with_slide_sync(limits);
         self.semantic_limits = profiles.into_ref();
         self
     }
@@ -249,11 +341,33 @@ impl OpenOptions {
         self
     }
 
+    /// Select the bounded media-track policy retained by the opened owner.
+    #[must_use]
+    pub fn tracks_limits(
+        mut self,
+        limits: crate::presentation_properties::metadata::tracks::Limits,
+    ) -> Self {
+        let profiles = selected(self.semantic_limits.as_ref()).with_tracks(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
     /// Select the bounded classic-comment policy retained by the opened
     /// owner.
     #[must_use]
     pub fn comments_limits(mut self, limits: crate::comments::Limits) -> Self {
         let profiles = selected(self.semantic_limits.as_ref()).with_comments(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded slide-show-events policy retained by the opened owner.
+    #[must_use]
+    pub fn events_limits(
+        mut self,
+        limits: crate::presentation_properties::metadata::events::Limits,
+    ) -> Self {
+        let profiles = selected(self.semantic_limits.as_ref()).with_events(limits);
         self.semantic_limits = profiles.into_ref();
         self
     }

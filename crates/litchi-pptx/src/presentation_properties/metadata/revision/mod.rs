@@ -9,4 +9,5 @@ pub use model::{Client, Info, Namespace, Part};
 pub use package::load;
 
 mod edit;
-pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub use codec::Limits;
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, Error, LimitKind, Patch};
