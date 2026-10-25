@@ -4650,3 +4650,44 @@ See [0063](0063-source-pptx-modern-comments.md).
   all quarantined evidence and reclaim about 15.1 GB of checkout allocation.
   Final capture, the full gate, signed-batch contract choice and actual native
   qualification remain open. Nothing is pushed.
+
+- Coordinator DOC/OLE, RTF and evidence-coverage integration (2026-10-25):
+  DOC/OLE raw-codec limits and fidelity repairs merge at `fa833c7d1b` from
+  atomic `d6cc88337c`. The final source differs from tested `983ab2cfb2`
+  only in its record; root reviews the small compile/Clippy correction delta
+  and verifies all seven receipts. The full suites pass 1,246 DOC tests
+  (two ignored) and 238 OLE tests, alongside seven focused limit/fidelity
+  cases and all-target check/Clippy. Target storage stays below 541 MB.
+  Record 0362ul45 retains every diagnostic attempt and the final identities.
+
+  RTF merges at `7a369a1580` from atomic `1d273acbf2`, including the missed
+  standalone performance-harness consumer. Its required open-options value
+  is prepared outside the timed loop and its labels describe that call.
+  Ten RTF/core/ops/facade validation rows pass; the additional locked
+  standalone all-target check passes on corrected `a41a0dc163`. Root verifies
+  source equality, all receipt artifacts, unchanged locks and completed
+  process cleanup. Record 0362ul49 binds the actual scoped checks without
+  inferring a native measurement from compiler runtime.
+
+  The numbered evidence-record guard repair merges at `479a3278db` from
+  reviewed `4cc7a78fbb`. It recognizes numbered follow-ups, rejects bare
+  five-digit record names and gives all 29 newly recognized directories
+  explicit evidence classifications. The composed matrix/glossary/iWork
+  checks pass all 83 tests. Native allocator observations remain diagnostic;
+  no timing or performance acceptance is manufactured by classification.
+
+  Cleanup wave 57 retires the merged iWork naming checkout, retains its
+  branch and preserves all eight ignored files. Root verifies payload
+  identities, actual sparse restoration, protected roots and final removal.
+  Record 0362ul56 reports 221,061,120 bytes of net checkout allocation
+  reduction after the complete quarantine. External validation artifacts
+  remain intact, and the integration hold is released.
+
+  Slot 1 now belongs to corrected XLS validation; DOCX, SpreadsheetDrawing
+  and crypto keep slots 2–4. ODF's strict XML fidelity is repaired; its latest
+  script-wrapper namespace/depth correction is under review. PPT still
+  needs aggregate admission to count nested payloads exactly. DOCX's actual
+  library run found two modern-comment output-length mismatches, which are
+  being corrected with failed evidence retained. Fresh full-gate capture,
+  signed-batch contract choice, font budget adaptation and final native
+  qualification remain required. Nothing is pushed.
