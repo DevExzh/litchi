@@ -5002,3 +5002,20 @@ See [0063](0063-source-pptx-modern-comments.md).
   measured savings remain pending. Full integration acceptance, complete
   gates, native/performance qualification and the signed-batch contract choice
   remain open. Nothing is pushed.
+
+- Coordinator cleanup wave 60 completion (2026-10-25):
+  The merged font, crypto and Markdown worktrees are removed non-forced.
+  Root verifies all seven quarantined payloads, retained branch tips, absent
+  registrations, actual sparse restore and the unchanged protected probe.
+  Record 0362ul78 binds the receipts and conservative net reduction of
+  7,873,409,024 allocated bytes including complete quarantine overhead.
+  Cleanup releases its integration hold; the current tooling row retains
+  its separate source hold until completion.
+
+  ODF completes five actual guarded validation rows, including all 2,135
+  library tests, strict XML and script-envelope regressions. Root verifies
+  logs, traces, locks, source, target guards and empty terminal ownership;
+  final source and runner-provenance reviews remain pending. Slot 1 moves
+  to formula; the other build slots remain VBA, PPTX properties and XLDM.
+  Current-native validator return 0362ul75f passes independent source review
+  and awaits merge after the tooling hold. Final acceptance remains open.
