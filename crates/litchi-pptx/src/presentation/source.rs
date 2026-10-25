@@ -6602,7 +6602,7 @@ mod tests {
         )
     }
 
-    fn svg_picture_pptx() -> Vec<u8> {
+    pub(super) fn svg_picture_pptx() -> Vec<u8> {
         svg_picture_pptx_with_extension(&format!(
             r#"<a:ext uri="{NATIVE_SVG_EXTENSION_URI}"><asvg:svgBlip r:embed="rIdSvg"/></a:ext>"#
         ))

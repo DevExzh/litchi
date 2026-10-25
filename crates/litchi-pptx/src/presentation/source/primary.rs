@@ -2799,6 +2799,121 @@ macro_rules! redacted_debug {
 }
 redacted_debug!(Package, Presentation, Slide, Edit, Patch);
 
+#[cfg(test)]
+mod deferred_policy_tests {
+    use std::sync::Arc;
+
+    use litchi_opc::SourceCacheLimits;
+
+    use super::Package;
+
+    fn fixture() -> Vec<u8> {
+        super::super::tests::svg_picture_pptx()
+    }
+
+    #[test]
+    fn deferred_svg_materialization_retains_mixed_profiles_and_cache_policy() {
+        let shape_defaults = crate::shape::Limits::DEFAULT;
+        let shape_limits = crate::shape::Limits::new(
+            shape_defaults.input_bytes(),
+            shape_defaults.output_bytes(),
+            shape_defaults.depth(),
+            shape_defaults.nodes(),
+            1,
+            shape_defaults.retained_text_bytes(),
+        )
+        .unwrap();
+        let notes_defaults = crate::notes::Limits::DEFAULT;
+        let notes_limits = crate::notes::Limits {
+            max_nodes: notes_defaults.max_nodes - 1,
+            ..notes_defaults
+        };
+        let events_defaults = crate::presentation_properties::metadata::events::Limits::DEFAULT;
+        let events_limits = crate::presentation_properties::metadata::events::Limits::new(
+            events_defaults.max_slide_xml_bytes(),
+            events_defaults.max_total_slide_xml_bytes(),
+            events_defaults.max_events() - 1,
+            events_defaults.max_xml_nodes(),
+            events_defaults.max_xml_depth(),
+            events_defaults.max_event_string_bytes(),
+            events_defaults.max_output_bytes(),
+        )
+        .unwrap();
+        let cache_limits = SourceCacheLimits::new(64 * 1024, 1).unwrap();
+        let options = crate::OpenOptions::default()
+            .cache_limits(cache_limits)
+            .shape_limits(shape_limits)
+            .notes_limits(notes_limits)
+            .events_limits(events_limits);
+        let selected = options
+            .semantic_limits
+            .clone()
+            .expect("selected semantic policy");
+        let source = Package::from_read_at_with_options(
+            Arc::new(litchi_core::OwnedSource::new(fixture())),
+            options,
+        )
+        .unwrap();
+
+        let mut edit = source.edit_svg_images().unwrap();
+        assert!(
+            edit.replace(
+                0,
+                0,
+                crate::source::svg::Replacement::new(
+                    br#"<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>"#.to_vec(),
+                    b"\x89PNGchanged".to_vec(),
+                ),
+            )
+            .unwrap()
+        );
+        let updated = edit.commit().unwrap().into_package();
+
+        // The public write takes the deferred stream route. The effective
+        // owner check then forces the same artifact through materialization.
+        assert!(!updated.to_bytes().unwrap().is_empty());
+        let effective = updated.effective().unwrap();
+        assert!(Arc::ptr_eq(
+            &selected,
+            effective.owner.semantic_limits.as_ref().unwrap(),
+        ));
+        assert_eq!(effective.owner.package.cache_limits(), cache_limits);
+
+        // Make the package non-pristine, then exercise the SVG physical
+        // reopen path rather than only reading the already-materialized owner.
+        let mut shape_edit = updated.edit().unwrap();
+        assert!(shape_edit.set_slide_name(0, "physical reopen").unwrap());
+        let nonpristine = shape_edit.commit().unwrap().into_package();
+        let reopened = super::svg::physical(&nonpristine).unwrap();
+        assert!(Arc::ptr_eq(
+            &selected,
+            reopened.owner.semantic_limits.as_ref().unwrap(),
+        ));
+        assert_eq!(reopened.owner.package.cache_limits(), cache_limits);
+        let image = nonpristine.edit_svg_images().unwrap().image(0, 0).unwrap();
+        assert_eq!(image.raster_bytes(), b"\x89PNGchanged");
+
+        // The selected shape ceiling rejects a second shape; the default
+        // profile admits the same public edit.
+        let mut selected_edit = nonpristine.edit().unwrap();
+        assert!(matches!(
+            selected_edit.add_text_box(0, "selected policy", (0, 0, 914_400, 914_400)),
+            Err(crate::Error::Limit {
+                resource: "shapes",
+                limit: 1,
+            })
+        ));
+        let default =
+            Package::from_read_at(Arc::new(litchi_core::OwnedSource::new(fixture()))).unwrap();
+        let mut default_edit = default.edit().unwrap();
+        assert!(
+            default_edit
+                .add_text_box(0, "default policy", (0, 0, 914_400, 914_400))
+                .unwrap()
+        );
+    }
+}
+
 // Charge conservative input/output and escaping headroom before lowering. The
 // token follows the candidate bytes through patches and detached shape handles.
 fn reserve_edit(
