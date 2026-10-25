@@ -52,6 +52,7 @@ _REQUIRED_SOURCE_KEYS = (
     "probe_inputs",
     "fixture",
     "archive",
+    "features",
 )
 
 
@@ -243,7 +244,7 @@ pub fn exercise_api() {
 '''
 
 
-def _project_toml(source: Path) -> str:
+def _project_toml(source: Path, features: Sequence[str]) -> str:
     dependencies = (
         ("litchi-ops", "crates/litchi-ops"),
         ("litchi-core", "crates/litchi-core"),
@@ -266,7 +267,7 @@ def _project_toml(source: Path) -> str:
         'edition = "2024"',
         "",
         "[features]",
-        'default = ["legacy_api"]',
+        'default = []',
         'legacy_api = []',
         "",
         "[dependencies]",
@@ -276,7 +277,10 @@ def _project_toml(source: Path) -> str:
             version = "1" if name == "serde_json" else "0.10"
             lines.append(f'{name} = "{version}"')
         else:
-            lines.append(f'{name} = {{ path = {json.dumps((source / relative).as_posix())} }}')
+            feature_clause = ""
+            if name == "litchi-ops":
+                feature_clause = ", features = [" + ", ".join(json.dumps(item) for item in features) + "]"
+            lines.append(f'{name} = {{ path = {json.dumps((source / relative).as_posix())}{feature_clause} }}')
     return "\n".join(lines) + "\n"
 
 
@@ -348,6 +352,7 @@ def _source_closure(source: Path, identity: Mapping[str, Any]) -> dict[str, Any]
         "git_tree": identity.get("git_tree"),
         "tree_sha256": identity.get("tree_sha256"),
         "archive": identity.get("archive", source_binding.get("archive")),
+        "features": identity.get("features", binding.get("features")),
         "manifests": identity.get("manifests", binding.get("manifests")),
         "locks": identity.get("locks"),
         "lock_graph": identity.get("lock_graph", binding.get("lock_graph")),
@@ -412,7 +417,9 @@ def prepare(source_root: Path, output_root: Path, *, identity: Mapping[str, Any]
     manifest_path = project / "Cargo.toml"
     _write_bytes_new(adapter_path, _adapter_source().encode("utf-8"), "consumer adapter")
     _write_bytes_new(main_path, generated_main.encode("utf-8"), "generated signed probe")
-    _write_bytes_new(manifest_path, _project_toml(source).encode("utf-8"), "consumer manifest")
+    features = closure.get("features", {}).get("selected", [])
+    _expect(isinstance(features, list) and all(isinstance(item, str) and item for item in features), "candidate feature selection is missing")
+    _write_bytes_new(manifest_path, _project_toml(source, features).encode("utf-8"), "consumer manifest")
     fixture_binding, fixture_summary = _stage_fixtures(source, output, fixture_value)
     probe_receipt = _stage_probes(source, output)
     policy_identity = _policy_identity()
