@@ -680,18 +680,10 @@ fn inspect_relationship_attributes(
 /// The source package is shared and never changed. Each operation publishes
 /// into the private working graph; `commit` creates one source-checked patch
 /// from the original package to the final graph.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct EditOptions {
     /// Resource ceilings used by Web Extensions reads and publication.
     pub limits: Limits,
-}
-
-impl Default for EditOptions {
-    fn default() -> Self {
-        Self {
-            limits: Limits::standard(),
-        }
-    }
 }
 
 /// A staged Web Extensions edit over one OPC package.

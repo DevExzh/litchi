@@ -385,18 +385,10 @@ impl Patch {
 }
 
 /// Limits selected before a staged Ribbon edit starts.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct EditOptions {
     /// Resource ceilings used by Ribbon reads and publication.
     pub limits: Limits,
-}
-
-impl Default for EditOptions {
-    fn default() -> Self {
-        Self {
-            limits: Limits::standard(),
-        }
-    }
 }
 
 /// A staged Ribbon edit over an immutable OPC package source.

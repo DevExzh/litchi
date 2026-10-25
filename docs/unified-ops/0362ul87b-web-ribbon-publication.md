@@ -127,3 +127,24 @@ All other Web/Ribbon Commit consumers in the four leaves were audited:
 common candidates and PPTX/XLSX/XLSB staged OPC values already assign the
 published `OpcPackage`, while DOCX tests and typed wrappers assign the
 published DOCX `Package`; no additional shape mismatch was found.
+
+The beac39a4c5 source freeze passed the formatter, common check, all four
+format-leaf checks, and the two facade checks. It stopped at the first Clippy
+failure in the shared common crate:
+
+* receipt: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-beac39a4c5/result.json`
+  (SHA-256 `8319cf286c414d1b54cb86315f3ecadb934af39cb5c97697e2d7e6272c0946d2`);
+* rows: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-beac39a4c5/rows.json`
+  (SHA-256 `8d00faafde7f03d7a743d280e11df8f6540690088d0d2eae17dbb3e0b88ad14e`);
+* first failed log: `/home/zhuhe/code/litchi-worktrees/.coord/0362ul87b-f5-retry-beac39a4c5/05-clippy-common-attempt-actual-f5-05.log`
+  (SHA-256 `d3af669c2338084ea3f52caf8417cbdc0e8d9b5e7453a3529ca4b33b1f836c5c`);
+* rows 0 through 4 passed; row 5 `clippy-common` exited `101` after
+  16.41 seconds with a 617,685,040-byte target. No later row ran and no
+  builder remained after termination.
+
+Clippy identified only the manual `Default` implementations for Ribbon and
+Web `EditOptions`. The repair derives `Default` on both option structs and
+removes those implementations; their `Limits` fields already implement
+`Default` as the respective standard limits. The failed receipt remains
+bound to beac39a4c5 and is not overwritten; the next F5 freeze must use this
+repair commit and a fresh empty target.
