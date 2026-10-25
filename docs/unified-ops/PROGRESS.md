@@ -5086,3 +5086,28 @@ See [0063](0063-source-pptx-modern-comments.md).
   the existing 61–63 profile-carrier design and receive no build slot yet.
   Census 0362ul79c is closing validator bytecode self-pollution after its
   receipt/guard/lock binding review. No final census or acceptance is claimed.
+
+- Coordinator census merge and tooling provenance return (2026-10-25):
+  Receipt-bound raw census 0362ul79c merges at `11048ed3cb` after independent
+  review and all 76 selected census/fixture-guard/glossary tests pass. It binds
+  package/features/command, source/tree, locks, toolchain, capped execution,
+  target trace and rustdoc artifact identities; lock symlinks and ignored
+  overlays are rejected. Bytecode generation is disabled before local imports.
+  The final profile matrix, captures and reviewed dispositions remain pending;
+  an incomplete manifest still fails final acceptance.
+
+  The next full tooling test process reports 1,746 passing tests, but its f5
+  wrapper correctly rejects the receipt because the worker ran against mutable
+  integration instead of the requested detached source. The source advanced
+  from `317f648242` to `11048ed3cb`; unchanged locks and empty final ownership
+  do not make that run admissible. Root verifies and preserves the provenance
+  failure. Return 0362ul80a requires an actual detached source checkout and
+  coordinator verification of its root, commit, branch, locks and command
+  before another run. Integration has no source hold.
+
+  Formula's final source/Clippy cleanup passes independent review and its
+  validation receipts await coordinator verification. PPTX core 63 replay
+  repairs pass source review, with actual combined validation still required.
+  Metadata returns 81–82 and the remaining PPTX replay/aggregate fixes remain
+  active. No full gate, final census or native/performance acceptance is
+  claimed; nothing is pushed.
