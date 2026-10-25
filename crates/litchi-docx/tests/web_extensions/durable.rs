@@ -77,14 +77,14 @@ fn assert_rejected_unchanged(
     source: &[u8],
     durable: &CorePatch<Reversible>,
     label: &str,
-) -> String {
+) -> litchi_docx::Error {
     let mut package = Package::from_reader(Cursor::new(source)).unwrap();
     let before = members(&package_bytes(&package));
     let error = apply_durable(&mut package, durable)
         .err()
         .unwrap_or_else(|| panic!("{label}: durable patch was accepted"));
     assert_eq!(members(&package_bytes(&package)), before, "{label}");
-    error.to_string()
+    error
 }
 
 fn wire_blob(wire: &[u8], collection: &str) -> (String, String, Vec<u8>) {
@@ -468,7 +468,10 @@ fn durable_changed_signed_patch_requires_unsign_and_replan() {
     package = package.unsign();
     let after_unsign = members(&package_bytes(&package));
     let error = apply_durable(&mut package, &durable).unwrap_err();
-    assert!(error.to_string().to_ascii_lowercase().contains("source"));
+    assert_patch_conflict(
+        &error,
+        "signed durable patch did not become stale after unsign",
+    );
     assert_eq!(members(&package_bytes(&package)), after_unsign);
 
     let replanned = durable_patch(
@@ -494,15 +497,17 @@ fn durable_stale_and_wire_tampering_are_atomic() {
         insert_before(content, b"</Types>", b"<!-- stale durable source -->")
     });
     let stale_error = assert_rejected_unchanged(&stale, &durable, "stale content types");
-    assert!(
-        stale_error.contains("Web Extensions durable typed replay target mismatch"),
-        "unexpected stale-source error: {stale_error}"
-    );
+    assert_patch_conflict(&stale_error, "unexpected stale-source error");
 
     let wire = durable.to_deterministic_json().unwrap();
     let op_tampered = decode_wire(&durable_replace_once(&wire, b"web.edit", b"web.edIt"));
     let op_error = assert_rejected_unchanged(&original, &op_tampered, "operation tamper");
-    assert!(op_error.to_ascii_lowercase().contains("unsupported"));
+    assert!(
+        op_error
+            .to_string()
+            .to_ascii_lowercase()
+            .contains("unsupported")
+    );
 
     let target_tampered = {
         let target = wire_target_hash(&wire);
@@ -515,7 +520,12 @@ fn durable_stale_and_wire_tampering_are_atomic() {
     };
     let target_error =
         assert_rejected_unchanged(&original, &decode_wire(&target_tampered), "target tamper");
-    assert!(target_error.to_ascii_lowercase().contains("target"));
+    assert!(
+        target_error
+            .to_string()
+            .to_ascii_lowercase()
+            .contains("target")
+    );
 
     let (_, _, intent) = wire_blob(&wire, "forward_blobs");
     let altered_intent = durable_replace_once(&intent, b"runtime-public", b"runtime-stale");
@@ -527,7 +537,10 @@ fn durable_stale_and_wire_tampering_are_atomic() {
     ));
     let blob_error = assert_rejected_unchanged(&original, &blob_tampered, "intent tamper");
     assert!(
-        blob_error.to_ascii_lowercase().contains("target"),
+        blob_error
+            .to_string()
+            .to_ascii_lowercase()
+            .contains("target"),
         "unexpected intent-tamper error: {blob_error}"
     );
 }
@@ -590,12 +603,7 @@ fn durable_altered_unrelated_restore_reaches_forward_replay_mismatch() {
     let mut reopened = Package::from_reader(Cursor::new(published_bytes)).unwrap();
     let before = members(&package_bytes(&reopened));
     let error = apply_durable(&mut reopened, &tampered).unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("Web Extensions durable restore forward replay mismatch"),
-        "unexpected altered-restore error: {error}"
-    );
+    assert_patch_conflict(&error, "unexpected altered-restore error");
     assert_eq!(members(&package_bytes(&reopened)), before);
 }
 
@@ -661,11 +669,7 @@ fn durable_inverse_rejects_unrelated_binary_closure_record() {
     let mut reopened = Package::from_reader(Cursor::new(published_bytes)).unwrap();
     let before = members(&package_bytes(&reopened));
     let error = apply_durable(&mut reopened, &forged).unwrap_err();
-    let message = error.to_string();
-    assert_eq!(
-        message,
-        "shared OOXML error: invalid OOXML relationship: Web Extensions durable restore forward replay mismatch"
-    );
+    assert_patch_conflict(&error, "unexpected inverse-closure error");
     assert_eq!(members(&package_bytes(&reopened)), before);
 }
 

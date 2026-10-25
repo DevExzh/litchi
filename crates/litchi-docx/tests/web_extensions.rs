@@ -71,6 +71,16 @@ fn members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
         .collect()
 }
 
+/// Web-extension replay mismatches use DOCX's public typed patch-conflict
+/// variant. Keep the assertion at the error-category boundary instead of
+/// coupling the consumer to an obsolete diagnostic string.
+fn assert_patch_conflict(error: &litchi_docx::Error, context: &str) {
+    assert!(
+        matches!(error, litchi_docx::Error::PatchConflict { .. }),
+        "{context}: expected a DOCX patch conflict, got {error:?}"
+    );
+}
+
 fn replace_once(bytes: &[u8], from: &[u8], to: &[u8]) -> Vec<u8> {
     let offset = bytes
         .windows(from.len())
@@ -411,17 +421,9 @@ fn stale_content_types_and_relationship_lexical_members_refuse_atomically() {
         )
     });
 
-    for (name, expected, variant) in [
-        (
-            "content types",
-            "source content-types changed",
-            content_types_variant,
-        ),
-        (
-            "root relationships",
-            "source relationship metadata changed",
-            relationship_variant,
-        ),
+    for (name, variant) in [
+        ("content types", content_types_variant),
+        ("root relationships", relationship_variant),
     ] {
         let stale = Package::from_reader(Cursor::new(variant)).unwrap();
         let before = members(&package_bytes(&stale));
@@ -432,10 +434,7 @@ fn stale_content_types_and_relationship_lexical_members_refuse_atomically() {
                 .and_then(|()| edit.commit().map(|_| ()))
         }
         .unwrap_err();
-        assert!(
-            error.to_string().contains(expected),
-            "{name}: unexpected stale error: {error}"
-        );
+        assert_patch_conflict(&error, &format!("{name}: unexpected stale error"));
         assert_eq!(members(&package_bytes(&stale)), before);
     }
 }
@@ -503,10 +502,7 @@ fn signed_noop_is_preserved_but_changed_publication_requires_explicit_unsign() {
             .and_then(|()| edit.commit().map(|_| ()))
     }
     .unwrap_err();
-    assert!(
-        error.to_string().to_ascii_lowercase().contains("source"),
-        "signed patch did not become stale after unsign: {error}"
-    );
+    assert_patch_conflict(&error, "signed patch did not become stale after unsign");
     assert_eq!(members(&package_bytes(&package)), after_unsign);
 
     let patch = package
@@ -1597,13 +1593,7 @@ fn semantic_noop_patch_rejects_semantically_stale_source_atomically() {
                 .and_then(|()| edit.commit().map(|_| ()))
         }
         .unwrap_err();
-        let message = error.to_string().to_ascii_lowercase();
-        assert!(
-            message.contains("source")
-                || message.contains("stale")
-                || message.contains("relationship"),
-            "{name} stale no-op refusal was not identifiable: {error}"
-        );
+        assert_patch_conflict(&error, &format!("{name} stale no-op refusal"));
         assert_eq!(members(&package_bytes(&stale)), before, "{name}");
     }
     let stale = Package::from_reader(Cursor::new(add_in_relationship_lexical_bytes)).unwrap();
@@ -1615,10 +1605,6 @@ fn semantic_noop_patch_rejects_semantically_stale_source_atomically() {
             .and_then(|()| edit.commit().map(|_| ()))
     }
     .unwrap_err();
-    let message = error.to_string().to_ascii_lowercase();
-    assert!(
-        message.contains("source") || message.contains("stale") || message.contains("relationship"),
-        "add-in relationship lexical stale refusal was not identifiable: {error}"
-    );
+    assert_patch_conflict(&error, "add-in relationship lexical stale refusal");
     assert_eq!(members(&package_bytes(&stale)), before);
 }
