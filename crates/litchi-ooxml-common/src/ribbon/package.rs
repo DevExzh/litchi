@@ -580,12 +580,29 @@ fn retained_destination_matches(
     expected.is_none() || actual == expected
 }
 
+fn retained_content_types_destination_matches(
+    actual: &Option<Arc<Vec<u8>>>,
+    expected: &Option<Arc<Vec<u8>>>,
+    content_types: &OwnedContentTypes,
+) -> bool {
+    match expected {
+        Some(expected) => actual.as_ref() == Some(expected),
+        None => actual
+            .as_ref()
+            .is_none_or(|actual| actual.as_slice() == content_types.bytes()),
+    }
+}
+
 fn destination_matches(actual: &GraphState, expected: &GraphState) -> bool {
     if actual.families != expected.families
         || actual.root != expected.root
         || actual.content_types != expected.content_types
         || !retained_destination_matches(&actual.retained_root, &expected.retained_root)
-        || actual.retained_content_types != expected.retained_content_types
+        || !retained_content_types_destination_matches(
+            &actual.retained_content_types,
+            &expected.retained_content_types,
+            &expected.content_types,
+        )
         || actual.parts.len() != expected.parts.len()
     {
         return false;
