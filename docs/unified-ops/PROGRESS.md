@@ -5835,3 +5835,18 @@ See [0063](0063-source-pptx-modern-comments.md).
   checks. Totals reach257 worktrees and422 refs. Preserving its full deletion
   manifest costs57,864,192 net allocated bytes, reducing the ledger to
   753,286,500,352 bytes under the same exclusions. No push or final acceptance.
+
+  All sixteen final diagnostic rows pass on a8. Eight reviewed repairs,
+  including the completed 128c memory-dimension fix, compose without conflicts
+  in private integration. Root verifies all sixteen changed crate files.
+  Records131/131a and the refreshed census matrix produce frozen candidate
+  C=780cf4c7ee; its matrix check passes with the same three locks. Fresh
+  compiler qualification has started. No old result is relabeled as a C pass.
+
+  Cleanup100 removes the obsolete DOC toggle candidate while preserving its
+  lock and canonical comparison baseline. Cleanup99 then removes all eight
+  merged repair worktrees and deletes their exact refs after fresh root
+  guards. Totals are 266 worktrees and 430 refs; the allocated ledger reaches
+  777,580,584,960 bytes under its recorded exclusions and evidence limits
+  (132). Main/office and independent office branches remain untouched.
+  Final qualification, performance and trunk integration stay open; no push.
