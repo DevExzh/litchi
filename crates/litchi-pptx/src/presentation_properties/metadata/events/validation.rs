@@ -14,12 +14,20 @@ pub(crate) const MAX_EVENT_STRING_BYTES: usize = 64;
 /// Validate one typed event without resolving its target or executing it.
 pub(crate) fn validate_draft(value: &Draft, limits: Limits) -> Result<()> {
     if value.time().as_str().len() > limits.max_event_string_bytes() {
-        return Err(limit("slide-show event time offset"));
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.time().as_str().len(),
+            limits.max_event_string_bytes(),
+        ));
     }
     if let Kind::Seek { at } = value.kind()
         && at.as_str().len() > limits.max_event_string_bytes()
     {
-        return Err(limit("slide-show seek offset"));
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            at.as_str().len(),
+            limits.max_event_string_bytes(),
+        ));
     }
     Ok(())
 }
@@ -32,7 +40,11 @@ pub(crate) fn validate_events(values: &[Draft], limits: Limits) -> Result<()> {
         ));
     }
     if values.len() > limits.max_events() {
-        return Err(limit("slide-show event count"));
+        return Err(limit(
+            crate::error::CodecLimitKind::Events,
+            values.len(),
+            limits.max_events(),
+        ));
     }
     for value in values {
         validate_draft(value, limits)?;
@@ -54,6 +66,10 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(what: &str) -> Error {
-    Error::Invalid(format!("{what} exceeds the supported safety limit"))
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }

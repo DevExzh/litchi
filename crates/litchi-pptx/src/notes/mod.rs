@@ -131,8 +131,12 @@ pub(crate) fn allocation(
     Error::Allocation { resource, source }
 }
 
-pub(crate) fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+pub(crate) fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 /// The namespace a resolved XML name is bound to as a string.

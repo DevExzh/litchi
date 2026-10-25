@@ -7,10 +7,15 @@ use super::model::{Caption, CaptionTarget, MediaMetadata, TracksInfo};
 use crate::{Error, Result};
 
 pub(crate) fn validate_metadata(value: &MediaMetadata, limits: Limits) -> Result<()> {
-    if value.key.slide_part_name.is_empty()
-        || value.key.slide_part_name.len() > limits.max_string_bytes()
-    {
-        return Err(invalid("media track slide part name is empty or too long"));
+    if value.key.slide_part_name.is_empty() {
+        return Err(invalid("media track slide part name is empty"));
+    }
+    if value.key.slide_part_name.len() > limits.max_string_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.key.slide_part_name.len(),
+            limits.max_string_bytes(),
+        ));
     }
     if value.key.shape_id == 0 {
         return Err(invalid("media track shape ID must be non-zero"));
@@ -26,10 +31,11 @@ pub(crate) fn validate_metadata(value: &MediaMetadata, limits: Limits) -> Result
 
 pub(crate) fn validate_tracks(value: &TracksInfo, limits: Limits) -> Result<()> {
     if value.captions.len() > limits.max_tracks() {
-        return Err(Error::Limit {
-            resource: "media caption track count",
-            limit: limits.max_tracks(),
-        });
+        return Err(limit(
+            crate::error::CodecLimitKind::CaptionTracks,
+            value.captions.len(),
+            limits.max_tracks(),
+        ));
     }
     let mut ids = std::collections::HashSet::with_capacity(value.captions.len());
     for caption in &value.captions {
@@ -101,10 +107,11 @@ pub(crate) fn parse_boolean(value: &str, label: &str) -> Result<bool> {
 
 fn bounded(value: &str, _label: &str, limits: Limits) -> Result<()> {
     if value.len() > limits.max_string_bytes() {
-        return Err(Error::Limit {
-            resource: "media track string",
-            limit: limits.max_string_bytes(),
-        });
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            limits.max_string_bytes(),
+        ));
     }
     Ok(())
 }
@@ -128,4 +135,12 @@ fn is_guid(value: &str) -> bool {
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
+}
+
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }

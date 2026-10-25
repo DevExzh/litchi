@@ -3,7 +3,7 @@
 use super::super::codec::{
     MAX_NORMALIZED_TIME_DECIMALS, MAX_TIME_FILTER_BYTES, MAX_TIME_FILTER_POINTS,
 };
-use super::super::invalid;
+use super::super::{invalid, limit};
 use super::{
     ConditionEvent, DiagramBuildType, Duration, Effect, EventFilter, Fill, GraphicChartBuildType,
     GraphicDiagramBuildType, NormalizedTime, OleChartBuildType, ParagraphBuildType, PresetClass,
@@ -290,13 +290,19 @@ impl NormalizedTime {
 impl TimeFilter {
     pub(in crate::animations) fn parse(value: &str) -> Result<Self> {
         if value.len() > MAX_TIME_FILTER_BYTES {
-            return Err(invalid("animation time filter exceeds safety limit"));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                value.len(),
+                MAX_TIME_FILTER_BYTES,
+            ));
         }
         let mut points = Vec::new();
         for pair in value.split(';') {
             if points.len() >= MAX_TIME_FILTER_POINTS {
-                return Err(invalid(
-                    "animation time filter point count exceeds safety limit",
+                return Err(limit(
+                    crate::error::CodecLimitKind::TimeFilterPoints,
+                    points.len().checked_add(1).unwrap_or(usize::MAX),
+                    MAX_TIME_FILTER_POINTS,
                 ));
             }
             let pair = pair.trim();

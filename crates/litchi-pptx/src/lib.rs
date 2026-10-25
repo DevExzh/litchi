@@ -146,8 +146,8 @@ pub use comments::{
     parse_slide_comments_with_tolerance, write_comment_authors, write_slide_comments,
 };
 pub use error::{
-    DurablePatchFormat, Error, Result, ShapeTransferRefusal, SlideCopyRefusal, SlideOrderRefusal,
-    SlideRemovalRefusal,
+    CodecLimitKind, DurablePatchFormat, Error, LimitKind, Result, ShapeTransferRefusal,
+    SlideCopyRefusal, SlideOrderRefusal, SlideRemovalRefusal,
 };
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;

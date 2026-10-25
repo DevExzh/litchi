@@ -92,8 +92,9 @@ pub(super) fn read(xml: &[u8]) -> Result<Source> {
     }
     if xml.len() > MAX_SHAPE_BYTES {
         return Err(Error::Limit {
-            resource: "designer shape XML bytes",
-            limit: MAX_SHAPE_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_SHAPE_BYTES,
         });
     }
 
@@ -152,8 +153,11 @@ pub(super) fn read(xml: &[u8]) -> Result<Source> {
                 )?;
                 if frames.len() >= MAX_SHAPE_DEPTH {
                     return Err(Error::Limit {
-                        resource: "designer shape XML depth",
-                        limit: MAX_SHAPE_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: frames.len().checked_add(1).unwrap_or(usize::MAX),
+                        maximum: MAX_SHAPE_DEPTH,
                     });
                 }
                 frames.push(Frame {
@@ -513,8 +517,9 @@ fn finish_frame(
                 empty,
             };
             *extension_children = extension_children.checked_add(1).ok_or(Error::Limit {
-                resource: "designer extension count",
-                limit: super::validation::MAX_EXTENSION_COUNT,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Extensions),
+                observed: usize::MAX,
+                maximum: super::validation::MAX_EXTENSION_COUNT,
             })?;
             if is_known {
                 if known.is_some() {
@@ -700,8 +705,9 @@ pub(super) fn write_extension(conformance: Conformance, value: bool) -> Result<V
     .into_bytes();
     if xml.len() > MAX_EXTENSION_BYTES {
         return Err(Error::Limit {
-            resource: "designer extension bytes",
-            limit: MAX_EXTENSION_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ExtensionBytes),
+            observed: xml.len(),
+            maximum: MAX_EXTENSION_BYTES,
         });
     }
     Ok(xml)

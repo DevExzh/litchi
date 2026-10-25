@@ -688,8 +688,9 @@ fn checked_relationship_count(
         .ok_or_else(|| Error::Invalid("slide-removal relationship count overflow".into()))?;
     if next > limit {
         return Err(Error::Limit {
-            resource: "slide-removal relationship scan",
-            limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+            observed: next,
+            maximum: limit,
         });
     }
     Ok(next)

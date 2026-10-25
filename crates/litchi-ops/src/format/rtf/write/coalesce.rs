@@ -535,7 +535,7 @@ impl Run {
         if self.items.len() >= self.limits.max_expanded_targets() {
             return Err(TransactionError::Limit {
                 kind: LimitKind::ExpandedTargets,
-                observed: self.items.len().saturating_add(1),
+                observed: self.items.len().checked_add(1).unwrap_or(usize::MAX),
                 maximum: self.limits.max_expanded_targets(),
             }
             .into());

@@ -470,8 +470,9 @@ fn raw_shape_span(
         // The raw offset pass would refuse an oversized owner first.
         if xml.len() > shape_limits.input_bytes() {
             return Err(Error::Limit {
-                resource: "shape-tag owner XML bytes",
-                limit: shape_limits.input_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: xml.len(),
+                maximum: shape_limits.input_bytes(),
             });
         }
         ActiveShapes::Every
@@ -518,8 +519,11 @@ fn raw_shape_span(
 
                 if active_tree {
                     active_trees = active_trees.checked_add(1).ok_or(Error::Limit {
-                        resource: "active PresentationML shape trees",
-                        limit: 1,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::Shapes,
+                        ),
+                        observed: usize::MAX,
+                        maximum: 1,
                     })?;
                     if active_trees > 1 {
                         return Err(invalid(
@@ -534,8 +538,11 @@ fn raw_shape_span(
                     if in_tree && parent.is_none_or(RawCandidateKind::is_group) {
                         let index = mapped;
                         mapped = mapped.checked_add(1).ok_or(Error::Limit {
-                            resource: "mapped active shapes",
-                            limit: shape_limits.nodes(),
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::Shapes,
+                            ),
+                            observed: mapped.checked_add(1).unwrap_or(usize::MAX),
+                            maximum: shape_limits.shapes(),
                         })?;
                         (index == selected_index).then_some(start)
                     } else {
@@ -565,8 +572,11 @@ fn raw_shape_span(
                 let active_candidate = candidate.filter(|_| active_event);
                 if active_tree {
                     active_trees = active_trees.checked_add(1).ok_or(Error::Limit {
-                        resource: "active PresentationML shape trees",
-                        limit: 1,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::Shapes,
+                        ),
+                        observed: usize::MAX,
+                        maximum: 1,
                     })?;
                     if active_trees > 1 {
                         return Err(invalid(
@@ -580,8 +590,11 @@ fn raw_shape_span(
                     if in_tree && parent.is_none_or(RawCandidateKind::is_group) {
                         let index = mapped;
                         mapped = mapped.checked_add(1).ok_or(Error::Limit {
-                            resource: "mapped active shapes",
-                            limit: shape_limits.nodes(),
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::Shapes,
+                            ),
+                            observed: mapped.checked_add(1).unwrap_or(usize::MAX),
+                            maximum: shape_limits.shapes(),
                         })?;
                         if index == selected_index {
                             selected = Some((start..end, kind));
@@ -634,8 +647,9 @@ fn raw_shape_span(
 fn raw_shape_offsets(xml: &[u8], shape_limits: crate::shape::Limits) -> Result<Vec<u32>> {
     if xml.len() > shape_limits.input_bytes() {
         return Err(Error::Limit {
-            resource: "shape-tag owner XML bytes",
-            limit: shape_limits.input_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: shape_limits.input_bytes(),
         });
     }
     let mut reader = NsReader::from_reader(xml);
@@ -698,8 +712,9 @@ pub(super) fn scan_layout(
 ) -> Result<Layout> {
     if xml.len() > shape_limits.input_bytes() {
         return Err(Error::Limit {
-            resource: "shape-tag owner XML bytes",
-            limit: shape_limits.input_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: shape_limits.input_bytes(),
         });
     }
     if shape_span.start >= shape_span.end || shape_span.end > xml.len() {
@@ -1004,8 +1019,9 @@ fn start_node(
         } => {
             observe_customer_child(local.as_ref(), tags_seen)?;
             *children = children.checked_add(1).ok_or(Error::Limit {
-                resource: "shape customer-data children",
-                limit: shape_limits.nodes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                observed: usize::MAX,
+                maximum: shape_limits.nodes(),
             })?;
             if local.as_ref() == b"tags" {
                 let (id, id_value) = anchor_id(reader, xml, element, start..end, profile)?;

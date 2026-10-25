@@ -356,8 +356,9 @@ pub(crate) struct ProcessedXml<'a> {
 fn raw_xml(part: &dyn Part) -> Result<&[u8]> {
     if part.blob().len() > MAX_PART_XML_BYTES {
         return Err(Error::Limit {
-            resource: "PresentationML part XML",
-            limit: MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: part.blob().len(),
+            maximum: MAX_PART_XML_BYTES,
         });
     }
     Ok(part.blob())
@@ -419,8 +420,9 @@ pub(crate) fn processed_xml_with_capture<'a, 'parent>(
 pub(crate) fn processed_xml(part: &dyn Part) -> Result<Cow<'_, [u8]>> {
     if part.blob().len() > MAX_PART_XML_BYTES {
         return Err(Error::Limit {
-            resource: "PresentationML part XML",
-            limit: MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: part.blob().len(),
+            maximum: MAX_PART_XML_BYTES,
         });
     }
     Ok(process_part(part)?)

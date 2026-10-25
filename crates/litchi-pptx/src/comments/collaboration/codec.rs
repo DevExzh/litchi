@@ -153,7 +153,8 @@ impl NodeIndex {
 pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) -> Result<Located> {
     if source.len() > limits.max_input_bytes {
         return Err(limit(
-            "legacy comment collaboration XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            source.len(),
             limits.max_input_bytes,
         ));
     }
@@ -183,7 +184,8 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
         .xml;
     if processed.len() > limits.max_input_bytes {
         return Err(limit(
-            "MCE-expanded legacy comment collaboration XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            processed.len(),
             limits.max_input_bytes,
         ));
     }
@@ -396,7 +398,8 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
 fn validate_replay_extensions(source: &[u8], kind: Kind, limits: Limits) -> Result<()> {
     if source.len() > limits.max_input_bytes {
         return Err(limit(
-            "legacy comment collaboration XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            source.len(),
             limits.max_input_bytes,
         ));
     }
@@ -423,7 +426,8 @@ fn validate_replay_extensions(source: &[u8], kind: Kind, limits: Limits) -> Resu
         .xml;
     if processed.len() > limits.max_input_bytes {
         return Err(limit(
-            "MCE-expanded legacy comment collaboration XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            processed.len(),
             limits.max_input_bytes,
         ));
     }
@@ -638,14 +642,16 @@ pub(crate) fn rewrite(
 ) -> Result<Vec<u8>> {
     if source.len() > limits.max_input_bytes {
         return Err(limit(
-            "legacy comment collaboration input XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            source.len(),
             limits.max_input_bytes,
         ));
     }
     if located.value == value {
         if source.len() > limits.max_output_bytes {
             return Err(limit(
-                "serialized legacy comment collaboration XML bytes",
+                crate::error::CodecLimitKind::XmlBytes,
+                source.len(),
                 limits.max_output_bytes,
             ));
         }
@@ -1116,7 +1122,8 @@ fn scan_raw(source: &[u8], limits: Limits) -> Result<Scan> {
             Event::Start(element) => {
                 if stack.len() >= limits.max_depth {
                     return Err(limit(
-                        "legacy comment collaboration XML depth",
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
                         limits.max_depth,
                     ));
                 }
@@ -1129,10 +1136,17 @@ fn scan_raw(source: &[u8], limits: Limits) -> Result<Scan> {
                     after,
                     stack.last().copied(),
                 )?;
-                nodes_seen = nodes_seen.saturating_add(1);
+                nodes_seen = nodes_seen.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes,
+                    )
+                })?;
                 if nodes_seen > limits.max_nodes {
                     return Err(limit(
-                        "legacy comment collaboration XML nodes",
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes_seen,
                         limits.max_nodes,
                     ));
                 }
@@ -1151,10 +1165,17 @@ fn scan_raw(source: &[u8], limits: Limits) -> Result<Scan> {
                     stack.last().copied(),
                 )?;
                 node.span.empty = true;
-                nodes_seen = nodes_seen.saturating_add(1);
+                nodes_seen = nodes_seen.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes,
+                    )
+                })?;
                 if nodes_seen > limits.max_nodes {
                     return Err(limit(
-                        "legacy comment collaboration XML nodes",
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes_seen,
                         limits.max_nodes,
                     ));
                 }
@@ -1185,7 +1206,11 @@ fn scan_raw(source: &[u8], limits: Limits) -> Result<Scan> {
             Event::PI(_) => {
                 if scan.processing_instructions.len() >= limits.max_nodes {
                     return Err(limit(
-                        "legacy comment collaboration processing instructions",
+                        crate::error::CodecLimitKind::XmlEvents,
+                        scan.processing_instructions
+                            .len()
+                            .checked_add(1)
+                            .unwrap_or(usize::MAX),
                         limits.max_nodes,
                     ));
                 }
@@ -1246,7 +1271,14 @@ fn record_non_whitespace_text(
         ));
     };
     if scan.non_whitespace_text.len() >= max_nodes {
-        return Err(limit("legacy comment collaboration text nodes", max_nodes));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            scan.non_whitespace_text
+                .len()
+                .checked_add(1)
+                .unwrap_or(usize::MAX),
+            max_nodes,
+        ));
     }
     scan.non_whitespace_text.push((owner, range));
     Ok(())
@@ -1526,7 +1558,8 @@ fn collect_offsets(scan: &Scan, items: &[usize], limits: Limits) -> Result<Vec<u
     offsets.dedup();
     if offsets.len() > limits.max_nodes {
         return Err(limit(
-            "legacy comment collaboration MCE offsets",
+            crate::error::CodecLimitKind::XmlNodes,
+            offsets.len(),
             limits.max_nodes,
         ));
     }
@@ -1728,9 +1761,13 @@ pub(crate) fn validate_value_with_limit(
     }
 }
 
-fn validate_string_with_limit(value: &str, label: &str, max_string_bytes: usize) -> Result<()> {
+fn validate_string_with_limit(value: &str, _label: &str, max_string_bytes: usize) -> Result<()> {
     if value.len() > max_string_bytes {
-        return Err(invalid(format!("{label} exceeds XML string limits")));
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            max_string_bytes,
+        ));
     }
     if let Some(character) = value.chars().find(|&character| !is_xml_10_char(character)) {
         return Err(invalid(format!(
@@ -2541,7 +2578,8 @@ fn preflight_size_plans(
 fn ensure_xml_size(length: usize, max_output_bytes: usize) -> Result<()> {
     if length > max_output_bytes {
         return Err(limit(
-            "serialized legacy comment collaboration XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            length,
             max_output_bytes,
         ));
     }
@@ -2640,7 +2678,8 @@ fn apply_replacements(
         .ok_or_else(|| invalid("serialized legacy comment collaboration size overflow"))?;
     if output_len > limits.max_output_bytes {
         return Err(limit(
-            "serialized legacy comment collaboration XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            output_len,
             limits.max_output_bytes,
         ));
     }
@@ -2814,10 +2853,11 @@ fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
         .ok_or_else(|| invalid("legacy comment collaboration XML offset does not fit usize"))
 }
 
-fn limit(resource: &'static str, maximum: usize) -> Error {
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
 }
 

@@ -163,8 +163,12 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(what: &str) -> Error {
-    Error::Invalid(format!("exceeded maximum {what}"))
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 impl Properties {
@@ -175,7 +179,11 @@ impl Properties {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(xml: &[u8], limits: Limits) -> Result<Self> {
         if xml.len() > limits.max_input_bytes() {
-            return Err(limit("slide synchronization XML bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::InputBytes,
+                xml.len(),
+                limits.max_input_bytes(),
+            ));
         }
         // Apply the selected MCE budget while AlternateContent is being
         // expanded.  Checking the expanded size only afterwards can already
@@ -183,7 +191,11 @@ impl Properties {
         let mce_limits = mce_limits(limits);
         let xml = process_markup_compatibility(xml, &Capabilities::default(), &mce_limits)?.xml;
         if xml.len() > limits.max_input_bytes() {
-            return Err(limit("MCE-processed slide synchronization XML bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                xml.len(),
+                limits.max_input_bytes(),
+            ));
         }
         let mut reader = NsReader::from_reader(xml.as_ref());
         let mut properties = None;
@@ -199,10 +211,16 @@ impl Properties {
             let is_empty_element = matches!(event, Event::Empty(_));
             match event {
                 Event::Start(element) | Event::Empty(element) => {
-                    nodes =
-                        increment(nodes, limits.max_nodes(), "slide synchronization XML nodes")?;
-                    depth =
-                        increment(depth, limits.max_depth(), "slide synchronization XML depth")?;
+                    nodes = increment(
+                        nodes,
+                        limits.max_nodes(),
+                        crate::error::CodecLimitKind::XmlNodes,
+                    )?;
+                    depth = increment(
+                        depth,
+                        limits.max_depth(),
+                        crate::error::CodecLimitKind::XmlDepth,
+                    )?;
                     let is_root = is_presentationml_name(&namespace, element.name(), b"sldSyncPr");
                     let is_extension_list =
                         is_presentationml_name(&namespace, element.name(), b"extLst");
@@ -284,7 +302,11 @@ impl Properties {
     /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self, limits: Limits) -> Result<Vec<u8>> {
         if self.server_slide_id.len() > limits.max_server_slide_id_bytes() {
-            return Err(limit("slide synchronization server slide ID bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::StringBytes,
+                self.server_slide_id.len(),
+                limits.max_server_slide_id_bytes(),
+            ));
         }
         // Preflight the escaped byte count before constructing the escaped
         // string or the final output buffer.  XML entities can expand a
@@ -310,9 +332,15 @@ impl Properties {
             .and_then(|length| length.checked_add(client_time.len()))
             .and_then(|length| length.checked_add(client_inserted_time.len()))
             .and_then(|length| length.checked_add(suffix.len()))
-            .ok_or_else(|| limit("serialized slide synchronization XML bytes"))?;
+            .ok_or(Error::CapacityOverflow {
+                resource: "serialized slide synchronization XML bytes",
+            })?;
         if output_len > limits.max_output_bytes() {
-            return Err(limit("serialized slide synchronization XML bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                output_len,
+                limits.max_output_bytes(),
+            ));
         }
         let server_slide_id = escape_xml(&self.server_slide_id);
         if server_slide_id.len() != escaped_server_slide_id_len {
@@ -391,7 +419,11 @@ fn from_root(element: &BytesStart<'_>, decoder: Decoder, limits: Limits) -> Resu
     let server_slide_id = unqualified_attribute_value(element, b"serverSldId", decoder)?
         .ok_or_else(|| invalid("missing slide synchronization serverSldId attribute"))?;
     if server_slide_id.len() > limits.max_server_slide_id_bytes() {
-        return Err(limit("slide synchronization server slide ID bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            server_slide_id.len(),
+            limits.max_server_slide_id_bytes(),
+        ));
     }
     let server_modified_time = DateTime::parse(
         &unqualified_attribute_value(element, b"serverSldModifiedTime", decoder)?.ok_or_else(
@@ -410,10 +442,12 @@ fn from_root(element: &BytesStart<'_>, decoder: Decoder, limits: Limits) -> Resu
     })
 }
 
-fn increment(value: usize, max: usize, label: &str) -> Result<usize> {
-    let next = value.checked_add(1).ok_or_else(|| limit(label))?;
+fn increment(value: usize, max: usize, kind: crate::error::CodecLimitKind) -> Result<usize> {
+    let next = value
+        .checked_add(1)
+        .ok_or_else(|| limit(kind, usize::MAX, max))?;
     if next > max {
-        return Err(limit(label));
+        return Err(limit(kind, next, max));
     }
     Ok(next)
 }

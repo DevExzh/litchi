@@ -30,16 +30,24 @@ pub fn validate(model: &Model, limits: Limits) -> Result<()> {
         .asset
         .embedded_data()
         .map_or(0, Data::len)
-        .saturating_add(
+        .checked_add(
             model
                 .preview
                 .as_ref()
                 .and_then(Preview::data)
                 .map_or(0, Data::len),
-        );
+        )
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                usize::MAX,
+                limits.max_total_payload_bytes(),
+            )
+        })?;
     if total > limits.max_total_payload_bytes() {
         return Err(limit(
-            "model3d total payload bytes",
+            crate::error::CodecLimitKind::PayloadBytes,
+            total,
             limits.max_total_payload_bytes(),
         ));
     }
@@ -212,7 +220,13 @@ fn validate_fragment_limits(inert: &drawing::Inert, limits: Limits) -> Result<()
     loop {
         match reader.read_event_into(&mut buffer) {
             Ok(Event::Start(_)) => {
-                nodes = nodes.saturating_add(1);
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    drawing_limit(
+                        LimitKind::InertFragmentNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 if nodes > limits.max_nodes() {
                     return Err(drawing_limit(
                         LimitKind::InertFragmentNodes,
@@ -220,7 +234,13 @@ fn validate_fragment_limits(inert: &drawing::Inert, limits: Limits) -> Result<()
                         limits.max_nodes(),
                     ));
                 }
-                depth = depth.saturating_add(1);
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    drawing_limit(
+                        LimitKind::InertFragmentDepth,
+                        usize::MAX,
+                        limits.max_depth(),
+                    )
+                })?;
                 if depth > limits.max_depth() {
                     return Err(drawing_limit(
                         LimitKind::InertFragmentDepth,
@@ -230,7 +250,13 @@ fn validate_fragment_limits(inert: &drawing::Inert, limits: Limits) -> Result<()
                 }
             },
             Ok(Event::Empty(_)) => {
-                nodes = nodes.saturating_add(1);
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    drawing_limit(
+                        LimitKind::InertFragmentNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 if nodes > limits.max_nodes() {
                     return Err(drawing_limit(
                         LimitKind::InertFragmentNodes,
@@ -281,7 +307,11 @@ fn validate_asset(asset: &Asset, limits: Limits) -> Result<()> {
     if let Some(data) = asset.embedded_data()
         && data.len() > limits.max_model_bytes()
     {
-        return Err(limit("model3d model bytes", limits.max_model_bytes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            data.len(),
+            limits.max_model_bytes(),
+        ));
     }
     if let Some(link) = asset.linked_target()
         && (link.as_str().is_empty() || link.as_str().len() > limits.max_link_bytes())
@@ -294,7 +324,11 @@ fn validate_asset(asset: &Asset, limits: Limits) -> Result<()> {
 fn validate_preview(preview: &Preview, limits: Limits) -> Result<()> {
     if let Some(data) = preview.data() {
         if data.len() > limits.max_preview_bytes() {
-            return Err(limit("model3d preview bytes", limits.max_preview_bytes()));
+            return Err(limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                data.len(),
+                limits.max_preview_bytes(),
+            ));
         }
         let content_type = preview
             .content_type()
@@ -379,11 +413,8 @@ fn validate_reference(
         }
     {
         return Err(limit(
-            if field == "model" {
-                "model3d model bytes"
-            } else {
-                "model3d preview bytes"
-            },
+            crate::error::CodecLimitKind::PayloadBytes,
+            part.blob().len(),
             if field == "model" {
                 limits.max_model_bytes()
             } else {
@@ -447,6 +478,10 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(format!("PPTX model3d {}", message.into()))
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }

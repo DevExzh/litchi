@@ -1,5 +1,5 @@
-use super::Limits;
 use super::model::{GraphicBuildMode, Sequence};
+use super::{Limits, limit};
 use crate::leniency::ToleranceReport;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -343,7 +343,11 @@ fn scan_hosts(xml: &[u8]) -> Result<HashMap<u32, HostReference>> {
 fn scan_hosts_with_limits(xml: &[u8], limits: Limits) -> Result<HashMap<u32, HostReference>> {
     let input_limit = MAX_SLIDE_XML.min(limits.max_input_bytes);
     if xml.len() > input_limit {
-        return invalid_relationship("slide XML exceeds animation relationship scan limit");
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            input_limit,
+        ));
     }
     // Branches are chosen below on namespace values as written; a declaration
     // that spells the markup-compatibility namespace with references would
@@ -430,9 +434,28 @@ fn scan_hosts_with_limits(xml: &[u8], limits: Limits) -> Result<HashMap<u32, Hos
             Event::Eof => break,
             _ => {},
         }
-        nodes += 1;
-        if nodes > MAX_NODES.min(limits.max_nodes) || depth > MAX_DEPTH.min(limits.max_depth) {
-            return invalid_relationship("slide XML exceeds animation relationship scan bounds");
+        nodes = nodes.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlNodes,
+                usize::MAX,
+                MAX_NODES.min(limits.max_nodes),
+            )
+        })?;
+        let node_limit = MAX_NODES.min(limits.max_nodes);
+        if nodes > node_limit {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlNodes,
+                nodes,
+                node_limit,
+            ));
+        }
+        let depth_limit = MAX_DEPTH.min(limits.max_depth);
+        if depth > depth_limit {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlDepth,
+                depth,
+                depth_limit,
+            ));
         }
     }
     if depth != 0 || frame.is_some() || alternate.is_some() {
@@ -452,9 +475,11 @@ fn inspect_start(
     alternate: &mut Option<AlternateState>,
 ) -> Result<()> {
     if count_up_to(element, max_attributes) > max_attributes {
-        return invalid_relationship(
-            "slide element exceeds animation relationship attribute limit",
-        );
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlAttributes,
+            max_attributes.checked_add(1).unwrap_or(usize::MAX),
+            max_attributes,
+        ));
     }
     if is_name(namespace, element.name(), &[MC_NS], b"AlternateContent") {
         if alternate.is_some() || empty {
@@ -904,8 +929,13 @@ mod tests {
         let is_attribute_limit = |result: Result<HashMap<u32, HostReference>>| {
             matches!(
                 result,
-                Err(Error::Invalid(message))
-                    if message == "slide element exceeds animation relationship attribute limit"
+                Err(Error::Limit {
+                    kind: crate::error::LimitKind::Codec(
+                        crate::error::CodecLimitKind::XmlAttributes
+                    ),
+                    observed,
+                    maximum,
+                }) if observed > maximum && maximum == MAX_ATTRIBUTES
             )
         };
 

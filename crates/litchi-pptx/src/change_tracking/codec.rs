@@ -295,8 +295,9 @@ fn read_at(xml: &[u8], owner: Owner, root_range: Option<&Range<usize>>) -> Resul
     }
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::Limit {
-            resource: "change-tracking XML bytes",
-            limit: MAX_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_XML_BYTES,
         });
     }
     let mut reader = NsReader::from_reader(xml);
@@ -349,8 +350,11 @@ fn read_at(xml: &[u8], owner: Owner, root_range: Option<&Range<usize>>) -> Resul
                 )?;
                 if frames.len() >= MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "change-tracking XML depth",
-                        limit: MAX_XML_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: frames.len().checked_add(1).unwrap_or(usize::MAX),
+                        maximum: MAX_XML_DEPTH,
                     });
                 }
                 frames.push(Frame {
@@ -728,8 +732,9 @@ fn replace(xml: &[u8], range: Range<usize>, replacement: &[u8]) -> Result<Vec<u8
         .ok_or_else(|| invalid("change-tracking replacement length overflow"))?;
     if length > MAX_XML_BYTES {
         return Err(Error::Limit {
-            resource: "change-tracking XML bytes",
-            limit: MAX_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: length,
+            maximum: MAX_XML_BYTES,
         });
     }
     let mut value = Vec::new();
@@ -757,8 +762,9 @@ fn bump_node(nodes: &mut usize) -> Result<()> {
         .ok_or_else(|| invalid("change-tracking XML node count overflow"))?;
     if *nodes > MAX_XML_NODES {
         return Err(Error::Limit {
-            resource: "change-tracking XML nodes",
-            limit: MAX_XML_NODES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: *nodes,
+            maximum: MAX_XML_NODES,
         });
     }
     Ok(())

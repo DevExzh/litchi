@@ -207,7 +207,11 @@ impl File {
         validate(self, limits)?;
         let output_len = serialized_len(self)?;
         if output_len > limits.max_output_bytes() {
-            return Err(limit("serialized WebVTT bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                output_len,
+                limits.max_output_bytes(),
+            ));
         }
         let mut out = Vec::new();
         out.try_reserve_exact(output_len)
@@ -375,7 +379,11 @@ pub(crate) fn store(package: &mut OpcPackage, value: &Track, limits: Limits) -> 
 
 fn parse_vtt(bytes: &[u8], limits: Limits) -> Result<File> {
     if bytes.len() > limits.max_input_bytes() {
-        return Err(limit("WebVTT part bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::InputBytes,
+            bytes.len(),
+            limits.max_input_bytes(),
+        ));
     }
     let bytes = bytes.strip_prefix(&[0xef, 0xbb, 0xbf]).unwrap_or(bytes);
     let text = std::str::from_utf8(bytes)
@@ -385,12 +393,22 @@ fn parse_vtt(bytes: &[u8], limits: Limits) -> Result<File> {
     }
     let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
     let lines: Vec<&str> = normalized.split('\n').collect();
-    if lines.len() > limits.max_lines()
-        || lines
-            .iter()
-            .any(|line| line.len() > limits.max_line_bytes())
+    if lines.len() > limits.max_lines() {
+        return Err(limit(
+            crate::error::CodecLimitKind::CaptionLines,
+            lines.len(),
+            limits.max_lines(),
+        ));
+    }
+    if let Some(line) = lines
+        .iter()
+        .find(|line| line.len() > limits.max_line_bytes())
     {
-        return Err(limit("WebVTT lines"));
+        return Err(limit(
+            crate::error::CodecLimitKind::TextBytes,
+            line.len(),
+            limits.max_line_bytes(),
+        ));
     }
     let first = lines.first().copied().unwrap_or_default();
     let header_text = if first == "WEBVTT" {
@@ -446,7 +464,11 @@ fn parse_vtt(bytes: &[u8], limits: Limits) -> Result<File> {
             index += 1;
         }
         if blocks.len() >= limits.max_blocks() {
-            return Err(limit("WebVTT blocks"));
+            return Err(limit(
+                crate::error::CodecLimitKind::CaptionBlocks,
+                blocks.len().checked_add(1).unwrap_or(usize::MAX),
+                limits.max_blocks(),
+            ));
         }
         let block = parse_block(&lines[start..index], cue_seen, limits)?;
         cue_seen |= matches!(block, Block::Cue(_));
@@ -533,7 +555,11 @@ fn parse_cue_settings<'a>(
     let mut seen = HashSet::new();
     for token in tokens {
         if result.len() >= limits.max_settings() {
-            return Err(limit("WebVTT cue settings"));
+            return Err(limit(
+                crate::error::CodecLimitKind::CaptionSettings,
+                result.len().checked_add(1).unwrap_or(usize::MAX),
+                limits.max_settings(),
+            ));
         }
         let (name, value) = token
             .split_once(':')
@@ -557,7 +583,11 @@ fn parse_region(lines: &[&str], limits: Limits) -> Result<Vec<RegionSetting>> {
     let mut seen = HashSet::new();
     for token in lines.iter().flat_map(|line| line.split_ascii_whitespace()) {
         if result.len() >= limits.max_settings() {
-            return Err(limit("WebVTT region settings"));
+            return Err(limit(
+                crate::error::CodecLimitKind::CaptionSettings,
+                result.len().checked_add(1).unwrap_or(usize::MAX),
+                limits.max_settings(),
+            ));
         }
         let (name, value) = token
             .split_once(':')
@@ -641,7 +671,11 @@ fn validate(value: &File, limits: Limits) -> Result<()> {
         }
     }
     if value.blocks.len() > limits.max_blocks() {
-        return Err(limit("WebVTT blocks"));
+        return Err(limit(
+            crate::error::CodecLimitKind::CaptionBlocks,
+            value.blocks.len(),
+            limits.max_blocks(),
+        ));
     }
     let mut cue_seen = false;
     for block in &value.blocks {
@@ -772,7 +806,9 @@ fn time_len(value: u64) -> usize {
 fn add_len(length: &mut usize, additional: usize) -> Result<()> {
     *length = length
         .checked_add(additional)
-        .ok_or_else(|| limit("serialized WebVTT bytes"))?;
+        .ok_or(Error::CapacityOverflow {
+            resource: "serialized WebVTT bytes",
+        })?;
     Ok(())
 }
 
@@ -850,7 +886,7 @@ fn timestamp(value: &str) -> Result<u64> {
     hours
         .checked_mul(3_600_000)
         .and_then(|v| v.checked_add(minutes * 60_000 + seconds * 1_000 + millis))
-        .ok_or_else(|| limit("WebVTT timestamp"))
+        .ok_or_else(|| invalid("WebVTT timestamp is out of range"))
 }
 
 fn write_time(out: &mut Vec<u8>, value: u64) {
@@ -893,7 +929,11 @@ fn no_arrow(lines: &[&str], label: &str) -> Result<()> {
 }
 fn line(value: &str, limits: Limits) -> Result<()> {
     if value.len() > limits.max_line_bytes() {
-        Err(limit("WebVTT line"))
+        Err(limit(
+            crate::error::CodecLimitKind::TextBytes,
+            value.len(),
+            limits.max_line_bytes(),
+        ))
     } else if value.contains(['\r', '\n', '\0']) {
         Err(invalid("WebVTT line contains forbidden character"))
     } else {
@@ -917,10 +957,14 @@ fn source_type(value: &str) -> bool {
     matches!(value, SLIDE | LAYOUT | MASTER)
 }
 fn valid_rel_id(value: &str, limits: Limits) -> Result<()> {
-    if value.is_empty()
-        || value.len() > limits.max_string_bytes()
-        || value.chars().any(char::is_whitespace)
-    {
+    if value.len() > limits.max_string_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            limits.max_string_bytes(),
+        ));
+    }
+    if value.is_empty() || value.chars().any(char::is_whitespace) {
         Err(invalid("invalid Track relationship ID"))
     } else {
         Ok(())
@@ -929,8 +973,12 @@ fn valid_rel_id(value: &str, limits: Limits) -> Result<()> {
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
-fn limit(label: &str) -> Error {
-    invalid(format!("{label} exceeds implementation limit"))
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 #[cfg(test)]

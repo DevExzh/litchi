@@ -44,7 +44,11 @@ const NOTES_XML_SUFFIX: &str = concat!(
 pub fn master_xml(limits: Limits) -> Result<&'static str> {
     let xml = include_str!("resources/generated/notesMaster.xml");
     if xml.len() > limits.max_output_bytes {
-        return Err(limit("notes master XML bytes", limits.max_output_bytes));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.max_output_bytes,
+        ));
     }
     Ok(xml)
 }
@@ -66,8 +70,9 @@ pub fn write_text(text: &str, limits: Limits) -> Result<Vec<u8>> {
 pub fn write_text_with(conformance: Conformance, text: &str, limits: Limits) -> Result<Vec<u8>> {
     if text.len() > limits.max_text_bytes {
         return Err(Error::Limit {
-            resource: "speaker-notes text bytes",
-            limit: limits.max_text_bytes,
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::TextBytes),
+            observed: text.len(),
+            maximum: limits.max_text_bytes,
         });
     }
     if !text.chars().all(is_xml_char) {
@@ -95,8 +100,9 @@ pub fn write_text_with(conformance: Conformance, text: &str, limits: Limits) -> 
         .ok_or_else(|| invalid("speaker-notes XML length overflow"))?;
     if capacity > limits.max_output_bytes {
         return Err(Error::Limit {
-            resource: "speaker-notes XML bytes",
-            limit: limits.max_output_bytes,
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            observed: capacity,
+            maximum: limits.max_output_bytes,
         });
     }
     let escaped = quick_xml::escape::escape(text);
@@ -137,9 +143,13 @@ fn append_text(value: &mut String, text: &str, maximum: usize) -> Result<()> {
     let next = value
         .len()
         .checked_add(text.len())
-        .ok_or_else(|| limit("speaker-notes text bytes", maximum))?;
+        .ok_or_else(|| limit(crate::error::CodecLimitKind::TextBytes, usize::MAX, maximum))?;
     if next > maximum {
-        return Err(limit("speaker-notes text bytes", maximum));
+        return Err(limit(
+            crate::error::CodecLimitKind::TextBytes,
+            next,
+            maximum,
+        ));
     }
     let spare = value.capacity().saturating_sub(value.len());
     if text.len() > spare {
@@ -170,14 +180,16 @@ impl Slide {
     pub fn text(&self, limits: Limits) -> Result<Option<String>> {
         if self.data.len() > limits.max_input_bytes {
             return Err(limit(
-                "speaker-notes input XML bytes",
+                crate::error::CodecLimitKind::XmlBytes,
+                self.data.len(),
                 limits.max_input_bytes,
             ));
         }
         let processed = process_notes_xml(&self.data, limits)?;
         if processed.len() > limits.max_input_bytes {
             return Err(limit(
-                "MCE-expanded speaker-notes XML bytes",
+                crate::error::CodecLimitKind::XmlBytes,
+                processed.len(),
                 limits.max_input_bytes,
             ));
         }
@@ -191,14 +203,33 @@ impl Slide {
         loop {
             match reader.read_event() {
                 Ok(Event::Start(element)) => {
-                    depth = depth
-                        .checked_add(1)
-                        .ok_or_else(|| limit("speaker-notes XML depth", limits.max_depth))?;
-                    nodes = nodes
-                        .checked_add(1)
-                        .ok_or_else(|| limit("speaker-notes XML nodes", limits.max_nodes))?;
-                    if depth > limits.max_depth || nodes > limits.max_nodes {
-                        return Err(limit("speaker-notes XML structure", limits.max_nodes));
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::error::CodecLimitKind::XmlDepth,
+                            usize::MAX,
+                            limits.max_depth,
+                        )
+                    })?;
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::error::CodecLimitKind::XmlNodes,
+                            usize::MAX,
+                            limits.max_nodes,
+                        )
+                    })?;
+                    if depth > limits.max_depth {
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlDepth,
+                            depth,
+                            limits.max_depth,
+                        ));
+                    }
+                    if nodes > limits.max_nodes {
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlNodes,
+                            nodes,
+                            limits.max_nodes,
+                        ));
                     }
                     if element.local_name().as_ref() != b"t" {
                         continue;
@@ -210,11 +241,19 @@ impl Slide {
                     in_text = true;
                 },
                 Ok(Event::Empty(element)) => {
-                    nodes = nodes
-                        .checked_add(1)
-                        .ok_or_else(|| limit("speaker-notes XML nodes", limits.max_nodes))?;
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::error::CodecLimitKind::XmlNodes,
+                            usize::MAX,
+                            limits.max_nodes,
+                        )
+                    })?;
                     if nodes > limits.max_nodes {
-                        return Err(limit("speaker-notes XML nodes", limits.max_nodes));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlNodes,
+                            nodes,
+                            limits.max_nodes,
+                        ));
                     }
                     if element.local_name().as_ref() == b"t" {
                         seen_text = true;
@@ -257,12 +296,17 @@ impl Slide {
 pub(crate) fn rewrite_text(xml: &[u8], text: &str, limits: Limits) -> Result<Vec<u8>> {
     if xml.len() > limits.max_input_bytes {
         return Err(limit(
-            "speaker-notes input XML bytes",
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
             limits.max_input_bytes,
         ));
     }
     if text.len() > limits.max_text_bytes {
-        return Err(limit("speaker-notes text bytes", limits.max_text_bytes));
+        return Err(limit(
+            crate::error::CodecLimitKind::TextBytes,
+            text.len(),
+            limits.max_text_bytes,
+        ));
     }
     if !text.chars().all(is_xml_char) {
         return Err(invalid("speaker notes contain an invalid XML character"));
@@ -273,12 +317,19 @@ pub(crate) fn rewrite_text(xml: &[u8], text: &str, limits: Limits) -> Result<Vec
         return Err(invalid("notes slide has no DrawingML text run"));
     };
     let mut output = Vec::new();
-    let capacity = xml
-        .len()
-        .checked_add(escaped_len)
-        .ok_or_else(|| limit("speaker-notes XML bytes", limits.max_output_bytes))?;
+    let capacity = xml.len().checked_add(escaped_len).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            usize::MAX,
+            limits.max_output_bytes,
+        )
+    })?;
     if capacity > limits.max_output_bytes {
-        return Err(limit("speaker-notes XML bytes", limits.max_output_bytes));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            capacity,
+            limits.max_output_bytes,
+        ));
     }
     let escaped = quick_xml::escape::escape(text);
     output
@@ -305,7 +356,11 @@ pub(crate) fn rewrite_text(xml: &[u8], text: &str, limits: Limits) -> Result<Vec
     }
     output.extend_from_slice(&xml[cursor..]);
     if output.len() > limits.max_output_bytes {
-        return Err(limit("speaker-notes XML bytes", limits.max_output_bytes));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            output.len(),
+            limits.max_output_bytes,
+        ));
     }
     Ok(output)
 }
@@ -501,11 +556,11 @@ fn is_typed_resource_error(error: &Error) -> bool {
     matches!(error, Error::Limit { .. } | Error::Allocation { .. })
 }
 
-fn node_policy(expected_root: &str) -> (&'static str, usize) {
+fn node_policy(expected_root: &str) -> (crate::error::CodecLimitKind, usize) {
     if expected_root == "sld" {
-        ("slide XML nodes", MAX_SLIDE_ROOT_NODES)
+        (crate::error::CodecLimitKind::XmlNodes, MAX_SLIDE_ROOT_NODES)
     } else {
-        ("notes XML nodes", MAX_NODES)
+        (crate::error::CodecLimitKind::XmlNodes, MAX_NODES)
     }
 }
 
@@ -527,7 +582,11 @@ pub(crate) fn scan_xml_with_limits(
 ) -> Result<XmlScan> {
     let max = max.min(limits.max_input_bytes).min(limits.max_output_bytes);
     if xml.len() > max {
-        return Err(limit("notes XML bytes", max));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            max,
+        ));
     }
     let limits = Limits {
         max_input_bytes: max,
@@ -572,10 +631,14 @@ fn scan_processed_xml_with_limits(
 ) -> Result<XmlScan> {
     let max = max.min(limits.max_input_bytes).min(limits.max_output_bytes);
     if raw_len > max {
-        return Err(limit("notes XML bytes", max));
+        return Err(limit(crate::error::CodecLimitKind::XmlBytes, raw_len, max));
     }
     if processed.len() > max {
-        return Err(limit("processed notes XML bytes", max));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            processed.len(),
+            max,
+        ));
     }
     // A slice reader's events borrow `processed` directly, so no event is
     // copied into a scratch buffer; the parser and its errors are the ones
@@ -590,7 +653,7 @@ fn scan_processed_xml_with_limits(
     let mut attribute_bytes = 0usize;
     let mut root_seen = false;
     let mut scan = XmlScan::default();
-    let (node_resource, node_limit) = node_policy(expected_root);
+    let (node_kind, node_limit) = node_policy(expected_root);
     let node_limit = node_limit.min(limits.max_nodes);
     loop {
         if pending_pop {
@@ -603,13 +666,29 @@ fn scan_processed_xml_with_limits(
                     .push(&element)
                     .map_err(quick_xml::Error::from)
                     .map_err(xml_error)?;
-                nodes += 1;
-                depth += 1;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        node_limit,
+                    )
+                })?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth,
+                    )
+                })?;
                 if depth > limits.max_depth {
-                    return Err(limit("notes XML depth", limits.max_depth));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth,
+                    ));
                 }
                 if nodes > node_limit {
-                    return Err(limit(node_resource, node_limit));
+                    return Err(limit(node_kind, nodes, node_limit));
                 }
                 inspect_element(
                     &resolver,
@@ -630,12 +709,22 @@ fn scan_processed_xml_with_limits(
                     .map_err(quick_xml::Error::from)
                     .map_err(xml_error)?;
                 pending_pop = true;
-                nodes += 1;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        node_limit,
+                    )
+                })?;
                 if nodes > node_limit {
-                    return Err(limit(node_resource, node_limit));
+                    return Err(limit(node_kind, nodes, node_limit));
                 }
                 if depth >= limits.max_depth {
-                    return Err(limit("notes XML depth", limits.max_depth));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth.checked_add(1).unwrap_or(usize::MAX),
+                        limits.max_depth,
+                    ));
                 }
                 inspect_element(
                     &resolver,
@@ -713,10 +802,17 @@ fn inspect_element(
         if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
             continue;
         }
-        *attributes += 1;
+        *attributes = (*attributes).checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlAttributes,
+                usize::MAX,
+                MAX_ATTRIBUTES.min(limits.max_nodes),
+            )
+        })?;
         if *attributes > MAX_ATTRIBUTES.min(limits.max_nodes) {
             return Err(limit(
-                "notes XML attributes",
+                crate::error::CodecLimitKind::XmlAttributes,
+                *attributes,
                 MAX_ATTRIBUTES.min(limits.max_nodes),
             ));
         }
@@ -725,12 +821,28 @@ fn inspect_element(
         let attr_local = std::str::from_utf8(attr_local.into_inner()).map_err(xml_error)?;
         let raw_value = std::str::from_utf8(item.value.as_ref()).map_err(xml_error)?;
         let value = quick_xml::escape::unescape(raw_value).map_err(xml_error)?;
-        *attribute_bytes = attribute_bytes
-            .checked_add(namespace.len() + attr_local.len() + value.len())
-            .ok_or_else(|| invalid("notes XML attribute byte count overflow"))?;
+        let added = namespace
+            .len()
+            .checked_add(attr_local.len())
+            .and_then(|length| length.checked_add(value.len()))
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::XmlAttributeBytes,
+                    usize::MAX,
+                    limits.max_attribute_bytes,
+                )
+            })?;
+        *attribute_bytes = attribute_bytes.checked_add(added).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                usize::MAX,
+                limits.max_attribute_bytes,
+            )
+        })?;
         if *attribute_bytes > limits.max_attribute_bytes {
             return Err(limit(
-                "notes XML attribute bytes",
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                *attribute_bytes,
                 limits.max_attribute_bytes,
             ));
         }
@@ -808,9 +920,10 @@ mod tests {
         assert!(matches!(
             raw_limited,
             Error::Limit {
-                resource: "notes XML bytes",
-                limit
-            } if limit == INVALID_ROOT.len() - 1
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            } if observed == INVALID_ROOT.len() && maximum == INVALID_ROOT.len() - 1
         ));
         let processed_limited = root_conformance_from_processed(
             processed.as_ref(),
@@ -822,9 +935,10 @@ mod tests {
         assert!(matches!(
             processed_limited,
             Error::Limit {
-                resource: "notes XML bytes",
-                limit
-            } if limit == INVALID_ROOT.len() - 1
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            } if observed == INVALID_ROOT.len() && maximum == INVALID_ROOT.len() - 1
         ));
 
         let processed_limit =
@@ -834,9 +948,11 @@ mod tests {
         assert!(matches!(
             processed_limit,
             Error::Limit {
-                resource: "processed notes XML bytes",
-                limit: 1,
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed,
+                maximum: 1,
             }
+            if observed == processed.len()
         ));
     }
 
@@ -1027,8 +1143,11 @@ mod tests {
             assert!(matches!(
                 result,
                 Err(Error::Limit {
-                    resource: "notes XML attributes",
-                    limit: MAX_ATTRIBUTES,
+                    kind: crate::error::LimitKind::Codec(
+                        crate::error::CodecLimitKind::XmlAttributes
+                    ),
+                    observed: MAX_ATTRIBUTES + 1,
+                    maximum: MAX_ATTRIBUTES,
                 })
             ));
             assert_eq!(attributes, MAX_ATTRIBUTES + 1);
@@ -1039,8 +1158,11 @@ mod tests {
             assert!(matches!(
                 result,
                 Err(Error::Limit {
-                    resource: "notes XML attribute bytes",
-                    limit: MAX_ATTRIBUTE_BYTES,
+                    kind: crate::error::LimitKind::Codec(
+                        crate::error::CodecLimitKind::XmlAttributeBytes
+                    ),
+                    maximum: MAX_ATTRIBUTE_BYTES,
+                    ..
                 })
             ));
             assert_eq!(attributes, 1);
@@ -1122,8 +1244,9 @@ mod tests {
                 "sld",
             ),
             Err(Error::Limit {
-                resource: "slide XML nodes",
-                limit: MAX_SLIDE_ROOT_NODES,
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlNodes),
+                maximum: MAX_SLIDE_ROOT_NODES,
+                ..
             })
         ));
 
@@ -1153,8 +1276,9 @@ mod tests {
                 "notes",
             ),
             Err(Error::Limit {
-                resource: "notes XML nodes",
-                limit: MAX_NODES,
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlNodes),
+                maximum: MAX_NODES,
+                ..
             })
         ));
     }
@@ -1295,10 +1419,14 @@ mod tests {
         expected_root: &str,
     ) -> Result<XmlScan> {
         if raw_len > max {
-            return Err(limit("notes XML bytes", max));
+            return Err(limit(crate::error::CodecLimitKind::XmlBytes, raw_len, max));
         }
         if processed.len() > max {
-            return Err(limit("processed notes XML bytes", max));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                processed.len(),
+                max,
+            ));
         }
         let mut reader = NsReader::from_reader(processed);
         reader.config_mut().trim_text(false);
@@ -1309,17 +1437,21 @@ mod tests {
         let mut attribute_bytes = 0usize;
         let mut root_seen = false;
         let mut scan = XmlScan::default();
-        let (node_resource, node_limit) = node_policy(expected_root);
+        let (node_kind, node_limit) = node_policy(expected_root);
         loop {
             match reader.read_event_into(&mut buffer).map_err(xml_error)? {
                 Event::Start(element) => {
                     nodes += 1;
                     depth += 1;
                     if depth > MAX_DEPTH {
-                        return Err(limit("notes XML depth", MAX_DEPTH));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlDepth,
+                            depth,
+                            MAX_DEPTH,
+                        ));
                     }
                     if nodes > node_limit {
-                        return Err(limit(node_resource, node_limit));
+                        return Err(limit(node_kind, nodes, node_limit));
                     }
                     inspect_element_oracle(
                         &reader,
@@ -1336,10 +1468,14 @@ mod tests {
                 Event::Empty(element) => {
                     nodes += 1;
                     if nodes > node_limit {
-                        return Err(limit(node_resource, node_limit));
+                        return Err(limit(node_kind, nodes, node_limit));
                     }
                     if depth >= MAX_DEPTH {
-                        return Err(limit("notes XML depth", MAX_DEPTH));
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlDepth,
+                            depth.checked_add(1).unwrap_or(usize::MAX),
+                            MAX_DEPTH,
+                        ));
                     }
                     inspect_element_oracle(
                         &reader,
@@ -1426,7 +1562,11 @@ mod tests {
             }
             *attributes += 1;
             if *attributes > MAX_ATTRIBUTES {
-                return Err(limit("notes XML attributes", MAX_ATTRIBUTES));
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlAttributes,
+                    *attributes,
+                    MAX_ATTRIBUTES,
+                ));
             }
             let (namespace, attr_local) = reader.resolver().resolve_attribute(item.key);
             let namespace = resolved_owned_oracle(namespace)?;
@@ -1435,11 +1575,30 @@ mod tests {
             let value = quick_xml::escape::unescape(raw_value)
                 .map_err(xml_error)?
                 .into_owned();
-            *attribute_bytes = attribute_bytes
-                .checked_add(namespace.len() + attr_local.len() + value.len())
-                .ok_or_else(|| invalid("notes XML attribute byte count overflow"))?;
+            let added = namespace
+                .len()
+                .checked_add(attr_local.len())
+                .and_then(|length| length.checked_add(value.len()))
+                .ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlAttributeBytes,
+                        usize::MAX,
+                        MAX_ATTRIBUTE_BYTES,
+                    )
+                })?;
+            *attribute_bytes = attribute_bytes.checked_add(added).ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::XmlAttributeBytes,
+                    usize::MAX,
+                    MAX_ATTRIBUTE_BYTES,
+                )
+            })?;
             if *attribute_bytes > MAX_ATTRIBUTE_BYTES {
-                return Err(limit("notes XML attribute bytes", MAX_ATTRIBUTE_BYTES));
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlAttributeBytes,
+                    *attribute_bytes,
+                    MAX_ATTRIBUTE_BYTES,
+                ));
             }
             if namespace == conformance.r() {
                 scan.relationship_attributes.push(value.clone());

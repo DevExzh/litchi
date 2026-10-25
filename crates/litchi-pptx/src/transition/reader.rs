@@ -134,8 +134,9 @@ impl Default for Limits {
 pub fn read(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
     if xml.len() > limits.input_bytes {
         return Err(Error::Limit {
-            resource: "input bytes",
-            limit: limits.input_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+            observed: xml.len(),
+            maximum: limits.input_bytes,
         });
     }
 
@@ -153,8 +154,9 @@ pub fn read(xml: &[u8], limits: Limits) -> Result<Option<Transition>> {
     let processed = process_markup_compatibility(xml, &capabilities, &mce_limits)?.xml;
     if processed.len() > limits.input_bytes {
         return Err(Error::Limit {
-            resource: "post-MCE bytes",
-            limit: limits.input_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: processed.len(),
+            maximum: limits.input_bytes,
         });
     }
     // Until change 0653 the preprocessor re-declared every in-scope binding on
@@ -368,13 +370,15 @@ impl Draft {
 
     fn finish_raw(&mut self, role: Role, bytes: &[u8], limit: usize) -> Result<()> {
         let retained = self.retained.checked_add(bytes.len()).ok_or(Error::Limit {
-            resource: "retained transition bytes",
-            limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::RetainedBytes),
+            observed: usize::MAX,
+            maximum: limit,
         })?;
         if retained > limit {
             return Err(Error::Limit {
-                resource: "retained transition bytes",
-                limit,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::RetainedBytes),
+                observed: retained,
+                maximum: limit,
             });
         }
         let xml = std::str::from_utf8(bytes).map_err(|error| {
@@ -961,8 +965,9 @@ fn bounded_attribute_value(
             }
             if attribute.value.len() > MAX_PRESET_NAME_BYTES {
                 return Err(Error::Limit {
-                    resource: "preset transition name bytes",
-                    limit: MAX_PRESET_NAME_BYTES,
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::NameBytes),
+                    observed: attribute.value.len(),
+                    maximum: MAX_PRESET_NAME_BYTES,
                 });
             }
             let decoded = attribute
@@ -970,8 +975,9 @@ fn bounded_attribute_value(
                 .map_err(|error| Error::Xml(error.to_string()))?;
             if decoded.len() > MAX_PRESET_NAME_BYTES {
                 return Err(Error::Limit {
-                    resource: "preset transition name bytes",
-                    limit: MAX_PRESET_NAME_BYTES,
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::NameBytes),
+                    observed: decoded.len(),
+                    maximum: MAX_PRESET_NAME_BYTES,
                 });
             }
             value = Some(decoded.into_owned());
@@ -1043,13 +1049,15 @@ fn reject_duplicate(seen: &mut bool, attribute: &str) -> Result<()> {
 
 fn count_node(nodes: usize, limit: usize) -> Result<usize> {
     let nodes = nodes.checked_add(1).ok_or(Error::Limit {
-        resource: "element count",
-        limit,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+        observed: usize::MAX,
+        maximum: limit,
     })?;
     if nodes > limit {
         Err(Error::Limit {
-            resource: "element count",
-            limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: nodes,
+            maximum: limit,
         })
     } else {
         Ok(nodes)
@@ -1058,13 +1066,15 @@ fn count_node(nodes: usize, limit: usize) -> Result<usize> {
 
 fn enter_depth(depth: usize, limit: usize) -> Result<usize> {
     let depth = depth.checked_add(1).ok_or(Error::Limit {
-        resource: "nesting depth",
-        limit,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+        observed: usize::MAX,
+        maximum: limit,
     })?;
     if depth > limit {
         Err(Error::Limit {
-            resource: "nesting depth",
-            limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+            observed: depth,
+            maximum: limit,
         })
     } else {
         Ok(depth)

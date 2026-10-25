@@ -1166,9 +1166,12 @@ fn the_memo_costs_one_32_byte_entry_per_captured_slide() -> Result<()> {
     // The slide count is bounded by the capture's limit, and so is the memo.
     let limits = Limits::new(6, 1 << 20, 1 << 20, 4, 1 << 20, 1 << 20).expect("limits");
     match package.opened_presentation_with_limits(limits) {
-        Err(Error::Limit { resource, limit }) => {
-            assert_eq!(resource, "opened-presentation slides");
-            assert_eq!(limit, 6);
+        Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
+            maximum,
+            ..
+        }) => {
+            assert_eq!(maximum, 6);
         },
         other => panic!("seven slides exceed a six-part limit: {other:?}"),
     }

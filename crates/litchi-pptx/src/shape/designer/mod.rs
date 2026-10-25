@@ -27,9 +27,7 @@ pub(crate) use p202::{read_tags_with_prefix, write_properties, write_tags};
 
 #[cfg(test)]
 pub(crate) use p202::{read_properties, read_tags};
-pub(crate) use package::{
-    load, load_with_limits, put, put_with_limits, remove, remove_with_limits,
-};
+pub(crate) use package::{load_with_limits, put_with_limits, remove_with_limits};
 mod edit;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
 
@@ -43,8 +41,7 @@ pub(crate) use properties::{
     remove_properties, remove_properties_with_shape_limits,
 };
 pub(crate) use properties::{
-    load_properties_with_limits, load_properties_with_limits_and_shape_limits,
-    load_properties_with_shape_limits,
+    load_properties_with_limits_and_shape_limits, load_properties_with_shape_limits,
 };
 
 /// URI assigned to the design-element extension by [MS-PPTX] 2.2.17.

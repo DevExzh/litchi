@@ -50,7 +50,11 @@ impl ExtensionList {
             .max_extension_bytes
             .min(MAX_MEDIA_EXTENSION_XML_BYTES);
         if xml.len() > extension_limit {
-            return Err(limit("media extension-list XML bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                xml.len(),
+                extension_limit,
+            ));
         }
         let root = parse_document(xml, limits)?;
         Self::from_node(&root, limits)
@@ -99,7 +103,11 @@ fn collect_pictures(
         && let Some(picture) = parse_picture(node, conformance, limits)?
     {
         if output.len() == limits.max_media {
-            return Err(limit("media count"));
+            return Err(limit(
+                crate::error::CodecLimitKind::MediaPictures,
+                output.len().checked_add(1).unwrap_or(usize::MAX),
+                limits.max_media,
+            ));
         }
         output.push(picture);
     }
@@ -279,7 +287,11 @@ fn parse_office_media(node: &Node, limits: Limits) -> Result<Extension> {
         whitespace(list)?;
         no_attributes(list, &[])?;
         if list.children.len() > limits.max_bookmarks {
-            return Err(limit("bookmark count"));
+            return Err(limit(
+                crate::error::CodecLimitKind::Bookmarks,
+                list.children.len(),
+                limits.max_bookmarks,
+            ));
         }
         for child in &list.children {
             require_node(child, P14, "bmk")?;
@@ -446,7 +458,11 @@ fn write_office_extension(output: &mut BoundedXml, value: &Extension) -> Result<
 /// Loads media pictures and validates their complete internal OPC resource graph.
 fn parse_document(xml: &[u8], limits: Limits) -> Result<Node> {
     if xml.len() > limits.max_input_bytes {
-        return Err(limit("input XML bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.max_input_bytes,
+        ));
     }
     let mut caps = Capabilities::ooxml_baseline();
     caps.understand_namespace(P14);
@@ -478,9 +494,26 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<Node> {
         let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
-                nodes += 1;
-                if nodes > limits.max_nodes || stack.len() >= limits.max_depth {
-                    return Err(limit("XML structure"));
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes,
+                    )
+                })?;
+                if nodes > limits.max_nodes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes,
+                    ));
+                }
+                if stack.len() >= limits.max_depth {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.max_depth,
+                    ));
                 }
                 let empty = matches!(&event, Event::Empty(_));
                 let parent_namespace_context = stack
@@ -782,15 +815,27 @@ pub(crate) fn bounded(value: &str) -> Result<()> {
     if value.len() <= MAX_STRING_BYTES {
         Ok(())
     } else {
-        Err(limit("string bytes"))
+        Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            MAX_STRING_BYTES,
+        ))
     }
 }
 fn add_strings(total: &mut usize, size: usize, maximum: usize) -> Result<()> {
-    *total = total
-        .checked_add(size)
-        .ok_or_else(|| limit("XML string bytes"))?;
+    *total = total.checked_add(size).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::StringBytes,
+            usize::MAX,
+            maximum,
+        )
+    })?;
     if *total > maximum {
-        Err(limit("XML string bytes"))
+        Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            *total,
+            maximum,
+        ))
     } else {
         Ok(())
     }
@@ -947,7 +992,11 @@ fn effective_namespace_bindings(
     let mut current = Some(context.as_ref());
     while let Some(context) = current {
         if contexts.len() == max_depth {
-            return Err(limit("media extension namespace depth"));
+            return Err(limit(
+                crate::error::CodecLimitKind::NamespaceBindings,
+                contexts.len().checked_add(1).unwrap_or(usize::MAX),
+                max_depth,
+            ));
         }
         contexts.push(context);
         current = context.parent.as_deref();
@@ -1028,9 +1077,13 @@ impl BoundedXml {
 
     fn escape(&mut self, value: &str) -> Result<()> {
         if value.len() > self.max_string_bytes {
-            return Err(output_limit(self.max_string_bytes));
+            return Err(limit(
+                crate::error::CodecLimitKind::StringBytes,
+                value.len(),
+                self.max_string_bytes,
+            ));
         }
-        let escaped = escaped_len(value).ok_or_else(|| output_limit(self.limit))?;
+        let escaped = escaped_len(value).ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         self.reserve(escaped)?;
         write_escaped(&mut self.bytes, value);
         Ok(())
@@ -1038,15 +1091,19 @@ impl BoundedXml {
 
     fn attr(&mut self, name: &str, value: &str) -> Result<()> {
         if value.len() > self.max_string_bytes {
-            return Err(output_limit(self.max_string_bytes));
+            return Err(limit(
+                crate::error::CodecLimitKind::StringBytes,
+                value.len(),
+                self.max_string_bytes,
+            ));
         }
-        let escaped = escaped_len(value).ok_or_else(|| output_limit(self.limit))?;
+        let escaped = escaped_len(value).ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         let fixed = 4usize
             .checked_add(name.len())
-            .ok_or_else(|| output_limit(self.limit))?;
+            .ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         let required = fixed
             .checked_add(escaped)
-            .ok_or_else(|| output_limit(self.limit))?;
+            .ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         self.reserve(required)?;
         self.bytes.push(b' ');
         self.bytes.extend_from_slice(name.as_bytes());
@@ -1061,9 +1118,9 @@ impl BoundedXml {
             .bytes
             .len()
             .checked_add(additional)
-            .ok_or_else(|| output_limit(self.limit))?;
+            .ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         if next > self.limit {
-            return Err(output_limit(self.limit));
+            return Err(output_limit(self.limit, next));
         }
         let spare = self.bytes.capacity().saturating_sub(self.bytes.len());
         if additional > spare {

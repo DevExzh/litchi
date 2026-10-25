@@ -7,7 +7,7 @@
 use super::Limits;
 use super::codec::*;
 use super::model::*;
-use crate::Result;
+use crate::{Error, Result};
 use std::collections::HashSet;
 
 fn parse_timing_tree(xml: &str) -> Result<TimingTree> {
@@ -73,7 +73,14 @@ mod recursive_timing_tests {
         let xml = format!(
             r#"<p:timing xmlns:p="{NS}"><p:tnLst><p:par><p:cTn id="not-a-number"/></p:par></p:tnLst></p:timing>"#
         );
-        assert!(parse_timing_tree(&xml).is_err());
+        assert!(matches!(
+            parse_timing_tree(&xml),
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlDepth),
+                observed,
+                maximum,
+            }) if observed > maximum && maximum == MAX_TIMING_DEPTH
+        ));
     }
 
     #[test]
@@ -132,7 +139,14 @@ mod recursive_timing_tests {
             xml.push_str("</p:childTnLst></p:cTn></p:par>");
         }
         xml.push_str("</p:tnLst></p:timing>");
-        assert!(parse_timing_tree(&xml).is_err());
+        assert!(matches!(
+            parse_timing_tree(&xml),
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlDepth),
+                observed,
+                maximum,
+            }) if observed > maximum && maximum == MAX_TIMING_DEPTH
+        ));
     }
 
     #[test]
@@ -142,7 +156,14 @@ mod recursive_timing_tests {
             xml.push_str(&format!("<p:par><p:cTn id=\"{id}\"/></p:par>"));
         }
         xml.push_str("</p:tnLst></p:timing>");
-        assert!(parse_timing_tree(&xml).is_err());
+        assert!(matches!(
+            parse_timing_tree(&xml),
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlNodes),
+                observed,
+                maximum,
+            }) if observed > maximum && maximum == MAX_TIMING_NODES
+        ));
     }
 }
 
@@ -284,14 +305,20 @@ mod integration_tests {
             ..Limits::DEFAULT
         };
         assert_eq!(sequence.to_xml(exact).unwrap(), wire);
-        assert!(
-            sequence
-                .to_xml(Limits {
-                    max_output_bytes: wire.len().saturating_sub(1),
-                    ..exact
-                })
-                .is_err()
-        );
+        let output_limit = sequence
+            .to_xml(Limits {
+                max_output_bytes: wire.len().saturating_sub(1),
+                ..exact
+            })
+            .unwrap_err();
+        assert!(matches!(
+            output_limit,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            } if observed > maximum && maximum == wire.len().saturating_sub(1)
+        ));
     }
 
     #[test]
@@ -1367,11 +1394,16 @@ mod integration_tests {
         let mut oversized = Sequence::new();
         oversized.graphic_builds =
             vec![GraphicBuild::as_one(5, GroupId::new(88)); MAX_ANIMATION_BUILDS + 1];
-        assert!(
-            oversized
-                .to_xml_for_slide(&targets, Limits::DEFAULT)
-                .is_err()
-        );
+        assert!(matches!(
+            oversized.to_xml_for_slide(&targets, Limits::DEFAULT),
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::Codec(
+                    crate::error::CodecLimitKind::AnimationBuilds
+                ),
+                observed,
+                maximum,
+            }) if observed > maximum && maximum == MAX_ANIMATION_BUILDS
+        ));
     }
 
     #[test]
@@ -1487,11 +1519,16 @@ mod integration_tests {
         let mut oversized = Sequence::new();
         oversized.ole_chart_builds =
             vec![OleChartBuild::new(5, GroupId::new(91)); MAX_ANIMATION_BUILDS + 1];
-        assert!(
-            oversized
-                .to_xml_for_slide(&targets, Limits::DEFAULT)
-                .is_err()
-        );
+        assert!(matches!(
+            oversized.to_xml_for_slide(&targets, Limits::DEFAULT),
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::Codec(
+                    crate::error::CodecLimitKind::AnimationBuilds
+                ),
+                observed,
+                maximum,
+            }) if observed > maximum && maximum == MAX_ANIMATION_BUILDS
+        ));
     }
 }
 

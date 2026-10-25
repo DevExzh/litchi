@@ -227,7 +227,11 @@ impl Info {
         validate_model(self, model_limits)?;
         let output_len = serialized_len(self)?;
         if output_len > limits.max_output_bytes() {
-            return Err(limit("serialized Changes Information bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                output_len,
+                limits.max_output_bytes(),
+            ));
         }
         let prefix = &self.command_prefix;
         let mut out = Vec::new();
@@ -419,7 +423,11 @@ enum PendingSlice {
 
 fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
     if xml.len() > limits.max_input_bytes() {
-        return Err(limit("Changes Information part bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::InputBytes,
+            xml.len(),
+            limits.max_input_bytes(),
+        ));
     }
     // MCE can expand an AlternateContent branch before the semantic parser
     // sees it.  Admit that expansion under the selected profile, rather than
@@ -427,7 +435,11 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
     let mce_limits = mce_limits(limits);
     let selected = process_markup_compatibility(xml, &Capabilities::default(), &mce_limits)?.xml;
     if selected.len() > limits.max_input_bytes() {
-        return Err(limit("MCE-processed Changes Information bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            selected.len(),
+            limits.max_input_bytes(),
+        ));
     }
     let bytes = selected.as_ref();
     let mut reader = NsReader::from_reader(bytes);
@@ -481,11 +493,33 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
         let empty = matches!(&event, Event::Empty(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| limit("Changes Information nodes"))?;
-                if nodes > limits.max_nodes() || stack.len() + 1 > limits.max_depth() {
-                    return Err(limit("Changes Information XML resources"));
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
+                if nodes > limits.max_nodes() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes(),
+                    ));
+                }
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth(),
+                    )
+                })?;
+                if depth > limits.max_depth() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
                 }
                 let local = element.local_name();
                 let frame = if stack.is_empty() {
@@ -506,8 +540,22 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
                         Frame::Root => {
                             expect(&namespace, PC, local.as_ref(), b"docChgLst")?;
                             no_attributes(&element, reader.decoder(), limits)?;
-                            if lists.len() >= limits.max_lists() || current_list.is_some() {
-                                return Err(limit("document change lists"));
+                            let next_lists = lists.len().checked_add(1).ok_or_else(|| {
+                                limit(
+                                    crate::error::CodecLimitKind::ChangeLists,
+                                    usize::MAX,
+                                    limits.max_lists(),
+                                )
+                            })?;
+                            if current_list.is_some() {
+                                return Err(invalid("document change list is nested"));
+                            }
+                            if next_lists > limits.max_lists() {
+                                return Err(limit(
+                                    crate::error::CodecLimitKind::ChangeLists,
+                                    next_lists,
+                                    limits.max_lists(),
+                                ));
                             }
                             current_list = Some(List::default());
                             list_order = 0;
@@ -537,9 +585,22 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
                                 if list_order > 1 {
                                     return Err(invalid("docChg is out of order"));
                                 }
-                                total_changes += 1;
-                                if total_changes > limits.max_changes() || empty {
-                                    return Err(limit("document changes"));
+                                total_changes = total_changes.checked_add(1).ok_or_else(|| {
+                                    limit(
+                                        crate::error::CodecLimitKind::Changes,
+                                        usize::MAX,
+                                        limits.max_changes(),
+                                    )
+                                })?;
+                                if empty {
+                                    return Err(invalid("docChg cannot be empty"));
+                                }
+                                if total_changes > limits.max_changes() {
+                                    return Err(limit(
+                                        crate::error::CodecLimitKind::Changes,
+                                        total_changes,
+                                        limits.max_changes(),
+                                    ));
                                 }
                                 let kinds = parse_change_kinds(&element, reader.decoder(), limits)?;
                                 document_start = Some(start);
@@ -631,9 +692,19 @@ fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
                         },
                         Frame::ListExtension { extensions } => {
                             expect(&namespace, P, local.as_ref(), b"ext")?;
-                            *extensions += 1;
+                            *extensions = extensions.checked_add(1).ok_or_else(|| {
+                                limit(
+                                    crate::error::CodecLimitKind::Extensions,
+                                    usize::MAX,
+                                    limits.max_extensions(),
+                                )
+                            })?;
                             if *extensions > limits.max_extensions() {
-                                return Err(limit("Changes Information extensions"));
+                                return Err(limit(
+                                    crate::error::CodecLimitKind::Extensions,
+                                    *extensions,
+                                    limits.max_extensions(),
+                                ));
                             }
                             extension_attributes(&element, reader.decoder(), limits)?;
                             Frame::Extension { payloads: 0 }
@@ -926,7 +997,11 @@ fn validate_model(value: &Info, limits: Limits) -> Result<()> {
         validate_ncname(&value.command_prefix, "command prefix")?;
     }
     if value.change_lists.len() > limits.max_lists() {
-        return Err(limit("document change lists"));
+        return Err(limit(
+            crate::error::CodecLimitKind::ChangeLists,
+            value.change_lists.len(),
+            limits.max_lists(),
+        ));
     }
     let mut prefixes = HashSet::new();
     for declaration in &value.namespace_declarations {
@@ -945,15 +1020,30 @@ fn validate_model(value: &Info, limits: Limits) -> Result<()> {
         if let Some(author) = &list.author {
             validate_changes_data(author, limits)?;
         }
-        total = total
-            .checked_add(list.changes.len())
-            .ok_or_else(|| limit("document changes"))?;
+        total = total.checked_add(list.changes.len()).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::Changes,
+                usize::MAX,
+                limits.max_changes(),
+            )
+        })?;
         if total > limits.max_changes() {
-            return Err(limit("document changes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::Changes,
+                total,
+                limits.max_changes(),
+            ));
         }
         for change in &list.changes {
-            if change.change_kinds.is_empty() || change.xml.len() > limits.max_input_bytes() {
+            if change.change_kinds.is_empty() {
                 return Err(invalid("invalid document change descriptor"));
+            }
+            if change.xml.len() > limits.max_input_bytes() {
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlBytes,
+                    change.xml.len(),
+                    limits.max_input_bytes(),
+                ));
             }
         }
         if list
@@ -961,7 +1051,11 @@ fn validate_model(value: &Info, limits: Limits) -> Result<()> {
             .as_ref()
             .is_some_and(|xml| xml.len() > limits.max_input_bytes())
         {
-            return Err(limit("Changes Information extension bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::ExtensionBytes,
+                list.extension_xml.as_ref().map_or(0, Vec::len),
+                limits.max_input_bytes(),
+            ));
         }
     }
     Ok(())
@@ -1108,7 +1202,9 @@ fn escaped_len(value: &str) -> Result<usize> {
 fn add_len(length: &mut usize, additional: usize) -> Result<()> {
     *length = length
         .checked_add(additional)
-        .ok_or_else(|| limit("serialized Changes Information bytes"))?;
+        .ok_or(Error::CapacityOverflow {
+            resource: "serialized Changes Information bytes",
+        })?;
     Ok(())
 }
 
@@ -1425,7 +1521,11 @@ fn validate_inbound_relationships(
 
 fn bounded(value: &str, limits: Limits) -> Result<()> {
     if value.len() > limits.max_string_bytes() {
-        Err(limit("Changes Information string bytes"))
+        Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            limits.max_string_bytes(),
+        ))
     } else {
         Ok(())
     }
@@ -1462,8 +1562,12 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
-fn limit(label: &str) -> Error {
-    invalid(format!("{label} exceed configured limit"))
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 #[cfg(test)]

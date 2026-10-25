@@ -157,8 +157,9 @@ fn scan_layout_uses_the_selected_shape_node_profile() {
     assert!(matches!(
         scan_layout(&xml, span.clone(), tight),
         Err(crate::Error::Limit {
-            resource: "shape-tag owner XML nodes",
-            limit: 1,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: 2,
+            maximum: 1,
         })
     ));
     let larger = crate::shape::Limits::new(

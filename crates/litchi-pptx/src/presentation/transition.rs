@@ -119,8 +119,9 @@ pub(super) fn validate_source_with_limits(
 fn has_mce_markup(xml: &[u8], transition_limits: crate::transition::Limits) -> Result<bool> {
     if xml.len() > transition_limits.input_bytes() {
         return Err(Error::Limit {
-            resource: "source-backed transition XML bytes",
-            limit: transition_limits.input_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: transition_limits.input_bytes(),
         });
     }
     // The scan below resolves names on namespace values as written. A
@@ -234,8 +235,9 @@ pub(crate) fn stage_with_limits(
         .ok_or_else(|| invalid("direct transition output size overflow"))?;
     if output_len > max_output_bytes {
         return Err(Error::Limit {
-            resource: "source-backed slide transition output bytes",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: output_len,
+            maximum: max_output_bytes,
         });
     }
 
@@ -808,7 +810,7 @@ fn root_has_namespace(root: &[u8], prefix: &str, expected: &str) -> Result<bool>
         let key = attribute.key.as_ref();
         if key.len() != b"xmlns:".len() + prefix.len()
             || !key.starts_with(b"xmlns:")
-            || key[b"xmlns:".len()..] != prefix.as_bytes()
+            || &key[b"xmlns:".len()..] != prefix.as_bytes()
         {
             continue;
         }
@@ -920,8 +922,9 @@ fn active_choice(
 ) -> Result<Option<ActiveChoice>> {
     if xml.len() > transition_limits.input_bytes() {
         return Err(Error::Limit {
-            resource: "source-backed transition XML bytes",
-            limit: transition_limits.input_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: transition_limits.input_bytes(),
         });
     }
     // Read from the slide root so inherited PML and MCE bindings remain in
@@ -1117,8 +1120,9 @@ fn active_transition_range(
         .iter()
         .map(|offset| {
             u32::try_from(*offset).map_err(|_| Error::Limit {
-                resource: "source-backed transition offset",
-                limit: u32::MAX as usize,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Index),
+                observed: *offset,
+                maximum: u32::MAX as usize,
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -1135,8 +1139,9 @@ fn active_transition_range(
     transition_element_range(
         xml,
         usize::try_from(offset).map_err(|_| Error::Limit {
-            resource: "source-backed transition offset",
-            limit: usize::MAX,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Index),
+            observed: usize::MAX,
+            maximum: usize::MAX,
         })?,
         transition_limits,
     )
@@ -1150,8 +1155,9 @@ fn transition_start_offsets(
 ) -> Result<Vec<usize>> {
     if xml.len() > transition_limits.input_bytes() {
         return Err(Error::Limit {
-            resource: "source-backed transition XML bytes",
-            limit: transition_limits.input_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: transition_limits.input_bytes(),
         });
     }
     let owner_bytes = xml
@@ -1177,8 +1183,11 @@ fn transition_start_offsets(
                     offsets.push(absolute);
                     if offsets.len() > transition_limits.nodes() {
                         return Err(Error::Limit {
-                            resource: "source-backed transition XML nodes",
-                            limit: transition_limits.nodes(),
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::XmlNodes,
+                            ),
+                            observed: offsets.len(),
+                            maximum: transition_limits.nodes(),
                         });
                     }
                 }
@@ -1199,8 +1208,9 @@ fn transition_element_range(
 ) -> Result<Option<Range<usize>>> {
     if xml.len() > transition_limits.input_bytes() {
         return Err(Error::Limit {
-            resource: "source-backed transition XML bytes",
-            limit: transition_limits.input_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: transition_limits.input_bytes(),
         });
     }
     if wanted_start >= xml.len() {
@@ -1265,8 +1275,9 @@ fn first_transition_range(
 ) -> Result<Range<usize>> {
     if xml.len() > transition_limits.output_bytes() {
         return Err(Error::Limit {
-            resource: "transition output bytes",
-            limit: transition_limits.output_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: xml.len(),
+            maximum: transition_limits.output_bytes(),
         });
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
@@ -1658,8 +1669,9 @@ fn locate_with(
 ) -> Result<Layout> {
     if xml.len() > transition_limits.input_bytes() {
         return Err(Error::Limit {
-            resource: "source-backed transition XML bytes",
-            limit: transition_limits.input_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: transition_limits.input_bytes(),
         });
     }
     let mut reader = NsReader::from_reader(xml);
@@ -1944,8 +1956,9 @@ fn validate_direct_subtree_with_extensions(
 ) -> Result<()> {
     if xml.len() > transition_limits.input_bytes() {
         return Err(Error::Limit {
-            resource: "source-backed transition XML bytes",
-            limit: transition_limits.input_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: transition_limits.input_bytes(),
         });
     }
     let mut reader = NsReader::from_reader(xml);
@@ -2271,13 +2284,15 @@ fn transition_offset_limits(
 
 fn add_node(nodes: usize, limits: crate::transition::Limits) -> Result<usize> {
     let nodes = nodes.checked_add(1).ok_or(Error::Limit {
-        resource: "source-backed transition XML nodes",
-        limit: limits.nodes(),
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+        observed: usize::MAX,
+        maximum: limits.nodes(),
     })?;
     if nodes > limits.nodes() {
         Err(Error::Limit {
-            resource: "source-backed transition XML nodes",
-            limit: limits.nodes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: nodes,
+            maximum: limits.nodes(),
         })
     } else {
         Ok(nodes)
@@ -2286,13 +2301,15 @@ fn add_node(nodes: usize, limits: crate::transition::Limits) -> Result<usize> {
 
 fn enter_depth(depth: usize, limits: crate::transition::Limits) -> Result<usize> {
     let depth = depth.checked_add(1).ok_or(Error::Limit {
-        resource: "source-backed transition XML depth",
-        limit: limits.depth(),
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+        observed: usize::MAX,
+        maximum: limits.depth(),
     })?;
     if depth > limits.depth() {
         Err(Error::Limit {
-            resource: "source-backed transition XML depth",
-            limit: limits.depth(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+            observed: depth,
+            maximum: limits.depth(),
         })
     } else {
         Ok(depth)
@@ -2343,8 +2360,9 @@ mod tests {
         assert!(matches!(
             super::locate_with(xml.as_bytes(), "test", false, tight),
             Err(crate::Error::Limit {
-                resource: "source-backed transition XML depth",
-                limit: 3,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: 4,
+                maximum: 3,
             })
         ));
         let larger = crate::transition::Limits::new(

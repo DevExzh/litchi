@@ -20,16 +20,18 @@ impl Master {
     pub fn parse_xml(xml: &str, limits: Limits) -> Result<Self> {
         if xml.len() > limits.max_input_bytes() {
             return Err(Error::Limit {
-                resource: "handout-master XML input",
-                limit: limits.max_input_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                observed: xml.len(),
+                maximum: limits.max_input_bytes(),
             });
         }
         let mut master = Self::default();
         let xml = process_str(xml, limits)?;
         if xml.len() > limits.max_output_bytes() {
             return Err(Error::Limit {
-                resource: "processed handout-master XML",
-                limit: limits.max_output_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                observed: xml.len(),
+                maximum: limits.max_output_bytes(),
             });
         }
         let mut reader = Reader::from_str(xml.as_ref());
@@ -40,19 +42,26 @@ impl Master {
         loop {
             match reader.read_event() {
                 Ok(Event::Start(element)) => {
-                    depth = depth.checked_add(1).ok_or(Error::Limit {
-                        resource: "handout-master XML depth",
-                        limit: limits.max_depth(),
+                    depth = depth.checked_add(1).ok_or_else(|| Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: usize::MAX,
+                        maximum: limits.max_depth(),
                     })?;
                     if depth > limits.max_depth() {
                         return Err(Error::Limit {
-                            resource: "handout-master XML depth",
-                            limit: limits.max_depth(),
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::XmlDepth,
+                            ),
+                            observed: depth,
+                            maximum: limits.max_depth(),
                         });
                     }
                     parse_element(&element, reader.decoder(), &mut master, &mut nodes, limits)?;
                 },
                 Ok(Event::Empty(element)) => {
+                    check_empty_depth(depth, limits)?;
                     parse_element(&element, reader.decoder(), &mut master, &mut nodes, limits)?
                 },
                 Ok(Event::End(_)) => {
@@ -133,14 +142,16 @@ fn parse_element(
     nodes: &mut usize,
     limits: Limits,
 ) -> Result<()> {
-    *nodes = nodes.checked_add(1).ok_or(Error::Limit {
-        resource: "handout-master XML nodes",
-        limit: limits.max_nodes(),
+    *nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+        observed: usize::MAX,
+        maximum: limits.max_nodes(),
     })?;
     if *nodes > limits.max_nodes() {
         return Err(Error::Limit {
-            resource: "handout-master XML nodes",
-            limit: limits.max_nodes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: *nodes,
+            maximum: limits.max_nodes(),
         });
     }
     check_attributes(element, decoder, limits)?;
@@ -180,26 +191,34 @@ fn check_attributes(
     let mut count = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        count = count.checked_add(1).ok_or(Error::Limit {
-            resource: "handout-master XML attributes",
-            limit: limits.max_attributes(),
+        count = count.checked_add(1).ok_or_else(|| Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+            observed: usize::MAX,
+            maximum: limits.max_attributes(),
         })?;
         if count > limits.max_attributes() {
             return Err(Error::Limit {
-                resource: "handout-master XML attributes",
-                limit: limits.max_attributes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+                observed: count,
+                maximum: limits.max_attributes(),
             });
         }
         if attribute.key.as_ref().len() > limits.max_string_bytes() {
             return Err(Error::Limit {
-                resource: "handout-master XML attribute name",
-                limit: limits.max_string_bytes(),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: attribute.key.as_ref().len(),
+                maximum: limits.max_string_bytes(),
             });
         }
         if attribute.value.as_ref().len() > limits.max_string_bytes() {
             return Err(Error::Limit {
-                resource: "handout-master XML attribute",
-                limit: limits.max_string_bytes(),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: attribute.value.as_ref().len(),
+                maximum: limits.max_string_bytes(),
             });
         }
         let value = attribute
@@ -207,10 +226,23 @@ fn check_attributes(
             .map_err(|error| Error::Xml(error.to_string()))?;
         if value.len() > limits.max_string_bytes() {
             return Err(Error::Limit {
-                resource: "handout-master XML attribute",
-                limit: limits.max_string_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+                observed: value.len(),
+                maximum: limits.max_string_bytes(),
             });
         }
+    }
+    Ok(())
+}
+
+fn check_empty_depth(depth: usize, limits: Limits) -> Result<()> {
+    let observed = depth.checked_add(1).unwrap_or(usize::MAX);
+    if observed > limits.max_depth() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+            observed,
+            maximum: limits.max_depth(),
+        });
     }
     Ok(())
 }
@@ -299,5 +331,40 @@ mod tests {
         assert!(master.header_footer.show_footer);
         assert!(!master.header_footer.show_slide_number);
         assert_eq!(master.background_color.as_deref(), Some("112233"));
+    }
+
+    #[test]
+    fn empty_handout_depth_is_checked_before_attributes() {
+        let limits = Limits::DEFAULT.with_depth(1).expect("depth limit");
+        let exact = r#"<p:handoutMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
+        Master::parse_xml(exact, limits).expect("depth-one empty root");
+
+        let one_over = r#"<p:handoutMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:hf/></p:handoutMaster>"#;
+        assert_xml_depth_limit(
+            Master::parse_xml(one_over, limits).expect_err("depth-two empty element"),
+            2,
+            1,
+        );
+        assert!(matches!(
+            Master::parse_xml(
+                "<p:handoutMaster xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">",
+                Limits::DEFAULT,
+            ),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    fn assert_xml_depth_limit(error: Error, observed: usize, maximum: usize) {
+        match error {
+            Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: actual,
+                maximum: configured,
+            } => {
+                assert_eq!(actual, observed);
+                assert_eq!(configured, maximum);
+            },
+            other => panic!("expected XML depth limit, got {other:?}"),
+        }
     }
 }

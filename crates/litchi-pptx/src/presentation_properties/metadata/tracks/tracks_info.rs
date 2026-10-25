@@ -111,10 +111,11 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Opt
         return Err(invalid("slide XML is empty"));
     }
     if xml.len() > limits.max_slide_xml_bytes() {
-        return Err(Error::Limit {
-            resource: "slide XML bytes for media tracks",
-            limit: limits.max_slide_xml_bytes(),
-        });
+        return Err(limit(
+            crate::error::CodecLimitKind::InputBytes,
+            xml.len(),
+            limits.max_slide_xml_bytes(),
+        ));
     }
 
     let mut reader = NsReader::from_reader(xml);
@@ -137,14 +138,19 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Opt
 
         match event {
             Event::Start(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| invalid("slide XML node count overflow"))?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_xml_nodes(),
+                    )
+                })?;
                 if nodes > limits.max_xml_nodes() {
-                    return Err(Error::Limit {
-                        resource: "slide XML nodes for media tracks",
-                        limit: limits.max_xml_nodes(),
-                    });
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_xml_nodes(),
+                    ));
                 }
                 let kind = classify(
                     namespace,
@@ -211,10 +217,11 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Opt
                             .and_then(|value| value.tracks_info.as_mut())
                             .ok_or_else(|| invalid("track is outside tracksInfo"))?;
                         if current.tracks.len() >= limits.max_tracks() {
-                            return Err(Error::Limit {
-                                resource: "media caption track count",
-                                limit: limits.max_tracks(),
-                            });
+                            return Err(limit(
+                                crate::error::CodecLimitKind::CaptionTracks,
+                                current.tracks.len().checked_add(1).unwrap_or(usize::MAX),
+                                limits.max_tracks(),
+                            ));
                         }
                         let track = Track {
                             id: required_attr(
@@ -270,14 +277,19 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Opt
                 stack.push(Open { kind, track: None });
             },
             Event::Empty(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| invalid("slide XML node count overflow"))?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_xml_nodes(),
+                    )
+                })?;
                 if nodes > limits.max_xml_nodes() {
-                    return Err(Error::Limit {
-                        resource: "slide XML nodes for media tracks",
-                        limit: limits.max_xml_nodes(),
-                    });
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_xml_nodes(),
+                    ));
                 }
                 let kind = classify(
                     namespace,
@@ -340,10 +352,11 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Opt
                             .and_then(|value| value.tracks_info.as_mut())
                             .ok_or_else(|| invalid("track is outside tracksInfo"))?;
                         if current.tracks.len() >= limits.max_tracks() {
-                            return Err(Error::Limit {
-                                resource: "media caption track count",
-                                limit: limits.max_tracks(),
-                            });
+                            return Err(limit(
+                                crate::error::CodecLimitKind::CaptionTracks,
+                                current.tracks.len().checked_add(1).unwrap_or(usize::MAX),
+                                limits.max_tracks(),
+                            ));
                         }
                         let track = parse_track(&element, decoder, start, limits)?;
                         current.tracks.push(track);
@@ -570,10 +583,11 @@ fn attr(
             .map_err(xml_error)?
             .into_owned();
         if value.len() > limits.max_string_bytes() {
-            return Err(Error::Limit {
-                resource: "media track attribute",
-                limit: limits.max_string_bytes(),
-            });
+            return Err(limit(
+                crate::error::CodecLimitKind::StringBytes,
+                value.len(),
+                limits.max_string_bytes(),
+            ));
         }
         let local_span = attribute_span(element.as_ref(), attribute.key.as_ref())?;
         let value_start = start
@@ -714,4 +728,12 @@ fn xml_error(error: quick_xml::Error) -> Error {
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
+}
+
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }

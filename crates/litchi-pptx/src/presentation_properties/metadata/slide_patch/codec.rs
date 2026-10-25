@@ -21,8 +21,12 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(what: &str) -> Error {
-    invalid(format!("{what} exceeds the supported safety limit"))
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {
@@ -30,9 +34,22 @@ fn xml_error(error: impl std::fmt::Display) -> Error {
 }
 
 fn checked_output_size(size: Option<usize>, max_output_bytes: usize) -> Result<usize> {
-    let size = size.ok_or_else(|| limit("updated slide XML bytes"))?;
-    if size > max_output_bytes || size > MAX_SLIDE_XML_BYTES {
-        return Err(limit("updated slide XML bytes"));
+    let size = size.ok_or(Error::CapacityOverflow {
+        resource: "updated slide XML bytes",
+    })?;
+    if size > max_output_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            size,
+            max_output_bytes,
+        ));
+    }
+    if size > MAX_SLIDE_XML_BYTES {
+        return Err(limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            size,
+            MAX_SLIDE_XML_BYTES,
+        ));
     }
     Ok(size)
 }
@@ -77,7 +94,11 @@ pub(crate) fn insert_extension_fragment(
     max_output_bytes: usize,
 ) -> Result<Vec<u8>> {
     if xml.len() > MAX_SLIDE_XML_BYTES {
-        return Err(limit("slide XML bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::InputBytes,
+            xml.len(),
+            MAX_SLIDE_XML_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -95,17 +116,33 @@ pub(crate) fn insert_extension_fragment(
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| limit("XML node count"))?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        MAX_XML_NODES,
+                    )
+                })?;
                 if nodes > MAX_XML_NODES {
-                    return Err(limit("XML node count"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        MAX_XML_NODES,
+                    ));
                 }
-                depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth"))?;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if depth > MAX_XML_DEPTH {
-                    return Err(limit("slide XML depth"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if depth == 1 {
                     if root_seen || !is_presentationml_name(&namespace, element.name(), b"sld") {
@@ -123,11 +160,19 @@ pub(crate) fn insert_extension_fragment(
                 }
             },
             Event::Empty(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| limit("XML node count"))?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        MAX_XML_NODES,
+                    )
+                })?;
                 if nodes > MAX_XML_NODES {
-                    return Err(limit("XML node count"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        MAX_XML_NODES,
+                    ));
                 }
                 if !root_seen {
                     if !is_presentationml_name(&namespace, element.name(), b"sld") {
@@ -137,7 +182,22 @@ pub(crate) fn insert_extension_fragment(
                     }
                     root_seen = true;
                 }
-                if depth + 1 == 2 && is_presentationml_name(&namespace, element.name(), b"extLst") {
+                let empty_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
+                if empty_depth > MAX_XML_DEPTH {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        empty_depth,
+                        MAX_XML_DEPTH,
+                    ));
+                }
+                if empty_depth == 2 && is_presentationml_name(&namespace, element.name(), b"extLst")
+                {
                     // Empty `<p:extLst/>`: remember its range for expansion.
                     if ext_lst_depth.replace(usize::MAX).is_some() {
                         return Err(invalid("slide has multiple extension lists"));
@@ -284,8 +344,13 @@ mod tests {
 
         assert!(matches!(
             error,
-            Error::Invalid(message)
-                if message == "updated slide XML bytes exceeds the supported safety limit"
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(
+                    crate::error::CodecLimitKind::OutputBytes
+                ),
+                observed,
+                maximum,
+            } if observed > maximum
         ));
     }
 

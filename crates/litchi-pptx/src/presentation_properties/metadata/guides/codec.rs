@@ -30,12 +30,17 @@ impl Guides {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_xml(xml: &[u8], limits: Limits) -> Result<Self> {
         if xml.len() > limits.max_input_bytes() {
-            return Err(limit("presentation guides input", limits.max_input_bytes()));
+            return Err(limit(
+                crate::opened::CodecLimitKind::InputBytes,
+                xml.len(),
+                limits.max_input_bytes(),
+            ));
         }
         let processed = process_ooxml(xml, limits)?;
         if processed.len() > limits.max_output_bytes() {
             return Err(limit(
-                "processed presentation guides",
+                crate::opened::CodecLimitKind::OutputBytes,
+                processed.len(),
                 limits.max_output_bytes(),
             ));
         }
@@ -93,13 +98,18 @@ pub(crate) fn validate_value(value: &Guides, limits: Limits) -> Result<()> {
 /// so an untouched source is returned byte-for-byte unchanged.
 pub(crate) fn rewrite_source(source: &[u8], value: &Guides, limits: Limits) -> Result<Vec<u8>> {
     if source.len() > limits.max_input_bytes() {
-        return Err(limit("presentation guides input", limits.max_input_bytes()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::InputBytes,
+            source.len(),
+            limits.max_input_bytes(),
+        ));
     }
     validate(value, limits)?;
     let processed = process_ooxml(source, limits)?;
     if processed.len() > limits.max_output_bytes() {
         return Err(limit(
-            "processed presentation guides",
+            crate::opened::CodecLimitKind::OutputBytes,
+            processed.len(),
             limits.max_output_bytes(),
         ));
     }
@@ -115,7 +125,8 @@ pub(crate) fn rewrite_source(source: &[u8], value: &Guides, limits: Limits) -> R
         if entry_lengths.iter().all(Option::is_none) {
             if source.len() > limits.max_output_bytes() {
                 return Err(limit(
-                    "patched presentation guides",
+                    crate::opened::CodecLimitKind::OutputBytes,
+                    source.len(),
                     limits.max_output_bytes(),
                 ));
             }
@@ -316,14 +327,32 @@ fn scan_source(source: &[u8], limits: Limits) -> Result<SourceLayout> {
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         match event {
             Event::Start(element) => {
-                nodes += 1;
-                if nodes > limits.max_nodes() || stack.len() >= limits.max_depth() {
-                    return Err(limit("presentation-guide XML resource", limits.max_nodes()));
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
+                if nodes > limits.max_nodes() {
+                    return Err(limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes(),
+                    ));
+                }
+                if stack.len() >= limits.max_depth() {
+                    return Err(limit(
+                        crate::opened::CodecLimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_depth(),
+                    ));
                 }
                 check_source_attributes(&element, decoder, limits)?;
                 if element.name().as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-guide XML element name",
+                        crate::opened::CodecLimitKind::NameBytes,
+                        element.name().as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -359,14 +388,26 @@ fn scan_source(source: &[u8], limits: Limits) -> Result<SourceLayout> {
                 });
             },
             Event::Empty(element) => {
-                nodes += 1;
+                check_empty_depth(stack.len(), limits)?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 if nodes > limits.max_nodes() {
-                    return Err(limit("presentation-guide XML nodes", limits.max_nodes()));
+                    return Err(limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes(),
+                    ));
                 }
                 check_source_attributes(&element, decoder, limits)?;
                 if element.name().as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-guide XML element name",
+                        crate::opened::CodecLimitKind::NameBytes,
+                        element.name().as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -514,7 +555,8 @@ fn element_uri(
             }
             if attribute.value.as_ref().len() > limits.max_string_bytes() {
                 return Err(limit(
-                    "presentation-guide XML attribute",
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                    attribute.value.as_ref().len(),
                     limits.max_string_bytes(),
                 ));
             }
@@ -523,7 +565,8 @@ fn element_uri(
                 .map_err(xml_error)?;
             if decoded.len() > limits.max_string_bytes() {
                 return Err(limit(
-                    "presentation-guide XML attribute",
+                    crate::opened::CodecLimitKind::StringBytes,
+                    decoded.len(),
                     limits.max_string_bytes(),
                 ));
             }
@@ -544,15 +587,22 @@ fn check_source_attributes(
         count += 1;
         if count > limits.max_attributes() {
             return Err(limit(
-                "presentation-guide XML attributes",
+                crate::opened::CodecLimitKind::XmlAttributes,
+                count,
                 limits.max_attributes(),
             ));
         }
-        if attribute.key.as_ref().len() > limits.max_string_bytes()
-            || attribute.value.as_ref().len() > limits.max_string_bytes()
-        {
+        if attribute.key.as_ref().len() > limits.max_string_bytes() {
             return Err(limit(
-                "presentation-guide XML attribute",
+                crate::opened::CodecLimitKind::XmlAttributeBytes,
+                attribute.key.as_ref().len(),
+                limits.max_string_bytes(),
+            ));
+        }
+        if attribute.value.as_ref().len() > limits.max_string_bytes() {
+            return Err(limit(
+                crate::opened::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.as_ref().len(),
                 limits.max_string_bytes(),
             ));
         }
@@ -561,7 +611,8 @@ fn check_source_attributes(
             .map_err(xml_error)?;
         if value.len() > limits.max_string_bytes() {
             return Err(limit(
-                "presentation-guide XML attribute",
+                crate::opened::CodecLimitKind::StringBytes,
+                value.len(),
                 limits.max_string_bytes(),
             ));
         }
@@ -758,7 +809,8 @@ fn expand_empty_bytes(
     let replacement_len = expanded_empty_len(source, span, body.len())?;
     if replacement_len > limits.max_output_bytes() {
         return Err(limit(
-            "patched presentation guides",
+            crate::opened::CodecLimitKind::OutputBytes,
+            replacement_len,
             limits.max_output_bytes(),
         ));
     }
@@ -853,7 +905,8 @@ fn insert_bytes(
             })?;
     if output_len > limits.max_output_bytes() {
         return Err(limit(
-            "patched presentation guides",
+            crate::opened::CodecLimitKind::OutputBytes,
+            output_len,
             limits.max_output_bytes(),
         ));
     }
@@ -901,7 +954,8 @@ struct Node {
 fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
     if xml.len() > limits.max_output_bytes() {
         return Err(limit(
-            "presentation-guide XML input",
+            crate::opened::CodecLimitKind::OutputBytes,
+            xml.len(),
             limits.max_output_bytes(),
         ));
     }
@@ -914,16 +968,44 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
         let decoder = reader.decoder();
         match reader.read_event() {
             Ok(Event::Start(element)) => {
-                count += 1;
-                if count > limits.max_nodes() || stack.len() >= limits.max_depth() {
-                    return Err(limit("presentation-guide XML resource", limits.max_nodes()));
+                count = count.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
+                if count > limits.max_nodes() {
+                    return Err(limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        count,
+                        limits.max_nodes(),
+                    ));
+                }
+                if stack.len() >= limits.max_depth() {
+                    return Err(limit(
+                        crate::opened::CodecLimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_depth(),
+                    ));
                 }
                 stack.push(make_node(&element, decoder, &stack, limits)?);
             },
             Ok(Event::Empty(element)) => {
-                count += 1;
+                check_empty_depth(stack.len(), limits)?;
+                count = count.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 if count > limits.max_nodes() {
-                    return Err(limit("presentation-guide XML nodes", limits.max_nodes()));
+                    return Err(limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        count,
+                        limits.max_nodes(),
+                    ));
                 }
                 let node = make_node(&element, decoder, &stack, limits)?;
                 attach(&mut stack, &mut root, node)?;
@@ -937,14 +1019,16 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
             Ok(Event::Text(text)) => {
                 if text.as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-guide XML text",
+                        crate::opened::CodecLimitKind::TextBytes,
+                        text.as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
                 let text = text.decode().map_err(xml_error)?;
                 if text.len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-guide XML text",
+                        crate::opened::CodecLimitKind::StringBytes,
+                        text.len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -958,14 +1042,16 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
             Ok(Event::CData(text)) => {
                 if text.as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-guide XML CDATA",
+                        crate::opened::CodecLimitKind::TextBytes,
+                        text.as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
                 let text = text.decode().map_err(xml_error)?;
                 if text.len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-guide XML CDATA",
+                        crate::opened::CodecLimitKind::StringBytes,
+                        text.len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -979,14 +1065,16 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
             Ok(Event::Comment(text)) => {
                 if text.as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-guide XML comment",
+                        crate::opened::CodecLimitKind::TextBytes,
+                        text.as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
                 let text = text.decode().map_err(xml_error)?;
                 if text.len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-guide XML comment",
+                        crate::opened::CodecLimitKind::StringBytes,
+                        text.len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -998,14 +1086,16 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
             Ok(Event::GeneralRef(reference)) => {
                 if reference.as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-guide XML reference",
+                        crate::opened::CodecLimitKind::ReferenceBytes,
+                        reference.as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
                 let text = litchi_ooxml_common::xml::decode_xml_reference(&reference)?;
                 if text.len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-guide XML reference",
+                        crate::opened::CodecLimitKind::StringBytes,
+                        text.len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -1047,7 +1137,8 @@ fn make_node(
         let attribute = attribute.map_err(xml_error)?;
         if raw.len() >= limits.max_attributes() {
             return Err(limit(
-                "presentation-guide XML attributes",
+                crate::opened::CodecLimitKind::XmlAttributes,
+                raw.len() + 1,
                 limits.max_attributes(),
             ));
         }
@@ -1055,7 +1146,8 @@ fn make_node(
         bounded_string(name, limits)?;
         if attribute.value.as_ref().len() > limits.max_string_bytes() {
             return Err(limit(
-                "presentation-guide XML attribute",
+                crate::opened::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.as_ref().len(),
                 limits.max_string_bytes(),
             ));
         }
@@ -1064,7 +1156,8 @@ fn make_node(
             .map_err(xml_error)?;
         if value.len() > limits.max_string_bytes() {
             return Err(limit(
-                "presentation-guide XML attribute",
+                crate::opened::CodecLimitKind::StringBytes,
+                value.len(),
                 limits.max_string_bytes(),
             ));
         }
@@ -1171,7 +1264,11 @@ fn parse_list(node: &Node, limits: Limits) -> Result<List> {
                 return Err(invalid("guide appears after guide-list extLst"));
             }
             if guides.len() >= limits.max_guides() {
-                return Err(limit("extended guide count", limits.max_guides()));
+                return Err(limit(
+                    crate::opened::CodecLimitKind::Guides,
+                    guides.len() + 1,
+                    limits.max_guides(),
+                ));
             }
             let guide = parse_guide(child, limits)?;
             if !ids.insert(guide.id) {
@@ -1273,7 +1370,11 @@ fn validate_extension_list(node: &Node, limits: Limits) -> Result<()> {
     no_attributes(node)?;
     let extensions = children(node)?;
     if extensions.len() > limits.max_extensions() {
-        return Err(limit("guide extension count", limits.max_extensions()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::Extensions,
+            extensions.len(),
+            limits.max_extensions(),
+        ));
     }
     for extension in extensions {
         expect(extension, &[P, PS], "ext")?;
@@ -1290,7 +1391,11 @@ fn validate_extension_list(node: &Node, limits: Limits) -> Result<()> {
 fn validate(value: &Guides, limits: Limits) -> Result<()> {
     for list in value.slide.iter().chain(value.notes.iter()) {
         if list.guides.len() > limits.max_guides() {
-            return Err(limit("extended guide count", limits.max_guides()));
+            return Err(limit(
+                crate::opened::CodecLimitKind::Guides,
+                list.guides.len(),
+                limits.max_guides(),
+            ));
         }
         let mut ids = HashSet::new();
         for guide in &list.guides {
@@ -1314,7 +1419,11 @@ fn validate(value: &Guides, limits: Limits) -> Result<()> {
 
 fn validate_color(color: &Color, limits: Limits) -> Result<()> {
     if color.xml.len() > limits.max_string_bytes() {
-        return Err(limit("extended guide color XML", limits.max_string_bytes()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::StringBytes,
+            color.xml.len(),
+            limits.max_string_bytes(),
+        ));
     }
     let node = parse_dom(&color.xml, limits)?;
     let parsed = parse_color_node(&node)?;
@@ -1338,7 +1447,11 @@ fn parse_color_node(node: &Node) -> Result<ColorKind> {
 
 fn validate_opaque_extension(xml: &[u8], limits: Limits) -> Result<()> {
     if xml.len() > limits.max_string_bytes() {
-        return Err(limit("guide extension XML", limits.max_string_bytes()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::ExtensionBytes,
+            xml.len(),
+            limits.max_string_bytes(),
+        ));
     }
     validate_extension_list(&parse_dom(xml, limits)?, limits)
 }
@@ -1393,7 +1506,11 @@ impl LengthCounter {
                 resource: self.resource,
             })?;
         if required > self.limit {
-            return Err(limit(self.resource, self.limit));
+            return Err(limit(
+                crate::opened::CodecLimitKind::OutputBytes,
+                required,
+                self.limit,
+            ));
         }
         self.length = required;
         Ok(())
@@ -1512,7 +1629,11 @@ fn write_opaque<W: GuideWriter>(
     limits: Limits,
 ) -> Result<()> {
     if xml.len() > limits.max_string_bytes() {
-        return Err(limit("guide opaque XML", limits.max_string_bytes()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::ExtensionBytes,
+            xml.len(),
+            limits.max_string_bytes(),
+        ));
     }
     let text = std::str::from_utf8(xml).map_err(xml_error)?;
     push_namespace_rewritten(output, text, strict)?;
@@ -1611,7 +1732,8 @@ fn no_attributes(node: &Node) -> Result<()> {
 fn bounded_string(value: &str, limits: Limits) -> Result<()> {
     if value.len() > limits.max_string_bytes() {
         Err(limit(
-            "presentation guide string",
+            crate::opened::CodecLimitKind::StringBytes,
+            value.len(),
             limits.max_string_bytes(),
         ))
     } else {
@@ -1761,11 +1883,24 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, maximum: usize) -> Error {
+fn limit(kind: crate::opened::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::opened::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
+}
+
+fn check_empty_depth(depth: usize, limits: Limits) -> Result<()> {
+    let observed = depth.checked_add(1).unwrap_or(usize::MAX);
+    if observed > limits.max_depth() {
+        return Err(limit(
+            crate::opened::CodecLimitKind::XmlDepth,
+            observed,
+            limits.max_depth(),
+        ));
+    }
+    Ok(())
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {
@@ -1880,5 +2015,48 @@ mod tests {
         value.slide.as_mut().unwrap().guides.truncate(1);
         value.slide.as_mut().unwrap().guides[0].color.kind = ColorKind::Scheme;
         assert!(value.to_xml(false, Limits::DEFAULT).is_err());
+    }
+
+    #[test]
+    fn empty_guide_depth_is_checked_in_parse_and_source_scan() {
+        let limits = Limits::DEFAULT.with_depth(1).expect("depth limit");
+        let exact = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
+        Guides::from_xml(exact, limits).expect("depth-one empty root");
+        Guides::rewrite_source(exact, &Guides::default(), limits)
+            .expect("depth-one empty source root");
+
+        let one_over = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:holder/></p:presentation>"#;
+        assert_xml_depth_limit(
+            Guides::from_xml(one_over, limits).expect_err("depth-two empty element"),
+            2,
+            1,
+        );
+        assert_xml_depth_limit(
+            Guides::rewrite_source(one_over, &Guides::default(), limits)
+                .expect_err("depth-two source element"),
+            2,
+            1,
+        );
+        assert!(matches!(
+            Guides::from_xml(
+                b"<p:presentation xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">",
+                Limits::DEFAULT,
+            ),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    fn assert_xml_depth_limit(error: Error, observed: usize, maximum: usize) {
+        match error {
+            Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: actual,
+                maximum: configured,
+            } => {
+                assert_eq!(actual, observed);
+                assert_eq!(configured, maximum);
+            },
+            other => panic!("expected XML depth limit, got {other:?}"),
+        }
     }
 }

@@ -8,7 +8,7 @@ use super::codec::{
 use super::{
     AUTHORS_CONTENT_TYPE, AUTHORS_REL, Author, COMMENTS_CONTENT_TYPE, COMMENTS_REL, Comment,
     Comments, Conformance, Limits, List, MAX_SLIDES, MAX_TOTAL_COMMENTS, SLIDE_CONTENT_TYPE,
-    SLIDE_REL, STRICT_AUTHORS_REL, STRICT_COMMENTS_REL, STRICT_SLIDE_REL, invalid,
+    SLIDE_REL, STRICT_AUTHORS_REL, STRICT_COMMENTS_REL, STRICT_SLIDE_REL, invalid, limit,
 };
 use crate::leniency::{CommentDefect, ToleranceReport};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
@@ -1138,8 +1138,13 @@ fn validate_package_value_with(
     limits: Limits,
 ) -> Result<()> {
     validate_authors_with_limit(&value.authors, limits.max_string_bytes, limits.max_nodes)?;
-    if value.slides.len() > MAX_SLIDES || value.slides.len() > limits.max_nodes {
-        return Err(invalid("commented-slide count exceeds limit"));
+    let slide_maximum = MAX_SLIDES.min(limits.max_nodes);
+    if value.slides.len() > slide_maximum {
+        return Err(limit(
+            crate::error::CodecLimitKind::Slides,
+            value.slides.len(),
+            slide_maximum,
+        ));
     }
     let authors: HashMap<_, _> = value
         .authors
@@ -1171,11 +1176,20 @@ fn validate_package_value_with(
             )?;
         }
         let mut slide_keys = HashSet::new();
-        total = total
-            .checked_add(slide.comments.len())
-            .ok_or_else(|| invalid("comment count overflow"))?;
-        if total > MAX_TOTAL_COMMENTS || total > limits.max_nodes {
-            return Err(invalid("total presentation comment count exceeds limit"));
+        total = total.checked_add(slide.comments.len()).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::CommentEntries,
+                usize::MAX,
+                MAX_TOTAL_COMMENTS.min(limits.max_nodes),
+            )
+        })?;
+        let comment_maximum = MAX_TOTAL_COMMENTS.min(limits.max_nodes);
+        if total > comment_maximum {
+            return Err(limit(
+                crate::error::CodecLimitKind::CommentEntries,
+                total,
+                comment_maximum,
+            ));
         }
         for comment in &slide.comments {
             let Some(last_index) = authors.get(&comment.author_id) else {
@@ -1253,8 +1267,13 @@ fn collect_slides(
         }
         let slide = package.get_part(&target)?;
         require_content_type(slide, SLIDE_CONTENT_TYPE)?;
-        if names.len() == MAX_SLIDES.min(max_nodes) {
-            return Err(invalid("presentation slide count exceeds limit"));
+        let maximum = MAX_SLIDES.min(max_nodes);
+        if names.len() >= maximum {
+            return Err(limit(
+                crate::error::CodecLimitKind::Slides,
+                names.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum,
+            ));
         }
         names.push(target.to_string());
     }
@@ -1528,27 +1547,39 @@ mod tests {
             parse_slide_comments(&comment_xml, comment_exact).unwrap(),
             comments
         );
-        assert!(
-            write_comment_authors(
-                &authors,
-                Conformance::Transitional,
-                Limits {
-                    max_output_bytes: author_xml.len().saturating_sub(1),
-                    ..author_exact
-                },
-            )
-            .is_err()
-        );
-        assert!(
-            parse_slide_comments(
-                &comment_xml,
-                Limits {
-                    max_input_bytes: comment_xml.len().saturating_sub(1),
-                    ..comment_exact
-                },
-            )
-            .is_err()
-        );
+        let write_error = write_comment_authors(
+            &authors,
+            Conformance::Transitional,
+            Limits {
+                max_output_bytes: author_xml.len().saturating_sub(1),
+                ..author_exact
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            write_error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            } if observed > maximum && maximum == author_xml.len().saturating_sub(1)
+        ));
+        let parse_error = parse_slide_comments(
+            &comment_xml,
+            Limits {
+                max_input_bytes: comment_xml.len().saturating_sub(1),
+                ..comment_exact
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            parse_error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            } if observed > maximum && maximum == comment_xml.len().saturating_sub(1)
+        ));
     }
 
     #[test]

@@ -43,8 +43,12 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> Error {

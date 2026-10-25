@@ -394,8 +394,9 @@ impl Sequence {
 fn bounded_output(xml: &str, limits: Limits) -> Result<String> {
     if xml.len() > limits.max_output_bytes {
         return Err(crate::Error::Limit {
-            resource: "animation XML output bytes",
-            limit: limits.max_output_bytes,
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: limits.max_output_bytes,
         });
     }
     Ok(xml.to_owned())

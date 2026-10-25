@@ -276,9 +276,7 @@ pub fn validate_source_backed(
     input_limits: Limits,
     report_limits: ValidationLimits,
 ) -> Result<ValidateReport, Error> {
-    let source_version = package
-        .source_version()
-        .map_err(Error::Ingress)?;
+    let source_version = package.source_version().map_err(Error::Ingress)?;
 
     let mut facts = Facts::new(report_limits, source_version)?;
     let (catalog, graph) = inspect_catalog_and_graph(package, input_limits.max_graph_nodes())?;
@@ -550,7 +548,7 @@ pub fn validate_source_backed(
                 break;
             },
             Err(XmlInspectionError::Allocation { resource }) => {
-            return Err(Error::Allocation { resource });
+                return Err(Error::Allocation { resource });
             },
             Err(XmlInspectionError::Malformed) => {
                 facts.malformed_slides = facts.malformed_slides.saturating_add(1);
@@ -1079,10 +1077,9 @@ fn inspect_catalog_and_graph(
         macros: 0,
     };
     let mut seen = std::collections::HashSet::<String>::new();
-    seen.try_reserve(1)
-        .map_err(|_| Error::Allocation {
-            resource: "PPTX relationship graph set",
-        })?;
+    seen.try_reserve(1).map_err(|_| Error::Allocation {
+        resource: "PPTX relationship graph set",
+    })?;
     let mut missing_targets = 0_u64;
     let mut invalid_targets = 0_u64;
     let mut blocked = false;
@@ -1204,10 +1201,9 @@ fn record_graph_node(
             resource: "PPTX relationship graph set",
         })?;
     owned.push_str(uri);
-    seen.try_reserve(1)
-        .map_err(|_| Error::Allocation {
-            resource: "PPTX relationship graph set",
-        })?;
+    seen.try_reserve(1).map_err(|_| Error::Allocation {
+        resource: "PPTX relationship graph set",
+    })?;
     seen.insert(owned);
     Ok(false)
 }
@@ -1272,10 +1268,7 @@ enum RootErrorKind {
 }
 
 impl Facts {
-    fn new(
-        limits: ValidationLimits,
-        source_version: SourceVersion,
-    ) -> Result<Self, Error> {
+    fn new(limits: ValidationLimits, source_version: SourceVersion) -> Result<Self, Error> {
         Ok(Self {
             source_version,
             root: RootOutcome::Blocked,
@@ -1301,9 +1294,10 @@ impl Facts {
 
     fn issue_capacity_check(&self, observed: usize) -> Result<(), Error> {
         if observed >= self.issue_capacity {
+            let next_issue = observed.checked_add(1).unwrap_or(usize::MAX);
             return Err(Error::Report(ValidationReportError::Limit {
                 kind: ValidationLimitKind::Issues,
-                observed: observed.saturating_add(1),
+                observed: next_issue,
                 limit: self.issue_capacity,
             }));
         }
@@ -1319,9 +1313,7 @@ fn finish(
     catalog: CatalogFacts,
     _root: Option<litchi_opc::PartView<'_>>,
 ) -> Result<ValidateReport, Error> {
-    let current_version = package
-        .source_version()
-        .map_err(Error::Ingress)?;
+    let current_version = package.source_version().map_err(Error::Ingress)?;
     if current_version != facts.source_version {
         return Err(Error::Ingress(OpcError::SourceChanged {
             expected: facts.source_version,
@@ -1532,11 +1524,8 @@ fn finish(
             limits,
         )?,
     ];
-    let report =
-        ValidateReport::try_new(checks, issues, limits).map_err(Error::from)?;
-    let current_version = package
-        .source_version()
-        .map_err(Error::Ingress)?;
+    let report = ValidateReport::try_new(checks, issues, limits).map_err(Error::from)?;
+    let current_version = package.source_version().map_err(Error::Ingress)?;
     if current_version != facts.source_version {
         return Err(Error::Ingress(OpcError::SourceChanged {
             expected: facts.source_version,
@@ -1660,10 +1649,7 @@ fn rejected_ingress_report(
     .map_err(Into::into)
 }
 
-fn blocked_report(
-    reason: &str,
-    limits: ValidationLimits,
-) -> Result<ValidateReport, Error> {
+fn blocked_report(reason: &str, limits: ValidationLimits) -> Result<ValidateReport, Error> {
     let ingress = id(INGRESS, limits)?;
     let blocked = CheckStatus::blocked(reason, limits)?;
     let dependent = CheckStatus::stopped_by(ingress.clone());

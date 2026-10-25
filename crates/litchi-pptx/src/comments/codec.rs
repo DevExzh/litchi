@@ -2,7 +2,7 @@
 
 use super::{
     Author, Comment, Conformance, Limits, MAX_AUTHORS, MAX_COMMENTS_PER_SLIDE, PML, STRICT_PML,
-    invalid,
+    invalid, limit,
 };
 use crate::leniency::{CommentDefect, MarkupDefect, ToleranceReport};
 use crate::{Error, Result};
@@ -51,8 +51,13 @@ pub(super) fn parse_comment_authors_with(
     let namespace = root_namespace(&root, "cmAuthorLst")?;
     no_attributes(&root, &[])?;
     whitespace_only(&root)?;
-    if root.children.len() > MAX_AUTHORS || root.children.len() > limits.max_nodes {
-        return Err(invalid("comment-author count exceeds limit"));
+    let maximum = MAX_AUTHORS.min(limits.max_nodes);
+    if root.children.len() > maximum {
+        return Err(limit(
+            crate::error::CodecLimitKind::Authors,
+            root.children.len(),
+            maximum,
+        ));
     }
     let mut authors = Vec::new();
     authors
@@ -151,8 +156,13 @@ fn parse_slide_comments_inner(
     let namespace = root_namespace(&root, "cmLst")?;
     no_attributes(&root, &[])?;
     whitespace_only(&root)?;
-    if root.children.len() > MAX_COMMENTS_PER_SLIDE || root.children.len() > limits.max_nodes {
-        return Err(invalid("slide comment count exceeds limit"));
+    let maximum = MAX_COMMENTS_PER_SLIDE.min(limits.max_nodes);
+    if root.children.len() > maximum {
+        return Err(limit(
+            crate::error::CodecLimitKind::CommentEntries,
+            root.children.len(),
+            maximum,
+        ));
     }
     let mut comments = Vec::new();
     comments
@@ -282,8 +292,13 @@ pub(super) fn validate_authors_with_limit(
     max_string_bytes: usize,
     max_nodes: usize,
 ) -> Result<()> {
-    if authors.len() > MAX_AUTHORS || authors.len() > max_nodes {
-        return Err(invalid("comment-author count exceeds limit"));
+    let maximum = MAX_AUTHORS.min(max_nodes);
+    if authors.len() > maximum {
+        return Err(limit(
+            crate::error::CodecLimitKind::Authors,
+            authors.len(),
+            maximum,
+        ));
     }
     let mut ids = HashSet::new();
     for author in authors {
@@ -308,8 +323,13 @@ pub(super) fn validate_comment_list_with_limit(
     max_string_bytes: usize,
     max_nodes: usize,
 ) -> Result<()> {
-    if comments.len() > MAX_COMMENTS_PER_SLIDE || comments.len() > max_nodes {
-        return Err(invalid("slide comment count exceeds limit"));
+    let maximum = MAX_COMMENTS_PER_SLIDE.min(max_nodes);
+    if comments.len() > maximum {
+        return Err(limit(
+            crate::error::CodecLimitKind::CommentEntries,
+            comments.len(),
+            maximum,
+        ));
     }
     let mut keys = HashSet::new();
     for comment in comments {
@@ -332,15 +352,17 @@ pub(super) fn validate_comment_list_with_limit(
 fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
     if xml.len() > limits.max_input_bytes {
         return Err(crate::Error::Limit {
-            resource: "presentation comment input XML bytes",
-            limit: limits.max_input_bytes,
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: limits.max_input_bytes,
         });
     }
     let (processed, instructions) = process_comment_mce(xml, limits)?;
     if processed.len() > limits.max_input_bytes {
         return Err(crate::Error::Limit {
-            resource: "MCE-expanded presentation comment XML bytes",
-            limit: limits.max_input_bytes,
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            observed: processed.len(),
+            maximum: limits.max_input_bytes,
         });
     }
     let mut reader = NsReader::from_reader(processed.as_ref());
@@ -358,7 +380,11 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
         match event {
             Event::Start(element) => {
                 if stack.len() >= limits.max_depth {
-                    return Err(invalid("presentation comment XML depth exceeds limit"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.max_depth,
+                    ));
                 }
                 let node = make_node(
                     &element,
@@ -367,9 +393,19 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
                     &mut strings,
                     limits.max_string_bytes,
                 )?;
-                nodes += 1;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes,
+                    )
+                })?;
                 if nodes > limits.max_nodes {
-                    return Err(invalid("presentation comment XML node count exceeds limit"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes,
+                    ));
                 }
                 stack.push(node);
             },
@@ -381,9 +417,19 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
                     &mut strings,
                     limits.max_string_bytes,
                 )?;
-                nodes += 1;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes,
+                    )
+                })?;
                 if nodes > limits.max_nodes {
-                    return Err(invalid("presentation comment XML node count exceeds limit"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes,
+                    ));
                 }
                 attach(node, &mut stack, &mut root)?;
             },
@@ -399,11 +445,19 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
             Event::Text(text) => {
                 let decoded = text.decode().map_err(xml_error)?;
                 let decoded = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
-                strings = strings
-                    .checked_add(decoded.len())
-                    .ok_or_else(|| invalid("XML string size overflow"))?;
+                strings = strings.checked_add(decoded.len()).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::StringBytes,
+                        usize::MAX,
+                        limits.max_string_bytes,
+                    )
+                })?;
                 if strings > limits.max_string_bytes {
-                    return Err(invalid("presentation comment XML strings exceed limit"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::StringBytes,
+                        strings,
+                        limits.max_string_bytes,
+                    ));
                 }
                 if let Some(node) = stack.last_mut() {
                     node.text.push_str(&decoded);
@@ -440,11 +494,19 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
                             },
                         }
                     };
-                strings = strings
-                    .checked_add(value.len())
-                    .ok_or_else(|| invalid("XML string size overflow"))?;
+                strings = strings.checked_add(value.len()).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::StringBytes,
+                        usize::MAX,
+                        limits.max_string_bytes,
+                    )
+                })?;
                 if strings > limits.max_string_bytes {
-                    return Err(invalid("presentation comment XML strings exceed limit"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::StringBytes,
+                        strings,
+                        limits.max_string_bytes,
+                    ));
                 }
                 if let Some(node) = stack.last_mut() {
                     node.text.push_str(&value);
@@ -526,11 +588,26 @@ fn make_node(
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
             .map_err(xml_error)?
             .into_owned();
-        *strings = strings
-            .checked_add(name.len() + value.len())
-            .ok_or_else(|| invalid("XML string size overflow"))?;
+        let attribute_bytes = name.len().checked_add(value.len()).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::StringBytes,
+                usize::MAX,
+                max_string_bytes,
+            )
+        })?;
+        *strings = strings.checked_add(attribute_bytes).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::StringBytes,
+                usize::MAX,
+                max_string_bytes,
+            )
+        })?;
         if *strings > max_string_bytes {
-            return Err(invalid("presentation comment XML strings exceed limit"));
+            return Err(limit(
+                crate::error::CodecLimitKind::StringBytes,
+                *strings,
+                max_string_bytes,
+            ));
         }
         if name != "xmlns" && !name.starts_with("xmlns:") {
             attributes.push(Attribute { name, value });
@@ -629,11 +706,15 @@ fn require_empty(node: &Node) -> Result<()> {
     }
 }
 
-fn validate_string_with_limit(label: &str, value: &str, max_string_bytes: usize) -> Result<()> {
+fn validate_string_with_limit(_label: &str, value: &str, max_string_bytes: usize) -> Result<()> {
     if value.len() <= max_string_bytes {
         Ok(())
     } else {
-        Err(invalid(format!("{label} exceeds size limit")))
+        Err(crate::Error::Limit {
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
+            observed: value.len(),
+            maximum: max_string_bytes,
+        })
     }
 }
 
@@ -669,9 +750,9 @@ impl BoundedOutput {
             .bytes
             .len()
             .checked_add(value.len())
-            .ok_or_else(|| output_limit(self.limit))?;
+            .ok_or_else(|| output_limit(usize::MAX, self.limit))?;
         if next > self.limit {
-            return Err(output_limit(self.limit));
+            return Err(output_limit(next, self.limit));
         }
         let spare = self.bytes.capacity().saturating_sub(self.bytes.len());
         if value.len() > spare {
@@ -718,10 +799,11 @@ impl BoundedOutput {
     }
 }
 
-fn output_limit(limit: usize) -> Error {
+fn output_limit(observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource: "presentation comment XML output bytes",
-        limit,
+        kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+        observed,
+        maximum,
     }
 }
 

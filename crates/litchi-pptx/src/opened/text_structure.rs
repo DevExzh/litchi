@@ -111,8 +111,9 @@ fn validate(change: &Change<'_>, max_text_bytes: usize) -> Result<()> {
     let text = properties.text.unwrap_or("");
     if text.len() > max_text_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation text structure bytes",
-            limit: max_text_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            observed: text.len(),
+            maximum: max_text_bytes,
         });
     }
     if run && text.contains(['\n', '\r']) {
@@ -415,8 +416,9 @@ pub(crate) fn stage_text_structure_with_limits(
     let length = xml.len() - span.len() + replacement.len();
     if length > max_output_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation text structure output bytes",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: length,
+            maximum: max_output_bytes,
         });
     }
     let mut candidate = Vec::new();

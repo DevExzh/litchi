@@ -92,7 +92,8 @@ pub(crate) fn rewrite(
     if equivalent_graph(original, value) {
         if source.len() > limits.max_output_bytes() {
             return Err(limit(
-                "patched presentation structure",
+                crate::opened::CodecLimitKind::OutputBytes,
+                source.len(),
                 limits.max_output_bytes(),
             ));
         }
@@ -101,7 +102,8 @@ pub(crate) fn rewrite(
 
     if source.len() > limits.max_output_bytes() {
         return Err(limit(
-            "patched presentation structure",
+            crate::opened::CodecLimitKind::OutputBytes,
+            source.len(),
             limits.max_output_bytes(),
         ));
     }
@@ -135,12 +137,17 @@ pub(crate) fn rewrite(
 /// topology without needing to reopen any slide part.
 pub(crate) fn parse_detached(xml: &[u8], slides: &[Reference], limits: Limits) -> Result<Graph> {
     if xml.len() > limits.max_input_bytes() {
-        return Err(limit("presentation structure", limits.max_input_bytes()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::InputBytes,
+            xml.len(),
+            limits.max_input_bytes(),
+        ));
     }
     let processed = process_ooxml(xml, limits)?;
     if processed.len() > limits.max_output_bytes() {
         return Err(limit(
-            "processed presentation structure",
+            crate::opened::CodecLimitKind::OutputBytes,
+            processed.len(),
             limits.max_output_bytes(),
         ));
     }
@@ -579,12 +586,17 @@ fn parse_structure_blob(
     limits: Limits,
 ) -> Result<Graph> {
     if xml.len() > limits.max_input_bytes() {
-        return Err(limit("presentation structure", limits.max_input_bytes()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::InputBytes,
+            xml.len(),
+            limits.max_input_bytes(),
+        ));
     }
     let processed = process_ooxml(xml, limits)?;
     if processed.len() > limits.max_output_bytes() {
         return Err(limit(
-            "processed presentation structure",
+            crate::opened::CodecLimitKind::OutputBytes,
+            processed.len(),
             limits.max_output_bytes(),
         ));
     }
@@ -690,7 +702,11 @@ struct Attribute {
 )]
 pub(super) fn parse_core(xml: &[u8], limits: Limits) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
     if xml.len() > limits.max_output_bytes() {
-        return Err(limit("presentation core XML", limits.max_output_bytes()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::OutputBytes,
+            xml.len(),
+            limits.max_output_bytes(),
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     // Keep raw text events intact until their selected string budget has been
@@ -718,13 +734,20 @@ pub(super) fn parse_core(xml: &[u8], limits: Limits) -> Result<(Vec<(u32, String
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             Event::Start(element) => {
-                nodes += 1;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 resource(nodes, ancestors.len(), limits)?;
                 let kind = core_element(&namespace, element.name())?;
                 if is_direct_slide_reference(&ancestors, kind) {
                     if slides.len() >= limits.max_slide_references() {
                         return Err(limit(
-                            "presentation slide references",
+                            crate::opened::CodecLimitKind::SlideReferences,
+                            slides.len() + 1,
                             limits.max_slide_references(),
                         ));
                     }
@@ -743,13 +766,20 @@ pub(super) fn parse_core(xml: &[u8], limits: Limits) -> Result<(Vec<(u32, String
                 ancestors.push(kind);
             },
             Event::Empty(element) => {
-                nodes += 1;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 resource(nodes, ancestors.len(), limits)?;
                 let kind = core_element(&namespace, element.name())?;
                 if is_direct_slide_reference(&ancestors, kind) {
                     if slides.len() >= limits.max_slide_references() {
                         return Err(limit(
-                            "presentation slide references",
+                            crate::opened::CodecLimitKind::SlideReferences,
+                            slides.len() + 1,
                             limits.max_slide_references(),
                         ));
                     }
@@ -773,7 +803,10 @@ pub(super) fn parse_core(xml: &[u8], limits: Limits) -> Result<(Vec<(u32, String
                         show.relationship_ids.len() > limits.max_slide_references()
                     }) {
                         return Err(limit(
-                            "custom-show slide references",
+                            crate::opened::CodecLimitKind::SlideReferences,
+                            current_show
+                                .as_ref()
+                                .map_or(usize::MAX, |show| show.relationship_ids.len()),
                             limits.max_slide_references(),
                         ));
                     }
@@ -789,7 +822,11 @@ pub(super) fn parse_core(xml: &[u8], limits: Limits) -> Result<(Vec<(u32, String
                 }
                 if kind == CoreElement::CustomShow {
                     if shows.len() >= limits.max_custom_shows() {
-                        return Err(limit("custom shows", limits.max_custom_shows()));
+                        return Err(limit(
+                            crate::opened::CodecLimitKind::CustomShows,
+                            shows.len() + 1,
+                            limits.max_custom_shows(),
+                        ));
                     }
                     shows.push(
                         current_show
@@ -818,40 +855,61 @@ fn preflight_core_event(event: &Event<'_>, limits: Limits) -> Result<()> {
             let mut count = 0usize;
             for attribute in element.checked_attributes() {
                 let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-                count += 1;
+                count = count.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::opened::CodecLimitKind::XmlAttributes,
+                        usize::MAX,
+                        limits.max_attributes(),
+                    )
+                })?;
                 if count > limits.max_attributes() {
                     return Err(limit(
-                        "presentation structure attributes",
+                        crate::opened::CodecLimitKind::XmlAttributes,
+                        count,
                         limits.max_attributes(),
                     ));
                 }
-                if attribute.key.as_ref().len() > limits.max_string_bytes()
-                    || attribute.value.as_ref().len() > limits.max_string_bytes()
-                {
+                if attribute.key.as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation structure attribute",
+                        crate::opened::CodecLimitKind::XmlAttributeBytes,
+                        attribute.key.as_ref().len(),
+                        limits.max_string_bytes(),
+                    ));
+                }
+                if attribute.value.as_ref().len() > limits.max_string_bytes() {
+                    return Err(limit(
+                        crate::opened::CodecLimitKind::XmlAttributeBytes,
+                        attribute.value.as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
             }
         },
         Event::End(element) => check_raw_name(element.name().as_ref(), limits)?,
-        Event::Text(text) => check_raw_text(text.as_ref(), limits, "presentation structure text")?,
-        Event::CData(text) => {
-            check_raw_text(text.as_ref(), limits, "presentation structure CDATA")?
-        },
-        Event::Comment(text) => {
-            check_raw_text(text.as_ref(), limits, "presentation structure comment")?
-        },
+        Event::Text(text) => check_raw_text(
+            text.as_ref(),
+            limits,
+            crate::opened::CodecLimitKind::TextBytes,
+        )?,
+        Event::CData(text) => check_raw_text(
+            text.as_ref(),
+            limits,
+            crate::opened::CodecLimitKind::TextBytes,
+        )?,
+        Event::Comment(text) => check_raw_text(
+            text.as_ref(),
+            limits,
+            crate::opened::CodecLimitKind::TextBytes,
+        )?,
         Event::GeneralRef(reference) => check_raw_text(
             reference.as_ref(),
             limits,
-            "presentation structure general reference",
+            crate::opened::CodecLimitKind::ReferenceBytes,
         )?,
         Event::Decl(declaration) => check_raw_text(
             declaration.as_ref(),
             limits,
-            "presentation structure declaration",
+            crate::opened::CodecLimitKind::XmlBytes,
         )?,
         Event::DocType(_) | Event::PI(_) => {
             // Reject these borrowed events before `into_owned`; their payload
@@ -866,16 +924,17 @@ fn preflight_core_event(event: &Event<'_>, limits: Limits) -> Result<()> {
 fn check_raw_name(name: &[u8], limits: Limits) -> Result<()> {
     if name.len() > limits.max_string_bytes() {
         return Err(limit(
-            "presentation structure XML element name",
+            crate::opened::CodecLimitKind::NameBytes,
+            name.len(),
             limits.max_string_bytes(),
         ));
     }
     Ok(())
 }
 
-fn check_raw_text(text: &[u8], limits: Limits, resource: &'static str) -> Result<()> {
+fn check_raw_text(text: &[u8], limits: Limits, kind: crate::opened::CodecLimitKind) -> Result<()> {
     if text.len() > limits.max_string_bytes() {
-        return Err(limit(resource, limits.max_string_bytes()));
+        return Err(limit(kind, text.len(), limits.max_string_bytes()));
     }
     Ok(())
 }
@@ -925,7 +984,11 @@ fn parse_show(
         .map_err(|_err| invalid("invalid custom-show ID"))?;
     let name = required(&attributes, "name")?;
     if name.len() > limits.max_string_bytes() {
-        return Err(limit("custom-show name", limits.max_string_bytes()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::StringBytes,
+            name.len(),
+            limits.max_string_bytes(),
+        ));
     }
     if name.is_empty() {
         return Err(invalid("custom-show name cannot be empty"));
@@ -953,7 +1016,8 @@ fn parse_slide_reference(
     let relationship_id = required_qualified(&attributes, "id")?;
     if relationship_id.len() > limits.max_string_bytes() {
         return Err(limit(
-            "presentation slide relationship ID",
+            crate::opened::CodecLimitKind::RelationshipBytes,
+            relationship_id.len(),
             limits.max_string_bytes(),
         ));
     }
@@ -970,7 +1034,8 @@ fn relationship_id(
     let relationship_id = required_qualified(&attributes, "id")?;
     if relationship_id.len() > limits.max_string_bytes() {
         return Err(limit(
-            "custom-show relationship ID",
+            crate::opened::CodecLimitKind::RelationshipBytes,
+            relationship_id.len(),
             limits.max_string_bytes(),
         ));
     }
@@ -989,7 +1054,8 @@ fn attributes_ns(
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if values.len() >= limits.max_attributes() {
             return Err(limit(
-                "presentation structure attributes",
+                crate::opened::CodecLimitKind::XmlAttributes,
+                values.len() + 1,
                 limits.max_attributes(),
             ));
         }
@@ -998,7 +1064,8 @@ fn attributes_ns(
             ResolveResult::Bound(Namespace(value)) => {
                 if value.len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation structure namespace",
+                        crate::opened::CodecLimitKind::NamespaceBytes,
+                        value.len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -1014,13 +1081,15 @@ fn attributes_ns(
         };
         if local.as_ref().len() > limits.max_string_bytes() {
             return Err(limit(
-                "presentation structure attribute name",
+                crate::opened::CodecLimitKind::NameBytes,
+                local.as_ref().len(),
                 limits.max_string_bytes(),
             ));
         }
         if attribute.value.as_ref().len() > limits.max_string_bytes() {
             return Err(limit(
-                "presentation structure attribute",
+                crate::opened::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.as_ref().len(),
                 limits.max_string_bytes(),
             ));
         }
@@ -1033,7 +1102,8 @@ fn attributes_ns(
             .map_err(|error| Error::Xml(error.to_string()))?;
         if value.len() > limits.max_string_bytes() {
             return Err(limit(
-                "presentation structure attribute",
+                crate::opened::CodecLimitKind::StringBytes,
+                value.len(),
                 limits.max_string_bytes(),
             ));
         }
@@ -1057,7 +1127,8 @@ fn attributes(
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if values.len() >= limits.max_attributes() {
             return Err(limit(
-                "presentation structure attributes",
+                crate::opened::CodecLimitKind::XmlAttributes,
+                values.len() + 1,
                 limits.max_attributes(),
             ));
         }
@@ -1065,13 +1136,15 @@ fn attributes(
             .map_err(|error| Error::Xml(error.to_string()))?;
         if name.len() > limits.max_string_bytes() {
             return Err(limit(
-                "presentation structure attribute name",
+                crate::opened::CodecLimitKind::NameBytes,
+                name.len(),
                 limits.max_string_bytes(),
             ));
         }
         if attribute.value.as_ref().len() > limits.max_string_bytes() {
             return Err(limit(
-                "presentation structure attribute",
+                crate::opened::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.as_ref().len(),
                 limits.max_string_bytes(),
             ));
         }
@@ -1084,7 +1157,8 @@ fn attributes(
             .map_err(|error| Error::Xml(error.to_string()))?;
         if value.len() > limits.max_string_bytes() {
             return Err(limit(
-                "presentation structure attribute",
+                crate::opened::CodecLimitKind::StringBytes,
+                value.len(),
                 limits.max_string_bytes(),
             ));
         }
@@ -1161,7 +1235,11 @@ fn validate_graph_shape(graph: &Graph, limits: Limits) -> Result<()> {
     let mut show_ids = HashSet::new();
     let mut show_names = HashSet::new();
     if graph.custom_shows.shows.len() > limits.max_custom_shows() {
-        return Err(limit("custom shows", limits.max_custom_shows()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::CustomShows,
+            graph.custom_shows.shows.len(),
+            limits.max_custom_shows(),
+        ));
     }
     let mut total_show_slides = 0usize;
     for show in &graph.custom_shows.shows {
@@ -1182,7 +1260,8 @@ fn validate_graph_shape(graph: &Graph, limits: Limits) -> Result<()> {
             .ok_or_else(|| invalid("custom-show slide reference count overflow"))?;
         if total_show_slides > limits.max_slide_references() {
             return Err(limit(
-                "custom-show slide references",
+                crate::opened::CodecLimitKind::SlideReferences,
+                total_show_slides,
                 limits.max_slide_references(),
             ));
         }
@@ -1219,7 +1298,11 @@ fn validate_graph_shape(graph: &Graph, limits: Limits) -> Result<()> {
         }
     }
     if graph.sections.sections().len() > limits.max_sections() {
-        return Err(limit("presentation sections", limits.max_sections()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::Sections,
+            graph.sections.sections().len(),
+            limits.max_sections(),
+        ));
     }
     graph.sections.to_xml(limits)?;
     Ok(())
@@ -1275,7 +1358,8 @@ struct XmlLayout {
 fn scan_layout(xml: &[u8], limits: Limits) -> Result<XmlLayout> {
     if xml.len() > limits.max_input_bytes() {
         return Err(limit(
-            "presentation structure input",
+            crate::opened::CodecLimitKind::InputBytes,
+            xml.len(),
             limits.max_input_bytes(),
         ));
     }
@@ -1294,11 +1378,18 @@ fn scan_layout(xml: &[u8], limits: Limits) -> Result<XmlLayout> {
         let decoder = reader.decoder();
         match reader.read_event() {
             Ok(Event::Start(element)) => {
-                nodes += 1;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 resource(nodes, stack.len(), limits)?;
                 if element.name().as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation structure XML element name",
+                        crate::opened::CodecLimitKind::NameBytes,
+                        element.name().as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -1316,11 +1407,18 @@ fn scan_layout(xml: &[u8], limits: Limits) -> Result<XmlLayout> {
                 });
             },
             Ok(Event::Empty(element)) => {
-                nodes += 1;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 resource(nodes, stack.len(), limits)?;
                 if element.name().as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation structure XML element name",
+                        crate::opened::CodecLimitKind::NameBytes,
+                        element.name().as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -1400,7 +1498,8 @@ fn patch_custom_shows(xml: &[u8], replacement: &[u8], limits: Limits) -> Result<
     if replacement.is_empty() {
         if xml.len() > limits.max_output_bytes() {
             return Err(limit(
-                "patched presentation structure",
+                crate::opened::CodecLimitKind::OutputBytes,
+                xml.len(),
                 limits.max_output_bytes(),
             ));
         }
@@ -1427,7 +1526,8 @@ fn patch_sections(
     if replacement.is_empty() {
         if xml.len() > limits.max_output_bytes() {
             return Err(limit(
-                "patched presentation structure",
+                crate::opened::CodecLimitKind::OutputBytes,
+                xml.len(),
                 limits.max_output_bytes(),
             ));
         }
@@ -1529,7 +1629,8 @@ fn insert_bytes(xml: &[u8], offset: usize, value: &[u8], limits: Limits) -> Resu
         })?;
     if output_len > limits.max_output_bytes() {
         return Err(limit(
-            "patched presentation structure",
+            crate::opened::CodecLimitKind::OutputBytes,
+            output_len,
             limits.max_output_bytes(),
         ));
     }
@@ -1608,14 +1709,21 @@ fn require_presentation(content_type: &str) -> Result<()> {
 }
 
 fn resource(nodes: usize, depth: usize, limits: Limits) -> Result<()> {
-    if nodes > limits.max_nodes() || depth >= limits.max_depth() {
-        Err(limit(
-            "presentation structure XML resource",
+    if nodes > limits.max_nodes() {
+        return Err(limit(
+            crate::opened::CodecLimitKind::XmlNodes,
+            nodes,
             limits.max_nodes(),
-        ))
-    } else {
-        Ok(())
+        ));
     }
+    if depth >= limits.max_depth() {
+        return Err(limit(
+            crate::opened::CodecLimitKind::XmlDepth,
+            depth + 1,
+            limits.max_depth(),
+        ));
+    }
+    Ok(())
 }
 
 fn local_name(name: &[u8]) -> Result<String> {
@@ -1630,10 +1738,11 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, maximum: usize) -> Error {
+fn limit(kind: crate::opened::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::opened::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
 }
 

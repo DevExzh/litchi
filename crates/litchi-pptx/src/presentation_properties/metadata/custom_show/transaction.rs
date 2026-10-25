@@ -43,8 +43,9 @@ impl Snapshot {
     ) -> Result<Self> {
         if source_xml.len() > limits.max_input_bytes() {
             return Err(Error::Limit {
-                resource: "custom-show PresentationML source bytes",
-                limit: limits.max_input_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                observed: source_xml.len(),
+                maximum: limits.max_input_bytes(),
             });
         }
         let revision = fingerprint(

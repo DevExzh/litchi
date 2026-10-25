@@ -77,8 +77,9 @@ impl Limits {
     fn check_source(self, bytes: usize) -> Result<()> {
         if bytes > self.owner_bytes {
             return Err(Error::Limit {
-                resource: "p232 placeholder owner XML bytes",
-                limit: self.owner_bytes,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: bytes,
+                maximum: self.owner_bytes,
             });
         }
         Ok(())
@@ -90,8 +91,9 @@ impl Limits {
         let growth = target.saturating_sub(source);
         if growth > self.growth_bytes {
             return Err(Error::Limit {
-                resource: "p232 placeholder patch growth bytes",
-                limit: self.growth_bytes,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                observed: growth,
+                maximum: self.growth_bytes,
             });
         }
         Ok(())
@@ -716,8 +718,9 @@ fn validate_placeholder_spec(spec: &PlaceholderSpec) -> Result<()> {
     {
         if escaped_xml_len(value)? > MAX_OWNER_BYTES {
             return Err(Error::Limit {
-                resource: "p232 placeholder escaped XML bytes",
-                limit: MAX_OWNER_BYTES,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: escaped_xml_len(value)?,
+                maximum: MAX_OWNER_BYTES,
             });
         }
     }
@@ -866,8 +869,9 @@ fn apply_replacements(
             .checked_sub(replacement.range.end - replacement.range.start)
             .and_then(|value| value.checked_add(replacement.bytes.len()))
             .ok_or(Error::Limit {
-                resource: "p232 placeholder shape output bytes",
-                limit: limits.owner_bytes,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                observed: usize::MAX,
+                maximum: limits.owner_bytes,
             })?;
         previous_end = replacement.range.end;
     }
@@ -898,8 +902,9 @@ fn escaped_xml_len(value: &str) -> Result<usize> {
             _ => character.len_utf8(),
         };
         length.checked_add(extra).ok_or(Error::Limit {
-            resource: "p232 placeholder escaped XML bytes",
-            limit: MAX_OWNER_BYTES,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: usize::MAX,
+            maximum: MAX_OWNER_BYTES,
         })
     })
 }
@@ -908,8 +913,9 @@ fn escape_xml_bounded(value: &str, limits: Limits) -> Result<Vec<u8>> {
     let length = escaped_xml_len(value)?;
     if length > limits.owner_bytes {
         return Err(Error::Limit {
-            resource: "p232 placeholder escaped XML bytes",
-            limit: limits.owner_bytes,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: length,
+            maximum: limits.owner_bytes,
         });
     }
     let mut escaped = Vec::new();
@@ -1652,16 +1658,18 @@ fn rewrite_slot(
                             length.checked_add(close_element_len(&prefix, b"extLst"))
                         })
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     let target_len = source
                         .len()
                         .checked_sub(list_len)
                         .and_then(|length| length.checked_add(replacement_len))
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     limits.check_growth(source.len(), target_len)?;
                     let extension = extension_bytes(&prefix, value)?;
@@ -1680,8 +1688,9 @@ fn rewrite_slot(
                             .len()
                             .checked_add(extension_len)
                             .ok_or(Error::Limit {
-                                resource: "p232 placeholder patch output bytes",
-                                limit: limits.owner_bytes,
+                                kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                                observed: usize::MAX,
+                                maximum: limits.owner_bytes,
                             })?,
                     )?;
                     let extension = extension_bytes(&prefix, value)?;
@@ -1703,16 +1712,18 @@ fn rewrite_slot(
                                 })
                         })
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     let target_len = source
                         .len()
                         .checked_sub(placeholder_len)
                         .and_then(|length| length.checked_add(replacement_len))
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     limits.check_growth(source.len(), target_len)?;
                     let extension = extension_bytes(&prefix, value)?;
@@ -1736,8 +1747,9 @@ fn rewrite_slot(
                             length.checked_add(close_element_len(&prefix, b"extLst"))
                         })
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     limits.check_growth(
                         source.len(),
@@ -1745,8 +1757,9 @@ fn rewrite_slot(
                             .len()
                             .checked_add(insertion_len)
                             .ok_or(Error::Limit {
-                                resource: "p232 placeholder patch output bytes",
-                                limit: limits.owner_bytes,
+                                kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                                observed: usize::MAX,
+                                maximum: limits.owner_bytes,
                             })?,
                     )?;
                     let extension = extension_bytes(&prefix, value)?;
@@ -1780,8 +1793,9 @@ fn replace_range(
         .checked_sub(old_len)
         .and_then(|value| value.checked_add(replacement.len()))
         .ok_or(Error::Limit {
-            resource: "p232 placeholder patch output bytes",
-            limit: limits.owner_bytes,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+            observed: usize::MAX,
+            maximum: limits.owner_bytes,
         })?;
     limits.check_growth(source.len(), target_len)?;
     let mut output = bytes_with_capacity(target_len, "p232 placeholder patch output bytes")?;
@@ -1801,8 +1815,9 @@ fn insert_range(source: &[u8], offset: usize, insertion: &[u8], limits: Limits) 
         .len()
         .checked_add(insertion.len())
         .ok_or(Error::Limit {
-            resource: "p232 placeholder patch output bytes",
-            limit: limits.owner_bytes,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+            observed: usize::MAX,
+            maximum: limits.owner_bytes,
         })?;
     limits.check_growth(source.len(), target_len)?;
     let mut output = bytes_with_capacity(target_len, "p232 placeholder patch output bytes")?;
@@ -1840,8 +1855,9 @@ fn extension_bytes_len(prefix: &[u8], value: PlaceholderTypeExtension) -> Result
     ];
     parts.into_iter().try_fold(0usize, |length, part| {
         length.checked_add(part).ok_or(Error::Limit {
-            resource: "p232 placeholder extension bytes",
-            limit: MAX_OWNER_BYTES,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::ExtensionBytes),
+            observed: usize::MAX,
+            maximum: MAX_OWNER_BYTES,
         })
     })
 }

@@ -1555,13 +1555,16 @@ fn prepare(
         check_execution(execution_context)?;
         let declared_size =
             usize::try_from(image_part.declared_size).map_err(|_| Error::Limit {
-                resource: "source-backed embedded image bytes",
-                limit: usize::MAX,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::MAX,
+                maximum: usize::MAX,
             })?;
         if image_part.declared_size > editor.limits.max_total_part_bytes() {
             return Err(Error::Limit {
-                resource: "source-backed embedded image bytes",
-                limit: usize::try_from(editor.limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::try_from(image_part.declared_size).unwrap_or(usize::MAX),
+                maximum: usize::try_from(editor.limits.max_total_part_bytes())
+                    .unwrap_or(usize::MAX),
             });
         }
         image_size = image_size
@@ -1573,13 +1576,16 @@ fn prepare(
         check_execution(execution_context)?;
         let declared_size =
             usize::try_from(chart_part.declared_size).map_err(|_| Error::Limit {
-                resource: "source-backed embedded chart bytes",
-                limit: usize::MAX,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::MAX,
+                maximum: usize::MAX,
             })?;
         if chart_part.declared_size > editor.limits.max_total_part_bytes() {
             return Err(Error::Limit {
-                resource: "source-backed embedded chart bytes",
-                limit: usize::try_from(editor.limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::try_from(chart_part.declared_size).unwrap_or(usize::MAX),
+                maximum: usize::try_from(editor.limits.max_total_part_bytes())
+                    .unwrap_or(usize::MAX),
             });
         }
         chart_size = chart_size
@@ -1791,8 +1797,9 @@ fn prepare(
         let actual_size = data.as_bytes().len();
         let declared_size =
             usize::try_from(image_part.declared_size).map_err(|_| Error::Limit {
-                resource: "source-backed embedded image bytes",
-                limit: usize::MAX,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::MAX,
+                maximum: usize::MAX,
             })?;
         if actual_size != declared_size {
             return Err(Error::Invalid(
@@ -1851,8 +1858,9 @@ fn prepare(
         let actual_size = data.as_bytes().len();
         let declared_size =
             usize::try_from(chart_part.declared_size).map_err(|_| Error::Limit {
-                resource: "source-backed embedded chart bytes",
-                limit: usize::MAX,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::MAX,
+                maximum: usize::MAX,
             })?;
         if actual_size != declared_size {
             return Err(Error::Invalid(
@@ -2060,13 +2068,16 @@ fn verify_candidate(
     for image in &prepared.images {
         check_execution(execution_context)?;
         let declared_size = usize::try_from(image.declared_size).map_err(|_| Error::Limit {
-            resource: "source-backed candidate image bytes",
-            limit: usize::MAX,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+            observed: usize::MAX,
+            maximum: usize::MAX,
         })?;
         if image.declared_size > editor.limits.max_total_part_bytes() {
             return Err(Error::Limit {
-                resource: "source-backed candidate image bytes",
-                limit: usize::try_from(editor.limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::try_from(image.declared_size).unwrap_or(usize::MAX),
+                maximum: usize::try_from(editor.limits.max_total_part_bytes())
+                    .unwrap_or(usize::MAX),
             });
         }
         if declared_size != image.bytes.len() {
@@ -2095,13 +2106,16 @@ fn verify_candidate(
     for chart in &prepared.charts {
         check_execution(execution_context)?;
         let declared_size = usize::try_from(chart.declared_size).map_err(|_| Error::Limit {
-            resource: "source-backed candidate chart bytes",
-            limit: usize::MAX,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+            observed: usize::MAX,
+            maximum: usize::MAX,
         })?;
         if chart.declared_size > editor.limits.max_total_part_bytes() {
             return Err(Error::Limit {
-                resource: "source-backed candidate chart bytes",
-                limit: usize::try_from(editor.limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+                observed: usize::try_from(chart.declared_size).unwrap_or(usize::MAX),
+                maximum: usize::try_from(editor.limits.max_total_part_bytes())
+                    .unwrap_or(usize::MAX),
             });
         }
         if declared_size != chart.bytes.len() {
@@ -5144,8 +5158,11 @@ fn validate_xml_with_policy(
                     .ok_or_else(|| invalid("XML node count overflow"))?;
                 if nodes > MAX_XML_NODES || depth >= MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "source-backed cross-copy XML",
-                        limit: MAX_XML_NODES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: MAX_XML_NODES,
                     });
                 }
                 let value = match &namespace {
@@ -5944,8 +5961,9 @@ fn reserve_memory(
     let bytes_u64 = u64::try_from(bytes).map_err(|_| invalid("cross-copy staging exceeds u64"))?;
     if bytes_u64 > limits.max_total_part_bytes() {
         return Err(Error::Limit {
-            resource: "source-backed cross-copy staged bytes",
-            limit: usize::try_from(limits.max_total_part_bytes()).unwrap_or(usize::MAX),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::SourceBytes),
+            observed: usize::try_from(bytes_u64).unwrap_or(usize::MAX),
+            maximum: usize::try_from(limits.max_total_part_bytes()).unwrap_or(usize::MAX),
         });
     }
     let Some(context) = context else {

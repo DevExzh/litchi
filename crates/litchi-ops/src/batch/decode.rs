@@ -348,7 +348,7 @@ impl<'de> DeserializeSeed<'de> for ItemSeed<'_> {
         if self.index >= self.maximum {
             self.state.failure = Some(Error::Limit {
                 kind: SourceLimitKind::Items,
-                observed: self.index.saturating_add(1),
+                observed: self.index.checked_add(1).unwrap_or(usize::MAX),
                 maximum: self.maximum,
             });
             return Err(de::Error::custom("batch item limit exceeded"));

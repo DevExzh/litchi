@@ -20,37 +20,65 @@ pub struct Limits {
 
 impl Limits {
     fn add_slide(&mut self, bytes: usize) -> Result<()> {
-        self.total_slide_xml_bytes = self
-            .total_slide_xml_bytes
-            .checked_add(bytes)
-            .ok_or_else(|| limit("control slide XML bytes", MAX_TOTAL_SLIDE_XML_BYTES))?;
+        self.total_slide_xml_bytes =
+            self.total_slide_xml_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlBytes,
+                        usize::MAX,
+                        MAX_TOTAL_SLIDE_XML_BYTES,
+                    )
+                })?;
         if self.total_slide_xml_bytes > MAX_TOTAL_SLIDE_XML_BYTES {
-            return Err(limit("control slide XML bytes", MAX_TOTAL_SLIDE_XML_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                self.total_slide_xml_bytes,
+                MAX_TOTAL_SLIDE_XML_BYTES,
+            ));
         }
         Ok(())
     }
 
     fn add_control(&mut self) -> Result<()> {
-        self.control_count = self
-            .control_count
-            .checked_add(1)
-            .ok_or_else(|| limit("control count", MAX_CONTROLS))?;
+        self.control_count = self.control_count.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::Controls,
+                usize::MAX,
+                MAX_CONTROLS,
+            )
+        })?;
         if self.control_count > MAX_CONTROLS {
-            return Err(limit("control count", MAX_CONTROLS));
+            return Err(limit(
+                crate::error::CodecLimitKind::Controls,
+                self.control_count,
+                MAX_CONTROLS,
+            ));
         }
         Ok(())
     }
 
     fn add_binary(&mut self, bytes: usize) -> Result<()> {
         if bytes > MAX_BINARY_BYTES {
-            return Err(limit("control binary bytes", MAX_BINARY_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                bytes,
+                MAX_BINARY_BYTES,
+            ));
         }
-        self.total_binary_bytes = self
-            .total_binary_bytes
-            .checked_add(bytes)
-            .ok_or_else(|| limit("control binary bytes", MAX_TOTAL_BINARY_BYTES))?;
+        self.total_binary_bytes = self.total_binary_bytes.checked_add(bytes).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                usize::MAX,
+                MAX_TOTAL_BINARY_BYTES,
+            )
+        })?;
         if self.total_binary_bytes > MAX_TOTAL_BINARY_BYTES {
-            return Err(limit("control binary bytes", MAX_TOTAL_BINARY_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                self.total_binary_bytes,
+                MAX_TOTAL_BINARY_BYTES,
+            ));
         }
         Ok(())
     }

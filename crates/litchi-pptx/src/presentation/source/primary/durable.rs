@@ -148,7 +148,11 @@ impl Patch {
     /// retained payload is allocated.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > maximum() {
-            return Err(limit("source-backed durable patch bytes", maximum()));
+            return Err(limit(
+                crate::error::CodecLimitKind::PatchBytes,
+                bytes.len(),
+                maximum(),
+            ));
         }
         let (shape_removals, bytes) = bytes
             .strip_prefix(REMOVAL_MAGIC)
@@ -163,7 +167,11 @@ impl Patch {
             });
         }
         if bytes.len() > maximum() {
-            return Err(limit("source-backed durable patch bytes", maximum()));
+            return Err(limit(
+                crate::error::CodecLimitKind::PatchBytes,
+                bytes.len(),
+                maximum(),
+            ));
         }
         let mut input = Input { bytes, offset: 0 };
         if input.take(MAGIC.len())? != MAGIC {
@@ -175,7 +183,8 @@ impl Patch {
         let change_count = input.count()?;
         if before_count > crate::parts::MAX_SLIDES || after_count > crate::parts::MAX_SLIDES {
             return Err(limit(
-                "source-backed durable catalog slides",
+                crate::error::CodecLimitKind::Slides,
+                before_count.max(after_count),
                 crate::parts::MAX_SLIDES,
             ));
         }
@@ -184,7 +193,8 @@ impl Patch {
             .ok_or_else(|| invalid("root order count overflows"))?;
         if change_count > MAX_SOURCE_BACKED_SLIDE_BATCH {
             return Err(limit(
-                "source-backed durable patch slides",
+                crate::error::CodecLimitKind::Slides,
+                change_count,
                 MAX_SOURCE_BACKED_SLIDE_BATCH,
             ));
         }
@@ -194,7 +204,11 @@ impl Patch {
         let before_root_len = input.length()?;
         let after_root_len = input.length()?;
         if before_root_len > maximum() || after_root_len > maximum() {
-            return Err(limit("source-backed durable patch bytes", maximum()));
+            return Err(limit(
+                crate::error::CodecLimitKind::PatchBytes,
+                before_root_len.max(after_root_len),
+                maximum(),
+            ));
         }
         let minimum = catalog_keys
             .checked_mul(KEY_FIXED)
@@ -327,7 +341,8 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
         }
         if change.after.len() > current.max_output_bytes {
             return Err(limit(
-                "source-backed primary slide output bytes",
+                crate::error::CodecLimitKind::OutputBytes,
+                change.after.len(),
                 current.max_output_bytes,
             ));
         }
@@ -438,10 +453,29 @@ pub(super) fn validate_pair_with_limits(
                 .checked_add(after.len())
                 .and_then(|bytes| bytes.checked_mul(64))
                 .and_then(|bytes| bytes.checked_add(1024))
-                .filter(|bytes| *bytes <= maximum)
-                .ok_or_else(|| limit("source-backed durable proof bytes", maximum))?;
+                .ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::ProofBytes,
+                        usize::MAX,
+                        maximum,
+                    )
+                })?;
+            if bytes > maximum {
+                return Err(limit(
+                    crate::error::CodecLimitKind::ProofBytes,
+                    bytes,
+                    maximum,
+                ));
+            }
+            let amount = u64::try_from(bytes).map_err(|_| {
+                limit(
+                    crate::error::CodecLimitKind::ProofBytes,
+                    usize::MAX,
+                    maximum,
+                )
+            })?;
             context
-                .reserve(litchi_core::Resource::Memory, bytes as u64)
+                .reserve(litchi_core::Resource::Memory, amount)
                 .map_err(|error| {
                     Error::Opc(match error {
                         litchi_core::ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
@@ -565,10 +599,29 @@ fn validate_property_surface(
                     .checked_add(right.len())
                     .and_then(|size| size.checked_mul(64))
                     .and_then(|size| size.checked_add(1024))
-                    .filter(|size| *size <= maximum)
-                    .ok_or_else(|| limit("source-backed geometry proof bytes", maximum))?;
+                    .ok_or_else(|| {
+                        limit(
+                            crate::error::CodecLimitKind::ProofBytes,
+                            usize::MAX,
+                            maximum,
+                        )
+                    })?;
+                if bytes > maximum {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::ProofBytes,
+                        bytes,
+                        maximum,
+                    ));
+                }
+                let amount = u64::try_from(bytes).map_err(|_| {
+                    limit(
+                        crate::error::CodecLimitKind::ProofBytes,
+                        usize::MAX,
+                        maximum,
+                    )
+                })?;
                 context
-                    .reserve(litchi_core::Resource::Memory, bytes as u64)
+                    .reserve(litchi_core::Resource::Memory, amount)
                     .map_err(|error| {
                         Error::Opc(match error {
                             litchi_core::ExecutionError::Cancelled => {
@@ -758,7 +811,8 @@ pub(super) fn data_wire_len(data: &Data) -> Result<usize> {
     }
     if data.changes.len() > MAX_SOURCE_BACKED_SLIDE_BATCH {
         return Err(limit(
-            "source-backed durable patch slides",
+            crate::error::CodecLimitKind::Slides,
+            data.changes.len(),
             MAX_SOURCE_BACKED_SLIDE_BATCH,
         ));
     }
@@ -784,19 +838,36 @@ fn body_len(
             .ok_or_else(|| invalid("wire length overflows"))?;
     }
     if total > maximum() {
-        return Err(limit("source-backed durable patch bytes", maximum()));
+        return Err(limit(
+            crate::error::CodecLimitKind::PatchBytes,
+            total,
+            maximum(),
+        ));
     }
     Ok(total)
 }
 
 fn entry_len(total: usize, key: &StableSlideKey, before: usize, after: usize) -> Result<usize> {
-    total
+    let length = total
         .checked_add(key_len(key)?)
         .and_then(|value| value.checked_add(8 + 8))
         .and_then(|value| value.checked_add(before))
         .and_then(|value| value.checked_add(after))
-        .filter(|value| *value <= maximum())
-        .ok_or_else(|| limit("source-backed durable patch bytes", maximum()))
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::PatchBytes,
+                usize::MAX,
+                maximum(),
+            )
+        })?;
+    if length > maximum() {
+        return Err(limit(
+            crate::error::CodecLimitKind::PatchBytes,
+            length,
+            maximum(),
+        ));
+    }
+    Ok(length)
 }
 
 fn key_len(key: &StableSlideKey) -> Result<usize> {
@@ -1007,7 +1078,11 @@ impl<'a> Input<'a> {
     fn payload(&mut self) -> Result<&'a [u8]> {
         let length = self.length()?;
         if length > maximum() {
-            return Err(limit("source-backed durable patch bytes", maximum()));
+            return Err(limit(
+                crate::error::CodecLimitKind::PatchBytes,
+                length,
+                maximum(),
+            ));
         }
         self.take(length)
     }

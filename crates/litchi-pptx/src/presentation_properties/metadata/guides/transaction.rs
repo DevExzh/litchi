@@ -61,8 +61,9 @@ impl Snapshot {
     ) -> Result<Self> {
         if source_xml.len() > limits.max_input_bytes() {
             return Err(Error::Limit {
-                resource: "presentation-guide source",
-                limit: limits.max_input_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                observed: source_xml.len(),
+                maximum: limits.max_input_bytes(),
             });
         }
         let guides = Guides::from_xml(source_xml.as_slice(), limits)?;

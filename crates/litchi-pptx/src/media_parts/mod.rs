@@ -130,14 +130,19 @@ pub(crate) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-pub(crate) fn limit(name: &str) -> Error {
-    invalid(format!("slide media {name} limit exceeded"))
+pub(crate) fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
-pub(crate) fn output_limit(maximum: usize) -> Error {
+pub(crate) fn output_limit(maximum: usize, observed: usize) -> Error {
     Error::Limit {
-        resource: "slide media serialized XML bytes",
-        limit: maximum,
+        kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::OutputBytes),
+        observed,
+        maximum,
     }
 }
 

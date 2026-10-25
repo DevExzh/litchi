@@ -21,7 +21,7 @@ use super::{Notes, RelatedPart, notes_text};
 pub(crate) fn load<'a>(
     package: &'a OpcPackage,
     slide: &SlidePart<'a>,
-    shape_limits: crate::shape::Limits,
+    shape_limits: shape::Limits,
     notes_limits: crate::notes::Limits,
 ) -> Result<Option<Notes>> {
     let Some((relationship, part)) = related_by_type(

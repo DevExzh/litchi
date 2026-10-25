@@ -76,3 +76,11 @@ impl Limits {
 pub(super) fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
+
+pub(super) fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
+}

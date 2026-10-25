@@ -190,7 +190,11 @@ impl Info {
         let root_prefix = unused_root_prefix(&self.namespace_declarations);
         let output_len = serialized_len(self, &root_prefix)?;
         if output_len > limits.max_output_bytes() {
-            return Err(limit("serialized Revision Information bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                output_len,
+                limits.max_output_bytes(),
+            ));
         }
         let mut out = Vec::new();
         out.try_reserve_exact(output_len)
@@ -401,14 +405,22 @@ enum Frame {
 
 fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
     if xml.len() > limits.max_input_bytes() {
-        return Err(limit("Revision Information part bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::InputBytes,
+            xml.len(),
+            limits.max_input_bytes(),
+        ));
     }
     // Bound the potentially expanding MCE selection before the revision
     // parser receives it; a post-expansion check would be too late.
     let mce_limits = mce_limits(limits);
     let selected = process_markup_compatibility(xml, &Capabilities::default(), &mce_limits)?.xml;
     if selected.len() > limits.max_input_bytes() {
-        return Err(limit("MCE-processed Revision Information bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            selected.len(),
+            limits.max_input_bytes(),
+        ));
     }
     let bytes = selected.as_ref();
     let mut reader = NsReader::from_reader(bytes);
@@ -441,11 +453,19 @@ fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
         let empty_event = matches!(&event, Event::Empty(_));
         match event {
             Event::Start(element) | Event::Empty(element) => {
-                node_count = node_count
-                    .checked_add(1)
-                    .ok_or_else(|| limit("Revision Information nodes"))?;
+                node_count = node_count.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 if node_count > limits.max_nodes() {
-                    return Err(limit("Revision Information nodes"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        node_count,
+                        limits.max_nodes(),
+                    ));
                 }
                 let local = element.local_name();
                 let frame = if stack.is_empty() {
@@ -486,8 +506,19 @@ fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
                         },
                         Frame::RevisionList => {
                             expect_namespace_name(&namespace, P1510, local.as_ref(), b"client")?;
-                            if clients.len() >= limits.max_clients() {
-                                return Err(limit("Revision Information clients"));
+                            let next_clients = clients.len().checked_add(1).ok_or_else(|| {
+                                limit(
+                                    crate::error::CodecLimitKind::References,
+                                    usize::MAX,
+                                    limits.max_clients(),
+                                )
+                            })?;
+                            if next_clients > limits.max_clients() {
+                                return Err(limit(
+                                    crate::error::CodecLimitKind::References,
+                                    next_clients,
+                                    limits.max_clients(),
+                                ));
                             }
                             clients.push(parse_client(&element, reader.decoder(), limits)?);
                             Frame::Client
@@ -497,9 +528,19 @@ fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
                         },
                         Frame::ExtensionList => {
                             expect_namespace_name(&namespace, P, local.as_ref(), b"ext")?;
-                            extension_count += 1;
+                            extension_count = extension_count.checked_add(1).ok_or_else(|| {
+                                limit(
+                                    crate::error::CodecLimitKind::Extensions,
+                                    usize::MAX,
+                                    limits.max_extensions(),
+                                )
+                            })?;
                             if extension_count > limits.max_extensions() {
-                                return Err(limit("Revision Information extensions"));
+                                return Err(limit(
+                                    crate::error::CodecLimitKind::Extensions,
+                                    extension_count,
+                                    limits.max_extensions(),
+                                ));
                             }
                             extension_attributes(&element, reader.decoder(), limits)?;
                             Frame::Extension { payloads: 0 }
@@ -521,8 +562,19 @@ fn parse_revision_information(xml: &[u8], limits: Limits) -> Result<Info> {
                     }
                 };
 
-                if stack.len() + 1 > limits.max_depth() {
-                    return Err(limit("Revision Information XML depth"));
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth(),
+                    )
+                })?;
+                if depth > limits.max_depth() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
                 }
                 if empty_event {
                     close_empty_frame(&frame)?;
@@ -757,7 +809,11 @@ fn validate_end(namespace: &ResolveResult<'_>, local: &[u8], frame: &Frame) -> R
 
 fn validate_model(value: &Info, limits: Limits) -> Result<()> {
     if value.clients.len() > limits.max_clients() {
-        return Err(limit("Revision Information clients"));
+        return Err(limit(
+            crate::error::CodecLimitKind::References,
+            value.clients.len(),
+            limits.max_clients(),
+        ));
     }
     for client in &value.clients {
         bounded(&client.client_id, limits)?;
@@ -781,7 +837,11 @@ fn validate_model(value: &Info, limits: Limits) -> Result<()> {
         .as_ref()
         .is_some_and(|extension| extension.len() > limits.max_input_bytes())
     {
-        return Err(limit("Revision Information extension bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::ExtensionBytes,
+            value.extension_xml.as_ref().map_or(0, Vec::len),
+            limits.max_input_bytes(),
+        ));
     }
     Ok(())
 }
@@ -851,7 +911,9 @@ fn escaped_len(value: &str) -> Result<usize> {
 fn add_len(length: &mut usize, additional: usize) -> Result<()> {
     *length = length
         .checked_add(additional)
-        .ok_or_else(|| limit("serialized Revision Information bytes"))?;
+        .ok_or(Error::CapacityOverflow {
+            resource: "serialized Revision Information bytes",
+        })?;
     Ok(())
 }
 
@@ -958,7 +1020,11 @@ fn ncname(value: &str) -> bool {
 
 fn bounded(value: &str, limits: Limits) -> Result<()> {
     if value.len() > limits.max_string_bytes() {
-        Err(limit("Revision Information string bytes"))
+        Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            limits.max_string_bytes(),
+        ))
     } else {
         Ok(())
     }
@@ -997,8 +1063,12 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(label: &str) -> Error {
-    invalid(format!("{label} exceed configured limit"))
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 #[cfg(test)]

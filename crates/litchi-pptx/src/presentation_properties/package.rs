@@ -243,7 +243,7 @@ fn find_properties_part(package: &OpcPackage) -> Result<Option<PackURI>> {
     Ok(Some(uri))
 }
 
-fn hydrate_html_target(part: &dyn litchi_opc::Part, value: &mut Properties) -> Result<()> {
+fn hydrate_html_target(part: &dyn Part, value: &mut Properties) -> Result<()> {
     if let Some(html) = value.html_publish.as_mut() {
         let target = part
             .rels()

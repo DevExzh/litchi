@@ -212,8 +212,9 @@ impl Item {
     pub fn validate(&self) -> Result<()> {
         if self.data.len() > MAX_DATA_BYTES {
             return Err(Error::Limit {
-                resource: "presentation media payload bytes",
-                limit: MAX_DATA_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                observed: self.data.len(),
+                maximum: MAX_DATA_BYTES,
             });
         }
         if self.width <= 0 || self.height <= 0 {

@@ -18,25 +18,43 @@ pub struct Limits {
 impl Limits {
     fn add_slide(&mut self, bytes: usize) -> Result<()> {
         if bytes > MAX_SLIDE_BYTES {
-            return Err(limit("OLE slide XML bytes", MAX_SLIDE_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                bytes,
+                MAX_SLIDE_BYTES,
+            ));
         }
-        self.total_slide_bytes = self
-            .total_slide_bytes
-            .checked_add(bytes)
-            .ok_or_else(|| limit("OLE slide XML bytes", MAX_TOTAL_SLIDE_BYTES))?;
+        self.total_slide_bytes = self.total_slide_bytes.checked_add(bytes).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                MAX_TOTAL_SLIDE_BYTES,
+            )
+        })?;
         if self.total_slide_bytes > MAX_TOTAL_SLIDE_BYTES {
-            return Err(limit("OLE slide XML bytes", MAX_TOTAL_SLIDE_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                self.total_slide_bytes,
+                MAX_TOTAL_SLIDE_BYTES,
+            ));
         }
         Ok(())
     }
 
     fn add_objects(&mut self, count: usize) -> Result<()> {
-        self.object_count = self
-            .object_count
-            .checked_add(count)
-            .ok_or_else(|| limit("OLE object count", super::codec::MAX_OBJECTS))?;
+        self.object_count = self.object_count.checked_add(count).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::OleObjects,
+                usize::MAX,
+                super::codec::MAX_OBJECTS,
+            )
+        })?;
         if self.object_count > super::codec::MAX_OBJECTS {
-            return Err(limit("OLE object count", super::codec::MAX_OBJECTS));
+            return Err(limit(
+                crate::error::CodecLimitKind::OleObjects,
+                self.object_count,
+                super::codec::MAX_OBJECTS,
+            ));
         }
         Ok(())
     }

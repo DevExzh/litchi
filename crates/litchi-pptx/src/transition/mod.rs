@@ -222,8 +222,11 @@ mod tests {
         let oversized = "x".repeat(MAX_PRESET_NAME_BYTES + 1);
         assert!(matches!(
             Preset::new(oversized),
-            Err(Error::Limit { resource, limit })
-                if resource == "preset transition name bytes" && limit == MAX_PRESET_NAME_BYTES
+            Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::NameBytes),
+                maximum,
+                ..
+            }) if maximum == MAX_PRESET_NAME_BYTES
         ));
     }
 
@@ -778,7 +781,7 @@ mod tests {
         assert!(matches!(
             write_to(&value, &mut output, narrow),
             Err(Error::Limit {
-                resource: "transition output bytes",
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
                 ..
             })
         ));

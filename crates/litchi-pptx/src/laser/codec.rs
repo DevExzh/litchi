@@ -68,15 +68,23 @@ pub fn read(
 impl Limits {
     fn add_slide_xml(&self, bytes: usize, usage: &mut Usage) -> Result<()> {
         if bytes > self.max_slide_xml_bytes() {
-            return Err(limit("slide XML bytes", self.max_slide_xml_bytes()));
-        }
-        usage.total_slide_xml_bytes = usage
-            .total_slide_xml_bytes
-            .checked_add(bytes)
-            .ok_or_else(|| limit("total slide XML bytes", self.max_total_slide_xml_bytes()))?;
-        if usage.total_slide_xml_bytes > self.max_total_slide_xml_bytes() {
             return Err(limit(
-                "total slide XML bytes",
+                crate::error::CodecLimitKind::XmlBytes,
+                bytes,
+                self.max_slide_xml_bytes(),
+            ));
+        }
+        let total = usage.add_slide_xml_bytes(bytes).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                self.max_total_slide_xml_bytes(),
+            )
+        })?;
+        if total > self.max_total_slide_xml_bytes() {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                total,
                 self.max_total_slide_xml_bytes(),
             ));
         }
@@ -84,23 +92,37 @@ impl Limits {
     }
 
     fn add_trace(&self, usage: &mut Usage) -> Result<()> {
-        usage.trace_count = usage
-            .trace_count
-            .checked_add(1)
-            .ok_or_else(|| limit("laser trace count", self.max_trace_count()))?;
-        if usage.trace_count > self.max_trace_count() {
-            return Err(limit("laser trace count", self.max_trace_count()));
+        let total = usage.add_trace().ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::Traces,
+                usize::MAX,
+                self.max_trace_count(),
+            )
+        })?;
+        if total > self.max_trace_count() {
+            return Err(limit(
+                crate::error::CodecLimitKind::Traces,
+                total,
+                self.max_trace_count(),
+            ));
         }
         Ok(())
     }
 
     fn add_point(&self, usage: &mut Usage) -> Result<()> {
-        usage.point_count = usage
-            .point_count
-            .checked_add(1)
-            .ok_or_else(|| limit("laser trace-point count", self.max_point_count()))?;
-        if usage.point_count > self.max_point_count() {
-            return Err(limit("laser trace-point count", self.max_point_count()));
+        let total = usage.add_point().ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::TracePoints,
+                usize::MAX,
+                self.max_point_count(),
+            )
+        })?;
+        if total > self.max_point_count() {
+            return Err(limit(
+                crate::error::CodecLimitKind::TracePoints,
+                total,
+                self.max_point_count(),
+            ));
         }
         Ok(())
     }
@@ -113,7 +135,11 @@ fn scan_slide_laser_traces(
     usage: &mut Usage,
 ) -> Result<Vec<Trace>> {
     if xml_bytes.len() > limits.max_slide_xml_bytes() {
-        return Err(limit("slide XML bytes", limits.max_slide_xml_bytes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml_bytes.len(),
+            limits.max_slide_xml_bytes(),
+        ));
     }
 
     let mut capabilities = Capabilities::ooxml_baseline();
@@ -148,12 +174,19 @@ fn scan_slide_laser_traces(
         match event {
             Event::Start(element) => {
                 increment_nodes(&mut nodes, limits)?;
-                let depth = stack
-                    .len()
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth", limits.max_xml_depth()))?;
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_xml_depth(),
+                    )
+                })?;
                 if depth > limits.max_xml_depth() {
-                    return Err(limit("slide XML depth", limits.max_xml_depth()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_xml_depth(),
+                    ));
                 }
                 let parent = stack.last().copied().unwrap_or(ElementKind::Other);
                 let kind = classify_element(
@@ -175,12 +208,19 @@ fn scan_slide_laser_traces(
             },
             Event::Empty(element) => {
                 increment_nodes(&mut nodes, limits)?;
-                let depth = stack
-                    .len()
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth", limits.max_xml_depth()))?;
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_xml_depth(),
+                    )
+                })?;
                 if depth > limits.max_xml_depth() {
-                    return Err(limit("slide XML depth", limits.max_xml_depth()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_xml_depth(),
+                    ));
                 }
                 let parent = stack.last().copied().unwrap_or(ElementKind::Other);
                 let kind = classify_element(
@@ -479,11 +519,19 @@ fn time_error(error: TimeParseError) -> Error {
 }
 
 fn increment_nodes(nodes: &mut usize, limits: &Limits) -> Result<()> {
-    *nodes = nodes
-        .checked_add(1)
-        .ok_or_else(|| limit("slide XML node count", limits.max_xml_nodes()))?;
+    *nodes = nodes.checked_add(1).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            usize::MAX,
+            limits.max_xml_nodes(),
+        )
+    })?;
     if *nodes > limits.max_xml_nodes() {
-        return Err(limit("slide XML node count", limits.max_xml_nodes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            *nodes,
+            limits.max_xml_nodes(),
+        ));
     }
     Ok(())
 }
@@ -495,8 +543,12 @@ fn invalid(message: impl Into<String>) -> Error {
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 /// Check the bounded authoring domain for a laser trace.
@@ -509,7 +561,11 @@ pub fn validate(points: &[TracePoint], limits: &Limits) -> Result<()> {
         return Err(invalid("laser trace requires at least one point"));
     }
     if points.len() > limits.max_point_count() {
-        return Err(limit("laser trace-point count", limits.max_point_count()));
+        return Err(limit(
+            crate::error::CodecLimitKind::TracePoints,
+            points.len(),
+            limits.max_point_count(),
+        ));
     }
     Ok(())
 }
@@ -545,7 +601,11 @@ pub fn write_to(
     emit(points, conformance, &mut count)?;
     let output_len = count.finish()?;
     if output_len > limits.max_output_bytes() {
-        return Err(limit("laser trace XML bytes", limits.max_output_bytes()));
+        return Err(limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            output_len,
+            limits.max_output_bytes(),
+        ));
     }
 
     let start = xml.len();
@@ -596,7 +656,11 @@ struct CountingXml {
 impl CountingXml {
     fn finish(self) -> Result<usize> {
         if self.overflowed {
-            Err(limit("laser trace XML bytes", usize::MAX))
+            Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                usize::MAX,
+            ))
         } else {
             Ok(self.length)
         }
@@ -610,12 +674,22 @@ impl LaserSink for CountingXml {
             Ok(())
         } else {
             self.overflowed = true;
-            Err(limit("laser trace XML bytes", usize::MAX))
+            Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                usize::MAX,
+            ))
         }
     }
 
     fn format(&mut self, arguments: std::fmt::Arguments<'_>) -> Result<()> {
-        std::fmt::write(self, arguments).map_err(|_| limit("laser trace XML bytes", usize::MAX))
+        std::fmt::write(self, arguments).map_err(|_| {
+            limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                usize::MAX,
+            )
+        })
     }
 }
 
@@ -633,20 +707,38 @@ impl LimitedXml<'_> {
             .checked_sub(self.start)
             .and_then(|length| length.checked_add(value.len()))
         else {
-            return Err(limit("laser trace XML bytes", self.maximum));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                self.maximum,
+            ));
         };
         let Some(end) = self.xml.len().checked_add(value.len()) else {
-            return Err(limit("laser trace XML bytes", self.maximum));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                self.maximum,
+            ));
         };
         if length > self.maximum || end > self.xml.capacity() {
-            return Err(limit("laser trace XML bytes", self.maximum));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                length.max(end),
+                self.maximum,
+            ));
         }
         self.xml.push_str(value);
         Ok(())
     }
 
     fn format(&mut self, arguments: std::fmt::Arguments<'_>) -> Result<()> {
-        std::fmt::write(self, arguments).map_err(|_| limit("laser trace XML bytes", self.maximum))
+        std::fmt::write(self, arguments).map_err(|_| {
+            limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                usize::MAX,
+                self.maximum,
+            )
+        })
     }
 }
 
@@ -830,7 +922,7 @@ mod tests {
                 narrow,
             ),
             Err(Error::Limit {
-                resource: "laser trace XML bytes",
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
                 ..
             })
         ));

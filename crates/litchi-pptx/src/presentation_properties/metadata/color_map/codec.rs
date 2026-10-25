@@ -77,31 +77,49 @@ fn locate(xml: &[u8], source: Source, value: Value, limits: Limits) -> Result<Lo
         match event {
             Event::Start(element) => {
                 check_attributes(&element, reader.decoder(), limits)?;
-                nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                    resource: "color-map XML nodes",
-                    limit: limits.max_nodes(),
-                })?;
-                if nodes > limits.max_nodes() || state.depth >= limits.max_depth() {
-                    return Err(Error::Limit {
-                        resource: "color-map XML nodes or depth",
-                        limit: limits.max_nodes(),
-                    });
-                }
-                scan_start(&mut state, &namespace, &element, &source, start)?;
-            },
-            Event::Empty(element) => {
-                check_attributes(&element, reader.decoder(), limits)?;
-                nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                    resource: "color-map XML nodes",
-                    limit: limits.max_nodes(),
+                nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                    observed: usize::MAX,
+                    maximum: limits.max_nodes(),
                 })?;
                 if nodes > limits.max_nodes() {
                     return Err(Error::Limit {
-                        resource: "color-map XML nodes",
-                        limit: limits.max_nodes(),
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: limits.max_nodes(),
                     });
                 }
-                scan_empty(&mut state, &namespace, &element, &source, start)?;
+                if state.depth >= limits.max_depth() {
+                    return Err(Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: state.depth + 1,
+                        maximum: limits.max_depth(),
+                    });
+                }
+                scan_start(&mut state, &namespace, &element, &source, start, limits)?;
+            },
+            Event::Empty(element) => {
+                check_empty_depth(state.depth, limits)?;
+                check_attributes(&element, reader.decoder(), limits)?;
+                nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                    observed: usize::MAX,
+                    maximum: limits.max_nodes(),
+                })?;
+                if nodes > limits.max_nodes() {
+                    return Err(Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: limits.max_nodes(),
+                    });
+                }
+                scan_empty(&mut state, &namespace, &element, &source, start, limits)?;
             },
             Event::End(element) => scan_end(&mut state, &namespace, &element)?,
             Event::Eof => break,
@@ -144,11 +162,13 @@ fn scan_start(
     element: &BytesStart<'_>,
     source: &Source,
     start: usize,
+    limits: Limits,
 ) -> Result<()> {
-    state.depth = state
-        .depth
-        .checked_add(1)
-        .ok_or_else(|| Error::Invalid("color-map XML nesting is too deep".to_string()))?;
+    state.depth = state.depth.checked_add(1).ok_or_else(|| Error::Limit {
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+        observed: usize::MAX,
+        maximum: limits.max_depth(),
+    })?;
     if state.depth == 1 {
         if state.saw_root {
             return Err(Error::Invalid(
@@ -186,7 +206,9 @@ fn scan_empty(
     element: &BytesStart<'_>,
     source: &Source,
     start: usize,
+    limits: Limits,
 ) -> Result<()> {
+    check_empty_depth(state.depth, limits)?;
     if state.depth == 0 {
         if state.saw_root {
             return Err(Error::Invalid(
@@ -197,10 +219,11 @@ fn scan_empty(
         state.saw_root = true;
     } else if is_master_map(
         source,
-        state
-            .depth
-            .checked_add(1)
-            .ok_or_else(|| Error::Invalid("color-map XML nesting is too deep".to_string()))?,
+        state.depth.checked_add(1).ok_or_else(|| Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+            observed: usize::MAX,
+            maximum: limits.max_depth(),
+        })?,
         namespace,
         element,
     ) || (state.override_depth == Some(state.depth)
@@ -241,8 +264,9 @@ pub(crate) fn rewrite(
     if located.value == desired {
         if source.len() > limits.max_output_bytes() {
             return Err(Error::Limit {
-                resource: "serialized color-map XML",
-                limit: limits.max_output_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                observed: source.len(),
+                maximum: limits.max_output_bytes(),
             });
         }
         return Ok(source.to_vec());
@@ -302,8 +326,21 @@ pub(crate) fn rewrite(
 fn check_input(xml: &[u8], limits: Limits) -> Result<()> {
     if xml.len() > limits.max_input_bytes() {
         return Err(Error::Limit {
-            resource: "color-map XML input",
-            limit: limits.max_input_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+            observed: xml.len(),
+            maximum: limits.max_input_bytes(),
+        });
+    }
+    Ok(())
+}
+
+fn check_empty_depth(depth: usize, limits: Limits) -> Result<()> {
+    let observed = depth.checked_add(1).unwrap_or(usize::MAX);
+    if observed > limits.max_depth() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+            observed,
+            maximum: limits.max_depth(),
         });
     }
     Ok(())
@@ -591,8 +628,9 @@ pub fn parse_master(xml: &[u8], limits: Limits) -> Result<Map> {
     let xml = process_ooxml(xml, limits)?;
     if xml.len() > limits.max_output_bytes() {
         return Err(Error::Limit {
-            resource: "processed color-map XML",
-            limit: limits.max_output_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: xml.len(),
+            maximum: limits.max_output_bytes(),
         });
     }
     let mut reader = NsReader::from_reader(xml.as_ref());
@@ -609,17 +647,32 @@ pub fn parse_master(xml: &[u8], limits: Limits) -> Result<Map> {
         match event {
             Event::Start(element) => {
                 check_attributes(&element, reader.decoder(), limits)?;
-                nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                    resource: "color-map XML nodes",
-                    limit: limits.max_nodes(),
+                nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                    observed: usize::MAX,
+                    maximum: limits.max_nodes(),
                 })?;
-                depth = depth.checked_add(1).ok_or_else(|| {
-                    Error::Invalid("color-map XML nesting is too deep".to_string())
+                depth = depth.checked_add(1).ok_or_else(|| Error::Limit {
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                    observed: usize::MAX,
+                    maximum: limits.max_depth(),
                 })?;
-                if nodes > limits.max_nodes() || depth > limits.max_depth() {
+                if nodes > limits.max_nodes() {
                     return Err(Error::Limit {
-                        resource: "color-map XML nodes or depth",
-                        limit: limits.max_nodes(),
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: limits.max_nodes(),
+                    });
+                }
+                if depth > limits.max_depth() {
+                    return Err(Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: depth,
+                        maximum: limits.max_depth(),
                     });
                 }
                 if depth == 1 {
@@ -640,15 +693,20 @@ pub fn parse_master(xml: &[u8], limits: Limits) -> Result<Map> {
                 }
             },
             Event::Empty(element) => {
+                check_empty_depth(depth, limits)?;
                 check_attributes(&element, reader.decoder(), limits)?;
-                nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                    resource: "color-map XML nodes",
-                    limit: limits.max_nodes(),
+                nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                    observed: usize::MAX,
+                    maximum: limits.max_nodes(),
                 })?;
                 if nodes > limits.max_nodes() {
                     return Err(Error::Limit {
-                        resource: "color-map XML nodes",
-                        limit: limits.max_nodes(),
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: limits.max_nodes(),
                     });
                 }
                 if depth == 0 {
@@ -699,8 +757,9 @@ pub fn parse_override(
     let xml = process_ooxml(xml, limits)?;
     if xml.len() > limits.max_output_bytes() {
         return Err(Error::Limit {
-            resource: "processed color-map XML",
-            limit: limits.max_output_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: xml.len(),
+            maximum: limits.max_output_bytes(),
         });
     }
     let mut reader = NsReader::from_reader(xml.as_ref());
@@ -719,17 +778,32 @@ pub fn parse_override(
         match event {
             Event::Start(element) => {
                 check_attributes(&element, reader.decoder(), limits)?;
-                nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                    resource: "color-map XML nodes",
-                    limit: limits.max_nodes(),
+                nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                    observed: usize::MAX,
+                    maximum: limits.max_nodes(),
                 })?;
-                depth = depth.checked_add(1).ok_or_else(|| {
-                    Error::Invalid("color-map XML nesting is too deep".to_string())
+                depth = depth.checked_add(1).ok_or_else(|| Error::Limit {
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                    observed: usize::MAX,
+                    maximum: limits.max_depth(),
                 })?;
-                if nodes > limits.max_nodes() || depth > limits.max_depth() {
+                if nodes > limits.max_nodes() {
                     return Err(Error::Limit {
-                        resource: "color-map XML nodes or depth",
-                        limit: limits.max_nodes(),
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: limits.max_nodes(),
+                    });
+                }
+                if depth > limits.max_depth() {
+                    return Err(Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: depth,
+                        maximum: limits.max_depth(),
                     });
                 }
                 if depth == 1 {
@@ -755,15 +829,20 @@ pub fn parse_override(
                 }
             },
             Event::Empty(element) => {
+                check_empty_depth(depth, limits)?;
                 check_attributes(&element, reader.decoder(), limits)?;
-                nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                    resource: "color-map XML nodes",
-                    limit: limits.max_nodes(),
+                nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                    observed: usize::MAX,
+                    maximum: limits.max_nodes(),
                 })?;
                 if nodes > limits.max_nodes() {
                     return Err(Error::Limit {
-                        resource: "color-map XML nodes",
-                        limit: limits.max_nodes(),
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: limits.max_nodes(),
                     });
                 }
                 if depth == 0 {
@@ -838,26 +917,34 @@ fn check_attributes(
     let mut count = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        count = count.checked_add(1).ok_or(Error::Limit {
-            resource: "color-map XML attributes",
-            limit: limits.max_attributes(),
+        count = count.checked_add(1).ok_or_else(|| Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+            observed: usize::MAX,
+            maximum: limits.max_attributes(),
         })?;
         if count > limits.max_attributes() {
             return Err(Error::Limit {
-                resource: "color-map XML attributes",
-                limit: limits.max_attributes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+                observed: count,
+                maximum: limits.max_attributes(),
             });
         }
         if attribute.key.as_ref().len() > limits.max_string_bytes() {
             return Err(Error::Limit {
-                resource: "color-map XML attribute name",
-                limit: limits.max_string_bytes(),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: attribute.key.as_ref().len(),
+                maximum: limits.max_string_bytes(),
             });
         }
         if attribute.value.as_ref().len() > limits.max_string_bytes() {
             return Err(Error::Limit {
-                resource: "color-map XML attribute",
-                limit: limits.max_string_bytes(),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: attribute.value.as_ref().len(),
+                maximum: limits.max_string_bytes(),
             });
         }
         let value = attribute
@@ -865,8 +952,9 @@ fn check_attributes(
             .map_err(|error| Error::Xml(error.to_string()))?;
         if value.len() > limits.max_string_bytes() {
             return Err(Error::Limit {
-                resource: "color-map XML attribute",
-                limit: limits.max_string_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+                observed: value.len(),
+                maximum: limits.max_string_bytes(),
             });
         }
     }
@@ -989,6 +1077,40 @@ mod tests {
             <p:sldMaster><p:clrMap {MAP}/></p:sldMaster>"#
         );
         assert!(parse_master(multiple_roots.as_bytes(), Limits::DEFAULT).is_err());
+    }
+
+    #[test]
+    fn empty_color_map_depth_is_checked_before_attributes() {
+        let limits = Limits::DEFAULT.with_depth(2).expect("depth limit");
+        let exact = format!(r#"<p:sldMaster xmlns:p="{P}"><p:clrMap {MAP}/></p:sldMaster>"#);
+        parse_master(exact.as_bytes(), limits).expect("depth-two empty element");
+
+        let one_over = format!(
+            r#"<p:sldMaster xmlns:p="{P}"><p:holder><p:clrMap {MAP}/></p:holder></p:sldMaster>"#
+        );
+        assert_xml_depth_limit(
+            parse_master(one_over.as_bytes(), limits).expect_err("depth-three empty element"),
+            3,
+            2,
+        );
+        assert!(matches!(
+            parse_master(b"<p:sldMaster xmlns:p=\"bad\">", Limits::DEFAULT),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    fn assert_xml_depth_limit(error: Error, observed: usize, maximum: usize) {
+        match error {
+            Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: actual,
+                maximum: configured,
+            } => {
+                assert_eq!(actual, observed);
+                assert_eq!(configured, maximum);
+            },
+            other => panic!("expected XML depth limit, got {other:?}"),
+        }
     }
 
     #[test]

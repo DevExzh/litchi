@@ -549,8 +549,9 @@ fn notes_capture_matrix_keeps_the_16m_notes_root_limit_distinct_from_the_64m_par
     assert!(matches!(
         error,
         Error::Limit {
-            resource: "notes XML bytes",
-            limit: crate::notes::MAX_SLIDE_XML,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: crate::notes::MAX_SLIDE_XML + 1,
+            maximum: crate::notes::MAX_SLIDE_XML,
         }
     ));
     assert_capture_matches_legacy(&notes_limited)?;
@@ -570,8 +571,9 @@ fn notes_capture_matrix_keeps_the_16m_notes_root_limit_distinct_from_the_64m_par
     assert!(matches!(
         error,
         Error::Limit {
-            resource: "PresentationML part XML",
-            limit: crate::parts::MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: crate::parts::MAX_PART_XML_BYTES + 1,
+            maximum: crate::parts::MAX_PART_XML_BYTES,
         }
     ));
     assert_capture_matches_legacy(&part_limited)?;
@@ -2314,7 +2316,7 @@ fn slide_copy_plan_refuses_global_tables_and_enforces_closure_limits() -> Result
         limited
             .opened_presentation_with_limits(limits)?
             .plan_slide_copy(0_usize, 1),
-        Err(Error::EditLimit {
+        Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
             ..
         })
@@ -2648,7 +2650,7 @@ fn slide_copy_application_refuses_result_limit_and_nonempty_slide_id() -> Result
         package
             .opened_presentation_with_limits(limits)?
             .plan_slide_copy(0_usize, 1),
-        Err(Error::EditLimit {
+        Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
             ..
         })
@@ -3164,7 +3166,7 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
         limited
             .opened_presentation_with_limits(limits)?
             .plan_slide_removal(0_usize),
-        Err(Error::EditLimit {
+        Err(Error::Limit {
             kind: crate::opened::LimitKind::PatchBytes,
             ..
         })
@@ -5452,7 +5454,7 @@ fn the_superseded_refusal_does_not_displace_the_durable_byte_limit() -> Result<(
     assert!(matches!(
         crate::slide_removal::Patch::from_bytes(&superseded, tight),
         Err(Error::Limit {
-            resource: "slide-removal durable patch bytes",
+            kind: crate::opened::LimitKind::PatchBytes,
             ..
         })
     ));

@@ -66,27 +66,31 @@ impl Limits {
     /// Check a caller-supplied value before any package scan or allocation.
     pub(crate) fn validate(self) -> Result<()> {
         if self.anchors == 0 || self.anchors > MAX_ANCHORS {
-            return Err(Error::Limit {
-                resource: "ink-action anchor count",
-                limit: MAX_ANCHORS,
+            return Err(Error::InvalidLimit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InkAnchors),
+                value: self.anchors,
+                maximum: MAX_ANCHORS,
             });
         }
         if self.target_bytes == 0 || self.target_bytes > MAX_TARGET_BYTES {
-            return Err(Error::Limit {
-                resource: "ink-action target bytes",
-                limit: MAX_TARGET_BYTES,
+            return Err(Error::InvalidLimit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                value: self.target_bytes,
+                maximum: MAX_TARGET_BYTES,
             });
         }
         if self.total_target_bytes == 0 || self.total_target_bytes > MAX_TOTAL_TARGET_BYTES {
-            return Err(Error::Limit {
-                resource: "ink-action aggregate target bytes",
-                limit: MAX_TOTAL_TARGET_BYTES,
+            return Err(Error::InvalidLimit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                value: self.total_target_bytes,
+                maximum: MAX_TOTAL_TARGET_BYTES,
             });
         }
         if self.target_relationships == 0 || self.target_relationships > MAX_TARGET_RELATIONSHIPS {
-            return Err(Error::Limit {
-                resource: "ink-action relationship edges",
-                limit: MAX_TARGET_RELATIONSHIPS,
+            return Err(Error::InvalidLimit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+                value: self.target_relationships,
+                maximum: MAX_TARGET_RELATIONSHIPS,
             });
         }
         Ok(())

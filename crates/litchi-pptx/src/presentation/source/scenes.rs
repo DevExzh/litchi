@@ -452,8 +452,11 @@ impl super::SourceSlide {
             let semantic_maximum = shape_limits.input_bytes();
             if declared > semantic_maximum as u64 {
                 return Err(crate::Error::Limit {
-                    resource: "shape owner input bytes",
-                    limit: semantic_maximum,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::InputBytes,
+                    ),
+                    observed: usize::try_from(declared).unwrap_or(usize::MAX),
+                    maximum: semantic_maximum,
                 });
             }
             let part = self.load_part(&view)?;

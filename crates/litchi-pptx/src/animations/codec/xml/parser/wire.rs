@@ -1,5 +1,5 @@
 use super::super::super::super::{
-    invalid,
+    invalid, limit,
     model::{
         CommonTimeNode, ConditionEvent, ConditionTarget, Duration, MotionFraction, NextAction,
         PresetClass, PresetTimeNode, PreviousAction, RuntimeTrigger, Sequence, TimeCondition,
@@ -8,9 +8,8 @@ use super::super::super::super::{
 };
 use super::semantic::TimingParser;
 use super::validation::{
-    MAX_TIMING_DEPTH, MAX_TIMING_NODES, MAX_TIMING_TEXT_BYTES, TimingValue, attribute,
-    check_attribute_count, is_presentationml_name, parse_shape_id, parse_timing_value,
-    parse_xml_bool,
+    TimingValue, attribute, check_attribute_count, is_presentationml_name, parse_shape_id,
+    parse_timing_value, parse_xml_bool,
 };
 use crate::animations::Limits;
 use crate::{Error, Result};
@@ -57,10 +56,33 @@ pub(super) fn parse_recursive_timing_tree(xml: &str, limits: Limits) -> Result<T
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
-                depth += 1;
-                count += 1;
-                if depth > limits.max_depth || count > limits.max_nodes {
-                    return Err(invalid("animation timing tree exceeds safety limit"));
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth,
+                    )
+                })?;
+                if depth > limits.max_depth {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth,
+                    ));
+                }
+                count = count.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes,
+                    )
+                })?;
+                if count > limits.max_nodes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        count,
+                        limits.max_nodes,
+                    ));
                 }
                 check_attribute_count(element, limits)?;
                 let empty = matches!(event, Event::Empty(_));
@@ -342,8 +364,9 @@ pub(super) fn parse_recursive_timing_tree(xml: &str, limits: Limits) -> Result<T
         .ok_or_else(|| invalid("animation timing range is invalid"))?;
     if source.len() > limits.max_output_bytes {
         return Err(crate::Error::Limit {
-            resource: "animation XML output bytes",
-            limit: limits.max_output_bytes,
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            observed: source.len(),
+            maximum: limits.max_output_bytes,
         });
     }
     let source = std::str::from_utf8(source)
@@ -427,11 +450,19 @@ pub(super) fn parse_processed_timing(
         let event_end = origin
             .offset(reader.buffer_position())
             .ok_or_else(|| invalid("animation XML offset does not fit usize"))?;
-        nodes = nodes
-            .checked_add(1)
-            .ok_or_else(|| invalid("animation XML node counter overflow"))?;
+        nodes = nodes.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlNodes,
+                usize::MAX,
+                limits.max_nodes,
+            )
+        })?;
         if nodes > limits.max_nodes {
-            return Err(invalid("animation XML node count exceeds safety limit"));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlNodes,
+                nodes,
+                limits.max_nodes,
+            ));
         }
         match event {
             Event::Start(element) => {
@@ -444,9 +475,19 @@ pub(super) fn parse_processed_timing(
                     event_start,
                     event_end,
                 )?;
-                depth += 1;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth,
+                    )
+                })?;
                 if depth > limits.max_depth {
-                    return Err(invalid("animation XML depth exceeds safety limit"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth,
+                    ));
                 }
             },
             Event::Empty(element) => parser.start(
@@ -465,19 +506,35 @@ pub(super) fn parse_processed_timing(
                 parser.end(&namespace, element.name(), depth, event_end)?;
             },
             Event::Text(text) => {
-                text_bytes = text_bytes
-                    .checked_add(text.as_ref().len())
-                    .ok_or_else(|| invalid("animation XML text counter overflow"))?;
+                text_bytes = text_bytes.checked_add(text.as_ref().len()).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::TextBytes,
+                        usize::MAX,
+                        limits.max_text_bytes,
+                    )
+                })?;
                 if text_bytes > limits.max_text_bytes {
-                    return Err(invalid("animation XML text exceeds safety limit"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::TextBytes,
+                        text_bytes,
+                        limits.max_text_bytes,
+                    ));
                 }
             },
             Event::CData(text) => {
-                text_bytes = text_bytes
-                    .checked_add(text.as_ref().len())
-                    .ok_or_else(|| invalid("animation XML text counter overflow"))?;
+                text_bytes = text_bytes.checked_add(text.as_ref().len()).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::TextBytes,
+                        usize::MAX,
+                        limits.max_text_bytes,
+                    )
+                })?;
                 if text_bytes > limits.max_text_bytes {
-                    return Err(invalid("animation XML text exceeds safety limit"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::TextBytes,
+                        text_bytes,
+                        limits.max_text_bytes,
+                    ));
                 }
             },
             Event::DocType(_) => return Err(invalid("DOCTYPE is not allowed in animation XML")),

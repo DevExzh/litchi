@@ -27,20 +27,20 @@ impl ChunkAdmission {
 
 #[derive(Clone, Copy)]
 struct ChunkPolicy {
-    chunk_resource: &'static str,
+    chunk_kind: crate::error::CodecLimitKind,
     plan_resource: &'static str,
     per_chunk_limit: usize,
-    selection_resource: &'static str,
+    selection_kind: crate::error::CodecLimitKind,
     max_text_bytes: usize,
     max_output_bytes: usize,
 }
 
 fn text_policy(max_text_bytes: usize, max_output_bytes: usize) -> ChunkPolicy {
     ChunkPolicy {
-        chunk_resource: "opened-presentation shape text chunks",
+        chunk_kind: crate::error::CodecLimitKind::TextReplacements,
         plan_resource: "opened-presentation shape text chunk plan",
         per_chunk_limit: super::MAX_SHAPE_TEXT_REPLACEMENTS,
-        selection_resource: "opened-presentation shape text replacements",
+        selection_kind: crate::error::CodecLimitKind::TextReplacements,
         max_text_bytes,
         max_output_bytes,
     }
@@ -48,10 +48,10 @@ fn text_policy(max_text_bytes: usize, max_output_bytes: usize) -> ChunkPolicy {
 
 fn property_policy(max_text_bytes: usize, max_output_bytes: usize) -> ChunkPolicy {
     ChunkPolicy {
-        chunk_resource: "opened-presentation shape property chunks",
+        chunk_kind: crate::error::CodecLimitKind::ShapeProperties,
         plan_resource: "opened-presentation shape property chunk plan",
         per_chunk_limit: super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
-        selection_resource: "opened-presentation shape property replacements",
+        selection_kind: crate::error::CodecLimitKind::ShapeProperties,
         max_text_bytes,
         max_output_bytes,
     }
@@ -261,8 +261,9 @@ fn admit_chunks<T: Copy>(
 ) -> Result<ChunkAdmission> {
     if chunks.len() > MAX_CHUNK_COUNT {
         return Err(Error::Limit {
-            resource: policy.chunk_resource,
-            limit: MAX_CHUNK_COUNT,
+            kind: crate::opened::LimitKind::Codec(policy.chunk_kind),
+            observed: chunks.len(),
+            maximum: MAX_CHUNK_COUNT,
         });
     }
 
@@ -271,17 +272,25 @@ fn admit_chunks<T: Copy>(
     for chunk in chunks {
         if chunk.len() > policy.per_chunk_limit {
             return Err(Error::Limit {
-                resource: policy.selection_resource,
-                limit: policy.per_chunk_limit,
+                kind: crate::opened::LimitKind::Codec(policy.selection_kind),
+                observed: chunk.len(),
+                maximum: policy.per_chunk_limit,
             });
         }
         total_selections = total_selections
             .checked_add(chunk.len())
-            .filter(|count| *count <= MAX_SELECTIONS)
             .ok_or(Error::Limit {
-                resource: policy.selection_resource,
-                limit: MAX_SELECTIONS,
+                kind: crate::opened::LimitKind::Codec(policy.selection_kind),
+                observed: usize::MAX,
+                maximum: MAX_SELECTIONS,
             })?;
+        if total_selections > MAX_SELECTIONS {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(policy.selection_kind),
+                observed: total_selections,
+                maximum: MAX_SELECTIONS,
+            });
+        }
 
         let chunk_text_bytes = chunk.iter().try_fold(0usize, |total, item| {
             total
@@ -290,8 +299,9 @@ fn admit_chunks<T: Copy>(
         })?;
         if chunk_text_bytes > policy.max_text_bytes {
             return Err(Error::Limit {
-                resource: "opened-presentation aggregate shape text bytes",
-                limit: policy.max_text_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: chunk_text_bytes,
+                maximum: policy.max_text_bytes,
             });
         }
         total_text_bytes = total_text_bytes
@@ -299,8 +309,9 @@ fn admit_chunks<T: Copy>(
             .ok_or_else(invalid_aggregate_text_size)?;
         if total_text_bytes > policy.max_output_bytes {
             return Err(Error::Limit {
-                resource: "opened-presentation aggregate shape text bytes",
-                limit: policy.max_output_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: total_text_bytes,
+                maximum: policy.max_output_bytes,
             });
         }
     }
@@ -352,13 +363,14 @@ mod tests {
         .into_bytes()
     }
 
-    fn is_limit(error: &Error, resource: &str, limit: usize) -> bool {
+    fn is_limit(error: &Error, kind: crate::error::CodecLimitKind, limit: usize) -> bool {
         matches!(
             error,
             Error::Limit {
-                resource: actual,
-                limit: actual_limit,
-            } if *actual_limit == limit && *actual == resource
+                kind: crate::opened::LimitKind::Codec(actual_kind),
+                maximum: actual_limit,
+                ..
+            } if *actual_limit == limit && *actual_kind == kind
         )
     }
 
@@ -375,7 +387,7 @@ mod tests {
         .expect_err("a chunk over 256 selections must be refused");
         assert!(is_limit(
             &error,
-            "opened-presentation shape text replacements",
+            crate::error::CodecLimitKind::TextReplacements,
             super::super::MAX_SHAPE_TEXT_REPLACEMENTS
         ));
 
@@ -387,11 +399,7 @@ mod tests {
             text_policy(4, usize::MAX),
         )
         .expect_err("a chunk over the text ceiling must be refused");
-        assert!(is_limit(
-            &error,
-            "opened-presentation aggregate shape text bytes",
-            4
-        ));
+        assert!(is_limit(&error, crate::error::CodecLimitKind::TextBytes, 4));
     }
 
     #[test]
@@ -405,11 +413,7 @@ mod tests {
             text_policy(4, 7),
         )
         .expect_err("the whole operation must honor its output budget");
-        assert!(is_limit(
-            &error,
-            "opened-presentation aggregate shape text bytes",
-            7
-        ));
+        assert!(is_limit(&error, crate::error::CodecLimitKind::TextBytes, 7));
     }
 
     #[test]
@@ -420,7 +424,7 @@ mod tests {
             .expect_err("an unbounded chunk list must be refused");
         assert!(is_limit(
             &error,
-            "opened-presentation shape text chunks",
+            crate::error::CodecLimitKind::TextReplacements,
             MAX_CHUNK_COUNT
         ));
     }
@@ -453,7 +457,7 @@ mod tests {
             .expect_err("one selection over the shape-count ceiling must be refused");
         assert!(is_limit(
             &error,
-            "opened-presentation shape text replacements",
+            crate::error::CodecLimitKind::TextReplacements,
             MAX_SELECTIONS
         ));
     }

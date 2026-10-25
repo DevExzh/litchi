@@ -328,6 +328,24 @@ impl Usage {
         self.point_count
     }
 
+    pub(super) fn add_slide_xml_bytes(&mut self, bytes: usize) -> Option<usize> {
+        let total = self.total_slide_xml_bytes.checked_add(bytes)?;
+        self.total_slide_xml_bytes = total;
+        Some(total)
+    }
+
+    pub(super) fn add_trace(&mut self) -> Option<usize> {
+        let total = self.trace_count.checked_add(1)?;
+        self.trace_count = total;
+        Some(total)
+    }
+
+    pub(super) fn add_point(&mut self) -> Option<usize> {
+        let total = self.point_count.checked_add(1)?;
+        self.point_count = total;
+        Some(total)
+    }
+
     /// Add one independently captured slide ledger without changing either
     /// input.  The caller applies its selected policy to the returned total;
     /// this keeps aggregate scope explicit when a batch preserves unchanged

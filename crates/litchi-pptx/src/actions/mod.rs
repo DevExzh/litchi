@@ -18,6 +18,14 @@ pub(super) fn invalid(message: impl Into<String>) -> crate::Error {
     crate::Error::Invalid(message.into())
 }
 
-pub(super) fn limit(resource: &'static str, limit: usize) -> crate::Error {
-    crate::Error::Limit { resource, limit }
+pub(super) fn limit(
+    kind: crate::error::CodecLimitKind,
+    observed: usize,
+    maximum: usize,
+) -> crate::Error {
+    crate::Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }

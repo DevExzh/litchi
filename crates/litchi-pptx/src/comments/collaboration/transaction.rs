@@ -536,8 +536,9 @@ impl CommentThreadingSnapshot {
 fn check_source_size(source: &[u8], limits: Limits) -> Result<()> {
     if source.len() > limits.max_input_bytes {
         return Err(Error::Limit {
-            resource: "legacy comment collaboration XML bytes",
-            limit: limits.max_input_bytes,
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            observed: source.len(),
+            maximum: limits.max_input_bytes,
         });
     }
     Ok(())

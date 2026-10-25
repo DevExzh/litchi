@@ -74,8 +74,9 @@ impl Snapshot {
     ) -> Result<Self> {
         if source_xml.len() > limits.max_input_bytes() {
             return Err(Error::Limit {
-                resource: "presentation structure source bytes",
-                limit: limits.max_input_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                observed: source_xml.len(),
+                maximum: limits.max_input_bytes(),
             });
         }
         codec::validate_detached_graph(&graph, &graph, limits)?;
@@ -477,8 +478,4 @@ fn fingerprint(bytes: &[u8]) -> Revision {
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
-}
-
-fn limit(what: &str) -> Error {
-    Error::Invalid(format!("{what} exceeds the supported safety limit"))
 }

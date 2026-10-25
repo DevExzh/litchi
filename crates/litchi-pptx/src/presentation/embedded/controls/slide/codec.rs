@@ -80,7 +80,11 @@ struct Replacement {
 
 pub(crate) fn locate_controls(xml: &[u8]) -> Result<Vec<SourceControl>> {
     if xml.len() > MAX_SLIDE_XML_BYTES {
-        return Err(limit("control slide XML bytes", MAX_SLIDE_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_SLIDE_XML_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -104,11 +108,19 @@ pub(crate) fn locate_controls(xml: &[u8]) -> Result<Vec<SourceControl>> {
         match event {
             Event::Start(element) => {
                 increment_nodes(&mut nodes)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("control XML depth", MAX_XML_DEPTH))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if child_depth > MAX_XML_DEPTH {
-                    return Err(limit("control XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if child_depth == 1 {
                     if root_seen || !is_presentationml_name(&namespace, element.name(), b"sld") {
@@ -137,11 +149,19 @@ pub(crate) fn locate_controls(xml: &[u8]) -> Result<Vec<SourceControl>> {
             },
             Event::Empty(element) => {
                 increment_nodes(&mut nodes)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("control XML depth", MAX_XML_DEPTH))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if child_depth > MAX_XML_DEPTH {
-                    return Err(limit("control XML depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if child_depth == 1 {
                     if root_seen || !is_presentationml_name(&namespace, element.name(), b"sld") {
@@ -211,7 +231,11 @@ pub(crate) fn locate_controls(xml: &[u8]) -> Result<Vec<SourceControl>> {
 
 pub(crate) fn locate_descriptor(xml: &[u8]) -> Result<SourceDescriptor> {
     if xml.len() > MAX_SLIDE_XML_BYTES {
-        return Err(limit("control descriptor XML bytes", MAX_SLIDE_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_SLIDE_XML_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -232,11 +256,19 @@ pub(crate) fn locate_descriptor(xml: &[u8]) -> Result<SourceDescriptor> {
         match event {
             Event::Start(element) | Event::Empty(element) => {
                 increment_nodes(&mut nodes)?;
-                let child_depth = depth
-                    .checked_add(1)
-                    .ok_or_else(|| limit("control descriptor depth", MAX_XML_DEPTH))?;
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        MAX_XML_DEPTH,
+                    )
+                })?;
                 if child_depth > MAX_XML_DEPTH {
-                    return Err(limit("control descriptor depth", MAX_XML_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        child_depth,
+                        MAX_XML_DEPTH,
+                    ));
                 }
                 if !root_seen {
                     if !matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == *AX)

@@ -1,5 +1,6 @@
 use super::super::model::NamespaceDeclaration;
 use super::super::{MAX_BYTES, MAX_DEPTH, MAX_NODES, MAX_STRING_BYTES};
+use crate::error::{CodecLimitKind, LimitKind};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -37,7 +38,7 @@ fn invalid(message: impl Into<String>) -> Error {
 
 pub(super) fn scan(xml: &[u8], label: &str) -> Result<Scan> {
     if xml.len() > MAX_BYTES {
-        return Err(limit(label));
+        return Err(limit(CodecLimitKind::XmlBytes, xml.len(), MAX_BYTES));
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
@@ -61,9 +62,14 @@ pub(super) fn scan(xml: &[u8], label: &str) -> Result<Scan> {
         let namespace = resolve_namespace(resolved)?;
         match event {
             Event::Start(element) => {
-                nodes = nodes.checked_add(1).ok_or_else(|| limit(label))?;
-                if nodes > MAX_NODES || stack.len() + 1 > MAX_DEPTH {
-                    return Err(limit(label));
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| limit(CodecLimitKind::XmlNodes, usize::MAX, MAX_NODES))?;
+                if nodes > MAX_NODES {
+                    return Err(limit(CodecLimitKind::XmlNodes, nodes, MAX_NODES));
+                }
+                if stack.len() + 1 > MAX_DEPTH {
+                    return Err(limit(CodecLimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
                 }
                 if root_closed && stack.is_empty() {
                     return Err(invalid(format!("{label} contains multiple roots")));
@@ -80,9 +86,14 @@ pub(super) fn scan(xml: &[u8], label: &str) -> Result<Scan> {
                 stack.push(open);
             },
             Event::Empty(element) => {
-                nodes = nodes.checked_add(1).ok_or_else(|| limit(label))?;
-                if nodes > MAX_NODES || stack.len() + 1 > MAX_DEPTH {
-                    return Err(limit(label));
+                nodes = nodes
+                    .checked_add(1)
+                    .ok_or_else(|| limit(CodecLimitKind::XmlNodes, usize::MAX, MAX_NODES))?;
+                if nodes > MAX_NODES {
+                    return Err(limit(CodecLimitKind::XmlNodes, nodes, MAX_NODES));
+                }
+                if stack.len() + 1 > MAX_DEPTH {
+                    return Err(limit(CodecLimitKind::XmlDepth, stack.len() + 1, MAX_DEPTH));
                 }
                 if root_closed && stack.is_empty() {
                     return Err(invalid(format!("{label} contains multiple roots")));
@@ -246,7 +257,11 @@ pub(super) fn namespace_declarations(
             .map_err(xml_error)?
             .into_owned();
         if uri.len() > MAX_STRING_BYTES {
-            return Err(limit("modern comment namespace URI"));
+            return Err(limit(
+                CodecLimitKind::StringBytes,
+                uri.len(),
+                MAX_STRING_BYTES,
+            ));
         }
         output.push(NamespaceDeclaration {
             prefix: prefix.to_owned(),
@@ -271,8 +286,19 @@ pub(super) fn attributes(
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
             .map_err(xml_error)?
             .into_owned();
-        if key.len() > MAX_STRING_BYTES || value.len() > MAX_STRING_BYTES {
-            return Err(limit("modern comment XML attribute"));
+        if key.len() > MAX_STRING_BYTES {
+            return Err(limit(
+                CodecLimitKind::StringBytes,
+                key.len(),
+                MAX_STRING_BYTES,
+            ));
+        }
+        if value.len() > MAX_STRING_BYTES {
+            return Err(limit(
+                CodecLimitKind::StringBytes,
+                value.len(),
+                MAX_STRING_BYTES,
+            ));
         }
         output.push((key.to_owned(), value));
     }
@@ -406,6 +432,32 @@ pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {
     invalid(format!("invalid modern comment XML: {error}"))
 }
 
-pub(super) fn limit(label: &str) -> Error {
-    invalid(format!("{label} exceeds implementation limit"))
+pub(super) fn limit(kind: CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scan_reports_the_depth_that_exceeded_its_limit() {
+        let mut xml = b"<root>".to_vec();
+        for _ in 0..MAX_DEPTH {
+            xml.extend_from_slice(b"<n>");
+        }
+        let error = scan(&xml, "modern comment").unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::Codec(CodecLimitKind::XmlDepth),
+                observed,
+                maximum: MAX_DEPTH,
+            } if observed == MAX_DEPTH + 1
+        ));
+    }
 }

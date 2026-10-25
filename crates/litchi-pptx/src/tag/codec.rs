@@ -27,15 +27,17 @@ pub fn parse(xml: &[u8], limits: Limits) -> Result<List> {
 pub(crate) fn parse_profiled(xml: &[u8], limits: Limits) -> Result<(List, Conformance)> {
     if xml.len() > limits.max_input_bytes {
         return Err(Error::Limit {
-            resource: "tag-list bytes",
-            limit: limits.max_input_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: limits.max_input_bytes,
         });
     }
     let xml = process_pptx_ooxml(xml, limits.max_input_bytes)?;
     if xml.len() > limits.max_input_bytes {
         return Err(Error::Limit {
-            resource: "MCE-expanded tag-list bytes",
-            limit: limits.max_input_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: limits.max_input_bytes,
         });
     }
     let mut reader = NsReader::from_reader(xml.as_ref());
@@ -73,8 +75,11 @@ pub(crate) fn parse_profiled(xml: &[u8], limits: Limits) -> Result<(List, Confor
                 {
                     if tags.len() == MAX_TAGS {
                         return Err(Error::Limit {
-                            resource: "tag count",
-                            limit: MAX_TAGS,
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::Tags,
+                            ),
+                            observed: tags.len().checked_add(1).unwrap_or(usize::MAX),
+                            maximum: MAX_TAGS,
                         });
                     }
                     let tag = parse_tag(&element, reader.decoder())?;
@@ -105,8 +110,11 @@ pub(crate) fn parse_profiled(xml: &[u8], limits: Limits) -> Result<(List, Confor
                 {
                     if tags.len() == MAX_TAGS {
                         return Err(Error::Limit {
-                            resource: "tag count",
-                            limit: MAX_TAGS,
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::Tags,
+                            ),
+                            observed: tags.len().checked_add(1).unwrap_or(usize::MAX),
+                            maximum: MAX_TAGS,
                         });
                     }
                     tags.push(parse_tag(&element, reader.decoder())?);
@@ -192,8 +200,9 @@ pub fn write(value: &List, conformance: Conformance, limits: Limits) -> Result<V
     ensure_list_budget(value.wire_len)?;
     if value.wire_len > limits.max_output_bytes {
         return Err(Error::Limit {
-            resource: "encoded tag-list output",
-            limit: limits.max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: value.wire_len,
+            maximum: limits.max_output_bytes,
         });
     }
     let mut out = Vec::new();
@@ -350,8 +359,9 @@ fn append(out: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
         .ok_or_else(|| invalid("tag-list output length overflow"))?;
     if len > MAX_PART_BYTES {
         return Err(Error::Limit {
-            resource: "encoded tag-list bytes",
-            limit: MAX_PART_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: len,
+            maximum: MAX_PART_BYTES,
         });
     }
     out.extend_from_slice(bytes);
@@ -402,8 +412,9 @@ fn valid_ncname(value: &str) -> bool {
 pub(crate) fn bounded_text(value: &str, resource: &'static str) -> Result<()> {
     if value.len() > MAX_TEXT_BYTES {
         return Err(Error::Limit {
-            resource,
-            limit: MAX_TEXT_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            observed: value.len(),
+            maximum: MAX_TEXT_BYTES,
         });
     }
     if value.chars().all(is_xml_char) {

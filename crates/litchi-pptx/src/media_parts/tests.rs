@@ -372,8 +372,10 @@ fn replay_resource_only_change_checks_unchanged_slide_aggregate() {
             under,
         ),
         Err(Error::Limit {
-            resource: "total payload bytes"
-        })
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::PayloadBytes),
+            observed,
+            maximum: 8,
+        }) if observed > 8
     ));
 }
 
@@ -472,9 +474,10 @@ fn escaped_media_output_is_preflighted_against_a_typed_budget() {
     assert!(matches!(
         error,
         Error::Limit {
-            resource: "slide media serialized XML bytes",
-            limit,
-        } if limit == maximum
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::OutputBytes),
+            observed,
+            maximum: actual_maximum,
+        } if observed > maximum && actual_maximum == maximum
     ));
     assert!(output.bytes.len() <= maximum);
 }
@@ -494,9 +497,10 @@ fn media_output_budget_is_aggregate_across_pictures() {
     assert!(matches!(
         error,
         Error::Limit {
-            resource: "slide media serialized XML bytes",
-            limit,
-        } if limit == maximum
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::OutputBytes),
+            observed,
+            maximum: actual_maximum,
+        } if observed > maximum && actual_maximum == maximum
     ));
     assert!(output.bytes.len() >= single_len);
     assert!(output.bytes.len() <= maximum);

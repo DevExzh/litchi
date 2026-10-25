@@ -227,8 +227,11 @@ pub(super) fn owner_anchor_uses(xml: &[u8], relationship_id: &str) -> Result<usi
                         anchor_relationship_id(xml, start, end, &reader, &element, conformance)?;
                     if candidate.value == relationship_id {
                         uses = uses.checked_add(1).ok_or(Error::Limit {
-                            resource: "raw tag-owner anchor references",
-                            limit: MAX_OWNER_NODES,
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::XmlNodes,
+                            ),
+                            observed: usize::MAX,
+                            maximum: MAX_OWNER_NODES,
                         })?;
                     }
                 }
@@ -310,8 +313,9 @@ pub(crate) fn resolve_anchor_with_limits(
 pub(crate) fn available_relationship_id(owner: &dyn OpcPart) -> Result<String> {
     if owner.rels().len() >= MAX_SOURCE_RELATIONSHIPS {
         return Err(Error::Limit {
-            resource: "tag-owner relationships",
-            limit: MAX_SOURCE_RELATIONSHIPS,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+            observed: owner.rels().len().checked_add(1).unwrap_or(usize::MAX),
+            maximum: MAX_SOURCE_RELATIONSHIPS,
         });
     }
     for number in 1..=MAX_SOURCE_RELATIONSHIPS {
@@ -321,8 +325,9 @@ pub(crate) fn available_relationship_id(owner: &dyn OpcPart) -> Result<String> {
         }
     }
     Err(Error::Limit {
-        resource: "tag-list relationship-ID allocation attempts",
-        limit: MAX_SOURCE_RELATIONSHIPS,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+        observed: MAX_SOURCE_RELATIONSHIPS,
+        maximum: MAX_SOURCE_RELATIONSHIPS,
     })
 }
 
@@ -338,16 +343,18 @@ pub(crate) fn available_part_name(package: &OpcPackage) -> Result<PackURI> {
         }
     }
     Err(Error::Limit {
-        resource: "tag-list part-name allocation attempts",
-        limit: PART_NAME_ATTEMPTS,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Parts),
+        observed: PART_NAME_ATTEMPTS,
+        maximum: PART_NAME_ATTEMPTS,
     })
 }
 
 fn sorted_part_names(package: &OpcPackage) -> Result<Vec<String>> {
     if package.part_count() > MAX_GRAPH_PARTS {
         return Err(Error::Limit {
-            resource: "tag package part-name scan",
-            limit: MAX_GRAPH_PARTS,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Parts),
+            observed: package.part_count(),
+            maximum: MAX_GRAPH_PARTS,
         });
     }
     let mut names = Vec::new();
@@ -359,13 +366,15 @@ fn sorted_part_names(package: &OpcPackage) -> Result<Vec<String>> {
         bytes = bytes
             .checked_add(part.partname().as_str().len())
             .ok_or(Error::Limit {
-                resource: "tag package part-name bytes",
-                limit: MAX_PART_NAME_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::NameBytes),
+                observed: usize::MAX,
+                maximum: MAX_PART_NAME_BYTES,
             })?;
         if bytes > MAX_PART_NAME_BYTES {
             return Err(Error::Limit {
-                resource: "tag package part-name bytes",
-                limit: MAX_PART_NAME_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::NameBytes),
+                observed: bytes,
+                maximum: MAX_PART_NAME_BYTES,
             });
         }
         names.push(part.partname().as_str().to_ascii_lowercase());
@@ -441,8 +450,9 @@ pub(crate) fn has_other_inbound(
 ) -> Result<bool> {
     if package.part_count() > MAX_GRAPH_PARTS {
         return Err(Error::Limit {
-            resource: "tag package graph parts",
-            limit: MAX_GRAPH_PARTS,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Parts),
+            observed: package.part_count(),
+            maximum: MAX_GRAPH_PARTS,
         });
     }
     let mut scanned = 0usize;
@@ -472,13 +482,15 @@ pub(crate) fn has_other_inbound(
 
 pub(super) fn bump_graph_link(scanned: &mut usize) -> Result<()> {
     *scanned = scanned.checked_add(1).ok_or(Error::Limit {
-        resource: "tag package graph relationships",
-        limit: MAX_GRAPH_LINKS,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+        observed: usize::MAX,
+        maximum: MAX_GRAPH_LINKS,
     })?;
     if *scanned > MAX_GRAPH_LINKS {
         Err(Error::Limit {
-            resource: "tag package graph relationships",
-            limit: MAX_GRAPH_LINKS,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+            observed: *scanned,
+            maximum: MAX_GRAPH_LINKS,
         })
     } else {
         Ok(())
@@ -495,13 +507,15 @@ pub(super) fn xml_position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Re
 
 pub(super) fn bump_owner_node(nodes: &mut usize) -> Result<()> {
     *nodes = nodes.checked_add(1).ok_or(Error::Limit {
-        resource: "tag-owner XML nodes",
-        limit: MAX_OWNER_NODES,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+        observed: usize::MAX,
+        maximum: MAX_OWNER_NODES,
     })?;
     if *nodes > MAX_OWNER_NODES {
         Err(Error::Limit {
-            resource: "tag-owner XML nodes",
-            limit: MAX_OWNER_NODES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: *nodes,
+            maximum: MAX_OWNER_NODES,
         })
     } else {
         Ok(())
@@ -514,8 +528,9 @@ pub(super) fn checked_owner_depth(depth: usize) -> Result<usize> {
         .ok_or_else(|| invalid("tag-owner XML depth overflow"))?;
     if depth > MAX_OWNER_DEPTH {
         Err(Error::Limit {
-            resource: "tag-owner XML depth",
-            limit: MAX_OWNER_DEPTH,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+            observed: depth,
+            maximum: MAX_OWNER_DEPTH,
         })
     } else {
         Ok(depth)

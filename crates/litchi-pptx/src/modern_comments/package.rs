@@ -16,14 +16,19 @@ mod comments {
         MODERN_COMMENT_RELATIONSHIP_TYPE, OpcPackage, PackURI, Part, Reply, Result,
         SLIDE_CONTENT_TYPE, load_modern_comment_authors, validate_modern_comment_author_references,
     };
+    use crate::error::{CodecLimitKind, LimitKind};
     use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 
     fn invalid(message: impl Into<String>) -> Error {
         Error::Invalid(message.into())
     }
 
-    fn limit(label: &str) -> Error {
-        invalid(format!("{label} exceeds implementation limit"))
+    fn limit(observed: usize) -> Error {
+        Error::Limit {
+            kind: LimitKind::Codec(CodecLimitKind::StringBytes),
+            observed,
+            maximum: super::super::MAX_STRING_BYTES,
+        }
     }
 
     fn validate_relationship_id(value: &str) -> Result<()> {
@@ -41,7 +46,7 @@ mod comments {
         if value.len() <= super::super::MAX_STRING_BYTES {
             Ok(())
         } else {
-            Err(limit("modern Comment string bytes"))
+            Err(limit(value.len()))
         }
     }
 
@@ -877,6 +882,7 @@ mod authors {
         MODERN_COMMENT_AUTHOR_CONTENT_TYPE, MODERN_COMMENT_AUTHOR_RELATIONSHIP_TYPE, OpcPackage,
         PackURI, Part, Result, load_modern_comments,
     };
+    use crate::error::{CodecLimitKind, LimitKind};
     use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 
     /// # Errors
@@ -886,15 +892,19 @@ mod authors {
         Error::Invalid(message.into())
     }
 
-    fn limit(label: &str) -> Error {
-        invalid(format!("{label} exceeds implementation limit"))
+    fn limit(observed: usize) -> Error {
+        Error::Limit {
+            kind: LimitKind::Codec(CodecLimitKind::StringBytes),
+            observed,
+            maximum: super::super::MAX_STRING_BYTES,
+        }
     }
 
     fn bounded(value: &str) -> Result<()> {
         if value.len() <= super::super::MAX_STRING_BYTES {
             Ok(())
         } else {
-            Err(limit("modern Comment Author string bytes"))
+            Err(limit(value.len()))
         }
     }
 

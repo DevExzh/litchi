@@ -24,7 +24,11 @@ pub(crate) fn validate_link(link: &Link) -> Result<()> {
 
 pub(crate) fn validate_links(links: &[Link]) -> Result<()> {
     if links.len() > MAX_RELATIONSHIPS {
-        return Err(limit("notes relationship count", MAX_RELATIONSHIPS));
+        return Err(limit(
+            crate::error::CodecLimitKind::Relationships,
+            links.len(),
+            MAX_RELATIONSHIPS,
+        ));
     }
     let mut ids = HashSet::new();
     ids.try_reserve(links.len())
@@ -57,7 +61,11 @@ pub(crate) fn validate_parts_with_limits(parts: &[PartState], limits: Limits) ->
     for part in parts {
         let name = part.name.as_str();
         if name.len() > MAX_RELATIONSHIP_FIELD_BYTES {
-            return Err(limit("notes part name", MAX_RELATIONSHIP_FIELD_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::NameBytes,
+                name.len(),
+                MAX_RELATIONSHIP_FIELD_BYTES,
+            ));
         }
         PackURI::new(name).map_err(crate::Error::Invalid)?;
         if part.content_type.is_empty() {
@@ -68,7 +76,11 @@ pub(crate) fn validate_parts_with_limits(parts: &[PartState], limits: Limits) ->
             .checked_add(part.data.len())
             .ok_or_else(|| invalid("notes transaction bytes overflow"))?;
         if total > limits.max_total_bytes {
-            return Err(limit("notes transaction bytes", limits.max_total_bytes));
+            return Err(limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                total,
+                limits.max_total_bytes,
+            ));
         }
         if !names.insert(name.to_owned()) {
             return Err(invalid("notes transaction contains duplicate part names"));
@@ -82,7 +94,11 @@ pub(crate) fn validate_id(value: &str, label: &'static str) -> Result<()> {
         return Err(invalid(format!("{label} is empty")));
     }
     if value.len() > MAX_RELATIONSHIP_FIELD_BYTES {
-        return Err(limit(label, MAX_RELATIONSHIP_FIELD_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::RelationshipBytes,
+            value.len(),
+            MAX_RELATIONSHIP_FIELD_BYTES,
+        ));
     }
     let mut bytes = value.bytes();
     let Some(first) = bytes.next() else {
@@ -98,7 +114,11 @@ pub(crate) fn validate_id(value: &str, label: &'static str) -> Result<()> {
 
 pub(crate) fn validate_field(value: &str, label: &'static str) -> Result<()> {
     if value.len() > MAX_RELATIONSHIP_FIELD_BYTES {
-        return Err(limit(label, MAX_RELATIONSHIP_FIELD_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::RelationshipBytes,
+            value.len(),
+            MAX_RELATIONSHIP_FIELD_BYTES,
+        ));
     }
     if value.chars().any(|character| {
         matches!(

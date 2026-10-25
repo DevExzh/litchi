@@ -52,7 +52,11 @@ impl Snapshot {
         limits: Limits,
     ) -> Result<Self> {
         if source_xml.len() > limits.max_input_bytes() {
-            return Err(limit("Changes Information source bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::SourceBytes,
+                source_xml.len(),
+                limits.max_input_bytes(),
+            ));
         }
         Ok(Self {
             presentation_part_name,
@@ -597,7 +601,11 @@ fn validate_kinds(kinds: &[Kind]) -> Result<()> {
 
 fn replace_change_kinds(source: &[u8], kinds: &[Kind], limits: Limits) -> Result<Vec<u8>> {
     if source.len() > limits.max_input_bytes() {
-        return Err(limit("document change descriptor bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            source.len(),
+            limits.max_input_bytes(),
+        ));
     }
     let value = kinds
         .iter()
@@ -726,6 +734,10 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(label: &str) -> Error {
-    invalid(format!("{label} exceed configured limit"))
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }

@@ -38,7 +38,7 @@ struct XmlSink {
 }
 
 enum SinkFailure {
-    Limit,
+    Limit(usize),
     Overflow,
     Allocation(TryReserveError),
 }
@@ -83,7 +83,7 @@ impl XmlSink {
             return;
         };
         if new_len > self.limit {
-            self.failure = Some(SinkFailure::Limit);
+            self.failure = Some(SinkFailure::Limit(new_len));
             return;
         }
         if let Some(out) = self.value.as_mut() {
@@ -104,7 +104,11 @@ impl XmlSink {
     fn check(&mut self) -> Result<()> {
         match self.failure.take() {
             None => Ok(()),
-            Some(SinkFailure::Limit) => Err(limit("serialized view properties bytes", self.limit)),
+            Some(SinkFailure::Limit(observed)) => Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                observed,
+                self.limit,
+            )),
             Some(SinkFailure::Overflow) => Err(Error::CapacityOverflow {
                 resource: "view-properties XML output",
             }),
@@ -315,7 +319,8 @@ impl ViewProperties {
         let limits = tol.limits;
         if xml.len() > limits.max_input_bytes() {
             return Err(limit(
-                "view properties input bytes",
+                crate::error::CodecLimitKind::InputBytes,
+                xml.len(),
                 limits.max_input_bytes(),
             ));
         }
@@ -347,7 +352,8 @@ impl ViewProperties {
         .xml;
         if x.len() > limits.max_output_bytes() {
             return Err(limit(
-                "processed view properties bytes",
+                crate::error::CodecLimitKind::OutputBytes,
+                x.len(),
                 limits.max_output_bytes(),
             ));
         }
@@ -451,7 +457,8 @@ struct Node {
 fn parse_dom_processed(xml: &[u8], limits: Limits) -> Result<Node> {
     if xml.len() > limits.max_output_bytes() {
         return Err(limit(
-            "processed view-properties bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            xml.len(),
             limits.max_output_bytes(),
         ));
     }
@@ -463,31 +470,59 @@ fn parse_dom_inner(xml: &[u8], limits: Limits) -> Result<Node> {
     let mut rd = Reader::from_reader(xml);
     let mut stack: Vec<Node> = Vec::new();
     let mut root = None;
-    let mut count = 0;
+    let mut count = 0usize;
     loop {
         let before = usize::try_from(rd.buffer_position())
             .map_err(|_| invalid("view-properties source offset overflows usize"))?;
         let d = rd.decoder();
         match rd.read_event() {
             Ok(Event::Start(e)) => {
-                count += 1;
+                count = count.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 if count > limits.max_nodes() {
-                    return Err(limit("view-properties XML nodes", limits.max_nodes()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        count,
+                        limits.max_nodes(),
+                    ));
                 }
                 if stack.len() >= limits.max_depth() {
-                    return Err(limit("view-properties XML depth", limits.max_depth()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.max_depth(),
+                    ));
                 }
                 let mut node = make(&e, d, &stack, limits)?;
                 node.source_start = before;
                 stack.push(node);
             },
             Ok(Event::Empty(e)) => {
-                count += 1;
+                count = count.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 if count > limits.max_nodes() {
-                    return Err(limit("view-properties XML nodes", limits.max_nodes()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        count,
+                        limits.max_nodes(),
+                    ));
                 }
                 if stack.len() >= limits.max_depth() {
-                    return Err(limit("view-properties XML depth", limits.max_depth()));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.max_depth(),
+                    ));
                 }
                 let mut n = make(&e, d, &stack, limits)?;
                 if n.capture_raw {
@@ -866,7 +901,11 @@ fn parse_common_slide(n: &Node, tol: &mut Tol<'_>) -> Result<CommonSlideView> {
         only(guide_list, &[], tol)?;
         for g in items(guide_list, "guide", tol)? {
             if guides.len() >= tol.limits.max_guides() {
-                return Err(limit("view-properties guides", tol.limits.max_guides()));
+                return Err(limit(
+                    crate::error::CodecLimitKind::Guides,
+                    guides.len().checked_add(1).unwrap_or(usize::MAX),
+                    tol.limits.max_guides(),
+                ));
             }
             let orientation = aopt(g, "orient")?
                 .map(|x| match x.as_str() {
@@ -929,7 +968,8 @@ fn parse_outline(n: &Node, tol: &mut Tol<'_>) -> Result<OutlineView> {
         for s in items(slide_list, "sld", tol)? {
             if slides.len() >= tol.limits.max_slides() {
                 return Err(limit(
-                    "view-properties outline slides",
+                    crate::error::CodecLimitKind::Slides,
+                    slides.len().checked_add(1).unwrap_or(usize::MAX),
                     tol.limits.max_slides(),
                 ));
             }
@@ -1112,14 +1152,21 @@ fn validate(v: &ViewProperties, limits: Limits) -> Result<()> {
         .chain(v.notes.iter().map(|x| &x.common))
     {
         if common.guides.len() > limits.max_guides() {
-            return Err(limit("view-properties guides", limits.max_guides()));
+            return Err(limit(
+                crate::error::CodecLimitKind::Guides,
+                common.guides.len(),
+                limits.max_guides(),
+            ));
         }
     }
-    if v.outline
-        .as_ref()
-        .is_some_and(|x| x.slides.len() > limits.max_slides())
-    {
-        return Err(limit("view-properties outline slides", limits.max_slides()));
+    if let Some(outline) = v.outline.as_ref() {
+        if outline.slides.len() > limits.max_slides() {
+            return Err(limit(
+                crate::error::CodecLimitKind::Slides,
+                outline.slides.len(),
+                limits.max_slides(),
+            ));
+        }
     }
     Ok(())
 }
@@ -1177,7 +1224,8 @@ fn boxed_copy(value: &[u8], resource: &'static str) -> Result<Box<[u8]>> {
 fn clone_fragment(value: &[u8], limits: Limits) -> Result<Vec<u8>> {
     if value.len() > limits.max_output_bytes() {
         return Err(limit(
-            "serialized view-properties fragment bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            value.len(),
             limits.max_output_bytes(),
         ));
     }
@@ -1421,7 +1469,8 @@ fn xml_error(e: impl std::fmt::Display) -> Error {
 fn bounded_string(value: &str, limits: Limits) -> Result<()> {
     if value.len() > limits.max_string_bytes() {
         return Err(limit(
-            "view-properties string bytes",
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
             limits.max_string_bytes(),
         ));
     }
@@ -1431,17 +1480,19 @@ fn bounded_string(value: &str, limits: Limits) -> Result<()> {
 fn bounded_attribute(value: &str, limits: Limits) -> Result<()> {
     if value.len() > limits.max_attribute_bytes {
         return Err(limit(
-            "view-properties attribute bytes",
+            crate::error::CodecLimitKind::XmlAttributeBytes,
+            value.len(),
             limits.max_attribute_bytes,
         ));
     }
     Ok(())
 }
 
-fn limit(resource: &'static str, maximum: usize) -> Error {
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
 }
 
@@ -1538,11 +1589,11 @@ mod tests {
         let xml = format!(r#"<p:viewPr xmlns:p="{P}"/>"#);
         assert!(matches!(
             ViewProperties::parse(xml.as_bytes(), limits),
-            Err(Error::Limit { limit: 1, .. })
+            Err(Error::Limit { maximum: 1, .. })
         ));
         assert!(matches!(
             ViewProperties::default().to_xml(false, limits),
-            Err(Error::Limit { limit: 1, .. })
+            Err(Error::Limit { maximum: 1, .. })
         ));
     }
 

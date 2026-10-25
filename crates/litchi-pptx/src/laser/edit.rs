@@ -68,7 +68,7 @@ impl Package {
                 let mut usage = Usage::default();
                 patch.validate_changed_parts(target, |_, part| {
                     if part.content_type() == ct::PML_SLIDE {
-                        raw::load_slide_traces(0, part, &limits, &mut usage).map(|_| ())
+                        load_slide_traces(0, part, &limits, &mut usage).map(|_| ())
                     } else {
                         Ok(())
                     }
@@ -160,8 +160,9 @@ mod tests {
         assert!(matches!(
             edit.set(0_usize, &points),
             Err(crate::Error::Limit {
-                resource: "laser trace-point count",
-                limit: 1,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TracePoints),
+                observed: 2,
+                maximum: 1,
             })
         ));
     }
@@ -187,8 +188,8 @@ mod tests {
         assert!(matches!(
             recipient.apply_laser_traces(&patch),
             Err(crate::Error::Limit {
-                resource: "slide XML bytes",
-                limit: 1,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                maximum: 1,
             })
         ));
         assert_eq!(recipient.to_bytes().unwrap(), before);
@@ -248,12 +249,14 @@ mod tests {
         assert_eq!(charged.point_count(), 1);
 
         let error = edit.set(1_usize, &[point()]).unwrap_err();
+        let expected_observed = one_slide_bytes.checked_add(one_slide_bytes).unwrap();
         assert!(matches!(
             error,
             crate::Error::Limit {
-                resource: "total slide XML bytes",
-                ..
-            }
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            } if observed == expected_observed && maximum == one_slide_bytes
         ));
         assert_eq!(edit.usage, charged);
         assert!(edit.set(1_usize, &[point()]).is_err());

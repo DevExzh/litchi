@@ -220,25 +220,46 @@ pub(crate) fn validate_slide_xml(slide: &dyn Part, policy: Limits) -> Result<()>
 impl LoadLimits {
     fn add_slide_xml(&mut self, bytes: usize, policy: Limits) -> Result<()> {
         if bytes > policy.max_slide_xml_bytes() {
-            return Err(limit("slide XML bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::InputBytes,
+                bytes,
+                policy.max_slide_xml_bytes(),
+            ));
         }
-        self.total_slide_xml_bytes = self
-            .total_slide_xml_bytes
-            .checked_add(bytes)
-            .ok_or_else(|| limit("total slide XML bytes"))?;
+        self.total_slide_xml_bytes =
+            self.total_slide_xml_bytes
+                .checked_add(bytes)
+                .ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlBytes,
+                        usize::MAX,
+                        policy.max_total_slide_xml_bytes(),
+                    )
+                })?;
         if self.total_slide_xml_bytes > policy.max_total_slide_xml_bytes() {
-            return Err(limit("total slide XML bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                self.total_slide_xml_bytes,
+                policy.max_total_slide_xml_bytes(),
+            ));
         }
         Ok(())
     }
 
     fn add_event(&mut self, policy: Limits) -> Result<()> {
-        self.event_count = self
-            .event_count
-            .checked_add(1)
-            .ok_or_else(|| limit("slide-show event count"))?;
+        self.event_count = self.event_count.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::Events,
+                usize::MAX,
+                policy.max_events(),
+            )
+        })?;
         if self.event_count > policy.max_events() {
-            return Err(limit("slide-show event count"));
+            return Err(limit(
+                crate::error::CodecLimitKind::Events,
+                self.event_count,
+                policy.max_events(),
+            ));
         }
         Ok(())
     }
@@ -251,7 +272,11 @@ fn scan_slide_show_events(
     limits: &mut LoadLimits,
 ) -> Result<Vec<Event>> {
     if xml_bytes.len() > policy.max_slide_xml_bytes() {
-        return Err(limit("slide XML bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::InputBytes,
+            xml_bytes.len(),
+            policy.max_slide_xml_bytes(),
+        ));
     }
 
     let mut capabilities = Capabilities::ooxml_baseline();
@@ -285,12 +310,19 @@ fn scan_slide_show_events(
         match event {
             XmlEvent::Start(element) => {
                 increment_nodes(&mut nodes, policy)?;
-                let depth = stack
-                    .len()
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth"))?;
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        policy.max_xml_depth(),
+                    )
+                })?;
                 if depth > policy.max_xml_depth() {
-                    return Err(limit("slide XML depth"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        policy.max_xml_depth(),
+                    ));
                 }
                 let parent = stack.last().copied().unwrap_or(ElementKind::Other);
                 let kind = classify_element(
@@ -313,12 +345,19 @@ fn scan_slide_show_events(
             },
             XmlEvent::Empty(element) => {
                 increment_nodes(&mut nodes, policy)?;
-                let depth = stack
-                    .len()
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth"))?;
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        policy.max_xml_depth(),
+                    )
+                })?;
                 if depth > policy.max_xml_depth() {
-                    return Err(limit("slide XML depth"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        policy.max_xml_depth(),
+                    ));
                 }
                 let parent = stack.last().copied().unwrap_or(ElementKind::Other);
                 let kind = classify_element(
@@ -573,7 +612,11 @@ fn required_attribute(
             ))
         })?;
     if value.len() > policy.max_event_string_bytes() {
-        return Err(limit("slide-show event attribute"));
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            policy.max_event_string_bytes(),
+        ));
     }
     Ok(value)
 }
@@ -615,11 +658,19 @@ fn time_error(error: TimeParseError) -> Error {
 }
 
 fn increment_nodes(nodes: &mut usize, policy: Limits) -> Result<()> {
-    *nodes = nodes
-        .checked_add(1)
-        .ok_or_else(|| limit("slide XML node count"))?;
+    *nodes = nodes.checked_add(1).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            usize::MAX,
+            policy.max_xml_nodes(),
+        )
+    })?;
     if *nodes > policy.max_xml_nodes() {
-        return Err(limit("slide XML node count"));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            *nodes,
+            policy.max_xml_nodes(),
+        ));
     }
     Ok(())
 }
@@ -628,8 +679,12 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(what: &str) -> Error {
-    invalid(format!("{what} exceeds the supported safety limit"))
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 fn trigger_token(trigger: Trigger) -> &'static str {
@@ -694,7 +749,11 @@ pub(super) fn store(
     let dialect = super::super::slide_patch::slide_dialect(slide.blob())?;
     let fragment_len = event_fragment_len(events, dialect)?;
     if fragment_len > policy.max_output_bytes() {
-        return Err(limit("slide-show event XML fragment bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            fragment_len,
+            policy.max_output_bytes(),
+        ));
     }
     let mut fragment = String::new();
     fragment
@@ -878,7 +937,11 @@ pub(crate) fn locate(
 
 fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
     if source.len() > policy.max_slide_xml_bytes() {
-        return Err(limit("slide XML bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::InputBytes,
+            source.len(),
+            policy.max_slide_xml_bytes(),
+        ));
     }
     let mut reader = NsReader::from_reader(source);
     let origin = ReaderOrigin::of(source);
@@ -909,11 +972,33 @@ fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
         let (namespace, event) = resolver.resolve_event(event);
         match event {
             XmlEvent::Start(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML node count"))?;
-                if nodes > policy.max_xml_nodes() || stack.len() + 1 > policy.max_xml_depth() {
-                    return Err(limit("slide XML resources"));
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        policy.max_xml_nodes(),
+                    )
+                })?;
+                if nodes > policy.max_xml_nodes() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        policy.max_xml_nodes(),
+                    ));
+                }
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        policy.max_xml_depth(),
+                    )
+                })?;
+                if depth > policy.max_xml_depth() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        policy.max_xml_depth(),
+                    ));
                 }
                 let parent = stack.last();
                 let kind = if stack.is_empty() {
@@ -927,7 +1012,12 @@ fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
                 } else if is_presentationml_name(&namespace, element.name(), b"ext")
                     && is_show_event_extension(&element, decoder)?
                 {
-                    extension_count += 1;
+                    extension_count =
+                        extension_count
+                            .checked_add(1)
+                            .ok_or(Error::CapacityOverflow {
+                                resource: "slide-show extension count",
+                            })?;
                     if extension_count > 1 {
                         return Err(invalid("slide has multiple slide-show event extensions"));
                     }
@@ -935,7 +1025,9 @@ fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
                 } else if is_p14_name(&namespace, element.name(), b"showEvtLst")
                     && parent.is_some_and(|frame| matches!(frame, Frame::Extension { .. }))
                 {
-                    list_count += 1;
+                    list_count = list_count.checked_add(1).ok_or(Error::CapacityOverflow {
+                        resource: "slide-show event-list count",
+                    })?;
                     if list_count > 1 {
                         return Err(invalid("slide has multiple slide-show event lists"));
                     }
@@ -950,11 +1042,33 @@ fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
                 stack.push(kind);
             },
             XmlEvent::Empty(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| limit("slide XML node count"))?;
-                if nodes > policy.max_xml_nodes() || stack.len() + 1 > policy.max_xml_depth() {
-                    return Err(limit("slide XML resources"));
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        policy.max_xml_nodes(),
+                    )
+                })?;
+                if nodes > policy.max_xml_nodes() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        policy.max_xml_nodes(),
+                    ));
+                }
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        policy.max_xml_depth(),
+                    )
+                })?;
+                if depth > policy.max_xml_depth() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        policy.max_xml_depth(),
+                    ));
                 }
                 let parent = stack.last();
                 if stack.is_empty() {
@@ -968,7 +1082,12 @@ fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
                 } else if is_presentationml_name(&namespace, element.name(), b"ext")
                     && is_show_event_extension(&element, decoder)?
                 {
-                    extension_count += 1;
+                    extension_count =
+                        extension_count
+                            .checked_add(1)
+                            .ok_or(Error::CapacityOverflow {
+                                resource: "slide-show extension count",
+                            })?;
                     if extension_count > 1 {
                         return Err(invalid("slide has multiple slide-show event extensions"));
                     }
@@ -976,7 +1095,9 @@ fn locate_raw(source: &[u8], policy: Limits) -> Result<Located> {
                 } else if is_p14_name(&namespace, element.name(), b"showEvtLst")
                     && parent.is_some_and(|frame| matches!(frame, Frame::Extension { .. }))
                 {
-                    list_count += 1;
+                    list_count = list_count.checked_add(1).ok_or(Error::CapacityOverflow {
+                        resource: "slide-show event-list count",
+                    })?;
                     if list_count > 1 {
                         return Err(invalid("slide has multiple slide-show event lists"));
                     }
@@ -1160,10 +1281,16 @@ pub(crate) fn rewrite(
         for event in working {
             body_len = body_len
                 .checked_add(serialized_event_len(event, &prefix)?)
-                .ok_or_else(|| limit("slide-show event XML bytes"))?;
+                .ok_or(Error::CapacityOverflow {
+                    resource: "slide-show event XML bytes",
+                })?;
         }
         if body_len > policy.max_output_bytes() {
-            return Err(limit("slide-show event XML bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                body_len,
+                policy.max_output_bytes(),
+            ));
         }
         let mut body = Vec::new();
         body.try_reserve_exact(body_len)
@@ -1397,10 +1524,16 @@ fn apply_edits(source: &[u8], mut edits: Vec<ListDraft>, policy: Limits) -> Resu
         output_len = output_len
             .checked_sub(edit.range.end - edit.range.start)
             .and_then(|length| length.checked_add(edit.replacement.len()))
-            .ok_or_else(|| limit("updated slide XML bytes"))?;
+            .ok_or(Error::CapacityOverflow {
+                resource: "updated slide XML bytes",
+            })?;
     }
     if output_len > policy.max_output_bytes() {
-        return Err(limit("updated slide XML bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::OutputBytes,
+            output_len,
+            policy.max_output_bytes(),
+        ));
     }
     let mut output = Vec::new();
     output
@@ -1425,7 +1558,9 @@ fn apply_edits(source: &[u8], mut edits: Vec<ListDraft>, policy: Limits) -> Resu
 fn add_len(length: &mut usize, additional: usize) -> Result<()> {
     *length = length
         .checked_add(additional)
-        .ok_or_else(|| limit("slide-show event XML bytes"))?;
+        .ok_or(Error::CapacityOverflow {
+            resource: "slide-show event XML bytes",
+        })?;
     Ok(())
 }
 

@@ -234,8 +234,11 @@ fn attribute(
                 .map_err(|error| Error::Xml(error.to_string()))?;
             if value.len() > MAX_TEXT_BYTES {
                 return Err(Error::Limit {
-                    resource: "hyperlink attribute bytes",
-                    limit: MAX_TEXT_BYTES,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::XmlAttributeBytes,
+                    ),
+                    observed: value.len(),
+                    maximum: MAX_TEXT_BYTES,
                 });
             }
             return Ok(Some(value.into_owned()));

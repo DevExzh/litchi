@@ -92,9 +92,10 @@ fn replay_notes_aggregate_accepts_exact_and_refuses_one_byte_under() {
     assert!(matches!(
         super::package::validate_replay_total(&index, under),
         Err(Error::Limit {
-            resource: "notes aggregate bytes",
-            limit,
-        }) if limit == total.saturating_sub(1)
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            observed,
+            maximum,
+        }) if observed == total && maximum == total.saturating_sub(1)
     ));
 }
 
@@ -124,7 +125,7 @@ fn replay_notes_index_applies_changed_slide_delta() {
     assert!(matches!(
         super::package::validate_replay_total(&updated, under),
         Err(Error::Limit {
-            resource: "notes aggregate bytes",
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
             ..
         })
     ));

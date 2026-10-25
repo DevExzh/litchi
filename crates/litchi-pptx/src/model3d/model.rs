@@ -23,7 +23,11 @@ impl Data {
 
     pub(crate) fn from_shared(bytes: Arc<Vec<u8>>) -> Result<Self> {
         if bytes.len() > super::MAX_MODEL_BYTES {
-            return Err(limit("model3d payload bytes", super::MAX_MODEL_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                bytes.len(),
+                super::MAX_MODEL_BYTES,
+            ));
         }
         Ok(Self(bytes))
     }
@@ -479,8 +483,12 @@ fn is_known_scene_child(value: &drawing::Inert) -> bool {
         )
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 /// Convert the shared model3d error into the host error without leaking its

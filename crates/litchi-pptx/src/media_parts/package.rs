@@ -99,7 +99,11 @@ pub(crate) fn validate_replay_part(
     if part.content_type() == ct::PML_SLIDE {
         load_with_limits(package, part_name, limits).map(drop)
     } else if part.blob().len() > limits.max_payload_bytes {
-        Err(limit("individual payload bytes"))
+        Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            part.blob().len(),
+            limits.max_payload_bytes,
+        ))
     } else {
         Ok(())
     }
@@ -379,9 +383,19 @@ fn insert_pictures(
                 if depth == 0 && (!core || element.local_name().as_ref() != b"sld") {
                     return Err(invalid("slide root does not match conformance"));
                 }
-                depth += 1;
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth,
+                    )
+                })?;
                 if depth > limits.max_depth {
-                    return Err(limit("XML depth"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth,
+                    ));
                 }
                 if core
                     && element.local_name().as_ref() == b"spTree"
@@ -413,12 +427,19 @@ fn insert_pictures(
         return Err(invalid("invalid slide XML"));
     }
     let position = position.ok_or_else(|| invalid("slide is missing a shape tree"))?;
-    let size = xml
-        .len()
-        .checked_add(fragment.len())
-        .ok_or_else(|| limit("updated XML bytes"))?;
+    let size = xml.len().checked_add(fragment.len()).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            usize::MAX,
+            limits.max_output_bytes,
+        )
+    })?;
     if size > limits.max_output_bytes {
-        return Err(limit("updated XML bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            size,
+            limits.max_output_bytes,
+        ));
     }
     let mut output = Vec::new();
     output
@@ -443,7 +464,11 @@ pub(crate) fn validate_value_with_limits(
     limits: Limits,
 ) -> Result<()> {
     if value.pictures.len() > limits.max_media {
-        return Err(limit("media count"));
+        return Err(limit(
+            crate::error::CodecLimitKind::MediaPictures,
+            value.pictures.len(),
+            limits.max_media,
+        ));
     }
     let mut shape_ids = HashSet::new();
     let mut resources: BTreeMap<String, Resource> = BTreeMap::new();
@@ -530,7 +555,11 @@ fn validate_extension_with_limits(value: &Extension, limits: Limits) -> Result<(
         validate_id(id)?;
     }
     if value.bookmarks.len() > limits.max_bookmarks {
-        return Err(limit("bookmark count"));
+        return Err(limit(
+            crate::error::CodecLimitKind::Bookmarks,
+            value.bookmarks.len(),
+            limits.max_bookmarks,
+        ));
     }
     let mut names = HashSet::new();
     let mut times = HashSet::new();
@@ -597,7 +626,11 @@ fn resource_uri_with_limits(
         }
     }
     if resource.data.len() > limits.max_payload_bytes {
-        return Err(limit("individual payload bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            resource.data.len(),
+            limits.max_payload_bytes,
+        ));
     }
     Ok(uri)
 }
@@ -606,7 +639,11 @@ fn bounded_with_limits(value: &str, maximum: usize) -> Result<()> {
     if value.len() <= maximum {
         Ok(())
     } else {
-        Err(limit("string bytes"))
+        Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            maximum,
+        ))
     }
 }
 
@@ -658,13 +695,25 @@ fn add_relationship_plan(
 }
 fn add_payload(total: &mut usize, size: usize, limits: Limits) -> Result<()> {
     if size > limits.max_payload_bytes {
-        return Err(limit("individual payload bytes"));
+        return Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            size,
+            limits.max_payload_bytes,
+        ));
     }
-    *total = total
-        .checked_add(size)
-        .ok_or_else(|| limit("total payload bytes"))?;
+    *total = total.checked_add(size).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            usize::MAX,
+            limits.max_total_payload_bytes,
+        )
+    })?;
     if *total > limits.max_total_payload_bytes {
-        Err(limit("total payload bytes"))
+        Err(limit(
+            crate::error::CodecLimitKind::PayloadBytes,
+            *total,
+            limits.max_total_payload_bytes,
+        ))
     } else {
         Ok(())
     }

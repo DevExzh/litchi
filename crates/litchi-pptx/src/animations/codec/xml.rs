@@ -36,15 +36,17 @@ impl BoundedXml {
         }
         let Some(next) = self.value.len().checked_add(value.len()) else {
             self.failure = Some(Error::Limit {
-                resource: "animation XML output bytes",
-                limit: self.limit,
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed: usize::MAX,
+                maximum: self.limit,
             });
             return;
         };
         if next > self.limit {
             self.failure = Some(Error::Limit {
-                resource: "animation XML output bytes",
-                limit: self.limit,
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed: next,
+                maximum: self.limit,
             });
             return;
         }

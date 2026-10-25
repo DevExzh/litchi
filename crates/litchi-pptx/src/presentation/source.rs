@@ -469,26 +469,65 @@ fn merge_laser_usage(
     addition: crate::laser::Usage,
     limits: crate::laser::Limits,
 ) -> Result<()> {
-    let next = usage.checked_add(addition).ok_or_else(|| Error::Limit {
-        resource: "total slide XML bytes",
-        limit: limits.max_total_slide_xml_bytes(),
-    })?;
+    // Check each aggregate independently before using the compact ledger's
+    // all-or-nothing addition.  `Usage::checked_add` intentionally returns
+    // only `Option`, so a single generic overflow must not be misreported as
+    // an XML-byte failure when the trace or point counter overflowed.
+    if usage
+        .total_slide_xml_bytes()
+        .checked_add(addition.total_slide_xml_bytes())
+        .is_none()
+    {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: usize::MAX,
+            maximum: limits.max_total_slide_xml_bytes(),
+        });
+    }
+    if usage
+        .trace_count()
+        .checked_add(addition.trace_count())
+        .is_none()
+    {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Traces),
+            observed: usize::MAX,
+            maximum: limits.max_trace_count(),
+        });
+    }
+    if usage
+        .point_count()
+        .checked_add(addition.point_count())
+        .is_none()
+    {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TracePoints),
+            observed: usize::MAX,
+            maximum: limits.max_point_count(),
+        });
+    }
+    let next = usage
+        .checked_add(addition)
+        .expect("aggregate counters were checked immediately above");
     if next.total_slide_xml_bytes() > limits.max_total_slide_xml_bytes() {
         return Err(Error::Limit {
-            resource: "total slide XML bytes",
-            limit: limits.max_total_slide_xml_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: next.total_slide_xml_bytes(),
+            maximum: limits.max_total_slide_xml_bytes(),
         });
     }
     if next.trace_count() > limits.max_trace_count() {
         return Err(Error::Limit {
-            resource: "laser trace count",
-            limit: limits.max_trace_count(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Traces),
+            observed: next.trace_count(),
+            maximum: limits.max_trace_count(),
         });
     }
     if next.point_count() > limits.max_point_count() {
         return Err(Error::Limit {
-            resource: "laser trace-point count",
-            limit: limits.max_point_count(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TracePoints),
+            observed: next.point_count(),
+            maximum: limits.max_point_count(),
         });
     }
     *usage = next;
@@ -520,37 +559,51 @@ fn reserve_source_text_box(
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
         .ok_or(Error::Limit {
-            resource: "source-backed text-box admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
     let output_scene = output_bound
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
         .ok_or(Error::Limit {
-            resource: "source-backed text-box admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
-    let fragment_bound = output_bound.checked_sub(input_bytes).ok_or(Error::Limit {
-        resource: "source-backed text-box admission bytes",
-        limit: maximum,
+    let fragment_bound = output_bound.checked_sub(input_bytes).ok_or_else(|| {
+        Error::internal(
+            "reserve_source_text_box",
+            "output bound is below the admitted input bytes",
+        )
     })?;
     let transient = output_bound
         .checked_add(fragment_bound)
         .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
         .ok_or(Error::Limit {
-            resource: "source-backed text-box admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
     let amount = input_scene
         .checked_add(output_scene)
         .and_then(|size| size.checked_add(transient))
         .ok_or(Error::Limit {
-            resource: "source-backed text-box admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
+    if amount > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: amount,
+            maximum: maximum,
+        });
+    }
     let amount = u64::try_from(amount).map_err(|_| Error::Limit {
-        resource: "source-backed text-box admission bytes",
-        limit: maximum,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+        observed: usize::MAX,
+        maximum: maximum,
     })?;
     context
         .reserve(litchi_core::Resource::Memory, amount)
@@ -578,26 +631,35 @@ fn reserve_source_shape_removal(
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
         .ok_or(Error::Limit {
-            resource: "source-backed removed shape admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
     let output_bound = input_bytes.min(max_output_bytes);
     let output_scene = output_bound
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
         .ok_or(Error::Limit {
-            resource: "source-backed removed shape admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
     let amount = input_scene
         .checked_add(output_scene)
         .and_then(|size| size.checked_add(output_bound))
         .and_then(|size| size.checked_add(4096))
-        .filter(|size| *size <= maximum)
         .ok_or(Error::Limit {
-            resource: "source-backed removed shape admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
+    if amount > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: amount,
+            maximum: maximum,
+        });
+    }
     context
         .reserve(litchi_core::Resource::Memory, amount as u64)
         .map(|reservation| Some(Arc::new(reservation)))
@@ -625,13 +687,15 @@ fn reserve_source_slide_properties(
     // still applies the exact output-byte limit before allocating the result.
     let conservative_output_bound = input_bytes
         .checked_add(name_bytes.checked_mul(6).ok_or(Error::Limit {
-            resource: "source-backed slide property admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?)
         .and_then(|size| size.checked_add(16))
         .ok_or(Error::Limit {
-            resource: "source-backed slide property admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
     // The native stage applies the exact output limit after it knows whether
     // each requested attribute is a no-op, replacement, insertion, or
@@ -645,26 +709,35 @@ fn reserve_source_slide_properties(
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
         .ok_or(Error::Limit {
-            resource: "source-backed slide property admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
     let output_scene = output_bound
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
         .ok_or(Error::Limit {
-            resource: "source-backed slide property admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
     let amount = input_scene
         .checked_add(output_scene)
         .and_then(|size| size.checked_add(output_bound))
         .and_then(|size| size.checked_add(name_bytes.checked_mul(6)?))
         .and_then(|size| size.checked_add(4096))
-        .filter(|amount| *amount <= maximum)
         .ok_or(Error::Limit {
-            resource: "source-backed slide property admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
+    if amount > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: amount,
+            maximum: maximum,
+        });
+    }
     context
         .reserve(litchi_core::Resource::Memory, amount as u64)
         .map(|reservation| Some(Arc::new(reservation)))
@@ -685,23 +758,25 @@ fn reserve_source_shape_properties(
     let maximum = max_output_bytes;
     if replacements.len() > crate::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS {
         return Err(Error::Limit {
-            resource: "source-backed shape property replacements",
-            limit: crate::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: replacements.len(),
+            maximum: crate::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
         });
     }
-    let refusal = || Error::Limit {
-        resource: "source-backed shape property admission bytes",
-        limit: maximum,
-    };
+    let text_maximum = crate::opened::Limits::default().max_text_bytes();
     let text_bytes = replacements.iter().try_fold(0usize, |sum, replacement| {
         sum.checked_add(replacement.text().map_or(0, str::len))
-            .ok_or_else(refusal)
+            .ok_or(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: usize::MAX,
+                maximum: text_maximum,
+            })
     })?;
-    let text_maximum = crate::opened::Limits::default().max_text_bytes();
     if text_bytes > text_maximum {
         return Err(Error::Limit {
-            resource: "source-backed shape property text bytes",
-            limit: text_maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            observed: text_bytes,
+            maximum: text_maximum,
         });
     }
     let Some(context) = context else {
@@ -715,15 +790,29 @@ fn reserve_source_shape_properties(
         .checked_mul(6)
         .and_then(|size| size.checked_add(input_bytes))
         .and_then(|size| size.checked_add(replacements.len().checked_mul(512)?))
-        .ok_or_else(refusal)?
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum,
+        })?
         .min(max_output_bytes);
     let amount = input_bytes
         .checked_mul(64)
         .and_then(|size| size.checked_add(output_bound.checked_mul(196)?))
         .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
         .and_then(|size| size.checked_add(4096))
-        .filter(|size| *size <= maximum)
-        .ok_or_else(refusal)?;
+        .ok_or_else(|| Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
+        })?;
+    if amount > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: amount,
+            maximum: maximum,
+        });
+    }
     context
         .reserve(litchi_core::Resource::Memory, amount as u64)
         .map(|reservation| Some(Arc::new(reservation)))
@@ -749,28 +838,32 @@ fn reserve_source_shape_text_chunks(
     };
     let output_bound = input_bytes
         .checked_add(text_bytes.checked_mul(6).ok_or(Error::Limit {
-            resource: "source-backed shape text admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?)
         .and_then(|size| size.checked_add(replacements.checked_mul(256)?))
         .ok_or(Error::Limit {
-            resource: "source-backed shape text admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?
         .min(max_output_bytes);
     let input_scene = input_bytes
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
         .ok_or(Error::Limit {
-            resource: "source-backed shape text admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
     let output_scene = output_bound
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
         .ok_or(Error::Limit {
-            resource: "source-backed shape text admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
     let amount = input_scene
         .checked_add(output_scene)
@@ -778,11 +871,18 @@ fn reserve_source_shape_text_chunks(
         .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
         .and_then(|size| size.checked_add(replacements.checked_mul(256)?))
         .and_then(|size| size.checked_add(4096))
-        .filter(|size| *size <= maximum)
         .ok_or(Error::Limit {
-            resource: "source-backed shape text admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
+    if amount > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: amount,
+            maximum: maximum,
+        });
+    }
     context
         .reserve(litchi_core::Resource::Memory, amount as u64)
         .map(|reservation| Some(Arc::new(reservation)))
@@ -808,13 +908,15 @@ fn reserve_source_shape_property_chunks(
     };
     let output_bound = input_bytes
         .checked_add(text_bytes.checked_mul(6).ok_or(Error::Limit {
-            resource: "source-backed shape property admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?)
         .and_then(|size| size.checked_add(replacements.checked_mul(512)?))
         .ok_or(Error::Limit {
-            resource: "source-backed shape property admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?
         .min(max_output_bytes);
     let amount = input_bytes
@@ -823,11 +925,18 @@ fn reserve_source_shape_property_chunks(
         .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
         .and_then(|size| size.checked_add(replacements.checked_mul(512)?))
         .and_then(|size| size.checked_add(4096))
-        .filter(|size| *size <= maximum)
         .ok_or(Error::Limit {
-            resource: "source-backed shape property admission bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: usize::MAX,
+            maximum: maximum,
         })?;
+    if amount > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
+            observed: amount,
+            maximum: maximum,
+        });
+    }
     context
         .reserve(litchi_core::Resource::Memory, amount as u64)
         .map(|reservation| Some(Arc::new(reservation)))
@@ -2742,8 +2851,9 @@ impl SourceBackedSlideSnapshot {
         target.xml = rebase_payload_reservation(target.xml, recipient.context.as_ref())?;
         if target.xml.as_bytes().len() > recipient.max_output_bytes {
             return Err(Error::Limit {
-                resource: "source-backed primary slide output bytes",
-                limit: recipient.max_output_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                observed: target.xml.as_bytes().len(),
+                maximum: recipient.max_output_bytes,
             });
         }
         let semantic = crate::open_options::selected(recipient.semantic_limits.as_ref());
@@ -3010,8 +3120,11 @@ impl SourceBackedSlideEdit {
             crate::open_options::selected(self.source.semantic_limits.as_ref()).shape();
         if chunks.len() > shape_limits.shapes() {
             return Err(Error::Limit {
-                resource: "source-backed shape text chunks",
-                limit: shape_limits.shapes(),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::TextReplacements,
+                ),
+                observed: chunks.len(),
+                maximum: shape_limits.shapes(),
             });
         }
         if chunks.iter().all(|chunk| chunk.is_empty()) {
@@ -3116,8 +3229,11 @@ impl SourceBackedSlideEdit {
             crate::open_options::selected(self.source.semantic_limits.as_ref()).shape();
         if chunks.len() > shape_limits.shapes() {
             return Err(Error::Limit {
-                resource: "source-backed shape property chunks",
-                limit: shape_limits.shapes(),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ShapeProperties,
+                ),
+                observed: chunks.len(),
+                maximum: shape_limits.shapes(),
             });
         }
         if chunks.iter().all(|chunk| chunk.is_empty()) {
@@ -3778,8 +3894,9 @@ impl SourceBackedSlideBatchEdit<'_> {
         }
         if self.commits.len() >= MAX_SOURCE_BACKED_SLIDE_BATCH {
             return Err(Error::Limit {
-                resource: "source-backed slide batch selections",
-                limit: MAX_SOURCE_BACKED_SLIDE_BATCH,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
+                observed: self.commits.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum: MAX_SOURCE_BACKED_SLIDE_BATCH,
             });
         }
         let added_text_bytes = replacements
@@ -3787,21 +3904,24 @@ impl SourceBackedSlideBatchEdit<'_> {
             .try_fold(0_usize, |total, replacement| {
                 total
                     .checked_add(replacement.text().len())
-                    .ok_or(Error::EditLimit {
+                    .ok_or(Error::Limit {
                         kind: crate::opened::LimitKind::TextBytes,
+                        observed: usize::MAX,
                         maximum: crate::opened::Limits::default().max_text_bytes(),
                     })
             })?;
         let text_bytes = self
             .text_bytes
             .checked_add(added_text_bytes)
-            .ok_or(Error::EditLimit {
+            .ok_or(Error::Limit {
                 kind: crate::opened::LimitKind::TextBytes,
+                observed: usize::MAX,
                 maximum: crate::opened::Limits::default().max_text_bytes(),
             })?;
         if text_bytes > crate::opened::Limits::default().max_text_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::TextBytes,
+                observed: text_bytes,
                 maximum: crate::opened::Limits::default().max_text_bytes(),
             });
         }
@@ -4021,12 +4141,9 @@ fn stage_svg_payload(current: &SourcePayload, replacement: Vec<u8>) -> SourcePay
 fn check_svg_replacement_payload(limits: &SourceLimits, bytes: usize, svg: bool) -> Result<()> {
     if bytes as u64 > limits.max_part_bytes() {
         return Err(Error::Limit {
-            resource: if svg {
-                "SVG replacement Part bytes"
-            } else {
-                "raster replacement Part bytes"
-            },
-            limit: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+            observed: bytes,
+            maximum: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
         });
     }
     if svg && bytes == 0 {
@@ -4322,8 +4439,9 @@ impl SourceSlide {
         let raw_xml_limit = SlidePart::semantic_text_raw_xml_limit();
         if declared > raw_xml_limit as u64 {
             return Err(Error::Limit {
-                resource: "semantic slide raw XML bytes",
-                limit: raw_xml_limit,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: usize::try_from(declared).unwrap_or(usize::MAX),
+                maximum: raw_xml_limit,
             });
         }
         let part = self.load_part(&view)?;
@@ -7303,6 +7421,12 @@ mod tests {
                 slides: vec![after_first, recipient_second.clone()].into_boxed_slice(),
             },
         };
+        let expected_observed = patch.after.slides[0]
+            .xml
+            .as_bytes()
+            .len()
+            .checked_add(patch.after.slides[1].xml.as_bytes().len())
+            .unwrap();
         let recipient = SourceBackedSlideBatchSnapshot {
             slides: vec![recipient_first, recipient_second].into_boxed_slice(),
         };
@@ -7310,9 +7434,10 @@ mod tests {
         assert!(matches!(
             patch.apply(&recipient),
             Err(Error::Limit {
-                resource: "total slide XML bytes",
-                limit,
-            }) if limit == total - 1
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            }) if observed == expected_observed && maximum == total - 1
         ));
         assert_eq!(source_laser_scans(), 2);
     }
@@ -7374,9 +7499,10 @@ mod tests {
         assert!(matches!(
             patch.apply(&tight_recipient),
             Err(Error::Limit {
-                resource: "shape owner input bytes",
-                limit,
-            }) if limit == source_len
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                maximum,
+                ..
+            }) if maximum == source_len
         ));
 
         let loose_shape = crate::shape::Limits::new(
@@ -8367,6 +8493,7 @@ mod tests {
             ),
             Err(Error::Opc(litchi_opc::OpcError::Limit {
                 kind: SourceLimitKind::PartBytes,
+                observed: 131326,
                 maximum: 1024,
                 ..
             }))

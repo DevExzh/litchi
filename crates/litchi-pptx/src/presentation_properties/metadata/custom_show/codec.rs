@@ -18,18 +18,20 @@ impl List {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_xml(xml: &str, limits: Limits) -> Result<Self> {
         if xml.len() > limits.max_input_bytes() {
-            return Err(Error::Limit {
-                resource: "custom-show XML input",
-                limit: limits.max_input_bytes(),
-            });
+            return Err(limit(
+                crate::opened::CodecLimitKind::InputBytes,
+                xml.len(),
+                limits.max_input_bytes(),
+            ));
         }
         let mut list = Self::new();
         let xml = process_str(xml, limits)?;
         if xml.len() > limits.max_output_bytes() {
-            return Err(Error::Limit {
-                resource: "processed custom-show XML",
-                limit: limits.max_output_bytes(),
-            });
+            return Err(limit(
+                crate::opened::CodecLimitKind::OutputBytes,
+                xml.len(),
+                limits.max_output_bytes(),
+            ));
         }
         let mut reader = Reader::from_str(xml.as_ref());
         reader.config_mut().trim_text(true);
@@ -43,29 +45,47 @@ impl List {
             match reader.read_event() {
                 Ok(Event::Start(e)) if e.local_name().as_ref() == b"custShow" => {
                     check_attributes(&e, reader.decoder(), limits)?;
-                    nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                        resource: "custom-show XML nodes",
-                        limit: limits.max_nodes(),
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                            usize::MAX,
+                            limits.max_nodes(),
+                        )
                     })?;
-                    depth = depth.checked_add(1).ok_or(Error::Limit {
-                        resource: "custom-show XML depth",
-                        limit: limits.max_depth(),
-                    })?;
-                    if nodes > limits.max_nodes() || depth > limits.max_depth() {
-                        return Err(Error::Limit {
-                            resource: "custom-show XML nodes or depth",
-                            limit: limits.max_nodes(),
-                        });
+                    if nodes > limits.max_nodes() {
+                        return Err(limit(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                            nodes,
+                            limits.max_nodes(),
+                        ));
                     }
-                    shows = shows.checked_add(1).ok_or(Error::Limit {
-                        resource: "custom-show entries",
-                        limit: limits.max_custom_shows(),
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                            usize::MAX,
+                            limits.max_depth(),
+                        )
+                    })?;
+                    if depth > limits.max_depth() {
+                        return Err(limit(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                            depth,
+                            limits.max_depth(),
+                        ));
+                    }
+                    shows = shows.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::opened::CodecLimitKind::CustomShows,
+                            usize::MAX,
+                            limits.max_custom_shows(),
+                        )
                     })?;
                     if shows > limits.max_custom_shows() {
-                        return Err(Error::Limit {
-                            resource: "custom-show entries",
-                            limit: limits.max_custom_shows(),
-                        });
+                        return Err(limit(
+                            crate::opened::CodecLimitKind::CustomShows,
+                            shows,
+                            limits.max_custom_shows(),
+                        ));
                     }
                     if current_show.is_some() {
                         return Err(Error::Invalid(
@@ -91,33 +111,52 @@ impl List {
                     current_show = Some(Show::new(id, name));
                 },
                 Ok(Event::Start(e)) => {
-                    nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                        resource: "custom-show XML nodes",
-                        limit: limits.max_nodes(),
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                            usize::MAX,
+                            limits.max_nodes(),
+                        )
                     })?;
-                    depth = depth.checked_add(1).ok_or(Error::Limit {
-                        resource: "custom-show XML depth",
-                        limit: limits.max_depth(),
+                    if nodes > limits.max_nodes() {
+                        return Err(limit(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                            nodes,
+                            limits.max_nodes(),
+                        ));
+                    }
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                            usize::MAX,
+                            limits.max_depth(),
+                        )
                     })?;
-                    if nodes > limits.max_nodes() || depth > limits.max_depth() {
-                        return Err(Error::Limit {
-                            resource: "custom-show XML nodes or depth",
-                            limit: limits.max_nodes(),
-                        });
+                    if depth > limits.max_depth() {
+                        return Err(limit(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                            depth,
+                            limits.max_depth(),
+                        ));
                     }
                     check_attributes(&e, reader.decoder(), limits)?;
                 },
                 Ok(Event::Empty(e)) => {
+                    check_empty_depth(depth, limits)?;
                     check_attributes(&e, reader.decoder(), limits)?;
-                    nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                        resource: "custom-show XML nodes",
-                        limit: limits.max_nodes(),
+                    nodes = nodes.checked_add(1).ok_or_else(|| {
+                        limit(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                            usize::MAX,
+                            limits.max_nodes(),
+                        )
                     })?;
                     if nodes > limits.max_nodes() {
-                        return Err(Error::Limit {
-                            resource: "custom-show XML nodes",
-                            limit: limits.max_nodes(),
-                        });
+                        return Err(limit(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                            nodes,
+                            limits.max_nodes(),
+                        ));
                     }
                     if e.local_name().as_ref() == b"sld"
                         && let Some(ref mut show) = current_show
@@ -188,10 +227,11 @@ impl List {
                             resource: "custom-show relationship ID",
                         })?;
                 if relationship_bytes > limits.max_string_bytes() {
-                    return Err(Error::Limit {
-                        resource: "custom-show relationship ID",
-                        limit: limits.max_string_bytes(),
-                    });
+                    return Err(limit(
+                        crate::opened::CodecLimitKind::RelationshipBytes,
+                        relationship_bytes,
+                        limits.max_string_bytes(),
+                    ));
                 }
                 fallback_map
                     .entry(*slide_id)
@@ -246,23 +286,26 @@ impl List {
 
 fn validate(value: &List, limits: Limits) -> Result<()> {
     if value.shows.len() > limits.max_custom_shows() {
-        return Err(Error::Limit {
-            resource: "custom-show entries",
-            limit: limits.max_custom_shows(),
-        });
+        return Err(limit(
+            crate::opened::CodecLimitKind::CustomShows,
+            value.shows.len(),
+            limits.max_custom_shows(),
+        ));
     }
     for show in &value.shows {
         if show.name.len() > limits.max_string_bytes() {
-            return Err(Error::Limit {
-                resource: "custom-show name",
-                limit: limits.max_string_bytes(),
-            });
+            return Err(limit(
+                crate::opened::CodecLimitKind::StringBytes,
+                show.name.len(),
+                limits.max_string_bytes(),
+            ));
         }
         if show.slide_ids.len() > limits.max_slide_references() {
-            return Err(Error::Limit {
-                resource: "custom-show slide references",
-                limit: limits.max_slide_references(),
-            });
+            return Err(limit(
+                crate::opened::CodecLimitKind::SlideReferences,
+                show.slide_ids.len(),
+                limits.max_slide_references(),
+            ));
         }
     }
     Ok(())
@@ -285,33 +328,64 @@ fn check_attributes(
     let mut count = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        count = count.checked_add(1).ok_or(Error::Limit {
-            resource: "custom-show XML attributes",
-            limit: limits.max_attributes(),
+        count = count.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::opened::CodecLimitKind::XmlAttributes,
+                usize::MAX,
+                limits.max_attributes(),
+            )
         })?;
         if count > limits.max_attributes() {
-            return Err(Error::Limit {
-                resource: "custom-show XML attributes",
-                limit: limits.max_attributes(),
-            });
+            return Err(limit(
+                crate::opened::CodecLimitKind::XmlAttributes,
+                count,
+                limits.max_attributes(),
+            ));
         }
-        if attribute.key.as_ref().len() > limits.max_string_bytes()
-            || attribute.value.as_ref().len() > limits.max_string_bytes()
-        {
-            return Err(Error::Limit {
-                resource: "custom-show XML attribute",
-                limit: limits.max_string_bytes(),
-            });
+        if attribute.key.as_ref().len() > limits.max_string_bytes() {
+            return Err(limit(
+                crate::opened::CodecLimitKind::XmlAttributeBytes,
+                attribute.key.as_ref().len(),
+                limits.max_string_bytes(),
+            ));
+        }
+        if attribute.value.as_ref().len() > limits.max_string_bytes() {
+            return Err(limit(
+                crate::opened::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.as_ref().len(),
+                limits.max_string_bytes(),
+            ));
         }
         let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?;
         if value.len() > limits.max_string_bytes() {
-            return Err(Error::Limit {
-                resource: "custom-show XML attribute",
-                limit: limits.max_string_bytes(),
-            });
+            return Err(limit(
+                crate::opened::CodecLimitKind::StringBytes,
+                value.len(),
+                limits.max_string_bytes(),
+            ));
         }
+    }
+    Ok(())
+}
+
+fn limit(kind: crate::opened::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::opened::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
+}
+
+fn check_empty_depth(depth: usize, limits: Limits) -> Result<()> {
+    let observed = depth.checked_add(1).unwrap_or(usize::MAX);
+    if observed > limits.max_depth() {
+        return Err(limit(
+            crate::opened::CodecLimitKind::XmlDepth,
+            observed,
+            limits.max_depth(),
+        ));
     }
     Ok(())
 }
@@ -404,5 +478,37 @@ mod tests {
         );
         let list = List::parse_xml(&xml, Limits::DEFAULT).unwrap();
         assert_eq!(list.shows, vec![Show::new(9, "First").with_slides(vec![3])]);
+    }
+
+    #[test]
+    fn empty_custom_show_depth_is_checked_before_attributes() {
+        let limits = Limits::DEFAULT.with_depth(4).expect("depth limit");
+        let exact = r#"<p:custShowLst><p:custShow name="Recap" id="8"><p:sldLst><p:sld r:id="rId2"/></p:sldLst></p:custShow></p:custShowLst>"#;
+        List::parse_xml(exact, limits).expect("depth-four empty element");
+
+        let one_over = r#"<p:custShowLst><p:custShow name="Recap" id="8"><p:sldLst><p:holder><p:sld r:id="rId2"/></p:holder></p:sldLst></p:custShow></p:custShowLst>"#;
+        assert_xml_depth_limit(
+            List::parse_xml(one_over, limits).expect_err("depth-five empty element"),
+            5,
+            4,
+        );
+        assert!(matches!(
+            List::parse_xml("<p:custShowLst>", Limits::DEFAULT),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    fn assert_xml_depth_limit(error: Error, observed: usize, maximum: usize) {
+        match error {
+            Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: actual,
+                maximum: configured,
+            } => {
+                assert_eq!(actual, observed);
+                assert_eq!(configured, maximum);
+            },
+            other => panic!("expected XML depth limit, got {other:?}"),
+        }
     }
 }

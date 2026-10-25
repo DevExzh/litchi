@@ -808,8 +808,11 @@ fn inspect_presentation_properties_xml(
                 }
                 if stack.len() >= MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "source-backed presentation-properties XML depth",
-                        limit: MAX_XML_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        maximum: MAX_XML_DEPTH,
                     });
                 }
                 reject_mce_element(&namespace, &element, resolver).map_err(|error| {
@@ -1243,8 +1246,11 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
                 }
                 if depth >= MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "source-backed presentation XML depth",
-                        limit: MAX_XML_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: depth.checked_add(1).unwrap_or(usize::MAX),
+                        maximum: MAX_XML_DEPTH,
                     });
                 }
                 reject_mce_element(&namespace, &element, resolver)?;
@@ -1641,8 +1647,9 @@ fn bump_xml(nodes: &mut usize) -> Result<()> {
         .ok_or_else(|| Error::Invalid("source-backed presentation XML node overflow".into()))?;
     if *nodes > MAX_XML_NODES {
         return Err(Error::Limit {
-            resource: "source-backed presentation XML nodes",
-            limit: MAX_XML_NODES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: *nodes,
+            maximum: MAX_XML_NODES,
         });
     }
     Ok(())

@@ -81,14 +81,16 @@ impl List {
     pub fn from_xml(xml: &[u8], limits: Limits) -> Result<Self> {
         if xml.len() > limits.max_input_bytes() {
             return Err(limit(
-                "presentation sections input",
+                crate::opened::CodecLimitKind::InputBytes,
+                xml.len(),
                 limits.max_input_bytes(),
             ));
         }
         let processed = process_ooxml(xml, limits)?;
         if processed.len() > limits.max_output_bytes() {
             return Err(limit(
-                "processed presentation sections",
+                crate::opened::CodecLimitKind::OutputBytes,
+                processed.len(),
                 limits.max_output_bytes(),
             ));
         }
@@ -104,7 +106,8 @@ impl List {
     pub(crate) fn from_processed(xml: &[u8], limits: Limits) -> Result<Self> {
         if xml.len() > limits.max_output_bytes() {
             return Err(limit(
-                "processed presentation sections",
+                crate::opened::CodecLimitKind::OutputBytes,
+                xml.len(),
                 limits.max_output_bytes(),
             ));
         }
@@ -165,7 +168,8 @@ struct Node {
 fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
     if xml.len() > limits.max_output_bytes() {
         return Err(limit(
-            "presentation-section XML input",
+            crate::opened::CodecLimitKind::OutputBytes,
+            xml.len(),
             limits.max_output_bytes(),
         ));
     }
@@ -178,19 +182,44 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
         let decoder = reader.decoder();
         match reader.read_event() {
             Ok(Event::Start(element)) => {
-                nodes += 1;
-                if nodes > limits.max_nodes() || stack.len() >= limits.max_depth() {
-                    return Err(limit(
-                        "presentation-section XML resource",
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        usize::MAX,
                         limits.max_nodes(),
+                    )
+                })?;
+                if nodes > limits.max_nodes() {
+                    return Err(limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes(),
+                    ));
+                }
+                if stack.len() >= limits.max_depth() {
+                    return Err(limit(
+                        crate::opened::CodecLimitKind::XmlDepth,
+                        stack.len() + 1,
+                        limits.max_depth(),
                     ));
                 }
                 stack.push(make_node(&element, decoder, &stack, limits)?);
             },
             Ok(Event::Empty(element)) => {
-                nodes += 1;
+                check_empty_depth(stack.len(), limits)?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
                 if nodes > limits.max_nodes() {
-                    return Err(limit("presentation-section XML nodes", limits.max_nodes()));
+                    return Err(limit(
+                        crate::opened::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes(),
+                    ));
                 }
                 let node = make_node(&element, decoder, &stack, limits)?;
                 attach(&mut stack, &mut root, node)?;
@@ -204,14 +233,16 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
             Ok(Event::Text(text)) => {
                 if text.as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-section XML text",
+                        crate::opened::CodecLimitKind::TextBytes,
+                        text.as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
                 let text = text.decode().map_err(xml_error)?;
                 if text.len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-section XML text",
+                        crate::opened::CodecLimitKind::StringBytes,
+                        text.len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -225,14 +256,16 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
             Ok(Event::CData(text)) => {
                 if text.as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-section XML CDATA",
+                        crate::opened::CodecLimitKind::TextBytes,
+                        text.as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
                 let text = text.decode().map_err(xml_error)?;
                 if text.len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-section XML CDATA",
+                        crate::opened::CodecLimitKind::StringBytes,
+                        text.len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -246,14 +279,16 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
             Ok(Event::Comment(text)) => {
                 if text.as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-section XML comment",
+                        crate::opened::CodecLimitKind::TextBytes,
+                        text.as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
                 let text = text.decode().map_err(xml_error)?;
                 if text.len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-section XML comment",
+                        crate::opened::CodecLimitKind::StringBytes,
+                        text.len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -265,14 +300,16 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
             Ok(Event::GeneralRef(reference)) => {
                 if reference.as_ref().len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-section XML reference",
+                        crate::opened::CodecLimitKind::ReferenceBytes,
+                        reference.as_ref().len(),
                         limits.max_string_bytes(),
                     ));
                 }
                 let text = litchi_ooxml_common::xml::decode_xml_reference(&reference)?;
                 if text.len() > limits.max_string_bytes() {
                     return Err(limit(
-                        "presentation-section XML reference",
+                        crate::opened::CodecLimitKind::StringBytes,
+                        text.len(),
                         limits.max_string_bytes(),
                     ));
                 }
@@ -314,7 +351,8 @@ fn make_node(
         let attribute = attribute.map_err(xml_error)?;
         if raw.len() >= limits.max_attributes() {
             return Err(limit(
-                "presentation-section XML attributes",
+                crate::opened::CodecLimitKind::XmlAttributes,
+                raw.len() + 1,
                 limits.max_attributes(),
             ));
         }
@@ -322,7 +360,8 @@ fn make_node(
         bounded_string(name, limits)?;
         if attribute.value.as_ref().len() > limits.max_string_bytes() {
             return Err(limit(
-                "presentation-section XML attribute",
+                crate::opened::CodecLimitKind::XmlAttributeBytes,
+                attribute.value.as_ref().len(),
                 limits.max_string_bytes(),
             ));
         }
@@ -331,7 +370,8 @@ fn make_node(
             .map_err(xml_error)?;
         if value.len() > limits.max_string_bytes() {
             return Err(limit(
-                "presentation-section XML attribute",
+                crate::opened::CodecLimitKind::StringBytes,
+                value.len(),
                 limits.max_string_bytes(),
             ));
         }
@@ -434,7 +474,11 @@ fn parse_section_list(node: &Node, limits: Limits) -> Result<List> {
         return Err(invalid("sectionLst requires at least one section"));
     }
     if sections.len() > limits.max_sections() {
-        return Err(limit("presentation section count", limits.max_sections()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::Sections,
+            sections.len(),
+            limits.max_sections(),
+        ));
     }
     let mut parsed = Vec::with_capacity(sections.len());
     let mut section_ids = HashSet::new();
@@ -502,7 +546,8 @@ fn parse_slide_id_list(node: &Node, total: &mut usize, limits: Limits) -> Result
             .ok_or_else(|| invalid("section slide reference count overflow"))?;
         if *total > limits.max_slide_references() {
             return Err(limit(
-                "section slide reference count",
+                crate::opened::CodecLimitKind::SlideReferences,
+                *total,
                 limits.max_slide_references(),
             ));
         }
@@ -516,7 +561,11 @@ fn validate_extension_list(node: &Node, limits: Limits) -> Result<()> {
     no_attributes(node)?;
     let extensions = children(node)?;
     if extensions.len() > limits.max_extensions() {
-        return Err(limit("section extension count", limits.max_extensions()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::Extensions,
+            extensions.len(),
+            limits.max_extensions(),
+        ));
     }
     for extension in extensions {
         expect(extension, &[P, PS], "ext")?;
@@ -532,7 +581,11 @@ fn validate_extension_list(node: &Node, limits: Limits) -> Result<()> {
 
 fn validate_list(list: &List, limits: Limits) -> Result<()> {
     if list.sections.len() > limits.max_sections() {
-        return Err(limit("presentation section count", limits.max_sections()));
+        return Err(limit(
+            crate::opened::CodecLimitKind::Sections,
+            list.sections.len(),
+            limits.max_sections(),
+        ));
     }
     let mut section_ids = HashSet::new();
     let mut total = 0usize;
@@ -548,7 +601,8 @@ fn validate_list(list: &List, limits: Limits) -> Result<()> {
             .ok_or_else(|| invalid("section slide reference count overflow"))?;
         if total > limits.max_slide_references() {
             return Err(limit(
-                "section slide reference count",
+                crate::opened::CodecLimitKind::SlideReferences,
+                total,
                 limits.max_slide_references(),
             ));
         }
@@ -574,7 +628,11 @@ fn validate_section(section: &Section, limits: Limits) -> Result<()> {
     }
     if let Some(extension) = &section.extension_xml {
         if extension.len() > limits.max_string_bytes() {
-            return Err(limit("section extension XML", limits.max_string_bytes()));
+            return Err(limit(
+                crate::opened::CodecLimitKind::ExtensionBytes,
+                extension.len(),
+                limits.max_string_bytes(),
+            ));
         }
         validate_extension_list(&parse_dom(extension, limits)?, limits)?;
     }
@@ -666,7 +724,8 @@ fn no_attributes(node: &Node) -> Result<()> {
 fn bounded_string(value: &str, limits: Limits) -> Result<()> {
     if value.len() > limits.max_string_bytes() {
         Err(limit(
-            "presentation section string",
+            crate::opened::CodecLimitKind::StringBytes,
+            value.len(),
             limits.max_string_bytes(),
         ))
     } else {
@@ -782,11 +841,24 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, maximum: usize) -> Error {
+fn limit(kind: crate::opened::CodecLimitKind, observed: usize, maximum: usize) -> Error {
     Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::opened::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
+}
+
+fn check_empty_depth(depth: usize, limits: Limits) -> Result<()> {
+    let observed = depth.checked_add(1).unwrap_or(usize::MAX);
+    if observed > limits.max_depth() {
+        return Err(limit(
+            crate::opened::CodecLimitKind::XmlDepth,
+            observed,
+            limits.max_depth(),
+        ));
+    }
+    Ok(())
 }
 
 fn xml_error(error: impl std::fmt::Display) -> Error {
@@ -915,5 +987,40 @@ mod tests {
             });
         }
         assert!(oversized.to_xml(Limits::DEFAULT).is_err());
+    }
+
+    #[test]
+    fn empty_section_depth_is_checked_before_dom_ownership() {
+        let limits = Limits::DEFAULT.with_depth(1).expect("depth limit");
+        let exact = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
+        List::from_xml(exact, limits).expect("depth-one empty root");
+
+        let one_over = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:holder/></p:presentation>"#;
+        assert_xml_depth_limit(
+            List::from_xml(one_over, limits).expect_err("depth-two empty element"),
+            2,
+            1,
+        );
+        assert!(matches!(
+            List::from_xml(
+                b"<p:presentation xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">",
+                Limits::DEFAULT,
+            ),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    fn assert_xml_depth_limit(error: Error, observed: usize, maximum: usize) {
+        match error {
+            Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: actual,
+                maximum: configured,
+            } => {
+                assert_eq!(actual, observed);
+                assert_eq!(configured, maximum);
+            },
+            other => panic!("expected XML depth limit, got {other:?}"),
+        }
     }
 }

@@ -280,8 +280,9 @@ pub(super) fn load_part(
     }
     if declared > semantic_maximum as u64 {
         return Err(Error::Limit {
-            resource: "source related part bytes",
-            limit: semantic_maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+            observed: usize::try_from(declared).unwrap_or(usize::MAX),
+            maximum: semantic_maximum,
         });
     }
 
@@ -321,8 +322,9 @@ pub(super) fn process_eager_part(
 ) -> Result<BlobPart> {
     if part.blob().len() > maximum {
         return Err(Error::Limit {
-            resource: "source related part bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+            observed: part.blob().len(),
+            maximum: maximum,
         });
     }
     crate::source_limits::validate_xml_limits(part.blob(), source_limits)?;
@@ -518,17 +520,21 @@ fn chart_relationships(rels: &litchi_opc::Relationships) -> Result<Vec<&Relation
             .filter(|relationship| is_relationship_type(relationship.reltype(), CHART_REL, "chart"))
     };
     let count = selected().count();
-    let limit = || Error::Limit {
-        resource: "source chart relationships",
-        limit: MAX_CHARTS_PER_SLIDE,
+    let limit = |observed| Error::Limit {
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+        observed,
+        maximum: MAX_CHARTS_PER_SLIDE,
     };
     if count > MAX_CHARTS_PER_SLIDE {
-        return Err(limit());
+        return Err(limit(count));
     }
     let mut relationships = Vec::new();
     relationships
         .try_reserve_exact(count)
-        .map_err(|_| limit())?;
+        .map_err(|source| Error::Allocation {
+            resource: "source chart relationship snapshots",
+            source,
+        })?;
     relationships.extend(selected());
     relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
     Ok(relationships)
@@ -793,8 +799,11 @@ impl SourceSlide {
             let comments = parse_slide_comments_strict(part.blob(), comment_limits)?;
             if comments.len() > crate::comments::MAX_COMMENTS_PER_SLIDE {
                 return Err(Error::Limit {
-                    resource: "source comments entries",
-                    limit: crate::comments::MAX_COMMENTS_PER_SLIDE,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::CommentEntries,
+                    ),
+                    observed: comments.len(),
+                    maximum: crate::comments::MAX_COMMENTS_PER_SLIDE,
                 });
             }
             let authors = selected_source_authors(&self.owner, &comments, comment_limits)?;
@@ -826,9 +835,9 @@ impl SourceSlide {
             let mut charts = Vec::new();
             charts
                 .try_reserve_exact(relationships.len())
-                .map_err(|_| Error::Limit {
+                .map_err(|source| Error::Allocation {
                     resource: "source chart snapshots",
-                    limit: MAX_CHARTS_PER_SLIDE,
+                    source,
                 })?;
 
             for relationship in relationships {
@@ -887,8 +896,11 @@ impl SourceSlide {
                 .input_bytes();
             if declared > maximum as u64 {
                 return Err(Error::Limit {
-                    resource: "source slide bytes",
-                    limit: maximum,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::SourceBytes,
+                    ),
+                    observed: usize::try_from(declared).unwrap_or(usize::MAX),
+                    maximum: maximum,
                 });
             }
             let data = view.data()?;

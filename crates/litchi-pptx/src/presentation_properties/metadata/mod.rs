@@ -569,8 +569,9 @@ impl BoundedString {
     ) -> crate::Result<Self> {
         if capacity > limits.max_output_bytes() {
             return Err(crate::Error::Limit {
-                resource,
-                limit: limits.max_output_bytes(),
+                kind: crate::LimitKind::Codec(crate::CodecLimitKind::OutputBytes),
+                observed: capacity,
+                maximum: limits.max_output_bytes(),
             });
         }
         let mut output = Self::new(limits, resource);
@@ -591,8 +592,9 @@ impl BoundedString {
                 })?;
         if required > self.limit {
             return Err(crate::Error::Limit {
-                resource: self.resource,
-                limit: self.limit,
+                kind: crate::LimitKind::Codec(crate::CodecLimitKind::OutputBytes),
+                observed: required,
+                maximum: self.limit,
             });
         }
         self.value
@@ -678,12 +680,13 @@ pub(crate) fn escaped_xml_len(value: &str) -> crate::Result<usize> {
 pub(crate) fn check_string(
     value: &str,
     limits: Limits,
-    resource: &'static str,
+    _resource: &'static str,
 ) -> crate::Result<()> {
     if value.len() > limits.max_string_bytes() {
         return Err(crate::Error::Limit {
-            resource,
-            limit: limits.max_string_bytes(),
+            kind: crate::LimitKind::Codec(crate::CodecLimitKind::StringBytes),
+            observed: value.len(),
+            maximum: limits.max_string_bytes(),
         });
     }
     Ok(())
@@ -705,8 +708,9 @@ pub(crate) fn checked_output_len(
         .ok_or(crate::Error::CapacityOverflow { resource })?;
     if output_len > limits.max_output_bytes() {
         return Err(crate::Error::Limit {
-            resource,
-            limit: limits.max_output_bytes(),
+            kind: crate::LimitKind::Codec(crate::CodecLimitKind::OutputBytes),
+            observed: output_len,
+            maximum: limits.max_output_bytes(),
         });
     }
     Ok(output_len)

@@ -20,8 +20,12 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(what: &str) -> Error {
-    Error::Invalid(format!("exceeded maximum {what}"))
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 /// Load every synchronization part and validate its slide relationship graph.
@@ -68,7 +72,11 @@ pub fn load(package: &OpcPackage, limits: Limits) -> Result<Vec<Part>> {
             ));
         }
         if loaded.len() >= limits.max_parts() {
-            return Err(limit("slide synchronization part count"));
+            return Err(limit(
+                crate::error::CodecLimitKind::Parts,
+                loaded.len().checked_add(1).unwrap_or(usize::MAX),
+                limits.max_parts(),
+            ));
         }
         let target = relationship.target_partname()?;
         let part = package.get_part(&target)?;
@@ -83,11 +91,18 @@ pub fn load(package: &OpcPackage, limits: Limits) -> Result<Vec<Part>> {
                 "slide synchronization part cannot have outbound relationships",
             ));
         }
-        total_xml_bytes = total_xml_bytes
-            .checked_add(part.blob().len())
-            .ok_or_else(|| limit("total slide synchronization XML bytes"))?;
+        total_xml_bytes =
+            total_xml_bytes
+                .checked_add(part.blob().len())
+                .ok_or(Error::CapacityOverflow {
+                    resource: "total slide synchronization XML bytes",
+                })?;
         if total_xml_bytes > limits.max_total_input_bytes() {
-            return Err(limit("total slide synchronization XML bytes"));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                total_xml_bytes,
+                limits.max_total_input_bytes(),
+            ));
         }
         loaded.push(Part::new(
             relationship.r_id().to_owned(),

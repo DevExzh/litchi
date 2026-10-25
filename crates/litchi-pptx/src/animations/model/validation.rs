@@ -1,7 +1,7 @@
 //! Invariant-enforcing constructors for animation values and builds.
 
 use super::super::codec::MAX_TIME_FILTER_POINTS;
-use super::super::invalid;
+use super::super::{invalid, limit};
 use super::{
     MotionFraction, NormalizedTime, ParagraphTemplate, Speed, TemplateTimeNode, TimeFilter,
 };
@@ -96,8 +96,10 @@ impl TimeFilter {
             ));
         }
         if points.len() > MAX_TIME_FILTER_POINTS {
-            return Err(invalid(
-                "animation time filter point count exceeds safety limit",
+            return Err(limit(
+                crate::error::CodecLimitKind::TimeFilterPoints,
+                points.len(),
+                MAX_TIME_FILTER_POINTS,
             ));
         }
         if points

@@ -577,8 +577,9 @@ fn validate_svg_payload(limits: &litchi_opc::SourceLimits, bytes: usize) -> Resu
     }
     if bytes as u64 > limits.max_part_bytes() {
         return Err(Error::Limit {
-            resource: "SVG attachment Part bytes",
-            limit: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+            observed: bytes,
+            maximum: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
         });
     }
     Ok(())
@@ -877,8 +878,9 @@ fn allocate_svg_identity(
         })
         .find(|candidate| view.rels().get(candidate).is_none())
         .ok_or(Error::Limit {
-            resource: "generated SVG relationship ID candidates",
-            limit: MAX_GENERATED_NAME_ATTEMPTS,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+            observed: MAX_GENERATED_NAME_ATTEMPTS,
+            maximum: MAX_GENERATED_NAME_ATTEMPTS,
         })?;
     // Keep the ordinary authoring name stable and recognizable.  Collision
     // probing below still makes this safe when a package already contains a
@@ -917,8 +919,9 @@ fn allocate_svg_identity(
         }
     }
     Err(Error::Limit {
-        resource: "generated SVG media Part candidates",
-        limit: MAX_GENERATED_NAME_ATTEMPTS,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Parts),
+        observed: MAX_GENERATED_NAME_ATTEMPTS,
+        maximum: MAX_GENERATED_NAME_ATTEMPTS,
     })
 }
 
@@ -1117,8 +1120,9 @@ fn generated_ext_list_len(drawing_prefix: &[u8], ext_len: usize) -> Result<usize
 fn check_slide_output_len(output_len: usize, limits: &litchi_opc::SourceLimits) -> Result<()> {
     if output_len as u64 > limits.max_part_bytes() {
         return Err(Error::Limit {
-            resource: "SVG lifecycle slide XML bytes",
-            limit: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: output_len,
+            maximum: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
         });
     }
     Ok(())
@@ -1363,8 +1367,9 @@ fn splice_checked(
     }
     if output_len as u64 > limits.max_part_bytes() {
         return Err(Error::Limit {
-            resource: "SVG lifecycle slide XML bytes",
-            limit: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: output_len,
+            maximum: usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX),
         });
     }
     let mut output = Vec::new();

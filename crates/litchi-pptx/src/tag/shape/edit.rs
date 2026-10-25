@@ -13,7 +13,6 @@
 
 use crate::part_edit::{Staged, family};
 use crate::{Package, Result};
-use litchi_opc::Part;
 use litchi_opc::constants::content_type as ct;
 
 family!("shape-tag");

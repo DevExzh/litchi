@@ -67,22 +67,34 @@ impl Limits {
 
     fn charge_anchor(&mut self, actual: usize) -> Result<()> {
         if actual >= self.content_parts {
-            return Err(limit("content-part count", self.content_parts));
+            return Err(limit(
+                crate::error::CodecLimitKind::ContentParts,
+                actual.checked_add(1).unwrap_or(usize::MAX),
+                self.content_parts,
+            ));
         }
         Ok(())
     }
 
     fn charge_payload(&mut self, bytes: usize) -> Result<()> {
         if bytes > self.payload_bytes {
-            return Err(limit("content-part payload bytes", self.payload_bytes));
+            return Err(limit(
+                crate::error::CodecLimitKind::PartBytes,
+                bytes,
+                self.payload_bytes,
+            ));
         }
-        let actual = self
-            .used_payload_bytes
-            .checked_add(bytes)
-            .ok_or_else(|| limit("total content-part payload bytes", self.total_payload_bytes))?;
+        let actual = self.used_payload_bytes.checked_add(bytes).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::PartBytes,
+                usize::MAX,
+                self.total_payload_bytes,
+            )
+        })?;
         if actual > self.total_payload_bytes {
             return Err(limit(
-                "total content-part payload bytes",
+                crate::error::CodecLimitKind::PartBytes,
+                actual,
                 self.total_payload_bytes,
             ));
         }
@@ -377,7 +389,8 @@ fn make_payload(part: &dyn Part, maximum_relationships: usize) -> Result<Payload
     for relationship in part.rels().iter() {
         if relationships.len() >= maximum_relationships {
             return Err(limit(
-                "content-part payload relationships",
+                crate::error::CodecLimitKind::Relationships,
+                relationships.len().checked_add(1).unwrap_or(usize::MAX),
                 maximum_relationships,
             ));
         }
@@ -400,7 +413,8 @@ fn relationship_metadata(relationship: &litchi_opc::Relationship) -> Result<Rela
     ] {
         if value.len() > MAX_RELATIONSHIP_FIELD_BYTES {
             return Err(limit(
-                "content-part relationship metadata bytes",
+                crate::error::CodecLimitKind::RelationshipBytes,
+                value.len(),
                 MAX_RELATIONSHIP_FIELD_BYTES,
             ));
         }

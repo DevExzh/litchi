@@ -69,9 +69,19 @@ pub fn summary(shape: crate::shape::Shape<'_>) -> Result<Option<Summary>> {
                     trim = Some(value);
                 }
                 if matches!(event, Event::Start(_)) {
-                    depth += 1;
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        super::limit(
+                            crate::error::CodecLimitKind::XmlDepth,
+                            usize::MAX,
+                            MAX_DEPTH,
+                        )
+                    })?;
                     if depth > MAX_DEPTH {
-                        return Err(super::limit("XML depth"));
+                        return Err(super::limit(
+                            crate::error::CodecLimitKind::XmlDepth,
+                            depth,
+                            MAX_DEPTH,
+                        ));
                     }
                 }
             },

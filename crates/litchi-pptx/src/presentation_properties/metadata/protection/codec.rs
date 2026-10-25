@@ -45,8 +45,9 @@ fn password_hash(password: &str, salt: &[u8], spin_count: u32) -> Zeroizing<Sha5
 pub(crate) fn generate_verifier(password: &str, limits: Limits) -> Result<Verifier> {
     if password.len() > limits.max_string_bytes() {
         return Err(Error::Limit {
-            resource: "protection password",
-            limit: limits.max_string_bytes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PasswordBytes),
+            observed: password.len(),
+            maximum: limits.max_string_bytes(),
         });
     }
 
@@ -73,15 +74,17 @@ impl Settings {
     pub fn parse_xml(xml: &str, limits: Limits) -> Result<Self> {
         if xml.len() > limits.max_input_bytes() {
             return Err(Error::Limit {
-                resource: "protection XML input",
-                limit: limits.max_input_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                observed: xml.len(),
+                maximum: limits.max_input_bytes(),
             });
         }
         let processed = process_str(xml, limits)?;
         if processed.len() > limits.max_output_bytes() {
             return Err(Error::Limit {
-                resource: "processed protection XML",
-                limit: limits.max_output_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                observed: processed.len(),
+                maximum: limits.max_output_bytes(),
             });
         }
         let mut reader = Reader::from_str(processed.as_ref());
@@ -93,24 +96,36 @@ impl Settings {
         loop {
             match reader.read_event()? {
                 Event::Start(element) => {
-                    depth = depth.checked_add(1).ok_or(Error::Limit {
-                        resource: "protection XML depth",
-                        limit: limits.max_depth(),
+                    depth = depth.checked_add(1).ok_or_else(|| Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: usize::MAX,
+                        maximum: limits.max_depth(),
                     })?;
                     if depth > limits.max_depth() {
                         return Err(Error::Limit {
-                            resource: "protection XML depth",
-                            limit: limits.max_depth(),
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::XmlDepth,
+                            ),
+                            observed: depth,
+                            maximum: limits.max_depth(),
                         });
                     }
-                    nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                        resource: "protection XML nodes",
-                        limit: limits.max_nodes(),
+                    nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: usize::MAX,
+                        maximum: limits.max_nodes(),
                     })?;
                     if nodes > limits.max_nodes() {
                         return Err(Error::Limit {
-                            resource: "protection XML nodes",
-                            limit: limits.max_nodes(),
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::XmlNodes,
+                            ),
+                            observed: nodes,
+                            maximum: limits.max_nodes(),
                         });
                     }
                     check_attributes(&element, reader.decoder(), limits)?;
@@ -125,14 +140,21 @@ impl Settings {
                     }
                 },
                 Event::Empty(element) => {
-                    nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                        resource: "protection XML nodes",
-                        limit: limits.max_nodes(),
+                    check_empty_depth(depth, limits)?;
+                    nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: usize::MAX,
+                        maximum: limits.max_nodes(),
                     })?;
                     if nodes > limits.max_nodes() {
                         return Err(Error::Limit {
-                            resource: "protection XML nodes",
-                            limit: limits.max_nodes(),
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::XmlNodes,
+                            ),
+                            observed: nodes,
+                            maximum: limits.max_nodes(),
                         });
                     }
                     check_attributes(&element, reader.decoder(), limits)?;
@@ -212,26 +234,34 @@ fn parse_verifier(
     let mut attributes = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        attributes = attributes.checked_add(1).ok_or(Error::Limit {
-            resource: "protection XML attributes",
-            limit: limits.max_attributes(),
+        attributes = attributes.checked_add(1).ok_or_else(|| Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+            observed: usize::MAX,
+            maximum: limits.max_attributes(),
         })?;
         if attributes > limits.max_attributes() {
             return Err(Error::Limit {
-                resource: "protection XML attributes",
-                limit: limits.max_attributes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+                observed: attributes,
+                maximum: limits.max_attributes(),
             });
         }
         if attribute.key.as_ref().len() > limits.max_string_bytes() {
             return Err(Error::Limit {
-                resource: "protection XML attribute name",
-                limit: limits.max_string_bytes(),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: attribute.key.as_ref().len(),
+                maximum: limits.max_string_bytes(),
             });
         }
         if attribute.value.as_ref().len() > limits.max_string_bytes() {
             return Err(Error::Limit {
-                resource: "protection XML attribute",
-                limit: limits.max_string_bytes(),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: attribute.value.as_ref().len(),
+                maximum: limits.max_string_bytes(),
             });
         }
         let value = attribute
@@ -239,8 +269,9 @@ fn parse_verifier(
             .map_err(|error| Error::Xml(error.to_string()))?;
         if value.len() > limits.max_string_bytes() {
             return Err(Error::Limit {
-                resource: "protection XML attribute",
-                limit: limits.max_string_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+                observed: value.len(),
+                maximum: limits.max_string_bytes(),
             });
         }
         let value = value.into_owned();
@@ -316,26 +347,34 @@ fn check_attributes(
     let mut attributes = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        attributes = attributes.checked_add(1).ok_or(Error::Limit {
-            resource: "protection XML attributes",
-            limit: limits.max_attributes(),
+        attributes = attributes.checked_add(1).ok_or_else(|| Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+            observed: usize::MAX,
+            maximum: limits.max_attributes(),
         })?;
         if attributes > limits.max_attributes() {
             return Err(Error::Limit {
-                resource: "protection XML attributes",
-                limit: limits.max_attributes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+                observed: attributes,
+                maximum: limits.max_attributes(),
             });
         }
         if attribute.key.as_ref().len() > limits.max_string_bytes() {
             return Err(Error::Limit {
-                resource: "protection XML attribute name",
-                limit: limits.max_string_bytes(),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: attribute.key.as_ref().len(),
+                maximum: limits.max_string_bytes(),
             });
         }
         if attribute.value.as_ref().len() > limits.max_string_bytes() {
             return Err(Error::Limit {
-                resource: "protection XML attribute",
-                limit: limits.max_string_bytes(),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: attribute.value.as_ref().len(),
+                maximum: limits.max_string_bytes(),
             });
         }
         let value = attribute
@@ -343,10 +382,23 @@ fn check_attributes(
             .map_err(|error| Error::Xml(error.to_string()))?;
         if value.len() > limits.max_string_bytes() {
             return Err(Error::Limit {
-                resource: "protection XML attribute",
-                limit: limits.max_string_bytes(),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+                observed: value.len(),
+                maximum: limits.max_string_bytes(),
             });
         }
+    }
+    Ok(())
+}
+
+fn check_empty_depth(depth: usize, limits: Limits) -> Result<()> {
+    let observed = depth.checked_add(1).unwrap_or(usize::MAX);
+    if observed > limits.max_depth() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+            observed,
+            maximum: limits.max_depth(),
+        });
     }
     Ok(())
 }
@@ -452,5 +504,42 @@ mod tests {
             BASE64_ENGINE.encode(hash.0.as_slice()),
             "3ACFcYR0/M+PsEwOXR4/mcgYsTN1VMXMunIrbpt1lY+1Kal3nCkZOJjIEw+LWRlQzI3rL5HZnVIoL87I6R8tNw=="
         );
+    }
+
+    #[test]
+    fn empty_protection_depth_is_checked_before_attributes() {
+        let limits = Limits::DEFAULT.with_depth(1).expect("depth limit");
+        let exact = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
+        Settings::parse_xml(std::str::from_utf8(exact).expect("UTF-8"), limits)
+            .expect("depth-one empty root");
+
+        let one_over = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:holder/></p:presentation>"#;
+        assert_xml_depth_limit(
+            Settings::parse_xml(std::str::from_utf8(one_over).expect("UTF-8"), limits)
+                .expect_err("depth-two empty element"),
+            2,
+            1,
+        );
+        assert!(matches!(
+            Settings::parse_xml(
+                "<p:presentation xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">",
+                Limits::DEFAULT,
+            ),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    fn assert_xml_depth_limit(error: Error, observed: usize, maximum: usize) {
+        match error {
+            Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: actual,
+                maximum: configured,
+            } => {
+                assert_eq!(actual, observed);
+                assert_eq!(configured, maximum);
+            },
+            other => panic!("expected XML depth limit, got {other:?}"),
+        }
     }
 }
