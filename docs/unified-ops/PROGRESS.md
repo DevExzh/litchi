@@ -5975,3 +5975,13 @@ See [0063](0063-source-pptx-modern-comments.md).
   formatting passes and the remaining rows are running or pending. Rawv10
   stays source-only while this build slot is occupied. Native measurements,
   census review, final trunk merge and cleanup remain open. Nothing is pushed.
+
+  The first final65 attempt is incomplete: its driver is absent after three
+  verified passing compiler rows, with no terminal result or known cause
+  (149). Root preserves it and starts the same reviewed 65 checks from fresh
+  state under a durable systemd user service. C and P remain unchanged.
+  Notes and replay-scan126 packets now bind C, with 16 and eight focused
+  tests passing; actual measurements remain unrun. Rawv11 source review
+  passes, but its capture binding is still being prepared. Current-nativev3
+  is returned for common-P admission; DrawingML repair continues. Final
+  qualification, trunk integration and cleanup remain open. Nothing is pushed.
