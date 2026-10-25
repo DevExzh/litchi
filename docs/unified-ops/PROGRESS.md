@@ -5616,3 +5616,13 @@ See [0063](0063-source-pptx-modern-comments.md).
   scoped to afede. Joint e2a qualification is being prepared, with no runtime
   or performance acceptance inferred. Baseline `c5d2b30740` carries the same
   eight harness blobs as e2a after its test-only consumer migration.
+
+
+  The joint e2a packet passes formatting and minimal PPTX compilation, then
+  direct primary-package Clippy finds one unnecessary closure in common
+  application properties. Root verifies the failed capture and independently
+  reviews/fast-forwards 101b at `6964022294`; the fixed error and bounds are
+  unchanged. Fresh compiler bindings are required. Joint runtime coverage is
+  consolidated to 33 rows and glossary coverage to 13 unique profiles/26 steps.
+  The existing signed-batch contract choice is explicitly surfaced to the owner;
+  no answer is inferred, and independent qualification continues.

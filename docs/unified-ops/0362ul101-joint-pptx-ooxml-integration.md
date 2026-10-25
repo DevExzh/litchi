@@ -97,3 +97,51 @@ Baseline `c5d2b30740186e2b4beb4a4d84e929e00a1c5718` receives the exact
 joint-tree test-only metadata consumer migration after a source-level API
 compatibility check. The eight harness blobs match e2a; production remains
 763. No benchmark build or measurement has run.
+
+
+## Joint compiler return
+
+Root rejects the first inert joint compiler proposal before GO because its
+standalone performance harness row selected a package from the root workspace.
+The corrected v2 uses `--manifest-path tools/perf-baseline/Cargo.toml`, restores
+the established driver interface and binds full plan/source/target/fixture
+metadata. The original proposal remains inert and unchanged.
+
+The actual v2 run on e2a passes all 499-path formatting checks (4.086 seconds)
+and minimal all-target PPTX compilation (64.100 seconds). The strict row now
+selects OPC and OOXML common as primary packages alongside all four formats,
+so their new code receives direct Clippy coverage. It finds one unnecessary
+lazy closure in application-property size accounting and exits 101 after
+36.788 seconds, with target size 272,704,264 bytes. Later rows do not run.
+Root verifies the complete terminal receipt before changing source.
+
+Packet `.coord/uo2-coordinator-replay-integration-f5-compiler-e2a833d7-v2`
+retains `rows.json` (41,952 bytes, SHA-256
+`f9288d734552734f0a34218d5155ea8369b60b94a818c710a74b61c725ea836e`) and
+`result.json` (44,097 bytes, SHA-256
+`efbaa7bed341f41630aee6fe95dc4b95acea5f06cfa3a77cde14ae2481c19233`).
+
+Root independently reviews the behavior-preserving `ok_or` correction,
+fast-forwards integration to `6964022294c001cc7a2d0ed70eed6e32412f01c4`
+(101b), tree `117f4d0f1a0eef2bcfbc1a4a4269a25956dc5ea3`, and verifies
+repository formatting. The fixed typed error and content-free reason remain
+unchanged. Fresh compiler, runtime and glossary bindings are required.
+
+Joint runtime coverage is consolidated into 33 rows: original OOXML rows
+24, 28–42 and 50–64, plus full/minimal PPTX helpers. Common helper coverage
+accounts for 25–27; full PPTX coverage accounts for 43–49. The glossary union
+has thirteen unique profiles and twenty-six paired rustdoc/check steps: the
+PPTX minimal/full profiles already equal original OOXML rows 17/18. No runtime
+or glossary execution has occurred yet.
+
+Root verifies the latest baseline's eight harness blobs against e2a, unchanged
+763 production/config/vendor/fixtures and all three role locks. External proof
+`.coord/combined-source-0362ul101/baseline-c5d2b307-proof.json` is 1,344 bytes,
+SHA-256 `d636dd96edb07fb5a2c4fe2a835efa7cc78da1e415e303b3b5b0bbba0608db60`.
+101b changes no harness file. No benchmark measurement is claimed.
+
+A separate read-only policy audit locates the explicitly pending signed-batch
+choice in the earlier coordinator contract record. The owner is asked whether
+to retain zero-item-read refusal and correct the stale equivalence test, or
+read items and revise that contract. This is unresolved observable behavior;
+no answer is inferred. Independent compiler/runtime/glossary work continues.
