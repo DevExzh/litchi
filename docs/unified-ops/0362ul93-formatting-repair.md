@@ -8,13 +8,13 @@
 
 The preserved actual formatter failure is `/home/zhuhe/code/litchi-worktrees/.coord/0362ul86-f5-actual-a84f576138/00-fmt-check-attempt-actual-f5-00.log` (949,997 bytes; SHA-256 `6444246d15f665bdb857146323f77dc64fb61e7542e483b7c1f5cfa4ffe23b53`). It was the only executed row and failed before any subsequent validation row. I extracted each Diff in path, removed the captured checkout prefix, sorted and deduplicated it. The resulting 335 tracked Rust paths are bound by this newline-delimited path-list SHA-256:
 
-`60cbf794c2d17e4266435e6ea56b5c0c648af1ad6ec16c902123bbf29122ab67` (112 `vendor/` paths, 223 workspace paths; 1,907 repeated diff-hunk lines in the capture).
+`6b53128af05235f8aef4bb89b0898fb743215b470af59acbd880fe0e09d2ebb5` (112 `vendor/` paths, 223 workspace paths; 1,907 repeated diff-hunk lines in the capture). This digest is SHA-256 over the sorted relative path strings, each followed by one LF byte.
 
 The selected path list was checked against the fresh leaf before editing; every selected path existed and was tracked. The formatter changed 323 files; the remaining 12 selected paths produced no Git diff after the explicit invocation and remain covered by the clean per-file check.
 
 ## Exact formatter decisions
 
-Every selected file uses the nearest owning `Cargo.toml` below. All selected manifests inherit or resolve to the edition shown. No nested rustfmt configuration exists under the leaf, so every invocation uses the root `rustfmt.toml` (SHA-256 `5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3`) with `skip_children=true`; `style_edition = "2024"` and `reorder_imports = true` are therefore applied consistently.
+Every selected file uses the nearest owning `Cargo.toml` below. All selected manifests inherit or resolve to the edition shown. No closer rustfmt configuration exists in the selected source trees; historical docs/performance snapshots elsewhere under the leaf are not selected. Every invocation therefore uses the root `rustfmt.toml` (SHA-256 `5b08a5db07e6acaee62319a09314b9302c8cbc0f8e6b88b5ee8695f6303383d3`) with `skip_children=true`; `style_edition = "2024"` and `reorder_imports = true` are therefore applied consistently.
 
 | owning manifest | edition | selected paths |
 | --- | ---: | ---: |
