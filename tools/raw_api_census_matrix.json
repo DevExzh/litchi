@@ -1341,7 +1341,7 @@
   "reason": "84 current profile inputs are prepared from 69 glossary profiles and 15 direct package-only profiles; rustdoc inputs, receipts, callable entries, and dispositions are intentionally not supplied",
   "schema": "litchi.raw-api-census-matrix.v1",
   "source": {
-    "commit": "faab79bc388e09101f8f4cf53ff722e0c4de5046",
+    "commit": "035615e0de91575af2fe8872f502a7cea32e0565",
     "glossary": {
       "blob": "b0d641cca4ffd7bd98b3b004a6b6a062b448dbb2",
       "bytes": 1100333,
