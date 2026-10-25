@@ -6036,3 +6036,14 @@ See [0063](0063-source-pptx-modern-comments.md).
   Root verifies 32 passing final65 rows; the gate remains live. Common-P
   installation, final gates, measurements, census review, merge and cleanup
   remain required. Nothing is pushed.
+
+  Completion audit 154 returns C=f8cd398a77 for a mandatory BatchCommit
+  accessor mismatch and 22 public deprecated format/support routes. Three
+  isolated repair leaves (155–157) must preserve capabilities and migrate
+  every consumer; stale detection/RTF prose also needs correction. The
+  current-native binding and ten DrawingML baseline roots finish and pass
+  root verification, but C's binding is held as evidence for that revision.
+  Signed streaming repair 154a passes 25 integrated tests in P, with candidate
+  bindings still pending. The live C gate remains useful reference evidence;
+  final gates/census/native acceptance must bind the corrected candidate.
+  No additional deferral, capability-loss waiver or push.
