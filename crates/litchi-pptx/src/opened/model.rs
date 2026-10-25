@@ -1086,7 +1086,8 @@ pub(crate) fn package_fingerprint(package: &OpcPackage) -> Result<[u8; 32]> {
 }
 
 /// The `litchi-pptx-opened-v2` complete-package revision, computed over sorted
-/// per-part digests, together with the payload-digest memo it filled.
+/// opaque-member identities and sorted per-part digests, together with the
+/// payload-digest memo it filled.
 ///
 /// The proof is tiered. A payload digest covers exactly one part's payload
 /// bytes; a part digest covers the part name, the content type, that payload
@@ -1130,11 +1131,12 @@ pub(crate) fn package_fingerprint_with_memo(
     root_relationships.extend(package.rels().iter());
     root_relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
     feed_relationships(&mut digest, &root_relationships)?;
-    let non_part_count = u32::try_from(package.non_part_members().len())
+    let non_part_members = sorted_non_part_members(package)?;
+    let non_part_count = u32::try_from(non_part_members.len())
         .map_err(|_error| invalid("opened-presentation non-part member count exceeds u32"))?;
     feed(&mut digest, b"non-part-members");
     feed(&mut digest, &non_part_count.to_le_bytes());
-    for member in package.non_part_members() {
+    for member in non_part_members {
         feed(&mut digest, member.name().as_bytes());
         feed(&mut digest, member.reason().as_str().as_bytes());
     }
@@ -1299,10 +1301,15 @@ pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
     {
         return false;
     }
-    if left
-        .non_part_members()
+    let Some(left_non_parts) = sorted_non_part_members(left).ok() else {
+        return false;
+    };
+    let Some(right_non_parts) = sorted_non_part_members(right).ok() else {
+        return false;
+    };
+    if left_non_parts
         .iter()
-        .zip(right.non_part_members())
+        .zip(right_non_parts)
         .any(|(left, right)| left.name() != right.name() || left.reason() != right.reason())
     {
         return false;
@@ -1318,6 +1325,28 @@ pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
             })
         })
     })
+}
+
+/// Return opaque ZIP members in their content order rather than central
+/// directory insertion order.  Their original order remains on the owner for
+/// faithful publication; only identity/equality proofs canonicalize it.
+fn sorted_non_part_members<'a>(
+    package: &'a OpcPackage,
+) -> Result<Vec<&'a litchi_opc::NonPartMember>> {
+    let mut members = Vec::new();
+    members
+        .try_reserve_exact(package.non_part_members().len())
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation fingerprint non-part members",
+            source,
+        })?;
+    members.extend(package.non_part_members());
+    members.sort_unstable_by(|left, right| {
+        left.name()
+            .cmp(right.name())
+            .then_with(|| left.reason().as_str().cmp(right.reason().as_str()))
+    });
+    Ok(members)
 }
 
 pub(super) fn blobs_equal(left: &dyn litchi_opc::Part, right: &dyn litchi_opc::Part) -> bool {

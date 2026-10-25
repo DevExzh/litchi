@@ -339,6 +339,11 @@ impl Revision {
                 limits.max_part_bytes() as usize,
             ));
         }
+        let semantic = crate::open_options::selected(package.owner.semantic_limits.as_ref());
+        let laser_usage = super::super::capture_laser_usage(
+            bytes,
+            semantic.laser().constrained_by_source(limits),
+        )?;
 
         // Admission must precede the owned copy.  The source PartData remains
         // attached to the prepared candidate; this extra reservation covers
@@ -393,22 +398,20 @@ impl Revision {
                 presentation_xml: package.owner._presentation.data.clone(),
                 slide: Arc::new(binding),
             },
-            max_output_bytes: super::super::source_slide_output_limit(
-                limits,
-                crate::open_options::selected(package.owner.semantic_limits.as_ref()).shape(),
-            ),
+            max_output_bytes: super::super::source_slide_output_limit(limits, semantic.shape()),
             semantic_limits: package.owner.semantic_limits.clone(),
             source_version,
             lineage: package.owner.package.source_lineage(),
             context,
+            laser_usage,
             // A prepared slide that encloses markup compatibility in shape
             // children admits only whole-shape removal (record 0303); other
             // slides keep the edit-time guards of each operation.
             mce: crate::presentation::transition::admit_source_with_limits(
                 bytes,
                 "slide_snapshot",
-                crate::open_options::selected(package.owner.semantic_limits.as_ref()).shape(),
-                crate::open_options::selected(package.owner.semantic_limits.as_ref()).transition(),
+                semantic.shape(),
+                semantic.transition(),
             )
             .unwrap_or(crate::presentation::transition::SlideMce::Plain),
         })

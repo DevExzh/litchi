@@ -61,9 +61,13 @@ Source-backed slide patches now match the recorded content and closure rather
 than process-local source lineage or version tokens. A changed replay always
 adopts the recipient execution context, output bound, semantic profile, and
 reservation ownership; batch and SVG/media replays retain unchanged recipient
-slides without re-admitting their opaque XML. Changed slides in a batch share
-one laser `Usage` ledger, preserving aggregate byte, trace, and point ceilings
-without charging unchanged slides.
+slides without re-admitting their opaque XML. Every selected slide in a batch
+shares one laser `Usage` ledger. Changed slides are re-admitted under the
+recipient policy; unchanged slides contribute their captured source usage
+without a second XML scan. Thus the selected batch scope preserves aggregate
+byte, trace, and point ceilings rather than silently charging only changed
+slides. A package-wide caller obtains package-wide accounting by passing every
+slide through the same ledger.
 
 All PPTX source, package, edit, unit-test, integration-test, and example
 consumers were migrated to the canonical signatures.  The minimal and full

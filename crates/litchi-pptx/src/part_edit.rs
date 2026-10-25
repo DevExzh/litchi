@@ -264,10 +264,11 @@ pub(crate) struct PartPatch {
     root: Option<(RelationshipImage, RelationshipImage)>,
     content_types: Option<(ContentTypesImage, ContentTypesImage)>,
     exact_content_types: bool,
-    /// Complete visible-content identity of the recorded base for an exact
-    /// no-op. Non-noop patches use their changed write-set states instead and
-    /// leave this absent so replay does not pay for an unrelated full digest.
-    base_revision: Option<[u8; 32]>,
+    /// Lazily cached complete-content identity of the recorded no-op base.
+    /// It is empty for a cold no-op commit and is filled by the first
+    /// independent replay, so repeated cross-owner replays do not fingerprint
+    /// the patch owner again. Non-noop patches never consult the cell.
+    base_revision: Arc<std::sync::OnceLock<[u8; 32]>>,
     /// The immutable graph that supplied an exact no-op's base. Keeping this
     /// owner preserves a pointer-identity fast path without forcing a cold
     /// first commit to fingerprint the whole package; independent recipients
@@ -290,7 +291,7 @@ impl PartialEq for PartPatch {
             && self.root == other.root
             && self.content_types == other.content_types
             && self.exact_content_types == other.exact_content_types
-            && self.base_revision == other.base_revision
+            && self.base_revision.get() == other.base_revision.get()
             && match (&self.base_owner, &other.base_owner) {
                 (None, None) => true,
                 (Some(left), Some(right)) => Arc::ptr_eq(left, right),
@@ -334,7 +335,7 @@ impl PartPatch {
             part_bytes_after: self.part_bytes_before,
             changed_part_bytes_before: self.changed_part_bytes_after,
             changed_part_bytes_after: self.changed_part_bytes_before,
-            base_revision: self.base_revision,
+            base_revision: Arc::clone(&self.base_revision),
             base_owner: self.base_owner.clone(),
         }
     }
@@ -346,9 +347,13 @@ impl PartPatch {
         if Arc::ptr_eq(owner, &package.opc) {
             return Ok(true);
         }
-        let base_revision = match self.base_revision {
+        let base_revision = match self.base_revision.get().copied() {
             Some(revision) => revision,
-            None => crate::opened::package_fingerprint_with_memo(owner, None)?.0,
+            None => {
+                let revision = crate::opened::package_fingerprint_with_memo(owner, None)?.0;
+                let _ = self.base_revision.set(revision);
+                revision
+            },
         };
         Ok(package.content_revision()? == base_revision)
     }
@@ -359,7 +364,10 @@ impl PartPatch {
     /// ordinary changed patches retain their O(affected) replay path.
     pub(crate) fn bind_noop_identity(&mut self, package: &Package) -> Result<()> {
         debug_assert!(self.is_noop());
-        self.base_revision = package.cached_content_revision();
+        self.base_revision = Arc::new(std::sync::OnceLock::new());
+        if let Some(revision) = package.cached_content_revision() {
+            let _ = self.base_revision.set(revision);
+        }
         self.base_owner = Some(Arc::clone(&package.opc));
         self.part_bytes_before = package.part_bytes;
         self.part_bytes_after = package.part_bytes;
@@ -531,7 +539,7 @@ impl PartPatch {
             root,
             content_types,
             exact_content_types,
-            base_revision: None,
+            base_revision: Arc::new(std::sync::OnceLock::new()),
             base_owner: None,
             part_bytes_before,
             part_bytes_after,
@@ -958,11 +966,16 @@ mod tests {
         // A cold no-op commit keeps only the owner handle.  It must not
         // fingerprint the whole package merely to record an exact no-op.
         assert!(base.cached_content_revision().is_none());
-        assert!(patch.0.base_revision.is_none());
+        assert!(patch.0.base_revision.get().is_none());
 
         let bytes = base.to_bytes().expect("serialize base");
         let equal = crate::Package::from_bytes(&bytes).expect("independent equal package");
+        let _ = crate::opened::model::fingerprint_log::take();
         assert!(equal.apply_opc(&patch).is_ok());
+        assert!(patch.0.base_revision.get().is_some());
+        assert!(!crate::opened::model::fingerprint_log::take().is_empty());
+        assert!(equal.apply_opc(&patch).is_ok());
+        assert!(crate::opened::model::fingerprint_log::take().is_empty());
 
         let mut edit = base.edit_opc().expect("raw edit");
         edit.update(|opc| {

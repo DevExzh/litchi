@@ -400,6 +400,36 @@ impl SourcePayload {
     }
 }
 
+/// Move an edit-owned payload into a replay recipient's execution scope.
+///
+/// The source patch keeps its original reservation until the patch itself is
+/// dropped.  A replay therefore reserves the same transient envelope from
+/// the recipient before replacing the copied source token.  If admission
+/// fails, the copied token is dropped and the target is never published.
+fn rebase_payload_reservation(
+    payload: SourcePayload,
+    context: Option<&ExecutionContext>,
+) -> Result<SourcePayload> {
+    let SourcePayload::ReservedEdit { bytes, reservation } = payload else {
+        return Ok(payload);
+    };
+    let Some(context) = context else {
+        return Ok(SourcePayload::Edited(bytes));
+    };
+    let replacement = context
+        .reserve(litchi_core::Resource::Memory, reservation.amount())
+        .map_err(|error| {
+            Error::Opc(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                error => litchi_opc::OpcError::Execution(error),
+            })
+        })?;
+    Ok(SourcePayload::ReservedEdit {
+        bytes,
+        reservation: Arc::new(replacement),
+    })
+}
+
 fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
     let Some(context) = context else {
         return Ok(());
@@ -410,6 +440,43 @@ fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
             error => litchi_opc::OpcError::Execution(error),
         })
     })
+}
+
+fn capture_laser_usage(xml: &[u8], limits: crate::laser::Limits) -> Result<crate::laser::Usage> {
+    let mut usage = crate::laser::Usage::default();
+    crate::laser::read(0, xml, &limits, &mut usage)?;
+    Ok(usage)
+}
+
+fn merge_laser_usage(
+    usage: &mut crate::laser::Usage,
+    addition: crate::laser::Usage,
+    limits: crate::laser::Limits,
+) -> Result<()> {
+    let next = usage.checked_add(addition).ok_or_else(|| Error::Limit {
+        resource: "total slide XML bytes",
+        limit: limits.max_total_slide_xml_bytes(),
+    })?;
+    if next.total_slide_xml_bytes() > limits.max_total_slide_xml_bytes() {
+        return Err(Error::Limit {
+            resource: "total slide XML bytes",
+            limit: limits.max_total_slide_xml_bytes(),
+        });
+    }
+    if next.trace_count() > limits.max_trace_count() {
+        return Err(Error::Limit {
+            resource: "laser trace count",
+            limit: limits.max_trace_count(),
+        });
+    }
+    if next.point_count() > limits.max_point_count() {
+        return Err(Error::Limit {
+            resource: "laser trace-point count",
+            limit: limits.max_point_count(),
+        });
+    }
+    *usage = next;
+    Ok(())
 }
 
 /// Reserve the full transient envelope of a source-backed text-box edit
@@ -1113,6 +1180,10 @@ pub(crate) struct SourceBackedSlideSnapshot {
     source_version: SourceVersion,
     lineage: SourceLineage,
     context: Option<ExecutionContext>,
+    /// Laser usage captured with this slide's existing source admission. A
+    /// batch can merge unchanged snapshots into its shared ledger without
+    /// re-admitting their opaque XML under a recipient policy.
+    laser_usage: crate::laser::Usage,
     /// Markup compatibility enclosed in shape-tree children admits only
     /// whole top-level shape removal (record 0303).
     mce: crate::presentation::transition::SlideMce,
@@ -2251,6 +2322,11 @@ impl SourceBackedPresentationEditor {
                 return Err(error.into());
             },
         };
+        let semantic = crate::open_options::selected(self.semantic_limits.as_ref());
+        let laser_usage = capture_laser_usage(
+            raw.as_bytes(),
+            semantic.laser().constrained_by_source(self.limits),
+        )?;
         Ok(SourceBackedSlideSnapshot {
             position,
             part_uri: data.part_uri.clone(),
@@ -2269,6 +2345,7 @@ impl SourceBackedPresentationEditor {
             source_version,
             lineage,
             context,
+            laser_usage,
             // Read and publication snapshots are never edited.
             mce: crate::presentation::transition::SlideMce::Plain,
         })
@@ -2489,6 +2566,10 @@ impl SourceBackedPresentationEditor {
         let SourcePart { data: raw, .. } = part;
         self.package.check_execution()?;
         let source_version = self.package.source_version()?;
+        let laser_usage = capture_laser_usage(
+            raw.as_bytes(),
+            semantic.laser().constrained_by_source(self.limits),
+        )?;
         Ok(SourceBackedSlideSnapshot {
             position,
             part_uri: data.part_uri.clone(),
@@ -2507,6 +2588,7 @@ impl SourceBackedPresentationEditor {
             source_version,
             lineage,
             context,
+            laser_usage,
             mce,
         })
     }
@@ -2615,9 +2697,7 @@ impl SourceBackedSlideSnapshot {
         target.context = recipient.context.clone();
         target.max_output_bytes = recipient.max_output_bytes;
         target.semantic_limits = recipient.semantic_limits.clone();
-        if let SourcePayload::ReservedEdit { bytes, .. } = target.xml {
-            target.xml = SourcePayload::Edited(bytes);
-        }
+        target.xml = rebase_payload_reservation(target.xml, recipient.context.as_ref())?;
         if target.xml.as_bytes().len() > recipient.max_output_bytes {
             return Err(Error::Limit {
                 resource: "source-backed primary slide output bytes",
@@ -2631,12 +2711,15 @@ impl SourceBackedSlideSnapshot {
             semantic.shape(),
             semantic.transition(),
         )?;
+        let mut slide_usage = crate::laser::Usage::default();
         crate::laser::read(
             target.position,
             target.xml.as_bytes(),
             &semantic.laser(),
-            usage,
+            &mut slide_usage,
         )?;
+        merge_laser_usage(usage, slide_usage, semantic.laser())?;
+        target.laser_usage = slide_usage;
         Ok(target)
     }
 }
@@ -3227,6 +3310,11 @@ impl SourceBackedSlideEdit {
             source_version: source.source_version,
             lineage: source.lineage.clone(),
             context: source.context.clone(),
+            laser_usage: if self.working.as_bytes() == source.xml.as_bytes() {
+                source.laser_usage
+            } else {
+                crate::laser::Usage::default()
+            },
             mce: source.mce,
         };
         let patch = SourceBackedSlidePatch {
@@ -3823,12 +3911,16 @@ impl SourceBackedSlideBatchPatch {
             if after.same_source(recipient) {
                 // The patch did not change this slide. Preserve the
                 // recipient snapshot without re-admitting opaque XML under a
-                // possibly tighter semantic profile.
+                // possibly tighter semantic profile, but charge its source
+                // admission ledger to the same selected batch scope.
+                let semantic = crate::open_options::selected(recipient.semantic_limits.as_ref());
+                merge_laser_usage(&mut usage, recipient.laser_usage, semantic.laser())?;
                 slides.push(recipient.clone());
             } else {
-                // One usage ledger covers exactly the changed slides in this
-                // batch, so laser aggregate ceilings remain package-wide
-                // without charging unchanged recipients.
+                // One usage ledger covers every selected slide in this batch;
+                // changed slides are re-admitted under the recipient policy,
+                // while unchanged slides contribute their captured source
+                // usage above without a second XML scan.
                 slides.push(after.rebase_policy_with_usage(recipient, &mut usage)?);
             }
         }
@@ -6241,6 +6333,7 @@ mod tests {
             source_version: before.source_version,
             lineage: before.lineage.clone(),
             context: before.context.clone(),
+            laser_usage: crate::laser::Usage::default(),
             mce: before.mce,
         };
         (before, after)
@@ -6691,6 +6784,48 @@ mod tests {
         assert_eq!(budget.used(Resource::Memory), 0);
     }
 
+    #[test]
+    fn replay_rehomes_edit_reservation_into_recipient_context() {
+        let archive = source_backed_pptx();
+        let (source_budget, _source_cancel, source_context) = source_backed_context(u64::MAX);
+        let source = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(CountingSource::new(archive.clone())),
+            crate::OpenOptions::default().execution_context(source_context),
+        )
+        .unwrap();
+        let mut edit = source.edit_slide(0).unwrap();
+        assert!(
+            edit.set_slide_properties(Some("Rebased reservation"), None)
+                .unwrap()
+        );
+        let commit = edit.commit_checked().unwrap();
+        let patch = commit.patch().clone();
+
+        let (recipient_budget, _recipient_cancel, recipient_context) =
+            source_backed_context(u64::MAX);
+        let recipient = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(CountingSource::new(archive)),
+            crate::OpenOptions::default().execution_context(recipient_context),
+        )
+        .unwrap();
+        let recipient_slide = recipient.slide_snapshot(0).unwrap();
+        let before_apply = recipient_budget.used(Resource::Memory);
+        let applied = patch.apply(&recipient_slide).unwrap();
+
+        assert!(matches!(&applied.xml, SourcePayload::ReservedEdit { .. }));
+        assert!(recipient_budget.used(Resource::Memory) > before_apply);
+        drop(applied);
+        assert_eq!(recipient_budget.used(Resource::Memory), before_apply);
+
+        drop(recipient_slide);
+        drop(recipient);
+        drop(patch);
+        drop(commit);
+        drop(source);
+        assert_eq!(recipient_budget.used(Resource::Memory), 0);
+        assert_eq!(source_budget.used(Resource::Memory), 0);
+    }
+
     fn publish_first_slide_update(editor: SourceBackedPresentationEditor) -> Vec<u8> {
         let commit = changed_slide_commit(&editor, 0, "First slide", "Updated slide");
         let mut output = Vec::new();
@@ -6928,6 +7063,57 @@ mod tests {
             applied.slides[0].xml.as_bytes(),
             patch.after.slides[0].xml.as_bytes()
         );
+    }
+
+    #[test]
+    fn batch_replay_charges_unchanged_laser_usage_in_selected_scope() {
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let (before_first, after_first) =
+            changed_slide_snapshots(&editor, 0, "First slide", "Updated slide");
+        let before_second = editor.slide_snapshot(1).unwrap();
+        let total = before_first
+            .laser_usage
+            .total_slide_xml_bytes()
+            .checked_add(before_second.laser_usage.total_slide_xml_bytes())
+            .unwrap();
+        let defaults = crate::laser::Limits::DEFAULT;
+        let profile = crate::laser::Limits::new(
+            defaults.max_slide_xml_bytes(),
+            total.saturating_sub(1),
+            defaults.max_trace_count(),
+            defaults.max_point_count(),
+            defaults.max_xml_nodes(),
+            defaults.max_xml_depth(),
+            defaults.max_output_bytes(),
+        )
+        .unwrap();
+        let options = crate::OpenOptions::default().laser_limits(profile);
+        let mut recipient_first = before_first.clone();
+        recipient_first.semantic_limits = options.semantic_limits.clone();
+        let mut recipient_second = before_second.clone();
+        recipient_second.semantic_limits = options.semantic_limits.clone();
+        let patch = SourceBackedSlideBatchPatch {
+            before: SourceBackedSlideBatchSnapshot {
+                slides: vec![before_first, before_second].into_boxed_slice(),
+            },
+            after: SourceBackedSlideBatchSnapshot {
+                slides: vec![after_first, recipient_second.clone()].into_boxed_slice(),
+            },
+        };
+        let recipient = SourceBackedSlideBatchSnapshot {
+            slides: vec![recipient_first, recipient_second].into_boxed_slice(),
+        };
+
+        assert!(matches!(
+            patch.apply(&recipient),
+            Err(Error::Limit {
+                resource: "total slide XML bytes",
+                limit,
+            }) if limit == total - 1
+        ));
     }
 
     #[test]
