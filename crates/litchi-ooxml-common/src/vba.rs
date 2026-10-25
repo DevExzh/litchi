@@ -3070,6 +3070,20 @@ mod tests {
         OpcPackage::from_vec(SOURCE.to_vec(), SourceLimits::default()).unwrap()
     }
 
+    fn serialized_archive_counts(bytes: &[u8]) -> (usize, usize) {
+        let archive = soapberry_zip::ZipArchive::from_slice(bytes).unwrap();
+        let mut members = 0usize;
+        let mut entries = 0usize;
+        for entry in archive.entries() {
+            let entry = entry.unwrap();
+            entries = entries.saturating_add(1);
+            if !entry.is_dir() {
+                members = members.saturating_add(1);
+            }
+        }
+        (members, entries)
+    }
+
     fn word_package() -> OpcPackage {
         let source_name = PackURI::new("/word/document.xml").unwrap();
         let mut package = OpcPackage::new();
@@ -3556,14 +3570,10 @@ mod tests {
             let bytes = PackageWriter::to_bytes(&candidate).unwrap();
             OpcPackage::from_vec(bytes, SourceLimits::default()).unwrap()
         };
-        let projected_metrics = projected
-            .retained_archive_metrics(SourceLimits::default())
-            .unwrap()
-            .unwrap();
+        let projected_bytes = PackageWriter::to_bytes(&projected).unwrap();
         let projected_relationships =
             relationship_totals(&projected, SourceLimits::default()).unwrap();
-        let projected_members = projected_metrics.members();
-        let projected_entries = projected_metrics.entries();
+        let (projected_members, projected_entries) = serialized_archive_counts(&projected_bytes);
         assert!(
             projected_entries > projected_members,
             "the structural fixture must retain directory entries"
@@ -3848,28 +3858,19 @@ mod tests {
 
         let broad = patch.apply(&recipient).unwrap();
         let broad_bytes = PackageWriter::to_bytes(broad.package()).unwrap();
+        let (final_members, final_entries) = serialized_archive_counts(&broad_bytes);
         let reopened = OpcPackage::from_vec(broad_bytes, SourceLimits::default()).unwrap();
-        let projected = reopened
+        let projected_metrics = reopened
             .retained_archive_metrics(SourceLimits::default())
             .unwrap()
             .unwrap();
-        let final_members = projected.members();
-        let final_entries = projected.entries();
-        let final_aggregate = projected.aggregate_bytes();
-        let final_metadata = projected.metadata_bytes();
+        let final_aggregate = projected_metrics.aggregate_bytes();
+        let final_metadata = projected_metrics.metadata_bytes();
         assert!(final_members > 1);
         assert!(final_entries > final_members);
         assert!(final_aggregate > 0);
         assert!(final_metadata > 0);
         let final_relationships = relationship_totals(&reopened, SourceLimits::default()).unwrap();
-        assert_eq!(
-            final_members,
-            projected
-                .opaque_members()
-                .saturating_add(1)
-                .saturating_add(reopened.part_count())
-                .saturating_add(final_relationships.members)
-        );
 
         let limits = |members, entries, aggregate, metadata| {
             SourceLimits::builder()

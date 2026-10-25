@@ -12,10 +12,12 @@ VBA-project overrides at the manifest close.  This keeps a recipient-only
 comment before the generated fragments and still checks every byte exactly.
 
 The structural-limit tests use a tracked Excel source fixture with directory
-entries, derive exact candidate member/entry budgets, and use one-under limits
-that satisfy all `SourceLimits` cross-field invariants while exercising the
-intended refusal kinds.  The replay test consequently distinguishes the
-member and total-entry ceilings instead of constructing an impossible policy.
+entries and count the serialized candidates through the existing ZIP reader,
+independently of the production retained-metrics planner.  They use exact
+candidate budgets and one-under limits that satisfy all `SourceLimits`
+cross-field invariants while exercising the intended refusal kinds.  The
+replay test consequently distinguishes the member and total-entry ceilings
+instead of constructing an impossible policy.
 
 Source inspection, formatting, and repository-size/binary checks passed in this
 leaf.  Cargo, compiler, and runtime execution remain intentionally pending for

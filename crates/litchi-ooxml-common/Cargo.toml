@@ -29,5 +29,8 @@ thiserror = { workspace = true }
 unicode-normalization = { workspace = true }
 url = { workspace = true }
 
+[dev-dependencies]
+soapberry-zip = { workspace = true }
+
 [lints]
 workspace = true
