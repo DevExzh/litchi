@@ -6,14 +6,14 @@
 
 use litchi_rtf::{
     OpenOptions, Package, SourceLimits, ValidationDependency, ValidationStatus,
-    validation::{ValidationReport, validate_with_options},
+    validation::{ValidationReport, validate},
 };
 
 const CLEAN: &str = r#"{\rtf1\ansi Clean text\par}"#;
 
 #[test]
 fn clean_report_is_content_free_and_explicit_about_scope() {
-    let report = ValidationReport::from_str(CLEAN).unwrap();
+    let report = report_str(CLEAN).unwrap();
 
     assert_eq!(report.syntax().status(), ValidationStatus::Valid);
     assert_eq!(report.root().status(), ValidationStatus::Valid);
@@ -86,7 +86,7 @@ fn malformed_external_field_keyword_is_unknown_not_proven_present() {
         r#"{\field{\*\fldinst DDE}{\fldrslt cached}}"#,
         r#" after}"#,
     );
-    let report = ValidationReport::from_str(source).unwrap();
+    let report = report_str(source).unwrap();
 
     assert_eq!(report.fields().status(), ValidationStatus::Present);
     assert_eq!(report.external_links().status(), ValidationStatus::Unknown);
@@ -106,7 +106,7 @@ fn dde_and_ddeauto_are_both_external_and_active() {
         let source = format!(
             r#"{{\rtf1\ansi{{\field{{\*\fldinst {instruction}}}{{\fldrslt cached}}}}Body}}"#
         );
-        let report = ValidationReport::from_str(&source).unwrap();
+        let report = report_str(&source).unwrap();
         assert_eq!(report.external_links().status(), ValidationStatus::Present);
         assert_eq!(report.active_content().status(), ValidationStatus::Present);
         assert_eq!(report.execution().status(), ValidationStatus::Unsupported);
@@ -120,7 +120,7 @@ fn dde_and_ddeauto_are_both_external_and_active() {
 #[test]
 fn xsl_and_mail_merge_metadata_are_external_and_active_surfaces() {
     let xsl =
-        ValidationReport::from_str(r#"{\rtf1{\*\xform transform.xsl}\usexform Body}"#).unwrap();
+        report_str(r#"{\rtf1{\*\xform transform.xsl}\usexform Body}"#).unwrap();
     assert_eq!(xsl.external_links().status(), ValidationStatus::Present);
     assert_eq!(xsl.active_content().status(), ValidationStatus::Present);
     assert_eq!(xsl.execution().status(), ValidationStatus::Unsupported);
@@ -132,7 +132,7 @@ fn xsl_and_mail_merge_metadata_are_external_and_active_surfaces() {
         r#"{\*\mmodso\mmodsoactive7}"#,
         r#"}Body}"#,
     );
-    let merge = ValidationReport::from_str(mail_merge).unwrap();
+    let merge = report_str(mail_merge).unwrap();
     assert_eq!(merge.external_links().status(), ValidationStatus::Present);
     assert_eq!(merge.active_content().status(), ValidationStatus::Present);
     assert_eq!(merge.execution().status(), ValidationStatus::Unsupported);
@@ -155,7 +155,7 @@ fn mail_merge_fields_are_external_and_active_even_with_cached_results() {
         let source = format!(
             r#"{{\rtf1\ansi{{\field{{\*\fldinst {instruction}}}{{\fldrslt cached}}}}Body}}"#
         );
-        let report = ValidationReport::from_str(&source).unwrap();
+        let report = report_str(&source).unwrap();
         assert_eq!(
             report.external_links().status(),
             ValidationStatus::Present,
@@ -185,18 +185,18 @@ fn destination_binary_limits_reject_one_over_before_arena_copy() {
         .expect("binary profile is consistent");
     let options = OpenOptions::new().source_limits(limits);
     let picture = br#"{\rtf1{\pict\pngblip\bin3 abc}}"#;
-    let picture_report = ValidationReport::from_bytes_with_options(picture, options).unwrap();
+    let picture_report = ValidationReport::from_bytes(picture, options).unwrap();
     assert_eq!(picture_report.counts().pictures(), 1);
 
     let over_picture = br#"{\rtf1{\pict\pngblip\bin4 abcd}}"#;
-    assert!(ValidationReport::from_bytes_with_options(over_picture, options).is_err());
+    assert!(ValidationReport::from_bytes(over_picture, options).is_err());
 
     let object = br#"{\rtf1{\object\objemb{\*\objdata\bin3 abc}}}"#;
-    let object_report = ValidationReport::from_bytes_with_options(object, options).unwrap();
+    let object_report = ValidationReport::from_bytes(object, options).unwrap();
     assert_eq!(object_report.counts().objects(), 1);
 
     let over_object = br#"{\rtf1{\object\objemb{\*\objdata\bin4 abcd}}}"#;
-    assert!(ValidationReport::from_bytes_with_options(over_object, options).is_err());
+    assert!(ValidationReport::from_bytes(over_object, options).is_err());
 }
 
 #[test]
@@ -206,7 +206,7 @@ fn malformed_active_field_keyword_is_unknown_not_proven_executable() {
         r#"{\field{\*\fldinst MACROBUTTON}{\fldrslt cached}}"#,
         r#" after}"#,
     );
-    let report = ValidationReport::from_str(source).unwrap();
+    let report = report_str(source).unwrap();
 
     assert_eq!(report.fields().status(), ValidationStatus::Present);
     assert_eq!(report.active_content().status(), ValidationStatus::Unknown);
@@ -222,7 +222,7 @@ fn known_objects_and_pictures_are_counted_without_inspecting_payload_content() {
         r#"{\object\objemb{\*\objdata 00}}"#,
         r#"Body}"#,
     );
-    let report = ValidationReport::from_str(source).unwrap();
+    let report = report_str(source).unwrap();
 
     assert_eq!(report.counts().pictures(), 1);
     assert_eq!(report.counts().objects(), 1);
@@ -238,7 +238,7 @@ fn linked_objects_are_external_and_unknown_object_kinds_fail_closed() {
         r#"{\object\objlink{\*\objclass Document}{\*\objdata 00}}"#,
         r#"Body}"#,
     );
-    let linked_report = ValidationReport::from_str(linked).unwrap();
+    let linked_report = report_str(linked).unwrap();
     assert_eq!(
         linked_report.external_links().status(),
         ValidationStatus::Present
@@ -251,7 +251,7 @@ fn linked_objects_are_external_and_unknown_object_kinds_fail_closed() {
     // No object-kind control is a parser-accepted retained object with an
     // unknown storage mode. Its payload remains opaque to this report.
     let unknown = concat!(r#"{\rtf1\ansi"#, r#"{\object{\*\objdata 00}}"#, r#"Body}"#,);
-    let unknown_report = ValidationReport::from_str(unknown).unwrap();
+    let unknown_report = report_str(unknown).unwrap();
     assert_eq!(unknown_report.objects().status(), ValidationStatus::Unknown);
     assert_eq!(
         unknown_report.external_links().status(),
@@ -263,7 +263,7 @@ fn linked_objects_are_external_and_unknown_object_kinds_fail_closed() {
     );
 
     let unknown_picture = r#"{\rtf1\ansi{\pict 00}Body}"#;
-    let unknown_picture_report = ValidationReport::from_str(unknown_picture).unwrap();
+    let unknown_picture_report = report_str(unknown_picture).unwrap();
     assert_eq!(
         unknown_picture_report.pictures().status(),
         ValidationStatus::Unknown
@@ -282,7 +282,7 @@ fn opaque_and_unknown_fields_fail_closed_without_leaking_content() {
         r#"{\field{\*\fldinst FUTUREACTIVE "opaque"}{\fldrslt cached}}"#,
         r#"Body}"#,
     );
-    let report = ValidationReport::from_str(source).unwrap();
+    let report = report_str(source).unwrap();
 
     assert_eq!(
         report.unsupported_syntax().status(),
@@ -303,9 +303,14 @@ fn opaque_and_unknown_fields_fail_closed_without_leaking_content() {
 #[test]
 fn compressed_and_raw_byte_ingress_use_one_bounded_parse() {
     let raw = CLEAN.as_bytes();
-    let compressed = litchi_rtf::transport::compress(raw, true).unwrap();
-    let raw_report = ValidationReport::from_bytes(raw).unwrap();
-    let compressed_report = ValidationReport::from_bytes(&compressed).unwrap();
+    let compressed = litchi_rtf::transport::compress(
+        raw,
+        true,
+        litchi_rtf::transport::CompressionLimits::default(),
+    )
+    .unwrap();
+    let raw_report = report_bytes(raw).unwrap();
+    let compressed_report = report_bytes(&compressed).unwrap();
 
     assert_eq!(
         raw_report.compressed_transport().status(),
@@ -324,15 +329,15 @@ fn compressed_and_raw_byte_ingress_use_one_bounded_parse() {
 
 #[test]
 fn malformed_root_and_finite_limits_are_errors_not_safe_reports() {
-    assert!(ValidationReport::from_str("plain text").is_err());
-    assert!(ValidationReport::from_str(r#"{\ansi text}"#).is_err());
-    assert!(ValidationReport::from_str(r#"{\rtf text}"#).is_err());
-    assert!(ValidationReport::from_str(r#"{\rtf2 text}"#).is_err());
-    assert!(ValidationReport::from_str(r#"{\rtf1\ansi unterminated"#).is_err());
+    assert!(report_str("plain text").is_err());
+    assert!(report_str(r#"{\ansi text}"#).is_err());
+    assert!(report_str(r#"{\rtf text}"#).is_err());
+    assert!(report_str(r#"{\rtf2 text}"#).is_err());
+    assert!(report_str(r#"{\rtf1\ansi unterminated"#).is_err());
     // Content after the root group is ignored, as Word and LibreOffice do.
-    assert!(ValidationReport::from_str(r#"{\rtf1 text} trailing"#).is_ok());
-    assert!(ValidationReport::from_str(r#"{\rtf1 text}{\rtf1 second}"#).is_ok());
-    assert!(ValidationReport::from_str("{\\rtf1 text} \t\r\n").is_ok());
+    assert!(report_str(r#"{\rtf1 text} trailing"#).is_ok());
+    assert!(report_str(r#"{\rtf1 text}{\rtf1 second}"#).is_ok());
+    assert!(report_str("{\\rtf1 text} \t\r\n").is_ok());
 
     let limits = SourceLimits::builder()
         .max_input_bytes(CLEAN.len() - 1)
@@ -340,7 +345,7 @@ fn malformed_root_and_finite_limits_are_errors_not_safe_reports() {
         .build()
         .expect("source profile is consistent");
     assert!(
-        validate_with_options(raw_bytes(CLEAN), OpenOptions::new().source_limits(limits)).is_err()
+        validate(raw_bytes(CLEAN), OpenOptions::new().source_limits(limits)).is_err()
     );
 
     let exact = SourceLimits::builder()
@@ -349,26 +354,25 @@ fn malformed_root_and_finite_limits_are_errors_not_safe_reports() {
         .build()
         .expect("source profile is consistent");
     let report =
-        ValidationReport::from_str_with_options(CLEAN, OpenOptions::new().source_limits(exact))
-            .unwrap();
+        ValidationReport::from_str(CLEAN, OpenOptions::new().source_limits(exact)).unwrap();
     assert_eq!(report.limits().max_input_bytes(), CLEAN.len());
     assert_eq!(report.limits().max_group_depth(), 32);
 }
 
 #[test]
 fn empty_picture_and_dropped_nested_destination_leave_unknown_markers() {
-    let empty = ValidationReport::from_str(r#"{\rtf1{\pict}Body}"#).unwrap();
+    let empty = report_str(r#"{\rtf1{\pict}Body}"#).unwrap();
     assert_eq!(empty.pictures().status(), ValidationStatus::Unknown);
     assert!(empty.counts().unknown_syntax_markers() > 0);
     assert_eq!(empty.security().status(), ValidationStatus::Unknown);
 
     let nested = r#"{\rtf1{\pict\pngblip{\*\futurePictureNested ignored}89504e}}"#;
-    let nested_report = ValidationReport::from_str(nested).unwrap();
+    let nested_report = report_str(nested).unwrap();
     assert!(nested_report.counts().unknown_syntax_markers() > 0);
     assert_eq!(nested_report.security().status(), ValidationStatus::Unknown);
 
     let object = r#"{\rtf1{\object\objemb{\*\objdata 00{\*\futureObjectNested ignored}}}}"#;
-    let object_report = ValidationReport::from_str(object).unwrap();
+    let object_report = report_str(object).unwrap();
     assert!(object_report.counts().unknown_syntax_markers() > 0);
     assert_eq!(object_report.objects().status(), ValidationStatus::Unknown);
     assert_eq!(object_report.security().status(), ValidationStatus::Unknown);
@@ -385,7 +389,7 @@ fn deep_iterative_object_data_is_rejected_with_a_finite_depth_bound() {
         source.push('}');
     }
     source.push_str("}Body}");
-    assert!(ValidationReport::from_str(&source).is_err());
+    assert!(report_str(&source).is_err());
 }
 
 #[test]
@@ -399,9 +403,17 @@ fn deeply_nested_generic_fields_are_rejected_before_stack_growth() {
         source.push_str("}}");
     }
     source.push('}');
-    assert!(ValidationReport::from_str(&source).is_err());
+    assert!(report_str(&source).is_err());
 }
 
 fn raw_bytes(source: &str) -> &[u8] {
     source.as_bytes()
+}
+
+fn report_str(input: &str) -> litchi_rtf::Result<ValidationReport> {
+    ValidationReport::from_str(input, OpenOptions::default())
+}
+
+fn report_bytes(input: &[u8]) -> litchi_rtf::Result<ValidationReport> {
+    ValidationReport::from_bytes(input, OpenOptions::default())
 }

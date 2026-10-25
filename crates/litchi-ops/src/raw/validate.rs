@@ -198,7 +198,12 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
             .map_err(Error::Cfb)?
         },
         #[cfg(feature = "rtf")]
-        FileFormat::Rtf => rtf(&file.to_bytes()?)?,
+        FileFormat::Rtf => {
+            let File::Rtf(handle) = file else {
+                return Err(refused(file));
+            };
+            rtf(handle)?
+        },
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp", odf_objects))]
         FileFormat::Odt
         | FileFormat::Oth
@@ -289,7 +294,7 @@ fn merge(first: &ValidateReport, second: &ValidateReport) -> Result<ValidateRepo
 
 /// RTF: the leaf's syntax and security inventory as a report.
 #[cfg(feature = "rtf")]
-fn rtf(bytes: &[u8]) -> Result<ValidateReport> {
+fn rtf(file: &crate::format::rtf::Rtf) -> Result<ValidateReport> {
     use litchi_core::{
         CheckCapabilityId, CheckStatus, CompatibilityImpact, IssueLocation, IssueSeverity,
         RepairAvailability, ValidationCheck, ValidationIssue,
@@ -300,49 +305,25 @@ fn rtf(bytes: &[u8]) -> Result<ValidateReport> {
     let security =
         CheckCapabilityId::try_new("rtf.security.surface_presence", limits).map_err(report)?;
     let mut issues = Vec::new();
-    let security_status = match litchi_rtf::validation::validate(bytes) {
-        Ok(inventory) => {
-            if !inventory.is_conservatively_clean() {
-                issues.push(
-                    ValidationIssue::try_new(
-                        security.clone(),
-                        "rtf.security.surface_present",
-                        IssueSeverity::Info,
-                        "The document carries objects, fields or other active surfaces; they were not executed.",
-                        [IssueLocation::try_new(None, Some("document"), None, None, None, limits).map_err(report)?],
-                        [],
-                        None,
-                        CompatibilityImpact::None,
-                        RepairAvailability::Unavailable,
-                        limits,
-                    )
-                    .map_err(report)?,
-                );
-            }
-            CheckStatus::Complete
-        },
-        Err(_) => {
-            issues.push(
-                ValidationIssue::try_new(
-                    syntax.clone(),
-                    "rtf.syntax.invalid",
-                    IssueSeverity::Error,
-                    "The published RTF does not parse.",
-                    [
-                        IssueLocation::try_new(None, Some("document"), None, None, None, limits)
-                            .map_err(report)?,
-                    ],
-                    [],
-                    None,
-                    CompatibilityImpact::Interoperability,
-                    RepairAvailability::Unavailable,
-                    limits,
-                )
-                .map_err(report)?,
-            );
-            CheckStatus::stopped_by(syntax.clone())
-        },
-    };
+    let inventory = file.validation_report();
+    if !inventory.is_conservatively_clean() {
+        issues.push(
+            ValidationIssue::try_new(
+                security.clone(),
+                "rtf.security.surface_present",
+                IssueSeverity::Info,
+                "The document carries objects, fields or other active surfaces; they were not executed.",
+                [IssueLocation::try_new(None, Some("document"), None, None, None, limits).map_err(report)?],
+                [],
+                None,
+                CompatibilityImpact::None,
+                RepairAvailability::Unavailable,
+                limits,
+            )
+            .map_err(report)?,
+        );
+    }
+    let security_status = CheckStatus::Complete;
     ValidateReport::try_new(
         [
             ValidationCheck::new(syntax, CheckStatus::Complete),

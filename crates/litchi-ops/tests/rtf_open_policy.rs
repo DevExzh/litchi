@@ -64,7 +64,12 @@ fn compressed_expansion_uses_native_profile() {
             .unwrap(),
     );
     for lzfu in [false, true] {
-        let bytes = litchi_rtf::transport::compress(PLAIN, lzfu).unwrap();
+        let bytes = litchi_rtf::transport::compress(
+            PLAIN,
+            lzfu,
+            litchi_rtf::transport::CompressionLimits::default(),
+        )
+        .unwrap();
         assert_eq!(
             open_bytes_with(bytes, &denied).unwrap_err().code(),
             Code::LimitExceeded

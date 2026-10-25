@@ -1,0 +1,80 @@
+{
+  "schema": "litchi.drawingml.raw-qualification.manifest.v2",
+  "status": "pending_final_candidate_binding",
+  "preparation_module": "tools/native_qualification/prepare_drawingml_raw_inputs_v2.py",
+  "historical_source": {
+    "ref": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+    "path": "tools/perf-baseline/src/lib.rs",
+    "blob_sha1": "fbc55c5dcdb7cf86e5377e4f8012954a7fb4e572",
+    "sha256": "280d61ae1f714af78be6cecf21a4432a9ea2a27478e89c237b5d358bc02db02a",
+    "bytes": 3088216
+  },
+  "approved_baseline_revisions": [
+    "11728db894181ffbcdbcea3ae0008d51fdd2d8af",
+    "2f7db7ee7fa01893e9099217fc4243687d196f63",
+    "945eb1d6b9ef6c56fa26c82e12758d38c1b9015d",
+    "996651b6b19717a0192dfd4144bccd367fb2ea44"
+  ],
+  "candidate": {
+    "revision": null,
+    "manifests": null,
+    "vendor_tree": null,
+    "locks": {
+      "Cargo.lock": {
+        "sha256": "efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811",
+        "bytes": 139189
+      },
+      "tools/perf-baseline/Cargo.lock": {
+        "sha256": "de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea",
+        "bytes": 56941
+      },
+      "tools/native-resave/Cargo.lock": {
+        "sha256": "989da70f10deab4460a77e4afa3a1b840b4697bbea2c07e134e22d9b4c5084ae",
+        "bytes": 56689
+      }
+    }
+  },
+  "candidate_manifest_paths": [
+    "Cargo.toml",
+    "tools/perf-baseline/Cargo.toml",
+    "tools/native-resave/Cargo.toml"
+  ],
+  "vendor_roots": [
+    "vendor/allsorts",
+    "vendor/flate2",
+    "vendor/zlib-rs"
+  ],
+  "probe_copy_paths": [
+    "tools/perf-baseline/Cargo.toml",
+    "tools/perf-baseline/src/lib.rs",
+    "tools/perf-baseline/src/drawingml_raw_probe.rs",
+    "tools/perf-baseline/src/bin/drawingml_raw_native.rs",
+    "tools/perf-baseline/src/bin/drawingml_raw_allocator.rs",
+    "tools/perf-baseline/src/bin/support/drawingml_counting_allocator.rs",
+    "tools/native_qualification/drawingml_raw_validator.py",
+    "tools/native_qualification/fixtures/drawingml_raw_fixtures.json"
+  ],
+  "dependency_path_transitions": [
+    {
+      "package": "allsorts",
+      "version": "0.17.0",
+      "baseline_source": "registry",
+      "candidate_source": "path",
+      "candidate_path": "vendor/allsorts"
+    },
+    {
+      "package": "flate2",
+      "version": "1.1.10",
+      "baseline_source": "registry",
+      "candidate_source": "path",
+      "candidate_path": "vendor/flate2"
+    },
+    {
+      "package": "zlib-rs",
+      "version": "0.6.8",
+      "baseline_source": "registry",
+      "candidate_source": "path",
+      "candidate_path": "vendor/zlib-rs"
+    }
+  ]
+}

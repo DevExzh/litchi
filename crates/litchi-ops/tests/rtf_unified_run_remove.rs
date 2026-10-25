@@ -252,7 +252,12 @@ fn mixed_targets_misses_and_dependent_sources_refuse_atomically() {
         Code::DocumentProtected
     );
     for lzfu in [false, true] {
-        let bytes = litchi_rtf::transport::compress(INPUT, lzfu).unwrap();
+        let bytes = litchi_rtf::transport::compress(
+            INPUT,
+            lzfu,
+            litchi_rtf::transport::CompressionLimits::default(),
+        )
+        .unwrap();
         let source = open_bytes(bytes.as_slice()).unwrap();
         assert_eq!(
             source.remove(query("r")).unwrap_err().code(),

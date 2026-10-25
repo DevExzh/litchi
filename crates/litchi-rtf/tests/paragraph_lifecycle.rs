@@ -8,7 +8,7 @@ use litchi_core::Position;
 use litchi_rtf::{
     EditOptions, Package, SemanticLimitKind, SemanticLimits,
     edit::{Composition, CompositionError, CompositionLimits, Error},
-    transport::compress,
+    transport::{CompressionLimits, compress},
 };
 use std::io::{self, Write};
 
@@ -571,7 +571,7 @@ fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports(
     assert_eq!(source.to_bytes().unwrap(), cp1252);
 
     let raw = br"{\rtf1\ansi One\par Two}";
-    let compressed = compress(raw, true).unwrap();
+    let compressed = compress(raw, true, CompressionLimits::default()).unwrap();
     let source = Package::from_bytes(&compressed).unwrap();
     let mut edit = source.edit();
     edit.move_paragraph(Position::new(0), Position::new(1))

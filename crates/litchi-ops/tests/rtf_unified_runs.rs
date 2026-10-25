@@ -217,7 +217,14 @@ fn run_capabilities_admit_sets_adds_and_removal_with_ordering_gaps() {
 fn compressed_transports_and_retained_corpus_match_native_run_text_and_flags() {
     let mut inputs = vec![INPUT.to_vec()];
     for lzfu in [false, true] {
-        inputs.push(litchi_rtf::transport::compress(INPUT, lzfu).unwrap());
+        inputs.push(
+            litchi_rtf::transport::compress(
+                INPUT,
+                lzfu,
+                litchi_rtf::transport::CompressionLimits::default(),
+            )
+            .unwrap(),
+        );
     }
     for name in [
         "typed_hyperlinks_and_references.rtf",

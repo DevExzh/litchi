@@ -467,6 +467,12 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         import hashlib
 
         for relative, expected in preparation.STATIC_REVIEWED_ADAPTER_SHA256.items():
+            if relative == preparation.CONSUMER_API_ADAPTER_PATH:
+                source, frozen = preparation._frozen_consumer_api_source(ROOT)
+                self.assertEqual(frozen["ref"], preparation.FROZEN_CONSUMER_API_SOURCE_REF)
+                self.assertEqual(frozen["blob_sha1"], preparation.FROZEN_CONSUMER_API_SOURCE_BLOB_SHA1)
+                self.assertEqual(hashlib.sha256(source).hexdigest(), expected, relative)
+                continue
             path = ROOT / relative
             if path.is_file():
                 self.assertEqual(
@@ -495,8 +501,9 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
         )
 
     def test_historical_consumer_adapter_changes_only_six_spellings(self) -> None:
-        path = ROOT / preparation.CONSUMER_API_ADAPTER_PATH
-        source = path.read_bytes()
+        source, frozen = preparation._frozen_consumer_api_source(ROOT)
+        self.assertEqual(frozen["ref"], preparation.FROZEN_CONSUMER_API_SOURCE_REF)
+        self.assertEqual(frozen["path"], preparation.FROZEN_CONSUMER_API_SOURCE_PATH)
         self.assertEqual(
             hashlib.sha256(source).hexdigest(), preparation.CONSUMER_API_CURRENT_SHA256
         )
@@ -537,6 +544,14 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
             preparation._adapt_baseline_consumer_adapter(
                 preparation.CONSUMER_API_ADAPTER_PATH,
                 adapted,
+            )
+
+    def test_v1_rejects_a_nonfrozen_current_candidate_source(self) -> None:
+        source, _ = preparation._frozen_consumer_api_source(ROOT)
+        with self.assertRaises(preparation.PreparationError):
+            preparation._adapt_baseline_consumer_adapter(
+                preparation.CONSUMER_API_ADAPTER_PATH,
+                source + b"\n",
             )
 
     def _write_unavailable_reports(self, output: Path) -> None:

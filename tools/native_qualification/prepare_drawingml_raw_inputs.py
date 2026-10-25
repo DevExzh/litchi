@@ -21,6 +21,14 @@ from typing import Any, Mapping
 
 
 SCHEMA = "litchi.drawingml.raw-preparation.v1"
+# Version one is a frozen historical protocol.  Its consumer adapter is
+# tested against this approved standalone source capture, never against the
+# current repository's lib.rs (which may have moved on to another API role).
+FROZEN_CONSUMER_API_SOURCE_REF = "805c08facf9ff7c92c7f05b66bde1e2bdb8524f2"
+FROZEN_CONSUMER_API_SOURCE_PATH = "tools/perf-baseline/src/lib.rs"
+FROZEN_CONSUMER_API_SOURCE_BLOB_SHA1 = "2ec7f936b22bef7468983134b0b5f05386f7f8a8"
+FROZEN_CONSUMER_API_SOURCE_SHA256 = "4acd072fd68c094e24524862194da9676260e1fb25f6ea3dbb539197d2838b5b"
+FROZEN_CONSUMER_API_SOURCE_BYTES = 3_088_209
 HISTORICAL_WORKSPACE_LOCK_SHA256 = "52ed0cacac15b5e440349bfc0f4aca2665bcf50d59d4321624e596bb410783c6"
 HISTORICAL_WORKSPACE_LOCK_BYTES = 139591
 # Kept as compatibility names for callers that only need the fixed historical
@@ -210,12 +218,45 @@ def _git(root: Path, *arguments: str) -> str:
     return result.stdout
 
 
+def _git_binary(root: Path, *arguments: str) -> bytes:
+    result = subprocess.run(
+        ["git", "-C", str(root), *arguments],
+        check=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if result.returncode:
+        detail = result.stderr.decode("utf-8", errors="replace").strip()
+        raise PreparationError(f"git {' '.join(arguments)} failed in {root}: {detail}")
+    return bytes(result.stdout)
+
+
 def _root(value: Path) -> Path:
     root = value.resolve(strict=False)
     _expect(root.is_dir(), f"source root is not a directory: {root}")
     top = Path(_git(root, "rev-parse", "--show-toplevel").strip()).resolve(strict=False)
     _expect(root == top, f"source root is not a worktree top-level: {root}")
     return root
+
+
+def _frozen_consumer_api_source(root: Path) -> tuple[bytes, dict[str, Any]]:
+    """Read the approved v1 perflib blob without consulting the live file."""
+
+    root = _root(root)
+    actual_ref = _git(root, "rev-parse", "--verify", f"{FROZEN_CONSUMER_API_SOURCE_REF}^{{commit}}").strip()
+    _expect(actual_ref == FROZEN_CONSUMER_API_SOURCE_REF, "v1 frozen consumer ref differs")
+    payload = _git_binary(root, "show", f"{FROZEN_CONSUMER_API_SOURCE_REF}:{FROZEN_CONSUMER_API_SOURCE_PATH}")
+    _expect(len(payload) == FROZEN_CONSUMER_API_SOURCE_BYTES, "v1 frozen consumer byte count differs")
+    _expect(_sha256_bytes(payload) == FROZEN_CONSUMER_API_SOURCE_SHA256, "v1 frozen consumer SHA-256 differs")
+    blob = hashlib.sha1(f"blob {len(payload)}\0".encode("ascii") + payload).hexdigest()
+    _expect(blob == FROZEN_CONSUMER_API_SOURCE_BLOB_SHA1, "v1 frozen consumer Git blob differs")
+    return payload, {
+        "ref": FROZEN_CONSUMER_API_SOURCE_REF,
+        "path": FROZEN_CONSUMER_API_SOURCE_PATH,
+        "blob_sha1": FROZEN_CONSUMER_API_SOURCE_BLOB_SHA1,
+        "sha256": FROZEN_CONSUMER_API_SOURCE_SHA256,
+        "bytes": FROZEN_CONSUMER_API_SOURCE_BYTES,
+    }
 
 
 def _status_paths(status: str) -> tuple[str, ...]:

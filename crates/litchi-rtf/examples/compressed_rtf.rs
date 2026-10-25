@@ -15,7 +15,9 @@
 //! cargo run -p litchi-rtf --example compressed_rtf
 //! ```
 
-use litchi_rtf::transport::{DecompressionLimits, compress, decompress, is_compressed_rtf};
+use litchi_rtf::transport::{
+    CompressionLimits, DecompressionLimits, compress, decompress, is_compressed_rtf,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let original: &[u8] = b"{\\rtf1\\ansi{\\fonttbl\\f0\\fswiss Helvetica;}\\f0\\pard \
@@ -29,7 +31,7 @@ This text is repeated.\\par}";
     );
 
     // ----- LZFu compressed framing -----
-    let compressed = compress(original, true)?;
+    let compressed = compress(original, true, CompressionLimits::default())?;
     println!("\nLZFu framing");
     println!("{}", "-".repeat(60));
     println!("Compressed payload size: {} bytes", compressed.len());
@@ -51,7 +53,7 @@ This text is repeated.\\par}";
     // ----- Uncompressed framing -----
     // The `compress = false` mode still wraps the data in the 16-byte
     // compressed-RTF header, but skips LZFu encoding.
-    let stored = compress(original, false)?;
+    let stored = compress(original, false, CompressionLimits::default())?;
     println!("\nUncompressed framing");
     println!("{}", "-".repeat(60));
     println!("Stored payload size: {} bytes", stored.len());

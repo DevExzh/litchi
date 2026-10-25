@@ -15,7 +15,7 @@ use litchi_rtf::{
         Composition, CompositionError, CompositionLimits, Error, ParagraphLayoutPatch,
         ParagraphLayoutUpdate, TextSpan,
     },
-    transport::compress,
+    transport::{CompressionLimits, compress},
 };
 
 fn semantic_limits(max_operations: usize) -> SemanticLimits {
@@ -800,7 +800,10 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
     }
 
     let raw = br"{\rtf1\ansi One}";
-    let compressed = Package::from_bytes(&compress(raw, true).unwrap()).unwrap();
+    let compressed = Package::from_bytes(
+        &compress(raw, true, CompressionLimits::default()).unwrap(),
+    )
+    .unwrap();
     let mut edit = compressed.edit();
     assert!(matches!(
         edit.patch_paragraph_layout(

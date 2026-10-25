@@ -1018,7 +1018,14 @@ mod tests {
         let plain = br"{\rtf1\ansi Bounded transport\par}";
         let mut sources = vec![plain.to_vec()];
         for use_lzfu in [false, true] {
-            sources.push(litchi_rtf::transport::compress(plain, use_lzfu).unwrap());
+            sources.push(
+                litchi_rtf::transport::compress(
+                    plain,
+                    use_lzfu,
+                    litchi_rtf::transport::CompressionLimits::default(),
+                )
+                .unwrap(),
+            );
         }
         for bytes in sources {
             let mut file = tempfile::NamedTempFile::new().unwrap();
@@ -1065,7 +1072,12 @@ mod tests {
     fn detects_compressed_rtf_bytes_and_reader_without_moving_reader_cursor() {
         let source = br#"{\rtf1\ansi Compressed RTF\par}"#;
         for use_lzfu in [true, false] {
-            let compressed = litchi_rtf::transport::compress(source, use_lzfu).unwrap();
+            let compressed = litchi_rtf::transport::compress(
+                source,
+                use_lzfu,
+                litchi_rtf::transport::CompressionLimits::default(),
+            )
+            .unwrap();
 
             assert_eq!(
                 detect_file_format_from_bytes(&compressed),

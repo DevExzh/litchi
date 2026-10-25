@@ -2056,7 +2056,8 @@ fn ppt_text_batch_history_length(bytes: &[u8]) -> Result<usize, Box<dyn Error>> 
         litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
     let current = ole.open_stream(&["Current User"])?;
     let document = ole.open_stream(&["PowerPoint Document"])?;
-    let mut offset = litchi_ppt::CurrentUser::parse(&current)?.current_edit_offset() as usize;
+    let mut offset = litchi_ppt::CurrentUser::parse(&current, &litchi_ppt::SourceLimits::default())?
+        .current_edit_offset() as usize;
     let mut count = 0usize;
     let mut visited = std::collections::BTreeSet::new();
     while offset != 0 {

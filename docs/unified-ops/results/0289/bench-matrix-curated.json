@@ -3254,6 +3254,10 @@
   {
    "record": "0362ul46",
    "reason": "XLS raw-profile source and consumer migration with scoped correctness, compiler and Clippy receipts, including the corrected complete library corpus. These command durations and target sizes are validation provenance, not a leaf-versus-unified benchmark pair."
+  },
+  {
+   "record": "0362ul52",
+   "reason": "Crypto raw-policy source and consumer migration with scoped correctness, compiler and Clippy receipts, including preserved failed and resource-bound attempts. Command target sizes and durations are validation provenance; no native or leaf-versus-unified performance measurement was performed."
   }
  ]
 }

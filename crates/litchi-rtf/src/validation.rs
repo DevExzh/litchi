@@ -447,29 +447,19 @@ pub struct ValidationReport {
 }
 
 impl ValidationReport {
-    /// Parse UTF-8 RTF once and produce its bounded report.
+    /// Parse UTF-8 RTF once with the caller's explicit opening profile.
     #[allow(
         clippy::should_implement_trait,
         reason = "the inherent constructor keeps the validation API parallel with Package::parse"
     )]
-    pub fn from_str(input: &str) -> RtfResult<Self> {
-        Self::from_str_with_options(input, OpenOptions::default())
-    }
-
-    /// Parse UTF-8 RTF once with an explicit opening profile.
-    pub fn from_str_with_options(input: &str, options: OpenOptions) -> RtfResult<Self> {
+    pub fn from_str(input: &str, options: OpenOptions) -> RtfResult<Self> {
         let document = crate::Package::parse_with_options(input, options)?;
         Ok(document.validation_report())
     }
 
     /// Parse original RTF bytes once, including bounded compressed-RTF
     /// decompression when the transport header is present.
-    pub fn from_bytes(input: &[u8]) -> RtfResult<Self> {
-        Self::from_bytes_with_options(input, OpenOptions::default())
-    }
-
-    /// Parse original RTF bytes once with an explicit opening profile.
-    pub fn from_bytes_with_options(input: &[u8], options: OpenOptions) -> RtfResult<Self> {
+    pub fn from_bytes(input: &[u8], options: OpenOptions) -> RtfResult<Self> {
         let document = crate::Package::from_bytes_with_options(input, options)?;
         Ok(document.validation_report())
     }
@@ -590,24 +580,14 @@ impl ValidationReport {
     }
 }
 
-/// Validate original RTF bytes with the default finite profile.
-pub fn validate(input: &[u8]) -> RtfResult<ValidationReport> {
-    ValidationReport::from_bytes(input)
+/// Validate original RTF bytes with the caller's explicit opening profile.
+pub fn validate(input: &[u8], options: OpenOptions) -> RtfResult<ValidationReport> {
+    ValidationReport::from_bytes(input, options)
 }
 
-/// Validate original RTF bytes with an explicit opening profile.
-pub fn validate_with_options(input: &[u8], options: OpenOptions) -> RtfResult<ValidationReport> {
-    ValidationReport::from_bytes_with_options(input, options)
-}
-
-/// Validate UTF-8 RTF with the default finite profile.
-pub fn validate_str(input: &str) -> RtfResult<ValidationReport> {
-    ValidationReport::from_str(input)
-}
-
-/// Validate UTF-8 RTF with an explicit opening profile.
-pub fn validate_str_with_options(input: &str, options: OpenOptions) -> RtfResult<ValidationReport> {
-    ValidationReport::from_str_with_options(input, options)
+/// Validate UTF-8 RTF with the caller's explicit opening profile.
+pub fn validate_str(input: &str, options: OpenOptions) -> RtfResult<ValidationReport> {
+    ValidationReport::from_str(input, options)
 }
 
 fn build_report(document: &Tree<'_>, parse_limits: SourceLimits) -> ValidationReport {
