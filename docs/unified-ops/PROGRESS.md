@@ -5534,3 +5534,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   merged privately at `cc2ab3f79d` (89av), with 23 Python tests passing after
   composition. Baseline source preparation continues; no benchmark or runtime
   acceptance is claimed. All changes are committed and nothing is pushed.
+
+  Corrected OOXML runtime result: 511 common-library tests pass and 17 fail;
+  root verifies the terminal capture. Four workers own the VBA, Custom XML,
+  properties and ribbon returns (94p–94s). PPTX presence 89ara is returned for
+  physical validation order and added scan cost; 89arb is required. Baseline
+  `a4c28413cc` carries the identical reviewed performance harness on unchanged
+  763 production source. No runtime or performance exception is accepted.

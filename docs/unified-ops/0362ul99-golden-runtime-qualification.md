@@ -215,3 +215,42 @@ JSON and metric/fidelity checks. No benchmark is run and no performance result
 is claimed. A source-only equivalent-harness baseline endpoint is being prepared
 from production `7637126651`; final correctness and quiet measurements remain
 required. Presence repair 89ara remains active and uncomposed.
+
+
+## Corrected runtime results and next repairs
+
+The corrected v2 packet reaches the common library and exits 1. Its mandatory
+library command reports 511 passed, 17 failed, zero ignored in 8.98 seconds.
+The outer helper takes 72.800 seconds and ends with a 387,773,289-byte target.
+Root verifies the completed outer receipt and inner helper log. No later
+integration/helper or proposal row executes.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `rows.json` | 4,387 | `869ca07fd523e617083030dbe16791f7bc4d103975c77910424a5c6c196e6011` |
+| `result.json` | 5,119 | `8dd09a1c71fd858dae5d5ce5c6709a9d286788944d4ebf502a302b3b5d69dab8` |
+| `common-tests/checks.json` | 1,054 | `c6b96248334a2cf64316ac753db5b8a37292a20c491c92d138f8b0871b297801` |
+| `common-tests/0000.log` | 222,716 | `668db8f2afc172f4abacf8ce06d36934cc1ca6a89d3ee7c404cc805abe5a8153` |
+
+Four source workers receive these engineering returns: 94p handles ten VBA
+admission/fixture failures; 94q handles four Custom XML exact-boundary and
+lexical-fidelity failures; 94r handles two properties classification failures;
+94s handles the ribbon namespace publication failure. Each starts from frozen
+`3774fe4374`, preserves selected limits and fidelity, and must pass independent
+review before composition. Passing Clippy does not discharge these failures.
+
+PPTX presence follow-up 89ara remains returned. Although its four previous
+issues are repaired, review finds physical admission after MCE and an extra
+full semantic traversal. Follow-up 89arb must restore validation order and
+resolve the scan cost; no performance exception is accepted. A scoped compiler
+and consumer packet is being prepared on `cc2ab3f79d` while that source review
+continues. Full runtime qualification remains required after composition.
+
+The isolated performance baseline is committed at
+`a4c28413cc77fa7c0e574d7f9d7c44ae67896d86`, tree
+`6f6525f8a2792edbb22cf0d1a8bc58aa147f7738`, in
+`uo2-pptx-notes-perf-base-89aw`. Root verifies all eight harness tool blobs
+match reviewed 89and and the production crate trees, root configuration and
+fixtures remain identical to `7637126651`. It is a benchmark endpoint only,
+not a branch to merge into trunk. There are still no benchmark measurements.
+All final acceptance obligations remain open; only audit22 is deferred.
