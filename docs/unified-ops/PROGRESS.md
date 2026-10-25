@@ -5771,3 +5771,15 @@ See [0063](0063-source-pptx-modern-comments.md).
   totals to 422 refs and 238 worktrees. Its missing pre-allocation measurement
   is disclosed; the allocated ledger remains unchanged. Further stale after
   snapshots are reviewed while canonical before controls remain available.
+
+  Common residual runtime exposes two Ribbon failures after the core/custom
+  and markup/MCE groups pass; Web Extensions integration passes all five tests.
+  Glossary finds the missing VBA Error export and an OPC rustdoc link. Returns
+  120/120a are committed; 119b passes independent review after correcting the
+  remaining ineligible fixture, and 121 is under replay/fidelity review (122).
+  Diagnostics continue on frozen a8; no failed capture is relabeled. The
+  full53 proposal is returned for using obsolete runner safety code. Cleanup95
+  reaches 422 deleted refs and 247 removed worktrees, with archived dirty
+  patches replayed and verified. The measured allocation ledger reaches
+  730,280,955,904 bytes under the recorded exclusions. Three active repair
+  branches remain for composition; final qualification and cleanup stay open.
