@@ -5908,9 +5908,18 @@ See [0063](0063-source-pptx-modern-comments.md).
   composition; no native pass is claimed. Trunk and cleanup work continue.
 
   Cleanup103 removes both merged repair worktrees without force and deletes
-  their exact refs after fresh root checks (141). Cumulative totals reach270
-  worktrees and432 refs; the conservative allocated ledger is800,318,455,808
+  their exact refs after fresh root checks (141). Cumulative totals reach 270
+  worktrees and 432 refs; the conservative allocated ledger is 800,318,455,808
   bytes under its existing exclusions, not a free-space measurement. All
   source blobs, three locks and the protected root probe are preserved.
-  The68 independent office refs stay outside scope; the126 a8 baseline stays
+  The 68 independent office refs stay outside scope; the 126 a8 baseline stays
   available. Three protocol leaves remain active. No push or final acceptance.
+
+  Reviewed DrawingML137e composes at 2197a6c7f2; all 44 integrated tests pass
+  (142). Separate protocol paths, ten imported tools and eight probe inputs
+  are bound; final outer source pins and native execution remain pending.
+  Cleanup104 retires its merged sparse leaf and exact ref, reaching 271
+  removed worktrees and 433 refs. The allocated ledger is 800,323,493,888
+  bytes under the existing exclusions. Final tooling coverage adds two new
+  test modules to the existing forty. Native135d/136c and final qualification
+  remain open; nothing is pushed.
