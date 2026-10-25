@@ -5730,3 +5730,17 @@ See [0063](0063-source-pptx-modern-comments.md).
   refreshes only the common crate's test dependency in the ignored root lock.
   Compiler/runtime/glossary and final qualification must now bind this repaired
   source. No result from e130 is relabeled as a repaired-source pass.
+
+  Fresh compiler qualification on fcc04996 stops at formatting of one new
+  metadata helper signature, before any Cargo row. Root verifies the terminal
+  capture and commits the whitespace-only correction as 0362ul116. Repaired
+  source must receive fresh compiler/runtime/glossary qualification.
+
+  Cleanup through91 deletes 402 refs and removes 195 worktrees: 149 fully
+  verified, seventeen with a recorded mode-evidence limitation, eight with
+  the disclosed late holder-guard failure, and cleanup83's 21 with its
+  ignored-inventory gap. All recorded source/payload and retained controls
+  receive root verification; the protected probe is unchanged. The measured
+  allocation ledger is 488,902,098,944 bytes under record103's exclusions,
+  including no allocation claim for waves88/90. Remaining ancestor snapshots
+  and retired leaves are being consolidated. No push or final acceptance.
