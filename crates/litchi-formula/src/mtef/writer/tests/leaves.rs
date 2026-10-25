@@ -1,5 +1,6 @@
 use super::{number, roundtrip, roundtrip_text, text};
 use crate::ast::{MathNode, Operator, PredefinedSymbol, SpaceType, Symbol};
+use crate::mtef::Limits;
 use crate::mtef::writer::{MtefWriteError, MtefWriter};
 use std::borrow::Cow;
 
@@ -91,7 +92,7 @@ fn error_nodes_are_dropped() {
 #[test]
 fn characters_outside_the_bmp_are_rejected() {
     assert_eq!(
-        MtefWriter::new().write_nodes(&[text("𝕏")]),
+        MtefWriter::new(Limits::DEFAULT).write_nodes(&[text("𝕏")]),
         Err(MtefWriteError::UnsupportedCharacter('𝕏'))
     );
 }

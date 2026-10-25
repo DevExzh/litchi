@@ -27197,6 +27197,89 @@
         }
       ],
       "families": []
+    },
+    {
+      "id": "formula-raw",
+      "package": "litchi-formula",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "_with_limits",
+          "scope": "litchi_formula",
+          "match": "suffix",
+          "replacement": "raw MTEF and OMML boundaries take caller-selected mtef::Limits or omml::Limits (record 0362ul69)"
+        }
+      ],
+      "required_signatures": [
+        {
+          "method": "litchi_formula::mtef::MtefParser::new",
+          "inputs": ["arena", "data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_formula::mtef::Limits"
+        },
+        {
+          "method": "litchi_formula::mtef::MtefWriter::new",
+          "inputs": ["limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_formula::mtef::Limits"
+        },
+        {
+          "method": "litchi_formula::mtef::MtefWriter::with_options",
+          "inputs": ["limits", "options"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_formula::mtef::Limits"
+        },
+        {
+          "method": "litchi_formula::omml::OmmlParser::new",
+          "inputs": ["arena", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_formula::omml::Limits"
+        },
+        {
+          "method": "litchi_formula::omml::OmmlWriter::new",
+          "inputs": ["limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_formula::omml::Limits"
+        },
+        {
+          "method": "litchi_formula::omml_to_latex",
+          "inputs": ["omml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_formula::omml::Limits"
+        },
+        {
+          "method": "litchi_formula::mtef_to_latex",
+          "inputs": ["mtef_data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_formula::mtef::Limits"
+        },
+        {
+          "method": "litchi_formula::omml_to_mtef",
+          "inputs": ["omml", "input_limits", "output_limits"],
+          "limits_argument": "input_limits",
+          "limits_type": "litchi_formula::omml::Limits"
+        },
+        {
+          "method": "litchi_formula::latex_to_omml",
+          "inputs": ["latex", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_formula::omml::Limits"
+        },
+        {
+          "method": "litchi_formula::latex_to_mtef",
+          "inputs": ["latex", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_formula::mtef::Limits"
+        },
+        {
+          "method": "litchi_formula::mtef_to_omml",
+          "inputs": ["mtef_data", "input_limits", "output_limits"],
+          "limits_argument": "input_limits",
+          "limits_type": "litchi_formula::mtef::Limits"
+        }
+      ],
+      "families": []
     }
   ]
 }

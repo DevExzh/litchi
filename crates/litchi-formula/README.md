@@ -23,8 +23,11 @@ litchi-formula = "0.0.1"
 use litchi_formula::{omml_to_latex, mtef_to_latex, FormulaError};
 
 fn convert_examples(mtef_bytes: &[u8]) -> Result<(String, String), FormulaError> {
-    let from_omml = omml_to_latex("<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>")?;
-    let from_mtef = mtef_to_latex(mtef_bytes)?;
+    let from_omml = omml_to_latex(
+        "<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>",
+        &litchi_formula::omml::Limits::DEFAULT,
+    )?;
+    let from_mtef = mtef_to_latex(mtef_bytes, &litchi_formula::mtef::Limits::DEFAULT)?;
     Ok((from_omml, from_mtef))
 }
 ```
@@ -35,6 +38,8 @@ fn convert_examples(mtef_bytes: &[u8]) -> Result<(String, String), FormulaError>
 - MTEF parser (`MtefParser`) for legacy MathType binary streams
 - LaTeX writer (`LatexConverter`) over a shared arena-allocated AST
 - One-shot helpers: `omml_to_latex`, `mtef_to_latex`
+- Raw parser and writer boundaries require caller-selected `omml::Limits` or
+  `mtef::Limits` policies; no limit-less conversion twin is provided.
 - Unified `FormulaError` covering all parser/converter failures
 
 ## License

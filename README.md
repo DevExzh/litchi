@@ -280,7 +280,10 @@ builder.build()?.save("output.pptx")?;
 #[cfg(feature = "formula")]
 {
     use litchi::formula;
-    let latex = formula::omml_to_latex("<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>")?;
+    let latex = formula::omml_to_latex(
+        "<m:oMath><m:r><m:t>x</m:t></m:r></m:oMath>",
+        &formula::omml::Limits::DEFAULT,
+    )?;
     println!("{latex}");
 }
 ```

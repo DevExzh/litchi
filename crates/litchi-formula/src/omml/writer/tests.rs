@@ -5,12 +5,12 @@ use crate::ast::{
     AccentType, Fence, Formula, FractionType, LargeOperator, MathNode, MatrixFence, Operator,
     PredefinedSymbol, StyleType,
 };
-use crate::omml::OmmlParser;
+use crate::omml::{Limits, OmmlParser};
 use std::borrow::Cow;
 
 /// Serialize AST nodes and return the XML
 fn write(nodes: &[MathNode]) -> String {
-    let mut writer = OmmlWriter::new();
+    let writer = OmmlWriter::new(Limits::DEFAULT);
     writer
         .write_nodes(nodes)
         .expect("serialization should succeed")
@@ -20,17 +20,17 @@ fn write(nodes: &[MathNode]) -> String {
 /// Parse OMML, re-serialize it, re-parse, and assert the ASTs match
 fn assert_roundtrip(xml: &str) {
     let formula1 = Formula::new();
-    let parser1 = OmmlParser::new(formula1.arena());
+    let parser1 = OmmlParser::new(formula1.arena(), Limits::DEFAULT);
     let ast1 = parser1.parse(xml).expect("initial parse should succeed");
 
-    let mut writer = OmmlWriter::new();
+    let writer = OmmlWriter::new(Limits::DEFAULT);
     let serialized = writer
         .write_nodes(&ast1)
         .expect("serialization should succeed")
         .to_string();
 
     let formula2 = Formula::new();
-    let parser2 = OmmlParser::new(formula2.arena());
+    let parser2 = OmmlParser::new(formula2.arena(), Limits::DEFAULT);
     let ast2 = parser2
         .parse(&serialized)
         .unwrap_or_else(|e| panic!("re-parse failed: {e}\nserialized: {serialized}"));
@@ -358,7 +358,7 @@ fn escapes_xml_special_characters() {
 
 #[test]
 fn error_node_fails_serialization() {
-    let mut writer = OmmlWriter::new();
+    let writer = OmmlWriter::new(Limits::DEFAULT);
     let nodes = [MathNode::Error(Cow::Borrowed("bad input"))];
     let result = writer.write_nodes(&nodes);
     assert!(result.is_err());
@@ -625,14 +625,14 @@ fn latex_of(nodes: &[MathNode]) -> String {
 fn assert_latex_consistent(nodes: &[MathNode]) {
     let latex_before = latex_of(nodes);
 
-    let mut writer = OmmlWriter::new();
+    let writer = OmmlWriter::new(Limits::DEFAULT);
     let serialized = writer
         .write_nodes(nodes)
         .expect("serialization should succeed")
         .to_string();
 
     let formula = Formula::new();
-    let parser = OmmlParser::new(formula.arena());
+    let parser = OmmlParser::new(formula.arena(), Limits::DEFAULT);
     let reparsed = parser
         .parse(&serialized)
         .unwrap_or_else(|e| panic!("re-parse failed: {e}\nserialized: {serialized}"));

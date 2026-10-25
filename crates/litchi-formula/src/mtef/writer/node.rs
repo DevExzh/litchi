@@ -31,13 +31,8 @@ use super::templates::{
     large_op_template, large_op_word, root_template, script_template,
 };
 use crate::ast::{Fence, LargeOperator, LineStyle, MathNode, MatrixFence, StyleType, Symbol};
+use crate::mtef::Limits;
 use crate::mtef::constants::*;
-
-/// Deepest AST nesting the writer will follow before giving up
-///
-/// Bounded so that a pathological tree returns an error instead of exhausting
-/// the stack. MathType's own editor stops far below this.
-pub(super) const MAX_NESTING_DEPTH: usize = 64;
 
 /// Font style byte written with a FONT record for an unstyled font
 const FONT_STYLE_PLAIN: u8 = 0;
@@ -55,16 +50,19 @@ pub(super) struct NodeWriter<'a> {
     last_char_options: Option<usize>,
     /// Typeface imposed by an enclosing style run, if any
     typeface: Option<u8>,
+    /// Caller-selected policy used by recursion checks.
+    limits: Limits,
 }
 
 impl<'a> NodeWriter<'a> {
     /// Create a writer that appends to `out`
-    pub(super) fn new(out: &'a mut Vec<u8>) -> Self {
+    pub(super) fn new(out: &'a mut Vec<u8>, limits: Limits) -> Self {
         Self {
             out,
             depth: 0,
             last_char_options: None,
             typeface: None,
+            limits,
         }
     }
 
@@ -108,14 +106,9 @@ impl<'a> NodeWriter<'a> {
     // Recursion guard
     // ------------------------------------------------------------------
 
-    /// Enter one nesting level, refusing to recurse past [`MAX_NESTING_DEPTH`]
+    /// Enter one nesting level, refusing to recurse past the retained policy.
     fn enter(&mut self) -> Result<(), MtefWriteError> {
-        if self.depth >= MAX_NESTING_DEPTH {
-            return Err(MtefWriteError::DepthExceeded {
-                limit: MAX_NESTING_DEPTH,
-            });
-        }
-        self.depth += 1;
+        self.depth = super::admit_depth(self.depth, self.limits)?;
         Ok(())
     }
 

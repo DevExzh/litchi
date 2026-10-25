@@ -1176,6 +1176,7 @@ fn wildcard_rtf_errors_are_corrupt_file() {
 #[cfg(feature = "formula")]
 #[test]
 fn formula_conversion_errors_keep_their_typed_source() {
+    use litchi_formula::omml::LimitKind;
     use litchi_formula::{FormulaError, LatexError, OmmlError};
 
     let unsupported = assert_code(
@@ -1184,7 +1185,11 @@ fn formula_conversion_errors_keep_their_typed_source() {
     );
     assert!(matches!(unsupported.leaf(), Source::Formula(_)));
     assert_code(
-        FormulaError::Omml(OmmlError::DepthLimitExceeded(64)),
+        FormulaError::Omml(OmmlError::LimitExceeded {
+            kind: LimitKind::Depth,
+            limit: 64,
+            actual: 65,
+        }),
         Code::LimitExceeded,
     );
     assert_code(

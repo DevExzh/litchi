@@ -119,7 +119,11 @@ impl Document {
 
         for (stream_name, data) in mtef_data {
             let formula = litchi_formula::Formula::new();
-            let mut parser = litchi_formula::MtefParser::new(formula.arena(), data);
+            let mut parser = litchi_formula::MtefParser::new(
+                formula.arena(),
+                data,
+                litchi_formula::mtef::Limits::DEFAULT,
+            );
 
             if parser.is_valid() {
                 match parser.parse() {
