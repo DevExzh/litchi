@@ -72,7 +72,8 @@ impl Snapshot {
         validate_source(source_xml.as_slice())?;
         if objects.len() > MAX_OBJECTS {
             return Err(crate::presentation::embedded::limit(
-                "OLE object count",
+                crate::error::CodecLimitKind::OleObjects,
+                objects.len(),
                 MAX_OBJECTS,
             ));
         }
@@ -245,7 +246,8 @@ impl Draft {
         validate_definition(&definition)?;
         if self.working.len() >= MAX_OBJECTS {
             return Err(crate::presentation::embedded::limit(
-                "OLE object count",
+                crate::error::CodecLimitKind::OleObjects,
+                self.working.len().checked_add(1).unwrap_or(usize::MAX),
                 MAX_OBJECTS,
             ));
         }
@@ -586,7 +588,8 @@ struct Build {
 fn build_after(source: &Snapshot, working: &[Working]) -> Result<Build> {
     if working.len() > MAX_OBJECTS {
         return Err(crate::presentation::embedded::limit(
-            "OLE object count",
+            crate::error::CodecLimitKind::OleObjects,
+            working.len(),
             MAX_OBJECTS,
         ));
     }
@@ -969,7 +972,8 @@ fn upsert_relationship(
     }
     if relationships.len() >= MAX_RELATIONSHIPS {
         return Err(crate::presentation::embedded::limit(
-            "OLE relationship count",
+            crate::error::CodecLimitKind::Relationships,
+            relationships.len().checked_add(1).unwrap_or(usize::MAX),
             MAX_RELATIONSHIPS,
         ));
     }
@@ -1004,7 +1008,8 @@ fn next_part_name(used: &mut HashSet<PackURI>, kind: Kind) -> Result<PackURI> {
         }
     }
     Err(crate::presentation::embedded::limit(
-        "OLE embedding part namespace",
+        crate::error::CodecLimitKind::Parts,
+        1_000_000,
         1_000_000,
     ))
 }
@@ -1059,7 +1064,8 @@ pub(crate) fn sorted_relationships(
 ) -> Result<Vec<RelationshipState>> {
     if values.len() > MAX_RELATIONSHIPS {
         return Err(crate::presentation::embedded::limit(
-            "OLE relationship count",
+            crate::error::CodecLimitKind::Relationships,
+            values.len(),
             MAX_RELATIONSHIPS,
         ));
     }
@@ -1077,7 +1083,8 @@ pub(crate) fn sorted_parts(mut values: Vec<PartSource>) -> Result<Vec<PartSource
     for part in &values {
         if part.bytes.len() > super::validation::MAX_PART_BYTES {
             return Err(crate::presentation::embedded::limit(
-                "OLE payload bytes",
+                crate::error::CodecLimitKind::PayloadBytes,
+                part.bytes.len(),
                 super::validation::MAX_PART_BYTES,
             ));
         }

@@ -90,7 +90,11 @@ pub(super) fn plan(
             match (change.before.is_some(), change.after.is_some()) {
                 (false, true) => {
                     effective_parts = effective_parts.checked_add(1).ok_or_else(|| {
-                        limit(crate::error::CodecLimitKind::Parts, usize::MAX, usize::MAX)
+                        limit(
+                            crate::error::CodecLimitKind::Parts,
+                            usize::MAX,
+                            package.owner.limits.max_parts(),
+                        )
                     })?;
                 },
                 (true, false) => {

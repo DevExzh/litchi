@@ -53,7 +53,8 @@ mod authors {
     fn parse_processed_author_list(bytes: &[u8]) -> Result<Authors> {
         if bytes.len() > MAX_BYTES {
             return Err(limit(
-                "MCE-processed modern Comment Author bytes",
+                crate::error::CodecLimitKind::XmlBytes,
+                bytes.len(),
                 MAX_BYTES,
             ));
         }
@@ -511,7 +512,8 @@ mod authors {
             Ok(())
         } else {
             Err(limit(
-                "modern Comment Author string bytes",
+                crate::error::CodecLimitKind::StringBytes,
+                value.len(),
                 MAX_STRING_BYTES,
             ))
         }

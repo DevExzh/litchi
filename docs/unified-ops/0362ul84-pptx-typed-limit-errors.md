@@ -103,3 +103,20 @@ This audit remains source-only. Rustfmt and static repository checks were run;
 Cargo, rustdoc, native fixture execution, and performance measurement remain
 for the coordinator's composed-tip gate. The historical cross-copy transcript
 still awaits exact regeneration on that composed tip.
+
+## 84b call-shape audit
+
+The whole-crate `limit("…")` search was checked against each callee rather
+than treating every one-argument helper as the same API. The remaining calls
+to typed three-argument helpers were repaired in modern-comment authors and
+the inert OLE slide/package paths. Modern-comment processed XML now reports
+`XmlBytes` with the measured byte length, and author strings report
+`StringBytes` with their measured length. OLE object, relationship, part, and
+payload failures use their concrete dimensions and prospective counts. The
+source-backed insertion overflow path now retains the configured owner part
+maximum while keeping `usize::MAX` as the genuine overflow observation.
+
+The other one-argument matches belong to private legacy helpers that still
+construct their own invalid-input text; they are not calls to a typed
+three-argument helper and were left outside this repair. A final composed-tip
+compile is required to validate all cross-lane callers.
