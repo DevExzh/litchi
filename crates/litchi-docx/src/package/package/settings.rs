@@ -67,9 +67,11 @@ impl Package {
         }
         let part = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
         let limits = crate::mail_merge::mce_limits_for_source(&self.opc.read_limits());
-        Ok(DocumentSettings::extract_from_part_with_mce_limits(&part, &limits)?
-            .attached_template()
-            .cloned())
+        Ok(
+            DocumentSettings::extract_from_part_with_mce_limits(&part, &limits)?
+                .attached_template()
+                .cloned(),
+        )
     }
 
     /// Associate this document with an external template URI.

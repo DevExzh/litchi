@@ -7,14 +7,14 @@ use crate::binary::read::ReadScope;
 use crate::error::ParseError;
 use crate::outline::{OutlineBuilder, OutlineSink};
 use crate::tables::os2::Os2;
-use crate::tables::variable_fonts::gvar::GvarTable;
 use crate::tables::variable_fonts::OwnedTuple;
+use crate::tables::variable_fonts::gvar::GvarTable;
 use crate::tables::{FontTableProvider, HheaTable, HmtxTable, MaxpTable};
 use crate::tag;
 
 use super::{
-    CompositeGlyphComponent, CompositeGlyphFlagExt, CompositeGlyphScale, Glyph, LocaGlyf,
-    SimpleGlyph, COMPOSITE_GLYPH_RECURSION_LIMIT,
+    COMPOSITE_GLYPH_RECURSION_LIMIT, CompositeGlyphComponent, CompositeGlyphFlagExt,
+    CompositeGlyphScale, Glyph, LocaGlyf, SimpleGlyph,
 };
 
 use contour::{Contour, CurvePoint};
@@ -270,7 +270,7 @@ impl<'a, 'data> GlyfVisitorContext<'a, 'data> {
                     &var.hhea,
                 )?;
                 Cow::Owned(glyph)
-            }
+            },
             _ => Cow::Borrowed(&*glyph),
         };
 
@@ -278,10 +278,10 @@ impl<'a, 'data> GlyfVisitorContext<'a, 'data> {
             Glyph::Empty(_) => Ok(()),
             Glyph::Simple(simple_glyph) => {
                 visit_simple_glyph_outline(sink, state.transform(), simple_glyph)
-            }
+            },
             Glyph::Composite(composite) => {
                 self.visit_composite_glyph_outline(sink, &composite.glyphs, tuple, state.depth)
-            }
+            },
         }
     }
 
@@ -421,24 +421,24 @@ fn visit_simple_glyph_outline<S: OutlineSink>(
             match next {
                 CurvePoint::OnCurve(to) => {
                     sink.line_to(transform * to);
-                }
+                },
                 CurvePoint::Control(control) => {
                     match points.next() {
                         Some(CurvePoint::OnCurve(to)) => {
                             sink.quadratic_curve_to(transform * control, transform * to);
-                        }
+                        },
                         Some(CurvePoint::Control(_)) => {
                             // Can't happen as the Points iterator inserts on curve mid-points
                             // when two consecutive control points are encountered
                             unreachable!("consecutive control points")
-                        }
+                        },
                         None => {
                             // Wrap around to the first point
                             sink.quadratic_curve_to(transform * control, transform * origin);
                             break;
-                        }
+                        },
                     }
-                }
+                },
             }
         }
 
@@ -484,17 +484,17 @@ mod contour {
                 (CurvePoint::OnCurve(first), _) => {
                     // Origin is the first point, so start on the second point
                     (first, 1, self.len())
-                }
+                },
                 (CurvePoint::Control(_), CurvePoint::OnCurve(last)) => {
                     // Origin is the last point, so start on the first point and consider
                     // the last point already processed
                     (last, 0, self.len() - 1) // TODO: Test this
-                }
+                },
                 (CurvePoint::Control(first), CurvePoint::Control(last)) => {
                     // Origin is the mid-point between first and last control points.
                     // Start on the first point
                     (first.lerp(last, 0.5), 0, self.len())
-                }
+                },
             }
         }
 
@@ -550,9 +550,9 @@ mod contour {
                             // after this one
                             self.mid = Some(control.lerp(control2, 0.5));
                             CurvePoint::Control(control)
-                        }
+                        },
                     }
-                }
+                },
             };
 
             self.i += 1;

@@ -9,8 +9,8 @@
 
 //! Round-trip tests for extended underline styles and `\ulcN` underline color.
 
-use litchi_rtf::write::Writer;
 use litchi_rtf::raw::Tree;
+use litchi_rtf::write::Writer;
 
 const STYLES: &[(&str, &str)] = &[
     (r"\ulhair", "Hairline"),
@@ -26,9 +26,7 @@ const STYLES: &[(&str, &str)] = &[
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -78,6 +76,10 @@ fn underline_color_round_trips() {
 
 #[test]
 fn underline_color_defaults_to_text_color() {
-    let document = Tree::parse(r"{\rtf1\ansi\ulwave Text\par}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi\ulwave Text\par}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.blocks()[0].formatting.underline_color, None);
 }

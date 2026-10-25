@@ -10,24 +10,25 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{Row, write::Writer, StyleType};
+use litchi_rtf::{Row, StyleType, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn retains_group_scope_row_inheritance_last_wins_and_trowd_reset() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1{\stylesheet{\*\ts5 Declared Table;}}"#,
-        r#"\trowd\ts4\ts5{\ts6}\cellx1000\intbl A\cell\row"#,
-        r#"\intbl B\cell\row"#,
-        r#"\trowd\cellx1000\intbl C\cell\row}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1{\stylesheet{\*\ts5 Declared Table;}}"#,
+            r#"\trowd\ts4\ts5{\ts6}\cellx1000\intbl A\cell\row"#,
+            r#"\intbl B\cell\row"#,
+            r#"\trowd\cellx1000\intbl C\cell\row}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert!(
         document
@@ -44,11 +45,14 @@ fn retains_group_scope_row_inheritance_last_wins_and_trowd_reset() {
 
 #[test]
 fn preserves_zero_maximum_omission_and_public_mutation() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\trowd\ts0\cellx1000\intbl A\cell\row"#,
-        r#"\trowd\ts65535\cellx1000\intbl B\cell\row"#,
-        r#"\trowd\cellx1000\intbl C\cell\row}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\trowd\ts0\cellx1000\intbl A\cell\row"#,
+            r#"\trowd\ts65535\cellx1000\intbl B\cell\row"#,
+            r#"\trowd\cellx1000\intbl C\cell\row}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let rows = document.tables()[0].rows();
     assert_eq!(rows[0].table_style(), Some(0));
@@ -76,13 +80,19 @@ fn rejects_malformed_body_and_stylesheet_handles_and_duplicate_selectors() {
         r"{\rtf1{\stylesheet{\*\ts1\ts2 Duplicate;}}}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }
 
-    let inert =
-        Tree::parse(r"{\rtf1{\field{\*\fldinst TEST \ts65536}{\fldrslt Result}}Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let inert = Tree::parse(
+        r"{\rtf1{\field{\*\fldinst TEST \ts65536}{\fldrslt Result}}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(
         inert
             .tables()
@@ -94,12 +104,15 @@ fn rejects_malformed_body_and_stylesheet_handles_and_duplicate_selectors() {
 
 #[test]
 fn canonical_writer_round_trips_outer_and_nested_row_references_stably() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1{\stylesheet{\*\ts3 Declared Table;}}"#,
-        r#"\trowd\ts3\cellx5000\intbl\itap2 Inner\nestcell"#,
-        r#"{\*\nesttableprops\itap2\trowd\ts4\cellx1000\nestrow}"#,
-        r#"\intbl\itap1\cell\row}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1{\stylesheet{\*\ts3 Declared Table;}}"#,
+            r#"\trowd\ts3\cellx5000\intbl\itap2 Inner\nestcell"#,
+            r#"{\*\nesttableprops\itap2\trowd\ts4\cellx1000\nestrow}"#,
+            r#"\intbl\itap1\cell\row}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let outer = &document.tables()[0].rows()[0];
     assert_eq!(outer.table_style(), Some(3));

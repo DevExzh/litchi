@@ -10,23 +10,24 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{BorderStyle, write::Writer, StyleType};
+use litchi_rtf::{BorderStyle, StyleType, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_full_paragraph_borders_and_round_trips() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\ansi{\colortbl;\red255\green0\blue0;}"#,
-        r#"\pard\brdrt\brdrs\brdrw20\brsp10\brdrcf1\brdrb\brdrdot"#,
-        r#"\brdrl\brdrhair\brdrw5\brdrr\brdrdb\brdrsh\brdrframe Text\par}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\ansi{\colortbl;\red255\green0\blue0;}"#,
+            r#"\pard\brdrt\brdrs\brdrw20\brsp10\brdrcf1\brdrb\brdrdot"#,
+            r#"\brdrl\brdrhair\brdrw5\brdrr\brdrdb\brdrsh\brdrframe Text\par}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let borders = &document.blocks()[0].paragraph.borders;
     assert_eq!(borders.top.style, BorderStyle::Single);
@@ -40,7 +41,8 @@ fn parses_full_paragraph_borders_and_round_trips() {
     assert!(borders.right.shadow);
     assert!(borders.right.frame);
 
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.blocks()[0].paragraph.borders, *borders);
 }
@@ -48,7 +50,8 @@ fn parses_full_paragraph_borders_and_round_trips() {
 #[test]
 fn normalizes_box_segment_and_retains_bar_and_between() {
     let document = Tree::parse(
-        r"{\rtf1\pard\box\brdrs\brdrw20\brdrbar\brdrth\brdrw40\brdrbtw\brdrdot Text\par}", litchi_rtf::read::OpenOptions::default()
+        r"{\rtf1\pard\box\brdrs\brdrw20\brdrbar\brdrth\brdrw40\brdrbtw\brdrdot Text\par}",
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     let borders = &document.blocks()[0].paragraph.borders;
@@ -70,10 +73,13 @@ fn normalizes_box_segment_and_retains_bar_and_between() {
 
 #[test]
 fn parses_style_entry_borders_and_keeps_character_borders_distinct() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\ansi{\stylesheet{\s1\brdrt\brdrs\brdrw30 Bordered;}}"#,
-        r#"{\*\defchp\chbrdr\brdrhair\brdrw5}\pard\chbrdr\brdrs\brdrw10 Text\par}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\ansi{\stylesheet{\s1\brdrt\brdrs\brdrw30 Bordered;}}"#,
+            r#"{\*\defchp\chbrdr\brdrhair\brdrw5}\pard\chbrdr\brdrs\brdrw10 Text\par}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let style = document
         .stylesheet()
@@ -95,7 +101,8 @@ fn parses_style_entry_borders_and_keeps_character_borders_distinct() {
         litchi_rtf::CharacterBorderStyle::Single
     );
 
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reparsed.stylesheet().styles()[0]
             .paragraph
@@ -112,12 +119,15 @@ fn table_style_border_syntax_stays_out_of_paragraph_borders() {
     // Word's built-in table styles carry \trbrdr* row borders with shared
     // style components; those belong to the table-decoration machinery and
     // must not trip the paragraph-border segment rules.
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\ansi{\stylesheet{\ql Normal;}"#,
-        r#"{\*\ts20\tsrowd\trbrdrt\brdrs\brdrw10 \trbrdrl\brdrs\brdrw10"#,
-        r#" \trbrdrb\brdrs\brdrw10 \trbrdrr\brdrs\brdrw10 Table Grid;}}"#,
-        r#"\pard\brdrt\brdrhair Text\par}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\ansi{\stylesheet{\ql Normal;}"#,
+            r#"{\*\ts20\tsrowd\trbrdrt\brdrs\brdrw10 \trbrdrl\brdrs\brdrw10"#,
+            r#" \trbrdrb\brdrs\brdrw10 \trbrdrr\brdrs\brdrw10 Table Grid;}}"#,
+            r#"\pard\brdrt\brdrhair Text\par}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(document.text(), "Text\n");
     assert_eq!(
@@ -148,7 +158,10 @@ fn rejects_malformed_paragraph_borders() {
     ];
     for rtf in cases {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(rtf, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                rtf,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {rtf}"
         );
     }

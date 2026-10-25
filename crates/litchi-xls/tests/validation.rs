@@ -342,11 +342,8 @@ fn status<'a>(report: &'a litchi_core::ValidateReport, id: &str) -> &'a CheckSta
 
 #[test]
 fn clear_workbook_reports_only_provable_semantics() {
-    let report = validate_source(
-        source(authored(false, false)),
-        Limits::default(),
-    )
-    .expect("validation");
+    let report =
+        validate_source(source(authored(false, false)), Limits::default()).expect("validation");
 
     assert!(report.is_complete());
     assert!(!report.has_errors());
@@ -390,8 +387,8 @@ fn clear_workbook_reports_only_provable_semantics() {
 
 #[test]
 fn external_metadata_is_reported_without_resolving_targets() {
-    let report = validate_source(source(authored_external()), Limits::default())
-        .expect("validation");
+    let report =
+        validate_source(source(authored_external()), Limits::default()).expect("validation");
 
     assert!(report.is_complete());
     assert!(!report.has_errors());
@@ -494,11 +491,8 @@ fn rejects_conflicting_dde_standard_document_flags() {
 
 #[test]
 fn protection_is_reported_without_retaining_password_material() {
-    let report = validate_source(
-        source(authored(true, false)),
-        Limits::default(),
-    )
-    .expect("validation");
+    let report =
+        validate_source(source(authored(true, false)), Limits::default()).expect("validation");
 
     assert!(report.is_complete());
     assert!(!report.has_errors());
@@ -513,11 +507,8 @@ fn protection_is_reported_without_retaining_password_material() {
 
 #[test]
 fn encrypted_workbook_stops_clear_semantic_checks() {
-    let report = validate_source(
-        source(authored(false, true)),
-        Limits::default(),
-    )
-    .expect("validation");
+    let report =
+        validate_source(source(authored(false, true)), Limits::default()).expect("validation");
 
     assert!(!report.is_complete());
     assert!(!report.has_errors());
@@ -640,8 +631,8 @@ fn preserves_metadata_errors_before_filepass_stop() {
 
 #[test]
 fn malformed_cfb_is_structured_and_downstream_is_blocked() {
-    let report = validate_source(source(vec![0u8; 512]), Limits::default())
-        .expect("validation report");
+    let report =
+        validate_source(source(vec![0u8; 512]), Limits::default()).expect("validation report");
 
     assert!(!report.is_complete());
     assert!(report.has_errors());
@@ -1014,8 +1005,7 @@ fn streaming_validation_stops_before_large_ciphertext_tail() {
     let tail_range = (tail_start as u64, sentinel.len());
     let source = Arc::new(ReadWidthSource::new(cfb, 16 * 1024));
 
-    let report =
-        validate_source(source.clone(), Limits::default()).expect("validation report");
+    let report = validate_source(source.clone(), Limits::default()).expect("validation report");
     assert!(!report.has_errors());
     assert!(source.maximum_observed() <= 16 * 1024);
     assert!(
@@ -1045,8 +1035,7 @@ fn streaming_validation_frames_many_records_without_a_read_each() {
         64 * 1024,
     ));
 
-    let report =
-        validate_source(source.clone(), Limits::default()).expect("validation report");
+    let report = validate_source(source.clone(), Limits::default()).expect("validation report");
     assert!(!report.has_errors());
     let ranges = source.ranges();
     assert!(
@@ -1078,8 +1067,7 @@ fn streaming_validation_opens_no_window_before_a_filepass() {
     let cfb = cfb_with_streams(&[("Workbook", stream)], &[]);
     let source = Arc::new(ReadWidthSource::new(cfb, 64 * 1024));
 
-    let report =
-        validate_source(source.clone(), Limits::default()).expect("validation report");
+    let report = validate_source(source.clone(), Limits::default()).expect("validation report");
     assert!(matches!(
         status(&report, "xls.encryption.presence"),
         CheckStatus::Complete
@@ -1119,17 +1107,12 @@ fn streaming_validation_propagates_read_and_source_change_errors() {
 
     let source =
         Arc::new(ReadWidthSource::new(cfb.clone(), 16 * 1024).with_failure_range(marker_range));
-    let error =
-        validate_source(source, Limits::default()).expect_err("injected read failure");
-    assert!(matches!(
-        error,
-        Error::Ingress(OleError::Io(_))
-    ));
+    let error = validate_source(source, Limits::default()).expect_err("injected read failure");
+    assert!(matches!(error, Error::Ingress(OleError::Io(_))));
 
     let source =
         Arc::new(ReadWidthSource::new(cfb.clone(), 16 * 1024).with_change_range(marker_range));
-    let error = validate_source(source, Limits::default())
-        .expect_err("injected source change");
+    let error = validate_source(source, Limits::default()).expect_err("injected source change");
     assert!(matches!(
         error,
         Error::Ingress(OleError::SourceChanged { .. })
@@ -1140,8 +1123,7 @@ fn streaming_validation_propagates_read_and_source_change_errors() {
             .with_failure_range(marker_range)
             .with_change_range(marker_range),
     );
-    let error = validate_source(source, Limits::default())
-        .expect_err("source change precedence");
+    let error = validate_source(source, Limits::default()).expect_err("source change precedence");
     assert!(matches!(
         error,
         Error::Ingress(OleError::SourceChanged { .. })
@@ -1285,8 +1267,8 @@ fn rejects_ambiguous_and_non_stream_workbook_entries() {
     let workbook = workbook_stream(authored(false, false));
 
     let book_fallback = cfb_with_streams(&[("Book", workbook.clone())], &[]);
-    let report = validate_source(source(book_fallback), Limits::default())
-        .expect("validation report");
+    let report =
+        validate_source(source(book_fallback), Limits::default()).expect("validation report");
     assert!(report.is_complete());
     assert!(!report.has_errors());
     assert!(matches!(
@@ -1298,8 +1280,7 @@ fn rejects_ambiguous_and_non_stream_workbook_entries() {
         &[("Workbook", workbook.clone()), ("Book", workbook.clone())],
         &[],
     );
-    let report = validate_source(source(both_names), Limits::default())
-        .expect("validation report");
+    let report = validate_source(source(both_names), Limits::default()).expect("validation report");
     assert_eq!(report.issues()[0].code(), "xls.workbook.stream_ambiguous");
     assert!(matches!(
         status(&report, "xls.workbook.stream"),
@@ -1311,8 +1292,7 @@ fn rejects_ambiguous_and_non_stream_workbook_entries() {
     ));
 
     let non_stream = cfb_with_streams(&[("Book", workbook)], &["Workbook"]);
-    let report = validate_source(source(non_stream), Limits::default())
-        .expect("validation report");
+    let report = validate_source(source(non_stream), Limits::default()).expect("validation report");
     assert_eq!(report.issues()[0].code(), "xls.workbook.stream_ambiguous");
     assert!(report.has_errors());
 }

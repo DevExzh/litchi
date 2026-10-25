@@ -148,7 +148,10 @@ impl Recipients {
         let output_len = recipients_output_len(self, conformance)?;
         check_output_bytes(output_len, limits)?;
         let mut xml = String::with_capacity(output_len);
-        xml.push_str(&format!(r#"<w:recipients xmlns:w="{}">"#, conformance.word()));
+        xml.push_str(&format!(
+            r#"<w:recipients xmlns:w="{}">"#,
+            conformance.word()
+        ));
         for recipient in &self.recipients {
             xml.push_str("<w:recipientData>");
             if !recipient.active {
@@ -600,7 +603,10 @@ fn validate_model(value: &Settings) -> Result<()> {
         });
     }
     for (description, string) in [
-        ("data-source relationship id", value.data_source_relationship_id.as_deref()),
+        (
+            "data-source relationship id",
+            value.data_source_relationship_id.as_deref(),
+        ),
         (
             "header-source relationship id",
             value.header_source_relationship_id.as_deref(),
@@ -649,9 +655,7 @@ fn validate_string(description: &str, value: Option<&str>) -> Result<()> {
 }
 
 fn validate_relationship_id(description: &str, value: Option<&str>) -> Result<()> {
-    if value.is_some_and(|text| {
-        text.is_empty() || text.len() > MAX_RELATIONSHIP_ID_BYTES
-    }) {
+    if value.is_some_and(|text| text.is_empty() || text.len() > MAX_RELATIONSHIP_ID_BYTES) {
         return Err(invalid(format!("{description} has invalid length")));
     }
     Ok(())
@@ -665,13 +669,21 @@ fn settings_output_len(value: &Settings, conformance: Conformance) -> Result<usi
     )
     .len();
     if value.main_document_type != MainDocumentType::FormLetters {
-        add_value_leaf_len(&mut length, "mainDocumentType", value.main_document_type.as_str())?;
+        add_value_leaf_len(
+            &mut length,
+            "mainDocumentType",
+            value.main_document_type.as_str(),
+        )?;
     }
     add_on_off_len(&mut length, "linkToQuery", value.link_to_query)?;
     if let Some(data_type) = value.data_type {
         add_value_leaf_len(&mut length, "dataType", data_type.as_str())?;
     }
-    add_optional_string_leaf_len(&mut length, "connectString", value.connect_string.as_deref())?;
+    add_optional_string_leaf_len(
+        &mut length,
+        "connectString",
+        value.connect_string.as_deref(),
+    )?;
     add_optional_string_leaf_len(&mut length, "query", value.query.as_deref())?;
     add_relationship_leaf_len(
         &mut length,
@@ -764,7 +776,9 @@ fn recipients_output_len(value: &Recipients, conformance: Conformance) -> Result
         }
         if let Some(tag) = &recipient.unique_tag {
             if tag.is_empty() || tag.len() > MAX_UNIQUE_TAG_BYTES {
-                return Err(invalid("mail-merge recipient unique tag has invalid length"));
+                return Err(invalid(
+                    "mail-merge recipient unique tag has invalid length",
+                ));
             }
             let encoded = tag
                 .len()
@@ -790,22 +804,14 @@ fn add_value_leaf_len(length: &mut usize, name: &str, value: &str) -> Result<()>
     add_len(length, b"\"/>".len())
 }
 
-fn add_optional_string_leaf_len(
-    length: &mut usize,
-    name: &str,
-    value: Option<&str>,
-) -> Result<()> {
+fn add_optional_string_leaf_len(length: &mut usize, name: &str, value: Option<&str>) -> Result<()> {
     if let Some(value) = value {
         add_value_leaf_len(length, name, value)?;
     }
     Ok(())
 }
 
-fn add_relationship_leaf_len(
-    length: &mut usize,
-    name: &str,
-    value: Option<&str>,
-) -> Result<()> {
+fn add_relationship_leaf_len(length: &mut usize, name: &str, value: Option<&str>) -> Result<()> {
     if let Some(value) = value {
         add_len(length, b"<w:".len())?;
         add_len(length, name.len())?;
@@ -955,8 +961,8 @@ impl Node {
     reason = "separate arms document distinct OOXML states"
 )]
 fn parse_tree(xml: &[u8], limits: &MceLimits) -> Result<Node> {
-    let processed = process_markup_compatibility(xml, &Capabilities::default(), limits)
-        .map_err(Error::Mce)?;
+    let processed =
+        process_markup_compatibility(xml, &Capabilities::default(), limits).map_err(Error::Mce)?;
     parse_tree_processed(processed.xml.as_ref())
 }
 

@@ -6,25 +6,25 @@
 //!
 //! — <https://docs.microsoft.com/en-us/typography/opentype/spec/gsub>
 
-use std::collections::hash_map::Entry;
 use std::collections::BTreeMap;
+use std::collections::hash_map::Entry;
 use std::fmt::Debug;
 
 use enumflags2::BitFlags;
-use tinyvec::{tiny_vec, TinyVec};
+use tinyvec::{TinyVec, tiny_vec};
 
 use crate::context::{ContextLookupHelper, Glyph, GlyphTable, MatchType};
 use crate::error::{ParseError, ShapingError};
 use crate::layout::{
-    chain_context_lookup_info, context_lookup_info, AlternateSet, AlternateSubst,
-    ChainContextLookup, ContextLookup, FeatureTableSubstitution, GDEFTable, LangSys, LayoutCache,
-    LayoutTable, Ligature, LigatureSubst, LookupCacheItem, LookupList, MultipleSubst,
-    ReverseChainSingleSubst, SequenceTable, SingleSubst, SubstLookup, GSUB,
+    AlternateSet, AlternateSubst, ChainContextLookup, ContextLookup, FeatureTableSubstitution,
+    GDEFTable, GSUB, LangSys, LayoutCache, LayoutTable, Ligature, LigatureSubst, LookupCacheItem,
+    LookupList, MultipleSubst, ReverseChainSingleSubst, SequenceTable, SingleSubst, SubstLookup,
+    chain_context_lookup_info, context_lookup_info,
 };
 use crate::scripts::{self, ScriptType};
 use crate::tables::variable_fonts::Tuple;
 use crate::unicode::VariationSelector;
-use crate::{tag, GlyphId};
+use crate::{GlyphId, tag};
 
 const SUBST_RECURSION_LIMIT: usize = 2;
 // Matches Harfbuzz:
@@ -213,31 +213,31 @@ pub fn gsub_lookup_would_apply<T: GlyphData>(
                     Some(_output_glyph) => Ok(true),
                     None => Ok(false),
                 }
-            }
+            },
             SubstLookup::MultipleSubst(ref subtables) => {
                 match multiplesubst_would_apply(subtables, i, glyphs)? {
                     Some(_sequence_table) => Ok(true),
                     None => Ok(false),
                 }
-            }
+            },
             SubstLookup::AlternateSubst(ref subtables) => {
                 match alternatesubst_would_apply(subtables, &glyphs[i])? {
                     Some(_alternate_set) => Ok(true),
                     None => Ok(false),
                 }
-            }
+            },
             SubstLookup::LigatureSubst(ref subtables) => {
                 match ligaturesubst_would_apply(opt_gdef_table, subtables, match_type, i, glyphs)? {
                     Some(_ligature) => Ok(true),
                     None => Ok(false),
                 }
-            }
+            },
             SubstLookup::ContextSubst(ref subtables) => {
                 match contextsubst_would_apply(opt_gdef_table, subtables, match_type, i, glyphs)? {
                     Some(_subst) => Ok(true),
                     None => Ok(false),
                 }
-            }
+            },
             SubstLookup::ChainContextSubst(ref subtables) => {
                 match chaincontextsubst_would_apply(
                     opt_gdef_table,
@@ -249,7 +249,7 @@ pub fn gsub_lookup_would_apply<T: GlyphData>(
                     Some(_subst) => Ok(true),
                     None => Ok(false),
                 }
-            }
+            },
             SubstLookup::ReverseChainSingleSubst(ref subtables) => {
                 match reversechainsinglesubst_would_apply(
                     opt_gdef_table,
@@ -261,7 +261,7 @@ pub fn gsub_lookup_would_apply<T: GlyphData>(
                     Some(_subst) => Ok(true),
                     None => Ok(false),
                 }
-            }
+            },
         };
     }
     Ok(false)
@@ -307,7 +307,7 @@ pub fn gsub_apply_lookup<T: GlyphData>(
                         singlesubst(subtables, feature_tag, glyph)?;
                     }
                 }
-            }
+            },
             SubstLookup::MultipleSubst(ref subtables) => {
                 let mut i = start;
                 while i < start + length {
@@ -317,14 +317,14 @@ pub fn gsub_apply_lookup<T: GlyphData>(
                                 i += replace_count;
                                 length += replace_count;
                                 length -= 1;
-                            }
+                            },
                             None => i += 1,
                         }
                     } else {
                         i += 1;
                     }
                 }
-            }
+            },
             SubstLookup::AlternateSubst(ref subtables) => {
                 for glyph in glyphs[start..(start + length)].iter_mut() {
                     if match_type.match_glyph(opt_gdef_table, glyph) && pred(glyph) {
@@ -332,7 +332,7 @@ pub fn gsub_apply_lookup<T: GlyphData>(
                         alternatesubst(subtables, alternate, glyph)?;
                     }
                 }
-            }
+            },
             SubstLookup::LigatureSubst(ref subtables) => {
                 let mut i = start;
                 while i < start + length {
@@ -341,14 +341,14 @@ pub fn gsub_apply_lookup<T: GlyphData>(
                             Some((removed_count, skip_count)) => {
                                 i += skip_count + 1;
                                 length -= removed_count;
-                            }
+                            },
                             None => i += 1,
                         }
                     } else {
                         i += 1;
                     }
                 }
-            }
+            },
             SubstLookup::ContextSubst(ref subtables) => {
                 let mut i = start;
                 while i < start + length {
@@ -368,14 +368,14 @@ pub fn gsub_apply_lookup<T: GlyphData>(
                             Some((input_length, changes)) => {
                                 i += input_length;
                                 length = checked_add(length, changes).unwrap();
-                            }
+                            },
                             None => i += 1,
                         }
                     } else {
                         i += 1;
                     }
                 }
-            }
+            },
             SubstLookup::ChainContextSubst(ref subtables) => {
                 let mut i = start;
                 while i < start + length {
@@ -395,21 +395,21 @@ pub fn gsub_apply_lookup<T: GlyphData>(
                             Some((input_length, changes)) => {
                                 i += input_length;
                                 length = checked_add(length, changes).unwrap();
-                            }
+                            },
                             None => i += 1,
                         }
                     } else {
                         i += 1;
                     }
                 }
-            }
+            },
             SubstLookup::ReverseChainSingleSubst(ref subtables) => {
                 for i in (start..start + length).rev() {
                     if match_type.match_glyph(opt_gdef_table, &glyphs[i]) && pred(&glyphs[i]) {
                         reversechainsinglesubst(opt_gdef_table, subtables, match_type, i, glyphs)?;
                     }
                 }
-            }
+            },
         }
     }
     Ok(length)
@@ -501,7 +501,7 @@ fn multiplesubst<T: GlyphData>(
                 glyphs.remove(i);
                 Ok(Some(0))
             }
-        }
+        },
         None => Ok(None),
     }
 }
@@ -780,23 +780,23 @@ fn apply_subst<T: GlyphData>(
         SubstLookup::SingleSubst(ref subtables) => {
             singlesubst(subtables, feature_tag, &mut glyphs[i])?;
             Ok(Some(0))
-        }
+        },
         SubstLookup::MultipleSubst(ref subtables) => {
             match multiplesubst(subtables, i, glyphs, max_glyphs)? {
                 Some(replace_count) => Ok(Some((replace_count as isize) - 1)),
                 None => Ok(None),
             }
-        }
+        },
         SubstLookup::AlternateSubst(ref subtables) => {
             alternatesubst(subtables, 0, &mut glyphs[i])?;
             Ok(Some(0))
-        }
+        },
         SubstLookup::LigatureSubst(ref subtables) => {
             match ligaturesubst(opt_gdef_table, subtables, match_type, i, glyphs)? {
                 Some((removed_count, _skip_count)) => Ok(Some(-(removed_count as isize))),
                 None => Ok(None), // FIXME error?
             }
-        }
+        },
         SubstLookup::ContextSubst(ref subtables) => {
             if recursion_limit > 0 {
                 match contextsubst(
@@ -817,7 +817,7 @@ fn apply_subst<T: GlyphData>(
             } else {
                 Err(ParseError::LimitExceeded)
             }
-        }
+        },
         SubstLookup::ChainContextSubst(ref subtables) => {
             if recursion_limit > 0 {
                 match chaincontextsubst(
@@ -838,11 +838,11 @@ fn apply_subst<T: GlyphData>(
             } else {
                 Err(ParseError::LimitExceeded)
             }
-        }
+        },
         SubstLookup::ReverseChainSingleSubst(ref subtables) => {
             reversechainsinglesubst(opt_gdef_table, subtables, match_type, i, glyphs)?;
             Ok(Some(0))
-        }
+        },
     }
 }
 
@@ -952,7 +952,7 @@ fn get_supported_features(
                 };
             entry.insert(feature_mask.bits());
             feature_mask
-        }
+        },
     };
     Ok(feature_mask)
 }
@@ -1243,7 +1243,7 @@ pub fn get_lookups_cache_index(
             } else {
                 *entry.insert(0)
             }
-        }
+        },
     };
     Ok(index)
 }
@@ -1540,7 +1540,7 @@ pub fn apply(
                     max_glyphs,
                 )?;
             }
-        }
+        },
     }
 
     // Apply custom features (font-variant-alternates) after script-specific
@@ -1587,7 +1587,7 @@ fn gsub_apply_custom_features(
                 Some(table) => Some(table),
                 None => gsub_table.find_script_or_default(script_tag)?,
             }
-        }
+        },
         _ => gsub_table.find_script_or_default(script_tag)?,
     };
     if let Some(script) = script_table {
@@ -1729,7 +1729,7 @@ fn find_fraction(glyphs: &[RawGlyph<()>]) -> Option<(usize, usize, usize)> {
         match glyphs[start_pos - 1].glyph_origin {
             GlyphOrigin::Char(c) if c.is_ascii_digit() => {
                 start_pos -= 1;
-            }
+            },
             _ => break,
         }
     }
@@ -1738,7 +1738,7 @@ fn find_fraction(glyphs: &[RawGlyph<()>]) -> Option<(usize, usize, usize)> {
         match glyphs[end_pos + 1].glyph_origin {
             GlyphOrigin::Char(c) if c.is_ascii_digit() => {
                 end_pos += 1;
-            }
+            },
             _ => break,
         }
     }
@@ -1782,8 +1782,8 @@ fn apply_rvrn(
 mod tests {
     use super::*;
     use crate::{
-        binary::read::ReadScope, font::MatchingPresentation, font_data::FontData,
-        tests::read_fixture, Font,
+        Font, binary::read::ReadScope, font::MatchingPresentation, font_data::FontData,
+        tests::read_fixture,
     };
 
     #[test]

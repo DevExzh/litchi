@@ -3,7 +3,7 @@
 
 use crate::error::ShapingError;
 use crate::gsub::{self, Feature, FeatureMask, RawGlyph};
-use crate::layout::{FeatureTableSubstitution, GDEFTable, LayoutCache, LayoutTable, GSUB};
+use crate::layout::{FeatureTableSubstitution, GDEFTable, GSUB, LayoutCache, LayoutTable};
 use crate::unicode::mcc::sort_by_modified_combining_class;
 
 pub(super) fn reorder_marks(cs: &mut Vec<char>) {

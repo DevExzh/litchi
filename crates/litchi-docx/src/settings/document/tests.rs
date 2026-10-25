@@ -7,9 +7,9 @@ use crate::settings::{
     ColorSchemeIndex, ColorSchemeMapping, ColorSchemeSlot, CompatFlag, NoteNumberingRestart,
     NotePosition, ProofState, ProofingState, ProtectionType, ThemeFontLanguages, View,
 };
+use litchi_ooxml_common::mce::Limits as MceLimits;
 use litchi_opc::PackURI;
 use litchi_opc::part::{BlobPart, Part};
-use litchi_ooxml_common::mce::Limits as MceLimits;
 use std::mem::size_of;
 
 /// Assert that `settings` recorded exactly `count` duplicate-setting repairs
@@ -841,11 +841,10 @@ fn patches_only_the_attached_template_element() {
     );
 
     let empty = br#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"/>"#;
-    let inserted =
-        String::from_utf8(
-            patch_attached_template(empty, Some("rId7"), &MceLimits::default()).unwrap(),
-        )
-        .unwrap();
+    let inserted = String::from_utf8(
+        patch_attached_template(empty, Some("rId7"), &MceLimits::default()).unwrap(),
+    )
+    .unwrap();
     assert_eq!(
         inserted,
         r#"<s:settings xmlns:s="http://purl.oclc.org/ooxml/wordprocessingml/main"><s:attachedTemplate r:id="rId7" xmlns:r="http://purl.oclc.org/ooxml/officeDocument/relationships"/></s:settings>"#
@@ -868,12 +867,10 @@ fn patches_document_variables_without_touching_unrelated_settings() {
     );
 
     variables.clear();
-    let removed =
-        String::from_utf8(
-            patch_document_variables(patched.as_bytes(), &variables, &MceLimits::default())
-                .unwrap(),
-        )
-        .unwrap();
+    let removed = String::from_utf8(
+        patch_document_variables(patched.as_bytes(), &variables, &MceLimits::default()).unwrap(),
+    )
+    .unwrap();
     assert_eq!(
         removed,
         r#"<?xml version="1.0"?><q:settings xmlns:q="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:opaque"><!--before--><q:compat/><x:opaque><![CDATA[a < b]]></x:opaque><q:rsids/></q:settings>"#

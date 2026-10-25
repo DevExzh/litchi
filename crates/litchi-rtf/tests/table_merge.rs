@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{write::Writer, TableCellMergeRole};
+use litchi_rtf::{TableCellMergeRole, write::Writer};
 
 fn write(document: &Tree<'_>) -> String {
     let mut bytes = Vec::new();
@@ -66,7 +66,10 @@ fn rejects_parameters_duplicates_conflicts_and_invalid_horizontal_ordering() {
     for word in ["clmgf0", "clmrg1", "clvmgf-1", "clvmrg2"] {
         let source = format!("{{\\rtf1\\trowd\\{word}\\cellx1000\\intbl X\\cell\\row}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                &source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {word}"
         );
     }
@@ -82,7 +85,10 @@ fn rejects_parameters_duplicates_conflicts_and_invalid_horizontal_ordering() {
     ] {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                &source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {controls}"
         );
     }
@@ -91,11 +97,20 @@ fn rejects_parameters_duplicates_conflicts_and_invalid_horizontal_ordering() {
         r"{\rtf1\trowd\clmgf\cellx1000\cellx2000\clmrg\cellx3000\intbl X\cell Y\cell Z\cell\row}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }
-    assert!(Tree::parse(r"{\rtf1\trowd\clmgf\clvmgf\cellx1000\intbl X\cell\row}", litchi_rtf::read::OpenOptions::default()).is_ok());
+    assert!(
+        Tree::parse(
+            r"{\rtf1\trowd\clmgf\clvmgf\cellx1000\intbl X\cell\row}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -123,7 +138,12 @@ fn applies_end_defined_nested_merge_metadata() {
     );
     assert_eq!(cells[1].right_boundary(), Some(1700));
     assert_eq!(
-        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap().tables()[0].rows()[0].cells()[0].nested_tables()[0]
+        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default())
+            .unwrap()
+            .tables()[0]
+            .rows()[0]
+            .cells()[0]
+            .nested_tables()[0]
             .table
             .rows()[0]
             .cells()[1]
@@ -145,16 +165,19 @@ fn handles_real_libreoffice_merge_fixtures() {
             if message == r"RTF \rtf control requires a version parameter"
     ));
     let horizontal_source = horizontal_source.replacen(r"{\rtf", r"{\rtf1", 1);
-    let horizontal = Tree::parse(&horizontal_source, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let horizontal =
+        Tree::parse(&horizontal_source, litchi_rtf::read::OpenOptions::default()).unwrap();
     let cells = horizontal.tables()[0].rows()[0].cells();
     assert_eq!(cells[0].merge().horizontal, Some(TableCellMergeRole::First));
     assert_eq!(
         cells[1].merge().horizontal,
         Some(TableCellMergeRole::Continuation)
     );
-    let vertical =
-        Tree::parse(&std::fs::read_to_string(base.join("rtfimport/data/tdf148544.rtf")).unwrap(), litchi_rtf::read::OpenOptions::default())
-            .unwrap();
+    let vertical = Tree::parse(
+        &std::fs::read_to_string(base.join("rtfimport/data/tdf148544.rtf")).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(
         vertical
             .tables()

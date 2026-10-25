@@ -7,15 +7,19 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
-use litchi_rtf::write::Writer;
 use litchi_rtf::raw::Tree;
+use litchi_rtf::write::Writer;
 
 #[test]
 fn splits_real_libreoffice_floating_tables_at_non_table_paragraphs() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
         "../../test-data/libreoffice-core/sw/qa/writerfilter/rtftok/data/floattable-tbl-overlap.rtf",
     );
-    let document = Tree::parse(&std::fs::read_to_string(path).unwrap(), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        &std::fs::read_to_string(path).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.tables().len(), 2);
     assert_eq!(document.tables()[0].row_count(), 2);
     assert_eq!(document.tables()[1].row_count(), 2);
@@ -45,7 +49,10 @@ fn rejects_inconsistent_positioning_without_a_provable_boundary() {
         r"{\rtf1\trowd\tphpg\tposx10\cellx1\intbl A\cell\row\trowd\tphpg\tposx20\cellx1\intbl B\cell\row}",
         r"{\rtf1\trowd\tphpg\tposx10\cellx1\intbl A\cell\row\pard {\*\unknown\tposx20 ignored}\trowd\tphpg\tposx20\cellx1\intbl B\cell\row}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 }
 
@@ -55,9 +62,7 @@ fn writer_preserves_logical_boundaries_deterministically() {
     let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(document.tables().len(), 2);
     let mut first = Vec::new();
-    Writer::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let first = String::from_utf8(first).unwrap();
     assert!(first.contains("\\row\n\\pard\\par\n\\trowd"));
     let reparsed = Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
@@ -71,9 +76,7 @@ fn writer_preserves_logical_boundaries_deterministically() {
         document.tables()[1].rows()[0].positioning()
     );
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, String::from_utf8(second).unwrap());
 }
 

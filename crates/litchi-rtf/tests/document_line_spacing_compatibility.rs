@@ -14,9 +14,7 @@ use litchi_rtf::{DocumentLineSpacingCompatibility, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -32,10 +30,13 @@ fn all_enabled() -> DocumentLineSpacingCompatibility {
 
 #[test]
 fn parses_all_flags_as_passive_metadata_without_changing_body() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\noextrasprl\sprstsp\sprsspbf"#,
-        r#"\sprslnsp\sprsbsp Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\noextrasprl\sprstsp\sprsspbf"#,
+            r#"\sprslnsp\sprsbsp Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(*document.line_spacing_compatibility(), all_enabled());
     assert_eq!(document.text(), "Body");
@@ -53,7 +54,8 @@ fn omission_is_false_and_serializes_nothing() {
 
 #[test]
 fn typed_api_round_trips_in_specification_order_and_clears_passively() {
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_line_spacing_compatibility(all_enabled());
     let output = write(&document);
     let serialized = String::from_utf8(output.clone()).unwrap();
@@ -113,7 +115,10 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
         for suffix in ["0", "1", "-1", "2147483647", "99999999999"] {
             let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
-                repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                    &source,
+                    litchi_rtf::read::OpenOptions::default()
+                )),
                 "accepted malformed {source}"
             );
         }
@@ -124,7 +129,10 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
             format!(r"{{\rtf1 Body\{name}}}"),
         ] {
             assert!(
-                repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                    &source,
+                    litchi_rtf::read::OpenOptions::default()
+                )),
                 "accepted malformed {source}"
             );
         }

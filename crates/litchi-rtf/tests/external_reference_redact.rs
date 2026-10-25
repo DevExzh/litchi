@@ -330,12 +330,8 @@ fn strict_shape_text_diagnostics_refuse_skipped_active_destinations() {
 #[test]
 fn compressed_transport_has_inventory_but_no_source_span_and_best_effort_noop() {
     let source = br#"{\rtf1\ansi{\*\template t.dot}Body}"#;
-    let compressed = litchi_rtf::compress(
-        source,
-        true,
-        litchi_rtf::CompressionLimits::default(),
-    )
-    .unwrap();
+    let compressed =
+        litchi_rtf::compress(source, true, litchi_rtf::CompressionLimits::default()).unwrap();
     let document = Package::from_bytes(&compressed).unwrap();
     let inventory = document.external_reference_redaction_snapshot().unwrap();
     assert!(

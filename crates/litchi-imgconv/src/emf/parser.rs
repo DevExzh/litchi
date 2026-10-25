@@ -325,11 +325,7 @@ impl EmfRecord {
     /// Parse an EMF record from data (creates owned copy)
     ///
     /// For high-performance scenarios, consider using `EmfRecordRef::parse_ref` instead
-    pub fn parse(
-        data: &[u8],
-        offset: usize,
-        limits: &crate::Limits,
-    ) -> Result<(Self, usize)> {
+    pub fn parse(data: &[u8], offset: usize, limits: &crate::Limits) -> Result<(Self, usize)> {
         let (record_ref, consumed) = EmfRecordRef::parse_ref(data, offset, limits)?;
 
         Ok((
@@ -970,7 +966,10 @@ mod tests {
         for &(offset, value) in cases {
             let mut data = valid_emf();
             put_u32(&mut data, offset, value);
-            assert!(EmfParser::new(&data, &crate::Limits::default()).is_err(), "offset {offset}");
+            assert!(
+                EmfParser::new(&data, &crate::Limits::default()).is_err(),
+                "offset {offset}"
+            );
         }
 
         let mut reserved = valid_emf();
@@ -1022,7 +1021,10 @@ mod tests {
         for size in [7, 10, u32::MAX] {
             let mut data = valid_emf();
             put_u32(&mut data, 92, size);
-            assert!(EmfParser::new(&data, &crate::Limits::default()).is_err(), "size {size}");
+            assert!(
+                EmfParser::new(&data, &crate::Limits::default()).is_err(),
+                "size {size}"
+            );
         }
 
         let mut count = valid_emf();
@@ -1096,7 +1098,8 @@ mod tests {
                 found: 29_868,
             }]
         );
-        let owned = EmfParser::from_owned_compatible(legacy.to_vec(), &crate::Limits::default()).unwrap();
+        let owned =
+            EmfParser::from_owned_compatible(legacy.to_vec(), &crate::Limits::default()).unwrap();
         assert_eq!(owned.records.len(), compatible.records.len());
     }
 

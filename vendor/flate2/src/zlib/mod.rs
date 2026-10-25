@@ -9,10 +9,10 @@ mod tests {
     use alloc::string::ToString;
     use alloc::vec::Vec;
 
-    use rand::{rng, Rng};
+    use rand::{Rng, rng};
 
-    use crate::zlib::{read, write};
     use crate::Compression;
+    use crate::zlib::{read, write};
 
     #[test]
     fn roundtrip() {

@@ -11,7 +11,8 @@ mod repair_support;
 
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    PageBorder, PageBorderAppliesTo, PageBorderDepth, PageBorderOffset, PageBorderStyle, write::Writer,
+    PageBorder, PageBorderAppliesTo, PageBorderDepth, PageBorderOffset, PageBorderStyle,
+    write::Writer,
 };
 
 #[test]
@@ -28,9 +29,7 @@ fn parses_libreoffice_page_border_export_and_round_trips_deterministically() {
     assert_eq!(borders.right.unwrap().width, 40);
     assert_eq!(borders.top.unwrap().space, 480);
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let text = String::from_utf8(output).unwrap();
     let expected = r"\pgbrdrt\brdrs\brdrw10\brdrcf0\brsp480\pgbrdrl\brdrs\brdrw20\brdrcf0\brsp480\pgbrdrb\brdrs\brdrw30\brdrcf0\brsp480\pgbrdrr\brdrs\brdrw40\brdrcf0\brsp480";
     assert!(text.contains(expected), "{text}");
@@ -92,7 +91,10 @@ fn rejects_malformed_page_borders_and_negative_libreoffice_fixture() {
         r"{\rtf1\pgbrdrt\brdrs\brdrw10\pgbrdrt\brdrs Body}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(rtf, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                rtf,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {rtf}"
         );
     }

@@ -1,6 +1,6 @@
 use core::arch::x86_64::{
-    __m512i, _mm512_add_epi32, _mm512_dpbusd_epi32, _mm512_loadu_si512, _mm512_sad_epu8,
-    _mm512_setzero_si512, _mm512_slli_epi32, _mm512_zextsi128_si512, _mm_cvtsi32_si128,
+    __m512i, _mm_cvtsi32_si128, _mm512_add_epi32, _mm512_dpbusd_epi32, _mm512_loadu_si512,
+    _mm512_sad_epu8, _mm512_setzero_si512, _mm512_slli_epi32, _mm512_zextsi128_si512,
 };
 
 use super::avx512::{_mm512_reduce_add_epu32, partial_hsum};

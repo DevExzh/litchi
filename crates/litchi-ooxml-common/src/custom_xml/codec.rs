@@ -132,9 +132,7 @@ pub(super) fn rewrite_props(
 }
 
 fn max_properties_bytes(source_limits: &SourceLimits) -> usize {
-    MAX_PROPS_BYTES.min(
-        usize::try_from(source_limits.max_part_bytes()).unwrap_or(usize::MAX),
-    )
+    MAX_PROPS_BYTES.min(usize::try_from(source_limits.max_part_bytes()).unwrap_or(usize::MAX))
 }
 
 fn item_id_span(source: &[u8]) -> Result<Option<(usize, usize)>> {

@@ -8,26 +8,27 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{LatentStyleException, LatentStyles, Error, write::Writer};
+use litchi_rtf::{Error, LatentStyleException, LatentStyles, write::Writer};
 use std::borrow::Cow;
 use std::fs;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_full_unicode_latent_styles_and_round_trips_order() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1{\*\latentstyles\lsdstimax156\lsdlockeddef0"#,
-        r#"\lsdsemihiddendef1\lsdunhideuseddef1\lsdqformatdef0\lsdprioritydef99"#,
-        r#"{\lsdlockedexcept \lsdqformat1\lsdpriority0 Normal;"#,
-        r#"\lsdsemihidden1\lsdunhideused0 Heading \u20320?;}}Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1{\*\latentstyles\lsdstimax156\lsdlockeddef0"#,
+            r#"\lsdsemihiddendef1\lsdunhideuseddef1\lsdqformatdef0\lsdprioritydef99"#,
+            r#"{\lsdlockedexcept \lsdqformat1\lsdpriority0 Normal;"#,
+            r#"\lsdsemihidden1\lsdunhideused0 Heading \u20320?;}}Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(document.text(), "Body");
     let styles = document.latent_styles().unwrap();
@@ -41,7 +42,8 @@ fn parses_full_unicode_latent_styles_and_round_trips_order() {
     assert_eq!(styles.exceptions[1].name, "Heading 你");
     assert_eq!(styles.exceptions[1].semi_hidden, Some(true));
 
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.latent_styles(), Some(styles));
 }
@@ -49,7 +51,8 @@ fn parses_full_unicode_latent_styles_and_round_trips_order() {
 #[test]
 fn parses_multiple_exception_names_from_one_text_token() {
     let document = Tree::parse(
-        r"{\rtf1{\*\latentstyles\lsdstimax3{\lsdlockedexcept\lsdlocked1 Alpha;Beta;Gamma;}}}", litchi_rtf::read::OpenOptions::default()
+        r"{\rtf1{\*\latentstyles\lsdstimax3{\lsdlockedexcept\lsdlocked1 Alpha;Beta;Gamma;}}}",
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     let exceptions = &document.latent_styles().unwrap().exceptions;
@@ -81,9 +84,11 @@ fn mutation_validates_and_clear_preserves_body() {
             priority: Some(10),
         }],
     };
-    let mut document = Tree::parse(r"{\rtf1 Text}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Text}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_latent_styles(styles.clone()).unwrap();
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.latent_styles(), Some(&styles));
     assert_eq!(reparsed.text(), "Text");
 
@@ -109,7 +114,10 @@ fn rejects_malformed_or_active_latent_style_grammar() {
         r"{\rtf1\lsdstimax1}",
     ];
     for rtf in cases {
-        assert!(Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {rtf}");
+        assert!(
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {rtf}"
+        );
     }
 
     let mut oversized_unicode =

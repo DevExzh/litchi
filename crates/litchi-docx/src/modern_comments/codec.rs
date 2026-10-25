@@ -311,7 +311,12 @@ pub fn write_comments_extended(
     let output_len = extended_output_len(items, conformance)?;
     check_output_len(output_len, limits)?;
     let mut out = String::with_capacity(output_len);
-    out.push_str(&xml_header("w15", WORD_2012_NAMESPACE, "commentsEx", conformance));
+    out.push_str(&xml_header(
+        "w15",
+        WORD_2012_NAMESPACE,
+        "commentsEx",
+        conformance,
+    ));
     for item in items {
         out.push_str("<w15:commentEx w15:paraId=\"");
         out.push_str(&format_hex(item.paragraph_id));
@@ -341,7 +346,12 @@ pub fn write_comments_ids(
     let output_len = ids_output_len(items, conformance)?;
     check_output_len(output_len, limits)?;
     let mut out = String::with_capacity(output_len);
-    out.push_str(&xml_header("w16cid", COMMENTS_IDS_NAMESPACE, "commentsIds", conformance));
+    out.push_str(&xml_header(
+        "w16cid",
+        COMMENTS_IDS_NAMESPACE,
+        "commentsIds",
+        conformance,
+    ));
     for item in items {
         out.push_str("<w16cid:commentId w16cid:paraId=\"");
         out.push_str(&format_hex(item.paragraph_id));
@@ -458,7 +468,12 @@ pub fn write_people(
     let output_len = people_output_len(people, conformance)?;
     check_output_len(output_len, limits)?;
     let mut out = String::with_capacity(output_len);
-    out.push_str(&xml_header("w15", WORD_2012_NAMESPACE, "people", conformance));
+    out.push_str(&xml_header(
+        "w15",
+        WORD_2012_NAMESPACE,
+        "people",
+        conformance,
+    ));
     for person in people {
         out.push_str("<w15:person w15:author=\"");
         escape_attr(&mut out, &person.author);
@@ -909,8 +924,7 @@ fn extension_list_output_len(list: &ExtensionList) -> Result<usize> {
 }
 
 fn extensible_output_len(comments: &[Comment], conformance: Conformance) -> Result<usize> {
-    let mut length = b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>"
-        .len();
+    let mut length = b"<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>".len();
     add_len(
         &mut length,
         format!(
@@ -987,8 +1001,7 @@ fn extensible_output_len(comments: &[Comment], conformance: Conformance) -> Resu
         }
         add_len(
             &mut length,
-            b"</cr:reactions></w16:ext></w16cex:extLst></w16cex:commentExtensible>"
-                .len(),
+            b"</cr:reactions></w16:ext></w16cex:extLst></w16cex:commentExtensible>".len(),
         )?;
     }
     add_len(&mut length, b"</w16cex:commentsExtensible>".len())?;
@@ -1084,14 +1097,14 @@ struct StringBudget {
 
 impl StringBudget {
     fn add(&mut self, value: &str) -> Result<()> {
-        self.total = self
-            .total
-            .checked_add(value.len())
-            .ok_or_else(|| Error::ModernCommentLimit {
-                kind: crate::modern_comments::LimitKind::StringBytes,
-                actual: usize::MAX,
-                maximum: MAX_MODERN_COMMENT_STRING_BYTES,
-            })?;
+        self.total =
+            self.total
+                .checked_add(value.len())
+                .ok_or_else(|| Error::ModernCommentLimit {
+                    kind: crate::modern_comments::LimitKind::StringBytes,
+                    actual: usize::MAX,
+                    maximum: MAX_MODERN_COMMENT_STRING_BYTES,
+                })?;
         if self.total > MAX_MODERN_COMMENT_STRING_BYTES {
             return Err(Error::ModernCommentLimit {
                 kind: crate::modern_comments::LimitKind::StringBytes,

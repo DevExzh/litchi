@@ -36,9 +36,7 @@ fn parses_decodes_and_round_trips_extended_font_metadata() {
     let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(doc.font_table(), reparsed.font_table());
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -88,7 +86,8 @@ fn rejects_malformed_extended_font_metadata() {
         r"{\rtf1{\fonttbl{\f0\fnil\fcharset3 Arial;}}}",
         r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset78 \'82\'a0;}}}",
     ] {
-        let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap_or_else(|error| panic!("{source}: {error}"));
+        let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default())
+            .unwrap_or_else(|error| panic!("{source}: {error}"));
         let report = document.tolerance_report();
         assert!(!report.is_clean(), "{source}");
         assert!(

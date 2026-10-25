@@ -60,7 +60,8 @@ fn parses_owns_and_canonically_round_trips_pn_metadata() {
     Writer::new(&mut first_bytes)
         .write_document(&document)
         .unwrap();
-    let reparsed = Tree::parse_bytes(&first_bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&first_bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut second_bytes = Vec::new();
     Writer::new(&mut second_bytes)
         .write_document(&reparsed)
@@ -70,8 +71,11 @@ fn parses_owns_and_canonically_round_trips_pn_metadata() {
 
 #[test]
 fn pn_is_inert_and_paragraph_scoped() {
-    let document =
-        Tree::parse(r"{\rtf1{\pn\pnlvlbody\pndec{\pntxtb NOT-BODY}}One\par\pard Two}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1{\pn\pnlvlbody\pndec{\pntxtb NOT-BODY}}One\par\pard Two}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "One\nTwo");
     let one = document
         .blocks()
@@ -118,7 +122,10 @@ fn rejects_adversarial_pn_destinations() {
     ];
     for source in malformed {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed RTF: {source}"
         );
     }

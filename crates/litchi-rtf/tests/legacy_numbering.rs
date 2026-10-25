@@ -35,10 +35,9 @@ fn parses_decodes_and_round_trips_legacy_section_numbering() {
     assert_eq!(doc.text().trim(), "Body");
 
     let mut first_bytes = Vec::new();
-    Writer::new(&mut first_bytes)
-        .write_document(&doc)
-        .unwrap();
-    let reparsed = Tree::parse_bytes(&first_bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
+    Writer::new(&mut first_bytes).write_document(&doc).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&first_bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(numbering, reparsed.legacy_section_numbering());
     let mut second_bytes = Vec::new();
     Writer::new(&mut second_bytes)
@@ -69,9 +68,12 @@ fn rejects_malformed_legacy_section_numbering() {
 
 #[test]
 fn parses_real_libreoffice_pnseclvl_fixture() {
-    let doc = Tree::parse_bytes(include_bytes!(
-        "../../../test-data/libreoffice-core/sw/qa/uibase/uiview/data/tdf152839_formtext.rtf"
-    ), litchi_rtf::read::OpenOptions::default())
+    let doc = Tree::parse_bytes(
+        include_bytes!(
+            "../../../test-data/libreoffice-core/sw/qa/uibase/uiview/data/tdf152839_formtext.rtf"
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let numbering = doc.legacy_section_numbering();
     assert_eq!(numbering.levels().len(), 9);

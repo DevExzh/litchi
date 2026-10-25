@@ -21,20 +21,20 @@ use pathfinder_geometry::transform2d::Matrix2x2F;
 use pathfinder_geometry::vector::Vector2F;
 use rustc_hash::FxHashMap;
 
+use crate::binary::budget;
 use crate::binary::read::{
     ReadBinary, ReadBinaryDep, ReadCtxt, ReadFrom, ReadScope, ReadUnchecked,
 };
-use crate::binary::budget;
 use crate::binary::write::{WriteBinary, WriteBinaryDep, WriteContext};
-use crate::binary::{word_align, I16Be, U16Be, I8, U8};
+use crate::binary::{I8, I16Be, U8, U16Be, word_align};
 use crate::error::{ParseError, WriteError};
-use crate::tables::loca::{owned, LocaTable};
+use crate::tables::loca::{LocaTable, owned};
 use crate::tables::os2::Os2;
 use crate::tables::{
-    read_and_box_table, F2Dot14, FontTableProvider, HeadTable, HheaTable, HmtxTable,
-    IndexToLocFormat, MaxpTable,
+    F2Dot14, FontTableProvider, HeadTable, HheaTable, HmtxTable, IndexToLocFormat, MaxpTable,
+    read_and_box_table,
 };
-use crate::{tag, SafeFrom};
+use crate::{SafeFrom, tag};
 
 pub use outline::{GlyfVisitorContext, VariableGlyfContext, VariableGlyfContextStore};
 pub use subset::SubsetGlyph;
@@ -322,7 +322,7 @@ impl ReadBinaryDep for GlyfTable<'_> {
                                 number_of_contours,
                                 scope,
                             })
-                        }
+                        },
                         Err(ParseError::BadEof) => {
                             // The length specified by `loca` is beyond the end of the `glyf`
                             // table. Try parsing the glyph without a length limit to see if it's
@@ -332,10 +332,10 @@ impl ReadBinaryDep for GlyfTable<'_> {
                             warn!("glyph length out of bounds, trying to parse");
                             let scope = ctxt.scope().offset(offset);
                             scope.read::<Glyph>().map(GlyfRecord::Parsed)
-                        }
+                        },
                         Err(err) => Err(err),
                     }
-                }
+                },
                 None => Err(ParseError::BadOffset),
             }?;
             glyph_records.push(record);
@@ -459,7 +459,7 @@ impl Glyph {
             Glyph::Simple(SimpleGlyph { phantom_points, .. })
             | Glyph::Composite(CompositeGlyph { phantom_points, .. }) => {
                 phantom_points.as_deref().copied()
-            }
+            },
         }
     }
 
@@ -523,7 +523,7 @@ pub(crate) fn calculate_phantom_points(
             let advance_height = default_ascender - default_descender;
             let tsb = default_ascender - y_max;
             (advance_height, tsb)
-        }
+        },
     };
 
     let x = 0;
@@ -657,8 +657,7 @@ impl ReadBinaryDep for SimpleGlyph {
             *point = prev_point
         }
 
-        budget::charge_allocation(instructions.len())
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::charge_allocation(instructions.len()).map_err(|_| ParseError::LimitExceeded)?;
         let instructions = Box::from(instructions);
 
         Ok(SimpleGlyph {
@@ -733,8 +732,7 @@ impl ReadBinary for CompositeGlyphs {
                 have_instructions = true;
             }
 
-            budget::reserve_for_push(&mut glyphs)
-                .map_err(|_| ParseError::LimitExceeded)?;
+            budget::reserve_for_push(&mut glyphs).map_err(|_| ParseError::LimitExceeded)?;
             glyphs.push(data);
 
             if !flags.more_components() {
@@ -762,8 +760,7 @@ impl ReadBinary for CompositeGlyph {
             0
         };
         let instructions = ctxt.read_slice(instruction_length)?;
-        budget::charge_allocation(instructions.len())
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::charge_allocation(instructions.len()).map_err(|_| ParseError::LimitExceeded)?;
         let instructions = Box::from(instructions);
 
         Ok(CompositeGlyph {
@@ -824,19 +821,11 @@ impl SimpleGlyphFlagExt for SimpleGlyphFlags {
     }
 
     fn x_short_sign(self) -> i16 {
-        if self.x_is_same_or_positive() {
-            1
-        } else {
-            -1
-        }
+        if self.x_is_same_or_positive() { 1 } else { -1 }
     }
 
     fn y_short_sign(self) -> i16 {
-        if self.y_is_same_or_positive() {
-            1
-        } else {
-            -1
-        }
+        if self.y_is_same_or_positive() { 1 } else { -1 }
     }
 
     fn x_is_same_or_positive(self) -> bool {
@@ -947,13 +936,13 @@ impl WriteBinary for CompositeGlyphScale {
             CompositeGlyphScale::XY { x_scale, y_scale } => {
                 F2Dot14::write(ctxt, x_scale)?;
                 F2Dot14::write(ctxt, y_scale)?;
-            }
+            },
             CompositeGlyphScale::Matrix(matrix) => {
                 F2Dot14::write(ctxt, matrix[0][0])?;
                 F2Dot14::write(ctxt, matrix[0][1])?;
                 F2Dot14::write(ctxt, matrix[1][0])?;
                 F2Dot14::write(ctxt, matrix[1][1])?;
-            }
+            },
         }
 
         Ok(())
@@ -1217,7 +1206,7 @@ impl GlyfRecord<'_> {
                     }
                     Ok(count)
                 }
-            }
+            },
             GlyfRecord::Parsed(glyph) => glyph.number_of_points(),
         }
     }
@@ -1238,7 +1227,7 @@ impl GlyfRecord<'_> {
 
 fn charge_glyph_clone(glyph: &Glyph) -> Result<(), ParseError> {
     match glyph {
-        Glyph::Empty(_) => {}
+        Glyph::Empty(_) => {},
         Glyph::Simple(simple) => {
             budget::charge_allocation(
                 simple
@@ -1262,7 +1251,7 @@ fn charge_glyph_clone(glyph: &Glyph) -> Result<(), ParseError> {
                 budget::charge_allocation(size_of::<PhantomPoints>())
                     .map_err(|_| ParseError::LimitExceeded)?;
             }
-        }
+        },
         Glyph::Composite(composite) => {
             budget::charge_allocation(
                 composite
@@ -1278,7 +1267,7 @@ fn charge_glyph_clone(glyph: &Glyph) -> Result<(), ParseError> {
                 budget::charge_allocation(size_of::<PhantomPoints>())
                     .map_err(|_| ParseError::LimitExceeded)?;
             }
-        }
+        },
     }
     Ok(())
 }
@@ -1476,11 +1465,11 @@ impl From<CompositeGlyphScale> for Matrix2x2F {
             CompositeGlyphScale::Scale(scale) => {
                 let scale = f32::from(scale);
                 Matrix2x2F::from_scale(scale)
-            }
+            },
             CompositeGlyphScale::XY { x_scale, y_scale } => {
                 let scale = Vector2F::new(f32::from(x_scale), f32::from(y_scale));
                 Matrix2x2F::from_scale(scale)
-            }
+            },
             CompositeGlyphScale::Matrix(matrix) => Matrix2x2F::row_major(
                 f32::from(matrix[0][0]),
                 f32::from(matrix[0][1]),
@@ -1660,7 +1649,7 @@ mod tests {
         match ReadScope::new(buffer.bytes()).read::<Glyph>() {
             Ok(Glyph::Composite(CompositeGlyph { instructions, .. })) => {
                 assert_eq!(&*instructions, vec![1, 2, 3, 4].as_slice())
-            }
+            },
             _ => panic!("did not read back expected instructions"),
         }
     }
@@ -1763,9 +1752,11 @@ mod tests {
         let loca = ReadScope::new(&loca_data)
             .read_dep::<LocaTable<'_>>((num_glyphs, IndexToLocFormat::Long))
             .expect("unable to read loca");
-        assert!(ReadScope::new(&glyph_data)
-            .read_dep::<GlyfTable<'_>>(&loca)
-            .is_ok())
+        assert!(
+            ReadScope::new(&glyph_data)
+                .read_dep::<GlyfTable<'_>>(&loca)
+                .is_ok()
+        )
     }
 
     // This is a test for a bug in which a composite glyph read with has_instructions = yes, but
@@ -1783,7 +1774,7 @@ mod tests {
         match ReadScope::new(buffer.bytes()).read::<Glyph>() {
             Ok(Glyph::Composite(CompositeGlyph { instructions, .. })) => {
                 assert_eq!(instructions, Box::default())
-            }
+            },
             Ok(_) => panic!("did not read back expected glyph"),
             Err(_) => panic!("unable to read back glyph"),
         }

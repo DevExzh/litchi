@@ -14,9 +14,7 @@ use litchi_rtf::{EmbeddedObject, ObjectKind, ObjectResultKind, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -155,7 +153,10 @@ fn rejects_hostile_object_destination_grammar() {
         r"{\rtf1{\object\objemb{\*\objclass X{\object}}{\*\objdata 00}}}",
         r"{\rtf1\intbl{\object\objemb{\*\objdata 00}}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
 }
 
@@ -200,7 +201,10 @@ fn rejects_misplaced_object_alias_and_section_destinations() {
         // Metadata after the CLSID.
         r"{\rtf1{\object\objemb{\*\oleclsid X}{\*\objalias A}{\*\objdata 00}}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
 }
 
@@ -245,6 +249,9 @@ fn rejects_misplaced_object_time_destinations() {
         // Active non-time control in the destination.
         r"{\rtf1{\object\objemb{\*\objtime \b\yr1994}{\*\objdata 00}}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
 }

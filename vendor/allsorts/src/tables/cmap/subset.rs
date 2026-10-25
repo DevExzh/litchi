@@ -7,9 +7,9 @@ use crate::error::ParseError;
 use crate::font::Encoding;
 use crate::macroman::{char_to_macroman, is_macroman, macroman_to_char};
 use crate::subset::{CmapTarget, SubsetGlyphs};
-use crate::tables::cmap::{owned, Cmap, EncodingId, PlatformId, SequentialMapGroup};
+use crate::tables::cmap::{Cmap, EncodingId, PlatformId, SequentialMapGroup, owned};
 use crate::tables::os2::{self, Os2};
-use crate::tables::{cmap, FontTableProvider};
+use crate::tables::{FontTableProvider, cmap};
 use crate::tag;
 
 pub struct MappingsToKeep<T> {
@@ -137,8 +137,7 @@ impl<'a> CmapSubtableFormat4Segment<'a> {
                 // if there's a gap then the glyph ids can't be consecutive
                 self.consecutive_glyph_ids = false;
             }
-            budget::reserve_vec(self.glyph_ids, 1)
-                .map_err(|_| ParseError::LimitExceeded)?;
+            budget::reserve_vec(self.glyph_ids, 1).map_err(|_| ParseError::LimitExceeded)?;
             self.glyph_ids.push(gid);
             self.end = ch;
             Ok(true)
@@ -188,8 +187,7 @@ impl owned::CmapSubtableFormat4 {
             for (ch, gid) in mappings.iter().skip(1) {
                 if !segment.add(ch.as_u32(), gid)? {
                     table.add_segment(segment, &mut id_range_offset_fixup_indices)?;
-                    segment =
-                        CmapSubtableFormat4Segment::new(ch.as_u32(), gid, &mut glyph_ids)?;
+                    segment = CmapSubtableFormat4Segment::new(ch.as_u32(), gid, &mut glyph_ids)?;
                 }
             }
 
@@ -214,9 +212,7 @@ impl owned::CmapSubtableFormat4 {
                 .and_then(|count| count.checked_sub(index))
                 .ok_or(ParseError::LimitExceeded)?;
             // ×2 because we need to skip over `count` 16-bit values
-            let offset = count
-                .checked_mul(2)
-                .ok_or(ParseError::LimitExceeded)?;
+            let offset = count.checked_mul(2).ok_or(ParseError::LimitExceeded)?;
             *id_range_offset = u16::try_from(offset).map_err(|_| ParseError::LimitExceeded)?;
         }
 
@@ -228,10 +224,8 @@ impl owned::CmapSubtableFormat4 {
         segment: CmapSubtableFormat4Segment<'_>,
         id_range_offset_fixups: &mut Vec<usize>,
     ) -> Result<(), ParseError> {
-        budget::reserve_vec(&mut self.start_codes, 1)
-            .map_err(|_| ParseError::LimitExceeded)?;
-        budget::reserve_vec(&mut self.end_codes, 1)
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::reserve_vec(&mut self.start_codes, 1).map_err(|_| ParseError::LimitExceeded)?;
+        budget::reserve_vec(&mut self.end_codes, 1).map_err(|_| ParseError::LimitExceeded)?;
         self.start_codes.push(segment.start as u16);
         self.end_codes.push(segment.end as u16);
 
@@ -244,16 +238,14 @@ impl owned::CmapSubtableFormat4 {
             // NOTE: casting start to i32 is safe as format 4 can only hold Unicode BMP chars,
             // which are 16-bit values. Casting the result to i16 is safe because the calculation
             // is modulo 0x10000 (65536), which limits the value to ±0x10000.
-            budget::reserve_vec(&mut self.id_deltas, 1)
-                .map_err(|_| ParseError::LimitExceeded)?;
+            budget::reserve_vec(&mut self.id_deltas, 1).map_err(|_| ParseError::LimitExceeded)?;
             self.id_deltas
                 .push((i32::from(first_glyph_id) - segment.start as i32 % 0x10000) as i16);
             budget::reserve_vec(&mut self.id_range_offsets, 1)
                 .map_err(|_| ParseError::LimitExceeded)?;
             self.id_range_offsets.push(0);
         } else {
-            budget::reserve_vec(&mut self.id_deltas, 1)
-                .map_err(|_| ParseError::LimitExceeded)?;
+            budget::reserve_vec(&mut self.id_deltas, 1).map_err(|_| ParseError::LimitExceeded)?;
             // Glyph ids are not consecutive so store them in the glyph id array via id range
             // offsets
             self.id_deltas.push(0);
@@ -330,7 +322,7 @@ impl owned::EncodingRecord {
                         // NOTE(unwrap): Safe as we verified all chars with `is_macroman` earlier
                         Character::Unicode(unicode) => {
                             usize::from(char_to_macroman(unicode).unwrap())
-                        }
+                        },
                         Character::Symbol(_) => unreachable!("symbol in mac roman"),
                     };
                     // Cast is safe as we determined that all chars are valid in Mac Roman
@@ -347,7 +339,7 @@ impl owned::EncodingRecord {
                     encoding_id: EncodingId::MACINTOSH_APPLE_ROMAN,
                     sub_table,
                 })
-            }
+            },
             CharExistence::BasicMultilingualPlane => {
                 let sub_table = cmap::owned::CmapSubtable::Format4(
                     owned::CmapSubtableFormat4::from_mappings(mappings)?,
@@ -357,7 +349,7 @@ impl owned::EncodingRecord {
                     encoding_id: EncodingId::UNICODE_BMP,
                     sub_table,
                 })
-            }
+            },
             CharExistence::AstralPlane => {
                 let sub_table = cmap::owned::CmapSubtable::Format12(
                     owned::CmapSubtableFormat12::from_mappings(mappings)?,
@@ -367,7 +359,7 @@ impl owned::EncodingRecord {
                     encoding_id: EncodingId::UNICODE_FULL,
                     sub_table,
                 })
-            }
+            },
             CharExistence::DivinePlane => {
                 let sub_table = cmap::owned::CmapSubtable::Format4(
                     owned::CmapSubtableFormat4::from_mappings(mappings)?,
@@ -377,7 +369,7 @@ impl owned::EncodingRecord {
                     encoding_id: EncodingId::WINDOWS_SYMBOL,
                     sub_table,
                 })
-            }
+            },
         }
     }
 }
@@ -471,15 +463,15 @@ impl MappingsToKeep<OldIds> {
                                     let order = source_order;
                                     source_order = next;
                                     order
-                                }
+                                },
                                 None => {
                                     allocation_error = Some(ParseError::LimitExceeded);
                                     return;
-                                }
+                                },
                             };
                             mappings_to_keep.push((output_char, gid, order));
                         }
-                    }
+                    },
                     CmapTarget::Unicode | CmapTarget::Unrestricted => {
                         if output_char.existence() > plane {
                             plane = output_char.existence();
@@ -493,14 +485,14 @@ impl MappingsToKeep<OldIds> {
                                 let order = source_order;
                                 source_order = next;
                                 order
-                            }
+                            },
                             None => {
                                 allocation_error = Some(ParseError::LimitExceeded);
                                 return;
-                            }
+                            },
                         };
                         mappings_to_keep.push((output_char, gid, order));
-                    }
+                    },
                 }
             }
         })?;
@@ -624,7 +616,10 @@ mod tests {
         ])
         .unwrap();
 
-        assert_eq!(mappings, vec![(Character::Unicode('a'), 9), (Character::Unicode('b'), 4)]);
+        assert_eq!(
+            mappings,
+            vec![(Character::Unicode('a'), 9), (Character::Unicode('b'), 4)]
+        );
     }
 
     #[test]

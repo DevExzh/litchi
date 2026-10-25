@@ -14,9 +14,7 @@ use std::fs;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -44,7 +42,8 @@ fn parses_complete_typed_info_and_round_trips_without_body_leakage() {
     assert_eq!(info.pages, Some(8));
     assert_eq!(document.text(), "Body");
 
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.info(), info);
     assert_eq!(reparsed.text(), "Body");
 }
@@ -103,11 +102,17 @@ fn rejects_ambiguous_or_malformed_known_info_metadata() {
         r"{\rtf1{\info}{\info}}",
     ];
     for rtf in cases {
-        assert!(Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {rtf}");
+        assert!(
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {rtf}"
+        );
     }
 
-    let invalid_calendar =
-        Tree::parse(r"{\rtf1{\info{\creatim\yr2023\mo2\dy29}{\revtim\hr24}}}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let invalid_calendar = Tree::parse(
+        r"{\rtf1{\info{\creatim\yr2023\mo2\dy29}{\revtim\hr24}}}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(
         !invalid_calendar
             .info()
@@ -169,7 +174,8 @@ fn preserves_libreoffice_zero_timestamp_sentinels() {
     assert!(!revision.is_valid());
     assert!(!printed.is_valid());
 
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.info().revision_timestamp, Some(revision));
     assert_eq!(reparsed.info().print_timestamp, Some(printed));
 }

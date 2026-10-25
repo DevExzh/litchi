@@ -14,9 +14,7 @@ use litchi_rtf::{DocumentRevisionPolicies, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -52,7 +50,8 @@ fn omission_remains_unspecified_and_is_not_serialized() {
 
 #[test]
 fn typed_api_round_trips_in_stable_order_and_clears_without_creating_revisions() {
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_revision_policies(DocumentRevisionPolicies {
         track_moves: Some(true),
         track_formatting: Some(false),
@@ -74,10 +73,13 @@ fn typed_api_round_trips_in_stable_order_and_clears_without_creating_revisions()
 
 #[test]
 fn coexists_with_embedding_and_xml_policies_as_independent_metadata() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\trackformatting1\validatexml0\donotembedsysfont1"#,
-        r#"\trackmoves0\showxmlerrors1 Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\trackformatting1\validatexml0\donotembedsysfont1"#,
+            r#"\trackmoves0\showxmlerrors1 Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let output = write(&document);
     let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
@@ -93,13 +95,19 @@ fn rejects_missing_non_boolean_overflow_and_duplicate_values() {
         for suffix in ["", "-1", "2", "32767", "99999999999"] {
             let source = format!(r"{{\rtf1\{name}{suffix} Body}}");
             assert!(
-                repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                    &source,
+                    litchi_rtf::read::OpenOptions::default()
+                )),
                 "accepted malformed {source}"
             );
         }
         let source = format!(r"{{\rtf1\{name}0\{name}1 Body}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                &source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted duplicate {source}"
         );
     }
@@ -113,7 +121,10 @@ fn rejects_every_starred_grouped_and_late_revision_policy() {
             format!(r"{{\rtf1{{{control}}}Body}}"),
             format!(r"{{\rtf1 Body{control}}}"),
         ] {
-            assert!(Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+            assert!(
+                Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+                "accepted malformed {source}"
+            );
         }
     }
 }

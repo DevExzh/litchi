@@ -1,8 +1,8 @@
 use crate::CRC32_INITIAL_VALUE;
 use core::arch::x86_64::{
-    __m512i, _mm512_clmulepi64_epi128, _mm512_extracti32x4_epi32, _mm512_inserti32x4,
-    _mm512_loadu_si512, _mm512_set4_epi32, _mm512_setzero_si512, _mm512_storeu_si512,
-    _mm512_ternarylogic_epi32, _mm512_xor_si512, _mm512_zextsi128_si512, _mm_cvtsi32_si128,
+    __m512i, _mm_cvtsi32_si128, _mm512_clmulepi64_epi128, _mm512_extracti32x4_epi32,
+    _mm512_inserti32x4, _mm512_loadu_si512, _mm512_set4_epi32, _mm512_setzero_si512,
+    _mm512_storeu_si512, _mm512_ternarylogic_epi32, _mm512_xor_si512, _mm512_zextsi128_si512,
 };
 
 impl super::pclmulqdq::Accumulator {

@@ -9,14 +9,13 @@
 
 use litchi_rtf::raw::Tree;
 use litchi_rtf::{
-    MAX_SECTION_LINE_GRID_TWIPS, write::Writer, Section, SectionDocumentGrid, SectionDocumentGridType,
+    MAX_SECTION_LINE_GRID_TWIPS, Section, SectionDocumentGrid, SectionDocumentGridType,
+    write::Writer,
 };
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -90,19 +89,31 @@ fn parses_all_grid_types() {
 
 #[test]
 fn preserves_missing_parameter_default_and_sectd_reset() {
-    let bare = Tree::parse(r"{\rtf1\sectlinegrid X}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let bare = Tree::parse(
+        r"{\rtf1\sectlinegrid X}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         bare.sections()[0].properties.document_grid.line_grid,
         Some(360)
     );
 
-    let zero = Tree::parse(r"{\rtf1\sectlinegrid0 X}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let zero = Tree::parse(
+        r"{\rtf1\sectlinegrid0 X}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         zero.sections()[0].properties.document_grid.line_grid,
         Some(0)
     );
 
-    let reset = Tree::parse(r"{\rtf1\sectlinegrid312\sectspecifycl X\sectd Y}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reset = Tree::parse(
+        r"{\rtf1\sectlinegrid312\sectspecifycl X\sectd Y}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(reset.sections()[0].properties.document_grid.is_empty());
 }
 
@@ -136,7 +147,10 @@ fn rejects_out_of_range_pitch_and_invalid_public_writer_state() {
             MAX_SECTION_LINE_GRID_TWIPS + 1
         ),
     ] {
-        assert!(Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 
     let mut section = Section::new();

@@ -14,18 +14,19 @@ use litchi_rtf::{DocumentDrawingGrid, DrawingGridLineInterval, DrawingGridSpacin
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_a_complete_producer_style_grid() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\dgmargin\dghspace180\dgvspace180\dghorigin1440"#,
-        r#"\dgvorigin1440\dghshow1\dgvshow1 Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\dgmargin\dghspace180\dgvspace180\dghorigin1440"#,
+            r#"\dgvorigin1440\dghshow1\dgvshow1 Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert_eq!(
         *document.drawing_grid(),
@@ -69,7 +70,8 @@ fn omission_is_distinct_from_all_effective_defaults() {
 
 #[test]
 fn typed_api_round_trips_boundaries_flags_and_canonical_order() {
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_drawing_grid(DocumentDrawingGrid {
         follows_margins: true,
         snap_to_grid: true,
@@ -108,10 +110,13 @@ fn typed_api_round_trips_boundaries_flags_and_canonical_order() {
 
 #[test]
 fn coexists_with_rendering_and_processing_properties_without_side_effects() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1\dgvshow2\jcompress\grfdocevents0\dgmargin"#,
-        r#"\dghspace120\horzdoc\dgsnap\fracwidth Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1\dgvshow2\jcompress\grfdocevents0\dgmargin"#,
+            r#"\dghspace120\horzdoc\dgsnap\fracwidth Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let output = write(&document);
     let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
@@ -159,7 +164,10 @@ fn rejects_parameters_missing_values_ranges_overflow_and_duplicates() {
         r"{\rtf1\dgvshow1\dgvshow2 Body}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted malformed {source}"
         );
     }
@@ -182,7 +190,10 @@ fn rejects_every_starred_grouped_and_late_grid_control() {
             format!(r"{{\rtf1{{{control}}}Body}}"),
             format!(r"{{\rtf1 Body{control}}}"),
         ] {
-            assert!(Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+            assert!(
+                Tree::parse(&source, litchi_rtf::read::OpenOptions::default()).is_err(),
+                "accepted malformed {source}"
+            );
         }
     }
 }

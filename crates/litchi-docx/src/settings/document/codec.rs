@@ -837,10 +837,7 @@ fn settings_patch_buffer(capacity: usize) -> Result<Vec<u8>> {
     Ok(output)
 }
 
-fn settings_patch_buffer_with_limits(
-    capacity: usize,
-    limits: &MceLimits,
-) -> Result<Vec<u8>> {
+fn settings_patch_buffer_with_limits(capacity: usize, limits: &MceLimits) -> Result<Vec<u8>> {
     if capacity > limits.max_output_bytes {
         return Err(Error::MailMergeLimit {
             kind: crate::mail_merge::LimitKind::XmlBytes,

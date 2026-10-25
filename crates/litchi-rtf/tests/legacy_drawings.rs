@@ -87,15 +87,11 @@ fn parses_all_simple_primitives_and_round_trips_canonically() {
     assert_eq!(points.len(), 3);
 
     let mut first = Vec::new();
-    Writer::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.legacy_drawings(), document.legacy_drawings());
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -169,7 +165,11 @@ fn parses_named_libreoffice_primitive_fixtures() {
     let group = include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf91684.rtf"
     );
-    let document = Tree::parse_bytes(&isolated_drawing(group), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse_bytes(
+        &isolated_drawing(group),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let LegacyDrawingPrimitive::Group { children, .. } = &document.legacy_drawings()[0].primitive
     else {
         panic!()

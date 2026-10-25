@@ -40,56 +40,56 @@ pub(crate) mod writer {
         match value {
             TtfType::Raw(bytes) => {
                 data.extend_from_slice(bytes);
-            }
+            },
             TtfType::TrueTypeMagic => {
                 data.extend_from_slice(&[0x00, 0x01, 0x00, 0x00]);
-            }
+            },
             TtfType::OpenTypeMagic => {
                 data.extend_from_slice(&[0x4F, 0x54, 0x54, 0x4F]);
-            }
+            },
             TtfType::FontCollectionMagic => {
                 data.extend_from_slice(&[0x74, 0x74, 0x63, 0x66]);
-            }
+            },
             TtfType::Int8(n) => {
                 data.extend_from_slice(&i8::to_be_bytes(n));
-            }
+            },
             TtfType::UInt8(n) => {
                 data.extend_from_slice(&u8::to_be_bytes(n));
-            }
+            },
             TtfType::Int16(n) => {
                 data.extend_from_slice(&i16::to_be_bytes(n));
-            }
+            },
             TtfType::UInt16(n) => {
                 data.extend_from_slice(&u16::to_be_bytes(n));
-            }
+            },
             TtfType::Int32(n) => {
                 data.extend_from_slice(&i32::to_be_bytes(n));
-            }
+            },
             TtfType::UInt32(n) => {
                 data.extend_from_slice(&u32::to_be_bytes(n));
-            }
+            },
             TtfType::CFFInt(n) => match n {
                 -107..=107 => {
                     data.push((n as i16 + 139) as u8);
-                }
+                },
                 108..=1131 => {
                     let n = n - 108;
                     data.push(((n >> 8) + 247) as u8);
                     data.push((n & 0xFF) as u8);
-                }
+                },
                 -1131..=-108 => {
                     let n = -n - 108;
                     data.push(((n >> 8) + 251) as u8);
                     data.push((n & 0xFF) as u8);
-                }
+                },
                 -32768..=32767 => {
                     data.push(28);
                     data.extend_from_slice(&i16::to_be_bytes(n as i16));
-                }
+                },
                 _ => {
                     data.push(29);
                     data.extend_from_slice(&i32::to_be_bytes(n));
-                }
+                },
             },
         }
     }

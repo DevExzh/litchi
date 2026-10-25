@@ -47,12 +47,8 @@ impl Recipients {
                 "mail-merge recipient-data part cannot have relationships",
             ));
         }
-        let processed = process_markup_compatibility(
-            part.blob(),
-            &Capabilities::default(),
-            limits,
-        )
-        .map_err(crate::Error::Mce)?;
+        let processed = process_markup_compatibility(part.blob(), &Capabilities::default(), limits)
+            .map_err(crate::Error::Mce)?;
         Self::parse_xml(processed.xml.as_ref(), limits)
     }
 }

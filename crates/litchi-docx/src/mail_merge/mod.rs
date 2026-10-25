@@ -28,8 +28,8 @@ pub use codec::parse_settings_mail_merge;
 pub(crate) use codec::{
     parse_settings_mail_merge_processed, parse_settings_mail_merge_with_mce_limits,
 };
-pub(crate) use limit::mce_limits_for_source;
 pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+pub(crate) use limit::mce_limits_for_source;
 pub use model::{
     Conformance, DataSourceObject, DataType, Destination, FieldMap, FieldMappingType,
     MainDocumentType, Recipient, Recipients, RelationshipId, Settings,

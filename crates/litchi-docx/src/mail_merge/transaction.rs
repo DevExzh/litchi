@@ -253,7 +253,8 @@ impl Transaction {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn commit(self) -> Result<Commit> {
-        self.settings.to_xml(self.original.conformance, &self.original.limits)?;
+        self.settings
+            .to_xml(self.original.conformance, &self.original.limits)?;
         let semantic_changed =
             self.settings != self.original.settings || self.recipients != self.original.recipients;
         if !semantic_changed {

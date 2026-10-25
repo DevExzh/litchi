@@ -10,13 +10,11 @@
 use std::borrow::Cow;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{PictureShapeProperties, write::Writer, ShapeProperty};
+use litchi_rtf::{PictureShapeProperties, ShapeProperty, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -58,9 +56,11 @@ fn parses_real_libreoffice_metro_blob_and_reuses_its_payload() {
     assert!(payload.starts_with(b"PK\x03\x04"));
     assert!(payload.len() > 1_000);
 
-    let mut document =
-        Tree::parse(r"{\rtf1{\*\shppict{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}Body}", litchi_rtf::read::OpenOptions::default())
-            .unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1{\*\shppict{\pict\pngblip\picw1\pich1 89504e470d0a1a0a}}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let payload_ptr = payload.as_ptr();
     document
         .set_picture_shape_properties(
@@ -117,7 +117,8 @@ fn parses_real_libreoffice_metro_blob_and_reuses_its_payload() {
 
 #[test]
 fn round_trips_binary_background_property_canonically() {
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut shape = litchi_rtf::Shape::new(litchi_rtf::ShapeType::Rectangle);
     shape.properties.push(ShapeProperty::new_binary(
         Cow::Borrowed("pInkData"),
@@ -162,7 +163,10 @@ fn rejects_hostile_shape_binary_value_grammar() {
         r"{\rtf1{\pict{\*\picprop{\sp{\sn{\*\svb 00}}{\sv 1}}}\pngblip 89504e470d0a1a0a}}",
         r"{\rtf1{\pict{\*\picprop{\sp{\sn x}{\sv\svb 00}}}\pngblip 89504e470d0a1a0a}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
 }
 

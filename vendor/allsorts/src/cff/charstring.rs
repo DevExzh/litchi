@@ -4,6 +4,7 @@ use std::fmt::{self, Write};
 
 pub use argstack::ArgumentsStack;
 
+use crate::GlyphId;
 use crate::binary::budget;
 use crate::binary::read::{ReadCtxt, ReadScope};
 use crate::binary::write::{WriteBinary, WriteBuffer, WriteContext, WriteCounter};
@@ -11,11 +12,10 @@ use crate::binary::{I16Be, U8};
 use crate::cff;
 use crate::cff::cff2::BlendOperand;
 use crate::error::{ParseError, WriteError};
-use crate::tables::variable_fonts::{ItemVariationStore, OwnedTuple};
 use crate::tables::Fixed;
-use crate::GlyphId;
+use crate::tables::variable_fonts::{ItemVariationStore, OwnedTuple};
 
-use super::{cff2, CFFError, CFFFont, CFFVariant, MaybeOwnedIndex, Operator};
+use super::{CFFError, CFFFont, CFFVariant, MaybeOwnedIndex, Operator, cff2};
 
 mod argstack;
 
@@ -418,7 +418,7 @@ impl fmt::Display for CharStringConversionError {
         match self {
             CharStringConversionError::Write(err) => {
                 write!(f, "unable to convert charstring: {err}")
-            }
+            },
             CharStringConversionError::Cff(err) => write!(f, "unable to convert charstring: {err}"),
         }
     }
@@ -458,12 +458,12 @@ impl<C: WriteContext> CharStringVisitor<cff2::StackValue, CharStringConversionEr
                 self.maybe_write_width()?;
                 cff2::write_stack(&mut *self.buffer, stack)?;
                 Ok(U8::write(&mut *self.buffer, op)?)
-            }
+            },
 
             VisitOp::Return | VisitOp::Endchar => {
                 // Should not be encountered in CFF2
                 Err(CFFError::InvalidOperator.into())
-            }
+            },
 
             VisitOp::LineTo
             | VisitOp::HorizontalLineTo
@@ -480,18 +480,18 @@ impl<C: WriteContext> CharStringVisitor<cff2::StackValue, CharStringConversionEr
                 }
                 cff2::write_stack(&mut *self.buffer, stack)?;
                 Ok(U8::write(&mut *self.buffer, op)?)
-            }
+            },
 
             VisitOp::Hflex | VisitOp::Flex | VisitOp::Hflex1 | VisitOp::Flex1 => {
                 cff2::write_stack(&mut *self.buffer, stack)?;
                 U8::write(&mut *self.buffer, TWO_BYTE_OPERATOR_MARK)?;
                 Ok(U8::write(&mut *self.buffer, op)?)
-            }
+            },
             VisitOp::VsIndex | VisitOp::Blend => {
                 // Should not be encountered when converting CharStrings. CharString should
                 // not be variable.
                 Err(CFFError::InvalidOperator.into())
-            }
+            },
         }
     }
 
@@ -507,7 +507,7 @@ impl<C: WriteContext> CharStringVisitor<cff2::StackValue, CharStringConversionEr
                     &mut *self.buffer,
                     operator::CALL_LOCAL_SUBROUTINE,
                 )?)
-            }
+            },
             SubroutineIndex::Global(index) => {
                 cff2::write_stack_value(
                     cff2::StackValue::Int(index.try_into().map_err(ParseError::from)?),
@@ -517,7 +517,7 @@ impl<C: WriteContext> CharStringVisitor<cff2::StackValue, CharStringConversionEr
                     &mut *self.buffer,
                     operator::CALL_GLOBAL_SUBROUTINE,
                 )?)
-            }
+            },
         }
     }
 
@@ -776,7 +776,7 @@ impl<'a, 'data> CharStringVisitorContext<'a, 'data> {
                 0 | 2 | 9 | 13 | 17 => {
                     // Reserved.
                     return Err(CFFError::InvalidOperator.into());
-                }
+                },
                 operator::HORIZONTAL_STEM
                 | operator::VERTICAL_STEM
                 | operator::HORIZONTAL_STEM_HINT_MASK
@@ -794,19 +794,19 @@ impl<'a, 'data> CharStringVisitorContext<'a, 'data> {
                     // We are ignoring the hint operators.
                     visitor.visit(op.try_into().unwrap(), stack)?;
                     stack.clear();
-                }
+                },
                 operator::VERTICAL_MOVE_TO => {
                     let offset = self.handle_width(stack.len() == 2 && !self.width_parsed);
                     stack.offset(offset, |stack| visitor.visit(op.try_into().unwrap(), stack))?;
                     stack.clear();
-                }
+                },
                 operator::LINE_TO
                 | operator::HORIZONTAL_LINE_TO
                 | operator::VERTICAL_LINE_TO
                 | operator::CURVE_TO => {
                     visitor.visit(op.try_into().unwrap(), stack)?;
                     stack.clear();
-                }
+                },
                 operator::CALL_LOCAL_SUBROUTINE => {
                     if stack.is_empty() {
                         return Err(CFFError::InvalidArgumentsStackLength.into());
@@ -859,19 +859,19 @@ impl<'a, 'data> CharStringVisitorContext<'a, 'data> {
 
                         break;
                     }
-                }
+                },
                 operator::RETURN => {
                     match font {
                         CFFFont::CFF(_) => {
                             visitor.visit(op.try_into().unwrap(), stack)?;
                             break;
-                        }
+                        },
                         CFFFont::CFF2(_) => {
                             // Removed in CFF2
                             return Err(CFFError::InvalidOperator.into());
-                        }
+                        },
                     }
-                }
+                },
                 TWO_BYTE_OPERATOR_MARK => {
                     // flex
                     let op2 = s.read::<U8>()?;
@@ -879,10 +879,10 @@ impl<'a, 'data> CharStringVisitorContext<'a, 'data> {
                         operator::HFLEX | operator::FLEX | operator::HFLEX1 | operator::FLEX1 => {
                             visitor.visit(op2.try_into().unwrap(), stack)?;
                             stack.clear()
-                        }
+                        },
                         _ => return Err(CFFError::UnsupportedOperator.into()),
                     }
-                }
+                },
                 operator::ENDCHAR => {
                     match font {
                         CFFFont::CFF(cff) => {
@@ -941,19 +941,19 @@ impl<'a, 'data> CharStringVisitorContext<'a, 'data> {
                             self.has_endchar = true;
                             visitor.visit(op.try_into().unwrap(), stack)?;
                             break;
-                        }
+                        },
                         CFFFont::CFF2(_) => {
                             // Removed in CFF2
                             return Err(CFFError::InvalidOperator.into());
-                        }
+                        },
                     }
-                }
+                },
                 operator::VS_INDEX => {
                     match font {
                         CFFFont::CFF(_) => {
                             // Added in CFF2
                             return Err(CFFError::InvalidOperator.into());
-                        }
+                        },
                         CFFFont::CFF2(_) => {
                             // When used, vsindex must precede the first blend operator,
                             // and may occur only once in the CharString.
@@ -972,15 +972,15 @@ impl<'a, 'data> CharStringVisitorContext<'a, 'data> {
                                     .ok_or(CFFError::InvalidArgumentsStackLength)?;
                                 self.vsindex = Some(item_variation_data_index);
                             }
-                        }
+                        },
                     }
-                }
+                },
                 operator::BLEND => {
                     match font {
                         CFFFont::CFF(_) => {
                             // Added in CFF2
                             return Err(CFFError::InvalidOperator.into());
-                        }
+                        },
                         CFFFont::CFF2(font) => {
                             let Some(var) = self.variable else {
                                 return Err(CFFError::MissingVariationStore.into());
@@ -1009,16 +1009,16 @@ impl<'a, 'data> CharStringVisitorContext<'a, 'data> {
                                             var.instance,
                                         )?);
                                         self.scalars.as_ref().unwrap()
-                                    }
+                                    },
                                 };
 
                                 cff2::blend(scalars, stack)?;
                             } else {
                                 return Err(CFFError::InvalidArgumentsStackLength.into());
                             }
-                        }
+                        },
                     }
-                }
+                },
                 operator::HINT_MASK | operator::COUNTER_MASK => {
                     let mut len = stack.len();
                     let visit_op = op.try_into().unwrap();
@@ -1050,17 +1050,17 @@ impl<'a, 'data> CharStringVisitorContext<'a, 'data> {
                             .map_err(|_| ParseError::LimitExceeded)?;
                     }
                     visitor.hint_data(visit_op, hints)?;
-                }
+                },
                 operator::MOVE_TO => {
                     let offset = self.handle_width(stack.len() == 3 && !self.width_parsed);
                     stack.offset(offset, |stack| visitor.visit(op.try_into().unwrap(), stack))?;
                     stack.clear();
-                }
+                },
                 operator::HORIZONTAL_MOVE_TO => {
                     let offset = self.handle_width(stack.len() == 2 && !self.width_parsed);
                     stack.offset(offset, |stack| visitor.visit(op.try_into().unwrap(), stack))?;
                     stack.clear();
-                }
+                },
                 operator::CURVE_LINE
                 | operator::LINE_CURVE
                 | operator::VV_CURVE_TO
@@ -1069,11 +1069,11 @@ impl<'a, 'data> CharStringVisitorContext<'a, 'data> {
                 | operator::HV_CURVE_TO => {
                     visitor.visit(op.try_into().unwrap(), stack)?;
                     stack.clear();
-                }
+                },
                 operator::SHORT_INT => {
                     let n = s.read::<I16Be>()?;
                     stack.push(S::from(n))?;
-                }
+                },
                 operator::CALL_GLOBAL_SUBROUTINE => {
                     if stack.is_empty() {
                         return Err(CFFError::InvalidArgumentsStackLength.into());
@@ -1100,19 +1100,19 @@ impl<'a, 'data> CharStringVisitorContext<'a, 'data> {
 
                         break;
                     }
-                }
+                },
                 32..=246 => {
                     stack.push(parse_int1(op)?)?;
-                }
+                },
                 247..=250 => {
                     stack.push(parse_int2(op, &mut s)?)?;
-                }
+                },
                 251..=254 => {
                     stack.push(parse_int3(op, &mut s)?)?;
-                }
+                },
                 operator::FIXED_16_16 => {
                     stack.push(parse_fixed(&mut s)?)?;
-                }
+                },
             }
         }
 
@@ -1203,7 +1203,7 @@ impl fmt::Display for CFFError {
             CFFError::ParseError(parse_error) => {
                 write!(f, "parse error: ")?;
                 parse_error.fmt(f)
-            }
+            },
             CFFError::InvalidOperator => write!(f, "an invalid operator occurred"),
             CFFError::UnsupportedOperator => write!(f, "an unsupported operator occurred"),
             CFFError::MissingEndChar => write!(f, "the 'endchar' operator is missing"),
@@ -1212,7 +1212,7 @@ impl fmt::Display for CFFError {
             CFFError::ArgumentsStackLimitReached => write!(f, "arguments stack limit reached"),
             CFFError::InvalidArgumentsStackLength => {
                 write!(f, "an invalid amount of items are in an arguments stack")
-            }
+            },
             CFFError::BboxOverflow => write!(f, "outline's bounding box is too large"),
             CFFError::MissingMoveTo => write!(f, "missing moveto operator"),
             CFFError::DuplicateVsIndex => write!(f, "duplicate vsindex operator"),

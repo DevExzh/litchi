@@ -4,10 +4,10 @@ use log::debug;
 
 use crate::error::{ComplexScriptError, ParseError, ShapingError};
 use crate::gsub::{self, Feature, FeatureMask, GlyphData, GlyphOrigin, RawGlyph, RawGlyphFlags};
-use crate::layout::{FeatureTableSubstitution, GDEFTable, LayoutCache, LayoutTable, GSUB};
+use crate::layout::{FeatureTableSubstitution, GDEFTable, GSUB, LayoutCache, LayoutTable};
 use crate::scripts::syllable::*;
 use crate::tinyvec::tiny_vec;
-use crate::{tag, DOTTED_CIRCLE};
+use crate::{DOTTED_CIRCLE, tag};
 
 // "A practical maximum cluster length is 31 characters."
 // https://learn.microsoft.com/en-us/typography/script-development/use#cluster-length
@@ -701,7 +701,7 @@ fn shape_syllable(
             initial_reorder_consonant_syllable(shaping_data, syllable)?;
             apply_basic_features(shaping_data, syllable, max_glyphs)?;
             apply_presentation_features(shaping_data, syllable, max_glyphs, extra_features)?;
-        }
+        },
     }
 
     Ok(())
@@ -743,7 +743,7 @@ fn to_myanmar_syllables(mut glyphs: &[RawGlyph<()>]) -> Vec<(Vec<RawGlyphMyanmar
                 let syllable = glyphs[..len].iter().map(to_raw_glyph_myanmar).collect();
                 syllables.push((syllable, syllable_type));
                 len
-            }
+            },
             None => {
                 let invalid_glyph = to_raw_glyph_myanmar(&glyphs[0]);
                 match syllables.last_mut() {
@@ -751,13 +751,13 @@ fn to_myanmar_syllables(mut glyphs: &[RawGlyph<()>]) -> Vec<(Vec<RawGlyphMyanmar
                     // this invalid glyph to that syllable
                     Some((invalid_syllable, Syllable::Broken)) => {
                         invalid_syllable.push(invalid_glyph)
-                    }
+                    },
                     // Collect invalid glyphs
                     _ => syllables.push((vec![invalid_glyph], Syllable::Broken)),
                 }
 
                 1
-            }
+            },
         };
 
         glyphs = &glyphs[len..];
@@ -1283,8 +1283,8 @@ mod tests {
         font::read_cmap_subtable,
         layout::new_layout_cache,
         tables::{
-            cmap::{Cmap, CmapSubtable},
             OffsetTable, OpenTypeData, OpenTypeFont,
+            cmap::{Cmap, CmapSubtable},
         },
         tests::read_fixture_font,
     };
@@ -1434,7 +1434,7 @@ mod tests {
                         syllables.push((syllable, Some(syllable_type)));
 
                         len
-                    }
+                    },
                     None => {
                         let invalid_glyph = input[0];
                         match syllables.last_mut() {
@@ -1446,7 +1446,7 @@ mod tests {
                         }
 
                         1
-                    }
+                    },
                 };
 
                 input = &input[len..];

@@ -3,7 +3,7 @@ use crate::io::{Read, Write};
 use alloc::vec::Vec;
 use core::cmp;
 
-use super::{corrupt, GzBuilder, GzHeader, GzHeaderParser};
+use super::{GzBuilder, GzHeader, GzHeaderParser, corrupt};
 use crate::crc::{Crc, CrcWriter};
 use crate::zio;
 use crate::{Compress, Compression, Decompress, Status};
@@ -356,13 +356,13 @@ impl<W: Write> Write for GzDecoder<W> {
                     } else {
                         Err(err)
                     }
-                }
+                },
                 Ok(_) => {
                     debug_assert!(self.header().is_some());
                     // buf now contains the unread part of the original buf
                     let n = buflen - buf.len();
                     Ok(n)
-                }
+                },
             }
         } else {
             let (n, status) = self.inner.write_with_status(buf)?;
@@ -494,7 +494,7 @@ impl<W: Write> Write for MultiGzDecoder<W> {
                     let w = self.inner.inner.take_inner().into_inner();
                     self.inner = GzDecoder::new(w);
                     self.inner.write(buf)
-                }
+                },
                 res => res,
             }
         }

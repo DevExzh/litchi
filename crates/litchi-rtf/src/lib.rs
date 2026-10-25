@@ -96,16 +96,16 @@ pub use numbering::list;
 // the source layout. New public code should depend on its responsibility
 // module.
 use api::story;
-use codec::{compressed, error, lexer, limits, parser, writer};
 use codec::error::{RtfError, RtfResult};
+use codec::{compressed, error, lexer, limits, parser, writer};
 use content::{equation, form_field, math_properties};
 use drawing::{legacy_drawing, legacy_text_box, object, page_border, picture_compatibility};
+use metadata::info::RtfTimestamp;
 use metadata::{
     custom_xml, data_store, document_origin, document_variable, external_reference, file_table,
     generator, info, mail_merge, smart_tag, theme, user_property, window_caption,
     write_reservation, xml_namespace, xsl_transform,
 };
-use metadata::info::RtfTimestamp;
 use model::{document, types};
 use numbering::{
     generated_list_marker, legacy_numbering, legacy_paragraph_numbering, navigation_entry,

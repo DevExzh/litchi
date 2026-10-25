@@ -1,5 +1,5 @@
-use flate2::read::ZlibEncoder;
 use flate2::Compression;
+use flate2::read::ZlibEncoder;
 use std::fs::File;
 use std::io::prelude::*;
 

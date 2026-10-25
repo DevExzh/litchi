@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{MAX_PARAGRAPH_TAB_STOPS, write::Writer, TabAlignment, TabLeader};
+use litchi_rtf::{MAX_PARAGRAPH_TAB_STOPS, TabAlignment, TabLeader, write::Writer};
 use std::fmt::Write as _;
 
 fn block<'a>(document: &'a Tree<'a>, needle: &str) -> &'a litchi_rtf::StyleBlock<'a> {
@@ -52,7 +52,8 @@ fn parses_libreoffice_paragraph_and_style_tab_fixture() {
         "../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tab-stop-fill-chars.rtf",
     ))
     .unwrap();
-    let leader_document = Tree::parse_bytes(&leader_source, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let leader_document =
+        Tree::parse_bytes(&leader_source, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(leader_document.blocks().iter().any(|block| {
         block
             .paragraph
@@ -106,9 +107,7 @@ fn parses_inherits_resets_and_deterministically_writes_all_tab_forms() {
     );
 
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let written = String::from_utf8(output).unwrap();
     assert!(written.contains(concat!(
         r#"\tqr\tldot\tx720\tqc\tlmdot\tx1440\tqdec\tlhyph\tx2160"#,
@@ -126,8 +125,11 @@ fn parses_inherits_resets_and_deterministically_writes_all_tab_forms() {
 
 #[test]
 fn parses_and_writes_tabs_in_paragraph_styles() {
-    let document =
-        Tree::parse(r"{\rtf1{\stylesheet{\s30\tqr\tldot\tx2552 Body Text 3;}}Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1{\stylesheet{\s30\tqr\tldot\tx2552 Body Text 3;}}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let tabs = document
         .stylesheet()
         .get(30)
@@ -170,7 +172,10 @@ fn rejects_malformed_and_over_limit_tab_definitions() {
         r"{\rtf1\tx2147483648 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }
@@ -184,5 +189,11 @@ fn rejects_malformed_and_over_limit_tab_definitions() {
         &Tree::parse(&over_limit, litchi_rtf::read::OpenOptions::default())
     ));
 
-    assert!(Tree::parse(r"{\rtf1{\*\unknown\tqr1\tx\tlmdot0 ignored}Visible}", litchi_rtf::read::OpenOptions::default()).is_ok());
+    assert!(
+        Tree::parse(
+            r"{\rtf1{\*\unknown\tqr1\tx\tlmdot0 ignored}Visible}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
+    );
 }

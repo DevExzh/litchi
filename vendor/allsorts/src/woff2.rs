@@ -15,18 +15,18 @@ use itertools::Either;
 
 use brotli_decompressor::{Allocator, HuffmanCode, StandardAlloc};
 
-use self::lut::{XYTriplet, COORD_LUT, KNOWN_TABLE_TAGS};
+use self::lut::{COORD_LUT, KNOWN_TABLE_TAGS, XYTriplet};
 use crate::binary::budget;
 use crate::binary::read::{
     ReadArray, ReadArrayCow, ReadBinary, ReadBinaryDep, ReadBuf, ReadCtxt, ReadFrom, ReadScope,
 };
-use crate::binary::{write, I16Be, U16Be, U8};
+use crate::binary::{I16Be, U8, U16Be, write};
 use crate::error::{ParseError, ReadWriteError};
 use crate::tables::glyf::{
     BoundingBox, CompositeGlyph, CompositeGlyphs, GlyfRecord, GlyfTable, Glyph, Point, SimpleGlyph,
     SimpleGlyphFlag, SimpleGlyphFlags,
 };
-use crate::tables::loca::{owned, LocaTable};
+use crate::tables::loca::{LocaTable, owned};
 use crate::tables::{
     FontTableProvider, HeadTable, HheaTable, HmtxTable, IndexToLocFormat, LongHorMetric, MaxpTable,
     SfntVersion, TTCF_MAGIC,
@@ -67,12 +67,12 @@ where
 
     fn alloc_cell(&mut self, len: usize) -> Self::AllocatedMemory {
         match len.checked_mul(size_of::<T>()) {
-            Some(bytes) if budget::charge_allocation(bytes).is_ok() => {}
+            Some(bytes) if budget::charge_allocation(bytes).is_ok() => {},
             Some(_) => return Default::default(),
             None => {
                 budget::fail();
                 return Default::default();
-            }
+            },
         }
         self.inner.alloc_cell(len)
     }
@@ -198,8 +198,7 @@ impl TableStore {
     fn new(table_count: usize) -> Result<Self, ParseError> {
         if budget::current().is_some() {
             let mut tables = Vec::new();
-            budget::reserve_vec(&mut tables, table_count)
-                .map_err(|_| ParseError::LimitExceeded)?;
+            budget::reserve_vec(&mut tables, table_count).map_err(|_| ParseError::LimitExceeded)?;
             Ok(TableStore::Bounded(tables))
         } else {
             Ok(TableStore::Fast(HashMap::with_capacity(table_count)))
@@ -223,19 +222,17 @@ impl TableStore {
         match self {
             TableStore::Fast(tables) => {
                 tables.insert(tag, data);
-            }
+            },
             TableStore::Bounded(tables) => {
-                if let Some((_, old_data)) = tables
-                    .iter_mut()
-                    .find(|(table_tag, _)| *table_tag == tag)
+                if let Some((_, old_data)) =
+                    tables.iter_mut().find(|(table_tag, _)| *table_tag == tag)
                 {
                     *old_data = data;
                 } else {
-                    budget::reserve_for_push(tables)
-                        .map_err(|_| ParseError::LimitExceeded)?;
+                    budget::reserve_for_push(tables).map_err(|_| ParseError::LimitExceeded)?;
                     tables.push((tag, data));
                 }
-            }
+            },
         }
         Ok(())
     }
@@ -268,7 +265,7 @@ impl TableStore {
                     return Err(ParseError::LimitExceeded);
                 }
                 Ok(tables.into_iter().collect())
-            }
+            },
         }
     }
 }
@@ -435,10 +432,8 @@ impl ReadBinary for Woff2Font<'_> {
                 .checked_add(entry.length())
                 .ok_or(ParseError::LimitExceeded)
         })?;
-        let table_data_block = decompress_brotli(
-            Cursor::new(compressed_data),
-            Some(max_table_data),
-        )?;
+        let table_data_block =
+            decompress_brotli(Cursor::new(compressed_data), Some(max_table_data))?;
 
         Ok(Woff2Font {
             scope,
@@ -512,7 +507,7 @@ impl ReadBinary for Woff2Header {
                     priv_offset,
                     priv_length,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -620,8 +615,7 @@ impl ReadBinaryDep for Woff2GlyfTable {
             let mut bbox_bitmap_ctxt = table.bbox_scope.ctxt();
 
             let mut records = Vec::new();
-            budget::reserve_vec(&mut records, num_glyphs)
-                .map_err(|_| ParseError::LimitExceeded)?;
+            budget::reserve_vec(&mut records, num_glyphs).map_err(|_| ParseError::LimitExceeded)?;
             for i in 0..num_glyphs {
                 let number_of_contours = n_contour_ctxt.read_i16be()?;
 
@@ -661,7 +655,7 @@ impl ReadBinaryDep for Woff2GlyfTable {
                             instructions: Box::from(instructions),
                             phantom_points: None,
                         }))
-                    }
+                    },
                     // Simple glyph
                     num if num > 0 => {
                         let mut data = Self::decode_simple_glyph(
@@ -680,7 +674,7 @@ impl ReadBinaryDep for Woff2GlyfTable {
                         data.bounding_box = bounding_box;
 
                         GlyfRecord::Parsed(Glyph::Simple(data))
-                    }
+                    },
                     _ => return Err(ParseError::BadValue),
                 };
 
@@ -749,7 +743,7 @@ impl ReadBinaryDep for Woff2HmtxTable {
                         GlyfRecord::Present { .. } => unreachable!(),
                         GlyfRecord::Parsed(glyph) => {
                             glyph.bounding_box().map(|bbox| bbox.x_min).unwrap_or(0)
-                        }
+                        },
                     });
                 }
                 ReadArrayCow::Owned(lsb)
@@ -770,7 +764,7 @@ impl ReadBinaryDep for Woff2HmtxTable {
                         GlyfRecord::Present { .. } => unreachable!(),
                         GlyfRecord::Parsed(glyph) => {
                             glyph.bounding_box().map(|bbox| bbox.x_min).unwrap_or(0)
-                        }
+                        },
                     });
                 }
                 ReadArrayCow::Owned(left_side_bearings)
@@ -780,10 +774,7 @@ impl ReadBinaryDep for Woff2HmtxTable {
             budget::reserve_vec(&mut h_metrics, lsb.len().min(num_h_metrics))
                 .map_err(|_| ParseError::LimitExceeded)?;
             for (lsb, advance_width) in lsb.iter().zip(advance_width_stream.iter()) {
-                h_metrics.push(LongHorMetric {
-                    advance_width,
-                    lsb,
-                });
+                h_metrics.push(LongHorMetric { advance_width, lsb });
             }
 
             Ok(HmtxTable {
@@ -957,8 +948,7 @@ impl Woff2GlyfTable {
         // Step 3.
         let mut prev_point = Point::zero();
         let mut points = Vec::new();
-        budget::reserve_vec(&mut points, flags.len())
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::reserve_vec(&mut points, flags.len()).map_err(|_| ParseError::LimitExceeded)?;
         for flag in flags.iter() {
             let coordinates = glyphs_ctxt.read_array::<U8>(flag.bytes_to_read())?;
             let point = Self::decode_coordinates(flag, coordinates);
@@ -975,8 +965,7 @@ impl Woff2GlyfTable {
 
         // Step 5.
         let instructions = instructions_ctxt.read_slice(instruction_length)?;
-        budget::charge_allocation(instruction_length)
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::charge_allocation(instruction_length).map_err(|_| ParseError::LimitExceeded)?;
 
         Ok(SimpleGlyph {
             bounding_box: BoundingBox::empty(), // filled in later
@@ -1100,8 +1089,8 @@ impl Woff2TableProvider {
             match loca.offsets.last() {
                 Some(&last) if (last / 2) > u32::from(u16::MAX) => {
                     head.index_to_loc_format = IndexToLocFormat::Long
-                }
-                _ => {}
+                },
+                _ => {},
             }
             let (_placeholder, data) = write::buffer::<_, HeadTable>(&head, ())?;
             tables.insert(tag::HEAD, Box::from(data.into_inner()))?;
@@ -1119,8 +1108,7 @@ impl Woff2TableProvider {
             let table_data_scope = woff.table_data_block_scope();
             let table_data = table_entry.read_table(&table_data_scope)?;
             let table_data = table_data.scope().data();
-            budget::charge_allocation(table_data.len())
-                .map_err(|_| ParseError::LimitExceeded)?;
+            budget::charge_allocation(table_data.len()).map_err(|_| ParseError::LimitExceeded)?;
             let data: Box<[u8]> = Box::from(table_data);
             tables.insert(tag, data)?;
         }
@@ -1274,13 +1262,17 @@ mod tests {
         assert!(ReadScope::new(&[0x80, 0x01]).read::<U32Base128>().is_err());
 
         // Overflow
-        assert!(ReadScope::new(&[0xFF, 0xFF, 0xFF, 0xFF, 0x7F])
-            .read::<U32Base128>()
-            .is_err());
+        assert!(
+            ReadScope::new(&[0xFF, 0xFF, 0xFF, 0xFF, 0x7F])
+                .read::<U32Base128>()
+                .is_err()
+        );
 
         // More than 5 bytes
-        assert!(ReadScope::new(&[0x8F, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F])
-            .read::<U32Base128>()
-            .is_err());
+        assert!(
+            ReadScope::new(&[0x8F, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F])
+                .read::<U32Base128>()
+                .is_err()
+        );
     }
 }

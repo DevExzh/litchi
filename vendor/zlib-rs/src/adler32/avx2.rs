@@ -2,15 +2,15 @@
 //!
 //! The functions in this module should only be executed on x86 machines with the AVX2 extension.
 use core::arch::x86_64::{
-    __m256i, _mm256_add_epi32, _mm256_castsi256_si128, _mm256_extracti128_si256, _mm256_madd_epi16,
-    _mm256_maddubs_epi16, _mm256_permutevar8x32_epi32, _mm256_sad_epu8, _mm256_slli_epi32,
-    _mm256_zextsi128_si256, _mm_add_epi32, _mm_cvtsi128_si32, _mm_cvtsi32_si128, _mm_shuffle_epi32,
-    _mm_unpackhi_epi64,
+    __m256i, _mm_add_epi32, _mm_cvtsi32_si128, _mm_cvtsi128_si32, _mm_shuffle_epi32,
+    _mm_unpackhi_epi64, _mm256_add_epi32, _mm256_castsi256_si128, _mm256_extracti128_si256,
+    _mm256_madd_epi16, _mm256_maddubs_epi16, _mm256_permutevar8x32_epi32, _mm256_sad_epu8,
+    _mm256_slli_epi32, _mm256_zextsi128_si256,
 };
 
 use crate::adler32::{
-    generic::{adler32_len_16, adler32_len_64},
     BASE, NMAX,
+    generic::{adler32_len_16, adler32_len_64},
 };
 
 const fn __m256i_literal(bytes: [u8; 32]) -> __m256i {

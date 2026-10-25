@@ -9,8 +9,8 @@ use core::arch::loongarch64::{
 };
 
 use crate::adler32::{
-    generic::{adler32_len_1, adler32_len_16},
     BASE, NMAX,
+    generic::{adler32_len_1, adler32_len_16},
 };
 
 const TAPS: [m128i; 16] = unsafe {

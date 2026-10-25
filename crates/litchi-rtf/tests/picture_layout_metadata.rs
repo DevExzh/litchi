@@ -70,7 +70,10 @@ fn picture_layout_controls_reject_ambiguous_or_unbounded_forms() {
         r"{\rtf1\piccropl1 Body}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted hostile source: {source}"
         );
     }

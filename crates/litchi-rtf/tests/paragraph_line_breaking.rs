@@ -10,7 +10,7 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{ParagraphFontAlignment, ParagraphWrapping, write::Writer, StyleBlock};
+use litchi_rtf::{ParagraphFontAlignment, ParagraphWrapping, StyleBlock, write::Writer};
 
 fn block<'a>(document: &'a Tree<'a>, needle: &str) -> &'a StyleBlock<'a> {
     document
@@ -94,9 +94,7 @@ fn deterministic_writer_and_stylesheet_round_trip() {
         .line_breaking;
     assert_eq!(expected, block(&document, "Body").paragraph.line_breaking);
     let mut first = Vec::new();
-    Writer::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let text = String::from_utf8(first.clone()).unwrap();
     assert!(text.contains(r"\hyphpar\nooverflow\aspalpha\aspnum\facenter\adjustright"));
     let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
@@ -111,9 +109,7 @@ fn deterministic_writer_and_stylesheet_round_trip() {
         expected
     );
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first, second);
 }
 
@@ -179,7 +175,10 @@ fn rejects_invalid_parameters() {
         r"{\rtf1\fafixed1 X}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }

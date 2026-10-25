@@ -6,7 +6,7 @@
 // > Once the stream has ended, the Decoder object must not be used anymore. That is, you need to
 // > create another one to process another stream.
 
-use encoding_rs::{DecoderResult, EncoderResult, BIG5};
+use encoding_rs::{BIG5, DecoderResult, EncoderResult};
 
 pub fn unicode_to_big5(u: char) -> Option<u16> {
     let mut encoder = BIG5.new_encoder();
@@ -21,7 +21,7 @@ pub fn unicode_to_big5(u: char) -> Option<u16> {
                 2 => Some(u16::from_be_bytes(dst)),
                 _ => None, // should not happen
             }
-        }
+        },
         EncoderResult::OutputFull => None, // should not happen
         EncoderResult::Unmappable(_) => None,
     }

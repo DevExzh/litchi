@@ -12,19 +12,19 @@ use std::str::FromStr;
 use pathfinder_geometry::line_segment::LineSegment2F;
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::transform2d::Transform2F;
-use pathfinder_geometry::vector::{vec2f, Vector2F};
+use pathfinder_geometry::vector::{Vector2F, vec2f};
 use rustc_hash::FxHashSet;
 
 use super::{F2Dot14, Fixed};
+use crate::SafeFrom;
 use crate::binary::{U24Be, U32Be};
 use crate::outline::{OutlineBuilder, OutlineSink};
 use crate::tables::cpal::{ColorRecord, Palette};
 use crate::tables::variable_fonts::{DeltaSetIndexMap, ItemVariationStore};
-use crate::SafeFrom;
 use crate::{
     binary::{
-        read::{ReadArray, ReadBinary, ReadBinaryDep, ReadCtxt, ReadFrom, ReadScope},
         U16Be,
+        read::{ReadArray, ReadBinary, ReadBinaryDep, ReadCtxt, ReadFrom, ReadScope},
     },
     error::ParseError,
 };
@@ -334,7 +334,7 @@ impl<'data, 'a> Paint<'data> {
                     // Restore the previous clip region
                     painter.pop_state()?;
                 }
-            }
+            },
             PaintTable::ColrLayers(PaintColrLayers {
                 num_layers,
                 first_layer_index,
@@ -347,14 +347,14 @@ impl<'data, 'a> Paint<'data> {
                     let layer = colr.layer(index)?;
                     layer.visit(painter, glyphs, palette, colr, stack)?;
                 }
-            }
+            },
             PaintTable::Solid(paint_solid) => {
                 // Fall back on transparent black if color reference is invalid
                 let color = paint_solid
                     .color(palette)
                     .unwrap_or(Color(0.0, 0.0, 0.0, 0.0));
                 painter.fill(color)?;
-            }
+            },
             PaintTable::LinearGradient(paint_linear_gradient) => {
                 let color_line = paint_linear_gradient.color_line()?;
                 let gradient = LinearGradient {
@@ -364,7 +364,7 @@ impl<'data, 'a> Paint<'data> {
                     rotation_point: (paint_linear_gradient.x2, paint_linear_gradient.y2),
                 };
                 painter.linear_gradient(gradient, palette)?;
-            }
+            },
             PaintTable::RadialGradient(paint_radial_gradient) => {
                 let color_line = paint_radial_gradient.color_line()?;
                 let gradient = RadialGradient {
@@ -381,7 +381,7 @@ impl<'data, 'a> Paint<'data> {
                     },
                 };
                 painter.radial_gradient(gradient, palette)?;
-            }
+            },
             PaintTable::SweepGradient(paint_sweep_gradient) => {
                 let color_line = paint_sweep_gradient.color_line()?;
                 let gradient = ConicGradient {
@@ -391,7 +391,7 @@ impl<'data, 'a> Paint<'data> {
                     end_angle: paint_sweep_gradient.end_angle.into(),
                 };
                 painter.conic_gradient(gradient, palette)?;
-            }
+            },
             PaintTable::Glyph(paint_glyph) => {
                 let paint = paint_glyph.subpaint()?;
                 painter.push_state()?;
@@ -408,7 +408,7 @@ impl<'data, 'a> Paint<'data> {
 
                 // Restore the previous clip region
                 painter.pop_state()?;
-            }
+            },
             PaintTable::ColrGlyph(paint_colr_glyph) => {
                 // TODO: This is essentially a sub-routine
                 // Ideally it would be possible for painters to cache the rendering of a glyph by id
@@ -416,7 +416,7 @@ impl<'data, 'a> Paint<'data> {
                 if let Some(glyph) = colr.lookup(paint_colr_glyph.glyph_id)? {
                     glyph.paint.visit(painter, glyphs, palette, colr, stack)?;
                 }
-            }
+            },
             PaintTable::Transform(paint_transform) => {
                 let paint = paint_transform.subpaint()?;
                 let t = &paint_transform.transform;
@@ -431,13 +431,13 @@ impl<'data, 'a> Paint<'data> {
                 self.visit_transform(&paint, painter, glyphs, palette, colr, stack, |painter| {
                     painter.transform(transform)
                 })?;
-            }
+            },
             PaintTable::Translate(paint_translate) => {
                 let paint = paint_translate.subpaint()?;
                 self.visit_transform(&paint, painter, glyphs, palette, colr, stack, |painter| {
                     painter.translate(paint_translate.dx, paint_translate.dy)
                 })?;
-            }
+            },
             PaintTable::Scale(paint_scale) => {
                 let PaintScale {
                     scale: (sx, sy),
@@ -448,13 +448,13 @@ impl<'data, 'a> Paint<'data> {
                 self.visit_transform(&paint, painter, glyphs, palette, colr, stack, |painter| {
                     painter.scale(f32::from(*sx), f32::from(*sy), *center)
                 })?;
-            }
+            },
             PaintTable::Rotate(paint_rotate) => {
                 let paint = paint_rotate.subpaint()?;
                 self.visit_transform(&paint, painter, glyphs, palette, colr, stack, |painter| {
                     painter.rotate(raw_to_degrees(paint_rotate.angle), paint_rotate.center)
                 })?;
-            }
+            },
             PaintTable::Skew(paint_skew) => {
                 let PaintSkew {
                     skew_angle: (sx, sy),
@@ -465,7 +465,7 @@ impl<'data, 'a> Paint<'data> {
                 self.visit_transform(&paint, painter, glyphs, palette, colr, stack, |painter| {
                     painter.skew(raw_to_degrees(*sx), raw_to_degrees(*sy), *center)
                 })?;
-            }
+            },
             PaintTable::Composite(paint_composite) => {
                 let paint_backdrop = paint_composite.backdrop()?;
                 let paint_source = paint_composite.source()?;
@@ -477,7 +477,7 @@ impl<'data, 'a> Paint<'data> {
                 paint_source.visit(painter, glyphs, palette, colr, stack)?;
                 let source = painter.end_layer()?;
                 painter.compose_layers(backdrop, source, paint_composite.composite_mode)?;
-            }
+            },
         }
         stack.pop(self);
 
@@ -1861,7 +1861,7 @@ impl ReadBinary for Paint<'_> {
             14 | 15 => PaintTable::Translate(ctxt.read::<PaintTranslate<'_>>()?),
             16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 => {
                 PaintTable::Scale(ctxt.read::<PaintScale<'_>>()?)
-            }
+            },
             24 | 25 | 26 | 27 => PaintTable::Rotate(ctxt.read::<PaintRotate<'_>>()?),
             28 | 29 | 30 | 31 => PaintTable::Skew(ctxt.read::<PaintSkew<'_>>()?),
             32 => PaintTable::Composite(ctxt.read::<PaintComposite<'_>>()?),
@@ -2159,7 +2159,7 @@ impl ReadBinary for PaintScale<'_> {
                 let scale_y = ctxt.read::<F2Dot14>()?;
                 let var_index_base = (format == 17).then(|| ctxt.read_u32be()).transpose()?;
                 ((scale_x, scale_y), None, var_index_base)
-            }
+            },
             // PaintScaleAroundCenter and PaintVarScaleAroundCenter
             18 | 19 => {
                 let scale_x = ctxt.read::<F2Dot14>()?;
@@ -2172,13 +2172,13 @@ impl ReadBinary for PaintScale<'_> {
                     Some((center_x, center_y)),
                     var_index_base,
                 )
-            }
+            },
             // PaintScaleUniform and PaintVarScaleUniform
             20 | 21 => {
                 let scale = ctxt.read::<F2Dot14>()?;
                 let var_index_base = (format == 21).then(|| ctxt.read_u32be()).transpose()?;
                 ((scale, scale), None, var_index_base)
-            }
+            },
             // PaintScaleUniformAroundCenter and PaintVarScaleUniformAroundCenter
             22 | 23 => {
                 let scale = ctxt.read::<F2Dot14>()?;
@@ -2186,7 +2186,7 @@ impl ReadBinary for PaintScale<'_> {
                 let center_y = ctxt.read_i16be()?;
                 let var_index_base = (format == 23).then(|| ctxt.read_u32be()).transpose()?;
                 ((scale, scale), Some((center_x, center_y)), var_index_base)
-            }
+            },
             _ => return Err(ParseError::BadValue),
         };
 
@@ -2215,14 +2215,14 @@ impl ReadBinary for PaintRotate<'_> {
             25 => {
                 let var_index_base = ctxt.read_u32be()?;
                 (None, Some(var_index_base))
-            }
+            },
             // PaintRotateAroundCenter and PaintVarRotateAroundCenter
             26 | 27 => {
                 let center_x = ctxt.read_i16be()?;
                 let center_y = ctxt.read_i16be()?;
                 let var_index_base = (format == 27).then(|| ctxt.read_u32be()).transpose()?;
                 (Some((center_x, center_y)), var_index_base)
-            }
+            },
             _ => return Err(ParseError::BadValue),
         };
 
@@ -2252,14 +2252,14 @@ impl ReadBinary for PaintSkew<'_> {
             29 => {
                 let var_index_base = ctxt.read_u32be()?;
                 (None, Some(var_index_base))
-            }
+            },
             // PaintSkewAroundCenter and PaintVarSkewAroundCenter
             30 | 31 => {
                 let center_x = ctxt.read_i16be()?;
                 let center_y = ctxt.read_i16be()?;
                 let var_index_base = (format == 31).then(|| ctxt.read_u32be()).transpose()?;
                 (Some((center_x, center_y)), var_index_base)
-            }
+            },
             _ => return Err(ParseError::BadValue),
         };
 
@@ -2431,10 +2431,10 @@ fn raw_to_degrees(angle: F2Dot14) -> f32 {
 mod tests {
     use super::*;
     use crate::{
+        Font,
         tables::{FontTableProvider, OpenTypeFont},
         tag,
         tests::read_fixture,
-        Font,
     };
 
     #[test]
@@ -2477,7 +2477,7 @@ mod tests {
 
         let glyph_id = 62; // 'N'
         match font.visit_colr_glyph(glyph_id, 0, &mut painter) {
-            Ok(()) => {}
+            Ok(()) => {},
             Err(err) => panic!("error visiting COLR glyph: {}", err),
         }
     }

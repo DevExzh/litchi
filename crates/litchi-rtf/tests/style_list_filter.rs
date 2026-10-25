@@ -12,15 +12,17 @@ use litchi_rtf::{DocumentStyleListFilter, DocumentXslTransformUsage, write::Writ
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_specification_example_as_typed_passive_flags() {
-    let document = Tree::parse(r"{\rtf1{\*\wgrffmtfilter 2002}Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1{\*\wgrffmtfilter 2002}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let filter = document.style_list_filter().unwrap();
     assert_eq!(filter.bits(), 0x2002);
     assert!(filter.contains(DocumentStyleListFilter::CUSTOM_STYLES));
@@ -31,7 +33,8 @@ fn parses_specification_example_as_typed_passive_flags() {
 
 #[test]
 fn typed_api_and_writer_canonicalize_uppercase_exact_width_hex() {
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let filter = DocumentStyleListFilter::ALL_STYLES
         .union(DocumentStyleListFilter::TABLE_STYLES)
         .union(DocumentStyleListFilter::ALTERNATE_STYLE_NAMES);
@@ -48,10 +51,13 @@ fn typed_api_and_writer_canonicalize_uppercase_exact_width_hex() {
 
 #[test]
 fn explicit_zero_and_coexisting_transform_metadata_round_trip_independently() {
-    let document = Tree::parse(concat!(
-        r#"{\rtf1{\*\xform transform.xsl}\usexform"#,
-        r#"{\*\wgrffmtfilter 0000}Body}"#,
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1{\*\xform transform.xsl}\usexform"#,
+            r#"{\*\wgrffmtfilter 0000}Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     assert!(document.style_list_filter().unwrap().is_empty());
     assert_eq!(
@@ -83,7 +89,10 @@ fn rejects_reserved_bit_invalid_width_text_parameters_and_active_content() {
         r"{\rtf1{\*\wgrffmtfilter {0001}}Body}",
         r"{\rtf1{\*\wgrffmtfilter \bin4 0001}Body}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
     assert!(DocumentStyleListFilter::from_bits(0x0010).is_err());
 }
@@ -123,6 +132,9 @@ fn rejects_unstarred_direct_duplicate_nested_and_late_destinations() {
         r"{\rtf1{{\*\wgrffmtfilter 0001}}Body}",
         r"{\rtf1 Body{\*\wgrffmtfilter 0001}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
 }

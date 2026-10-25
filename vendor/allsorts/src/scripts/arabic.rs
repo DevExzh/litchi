@@ -3,14 +3,14 @@
 //! Code herein follows the specification at:
 //! <https://github.com/n8willis/opentype-shaping-documents/blob/master/opentype-shaping-arabic-general.md>
 
-use unicode_joining_type::{get_joining_type, JoiningType};
+use unicode_joining_type::{JoiningType, get_joining_type};
 
 use crate::error::{ParseError, ShapingError};
 use crate::gsub::{self, Feature, FeatureMask, GlyphData, GlyphOrigin, RawGlyph};
-use crate::layout::{FeatureTableSubstitution, GDEFTable, LayoutCache, LayoutTable, GSUB};
+use crate::layout::{FeatureTableSubstitution, GDEFTable, GSUB, LayoutCache, LayoutTable};
 use crate::tag;
 use crate::unicode::mcc::{
-    modified_combining_class, sort_by_modified_combining_class, ModifiedCombiningClass,
+    ModifiedCombiningClass, modified_combining_class, sort_by_modified_combining_class,
 };
 
 #[derive(Clone)]
@@ -112,7 +112,7 @@ pub fn gsub_apply_arabic(
             if s.find_langsys_or_default(lang_tag)?.is_none() {
                 return Ok(());
             }
-        }
+        },
         None => return Ok(()),
     }
 
@@ -152,7 +152,7 @@ pub fn gsub_apply_arabic(
                 match arabic_glyphs[previous_i].feature_tag() {
                     tag::ISOL => arabic_glyphs[previous_i].set_feature_tag(tag::INIT),
                     tag::FINA => arabic_glyphs[previous_i].set_feature_tag(tag::MEDI),
-                    _ => {}
+                    _ => {},
                 }
             }
 

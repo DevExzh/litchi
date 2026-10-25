@@ -24,9 +24,11 @@ impl Package {
         let mce_limits = mail_merge::mce_limits_for_source(&self.opc.read_limits());
         let snapshot = self.settings_part_snapshot()?;
         let part = settings_part_from_snapshot(&snapshot, snapshot.xml.clone(), None);
-        Ok(DocumentSettings::extract_from_part_with_mce_limits(&part, &mce_limits)?
-            .mail_merge()
-            .cloned())
+        Ok(
+            DocumentSettings::extract_from_part_with_mce_limits(&part, &mce_limits)?
+                .mail_merge()
+                .cloned(),
+        )
     }
 
     /// Resolve a mail-merge relationship without opening or fetching its target.
@@ -158,12 +160,7 @@ impl Package {
             None
         };
         settings.assign_package_relationships(data_id, header_id, recipient_id);
-        let patched = patch_mail_merge(
-            &snapshot.xml,
-            Some(&settings),
-            conformance,
-            &mce_limits,
-        )?;
+        let patched = patch_mail_merge(&snapshot.xml, Some(&settings), conformance, &mce_limits)?;
         let mut replacement = settings_part_from_snapshot(&snapshot, patched, None);
         let old_ids = replacement
             .rels()

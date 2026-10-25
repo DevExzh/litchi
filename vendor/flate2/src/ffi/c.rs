@@ -224,7 +224,7 @@ impl Inflate {
             match rc {
                 MZ_DATA_ERROR | MZ_STREAM_ERROR | MZ_MEM_ERROR => {
                     mem::decompress_failed(self.inner.msg())
-                }
+                },
                 MZ_OK => Ok(Status::Ok),
                 MZ_BUF_ERROR => Ok(Status::BufError),
                 MZ_STREAM_END => Ok(Status::StreamEnd),

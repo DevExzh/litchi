@@ -1,7 +1,7 @@
+use flate2::Compression;
 use flate2::read::GzDecoder;
 use flate2::read::MultiGzDecoder;
 use flate2::write::GzEncoder;
-use flate2::Compression;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::{self, BufReader};

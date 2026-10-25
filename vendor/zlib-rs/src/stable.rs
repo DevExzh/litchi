@@ -1,8 +1,8 @@
 use core::{ffi::c_uint, mem::MaybeUninit};
 
+use crate::ReturnCode;
 use crate::deflate::DeflateConfig;
 use crate::inflate::InflateConfig;
-use crate::ReturnCode;
 pub use crate::{DeflateFlush, InflateFlush};
 
 /// Possible status results of compressing some data or successfully

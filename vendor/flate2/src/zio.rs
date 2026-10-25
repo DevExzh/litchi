@@ -157,15 +157,15 @@ where
                     io::ErrorKind::UnexpectedEof,
                     "incomplete deflate stream",
                 ));
-            }
+            },
             Ok(Status::Ok | Status::BufError | Status::StreamEnd) => return Ok(read),
 
             Err(..) => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "corrupt deflate stream",
-                ))
-            }
+                ));
+            },
         }
     }
 }

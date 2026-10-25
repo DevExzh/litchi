@@ -10,13 +10,11 @@
 use std::borrow::Cow;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{write::Writer, Shape, ShapeType};
+use litchi_rtf::{Shape, ShapeType, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -30,7 +28,8 @@ fn parses_real_libreoffice_text_frames_and_round_trips_canonically() {
     assert_eq!(producer.shapes()[0].text, "Textbox text.\n");
     assert!(producer.shapes()[0].text_destination_present);
 
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let shape = Shape::text_box(Cow::Borrowed("Line one\nTabbed\tUnicode 你"));
     document.set_background_shape(shape).unwrap();
     let output = write(&document);
@@ -84,7 +83,10 @@ fn rejects_hostile_shape_text_grammar_and_resource_abuse() {
         r"{\rtf1{\shp{\*\shprslt fallback}{\shptxt late}}}",
         "{\\rtf1{\\shp{\\*\\shpinst{\\shptxt\\bin1 x}}}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
 
     let mut nested = r"{\rtf1{\shp{\*\shpinst{\shptxt ".to_string();

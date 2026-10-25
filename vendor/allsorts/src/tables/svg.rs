@@ -238,7 +238,7 @@ mod tests {
             }) => {
                 let doc = std::str::from_utf8(&data).unwrap();
                 assert_eq!(&doc[0..42], r#"<?xml version="1.0" encoding="UTF-8"?><svg"#);
-            }
+            },
             _ => panic!("did not get expected result"),
         }
     }

@@ -17,8 +17,8 @@ use crate::records::{
 use crate::workbook::model::Reader;
 use crate::worksheet::Worksheet;
 use crate::{
-    autofilter, comments, compatibility::CompatibilityProfile, conditional_format, hyperlinks,
-    layout, merged_cells, page_setup, pivot_table, protection, utils, view, SourceLimits,
+    SourceLimits, autofilter, comments, compatibility::CompatibilityProfile, conditional_format,
+    hyperlinks, layout, merged_cells, page_setup, pivot_table, protection, utils, view,
 };
 use litchi_biff::Records;
 use std::collections::{HashMap, HashSet};

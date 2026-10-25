@@ -6,12 +6,12 @@
 //!
 //! <https://learn.microsoft.com/en-us/typography/opentype/spec/hvar>
 
+use crate::SafeFrom;
 use crate::binary::read::{ReadBinary, ReadCtxt, ReadScope};
 use crate::error::ParseError;
 use crate::tables::variable_fonts::{
     DeltaSetIndexMap, DeltaSetIndexMapEntry, ItemVariationStore, OwnedTuple,
 };
-use crate::SafeFrom;
 
 /// `HVAR` — Horizontal Metrics Variations Table.
 pub struct HvarTable<'a> {

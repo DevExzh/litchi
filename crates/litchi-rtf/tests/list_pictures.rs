@@ -12,9 +12,7 @@ use litchi_rtf::{ImageType, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -72,7 +70,11 @@ fn canonical_roundtrip_preserves_multiple_records_and_empty_legacy_entry() {
     assert_eq!(reparsed.pictures().len(), 2);
     assert_eq!(write(&reparsed), first);
 
-    let empty = Tree::parse(r"{\rtf1{\*\listtable{\*\listpicture}}}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let empty = Tree::parse(
+        r"{\rtf1{\*\listtable{\*\listpicture}}}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(empty.list_table().picture_bullet_count, 1);
     assert!(empty.list_picture_bullets().next().unwrap().is_none());
     let rewritten = write(&empty);
@@ -82,7 +84,11 @@ fn canonical_roundtrip_preserves_multiple_records_and_empty_legacy_entry() {
 
 #[test]
 fn typed_indices_validate_and_clear_only_references() {
-    let mut document = Tree::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a}Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1{\pict\pngblip 89504e470d0a1a0a}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.pictures().len(), 1);
     document
         .set_list_picture_bullet_indices(vec![Some(0), None])
@@ -94,7 +100,13 @@ fn typed_indices_validate_and_clear_only_references() {
             .is_err()
     );
     let output = write(&document);
-    assert_eq!(Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap().pictures().len(), 1);
+    assert_eq!(
+        Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default())
+            .unwrap()
+            .pictures()
+            .len(),
+        1
+    );
 
     document.clear_list_picture_bullets().unwrap();
     assert_eq!(document.pictures().len(), 1);
@@ -115,6 +127,9 @@ fn rejects_hostile_list_picture_grammar() {
         r"{\rtf1{\*\listtable{\*\listpicture}{\*\listpicture}}}",
         r"{\rtf1{\*\listpicture{\*\shppict{\pict\pngblip 00}}}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
 }

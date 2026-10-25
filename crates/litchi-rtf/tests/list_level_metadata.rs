@@ -11,8 +11,8 @@
 //! `\levellegal`, `\levelnorestart`, `\levelold`, `\levelprev`,
 //! `\levelprevspace`, and `\leveltemplateid`.
 
-use litchi_rtf::write::Writer;
 use litchi_rtf::raw::Tree;
+use litchi_rtf::write::Writer;
 
 const SOURCE: &str = concat!(
     r"{\rtf1\ansi{\*\listtable{\list\listtemplateid42{\listlevel\levelnfc0\leveljc0\levelfollow0",
@@ -23,9 +23,7 @@ const SOURCE: &str = concat!(
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 

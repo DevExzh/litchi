@@ -18,9 +18,9 @@ use crate::binary::read::{
 use crate::binary::{U16Be, U32Be};
 use crate::context::{ContextLookupHelper, GlyphTable, LookupFlag, MatchContext};
 use crate::error::ParseError;
-use crate::tables::variable_fonts::{owned, ItemVariationStore, Tuple};
 use crate::tables::F2Dot14;
-use crate::{size, tag, GlyphId, SafeFrom};
+use crate::tables::variable_fonts::{ItemVariationStore, Tuple, owned};
+use crate::{GlyphId, SafeFrom, size, tag};
 
 pub enum GSUB {}
 pub enum GPOS {}
@@ -697,7 +697,7 @@ impl FeatureTableSubstitution<'_> {
                     ))
                     .read::<FeatureTable>()
                     .ok()
-            }
+            },
         }
     }
 }
@@ -791,7 +791,7 @@ impl ConditionTable {
                 };
                 (condition_set.filter_range_min_value..=condition_set.filter_range_max_value)
                     .contains(&axis_value)
-            }
+            },
         }
     }
 }
@@ -1051,19 +1051,19 @@ impl LookupList<GSUB> {
         let lookup_subtables = match lookup_type {
             SubstLookupType::SingleSubst => {
                 SubstLookup::SingleSubst(lookup.read_subtables::<SingleSubst>(cache)?)
-            }
+            },
             SubstLookupType::MultipleSubst => {
                 SubstLookup::MultipleSubst(lookup.read_subtables::<MultipleSubst>(cache)?)
-            }
+            },
             SubstLookupType::AlternateSubst => {
                 SubstLookup::AlternateSubst(lookup.read_subtables::<AlternateSubst>(cache)?)
-            }
+            },
             SubstLookupType::LigatureSubst => {
                 SubstLookup::LigatureSubst(lookup.read_subtables::<LigatureSubst>(cache)?)
-            }
+            },
             SubstLookupType::ContextSubst => {
                 SubstLookup::ContextSubst(lookup.read_subtables::<ContextLookup<GSUB>>(cache)?)
-            }
+            },
             SubstLookupType::ChainContextSubst => SubstLookup::ChainContextSubst(
                 lookup.read_subtables::<ChainContextLookup<GSUB>>(cache)?,
             ),
@@ -1110,23 +1110,23 @@ impl LookupList<GPOS> {
         let lookup_subtables = match lookup_type {
             PosLookupType::SinglePos => {
                 PosLookup::SinglePos(lookup.read_subtables::<SinglePos>(cache)?)
-            }
+            },
             PosLookupType::PairPos => PosLookup::PairPos(lookup.read_subtables::<PairPos>(cache)?),
             PosLookupType::CursivePos => {
                 PosLookup::CursivePos(lookup.read_subtables::<CursivePos>(cache)?)
-            }
+            },
             PosLookupType::MarkBasePos => {
                 PosLookup::MarkBasePos(lookup.read_subtables::<MarkBasePos>(cache)?)
-            }
+            },
             PosLookupType::MarkLigPos => {
                 PosLookup::MarkLigPos(lookup.read_subtables::<MarkLigPos>(cache)?)
-            }
+            },
             PosLookupType::MarkMarkPos => {
                 PosLookup::MarkMarkPos(lookup.read_subtables::<MarkBasePos>(cache)?)
-            }
+            },
             PosLookupType::ContextPos => {
                 PosLookup::ContextPos(lookup.read_subtables::<ContextLookup<GPOS>>(cache)?)
-            }
+            },
             PosLookupType::ChainContextPos => PosLookup::ChainContextPos(
                 lookup.read_subtables::<ChainContextLookup<GPOS>>(cache)?,
             ),
@@ -1154,7 +1154,7 @@ impl<'a, T: LayoutTableType + 'static> Lookup<'a, T> {
             LookupType::Normal(lookup_type) => {
                 let iter = self.subtable_iter();
                 Ok(SmartLookupSubtableIter::Normal(lookup_type, iter))
-            }
+            },
             LookupType::Extension => {
                 if let Some(subtable) = self.subtable_iter().next() {
                     let ext_subtable = subtable.read::<ExtensionSubst<'_, T>>()?;
@@ -1167,7 +1167,7 @@ impl<'a, T: LayoutTableType + 'static> Lookup<'a, T> {
                 } else {
                     Err(ParseError::BadValue)
                 }
-            }
+            },
         }
     }
 
@@ -1186,7 +1186,7 @@ impl<'a, T: LayoutTableType + 'static> Lookup<'a, T> {
             let subtable = subtable_result?;
             match f(subtable) {
                 Ok(Some(t)) => return Ok(Some(t)),
-                Ok(None) => {}
+                Ok(None) => {},
                 Err(err) => warn!("skipping invalid subtable: {}", err),
             }
         }
@@ -1255,7 +1255,7 @@ impl<T: LayoutTableType> ReadBinary for ExtensionSubst<'_, T> {
                     extension_lookup_type,
                     extension_offset,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -1294,7 +1294,7 @@ impl<'a, T: LayoutTableType> Iterator for ExtensionLookupSubtableIter<'a, '_, T>
                         .scope
                         .offset(ext_subtable.extension_offset as usize);
                     Some(Ok(subtable))
-                }
+                },
                 Err(err) => Some(Err(err)),
             }
         } else {
@@ -1394,7 +1394,7 @@ impl ReadBinaryDep for SingleSubst {
                     coverage,
                     delta_glyph_index,
                 })
-            }
+            },
             2 => {
                 let coverage_offset = usize::from(ctxt.read_u16be()?);
                 let coverage = subtable
@@ -1407,7 +1407,7 @@ impl ReadBinaryDep for SingleSubst {
                     coverage,
                     substitute_glyph_array,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -1427,7 +1427,7 @@ impl SingleSubst {
                 } else {
                     Ok(None)
                 }
-            }
+            },
             SingleSubst::Format2 {
                 ref coverage,
                 ref substitute_glyph_array,
@@ -1437,7 +1437,7 @@ impl SingleSubst {
                     substitute_glyph_array.check_index(coverage_index)?;
                     let new_glyph_index = substitute_glyph_array[coverage_index];
                     Ok(Some(new_glyph_index))
-                }
+                },
                 None => Ok(None),
             },
         }
@@ -1472,7 +1472,7 @@ impl ReadBinaryDep for MultipleSubst {
                     coverage,
                     sequences,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -1486,7 +1486,7 @@ impl MultipleSubst {
                 self.sequences.check_index(coverage_index)?;
                 let sequence = &self.sequences[coverage_index];
                 Ok(Some(sequence))
-            }
+            },
             None => Ok(None),
         }
     }
@@ -1532,7 +1532,7 @@ impl ReadBinaryDep for AlternateSubst {
                     coverage,
                     alternatesets,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -1546,7 +1546,7 @@ impl AlternateSubst {
                 self.alternatesets.check_index(coverage_index)?;
                 let alternateset = &self.alternatesets[coverage_index];
                 Ok(Some(alternateset))
-            }
+            },
             None => Ok(None),
         }
     }
@@ -1597,7 +1597,7 @@ impl ReadBinaryDep for LigatureSubst {
                     coverage,
                     ligaturesets,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -1611,7 +1611,7 @@ impl LigatureSubst {
                 self.ligaturesets.check_index(coverage_index)?;
                 let ligatureset = &self.ligaturesets[coverage_index];
                 Ok(Some(ligatureset))
-            }
+            },
             None => Ok(None),
         }
     }
@@ -1727,7 +1727,7 @@ impl ReadBinary for Option<VariationIndex> {
                 // Given how we are using the VariationIndex it makes sense to ignore these as opposed to
                 // reporting an error.
                 Ok(None)
-            }
+            },
         }
     }
 }
@@ -1851,7 +1851,7 @@ impl ReadBinary for Anchor {
                 let y = ctxt.read_i16be()?;
                 // Doesn't read other fields because we don't use them
                 Ok(Anchor { x, y })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -1887,7 +1887,7 @@ impl ReadBinaryDep for SinglePos {
                     coverage,
                     value_record,
                 })
-            }
+            },
             2 => {
                 let coverage_offset = usize::from(ctxt.read_u16be()?);
                 let coverage = scope
@@ -1902,7 +1902,7 @@ impl ReadBinaryDep for SinglePos {
                     coverage,
                     value_records,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -1920,7 +1920,7 @@ impl SinglePos {
                 } else {
                     Ok(None)
                 }
-            }
+            },
             SinglePos::Format2 {
                 ref coverage,
                 ref value_records,
@@ -1932,7 +1932,7 @@ impl SinglePos {
                 } else {
                     Ok(None)
                 }
-            }
+            },
         }
     }
 }
@@ -1974,7 +1974,7 @@ impl ReadBinaryDep for PairPos {
                     (value_format1, value_format2),
                 )?;
                 Ok(PairPos::Format1 { coverage, pairsets })
-            }
+            },
             2 => {
                 let coverage_offset = usize::from(ctxt.read_u16be()?);
                 let coverage = scope
@@ -2005,7 +2005,7 @@ impl ReadBinaryDep for PairPos {
                     class2_count,
                     class1_records,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -2138,7 +2138,7 @@ impl PairPos {
                 } else {
                     Ok(None)
                 }
-            }
+            },
             PairPos::Format2 {
                 ref coverage,
                 ref classdef1,
@@ -2161,7 +2161,7 @@ impl PairPos {
                 } else {
                     Ok(None)
                 }
-            }
+            },
         }
     }
 }
@@ -2192,7 +2192,7 @@ impl ReadBinaryDep for CursivePos {
                     coverage,
                     entry_exit_records,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -2260,10 +2260,10 @@ impl CursivePos {
                 match (entry_exit1.exit_anchor, entry_exit2.entry_anchor) {
                     (Some(glyph1_exit), Some(glyph2_entry)) => {
                         Ok(Some((glyph1_exit, glyph2_entry)))
-                    }
+                    },
                     _ => Ok(None),
                 }
-            }
+            },
             _ => Ok(None),
         }
     }
@@ -2309,7 +2309,7 @@ impl ReadBinaryDep for MarkBasePos {
                     mark_array,
                     base_array,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -2432,7 +2432,7 @@ impl MarkBasePos {
                 } else {
                     Err(ParseError::BadIndex)
                 }
-            }
+            },
             _ => Ok(None),
         }
     }
@@ -2476,7 +2476,7 @@ impl ReadBinaryDep for MarkLigPos {
                     mark_array,
                     ligature_array,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -2580,7 +2580,7 @@ impl MarkLigPos {
                 } else {
                     Err(ParseError::BadIndex)
                 }
-            }
+            },
             _ => Ok(None),
         }
     }
@@ -2688,7 +2688,7 @@ impl<T: LayoutTableType> ReadBinaryDep for ContextLookup<T> {
                     subrulesets,
                     phantom: PhantomData,
                 })
-            }
+            },
             2 => {
                 let coverage_offset = usize::from(ctxt.read_u16be()?);
                 let classdef_offset = usize::from(ctxt.read_u16be()?);
@@ -2709,7 +2709,7 @@ impl<T: LayoutTableType> ReadBinaryDep for ContextLookup<T> {
                     subclasssets,
                     phantom: PhantomData,
                 })
-            }
+            },
             3 => {
                 let glyph_count = usize::from(ctxt.read_u16be()?);
                 ctxt.check(glyph_count > 0)?;
@@ -2722,7 +2722,7 @@ impl<T: LayoutTableType> ReadBinaryDep for ContextLookup<T> {
                     lookup_records,
                     phantom: PhantomData,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -2774,7 +2774,7 @@ impl ReadBinaryDep for ReverseChainSingleSubst {
                     lookahead_coverages,
                     substitute_glyphs,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -2914,7 +2914,7 @@ impl<T: LayoutTableType> ReadBinaryDep for ChainContextLookup<T> {
                     chainsubrulesets,
                     phantom: PhantomData,
                 })
-            }
+            },
             2 => {
                 let coverage_offset = usize::from(ctxt.read_u16be()?);
                 let backtrack_classdef_offset = usize::from(ctxt.read_u16be()?);
@@ -2945,7 +2945,7 @@ impl<T: LayoutTableType> ReadBinaryDep for ChainContextLookup<T> {
                     chainsubclasssets,
                     phantom: PhantomData,
                 })
-            }
+            },
             3 => {
                 let backtrack_count = usize::from(ctxt.read_u16be()?);
                 let backtrack_coverage_offsets = ctxt.read_array::<U16Be>(backtrack_count)?;
@@ -2968,7 +2968,7 @@ impl<T: LayoutTableType> ReadBinaryDep for ChainContextLookup<T> {
                     lookup_records,
                     phantom: PhantomData,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -3077,7 +3077,7 @@ pub fn context_lookup_info<'a, T, Table: LayoutTableType>(
                 } else {
                     Ok(None)
                 }
-            }
+            },
             None => Ok(None),
         },
         ContextLookup::Format2 {
@@ -3112,7 +3112,7 @@ pub fn context_lookup_info<'a, T, Table: LayoutTableType>(
                 } else {
                     Ok(None)
                 }
-            }
+            },
             None => Ok(None),
         },
         ContextLookup::Format3 {
@@ -3135,13 +3135,13 @@ pub fn context_lookup_info<'a, T, Table: LayoutTableType>(
                         } else {
                             Ok(None)
                         }
-                    }
+                    },
                     None => Ok(None),
                 }
             } else {
                 Ok(None)
             }
-        }
+        },
     }
 }
 
@@ -3179,7 +3179,7 @@ pub fn chain_context_lookup_info<'a, T, Table: LayoutTableType>(
                 } else {
                     Ok(None)
                 }
-            }
+            },
             None => Ok(None),
         },
         ChainContextLookup::Format2 {
@@ -3222,7 +3222,7 @@ pub fn chain_context_lookup_info<'a, T, Table: LayoutTableType>(
                 } else {
                     Ok(None)
                 }
-            }
+            },
             None => Ok(None),
         },
         ChainContextLookup::Format3 {
@@ -3244,7 +3244,7 @@ pub fn chain_context_lookup_info<'a, T, Table: LayoutTableType>(
                 } else {
                     Ok(None)
                 }
-            }
+            },
             None => Ok(None),
         },
     }
@@ -3277,7 +3277,7 @@ impl ReverseChainSingleSubst {
                     } else {
                         Ok(None)
                     }
-                }
+                },
                 None => Ok(None),
             },
         }
@@ -3326,7 +3326,7 @@ impl ReadBinary for Coverage {
                 Ok(Coverage::Format1 {
                     glyph_array: glyph_vec,
                 })
-            }
+            },
             2 => {
                 let coverage_range_count = ctxt.read_u16be()?;
                 let coverage_range_array =
@@ -3340,7 +3340,7 @@ impl ReadBinary for Coverage {
                 Ok(Coverage::Format2 {
                     coverage_range_array: coverage_range_vec,
                 })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -3357,7 +3357,7 @@ impl Coverage {
                 } else {
                     None
                 }
-            }
+            },
             Coverage::Format2 {
                 ref coverage_range_array,
             } => {
@@ -3371,7 +3371,7 @@ impl Coverage {
                     }
                 }
                 None
-            }
+            },
         }
     }
 
@@ -3433,7 +3433,7 @@ impl ReadBinary for ClassDef {
                     start_glyph,
                     class_value_array,
                 })
-            }
+            },
             2 => {
                 let class_range_count = usize::from(ctxt.read_u16be()?);
                 let class_range_array = ctxt
@@ -3445,7 +3445,7 @@ impl ReadBinary for ClassDef {
                     .or_else(|_| ctxt.read_array_upto_hack::<ClassRangeRecord>(class_range_count))?
                     .to_vec();
                 Ok(ClassDef::Format2 { class_range_array })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -3466,7 +3466,7 @@ impl ClassDef {
                 } else {
                     0
                 }
-            }
+            },
             ClassDef::Format2 {
                 ref class_range_array,
             } => {
@@ -3476,7 +3476,7 @@ impl ClassDef {
                     }
                 }
                 0
-            }
+            },
         }
     }
 }
@@ -3596,7 +3596,7 @@ mod tests {
         let data = make_gdef_header(1000);
         match ReadScope::new(&data).read::<GDEFTable>() {
             Ok(_) => panic!("expected error got success"),
-            Err(ParseError::BadEof) => {}
+            Err(ParseError::BadEof) => {},
             Err(err) => panic!("expeceted ParseError::BadEof got {:?}", err),
         }
     }

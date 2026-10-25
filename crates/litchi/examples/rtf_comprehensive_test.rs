@@ -29,9 +29,9 @@
 //! module which depends on document types from doc/ooxml features. This is a known
 //! issue with feature gating in the markdown module and doesn't affect RTF functionality.
 
+use litchi::rtf::write::Writer;
 #[cfg(feature = "rtf")]
 use litchi::rtf::*;
-use litchi::rtf::write::Writer;
 
 #[cfg(feature = "rtf")]
 fn main() -> std::io::Result<()> {
@@ -619,12 +619,13 @@ Tab:\tab Tabbed text here\par
 #[cfg(feature = "rtf")]
 fn write_and_verify(rtf_content: &str, output_path: &str, test_name: &str) -> std::io::Result<()> {
     // Parse the RTF
-    let doc = raw::Tree::parse(rtf_content, litchi::rtf::read::OpenOptions::default()).map_err(|e| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("Failed to parse {} RTF: {:?}", test_name, e),
-        )
-    })?;
+    let doc =
+        raw::Tree::parse(rtf_content, litchi::rtf::read::OpenOptions::default()).map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Failed to parse {} RTF: {:?}", test_name, e),
+            )
+        })?;
 
     println!("  ✓ Parsed {} document", test_name);
     println!("    - Fonts: {}", doc.font_table().fonts().len());
@@ -657,12 +658,13 @@ fn write_and_verify(rtf_content: &str, output_path: &str, test_name: &str) -> st
 
     // Verify the original can be re-parsed (demonstrates parser correctness)
     let rtf_output = std::fs::read_to_string(output_path)?;
-    let reparsed = raw::Tree::parse(&rtf_output, litchi::rtf::read::OpenOptions::default()).map_err(|e| {
-        std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("Failed to reparse {}: {:?}", output_path, e),
-        )
-    })?;
+    let reparsed = raw::Tree::parse(&rtf_output, litchi::rtf::read::OpenOptions::default())
+        .map_err(|e| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!("Failed to reparse {}: {:?}", output_path, e),
+            )
+        })?;
 
     println!("  ✓ Parser verification successful");
     println!("    - Document can be parsed correctly");

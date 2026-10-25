@@ -14,15 +14,17 @@ use std::fs;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
 #[test]
 fn parses_inert_data_store_bytes_and_round_trips() {
-    let document = Tree::parse(r"{\rtf1{\*\datastore 01050000 0200000018000000}Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1{\*\datastore 01050000 0200000018000000}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "Body");
     let store = document.data_store().unwrap();
     assert_eq!(store.data.as_ref(), [1, 5, 0, 0, 2, 0, 0, 0, 24, 0, 0, 0]);
@@ -38,9 +40,11 @@ fn parses_inert_data_store_bytes_and_round_trips() {
 #[test]
 fn mutation_validates_and_clear_preserves_body() {
     let store = DocumentDataStore::new(Cow::Borrowed(b"opaque\0bytes")).unwrap();
-    let mut document = Tree::parse(r"{\rtf1 Text}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Text}", litchi_rtf::read::OpenOptions::default()).unwrap();
     document.set_data_store(store.clone()).unwrap();
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.data_store(), Some(&store));
     assert_eq!(reparsed.text(), "Text");
 
@@ -64,7 +68,10 @@ fn rejects_malformed_or_active_data_store_payloads() {
         r"{\rtf1\datastore 00}",
     ];
     for rtf in cases {
-        assert!(Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {rtf}");
+        assert!(
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {rtf}"
+        );
     }
 }
 

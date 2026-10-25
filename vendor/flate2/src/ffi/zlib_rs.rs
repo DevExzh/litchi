@@ -245,7 +245,7 @@ impl Deflate {
                 Status::BufError => compress_failed(ErrorMessage(Some("insufficient space"))),
                 Status::StreamEnd => {
                     unreachable!("zlib-rs is known to never return the StreamEnd status")
-                }
+                },
             },
             Err(_) => self.compress_error(),
         }

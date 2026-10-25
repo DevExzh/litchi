@@ -14,9 +14,7 @@ use std::fs;
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -48,7 +46,8 @@ fn parses_and_round_trips_unicode_dropdown_metadata_and_visible_result() {
     assert_eq!(field.range_end, 4);
     assert_eq!(field.result_text, "Two");
 
-    let reparsed = Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), document.text());
     assert_eq!(reparsed.form_fields(), document.form_fields());
 }
@@ -68,7 +67,11 @@ fn checkbox_undefined_result_and_mutation_are_typed_and_positional() {
     assert_eq!(checkbox.default_checked(), Some(true));
     assert_eq!(checkbox.checked(), None);
 
-    let mut mutated = Tree::parse(r"{\rtf1 AChoiceZ}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut mutated = Tree::parse(
+        r"{\rtf1 AChoiceZ}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     mutated
         .push_form_field(FormField {
             field_type: FormFieldType::DropDown,
@@ -98,12 +101,13 @@ fn checkbox_undefined_result_and_mutation_are_typed_and_positional() {
         })
         .unwrap();
     let output = write(&mutated);
-    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap_or_else(|error| {
-        panic!(
-            "failed to parse writer output: {error}\n{}",
-            String::from_utf8_lossy(&output)
-        )
-    });
+    let reparsed = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default())
+        .unwrap_or_else(|error| {
+            panic!(
+                "failed to parse writer output: {error}\n{}",
+                String::from_utf8_lossy(&output)
+            )
+        });
     assert_eq!(reparsed.text(), "AChoiceZ");
     assert_eq!(reparsed.form_fields(), mutated.form_fields());
 }
@@ -123,7 +127,10 @@ fn rejects_malformed_conflicting_or_active_form_field_grammar() {
         r"{\rtf1{\field{\*\fldinst FORMTEXT{\*\datafield\bin2 xx}{\*\formfield{\fftype0}}}{\fldrslt x}}}",
     ];
     for rtf in cases {
-        assert!(Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {rtf}");
+        assert!(
+            Tree::parse(rtf, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {rtf}"
+        );
     }
 }
 

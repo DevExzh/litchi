@@ -1,7 +1,7 @@
 //! This module contains backend-specific code.
 
-use crate::mem::{CompressError, DecompressError, FlushCompress, FlushDecompress, Status};
 use crate::Compression;
+use crate::mem::{CompressError, DecompressError, FlushCompress, FlushDecompress, Status};
 use core::mem::MaybeUninit;
 
 fn initialize_buffer(output: &mut [MaybeUninit<u8>]) -> &mut [u8] {
@@ -79,7 +79,9 @@ pub use self::miniz_oxide::*;
 
 // If no backend is enabled, fail fast with a clear error message.
 #[cfg(not(feature = "any_impl"))]
-compile_error!("No compression backend selected; enable one of `zlib`, `zlib-ng`, `zlib-rs`, or the default `rust_backend` feature.");
+compile_error!(
+    "No compression backend selected; enable one of `zlib`, `zlib-ng`, `zlib-rs`, or the default `rust_backend` feature."
+);
 
 impl core::fmt::Debug for ErrorMessage {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {

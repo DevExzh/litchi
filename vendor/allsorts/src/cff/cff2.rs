@@ -6,19 +6,19 @@
 use std::fmt::{Debug, Write as _};
 
 use super::{
-    owned, read_local_subr_index, CFFError, CFFFont, CFFVariant, CIDData, Charset, CustomCharset,
-    Dict, DictDefault, DictDelta, Encoding, FDSelect, Index, IndexU32, MaybeOwnedIndex, Operand,
-    Operator, SubsetCFF, Type1Data, CFF, DEFAULT_BLUE_FUZZ, DEFAULT_BLUE_SCALE, DEFAULT_BLUE_SHIFT,
-    DEFAULT_EXPANSION_FACTOR, DEFAULT_FONT_MATRIX, ISO_ADOBE_LAST_SID, OFFSET_ZERO, OPERAND_ZERO,
-    STANDARD_STRINGS,
+    CFF, CFFError, CFFFont, CFFVariant, CIDData, Charset, CustomCharset, DEFAULT_BLUE_FUZZ,
+    DEFAULT_BLUE_SCALE, DEFAULT_BLUE_SHIFT, DEFAULT_EXPANSION_FACTOR, DEFAULT_FONT_MATRIX, Dict,
+    DictDefault, DictDelta, Encoding, FDSelect, ISO_ADOBE_LAST_SID, Index, IndexU32,
+    MaybeOwnedIndex, OFFSET_ZERO, OPERAND_ZERO, Operand, Operator, STANDARD_STRINGS, SubsetCFF,
+    Type1Data, owned, read_local_subr_index,
 };
 use crate::binary::budget;
 use crate::binary::read::{ReadArrayCow, ReadBinary, ReadCtxt, ReadScope};
 use crate::binary::write::{WriteBinary, WriteBinaryDep, WriteBuffer, WriteContext};
-use crate::binary::{I16Be, U16Be, U32Be, U8};
+use crate::binary::{I16Be, U8, U16Be, U32Be};
 use crate::cff::charstring::{
-    operator, ArgumentsStack, CharStringConversionError, CharStringVisitor,
-    CharStringVisitorContext, VariableCharStringVisitorContext, VisitOp, TWO_BYTE_OPERATOR_MARK,
+    ArgumentsStack, CharStringConversionError, CharStringVisitor, CharStringVisitorContext,
+    TWO_BYTE_OPERATOR_MARK, VariableCharStringVisitorContext, VisitOp, operator,
 };
 use crate::cff::subset::{
     rebuild_global_subr_index, rebuild_local_subr_indices, rebuild_type_1_local_subr_index,
@@ -35,7 +35,7 @@ use crate::tables::{
     Fixed, FontTableProvider, HeadTable, HheaTable, HmtxTable, MaxpTable, NameTable,
 };
 use crate::variations::VariationError;
-use crate::{cff, tag, SafeFrom, TryNumFrom};
+use crate::{SafeFrom, TryNumFrom, cff, tag};
 
 /// Maximum number of operands in Top DICT, Font DICTs, Private DICTs and CharStrings.
 ///
@@ -296,8 +296,7 @@ impl<'a> CFF2<'a> {
         // Calculate the width of each glyph. These are used to update the CharStrings when
         // converting from CFF2 to CFF CharStrings.
         let mut widths = Vec::new();
-        budget::reserve_vec(&mut widths, glyph_ids.len())
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::reserve_vec(&mut widths, glyph_ids.len()).map_err(|_| ParseError::LimitExceeded)?;
         for &glyph_id in glyph_ids {
             widths.push(hmtx.horizontal_advance(glyph_id)?);
         }
@@ -338,8 +337,8 @@ impl<'a> CFF2<'a> {
             // The count pass uses the same borrowed-input traversal and writer
             // callbacks as the output pass, so hint bytes, widths, and nested
             // subroutine operators are included.
-            let working_limit = budget::current()
-                .map_or(usize::MAX, |budget| budget.remaining_working());
+            let working_limit =
+                budget::current().map_or(usize::MAX, |budget| budget.remaining_working());
             let output_len = super::charstring::count_cff2_to_cff(
                 CFFFont::CFF2(font),
                 &self.char_strings_index,
@@ -399,9 +398,7 @@ impl<'a> CFF2<'a> {
         let mut name_data = Vec::new();
         budget::reserve_vec(&mut name_data, 1).map_err(|_| ParseError::LimitExceeded)?;
         name_data.push(name_bytes);
-        let name_index = owned::Index {
-            data: name_data,
-        };
+        let name_index = owned::Index { data: name_data };
 
         let mut string_table = StringTable::new()?;
         let glyph_names;
@@ -492,13 +489,12 @@ impl<'a> CFF2<'a> {
             Some(name) => name,
             None => budgeted_string("Unspecified")?,
         };
-        let notice = if let Some(trademark) =
-            name_table.string_for_id_with_budget(NameTable::TRADEMARK)?
-        {
-            join_names(&copyright, &trademark)?
-        } else {
-            budgeted_string(&copyright)?
-        };
+        let notice =
+            if let Some(trademark) = name_table.string_for_id_with_budget(NameTable::TRADEMARK)? {
+                join_names(&copyright, &trademark)?
+            } else {
+                budgeted_string(&copyright)?
+            };
         // Add notice to the string table and push its SID as the operand
         let sid = string_table.get_or_insert(&notice)?;
         cff::dict_push_with_budget(
@@ -677,8 +673,7 @@ impl<'a> CFF2<'a> {
         let post_script;
         if include_fstype {
             let mut generated = String::new();
-            budget::reserve_string(&mut generated, 64)
-                .map_err(|_| ParseError::LimitExceeded)?;
+            budget::reserve_string(&mut generated, 64).map_err(|_| ParseError::LimitExceeded)?;
             write!(
                 &mut generated,
                 "/FSType {} def /OrigFontType /TrueType def",
@@ -718,20 +713,12 @@ impl<'a> CFF2<'a> {
         // the actual offset when it does not refer to predefined data. Using 1 here ensures that
         // it is a non-default value and is not omitted when calculating the size of the written
         // Top DICT.
-        cff::dict_push_with_budget(
-            &mut top_dict,
-            Operator::Charset,
-            &[Operand::Offset(1)],
-        )?;
+        cff::dict_push_with_budget(&mut top_dict, Operator::Charset, &[Operand::Offset(1)])?;
 
         // Encoding - omitted as we use the default, Standard Encoding
 
         // CharStrings INDEX offset, will be updated when writing Top DICT
-        cff::dict_push_with_budget(
-            &mut top_dict,
-            Operator::CharStrings,
-            &[Operand::Offset(0)],
-        )?;
+        cff::dict_push_with_budget(&mut top_dict, Operator::CharStrings, &[Operand::Offset(0)])?;
 
         // The font names need to be stored out here because string_table borrows them. So they
         // have to live as long as that.
@@ -855,16 +842,8 @@ impl<'a> CFF2<'a> {
             let font_dict_index = MaybeOwnedIndex::Owned(owned::Index { data: font_dicts });
 
             // Add placeholders for FDArray and FDSelect
-            cff::dict_push_with_budget(
-                &mut top_dict,
-                Operator::FDArray,
-                &[Operand::Offset(0)],
-            )?;
-            cff::dict_push_with_budget(
-                &mut top_dict,
-                Operator::FDSelect,
-                &[Operand::Offset(0)],
-            )?;
+            cff::dict_push_with_budget(&mut top_dict, Operator::FDArray, &[Operand::Offset(0)])?;
+            cff::dict_push_with_budget(&mut top_dict, Operator::FDSelect, &[Operand::Offset(0)])?;
 
             // Ideally we'd combine this with rebuilding the subr indices below
             let (rebuild, local_subr_indices) = if used_local_subrs.is_empty() {
@@ -965,8 +944,7 @@ impl<'a> StringTable<'a> {
             .next_sid
             .checked_add(1)
             .ok_or(ParseError::LimitExceeded)?;
-        budget::reserve_for_push(&mut self.strings)
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::reserve_for_push(&mut self.strings).map_err(|_| ParseError::LimitExceeded)?;
         self.strings.push((s, sid));
         Ok(sid)
     }
@@ -974,8 +952,7 @@ impl<'a> StringTable<'a> {
     pub fn into_string_index(self) -> Result<owned::Index, ParseError> {
         let mut strings = self.strings;
         let mut data = Vec::new();
-        budget::reserve_vec(&mut data, strings.len())
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::reserve_vec(&mut data, strings.len()).map_err(|_| ParseError::LimitExceeded)?;
         strings.sort_unstable_by_key(|(_string, sid)| *sid);
         let non_standard_strings = strings.into_iter().filter_map(|(string, sid)| {
             (usize::from(sid) >= STANDARD_STRINGS.len()).then_some(string)
@@ -983,8 +960,7 @@ impl<'a> StringTable<'a> {
 
         for string in non_standard_strings {
             let mut bytes = Vec::new();
-            budget::reserve_vec(&mut bytes, string.len())
-                .map_err(|_| ParseError::LimitExceeded)?;
+            budget::reserve_vec(&mut bytes, string.len()).map_err(|_| ParseError::LimitExceeded)?;
             bytes.extend_from_slice(string.as_bytes());
             data.push(bytes);
         }
@@ -1020,16 +996,16 @@ impl CharStringVisitor<StackValue, VariationError> for CharStringInstancer<'_> {
             | VisitOp::HvCurveTo => {
                 write_stack(self.new_char_string, stack)?;
                 Ok(U8::write(self.new_char_string, op)?)
-            }
+            },
             VisitOp::Return | VisitOp::Endchar => {
                 // Removed in CFF2
                 Err(CFFError::InvalidOperator.into())
-            }
+            },
             VisitOp::Hflex | VisitOp::Flex | VisitOp::Hflex1 | VisitOp::Flex1 => {
                 write_stack(self.new_char_string, stack)?;
                 U8::write(self.new_char_string, TWO_BYTE_OPERATOR_MARK)?;
                 Ok(U8::write(self.new_char_string, op)?)
-            }
+            },
             VisitOp::VsIndex | VisitOp::Blend => Ok(()),
         }
     }
@@ -1050,8 +1026,7 @@ fn decimal_digits(mut value: usize) -> usize {
 
 fn budgeted_string(value: &str) -> Result<String, ParseError> {
     let mut string = String::new();
-    budget::reserve_string(&mut string, value.len())
-        .map_err(|_| ParseError::LimitExceeded)?;
+    budget::reserve_string(&mut string, value.len()).map_err(|_| ParseError::LimitExceeded)?;
     string.push_str(value);
     Ok(string)
 }
@@ -1129,8 +1104,7 @@ impl ReadBinary for CFF2<'_> {
 
         // Font/glyph data
         let mut fonts = Vec::new();
-        budget::reserve_vec(&mut fonts, fd_array.count)
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::reserve_vec(&mut fonts, fd_array.count).map_err(|_| ParseError::LimitExceeded)?;
         for font_index in 0..fd_array.count {
             let font_dict = fd_array.read::<FontDict>(font_index, MAX_OPERANDS)?;
             let (private_dict, private_dict_offset) =
@@ -1222,10 +1196,10 @@ impl WriteBinary for CFF2<'_> {
                 )
                 .map_err(|_| WriteError::LimitExceeded)?;
                 FDSelect::write(ctxt, fd_select)?;
-            }
+            },
             // If there is more than one font then FDSelect is required
             None if cff2.fonts.len() > 1 => return Err(WriteError::BadValue),
-            Some(_) | None => {}
+            Some(_) | None => {},
         }
 
         // Write out Private DICTs and Local Subr INDEXes so the offsets can be updated
@@ -1355,22 +1329,22 @@ impl WriteBinary for StackValue {
                         let int = int - 108;
                         U8::write(ctxt, ((int >> 8) + 247) as u8)?;
                         U8::write(ctxt, int as u8)
-                    }
+                    },
                     -1131..=-108 => {
                         let int = -int - 108;
                         U8::write(ctxt, ((int >> 8) + 251) as u8)?;
                         U8::write(ctxt, int as u8)
-                    }
+                    },
                     -32768..=32767 => {
                         U8::write(ctxt, operator::SHORT_INT)?;
                         I16Be::write(ctxt, int)
-                    }
+                    },
                 }
-            }
+            },
             StackValue::Fixed(fixed) => {
                 U8::write(ctxt, operator::FIXED_16_16)?;
                 Fixed::write(ctxt, fixed)
-            }
+            },
         }
     }
 }
@@ -1427,8 +1401,7 @@ pub(super) fn scalars(
     let regions = vstore.regions(vs_index)?;
     let (lower_bound, _) = regions.size_hint();
     let mut scalars = Vec::new();
-    budget::reserve_vec(&mut scalars, lower_bound)
-        .map_err(|_| ParseError::LimitExceeded)?;
+    budget::reserve_vec(&mut scalars, lower_bound).map_err(|_| ParseError::LimitExceeded)?;
     for region in regions {
         let region = region?;
         budget::reserve_for_push(&mut scalars).map_err(|_| ParseError::LimitExceeded)?;
@@ -1592,8 +1565,7 @@ fn mode(widths: &[u16]) -> Result<Option<u16>, ParseError> {
     }
 
     let mut sorted_widths = Vec::new();
-    budget::reserve_vec(&mut sorted_widths, widths.len())
-        .map_err(|_| ParseError::LimitExceeded)?;
+    budget::reserve_vec(&mut sorted_widths, widths.len()).map_err(|_| ParseError::LimitExceeded)?;
     sorted_widths.extend_from_slice(widths);
     sorted_widths.sort_unstable();
     let mut mode = (sorted_widths[0], 1);

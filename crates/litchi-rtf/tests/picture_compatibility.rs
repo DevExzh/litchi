@@ -12,9 +12,7 @@ use litchi_rtf::{ImageType, PictureCompatibilityKind, PictureCompatibilityRecord
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -87,7 +85,11 @@ fn preferred_and_fallback_share_position_and_round_trip_in_order() {
 
 #[test]
 fn typed_mutation_references_and_clears_without_deleting_picture() {
-    let mut document = Tree::parse(r"{\rtf1 A{\pict\pngblip 89504e470d0a1a0a}B}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1 A{\pict\pngblip 89504e470d0a1a0a}B}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     document
         .push_picture_compatibility_record(PictureCompatibilityRecord {
             position: 1,
@@ -139,6 +141,9 @@ fn rejects_hostile_wrapper_grammar() {
         r"{\rtf1{\*\shppict{\pict\pngblip 00}{\pict\pngblip 00}}}",
         r"{\rtf1{\*\shppict{\pict\pngblip 00}}{\*\shppict{\pict\pngblip 01}}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
 }

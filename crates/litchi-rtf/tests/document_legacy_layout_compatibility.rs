@@ -28,10 +28,13 @@ fn write(doc: &Tree<'_>) -> String {
 
 #[test]
 fn parses_complete_cluster_as_passive_metadata() {
-    let doc = Tree::parse(concat!(
-        r"{\rtf1\ansi\splytwnine\ftnlytwnine\htmautsp",
-        r"\useltbaln\oldas Body}"
-    ), litchi_rtf::read::OpenOptions::default())
+    let doc = Tree::parse(
+        concat!(
+            r"{\rtf1\ansi\splytwnine\ftnlytwnine\htmautsp",
+            r"\useltbaln\oldas Body}"
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let compatibility = doc.legacy_layout_compatibility();
     assert!(compatibility.do_not_use_word_97_shape_layout);
@@ -46,7 +49,11 @@ fn parses_complete_cluster_as_passive_metadata() {
 
 #[test]
 fn omission_is_empty_and_serializes_no_legacy_layout_flags() {
-    let doc = Tree::parse(r"{\rtf1\ansi Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let doc = Tree::parse(
+        r"{\rtf1\ansi Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(doc.legacy_layout_compatibility().is_empty());
     let serialized = write(&doc);
     for name in CONTROLS {
@@ -56,7 +63,11 @@ fn omission_is_empty_and_serializes_no_legacy_layout_flags() {
 
 #[test]
 fn typed_api_round_trips_in_specification_order_and_clears_inertly() {
-    let mut doc = Tree::parse(r"{\rtf1\ansi Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut doc = Tree::parse(
+        r"{\rtf1\ansi Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     doc.set_legacy_layout_compatibility(DocumentLegacyLayoutCompatibility {
         do_not_use_word_97_shape_layout: true,
         use_legacy_footnote_layout: true,
@@ -89,7 +100,11 @@ fn typed_api_round_trips_in_specification_order_and_clears_inertly() {
 #[test]
 fn accepts_each_flag_independently_without_layout_side_effects() {
     for name in CONTROLS {
-        let doc = Tree::parse(&format!(r"{{\rtf1\ansi\{name} Body}}"), litchi_rtf::read::OpenOptions::default()).unwrap();
+        let doc = Tree::parse(
+            &format!(r"{{\rtf1\ansi\{name} Body}}"),
+            litchi_rtf::read::OpenOptions::default(),
+        )
+        .unwrap();
         assert_eq!(doc.text(), "Body");
         assert!(doc.shapes().is_empty());
         assert!(doc.notes().is_empty());
@@ -107,13 +122,19 @@ fn rejects_parameters_duplicates_starred_grouped_and_late_flags() {
             format!(r"{{\rtf1\ansi Body\{name}}}"),
         ] {
             assert!(
-                repair_support::rejected_or_parameter_repaired(&Tree::parse(&input, litchi_rtf::read::OpenOptions::default())),
+                repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                    &input,
+                    litchi_rtf::read::OpenOptions::default()
+                )),
                 "accepted {input}"
             );
         }
     }
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Tree::parse(r"{\rtf1\ansi\oldas999999999999 Body}", litchi_rtf::read::OpenOptions::default())
+        &Tree::parse(
+            r"{\rtf1\ansi\oldas999999999999 Body}",
+            litchi_rtf::read::OpenOptions::default()
+        )
     ));
 }
 
@@ -123,7 +144,11 @@ fn parses_bundled_libreoffice_legacy_layout_flags() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf161878.rtf"
     );
-    let common = Tree::parse_bytes(&std::fs::read(common_path).unwrap(), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let common = Tree::parse_bytes(
+        &std::fs::read(common_path).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let compatibility = common.legacy_layout_compatibility();
     assert!(compatibility.do_not_use_word_97_shape_layout);
     assert!(compatibility.use_legacy_footnote_layout);
@@ -133,7 +158,11 @@ fn parses_bundled_libreoffice_legacy_layout_flags() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/fdo82006.rtf"
     );
-    let html = Tree::parse_bytes(&std::fs::read(html_path).unwrap(), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let html = Tree::parse_bytes(
+        &std::fs::read(html_path).unwrap(),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert!(
         html.legacy_layout_compatibility()
             .use_html_paragraph_auto_spacing

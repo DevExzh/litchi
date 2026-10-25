@@ -160,11 +160,7 @@ fn assert_one_block(source: &str, dialect: Dialect, expected: BlockKind) -> Resu
     Ok(())
 }
 
-fn read_with_policy(
-    source: &str,
-    dialect: Dialect,
-    limits: ReadLimits,
-) -> Result<Snapshot, Error> {
+fn read_with_policy(source: &str, dialect: Dialect, limits: ReadLimits) -> Result<Snapshot, Error> {
     Snapshot::read_with_options(
         source,
         OpenOptions::default().dialect(dialect).read_limits(limits),

@@ -9,8 +9,8 @@
 
 use super::super::*;
 use super::codec::{Charset, RtfWriter, WriterOptions};
-use crate::codec::limits::OpenOptions;
 use crate::Tree;
+use crate::codec::limits::OpenOptions;
 use litchi_codepage::Mbcs;
 use std::io;
 
@@ -179,7 +179,10 @@ fn checked_charsets_write_their_exact_header_controls() {
 
         let result = String::from_utf8(output).unwrap();
         assert!(result.contains(expected), "{charset:?}: {result}");
-        assert!(Tree::parse(&result, OpenOptions::default()).is_ok(), "{charset:?}: {result}");
+        assert!(
+            Tree::parse(&result, OpenOptions::default()).is_ok(),
+            "{charset:?}: {result}"
+        );
     }
 }
 
@@ -284,7 +287,11 @@ fn document_writer_round_trips_bookmark_ranges() {
 
 #[test]
 fn document_writer_preserves_bookmark_in_empty_body() {
-    let document = Tree::parse(r"{\rtf1{\*\bkmkstart Empty}{\*\bkmkend Empty}}", OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1{\*\bkmkstart Empty}{\*\bkmkend Empty}}",
+        OpenOptions::default(),
+    )
+    .unwrap();
     let mut output = Vec::new();
     RtfWriter::new(&mut output)
         .write_document(&document)
@@ -516,8 +523,11 @@ fn document_writer_round_trips_multiple_section_boundaries() {
 
 #[test]
 fn document_writer_round_trips_boundary_to_first_explicit_section() {
-    let document =
-        Tree::parse(r"{\rtf1\ansi Before\sect\sectd\sbknone{\header Second}After}", OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi Before\sect\sectd\sbknone{\header Second}After}",
+        OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "BeforeAfter");
     assert_eq!(document.sections().len(), 1);
     assert_eq!(
@@ -547,7 +557,11 @@ fn document_writer_round_trips_boundary_to_first_explicit_section() {
 
 #[test]
 fn document_writer_preserves_inherited_section_boundary() {
-    let document = Tree::parse(r"{\rtf1\ansi\sectd\sbknone One\sect Two}", OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi\sectd\sbknone One\sect Two}",
+        OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "OneTwo");
     assert_eq!(document.sections().len(), 1);
     assert_eq!(
@@ -570,7 +584,11 @@ fn document_writer_preserves_inherited_section_boundary() {
 
 #[test]
 fn document_writer_preserves_page_then_section_break_order() {
-    let document = Tree::parse(r"{\rtf1\ansi\sectd One\page\sect\sectd\sbknone Two}", OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi\sectd One\page\sect\sectd\sbknone Two}",
+        OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(document.text(), "OneTwo");
     assert_eq!(document.sections().len(), 2);
     assert_eq!(
@@ -592,10 +610,13 @@ fn document_writer_preserves_page_then_section_break_order() {
 
 #[test]
 fn document_writer_round_trips_libreoffice_multi_section_fixture() {
-    let document = Tree::parse(include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf94043.rtf"
-    )), OpenOptions::default())
+    let document = Tree::parse(
+        include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf94043.rtf"
+        )),
+        OpenOptions::default(),
+    )
     .unwrap();
     assert!(document.sections().len() >= 3);
     assert!(document.section_breaks().count() >= 3);

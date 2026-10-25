@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use ouroboros::self_referencing;
 
+use crate::GlyphId;
 use crate::binary::budget;
 use crate::binary::read::ReadScope;
 use crate::error::ParseError;
@@ -17,7 +18,6 @@ use crate::macroman::macroman_to_char;
 use crate::post::PostTable;
 use crate::tables::cmap::CmapSubtable;
 use crate::tables::{HheaTable, HmtxTable, MaxpTable};
-use crate::GlyphId;
 
 /// Retrieve glyph advance.
 ///
@@ -157,8 +157,7 @@ impl GlyphNames {
         let required = 1usize
             .checked_add(digits)
             .ok_or(ParseError::LimitExceeded)?;
-        budget::reserve_string(&mut fallback, required)
-            .map_err(|_| ParseError::LimitExceeded)?;
+        budget::reserve_string(&mut fallback, required).map_err(|_| ParseError::LimitExceeded)?;
         write!(&mut fallback, "g{gid}").map_err(|_| ParseError::BadValue)?;
         Ok(Cow::Owned(fallback))
     }
@@ -233,8 +232,7 @@ fn unique_glyph_names_budgeted<'a>(
     });
 
     let mut unique_names: Vec<(usize, Arc<Cow<'a, str>>)> = Vec::new();
-    budget::reserve_vec(&mut unique_names, source.len())
-        .map_err(|_| ParseError::LimitExceeded)?;
+    budget::reserve_vec(&mut unique_names, source.len()).map_err(|_| ParseError::LimitExceeded)?;
 
     let mut group_start = 0;
     while group_start < order.len() {
@@ -267,12 +265,10 @@ fn unique_glyph_names_budgeted<'a>(
                 let arc_bytes = size_of::<Cow<'a, str>>()
                     .checked_add(2 * size_of::<usize>())
                     .ok_or(ParseError::LimitExceeded)?;
-                budget::charge_allocation(arc_bytes)
-                    .map_err(|_| ParseError::LimitExceeded)?;
+                budget::charge_allocation(arc_bytes).map_err(|_| ParseError::LimitExceeded)?;
                 Arc::new(Cow::Owned(generated))
             };
-            budget::reserve_for_push(&mut unique_names)
-                .map_err(|_| ParseError::LimitExceeded)?;
+            budget::reserve_for_push(&mut unique_names).map_err(|_| ParseError::LimitExceeded)?;
             unique_names.push((index, unique_name));
         }
         group_start = group_end;
@@ -282,8 +278,7 @@ fn unique_glyph_names_budgeted<'a>(
     drop(source);
 
     let mut result = Vec::new();
-    budget::reserve_vec(&mut result, unique_names.len())
-        .map_err(|_| ParseError::LimitExceeded)?;
+    budget::reserve_vec(&mut result, unique_names.len()).map_err(|_| ParseError::LimitExceeded)?;
     for (_, name) in unique_names {
         result.push(Arc::try_unwrap(name).map_err(|_| ParseError::BadValue)?);
     }
@@ -306,32 +301,33 @@ impl Post {
                 Ok(Some(glyph_name)) if glyph_name != ".notdef" => {
                     // Doesn't seem possible to avoid this allocation
                     Some(Cow::from(glyph_name.to_owned()))
-                }
+                },
                 _ => None,
             }
         })
     }
 
     fn try_glyph_name<'a>(&self, gid: GlyphId) -> Result<Option<Cow<'a, str>>, ParseError> {
-        self.with_table(|post: &PostTable<'_>| {
-            match post.glyph_name(gid) {
-                Ok(Some(glyph_name)) if glyph_name != ".notdef" => {
-                    let mut owned = String::new();
-                    budget::reserve_string(&mut owned, glyph_name.len())
-                        .map_err(|_| ParseError::LimitExceeded)?;
-                    owned.push_str(glyph_name);
-                    Ok(Some(Cow::Owned(owned)))
-                }
-                Ok(_) => Ok(None),
-                Err(ParseError::LimitExceeded) => Err(ParseError::LimitExceeded),
-                Err(_) => Ok(None),
-            }
+        self.with_table(|post: &PostTable<'_>| match post.glyph_name(gid) {
+            Ok(Some(glyph_name)) if glyph_name != ".notdef" => {
+                let mut owned = String::new();
+                budget::reserve_string(&mut owned, glyph_name.len())
+                    .map_err(|_| ParseError::LimitExceeded)?;
+                owned.push_str(glyph_name);
+                Ok(Some(Cow::Owned(owned)))
+            },
+            Ok(_) => Ok(None),
+            Err(ParseError::LimitExceeded) => Err(ParseError::LimitExceeded),
+            Err(_) => Ok(None),
         })
     }
 }
 
 impl CmapMappings {
-    fn new(encoding: Encoding, subtable: &CmapSubtable<'_>) -> Result<Option<CmapMappings>, ParseError> {
+    fn new(
+        encoding: Encoding,
+        subtable: &CmapSubtable<'_>,
+    ) -> Result<Option<CmapMappings>, ParseError> {
         let mut mappings = Vec::new();
         budget::reserve_vec(&mut mappings, subtable.size_hint())
             .map_err(|_| ParseError::LimitExceeded)?;

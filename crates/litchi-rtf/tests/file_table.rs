@@ -39,10 +39,9 @@ fn parses_decodes_and_round_trips_file_table() {
     assert_eq!(doc.text().trim(), "Body");
 
     let mut first_bytes = Vec::new();
-    Writer::new(&mut first_bytes)
-        .write_document(&doc)
-        .unwrap();
-    let reparsed = Tree::parse_bytes(&first_bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
+    Writer::new(&mut first_bytes).write_document(&doc).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&first_bytes, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(table, reparsed.file_table().unwrap());
     let mut second_bytes = Vec::new();
     Writer::new(&mut second_bytes)

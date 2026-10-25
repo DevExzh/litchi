@@ -56,7 +56,11 @@ fn parses_and_canonically_round_trips_picture_identity() {
 
 #[test]
 fn accepts_real_empty_uid_but_rejects_malformed_identity_content() {
-    let empty = Tree::parse(r"{\rtf1{\pict\pngblip{\*\blipuid } 89504e470d0a1a0a}}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let empty = Tree::parse(
+        r"{\rtf1{\pict\pngblip{\*\blipuid } 89504e470d0a1a0a}}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         empty.pictures()[0]
             .identity

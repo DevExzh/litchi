@@ -4,10 +4,10 @@ use alloc::vec::Vec;
 use core::cmp;
 use core::mem;
 
-use super::{corrupt, read_into, GzBuilder, GzHeader, GzHeaderParser};
+use super::{GzBuilder, GzHeader, GzHeaderParser, corrupt, read_into};
+use crate::Compression;
 use crate::crc::CrcReader;
 use crate::deflate;
-use crate::Compression;
 
 fn copy(into: &mut [u8], from: &[u8], pos: &mut usize) -> usize {
     let min = cmp::min(into.len(), from.len() - *pos);
@@ -150,7 +150,7 @@ impl<R: BufRead> Read for GzEncoder<R> {
                 self.eof = true;
                 self.pos = 0;
                 self.read_footer(into)
-            }
+            },
             n => Ok(amt + n),
         }
     }
@@ -242,7 +242,7 @@ impl<R: BufRead> GzDecoder<R> {
             Ok(_) => GzState::Body(GzHeader::from(header_parser)),
             Err(ref err) if io::ErrorKind::WouldBlock == err.kind() => {
                 GzState::Header(header_parser)
-            }
+            },
             Err(err) => GzState::Err(err),
         };
 
@@ -310,7 +310,7 @@ impl<R: BufRead> Read for GzDecoder<R> {
                 GzState::Header(parser) => {
                     parser.parse(self.reader.get_mut().get_mut())?;
                     self.state = GzState::Body(GzHeader::from(mem::take(parser)));
-                }
+                },
                 GzState::Body(header) => {
                     if into.is_empty() {
                         return Ok(0);
@@ -318,12 +318,12 @@ impl<R: BufRead> Read for GzDecoder<R> {
                     match self.reader.read(into)? {
                         0 => {
                             self.state = GzState::Finished(mem::take(header), 0, [0; 8]);
-                        }
+                        },
                         n => {
                             return Ok(n);
-                        }
+                        },
                     }
-                }
+                },
                 GzState::Finished(header, pos, buf) => {
                     if *pos < buf.len() {
                         *pos += read_into(self.reader.get_mut().get_mut(), &mut buf[*pos..])?;
@@ -352,12 +352,12 @@ impl<R: BufRead> Read for GzDecoder<R> {
                             self.state = GzState::End(Some(mem::take(header)));
                         }
                     }
-                }
+                },
                 GzState::Err(err) => {
                     let result = Err(mem::replace(err, io::ErrorKind::Other.into()));
                     self.state = GzState::End(None);
                     return result;
-                }
+                },
                 GzState::End(_) => return Ok(0),
             }
         }
@@ -464,10 +464,10 @@ impl<R: BufRead> Read for MultiGzDecoder<R> {
 
 #[cfg(test)]
 mod test {
+    use crate::Compression;
     use crate::bufread::GzDecoder;
     use crate::gz::write;
     use crate::io::{Read, Write};
-    use crate::Compression;
     use alloc::vec::Vec;
 
     // GzDecoder consumes one gzip member and then returns 0 for subsequent reads, allowing any
@@ -510,8 +510,8 @@ mod test {
     }
 
     fn compress_data(data: &[u8]) -> Vec<u8> {
-        use crate::write::GzEncoder;
         use crate::Compression;
+        use crate::write::GzEncoder;
 
         let mut e = GzEncoder::new(Vec::new(), Compression::default());
         e.write_all(data).unwrap();

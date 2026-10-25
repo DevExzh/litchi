@@ -4,10 +4,10 @@
 //!
 //! <https://learn.microsoft.com/en-us/typography/opentype/spec/cpal>
 
-use crate::binary::read::{ReadArray, ReadBinary, ReadCtxt, ReadFrom};
-use crate::binary::{U16Be, U32Be, U8};
-use crate::error::ParseError;
 use crate::SafeFrom;
+use crate::binary::read::{ReadArray, ReadBinary, ReadCtxt, ReadFrom};
+use crate::binary::{U8, U16Be, U32Be};
+use crate::error::ParseError;
 
 /// `CPAL` — Color Palette Table
 pub struct CpalTable<'a> {

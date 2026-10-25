@@ -8,13 +8,11 @@
 )]
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{LegacyDrawingPrimitive, write::Writer, Shape, ShapeType};
+use litchi_rtf::{LegacyDrawingPrimitive, Shape, ShapeType, write::Writer};
 
 fn write(document: &Tree<'_>) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     output
 }
 
@@ -35,7 +33,8 @@ fn parses_real_libreoffice_legacy_shape_result_and_round_trips_canonically() {
         LegacyDrawingPrimitive::Line { .. }
     ));
 
-    let mut document = Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document =
+        Tree::parse(r"{\rtf1 Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
     let mut shape = Shape::new(ShapeType::Line);
     shape.result = Some(result.clone());
     document.set_background_shape(shape).unwrap();
@@ -53,7 +52,8 @@ fn parses_real_libreoffice_legacy_shape_result_and_round_trips_canonically() {
 #[test]
 fn accepts_text_only_producer_result_without_leaking_or_misrepresenting_it() {
     let document = Tree::parse(
-        r"{\rtf1 A{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}}}{\shprslt\par\pard fallback}}B}", litchi_rtf::read::OpenOptions::default()
+        r"{\rtf1 A{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 1}}}{\shprslt\par\pard fallback}}B}",
+        litchi_rtf::read::OpenOptions::default(),
     )
     .unwrap();
     assert_eq!(document.text(), "AB");
@@ -73,7 +73,10 @@ fn rejects_hostile_shape_result_grammar() {
         r"{\rtf1{\shp{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1} trailing}}}",
         r"{\rtf1{\shp{\*\shprslt{\*\do\dobxpage\dobypage\dodhgt0\dpline\dpptx0\dppty0\dpptx1\dppty1\dpx0\dpy0\dpxsize1\dpysize1}}{\sp{\sn x}{\sv 1}}}}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted malformed {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted malformed {source}"
+        );
     }
 }
 

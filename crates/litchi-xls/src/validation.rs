@@ -165,10 +165,7 @@ impl Limits {
     ///
     /// Returns [`Error::Ingress`] if the value is outside the CFB
     /// directory limit bounds.
-    pub fn with_max_directory_bytes(
-        mut self,
-        max_directory_bytes: u64,
-    ) -> Result<Self, Error> {
+    pub fn with_max_directory_bytes(mut self, max_directory_bytes: u64) -> Result<Self, Error> {
         let limits = SharedOleFileLimits::default()
             .with_max_directory_bytes(max_directory_bytes)
             .map_err(Error::Ingress)?;
@@ -260,10 +257,7 @@ impl From<OleError> for Error {
 ///
 /// Returns an error for source I/O/version changes, bounded allocation
 /// failure, or bounded report-construction failure.
-pub fn validate_source(
-    source: Arc<dyn ReadAt>,
-    limits: Limits,
-) -> Result<ValidateReport, Error> {
+pub fn validate_source(source: Arc<dyn ReadAt>, limits: Limits) -> Result<ValidateReport, Error> {
     let expected_version = source
         .version()
         .map_err(|error| Error::Ingress(OleError::Io(error)))?;
@@ -396,9 +390,7 @@ pub fn validate_source(
         statuses[4] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
         statuses[8] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
         let report = finish_report(statuses, issues, limits.report);
-        shared
-            .source_version()
-            .map_err(Error::Ingress)?;
+        shared.source_version().map_err(Error::Ingress)?;
         return report;
     };
 
@@ -415,9 +407,7 @@ pub fn validate_source(
             statuses[5] = CheckStatus::stopped_by(check_id(WORKBOOK_STREAM, limits.report)?);
         }
         let report = finish_report(statuses, issues, limits.report);
-        shared
-            .source_version()
-            .map_err(Error::Ingress)?;
+        shared.source_version().map_err(Error::Ingress)?;
         return report;
     }
 
@@ -698,9 +688,7 @@ pub fn validate_source(
     }
 
     let report = finish_report(statuses, issues, limits.report);
-    shared
-        .source_version()
-        .map_err(Error::Ingress)?;
+    shared.source_version().map_err(Error::Ingress)?;
     report
 }
 
@@ -856,10 +844,7 @@ fn read_u16(data: &[u8], offset: usize) -> Option<u16> {
     Some(u16::from_le_bytes([bytes[0], bytes[1]]))
 }
 
-fn inspect_filepass_record(
-    output: &mut Analysis,
-    payload: &[u8],
-) -> Result<(), Error> {
+fn inspect_filepass_record(output: &mut Analysis, payload: &[u8]) -> Result<(), Error> {
     output.filepass_count = output
         .filepass_count
         .checked_add(1)
@@ -1791,10 +1776,7 @@ enum LogicalEntry {
     Stream(u64),
 }
 
-fn logical_stream_len(
-    shared: &SharedOleFile,
-    name: &str,
-) -> Result<LogicalEntry, Error> {
+fn logical_stream_len(shared: &SharedOleFile, name: &str) -> Result<LogicalEntry, Error> {
     match shared.stream_len(&[name]) {
         Ok(size) => Ok(LogicalEntry::Stream(size)),
         Err(OleError::StreamNotFound) => Ok(LogicalEntry::Missing),
@@ -2552,10 +2534,7 @@ fn is_directory_limit_error(error: &OleError) -> bool {
     )
 }
 
-fn require_version(
-    source: &dyn ReadAt,
-    expected: litchi_core::SourceVersion,
-) -> Result<(), Error> {
+fn require_version(source: &dyn ReadAt, expected: litchi_core::SourceVersion) -> Result<(), Error> {
     let observed = source
         .version()
         .map_err(|error| Error::Ingress(OleError::Io(error)))?;
@@ -2579,11 +2558,7 @@ fn try_reserve<T>(
         .map_err(|_| Error::Allocation(resource))
 }
 
-fn try_push<T>(
-    values: &mut Vec<T>,
-    value: T,
-    resource: &'static str,
-) -> Result<(), Error> {
+fn try_push<T>(values: &mut Vec<T>, value: T, resource: &'static str) -> Result<(), Error> {
     if values.len() == values.capacity() {
         try_reserve(values, 1, resource)?;
     }

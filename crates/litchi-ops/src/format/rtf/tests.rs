@@ -67,7 +67,8 @@ fn compressed_transports_open_through_the_same_route() {
 #[test]
 fn metadata_matches_the_facade_projection() {
     let bytes = std::fs::read(fixture("rtf/chtoutline.rtf")).expect("read");
-    let leaf = Tree::from_owned_bytes(bytes.clone(), litchi_rtf::read::OpenOptions::default()).expect("leaf RTF");
+    let leaf = Tree::from_owned_bytes(bytes.clone(), litchi_rtf::read::OpenOptions::default())
+        .expect("leaf RTF");
     let info = leaf.info();
     let metadata = open_detected(bytes)
         .metadata()

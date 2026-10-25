@@ -68,7 +68,13 @@ fn paragraph_revision_metadata_resets_with_pard() {
 
 #[test]
 fn negative_paragraph_revision_author_is_rejected() {
-    assert!(Tree::parse(r"{\rtf1\ansi\prauth-1 X\par}", litchi_rtf::read::OpenOptions::default()).is_err());
+    assert!(
+        Tree::parse(
+            r"{\rtf1\ansi\prauth-1 X\par}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -152,12 +158,36 @@ fn cell_revision_marks_and_metadata_round_trip() {
 #[test]
 fn cell_revision_metadata_requires_matching_mark() {
     // Author/DTTM companions require a preceding \clins/\cldel/\clmrgd.
-    assert!(Tree::parse(r"{\rtf1\trowd\clinsauth1\cellx900\intbl A\cell\row}", litchi_rtf::read::OpenOptions::default()).is_err());
-    assert!(Tree::parse(r"{\rtf1\trowd\cldel\clinsdttm1\cellx900\intbl A\cell\row}", litchi_rtf::read::OpenOptions::default()).is_err());
+    assert!(
+        Tree::parse(
+            r"{\rtf1\trowd\clinsauth1\cellx900\intbl A\cell\row}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
+    assert!(
+        Tree::parse(
+            r"{\rtf1\trowd\cldel\clinsdttm1\cellx900\intbl A\cell\row}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
     // Conflicting revision markers on one cell are rejected.
-    assert!(Tree::parse(r"{\rtf1\trowd\clins\cldel\cellx900\intbl A\cell\row}", litchi_rtf::read::OpenOptions::default()).is_err());
+    assert!(
+        Tree::parse(
+            r"{\rtf1\trowd\clins\cldel\cellx900\intbl A\cell\row}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
     // Negative author indices are rejected.
-    assert!(Tree::parse(r"{\rtf1\trowd\clins\clinsauth-1\cellx900\intbl A\cell\row}", litchi_rtf::read::OpenOptions::default()).is_err());
+    assert!(
+        Tree::parse(
+            r"{\rtf1\trowd\clins\clinsauth-1\cellx900\intbl A\cell\row}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -178,7 +208,10 @@ fn cell_revision_resets_per_cell_and_row() {
     assert_eq!(rows[1].cells()[0].revision(), None);
 
     let first = write(&document);
-    assert_eq!(first, write(&Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap()));
+    assert_eq!(
+        first,
+        write(&Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap())
+    );
 }
 
 #[test]
@@ -199,7 +232,10 @@ fn nested_table_cell_and_row_revision_round_trip() {
     assert_eq!(revision.metadata, metadata(2, 8));
 
     let first = write(&document);
-    assert_eq!(first, write(&Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap()));
+    assert_eq!(
+        first,
+        write(&Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap())
+    );
     assert!(first.contains("\\trauth1"), "missing trauth in {first}");
     assert!(first.contains("\\cldel"), "missing cldel in {first}");
 }

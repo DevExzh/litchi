@@ -160,7 +160,7 @@ impl MatchType {
                 let mark_attach_class =
                     gdef::mark_attach_class(opt_gdef_table, glyph.get_glyph_index());
                 (glyph_class != 3) || (mark_attach_class == u16::from(keep_class))
-            }
+            },
             IgnoreMarks::IgnoreMarksInSet(index) => {
                 (glyph_class != 3)
                     || gdef::glyph_is_mark_in_set(
@@ -168,7 +168,7 @@ impl MatchType {
                         glyph.get_glyph_index(),
                         index.into(),
                     )
-            }
+            },
         }
     }
 
@@ -250,7 +250,7 @@ impl MatchType {
                     if !check_glyph_table(glyph_table, i, glyph_index) {
                         return false;
                     }
-                }
+                },
                 None => return false,
             }
         }
@@ -275,7 +275,7 @@ impl MatchType {
                     if !check_glyph_table(glyph_table, i, glyph_index) {
                         return None;
                     }
-                }
+                },
                 None => return None,
             }
         }
@@ -314,11 +314,7 @@ impl MatchContext<'_> {
                     &mut front_index,
                 )
                 .is_some();
-        if matched {
-            range
-        } else {
-            None
-        }
+        if matched { range } else { None }
     }
 }
 
@@ -328,7 +324,7 @@ fn check_glyph_table(glyph_table: &GlyphTable<'_>, i: usize, glyph_index: u16) -
         GlyphTable::ById(table) => table[i] == glyph_index,
         GlyphTable::ByClassDef(classdef, table) => {
             classdef.glyph_class_value(glyph_index) == table[i]
-        }
+        },
         GlyphTable::ByCoverage(vec) => vec[i].glyph_coverage_value(glyph_index).is_some(),
     }
 }

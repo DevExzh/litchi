@@ -4,13 +4,13 @@
 //!
 //! <https://learn.microsoft.com/en-us/typography/opentype/spec/gvar>
 
+use crate::SafeFrom;
 use crate::binary::read::{ReadBinary, ReadCtxt, ReadScope, ReadUnchecked};
 use crate::binary::{U16Be, U32Be};
 use crate::error::ParseError;
+use crate::tables::F2Dot14;
 use crate::tables::loca::LocaOffsets;
 use crate::tables::variable_fonts::{ReadTuple, TupleVariationStore};
-use crate::tables::F2Dot14;
-use crate::SafeFrom;
 use std::fmt;
 use std::fmt::Formatter;
 

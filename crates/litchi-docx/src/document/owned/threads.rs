@@ -130,12 +130,9 @@ impl Edit<Package> {
                 let limits = crate::mail_merge::mce_limits_for_source(
                     &self.package.opc_package().read_limits(),
                 );
-                let xml = crate::modern_comments::write_comments_extended(
-                    &items,
-                    conformance,
-                    &limits,
-                )
-                    .map_err(Error::Document)?;
+                let xml =
+                    crate::modern_comments::write_comments_extended(&items, conformance, &limits)
+                        .map_err(Error::Document)?;
                 self.stage_related_part(
                     COMMENTS_EXTENDED_RELATIONSHIP,
                     ("", "commentsExtended", ".xml"),
@@ -150,9 +147,8 @@ impl Edit<Package> {
             && let Some((name, _)) = self.related_part(COMMENTS_IDS_RELATIONSHIP)?
             && let Some(xml) = self.part_payload(&name)?
         {
-            let limits = crate::mail_merge::mce_limits_for_source(
-                &self.package.opc_package().read_limits(),
-            );
+            let limits =
+                crate::mail_merge::mce_limits_for_source(&self.package.opc_package().read_limits());
             let updated = map_durable_ids(&xml, assigned, &limits)?;
             if updated.as_slice() != xml.as_slice() {
                 self.replace_part(&name, updated)?;
@@ -339,12 +335,14 @@ fn upsert_entries(
         edits.push((close, close, appended));
     }
     edits.sort_by_key(|(start, end, _)| (*start, *end));
-    let output_len = edits.iter().try_fold(xml.len(), |length, (start, end, bytes)| {
-        length
-            .checked_sub(end.saturating_sub(*start))
-            .and_then(|length| length.checked_add(bytes.len()))
-            .ok_or_else(|| invalid("commentsExtended output length overflow"))
-    })?;
+    let output_len = edits
+        .iter()
+        .try_fold(xml.len(), |length, (start, end, bytes)| {
+            length
+                .checked_sub(end.saturating_sub(*start))
+                .and_then(|length| length.checked_add(bytes.len()))
+                .ok_or_else(|| invalid("commentsExtended output length overflow"))
+        })?;
     ensure_output_bytes(output_len, limits)?;
     let mut output = Vec::with_capacity(output_len);
     let mut cursor = 0usize;

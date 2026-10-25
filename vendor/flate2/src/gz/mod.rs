@@ -161,7 +161,7 @@ impl GzHeaderParser {
                         None
                     };
                     self.state = GzHeaderState::Xlen(crc, 0, [0; 2]);
-                }
+                },
                 GzHeaderState::Xlen(crc, count, buffer) => {
                     if self.flags & FEXTRA != 0 {
                         while (*count as usize) < buffer.len() {
@@ -176,7 +176,7 @@ impl GzHeaderParser {
                     } else {
                         self.state = GzHeaderState::Filename(crc.take());
                     }
-                }
+                },
                 GzHeaderState::Extra(crc, count) => {
                     debug_assert!(self.header.extra.is_some());
                     let extra = self.header.extra.as_mut().unwrap();
@@ -187,7 +187,7 @@ impl GzHeaderParser {
                         crc.update(extra);
                     }
                     self.state = GzHeaderState::Filename(crc.take());
-                }
+                },
                 GzHeaderState::Filename(crc) => {
                     if self.flags & FNAME != 0 {
                         let filename = self.header.filename.get_or_insert_with(Vec::new);
@@ -198,7 +198,7 @@ impl GzHeaderParser {
                         }
                     }
                     self.state = GzHeaderState::Comment(crc.take());
-                }
+                },
                 GzHeaderState::Comment(crc) => {
                     if self.flags & FCOMMENT != 0 {
                         let comment = self.header.comment.get_or_insert_with(Vec::new);
@@ -209,7 +209,7 @@ impl GzHeaderParser {
                         }
                     }
                     self.state = GzHeaderState::Crc(crc.take(), 0, [0; 2]);
-                }
+                },
                 GzHeaderState::Crc(crc, count, buffer) => {
                     if let Some(crc) = crc {
                         debug_assert!(self.flags & FHCRC != 0);
@@ -223,10 +223,10 @@ impl GzHeaderParser {
                         }
                     }
                     self.state = GzHeaderState::Complete;
-                }
+                },
                 GzHeaderState::Complete => {
                     return Ok(());
-                }
+                },
             }
         }
     }
@@ -270,13 +270,13 @@ fn read_to_nul<R: BufRead>(r: &mut R, buffer: &mut Vec<u8>) -> Result<()> {
                     ErrorKind::InvalidInput,
                     "gzip header field too long",
                 ));
-            }
+            },
             Some(byte) => {
                 buffer.push(byte);
-            }
+            },
             None => {
                 return Err(ErrorKind::UnexpectedEof.into());
-            }
+            },
         }
     }
 }
@@ -470,9 +470,9 @@ mod tests {
     use alloc::string::{String, ToString};
     use alloc::vec::Vec;
 
-    use super::{read, write, GzBuilder, GzHeaderParser};
+    use super::{GzBuilder, GzHeaderParser, read, write};
     use crate::{Compression, GzHeader};
-    use rand::{rng, Rng};
+    use rand::{Rng, rng};
 
     #[test]
     fn roundtrip() {

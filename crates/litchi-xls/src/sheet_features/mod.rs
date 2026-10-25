@@ -163,8 +163,7 @@ impl Package {
     ) -> crate::package::Result<Features> {
         let stream = self.workbook_stream()?;
         let limits = self.raw_record_limits()?;
-        read::features(&stream, sheet, select, &limits)
-            .map_err(crate::package::Error::Reader)
+        read::features(&stream, sheet, select, &limits).map_err(crate::package::Error::Reader)
     }
 
     /// The workbook palette (`Palette`, or the default one), the colors a

@@ -118,12 +118,8 @@ fn valid_source_report_reuses_catalog_and_reports_external_presence_only() {
         None,
     )
     .unwrap();
-    let report = validate_source_backed(
-        &package,
-        Limits::default(),
-        ValidationLimits::default(),
-    )
-    .unwrap();
+    let report =
+        validate_source_backed(&package, Limits::default(), ValidationLimits::default()).unwrap();
 
     assert!(matches!(
         status(&report, "pptx.package.loaded_relationships_content_types"),

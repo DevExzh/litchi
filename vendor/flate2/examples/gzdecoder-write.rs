@@ -1,5 +1,5 @@
-use flate2::write::{GzDecoder, GzEncoder};
 use flate2::Compression;
+use flate2::write::{GzDecoder, GzEncoder};
 use std::io;
 use std::io::prelude::*;
 

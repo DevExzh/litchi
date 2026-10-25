@@ -10,13 +10,11 @@
 mod repair_support;
 
 use litchi_rtf::raw::Tree;
-use litchi_rtf::{write::Writer, TablePreferredWidthUnit, TextDirection};
+use litchi_rtf::{TablePreferredWidthUnit, TextDirection, write::Writer};
 
 fn write(document: &Tree<'_>) -> String {
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(document)
-        .unwrap();
+    Writer::new(&mut output).write_document(document).unwrap();
     String::from_utf8(output).unwrap()
 }
 
@@ -135,7 +133,8 @@ fn applies_end_defined_nested_widths_and_owned_conversion() {
         Some(625)
     );
     assert_eq!(nested.cells()[0].right_boundary(), Some(700));
-    let reparsed = Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     let nested = &reparsed.tables()[0].rows()[0].cells()[0].nested_tables()[0]
         .table
         .rows()[0];
@@ -170,7 +169,10 @@ fn rejects_malformed_duplicate_unpaired_and_out_of_range_controls() {
     ] {
         let source = format!("{{\\rtf1\\trowd\\{controls}\\cellx1000\\intbl X\\cell\\row}}");
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(&source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                &source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {controls}"
         );
     }
@@ -185,10 +187,13 @@ fn parses_real_libreoffice_unit_only_invisible_widths() {
     let marker = fixture.find(pair).unwrap();
     let start = fixture[..marker].rfind("\\trowd").unwrap();
     let end = marker + pair.len();
-    let document = Tree::parse(&format!(
-        "{{\\rtf1{}\\cellx1000\\intbl X\\cell\\row}}",
-        &fixture[start..end]
-    ), litchi_rtf::read::OpenOptions::default())
+    let document = Tree::parse(
+        &format!(
+            "{{\\rtf1{}\\cellx1000\\intbl X\\cell\\row}}",
+            &fixture[start..end]
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
     .unwrap();
     let row = &document.tables()[0].rows()[0];
     assert!(
@@ -205,7 +210,8 @@ fn parses_real_libreoffice_unit_only_invisible_widths() {
                 |width| width.unit() == TablePreferredWidthUnit::Twips && width.value() == Some(0)
             )
     );
-    let reparsed = Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
+    let reparsed =
+        Tree::parse(&write(&document), litchi_rtf::read::OpenOptions::default()).unwrap();
     assert!(
         reparsed.tables()[0].rows()[0]
             .geometry()

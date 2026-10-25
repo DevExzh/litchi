@@ -53,9 +53,7 @@ fn parses_and_round_trips_complete_inert_mail_merge_metadata() {
     assert_eq!(object.recipient_data, ["1,1,0"]);
 
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let reparsed = Tree::from_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), "Body");
     assert_eq!(reparsed.mail_merge(), document.mail_merge());
@@ -63,7 +61,11 @@ fn parses_and_round_trips_complete_inert_mail_merge_metadata() {
 
 #[test]
 fn ergonomic_api_round_trips_without_interpreting_values() {
-    let mut document = Tree::parse(r"{\rtf1 Safe body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut document = Tree::parse(
+        r"{\rtf1 Safe body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let mut object = MailMergeDataSourceObject {
         source_type: Some(MailMergeDataSourceType::from_rtf(99)),
         ..MailMergeDataSourceObject::default()
@@ -81,9 +83,7 @@ fn ergonomic_api_round_trips_without_interpreting_values() {
     document.set_mail_merge(merge).unwrap();
 
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let reparsed = Tree::from_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(reparsed.text(), "Safe body");
     assert_eq!(reparsed.mail_merge(), document.mail_merge());
@@ -98,7 +98,10 @@ fn rejects_duplicate_nonstarred_nested_and_oversized_metadata() {
         r"{\rtf1{\*\mailmerge{\*\mmquery before{nested}after}}}",
         r"{\rtf1{\*\mailmerge{\*\mmodso{\*\mmodsofldmpdata{\*\mmodsoname MissingColumn}}}}}",
     ] {
-        assert!(Tree::parse(malformed, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted {malformed}");
+        assert!(
+            Tree::parse(malformed, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {malformed}"
+        );
     }
 
     let oversized = "x".repeat(MAX_MAIL_MERGE_STRING_BYTES + 1);

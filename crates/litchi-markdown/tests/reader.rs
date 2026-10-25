@@ -1,7 +1,7 @@
 use litchi_markdown::reader::{
-    BlockKind, Dialect, Error, History, HistoryLimits, InlineKind, JoinError, Patch,
-    OpenOptions, PatchEnvelopeLimits, ProjectionCapabilities, ProjectionIssueKind, ReadLimits,
-    ReferenceKind, Snapshot,
+    BlockKind, Dialect, Error, History, HistoryLimits, InlineKind, JoinError, OpenOptions, Patch,
+    PatchEnvelopeLimits, ProjectionCapabilities, ProjectionIssueKind, ReadLimits, ReferenceKind,
+    Snapshot,
 };
 
 #[test]
@@ -115,7 +115,10 @@ fn open_options_are_retained_across_text_and_bytes_ingress() -> Result<(), Error
     let snapshot = Snapshot::read_with_options(source, options)?;
     assert_eq!(snapshot.dialect(), Dialect::GitHubFlavored);
     assert_eq!(snapshot.limits(), limits);
-    assert_eq!(snapshot.block(0).map(|block| block.kind()), Some(BlockKind::Table));
+    assert_eq!(
+        snapshot.block(0).map(|block| block.kind()),
+        Some(BlockKind::Table)
+    );
 
     let bytes = Snapshot::read_bytes_with_options(source.as_bytes(), options)?;
     assert_eq!(bytes.source(), source);
@@ -505,10 +508,8 @@ fn replay_keeps_recipient_policy_for_noop_and_changed_commits() -> Result<(), Er
         max_operations: 1,
         ..ReadLimits::DEFAULT
     };
-    let recipient = Snapshot::read_with_options(
-        "one",
-        OpenOptions::default().read_limits(recipient_limits),
-    )?;
+    let recipient =
+        Snapshot::read_with_options("one", OpenOptions::default().read_limits(recipient_limits))?;
 
     let mut no_op_edit = producer.edit();
     no_op_edit.replace_block(0, "one")?;
@@ -545,17 +546,15 @@ fn replay_keeps_recipient_policy_for_noop_and_changed_commits() -> Result<(), Er
 }
 
 #[test]
-fn replay_rejects_stricter_recipient_policy_atomically_and_keeps_dialect_explicit() -> Result<(), Error>
-{
+fn replay_rejects_stricter_recipient_policy_atomically_and_keeps_dialect_explicit()
+-> Result<(), Error> {
     let producer = Snapshot::read("one")?;
     let strict_limits = ReadLimits {
         max_source_bytes: 3,
         ..ReadLimits::DEFAULT
     };
-    let recipient = Snapshot::read_with_options(
-        "one",
-        OpenOptions::default().read_limits(strict_limits),
-    )?;
+    let recipient =
+        Snapshot::read_with_options("one", OpenOptions::default().read_limits(strict_limits))?;
     let mut edit = producer.edit();
     edit.replace_block(0, "long")?;
     let commit = edit.commit()?;
@@ -624,10 +623,8 @@ fn strict_history_replay_failure_preserves_existing_undo_and_redo_branches() -> 
         max_source_bytes: 3,
         ..ReadLimits::DEFAULT
     };
-    let recipient = Snapshot::read_with_options(
-        "one",
-        OpenOptions::default().read_limits(strict_limits),
-    )?;
+    let recipient =
+        Snapshot::read_with_options("one", OpenOptions::default().read_limits(strict_limits))?;
     let mut history = History::new(
         recipient,
         HistoryLimits {
@@ -944,11 +941,7 @@ fn snapshots_are_send_sync_and_cheap_to_clone() -> Result<(), Error> {
     Ok(())
 }
 
-fn read_with_policy(
-    source: &str,
-    dialect: Dialect,
-    limits: ReadLimits,
-) -> Result<Snapshot, Error> {
+fn read_with_policy(source: &str, dialect: Dialect, limits: ReadLimits) -> Result<Snapshot, Error> {
     Snapshot::read_with_options(
         source,
         OpenOptions::default().dialect(dialect).read_limits(limits),

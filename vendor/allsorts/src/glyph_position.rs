@@ -9,12 +9,12 @@
 //! incremented by the advance of each glyph as they are processed. The position of a particular
 //! glyph is the current pen position plus `x_offset` and `y_offset`.
 
+use crate::Font;
 use crate::context::Glyph;
 use crate::error::ParseError;
 use crate::gpos::{Info, Placement};
 use crate::tables::FontTableProvider;
 use crate::unicode::codepoint::is_upright_char;
-use crate::Font;
 
 /// Used to calculate the position of shaped glyphs.
 pub struct GlyphLayout<'f, 'i, T>
@@ -83,7 +83,7 @@ impl<'f, 'i, T: FontTableProvider> GlyphLayout<'f, 'i, T> {
                 Placement::None => positions[i].update(hori_advance, vert_advance, 0, 0),
                 Placement::Distance(dx, dy) => {
                     positions[i].update(hori_advance, vert_advance, dx, dy)
-                }
+                },
                 Placement::MarkAnchor(base_index, base_anchor, mark_anchor) => {
                     has_marks = true;
                     match self.infos.get(base_index) {
@@ -95,17 +95,17 @@ impl<'f, 'i, T: FontTableProvider> GlyphLayout<'f, 'i, T> {
                             let offset_x = i32::from(base_anchor.x) - i32::from(mark_anchor.x) + dx;
                             let offset_y = i32::from(base_anchor.y) - i32::from(mark_anchor.y) + dy;
                             positions[i].update(hori_advance, vert_advance, offset_x, offset_y);
-                        }
+                        },
                         None => {
                             return Err(ParseError::BadIndex);
-                        }
+                        },
                     }
-                }
+                },
                 Placement::MarkOverprint(base_index) => {
                     has_marks = true;
                     positions[i].update_advance(0, 0);
                     self.infos.get(base_index).ok_or(ParseError::BadIndex)?;
-                }
+                },
                 Placement::CursiveAnchor(exit_glyph_index, _, _, _) => {
                     has_cursive_connection = true;
                     // Validate index
@@ -121,7 +121,7 @@ impl<'f, 'i, T: FontTableProvider> GlyphLayout<'f, 'i, T> {
                         ..positions[i]
                     };
                     positions[i] = new_glyph;
-                }
+                },
             };
         }
 
@@ -146,7 +146,7 @@ impl<'f, 'i, T: FontTableProvider> GlyphLayout<'f, 'i, T> {
                 Placement::None
                 | Placement::Distance(_, _)
                 | Placement::MarkAnchor(_, _, _)
-                | Placement::MarkOverprint(_) => {}
+                | Placement::MarkOverprint(_) => {},
                 Placement::CursiveAnchor(
                     exit_glyph_index,
                     rtl_flag,
@@ -184,11 +184,11 @@ impl<'f, 'i, T: FontTableProvider> GlyphLayout<'f, 'i, T> {
                         TextDirection::LeftToRight => {
                             positions[first_glyph_index].hori_advance =
                                 i32::from(entry_glyph_anchor.x)
-                        }
+                        },
                         TextDirection::RightToLeft => {
                             positions[first_glyph_index].hori_advance +=
                                 i32::from(entry_glyph_anchor.x)
-                        }
+                        },
                     }
 
                     // Cross-stream direction
@@ -220,7 +220,7 @@ impl<'f, 'i, T: FontTableProvider> GlyphLayout<'f, 'i, T> {
                             );
                         }
                     }
-                }
+                },
             }
         }
     }
@@ -230,7 +230,7 @@ impl<'f, 'i, T: FontTableProvider> GlyphLayout<'f, 'i, T> {
             match info.placement {
                 Placement::None
                 | Placement::Distance(_, _)
-                | Placement::CursiveAnchor(_, _, _, _) => {}
+                | Placement::CursiveAnchor(_, _, _, _) => {},
                 Placement::MarkAnchor(base_index, _, _) => {
                     let base_pos = positions[base_index];
                     let (hori_advance_offset, vert_advance_offset) = match self.direction {
@@ -249,19 +249,19 @@ impl<'f, 'i, T: FontTableProvider> GlyphLayout<'f, 'i, T> {
                         TextDirection::LeftToRight => {
                             position.x_offset -= hori_advance_offset;
                             position.y_offset -= vert_advance_offset;
-                        }
+                        },
                         TextDirection::RightToLeft => {
                             position.x_offset += hori_advance_offset;
                             position.y_offset += vert_advance_offset;
-                        }
+                        },
                     }
-                }
+                },
                 Placement::MarkOverprint(base_index) => {
                     let base_pos = positions[base_index];
                     let position = &mut positions[i];
                     position.x_offset = base_pos.x_offset;
                     position.y_offset = base_pos.y_offset;
-                }
+                },
             }
         }
     }

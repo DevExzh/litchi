@@ -123,7 +123,10 @@ const SEEDS: &[(&str, &str)] = &[
 
 fn parse_all(prefixes: &[u8]) {
     for end in 0..=prefixes.len() {
-        drop(Tree::parse_bytes(&prefixes[..end], litchi_rtf::read::OpenOptions::default()));
+        drop(Tree::parse_bytes(
+            &prefixes[..end],
+            litchi_rtf::read::OpenOptions::default(),
+        ));
     }
 }
 
@@ -133,13 +136,19 @@ fn mutate_all(seed: &[u8]) {
         for &replacement in REPLACEMENTS {
             let mut mutated = seed.to_vec();
             mutated[index] = replacement;
-            drop(Tree::parse_bytes(&mutated, litchi_rtf::read::OpenOptions::default()));
+            drop(Tree::parse_bytes(
+                &mutated,
+                litchi_rtf::read::OpenOptions::default(),
+            ));
         }
         // Also flip the byte through all values that change control-word shape.
         for replacement in *b"a9- *" {
             let mut mutated = seed.to_vec();
             mutated[index] = replacement;
-            drop(Tree::parse_bytes(&mutated, litchi_rtf::read::OpenOptions::default()));
+            drop(Tree::parse_bytes(
+                &mutated,
+                litchi_rtf::read::OpenOptions::default(),
+            ));
         }
     }
 }
@@ -149,7 +158,8 @@ fn truncation_sweeps_never_panic() {
     for (name, seed) in SEEDS {
         parse_all(seed.as_bytes());
         // The seed itself must parse: sweeps only guard against panics.
-        Tree::parse(seed, litchi_rtf::read::OpenOptions::default()).unwrap_or_else(|error| panic!("seed {name} does not parse: {error}"));
+        Tree::parse(seed, litchi_rtf::read::OpenOptions::default())
+            .unwrap_or_else(|error| panic!("seed {name} does not parse: {error}"));
     }
 }
 

@@ -42,10 +42,9 @@ fn parses_decodes_and_round_trips_embedded_fonts() {
     assert_eq!(table.get(2).unwrap().embedded, None);
 
     let mut first_pass = Vec::new();
-    Writer::new(&mut first_pass)
-        .write_document(&doc)
-        .unwrap();
-    let reparsed = Tree::parse_bytes(&first_pass, litchi_rtf::read::OpenOptions::default()).unwrap();
+    Writer::new(&mut first_pass).write_document(&doc).unwrap();
+    let reparsed =
+        Tree::parse_bytes(&first_pass, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(doc.font_table(), reparsed.font_table());
     let mut second_pass = Vec::new();
     Writer::new(&mut second_pass)
@@ -112,7 +111,8 @@ fn rejects_malformed_embedded_fonts() {
         r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg1200 a.ttf}}Arial;}}}",
         r"{\rtf1{\fonttbl{\f0\fnil{\*\fontemb\ftnil{\*\fontfile\cpg65000 a.ttf}}Arial;}}}",
     ] {
-        let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap_or_else(|error| panic!("{source}: {error}"));
+        let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default())
+            .unwrap_or_else(|error| panic!("{source}: {error}"));
         let report = document.tolerance_report();
         assert!(!report.is_clean(), "{source}");
         assert!(

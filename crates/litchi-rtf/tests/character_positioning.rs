@@ -151,9 +151,7 @@ fn wire_positioning_boundaries_and_explicit_expansion_resets_round_trip() {
     assert_eq!(block(&document, "ScaleReset").formatting.char_scale, 100);
 
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let reopened = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         block(&reopened, "Quarter").formatting.character_positioning,
@@ -191,12 +189,13 @@ fn wire_positioning_boundaries_and_explicit_expansion_resets_round_trip() {
 
 #[test]
 fn writer_is_deterministic_and_preserves_units() {
-    let document =
-        Tree::parse(r"{\rtf1 A{\up2\expndtw-15\charscalex75\kerning8 B}{\sub\expnd3 C}}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let document = Tree::parse(
+        r"{\rtf1 A{\up2\expndtw-15\charscalex75\kerning8 B}{\sub\expnd3 C}}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     let mut first = Vec::new();
-    Writer::new(&mut first)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut first).write_document(&document).unwrap();
     let first_text = String::from_utf8(first).unwrap();
     assert!(first_text.contains("\\up2"));
     assert!(first_text.contains("\\expndtw-15"));
@@ -206,9 +205,7 @@ fn writer_is_deterministic_and_preserves_units() {
         block(&document, "B").formatting.character_positioning
     );
     let mut second = Vec::new();
-    Writer::new(&mut second)
-        .write_document(&reparsed)
-        .unwrap();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
     assert_eq!(first_text, String::from_utf8(second).unwrap());
 }
 
@@ -247,14 +244,26 @@ fn rejects_out_of_range_parameters() {
         r"{\rtf1{\stylesheet{\s0\nosupersub1 Normal;}}Body}",
     ] {
         assert!(
-            repair_support::rejected_or_parameter_repaired(&Tree::parse(source, litchi_rtf::read::OpenOptions::default())),
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
             "accepted {source}"
         );
     }
-    assert!(Tree::parse(r"{\rtf1 A{\*\unknown\nosupersub1 hidden}B}", litchi_rtf::read::OpenOptions::default()).is_ok());
     assert!(
-        Tree::parse(r"{\rtf1{\stylesheet{\s0 Normal;}{\*\futurestyle\nosupersub1 ignored;}}Body}", litchi_rtf::read::OpenOptions::default())
-            .is_ok()
+        Tree::parse(
+            r"{\rtf1 A{\*\unknown\nosupersub1 hidden}B}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
+    );
+    assert!(
+        Tree::parse(
+            r"{\rtf1{\stylesheet{\s0 Normal;}{\*\futurestyle\nosupersub1 ignored;}}Body}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
     );
 }
 
@@ -297,9 +306,11 @@ fn typed_zero_baseline_offsets_are_invalid_but_wire_zero_is_normal() {
 
 #[test]
 fn non_body_stories_preserve_one_baseline_and_refuse_mixed_states() {
-    let document =
-        Tree::parse(r"{\rtf1\ansi{\header {\super\aup2 Head}}A{\footnote {\sub\adn2 Note}}B}", litchi_rtf::read::OpenOptions::default())
-            .unwrap();
+    let document = Tree::parse(
+        r"{\rtf1\ansi{\header {\super\aup2 Head}}A{\footnote {\sub\adn2 Note}}B}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         document.sections()[0].headers_footers[0].paragraphs[0]
             .formatting
@@ -326,9 +337,7 @@ fn non_body_stories_preserve_one_baseline_and_refuse_mixed_states() {
         Some(AssociatedCharacterBaseline::LoweredHalfPoints(2))
     );
     let mut output = Vec::new();
-    Writer::new(&mut output)
-        .write_document(&document)
-        .unwrap();
+    Writer::new(&mut output).write_document(&document).unwrap();
     let reopened = Tree::parse_bytes(&output, litchi_rtf::read::OpenOptions::default()).unwrap();
     assert_eq!(
         reopened.sections()[0].headers_footers[0].paragraphs[0]
@@ -364,11 +373,17 @@ fn non_body_stories_preserve_one_baseline_and_refuse_mixed_states() {
         r"{\rtf1 A{\footnote\adn2 One\par\adn4 Two}B}",
         r"{\rtf1\ansi{\header\super One\line\sub Two}Body}",
     ] {
-        assert!(Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(), "accepted {source}");
+        assert!(
+            Tree::parse(source, litchi_rtf::read::OpenOptions::default()).is_err(),
+            "accepted {source}"
+        );
     }
 
-    let representable =
-        Tree::parse(r"{\rtf1\ansi{\header\super One\par\nosupersub Two}Body}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let representable = Tree::parse(
+        r"{\rtf1\ansi{\header\super One\par\nosupersub Two}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
     assert_eq!(
         representable.sections()[0].headers_footers[0].paragraphs[0]
             .formatting

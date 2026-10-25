@@ -17,9 +17,9 @@ use scripts::SCRIPTS;
 use crate::big5::{big5_to_unicode, unicode_to_big5};
 use crate::binary::read::ReadScope;
 use crate::error::{ParseError, ReadWriteError, WriteError};
-use crate::font::{find_good_cmap_subtable, Encoding};
+use crate::font::{Encoding, find_good_cmap_subtable};
 use crate::font_data::{DynamicFontTableProvider, FontData};
-use crate::layout::{LangSys, LayoutTable, GPOS, GSUB};
+use crate::layout::{GPOS, GSUB, LangSys, LayoutTable};
 use crate::macroman::{char_to_macroman, macroman_to_char};
 use crate::tables::cmap::{Cmap, CmapSubtable};
 use crate::tables::os2::Os2;
@@ -28,7 +28,7 @@ use crate::tables::{
     FontTableProvider, MaxpTable, NameTable, OpenTypeData, OpenTypeFont, SfntVersion,
 };
 use crate::tag::DisplayTag;
-use crate::{tables, tag, SafeFrom};
+use crate::{SafeFrom, tables, tag};
 
 mod features;
 mod langsys;
@@ -272,7 +272,7 @@ pub fn specimen(
         FontData::OpenType(OpenTypeFont {
             data: OpenTypeData::Single(_),
             ..
-        }) => {}
+        }) => {},
         FontData::OpenType(OpenTypeFont {
             data: OpenTypeData::Collection(ttc),
             ..
@@ -282,13 +282,13 @@ pub fn specimen(
                 options.index + 1,
                 ttc.offset_tables.len()
             ));
-        }
+        },
         FontData::Woff(_) => {
             font_type.push_str(" (WOFF)");
-        }
+        },
         FontData::Woff2(_) => {
             font_type.push_str(" (WOFF2)");
-        }
+        },
     };
     let version = name
         .string_for_id(NameTable::VERSION_STRING)
@@ -512,7 +512,7 @@ fn character_variant(tag: u32) -> Option<u8> {
     match tag.to_be_bytes() {
         [b'c', b'v', a, b] if a.is_ascii_digit() && b.is_ascii_digit() => {
             Some(((a - b'0') * 10) + (b - b'0'))
-        }
+        },
         _ => None,
     }
 }
@@ -641,7 +641,7 @@ fn to_unicode_fn(encoding: Encoding) -> fn(u32, u16) -> Option<char> {
                 ch + 0xF000
             };
             std::char::from_u32((char_code0 + 0x20) - u32::from(first_char)) // Perform subtraction last to avoid underflow.
-                                                                             // }
+            // }
         },
         Encoding::AppleRoman => |char_code, _| macroman_to_char(char_code as u8),
         Encoding::Big5 => |char_code, _| u16::try_from(char_code).ok().and_then(big5_to_unicode),
@@ -740,7 +740,7 @@ fn escape_html(f: &mut upon::fmt::Formatter<'_>, value: &upon::Value) -> upon::f
         value => {
             // Fallback to default formatter
             return upon::fmt::default(f, value);
-        }
+        },
     };
 
     let mut last = 0;
@@ -758,8 +758,8 @@ fn escape_html(f: &mut upon::fmt::Formatter<'_>, value: &upon::Value) -> upon::f
                 };
                 f.write_str(s)?;
                 last = i + 1;
-            }
-            _ => {}
+            },
+            _ => {},
         }
     }
     if last < s.len() {

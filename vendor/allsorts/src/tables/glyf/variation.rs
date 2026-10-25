@@ -3,19 +3,19 @@ use std::ops::RangeInclusive;
 
 use pathfinder_geometry::rect::RectF;
 use pathfinder_geometry::transform2d::{Matrix2x2F, Transform2F};
-use pathfinder_geometry::vector::{vec2f, Vector2F};
+use pathfinder_geometry::vector::{Vector2F, vec2f};
 
+use crate::SafeFrom;
 use crate::error::ParseError;
 use crate::tables::glyf::{
-    calculate_phantom_points, BoundingBox, ComponentOffsets, CompositeGlyph,
-    CompositeGlyphArgument, CompositeGlyphComponent, CompositeGlyphFlag, CompositeGlyphFlagExt,
-    EmptyGlyph, GlyfRecord, GlyfTable, Glyph, PhantomPoints, Point, SimpleGlyph, SimpleGlyphFlags,
+    BoundingBox, ComponentOffsets, CompositeGlyph, CompositeGlyphArgument, CompositeGlyphComponent,
+    CompositeGlyphFlag, CompositeGlyphFlagExt, EmptyGlyph, GlyfRecord, GlyfTable, Glyph,
+    PhantomPoints, Point, SimpleGlyph, SimpleGlyphFlags, calculate_phantom_points,
 };
 use crate::tables::os2::Os2;
-use crate::tables::variable_fonts::gvar::{GvarTable, NumPoints};
 use crate::tables::variable_fonts::OwnedTuple;
+use crate::tables::variable_fonts::gvar::{GvarTable, NumPoints};
 use crate::tables::{HheaTable, HmtxTable};
-use crate::SafeFrom;
 
 impl<'a> Glyph {
     /// Apply glyph variation to the supplied glyph according to the variation
@@ -45,7 +45,7 @@ impl<'a> Glyph {
                 apply_phantom_point_deltas(&mut phantom_points, &deltas);
                 empty.phantom_points = Some(phantom_points);
                 Ok(())
-            }
+            },
             Glyph::Simple(simple_glyph) => {
                 // Calculate the phantom points before variations are applied
                 let mut phantom_points = calculate_phantom_points(
@@ -93,7 +93,7 @@ impl<'a> Glyph {
 
                 // TODO: Update flag 1 in head?
                 Ok(())
-            }
+            },
             Glyph::Composite(composite) => {
                 // Calculate the phantom points before variations are applied
                 let mut phantom_points = calculate_phantom_points(
@@ -119,7 +119,7 @@ impl<'a> Glyph {
                 composite.phantom_points = Some(Box::new(phantom_points));
 
                 Ok(())
-            }
+            },
         }
     }
 
@@ -142,7 +142,7 @@ impl<'a> Glyph {
             Glyph::Simple(simple) => simple.phantom_points = Some(Box::new(phantom_points)),
             Glyph::Composite(composite) => {
                 composite.phantom_points = Some(Box::new(phantom_points))
-            }
+            },
         }
     }
 }
@@ -208,7 +208,7 @@ impl CompositeGlyph {
                                 vector: Vector2F::zero(),
                             };
                             child_bbox = transform * (child_bbox + offset);
-                        }
+                        },
                         // scale, then translate - this the default for Transform2F
                         ComponentOffsets::Unscaled => {
                             let transform = Transform2F {
@@ -216,9 +216,9 @@ impl CompositeGlyph {
                                 vector: offset,
                             };
                             child_bbox = transform * child_bbox;
-                        }
+                        },
                     }
-                }
+                },
                 // just translate
                 None => child_bbox = child_bbox + offset,
             }
@@ -361,7 +361,7 @@ fn infer_unreferenced_points(
                 // No points in this contour were referenced; no inferred deltas need to
                 // be computed.
                 continue;
-            }
+            },
             1 => {
                 // If exactly one point from the contour is referenced in the point number list,
                 // then every point in that contour uses the same X and Y delta values as that
@@ -378,18 +378,18 @@ fn infer_unreferenced_points(
                 // Set all the deltas in this contour to `reference_delta`
                 deltas[usize_range].fill(reference_delta);
                 continue;
-            }
+            },
             n if n == range_len => {
                 // All points in this contour were referenced; no inferred deltas need to
                 // be computed.
                 continue;
-            }
+            },
             _ => {
                 // If the point number list includes some but not all of the points in a given
                 // contour, then inferred deltas must be derived for the points that were not
                 // included in the point number list.
                 infer_contour(&range, deltas, raw_deltas, simple_glyph)?;
-            }
+            },
         }
     }
     Ok(())

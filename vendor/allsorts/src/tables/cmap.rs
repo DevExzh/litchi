@@ -12,12 +12,12 @@ use std::collections::HashMap;
 
 use itertools::izip;
 
+use crate::SafeFrom;
 use crate::binary::read::{ReadArray, ReadArrayIter, ReadBinary, ReadCtxt, ReadFrom, ReadScope};
 use crate::binary::write::{WriteBinary, WriteContext};
-use crate::binary::{I16Be, U16Be, U32Be, U8};
+use crate::binary::{I16Be, U8, U16Be, U32Be};
 use crate::error::{ParseError, WriteError};
 use crate::size;
-use crate::SafeFrom;
 
 use self::owned::CmapSubtable as OwnedCmapSubtable;
 
@@ -171,7 +171,7 @@ impl ReadBinary for CmapSubtable<'_> {
                     language,
                     glyph_id_array,
                 })
-            }
+            },
             2 => {
                 let _length = usize::from(ctxt.read_u16be()?);
                 let language = ctxt.read_u16be()?;
@@ -191,7 +191,7 @@ impl ReadBinary for CmapSubtable<'_> {
                     sub_headers,
                     sub_headers_scope,
                 })
-            }
+            },
             4 => {
                 let length = usize::from(ctxt.read_u16be()?);
                 let language = ctxt.read_u16be()?;
@@ -218,7 +218,7 @@ impl ReadBinary for CmapSubtable<'_> {
                     id_range_offsets,
                     glyph_id_array,
                 }))
-            }
+            },
             6 => {
                 let _length = ctxt.read_u16be()?;
                 let language = ctxt.read_u16be()?;
@@ -230,7 +230,7 @@ impl ReadBinary for CmapSubtable<'_> {
                     first_code,
                     glyph_id_array,
                 })
-            }
+            },
             10 => {
                 let reserved = ctxt.read_u16be()?;
                 ctxt.check(reserved == 0)?;
@@ -244,7 +244,7 @@ impl ReadBinary for CmapSubtable<'_> {
                     start_char_code,
                     glyph_id_array,
                 })
-            }
+            },
             12 => {
                 let reserved = ctxt.read_u16be()?;
                 ctxt.check(reserved == 0)?;
@@ -253,7 +253,7 @@ impl ReadBinary for CmapSubtable<'_> {
                 let num_groups = usize::try_from(ctxt.read_u32be()?)?;
                 let groups = ctxt.read_array::<SequentialMapGroup>(num_groups)?;
                 Ok(CmapSubtable::Format12 { language, groups })
-            }
+            },
             _ => Err(ParseError::BadVersion),
         }
     }
@@ -272,12 +272,12 @@ impl<'a> WriteBinary<&Self> for CmapSubtable<'a> {
                 U16Be::write(ctxt, u16::try_from(3 * size::U16 + glyph_id_array.len())?)?; // length
                 U16Be::write(ctxt, *language)?;
                 <&ReadArray<'_, _>>::write(ctxt, glyph_id_array)?;
-            }
+            },
             CmapSubtable::Format2 { .. } => {
                 // Not implemented for now. Format 2 is rarely seen in the wild and would generally
                 // not be generated for a subset font (the most common path for font writing)
                 return Err(WriteError::NotImplemented);
-            }
+            },
             CmapSubtable::Format4(CmapSubtableFormat4 {
                 language,
                 end_codes,
@@ -305,7 +305,7 @@ impl<'a> WriteBinary<&Self> for CmapSubtable<'a> {
                 <&ReadArray<'_, _>>::write(ctxt, id_range_offsets)?;
                 <&ReadArray<'_, _>>::write(ctxt, glyph_id_array)?;
                 ctxt.write_placeholder(length, u16::try_from(ctxt.bytes_written() - start)?)?;
-            }
+            },
             CmapSubtable::Format6 {
                 language,
                 first_code,
@@ -320,7 +320,7 @@ impl<'a> WriteBinary<&Self> for CmapSubtable<'a> {
                 U16Be::write(ctxt, u16::try_from(glyph_id_array.len())?)?;
                 <&ReadArray<'_, _>>::write(ctxt, glyph_id_array)?;
                 ctxt.write_placeholder(length, u16::try_from(ctxt.bytes_written() - start)?)?;
-            }
+            },
             CmapSubtable::Format10 {
                 language,
                 start_char_code,
@@ -336,7 +336,7 @@ impl<'a> WriteBinary<&Self> for CmapSubtable<'a> {
                 U32Be::write(ctxt, u32::try_from(glyph_id_array.len())?)?;
                 <&ReadArray<'_, _>>::write(ctxt, glyph_id_array)?;
                 ctxt.write_placeholder(length, u32::try_from(ctxt.bytes_written() - start)?)?;
-            }
+            },
             CmapSubtable::Format12 { language, groups } => {
                 let start = ctxt.bytes_written();
 
@@ -347,7 +347,7 @@ impl<'a> WriteBinary<&Self> for CmapSubtable<'a> {
                 U32Be::write(ctxt, u32::try_from(groups.len())?)?;
                 <&ReadArray<'_, _>>::write(ctxt, groups)?;
                 ctxt.write_placeholder(length, u32::try_from(ctxt.bytes_written() - start)?)?;
-            }
+            },
         }
 
         Ok(())
@@ -504,7 +504,7 @@ impl CmapSubtable<'_> {
             } => {
                 let index = usize::safe_from(ch);
                 Ok(glyph_id_array.get_item(index).map(u16::from))
-            }
+            },
             CmapSubtable::Format2 {
                 ref sub_header_keys,
                 ref sub_headers,
@@ -553,7 +553,7 @@ impl CmapSubtable<'_> {
                 }
 
                 Ok(Some(glyph_id))
-            }
+            },
             CmapSubtable::Format4(ref format4) => format4.map_glyph(ch),
             CmapSubtable::Format6 {
                 first_code,
@@ -567,7 +567,7 @@ impl CmapSubtable<'_> {
                 } else {
                     Ok(None)
                 }
-            }
+            },
             CmapSubtable::Format10 {
                 start_char_code,
                 ref glyph_id_array,
@@ -579,7 +579,7 @@ impl CmapSubtable<'_> {
                 } else {
                     Ok(None)
                 }
-            }
+            },
             CmapSubtable::Format12 { ref groups, .. } => {
                 for group in groups {
                     if group.start_char_code <= ch && ch <= group.end_char_code {
@@ -588,7 +588,7 @@ impl CmapSubtable<'_> {
                     }
                 }
                 Ok(None)
-            }
+            },
         }
     }
 
@@ -652,7 +652,7 @@ impl CmapSubtable<'_> {
                     language: *language,
                     groups: groups.to_vec(),
                 }))
-            }
+            },
         }
     }
 
@@ -683,7 +683,7 @@ impl CmapSubtable<'_> {
                     // cast is safe as format 0 can only contain 256 glyphs
                     callback(ch as u32, u16::from(gid))
                 }
-            }
+            },
             CmapSubtable::Format2 {
                 sub_header_keys,
                 sub_headers,
@@ -740,7 +740,7 @@ impl CmapSubtable<'_> {
                         }
                     }
                 }
-            }
+            },
             CmapSubtable::Format4(format4) => format4.mappings_fn(callback)?,
             CmapSubtable::Format6 {
                 language: _,
@@ -751,7 +751,7 @@ impl CmapSubtable<'_> {
                     // cast is safe as the entryCount of the glyphIdArray is a 16-bit value
                     callback(u32::from(*first_code) + index as u32, gid)
                 }
-            }
+            },
             CmapSubtable::Format10 {
                 language: _,
                 start_char_code,
@@ -761,7 +761,7 @@ impl CmapSubtable<'_> {
                     let index = u32::try_from(index)?;
                     callback(*start_char_code + index, gid)
                 }
-            }
+            },
             CmapSubtable::Format12 { groups, .. } => {
                 for record in groups.iter() {
                     for (i, ch) in (record.start_char_code..=record.end_char_code).enumerate() {
@@ -771,7 +771,7 @@ impl CmapSubtable<'_> {
                         )
                     }
                 }
-            }
+            },
         }
 
         Ok(())
@@ -786,7 +786,7 @@ impl CmapSubtable<'_> {
             CmapSubtable::Format2 { .. } => 0, // TODO: Implement if needed in mappings_fn
             CmapSubtable::Format4(CmapSubtableFormat4 { glyph_id_array, .. }) => {
                 glyph_id_array.len()
-            }
+            },
             CmapSubtable::Format6 { glyph_id_array, .. } => glyph_id_array.len(),
             CmapSubtable::Format10 { glyph_id_array, .. } => glyph_id_array.len(),
             CmapSubtable::Format12 { groups, .. } => groups
@@ -929,8 +929,8 @@ fn offset_to_index(
 
 pub mod owned {
     use super::{
-        size, EncodingId, Format4, Format4Calculator, I16Be, ParseError, PlatformId,
-        SequentialMapGroup, U16Be, U32Be, WriteBinary, WriteContext, WriteError,
+        EncodingId, Format4, Format4Calculator, I16Be, ParseError, PlatformId, SequentialMapGroup,
+        U16Be, U32Be, WriteBinary, WriteContext, WriteError, size,
     };
     use crate::binary::budget;
 
@@ -996,7 +996,7 @@ pub mod owned {
                     } else {
                         Ok(None)
                     }
-                }
+                },
                 CmapSubtable::Format4(ref format4) => format4.map_glyph(ch),
                 CmapSubtable::Format6 {
                     first_code,
@@ -1015,7 +1015,7 @@ pub mod owned {
                     } else {
                         Ok(None)
                     }
-                }
+                },
                 CmapSubtable::Format10 {
                     start_char_code,
                     ref glyph_id_array,
@@ -1032,7 +1032,7 @@ pub mod owned {
                     } else {
                         Ok(None)
                     }
-                }
+                },
                 CmapSubtable::Format12(CmapSubtableFormat12 { ref groups, .. }) => {
                     for group in groups {
                         if group.start_char_code <= ch && ch <= group.end_char_code {
@@ -1041,7 +1041,7 @@ pub mod owned {
                         }
                     }
                     Ok(None)
-                }
+                },
             }
         }
     }
@@ -1118,7 +1118,7 @@ pub mod owned {
                     U16Be::write(ctxt, u16::try_from(3 * size::U16 + glyph_id_array.len())?)?; // length
                     U16Be::write(ctxt, language)?;
                     ctxt.write_bytes(glyph_id_array.as_ref())?;
-                }
+                },
                 CmapSubtable::Format4(CmapSubtableFormat4 {
                     language,
                     end_codes,
@@ -1146,7 +1146,7 @@ pub mod owned {
                     ctxt.write_vec::<U16Be, _>(id_range_offsets)?;
                     ctxt.write_vec::<U16Be, _>(glyph_id_array)?;
                     ctxt.write_placeholder(length, u16::try_from(ctxt.bytes_written() - start)?)?;
-                }
+                },
                 CmapSubtable::Format6 {
                     language,
                     first_code,
@@ -1161,7 +1161,7 @@ pub mod owned {
                     U16Be::write(ctxt, u16::try_from(glyph_id_array.len())?)?;
                     ctxt.write_vec::<U16Be, _>(glyph_id_array)?;
                     ctxt.write_placeholder(length, u16::try_from(ctxt.bytes_written() - start)?)?;
-                }
+                },
                 CmapSubtable::Format10 {
                     language,
                     start_char_code,
@@ -1177,7 +1177,7 @@ pub mod owned {
                     U32Be::write(ctxt, u32::try_from(glyph_id_array.len())?)?;
                     ctxt.write_vec::<U16Be, _>(glyph_id_array)?;
                     ctxt.write_placeholder(length, u32::try_from(ctxt.bytes_written() - start)?)?;
-                }
+                },
                 CmapSubtable::Format12(CmapSubtableFormat12 { language, groups }) => {
                     let start = ctxt.bytes_written();
 
@@ -1188,7 +1188,7 @@ pub mod owned {
                     U32Be::write(ctxt, u32::try_from(groups.len())?)?;
                     ctxt.write_vec::<SequentialMapGroup, _>(groups)?;
                     ctxt.write_placeholder(length, u32::try_from(ctxt.bytes_written() - start)?)?;
-                }
+                },
             }
 
             Ok(())
@@ -1264,10 +1264,10 @@ mod tests {
             EncodingId::MACINTOSH_APPLE_ROMAN,
             |cmap_subtable| {
                 match cmap_subtable {
-                    CmapSubtable::Format0 { .. } => {}
+                    CmapSubtable::Format0 { .. } => {},
                     _ => {
                         panic!("expected CmapSubtable::Format0");
-                    }
+                    },
                 };
 
                 let mappings = cmap_subtable.mappings().unwrap();
@@ -1333,10 +1333,10 @@ mod tests {
             EncodingId(3),
             |cmap_subtable| {
                 match cmap_subtable {
-                    CmapSubtable::Format4 { .. } => {}
+                    CmapSubtable::Format4 { .. } => {},
                     _ => {
                         panic!("expected CmapSubtable::Format4");
-                    }
+                    },
                 };
 
                 let mappings = cmap_subtable.mappings().unwrap();
@@ -1361,10 +1361,10 @@ mod tests {
             EncodingId::WINDOWS_UNICODE_BMP_UCS2,
             |cmap_subtable| {
                 match cmap_subtable {
-                    CmapSubtable::Format4 { .. } => {}
+                    CmapSubtable::Format4 { .. } => {},
                     _ => {
                         panic!("expected CmapSubtable::Format4");
-                    }
+                    },
                 };
             },
         );
@@ -1378,10 +1378,10 @@ mod tests {
             EncodingId::MACINTOSH_APPLE_ROMAN,
             |cmap_subtable| {
                 match cmap_subtable {
-                    CmapSubtable::Format6 { .. } => {}
+                    CmapSubtable::Format6 { .. } => {},
                     _ => {
                         panic!("expected CmapSubtable::Format6");
-                    }
+                    },
                 };
 
                 let mappings = cmap_subtable.mappings().unwrap();
@@ -1401,10 +1401,10 @@ mod tests {
             EncodingId::WINDOWS_UNICODE_UCS4,
             |cmap_subtable| {
                 match cmap_subtable {
-                    CmapSubtable::Format12 { .. } => {}
+                    CmapSubtable::Format12 { .. } => {},
                     _ => {
                         panic!("expected CmapSubtable::Format12");
-                    }
+                    },
                 };
 
                 let mappings = cmap_subtable.mappings().unwrap();

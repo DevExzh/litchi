@@ -2,8 +2,8 @@
 
 //! Reading and writing of binary data.
 
-pub mod read;
 pub mod budget;
+pub mod read;
 pub mod write;
 
 /// Calculate the length required to 32-bit (long) align data of length `len`
