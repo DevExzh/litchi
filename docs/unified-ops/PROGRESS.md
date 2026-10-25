@@ -4776,8 +4776,21 @@ See [0063](0063-source-pptx-modern-comments.md).
   structural failure and policy refusal. A direct dependency path keeps the
   Allsorts allocation query and decoder on the same vendored zlib-rs instance
   for standalone consumers. New root and standalone lock identities still
-  require explicit review and guarded validation; no font acceptance is
-  claimed. ODF, DOCX and PPT continue actual validation and finite repairs;
-  crypto's final encrypted-consumer checks pass and await atomic composition.
+  require guarded validation; root records the reviewed source transitions
+  and installs the new locks only in the isolated font leaf. Source review
+  returns the remaining public glyph-mapping/subsetter APIs for required
+  limits, a selected loader limit for typed propagation, and real preparation
+  boundary tests. Public capabilities must remain available; an ambient-only
+  budget or privatization is not accepted.
+
+  DOCX's corrected modern-comment sizing passes independent review and the
+  full library suite. Broader checks still require complete tracked fixture
+  hydration. PPT's copied-payload test now has an independently derived exact
+  288-byte boundary and a 287-byte refusal; the earlier failed guesses remain
+  preserved. ODF is correcting missing required-limit consumers exposed by
+  actual compilation. Crypto's final encrypted-consumer checks pass, but
+  review finds that ops unlock drops selected encryption profiles for DOCX,
+  PPTX and XLSX. That lane is returned for retention fixes and focused tests
+  before atomic composition. The four bounded validation slots remain active.
   Fresh integrated capture, full gate, the pending signed-batch contract choice
   and actual native/performance qualification remain required. Nothing is pushed.
