@@ -27,6 +27,15 @@ FACADE_COMMIT_PATHS = frozenset({
 # identity before extracting the alias's owner argument.
 ODF_METADATA_COMMIT = ("litchi_odf_common", "metadata", "Commit")
 
+# rustdoc JSON for a dependency may omit a root re-export while retaining the
+# defining item's canonical path. This is an explicit, audited binding for
+# the one external root limit type registered by the glossary; it is not a
+# basename heuristic and must be extended only with reviewed re-export
+# provenance.
+CANONICAL_ROOT_REEXPORTS = {
+    ("litchi_opc", "SourceLimits"): ("litchi_opc", "limits", "SourceLimits"),
+}
+
 
 class ReturnTypes:
     def __init__(self, surface):
@@ -106,26 +115,19 @@ class ReturnTypes:
                 and entry.get("crate_id") != self.surface.crate_id
                 and entry.get("kind") in NOMINAL_KINDS
             ]
-            if not candidates and len(path) == 2:
-                # A dependency's root type re-export is often absent from a
-                # caller's rustdoc paths table.  Rustdoc still records the
-                # defining item under its canonical module path, so resolve a
-                # root re-export only when exactly one external nominal item
-                # has the same crate root and final component.  Nested paths
-                # deliberately do not use this spelling fallback: accepting
-                # one merely by its name would make a missing canonical path
-                # indistinguishable from an unrelated type.
+            if not candidates:
+                defining_path = CANONICAL_ROOT_REEXPORTS.get(path)
+                if defining_path is None:
+                    return None
                 candidates = [
                     item_id for item_id, entry in self.surface.paths.items()
+                    if tuple(entry.get("path", ())) == defining_path
                     if entry.get("crate_id") != self.surface.crate_id
                     and entry.get("kind") in NOMINAL_KINDS
-                    and len(entry.get("path", ())) >= 2
-                    and entry["path"][0] == path[0]
-                    and entry["path"][-1] == path[-1]
                 ]
             # Multiple rustdoc IDs for one canonical path are ambiguous, even
-            # when their spelling happens to match.  The same fail-closed rule
-            # applies to the unique root-re-export fallback above.
+            # when their spelling happens to match. The same fail-closed rule
+            # applies to the explicit root-reexport binding above.
             if len(candidates) != 1:
                 return None
             item_id = candidates[0]

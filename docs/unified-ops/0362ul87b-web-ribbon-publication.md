@@ -169,10 +169,10 @@ The six findings had two checker causes and one real API migration:
 
 * `custom_xml::{read_props,validate_payload,write_props}` already use the
   public root re-export `litchi_opc::SourceLimits`. Dependency rustdoc exposes
-  its unique nominal item only as `litchi_opc::limits::SourceLimits`; the
-  checker now resolves a unique external root re-export by crate root and
-  final component, while remaining fail-closed for ambiguity and nested-path
-  misses. No raw limit signature or public spelling was changed.
+  its nominal item only as `litchi_opc::limits::SourceLimits`; the checker now
+  uses an explicit audited root-re-export binding to that defining path,
+  remaining fail-closed for wrong middle paths and duplicate identities. No
+  raw limit signature or public spelling was changed.
 * Ribbon and Web `Patch::apply` already return the correct core triad
   `Result<Commit<OpcPackage, Patch>>`. The shared owner checker had compared
   that result against the `Patch` receiver; it now checks the package source
@@ -182,5 +182,6 @@ The six findings had two checker causes and one real API migration:
   same change and no alias left behind. Signed no-op and source-proof
   semantics are unchanged.
 
-The checker changes have fixture coverage for root re-export resolution,
-ambiguous fallback rejection, and `Patch::apply` package-owner publication.
+The checker changes have fixture coverage for the valid root re-export,
+wrong-middle-path and duplicate-identity rejection, and `Patch::apply`
+package-owner publication.
