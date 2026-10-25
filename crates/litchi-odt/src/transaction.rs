@@ -1117,15 +1117,6 @@ impl Edit {
         })
     }
 
-    /// Stages removal of one RDF assertion.
-    #[deprecated(note = "use remove_rdf_triple_at with a checked Position")]
-    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> FamilyResult<&mut Self> {
-        self.push(Operation::RemoveRdfTriple {
-            path: path.to_owned(),
-            index,
-        })
-    }
-
     /// Stages removal of one RDF assertion selected by a checked position.
     ///
     /// # Errors
@@ -1139,24 +1130,6 @@ impl Edit {
         self.push(Operation::RemoveRdfTriple {
             path: path.to_owned(),
             index: position.get(),
-        })
-    }
-
-    /// Stages an RDF assertion move; equal selectors are an exact no-op.
-    #[deprecated(note = "use move_rdf_triple_to with checked Positions")]
-    pub fn move_rdf_triple(
-        &mut self,
-        path: &str,
-        from: usize,
-        to: usize,
-    ) -> FamilyResult<&mut Self> {
-        if from == to {
-            return Ok(self);
-        }
-        self.push(Operation::MoveRdfTriple {
-            path: path.to_owned(),
-            from,
-            to,
         })
     }
 
@@ -1229,12 +1202,6 @@ impl Edit {
         })
     }
 
-    /// Stages removal of an inert form control.
-    #[deprecated(note = "use remove_form_control_at with a checked Position")]
-    pub fn remove_form_control(&mut self, index: usize) -> FamilyResult<&mut Self> {
-        self.push(Operation::RemoveFormControl { index })
-    }
-
     /// Stages removal of a form control selected by a checked position.
     ///
     /// # Errors
@@ -1244,15 +1211,6 @@ impl Edit {
         self.push(Operation::RemoveFormControl {
             index: position.get(),
         })
-    }
-
-    /// Stages a form-control move; equal selectors are an exact no-op.
-    #[deprecated(note = "use move_form_control_to with checked Positions")]
-    pub fn move_form_control(&mut self, from: usize, to: usize) -> FamilyResult<&mut Self> {
-        if from == to {
-            return Ok(self);
-        }
-        self.push(Operation::MoveFormControl { from, to })
     }
 
     /// Stages a form-control move between checked semantic positions.
@@ -1286,12 +1244,6 @@ impl Edit {
         })
     }
 
-    /// Stages removal of a form selected in semantic document order.
-    #[deprecated(note = "use remove_form_at with a checked Position")]
-    pub fn remove_form(&mut self, index: usize) -> FamilyResult<&mut Self> {
-        self.push(Operation::RemoveForm { index })
-    }
-
     /// Stages removal of a form selected by a checked position.
     ///
     /// # Errors
@@ -1301,15 +1253,6 @@ impl Edit {
         self.push(Operation::RemoveForm {
             index: position.get(),
         })
-    }
-
-    /// Stages a form move; equal selectors are an exact no-op.
-    #[deprecated(note = "use move_form_to with checked Positions")]
-    pub fn move_form(&mut self, from: usize, to: usize) -> FamilyResult<&mut Self> {
-        if from == to {
-            return Ok(self);
-        }
-        self.push(Operation::MoveForm { from, to })
     }
 
     /// Stages a form move between checked semantic positions.
@@ -1360,12 +1303,6 @@ impl Edit {
             index,
             definition: definition.clone(),
         })
-    }
-
-    /// Stages removal of an embedded chart selected in document order.
-    #[deprecated(note = "use remove_embedded_chart_at with a checked Position")]
-    pub fn remove_embedded_chart(&mut self, index: usize) -> FamilyResult<&mut Self> {
-        self.push(Operation::RemoveEmbeddedChart { index })
     }
 
     /// Stages removal of an embedded chart selected by a checked position.
@@ -1435,12 +1372,6 @@ impl Edit {
         })
     }
 
-    /// Stages removal of an embedded object selected in document order.
-    #[deprecated(note = "use remove_embedded_object_at with a checked Position")]
-    pub fn remove_embedded_object(&mut self, index: usize) -> FamilyResult<&mut Self> {
-        self.push(Operation::RemoveEmbeddedObject { index })
-    }
-
     /// Stages removal of an embedded object selected by a checked position.
     ///
     /// # Errors
@@ -1452,12 +1383,6 @@ impl Edit {
         })
     }
 
-    /// Stages removal of an embedded image selected in document order.
-    #[deprecated(note = "use remove_embedded_image_at with a checked Position")]
-    pub fn remove_embedded_image(&mut self, index: usize) -> FamilyResult<&mut Self> {
-        self.push(Operation::RemoveEmbeddedImage { index })
-    }
-
     /// Stages removal of an embedded image selected by a checked position.
     ///
     /// # Errors
@@ -1467,15 +1392,6 @@ impl Edit {
         self.push(Operation::RemoveEmbeddedImage {
             index: position.get(),
         })
-    }
-
-    /// Stages an embedded-object move; equal selectors are an exact no-op.
-    #[deprecated(note = "use move_embedded_object_to with checked Positions")]
-    pub fn move_embedded_object(&mut self, from: usize, to: usize) -> FamilyResult<&mut Self> {
-        if from == to {
-            return Ok(self);
-        }
-        self.push(Operation::MoveEmbeddedObject { from, to })
     }
 
     /// Stages an embedded-object move between checked semantic positions.
@@ -1495,15 +1411,6 @@ impl Edit {
             from: from.get(),
             to: to.get(),
         })
-    }
-
-    /// Stages an embedded-image move; equal selectors are an exact no-op.
-    #[deprecated(note = "use move_embedded_image_to with checked Positions")]
-    pub fn move_embedded_image(&mut self, from: usize, to: usize) -> FamilyResult<&mut Self> {
-        if from == to {
-            return Ok(self);
-        }
-        self.push(Operation::MoveEmbeddedImage { from, to })
     }
 
     /// Stages an embedded-image move between checked semantic positions.

@@ -2962,6 +2962,18 @@
           "replacement": "use SourceLimitKind"
         },
         {
+          "name": "to_preset",
+          "scope": "litchi_pptx::animations::Effect",
+          "replacement": "use preset_class; the deprecated effect alias is removed (record 0362ul156)",
+          "recursive": false
+        },
+        {
+          "name": "to_preset",
+          "scope": "litchi_pptx",
+          "replacement": "use animations::Effect::preset_class; the deprecated effect alias is removed (record 0362ul156)",
+          "recursive": true
+        },
+        {
           "name": "read",
           "scope": "litchi_pptx::presentation_properties::metadata::custom_show::Snapshot",
           "replacement": "use Snapshot::load; no compatibility reader alias (record 0362ul81a)"
@@ -4236,6 +4248,18 @@
           "name": "ReadResource",
           "scope": "litchi_pptx",
           "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "to_preset",
+          "scope": "litchi_pptx::animations::Effect",
+          "replacement": "use preset_class; the deprecated effect alias is removed (record 0362ul156)",
+          "recursive": false
+        },
+        {
+          "name": "to_preset",
+          "scope": "litchi_pptx",
+          "replacement": "use animations::Effect::preset_class; the deprecated effect alias is removed (record 0362ul156)",
+          "recursive": true
         },
         {
           "name": "read",
@@ -16556,6 +16580,72 @@
           "name": "ReadLimits",
           "scope": "litchi_odt",
           "replacement": "use checked SourceLimits and OpenOptions (ADR 0034 \u00a75)"
+        },
+        {
+          "name": "remove_rdf_triple",
+          "scope": "litchi_odt::transaction::Edit",
+          "replacement": "use remove_rdf_triple_at(Position); the unchecked selector alias is removed (record 0362ul156)",
+          "recursive": false
+        },
+        {
+          "name": "move_rdf_triple",
+          "scope": "litchi_odt::transaction::Edit",
+          "replacement": "use move_rdf_triple_to(Position, Position); the unchecked selector alias is removed (record 0362ul156)",
+          "recursive": false
+        },
+        {
+          "name": "remove_form_control",
+          "scope": "litchi_odt::transaction::Edit",
+          "replacement": "use remove_form_control_at(Position); the unchecked selector alias is removed (record 0362ul156)",
+          "recursive": false
+        },
+        {
+          "name": "move_form_control",
+          "scope": "litchi_odt::transaction::Edit",
+          "replacement": "use move_form_control_to(Position, Position); the unchecked selector alias is removed (record 0362ul156)",
+          "recursive": false
+        },
+        {
+          "name": "remove_form",
+          "scope": "litchi_odt::transaction::Edit",
+          "replacement": "use remove_form_at(Position); the unchecked selector alias is removed (record 0362ul156)",
+          "recursive": false
+        },
+        {
+          "name": "move_form",
+          "scope": "litchi_odt::transaction::Edit",
+          "replacement": "use move_form_to(Position, Position); the unchecked selector alias is removed (record 0362ul156)",
+          "recursive": false
+        },
+        {
+          "name": "remove_embedded_chart",
+          "scope": "litchi_odt::transaction::Edit",
+          "replacement": "use remove_embedded_chart_at(Position); the unchecked selector alias is removed (record 0362ul156)",
+          "recursive": false
+        },
+        {
+          "name": "remove_embedded_object",
+          "scope": "litchi_odt::transaction::Edit",
+          "replacement": "use remove_embedded_object_at(Position); the unchecked selector alias is removed (record 0362ul156)",
+          "recursive": false
+        },
+        {
+          "name": "remove_embedded_image",
+          "scope": "litchi_odt::transaction::Edit",
+          "replacement": "use remove_embedded_image_at(Position); the unchecked selector alias is removed (record 0362ul156)",
+          "recursive": false
+        },
+        {
+          "name": "move_embedded_object",
+          "scope": "litchi_odt::transaction::Edit",
+          "replacement": "use move_embedded_object_to(Position, Position); the unchecked selector alias is removed (record 0362ul156)",
+          "recursive": false
+        },
+        {
+          "name": "move_embedded_image",
+          "scope": "litchi_odt::transaction::Edit",
+          "replacement": "use move_embedded_image_to(Position, Position); the unchecked selector alias is removed (record 0362ul156)",
+          "recursive": false
         },
         {
           "name": "Snapshot",
