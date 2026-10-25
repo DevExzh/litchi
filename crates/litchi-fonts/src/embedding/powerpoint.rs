@@ -111,11 +111,7 @@ pub struct View<'a> {
 }
 
 impl<'a> View<'a> {
-    pub fn parse(bytes: &'a [u8]) -> Result<Self> {
-        Self::parse_with(bytes, Limits::default())
-    }
-
-    pub fn parse_with(bytes: &'a [u8], limits: Limits) -> Result<Self> {
+    pub fn parse(bytes: &'a [u8], limits: Limits) -> Result<Self> {
         limit("EOT input bytes", bytes.len(), limits.max_input_bytes)?;
         if bytes.len() < FIXED_BYTES {
             return Err(invalid("truncated EOT 1.0 fixed header"));
@@ -284,28 +280,16 @@ impl<'a> View<'a> {
     }
 }
 
-/// Compatibility wrapper with the least-privileged document intent.
-///
-/// New integrations should call [`encode`] and state their intent explicitly.
-pub fn data(font: &mut Prepared) -> Result<Vec<u8>> {
-    encode(font, Intent::PreviewPrint, Limits::default())
-}
-
-/// Restore a successfully encoded program after a later publication failure.
+/// Restore with the same explicit bounds used for encoding.
 ///
 /// The EOT allocation is reused in place. This function refuses to overwrite a
 /// nonempty `Prepared` program or restore bytes whose license/subset metadata no
 /// longer matches the prepared face.
-pub fn restore(font: &mut Prepared, eot: Vec<u8>) -> Result<()> {
-    restore_with(font, eot, Limits::default())
-}
-
-/// Restore with the same explicit bounds used for encoding.
-pub fn restore_with(font: &mut Prepared, mut eot: Vec<u8>, limits: Limits) -> Result<()> {
+pub fn restore(font: &mut Prepared, mut eot: Vec<u8>, limits: Limits) -> Result<()> {
     if !font.data.is_empty() {
         return Err(invalid("cannot restore EOT over a nonempty prepared font"));
     }
-    let view = View::parse_with(&eot, limits)?;
+    let view = View::parse(&eot, limits)?;
     if view.license() != font.properties.license() {
         return Err(FontError::LicenseMismatch {
             name: font.name.clone(),
@@ -841,7 +825,7 @@ mod tests {
         let eot = encode(&mut font, Intent::Editable, Limits::default()).unwrap();
         assert!(font.data.is_empty());
 
-        let view = View::parse(&eot).unwrap();
+        let view = View::parse(&eot, Limits::default()).unwrap();
         assert_eq!(view.font_data(), sfnt);
         assert_eq!(view.family_name().decode().unwrap(), "Litchi Test");
         assert_eq!(view.style_name().decode().unwrap(), "Regular");
@@ -1001,13 +985,13 @@ mod tests {
         let eot = encode(&mut font, Intent::Editable, Limits::default()).unwrap();
         let allocation = eot.as_ptr();
         assert!(font.data.is_empty());
-        restore(&mut font, eot).unwrap();
+        restore(&mut font, eot, Limits::default()).unwrap();
         assert_eq!(font.data, sfnt);
         assert_eq!(font.data.as_ptr(), allocation);
 
         let replacement = encode(&mut font, Intent::Editable, Limits::default()).unwrap();
         let mut occupied = prepared(test_sfnt(0x0008), 0x0008, true);
-        assert!(restore(&mut occupied, replacement).is_err());
+        assert!(restore(&mut occupied, replacement, Limits::default()).is_err());
         assert!(!occupied.data.is_empty());
     }
 
@@ -1018,18 +1002,18 @@ mod tests {
 
         let mut forged = eot.clone();
         forged[32..34].copy_from_slice(&0x0008u16.to_le_bytes());
-        assert!(View::parse(&forged).is_err());
+        assert!(View::parse(&forged, Limits::default()).is_err());
         let mut reserved = eot.clone();
         reserved[64] = 1;
-        assert!(View::parse(&reserved).is_err());
-        assert!(View::parse(&eot[..eot.len() - 1]).is_err());
+        assert!(View::parse(&reserved, Limits::default()).is_err());
+        assert!(View::parse(&eot[..eot.len() - 1], Limits::default()).is_err());
 
         let limits = Limits {
             max_input_bytes: eot.len() - 1,
             ..Limits::default()
         };
         assert!(matches!(
-            View::parse_with(&eot, limits),
+            View::parse(&eot, limits),
             Err(FontError::LimitExceeded {
                 resource: "EOT input bytes",
                 ..

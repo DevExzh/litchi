@@ -18,7 +18,9 @@ discovery = ["dep:font-kit"]
 automatic = ["discovery", "subset"]
 
 [dependencies]
-allsorts    = { workspace = true, optional = true }
+# Keep the reviewed decoder paths explicit: this crate is also consumed by
+# standalone Cargo roots, which do not inherit the workspace patch table.
+allsorts    = { version = "0.17", path = "../../vendor/allsorts", default-features = false, features = ["flate2_zlib-rs"], optional = true }
 font-kit    = { workspace = true, optional = true }
 litchi-core = { workspace = true }
 roaring     = { workspace = true }

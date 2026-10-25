@@ -1,37 +1,51 @@
 //! Unicode-to-glyph mapping for OpenType faces.
 
-use allsorts::{
+use ::allsorts::{
     binary::read::ReadScope,
     font::read_cmap_subtable,
     tables::{FontTableProvider, OpenTypeFont, cmap::Cmap},
 };
 
+use super::{Limits, SubsetSession, parse_error};
 use crate::model::{FontData, FontError, Glyphs};
 
-/// Map a validated Unicode request to sorted, deduplicated glyph IDs.
-pub fn glyph_ids(font_data: &FontData, codepoints: &Glyphs) -> Result<Vec<u16>, FontError> {
+/// Map a validated Unicode request to sorted, deduplicated glyph IDs under the
+/// caller-selected raw limits.
+pub fn glyph_ids(
+    font_data: &FontData,
+    codepoints: &Glyphs,
+    limits: Limits,
+) -> Result<Vec<u16>, FontError> {
+    let session = SubsetSession::new(limits);
+    session.charge_mapping_staging(font_data.data.len(), codepoints.len())?;
+    glyph_ids_scoped(&session, font_data, codepoints)
+}
+
+pub(crate) fn glyph_ids_scoped(
+    _session: &SubsetSession,
+    font_data: &FontData,
+    codepoints: &Glyphs,
+) -> Result<Vec<u16>, FontError> {
     let scope = ReadScope::new(&font_data.data);
     let font_file = scope
         .read::<OpenTypeFont<'_>>()
-        .map_err(|error| FontError::SubsettingFailed(format!("failed to parse font: {error}")))?;
+        .map_err(|error| parse_error("failed to parse font", error))?;
 
     let font_index = usize::try_from(font_data.index)
         .map_err(|_| FontError::InvalidFaceIndex(font_data.index))?;
-    let provider = font_file.table_provider(font_index).map_err(|error| {
-        FontError::SubsettingFailed(format!("failed to get font face: {error}"))
-    })?;
+    let provider = font_file
+        .table_provider(font_index)
+        .map_err(|error| parse_error("failed to get font face", error))?;
 
     let cmap_data = provider
-        .table_data(allsorts::tag::CMAP)
-        .map_err(|error| FontError::SubsettingFailed(format!("failed to get cmap table: {error}")))?
+        .table_data(::allsorts::tag::CMAP)
+        .map_err(|error| parse_error("failed to get cmap table", error))?
         .ok_or_else(|| FontError::SubsettingFailed("font has no cmap table".into()))?;
     let cmap = ReadScope::new(cmap_data.as_ref())
         .read::<Cmap<'_>>()
-        .map_err(|error| FontError::SubsettingFailed(format!("failed to read cmap: {error}")))?;
+        .map_err(|error| parse_error("failed to read cmap", error))?;
     let subtable = read_cmap_subtable(&cmap)
-        .map_err(|error| {
-            FontError::SubsettingFailed(format!("failed to read cmap subtable: {error}"))
-        })?
+        .map_err(|error| parse_error("failed to read cmap subtable", error))?
         .map(|(_, subtable)| subtable)
         .ok_or_else(|| FontError::SubsettingFailed("no usable cmap subtable found".into()))?;
 
@@ -56,9 +70,10 @@ pub fn glyph_ids(font_data: &FontData, codepoints: &Glyphs) -> Result<Vec<u16>, 
                 "font glyph request contains non-scalar Unicode value U+{codepoint:04X}"
             )));
         }
-        if let Some(glyph_id) = subtable.map_glyph(codepoint).map_err(|error| {
-            FontError::SubsettingFailed(format!("invalid cmap mapping: {error}"))
-        })? && glyph_id != 0
+        if let Some(glyph_id) = subtable
+            .map_glyph(codepoint)
+            .map_err(|error| parse_error("invalid cmap mapping", error))?
+            && glyph_id != 0
         {
             glyph_ids.push(glyph_id);
         }

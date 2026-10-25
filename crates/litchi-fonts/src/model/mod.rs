@@ -477,8 +477,6 @@ pub enum FontError {
     MissingProperties { name: String },
     #[error("font embedding requires one standalone OpenType face")]
     RequiresStandaloneFace,
-    #[error("font program is {actual} bytes, exceeding the {limit}-byte limit")]
-    ProgramTooLarge { limit: u64, actual: u64 },
     #[error("{resource} is {actual}, exceeding the configured limit of {limit}")]
     LimitExceeded {
         resource: &'static str,

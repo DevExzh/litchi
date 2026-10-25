@@ -99,7 +99,11 @@ impl Loader {
     fn ensure_program_size(&self, actual: u64) -> Result<(), FontError> {
         let limit = u64::try_from(self.max_font_program_bytes).unwrap_or(u64::MAX);
         if actual > limit {
-            return Err(FontError::ProgramTooLarge { limit, actual });
+            return Err(FontError::LimitExceeded {
+                resource: "resolved font program",
+                limit: usize::try_from(limit).unwrap_or(usize::MAX),
+                actual: usize::try_from(actual).unwrap_or(usize::MAX),
+            });
         }
         Ok(())
     }
@@ -376,7 +380,8 @@ mod tests {
         let loader = Loader::with_max_font_program_bytes(4);
         assert!(matches!(
             loader.ensure_program_size(5),
-            Err(FontError::ProgramTooLarge {
+            Err(FontError::LimitExceeded {
+                resource: "resolved font program",
                 limit: 4,
                 actual: 5
             })

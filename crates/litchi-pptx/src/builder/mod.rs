@@ -35,6 +35,10 @@ pub struct Builder {
     package: Package,
     presentation: Presentation,
     embed_fonts: bool,
+    #[cfg(feature = "automatic-fonts")]
+    font_preparation_limits: litchi_fonts::PreparationLimits,
+    #[cfg(feature = "automatic-fonts")]
+    font_eot_limits: litchi_fonts::embedding::powerpoint::Limits,
 }
 impl Builder {
     /// Start the native minimal empty presentation.
@@ -46,6 +50,10 @@ impl Builder {
             package: Package::new_authoring()?,
             presentation: Presentation::new(),
             embed_fonts: false,
+            #[cfg(feature = "automatic-fonts")]
+            font_preparation_limits: litchi_fonts::PreparationLimits::default(),
+            #[cfg(feature = "automatic-fonts")]
+            font_eot_limits: litchi_fonts::embedding::powerpoint::Limits::default(),
         })
     }
 
@@ -83,13 +91,41 @@ impl Builder {
         Ok(self)
     }
 
+    /// Bound automatic font preparation during finalization.
+    #[cfg(feature = "automatic-fonts")]
+    #[must_use]
+    pub fn font_preparation_limits(
+        &mut self,
+        limits: litchi_fonts::PreparationLimits,
+    ) -> &mut Self {
+        self.font_preparation_limits = limits;
+        self
+    }
+
+    /// Bound PowerPoint EOT publication during finalization.
+    #[cfg(feature = "automatic-fonts")]
+    #[must_use]
+    pub fn font_eot_limits(
+        &mut self,
+        limits: litchi_fonts::embedding::powerpoint::Limits,
+    ) -> &mut Self {
+        self.font_eot_limits = limits;
+        self
+    }
+
     /// Finalize the native graph without serializing and reopening a ZIP.
     ///
     /// # Errors
     /// Returns native graph construction and validation failures.
     pub fn build(self) -> Result<Package> {
-        self.package
-            .publish_authored(&self.presentation, self.embed_fonts)
+        self.package.publish_authored(
+            &self.presentation,
+            self.embed_fonts,
+            #[cfg(feature = "automatic-fonts")]
+            self.font_preparation_limits,
+            #[cfg(feature = "automatic-fonts")]
+            self.font_eot_limits,
+        )
     }
 }
 impl std::fmt::Debug for Builder {

@@ -163,6 +163,8 @@ pub enum LimitKind {
     OpenTypeXmlAttributeBytes,
     /// Word 2010 OpenType stylistic-set count.
     OpenTypeStyleSets,
+    /// Format-independent automatic font preparation.
+    FontPreparation,
 }
 
 impl LimitKind {
@@ -187,6 +189,7 @@ impl LimitKind {
             Self::OpenTypeXmlAttributes => "OpenType XML attribute count",
             Self::OpenTypeXmlAttributeBytes => "OpenType XML attribute bytes",
             Self::OpenTypeStyleSets => "OpenType stylistic-set count",
+            Self::FontPreparation => "automatic font preparation",
         }
     }
 }

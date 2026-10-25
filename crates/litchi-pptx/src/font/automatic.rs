@@ -10,21 +10,30 @@ impl Package {
     pub(crate) fn embed_fonts_for_presentation(
         &mut self,
         presentation: &crate::builder::Presentation,
+        preparation_limits: litchi_fonts::PreparationLimits,
+        eot_limits: litchi_fonts::embedding::powerpoint::Limits,
     ) -> Result<()> {
         let mode = match self.opc.save_options().fonts {
             litchi_opc::FontEmbedding::None => return Ok(()),
             litchi_opc::FontEmbedding::Full => litchi_fonts::embedding::Mode::Full,
             litchi_opc::FontEmbedding::Subset => litchi_fonts::embedding::Mode::Subset,
         };
-        self.embed_fonts_with_glyphs(presentation.collect_glyphs(), mode)
+        self.embed_fonts_with_glyphs(
+            presentation.collect_glyphs(),
+            mode,
+            preparation_limits,
+            eot_limits,
+        )
     }
 
     fn embed_fonts_with_glyphs(
         &mut self,
         glyphs: GlyphMap,
         mode: litchi_fonts::embedding::Mode,
+        preparation_limits: litchi_fonts::PreparationLimits,
+        eot_limits: litchi_fonts::embedding::powerpoint::Limits,
     ) -> Result<()> {
-        let prepared = litchi_fonts::embedding::prepare(glyphs, mode)?;
+        let prepared = litchi_fonts::embedding::prepare(glyphs, mode, preparation_limits)?;
         if prepared.is_empty() {
             return Ok(());
         }
@@ -33,7 +42,11 @@ impl Package {
         let mut fonts = font::load(&staged)?.unwrap_or_else(Fonts::new);
         let mut changed = false;
         for mut prepared in prepared {
-            let data = litchi_fonts::embedding::powerpoint::data(&mut prepared)?;
+            let data = litchi_fonts::embedding::powerpoint::encode(
+                &mut prepared,
+                litchi_fonts::embedding::powerpoint::Intent::PreviewPrint,
+                eot_limits,
+            )?;
             changed |= merge(&mut fonts, prepared, data)?;
         }
         if changed {

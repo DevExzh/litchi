@@ -205,6 +205,19 @@ impl Builder {
         Ok(self)
     }
 
+    /// Bound automatic font preparation for the package finalized by this
+    /// builder. The policy is retained by the package's semantic limits.
+    #[cfg(feature = "automatic-fonts")]
+    #[must_use]
+    pub fn font_preparation_limits(
+        &mut self,
+        limits: litchi_fonts::PreparationLimits,
+    ) -> &mut Self {
+        let semantic_limits = self.package.semantic_limits().clone().fonts(limits);
+        self.package = self.package.with_semantic_limits(semantic_limits);
+        self
+    }
+
     /// Finalize the authored document into the package graph without
     /// serializing and reopening a ZIP.
     ///

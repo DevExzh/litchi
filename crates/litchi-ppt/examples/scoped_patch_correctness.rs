@@ -7,16 +7,21 @@
 //! inverse source bytes. Checksums and all publication serialization happen
 //! only in this correctness mode.
 
-use std::{env, fs};
+use std::{env, fmt::Write as _, fs};
 
-use litchi_ppt::{slide_order, Package};
+use litchi_ppt::{Package, slide_order};
 use sha2::{Digest, Sha256};
 
 const MEDIA_ID: u32 = 1;
 const EXPECTED_PATH: &str = "clip-0000.avi";
 
 fn sha256(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
+    let digest = Sha256::digest(bytes);
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    for byte in digest {
+        write!(&mut encoded, "{byte:02x}").expect("writing into a String cannot fail");
+    }
+    encoded
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

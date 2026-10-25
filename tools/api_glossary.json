@@ -109,6 +109,146 @@
       "families": []
     },
     {
+      "id": "fonts-minimal",
+      "package": "litchi-fonts",
+      "default_features": false,
+      "features": ["subset"],
+      "required_signatures": [
+        {
+          "method": "litchi_fonts::embedding::prepare_with",
+          "inputs": ["resolver", "used_glyphs", "mode", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::PreparationLimits"
+        },
+        {
+          "method": "litchi_fonts::subset::glyph_ids",
+          "inputs": ["font_data", "codepoints", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::subset::Limits"
+        },
+        {
+          "method": "litchi_fonts::subset::Subsetter::subset",
+          "inputs": ["self", "font", "glyph_ids", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::subset::Limits"
+        },
+        {
+          "method": "litchi_fonts::embedding::powerpoint::View::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::embedding::powerpoint::Limits"
+        },
+        {
+          "method": "litchi_fonts::embedding::powerpoint::restore",
+          "inputs": ["font", "eot", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::embedding::powerpoint::Limits"
+        },
+        {
+          "method": "litchi_fonts::embedding::powerpoint::encode",
+          "inputs": ["font", "intent", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::embedding::powerpoint::Limits"
+        }
+      ],
+      "banned_names": [
+        {
+          "name": "prepare_with_limits",
+          "scope": "litchi_fonts::embedding",
+          "replacement": "use embedding::prepare_with(..., limits) (record 0362ul50)"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_fonts::embedding::powerpoint",
+          "replacement": "use powerpoint::encode(font, intent, limits) (record 0362ul50)"
+        },
+        {
+          "name": "parse_with",
+          "scope": "litchi_fonts::embedding::powerpoint::View",
+          "replacement": "use View::parse(bytes, limits) (record 0362ul50)"
+        },
+        {
+          "name": "restore_with",
+          "scope": "litchi_fonts::embedding::powerpoint",
+          "replacement": "use powerpoint::restore(font, eot, limits) (record 0362ul50)"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "fonts-full",
+      "package": "litchi-fonts",
+      "default_features": false,
+      "features": ["automatic"],
+      "required_signatures": [
+        {
+          "method": "litchi_fonts::embedding::prepare",
+          "inputs": ["used_glyphs", "mode", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::PreparationLimits"
+        },
+        {
+          "method": "litchi_fonts::embedding::prepare_with",
+          "inputs": ["resolver", "used_glyphs", "mode", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::PreparationLimits"
+        },
+        {
+          "method": "litchi_fonts::subset::glyph_ids",
+          "inputs": ["font_data", "codepoints", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::subset::Limits"
+        },
+        {
+          "method": "litchi_fonts::subset::Subsetter::subset",
+          "inputs": ["self", "font", "glyph_ids", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::subset::Limits"
+        },
+        {
+          "method": "litchi_fonts::embedding::powerpoint::View::parse",
+          "inputs": ["bytes", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::embedding::powerpoint::Limits"
+        },
+        {
+          "method": "litchi_fonts::embedding::powerpoint::restore",
+          "inputs": ["font", "eot", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::embedding::powerpoint::Limits"
+        },
+        {
+          "method": "litchi_fonts::embedding::powerpoint::encode",
+          "inputs": ["font", "intent", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_fonts::embedding::powerpoint::Limits"
+        }
+      ],
+      "banned_names": [
+        {
+          "name": "prepare_with_limits",
+          "scope": "litchi_fonts::embedding",
+          "replacement": "use embedding::prepare_with(..., limits) (record 0362ul50)"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_fonts::embedding::powerpoint",
+          "replacement": "use powerpoint::encode(font, intent, limits) (record 0362ul50)"
+        },
+        {
+          "name": "parse_with",
+          "scope": "litchi_fonts::embedding::powerpoint::View",
+          "replacement": "use View::parse(bytes, limits) (record 0362ul50)"
+        },
+        {
+          "name": "restore_with",
+          "scope": "litchi_fonts::embedding::powerpoint",
+          "replacement": "use powerpoint::restore(font, eot, limits) (record 0362ul50)"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "docx-minimal",
       "package": "litchi-docx",
       "default_features": false,

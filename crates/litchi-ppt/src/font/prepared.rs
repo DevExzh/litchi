@@ -48,7 +48,7 @@ pub(crate) fn restore_encoded(
     encoded: Vec<u8>,
     limits: litchi_fonts::embedding::powerpoint::Limits,
 ) -> Result<(), FontError> {
-    litchi_fonts::embedding::powerpoint::restore_with(font, encoded, limits)
+    litchi_fonts::embedding::powerpoint::restore(font, encoded, limits)
 }
 
 #[allow(
@@ -119,7 +119,9 @@ mod tests {
         assert_eq!(font.font_flags & 1, 0);
         let facet = font.facet(Facet::Bold).unwrap();
         assert_eq!(
-            View::parse(facet.bytes()).unwrap().font_data(),
+            View::parse(facet.bytes(), EotLimits::default())
+                .unwrap()
+                .font_data(),
             test_sfnt(0)
         );
     }
@@ -183,7 +185,11 @@ mod tests {
         let font = commit.fonts().get_base(0).unwrap();
         assert!(font.embedded_subset);
         assert_eq!(font.font_flags & 1, 1);
-        let view = View::parse(font.facet(Facet::Italic).unwrap().bytes()).unwrap();
+        let view = View::parse(
+            font.facet(Facet::Italic).unwrap().bytes(),
+            EotLimits::default(),
+        )
+        .unwrap();
         assert!(view.subsetted());
     }
 
