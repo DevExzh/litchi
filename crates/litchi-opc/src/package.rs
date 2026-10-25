@@ -5,7 +5,7 @@
 //! high-level operations for working with office documents.
 
 use crate::constants::relationship_type;
-use crate::content_type::ContentTypeMap;
+use crate::content_type::{ContentType, ContentTypeMap};
 use crate::error::{OpcError, Result};
 use crate::execution::OpenSession;
 use crate::leniency::ToleranceReport;
@@ -922,15 +922,17 @@ impl OpcPackage {
                             && source_blob_retained(source_part, current.decoded_blob())
                     }),
                 SourceMemberKind::PartRelationships(partname) => {
-                    let Some((source_part, current)) =
-                        provenance.parts.get(partname).zip(self.parts.get(partname))
-                    else {
-                        false
-                    };
-                    if !source_part.relationships_member_present {
-                        false
-                    } else {
-                        self.source_relationships_retained(partname, source_part, current.rels())?
+                    match provenance.parts.get(partname).zip(self.parts.get(partname)) {
+                        Some((source_part, current))
+                            if source_part.relationships_member_present =>
+                        {
+                            self.source_relationships_retained(
+                                partname,
+                                source_part,
+                                current.rels(),
+                            )?
+                        },
+                        _ => false,
                     }
                 },
                 // Unknown source members are copied by the targeted writer,

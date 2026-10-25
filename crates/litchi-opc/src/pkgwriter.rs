@@ -775,7 +775,7 @@ fn try_write_preserved<W: Write>(
                 let Some(source_part) = provenance.parts.get(partname) else {
                     return Ok(PreservationWrite::Fallback(writer));
                 };
-                if source_blob_retained(source_part, part.blob.as_deref()) {
+                if source_blob_retained(source_part, part.blob.as_deref().map(Vec::as_slice)) {
                     None
                 } else {
                     Some(part.materialized_blob()?.len())
@@ -886,7 +886,7 @@ fn try_write_preserved<W: Write>(
                     let Some(source_part) = provenance.parts.get(partname) else {
                         return Ok(PreservationWrite::Fallback(writer));
                     };
-                    if source_blob_retained(source_part, part.blob.as_deref()) {
+                    if source_blob_retained(source_part, part.blob.as_deref().map(Vec::as_slice)) {
                         soapberry_zip::PreservationAction::Copy(indexed_entry.id())
                     } else {
                         regenerated_part_action(

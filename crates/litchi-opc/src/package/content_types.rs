@@ -432,6 +432,7 @@ fn without_part_overrides_inner(
     loop {
         let start = content_types_offset(&reader, origin)?;
         let (resolved_namespace, event) = reader.read_resolved_event()?;
+        let is_opc_namespace = is_opc_content_types_namespace(&resolved_namespace);
         let end = content_types_offset(&reader, origin)?;
         if end < start || end > source.bytes().len() {
             return Err(OpcError::InvalidContentTypesManifest(
@@ -441,7 +442,7 @@ fn without_part_overrides_inner(
         match event {
             Event::Start(element) => {
                 if depth == 1
-                    && is_opc_content_types_element(&resolved_namespace, &element, b"Override")
+                    && is_opc_content_types_element(is_opc_namespace, &element, b"Override")
                 {
                     return Err(OpcError::InvalidContentTypesManifest(
                         "non-empty content-type Overrides are unsupported for source removal"
@@ -456,7 +457,7 @@ fn without_part_overrides_inner(
             },
             Event::Empty(element)
                 if depth == 1
-                    && is_opc_content_types_element(&resolved_namespace, &element, b"Override") =>
+                    && is_opc_content_types_element(is_opc_namespace, &element, b"Override") =>
             {
                 let mut part_name = None;
                 for attribute in element.checked_attributes() {
@@ -518,17 +519,20 @@ fn without_part_overrides_inner(
     source.update_elements(&updates, maximum)
 }
 
+fn is_opc_content_types_namespace(resolved_namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        resolved_namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == crate::constants::namespace::OPC_CONTENT_TYPES.as_bytes()
+    )
+}
+
 fn is_opc_content_types_element(
-    resolved_namespace: &ResolveResult<'_>,
+    is_opc_namespace: bool,
     element: &BytesStart<'_>,
     local_name: &[u8],
 ) -> bool {
-    element.local_name().as_ref() == local_name
-        && matches!(
-            resolved_namespace,
-            ResolveResult::Bound(Namespace(value))
-                if *value == crate::constants::namespace::OPC_CONTENT_TYPES.as_bytes()
-        )
+    is_opc_namespace && element.local_name().as_ref() == local_name
 }
 
 pub(crate) fn preflight_part_overrides(
@@ -632,10 +636,11 @@ pub(crate) fn with_part_overrides(
     loop {
         let start = content_types_offset(&reader, origin)?;
         let (resolved_namespace, event) = reader.read_resolved_event()?;
+        let is_opc_namespace = is_opc_content_types_namespace(&resolved_namespace);
         let end = content_types_offset(&reader, origin)?;
         match event {
             Event::Start(element) if depth == 0 => {
-                if !is_opc_content_types_element(&resolved_namespace, &element, b"Types") {
+                if !is_opc_content_types_element(is_opc_namespace, &element, b"Types") {
                     return Err(OpcError::InvalidContentTypesManifest(
                         "content-types root must be Types".into(),
                     ));
@@ -645,7 +650,7 @@ pub(crate) fn with_part_overrides(
                 depth = 1;
             },
             Event::Empty(element) if depth == 0 => {
-                if !is_opc_content_types_element(&resolved_namespace, &element, b"Types") {
+                if !is_opc_content_types_element(is_opc_namespace, &element, b"Types") {
                     return Err(OpcError::InvalidContentTypesManifest(
                         "content-types root must be Types".into(),
                     ));

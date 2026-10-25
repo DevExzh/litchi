@@ -795,13 +795,14 @@ fn scan_relationship_source(
         )?;
         let start = relationship_offset(&reader, origin)?;
         let (resolved_namespace, event) = reader.read_resolved_event()?;
+        let is_opc_namespace = is_opc_relationships_namespace(&resolved_namespace);
         let end = relationship_offset(&reader, origin)?;
         if end < start || end > source.len() {
             return Err(invalid("relationship XML event range is invalid"));
         }
         match event {
             Event::Start(element) if depth == 0 => {
-                if !is_opc_relationships_element(&resolved_namespace, &element, b"Relationships") {
+                if !(is_opc_namespace && element.local_name().as_ref() == b"Relationships") {
                     return Err(invalid("relationships root must be Relationships"));
                 }
                 root_name = Some(element.name().as_ref().to_vec());
@@ -809,7 +810,7 @@ fn scan_relationship_source(
                 depth = 1;
             },
             Event::Empty(element) if depth == 0 => {
-                if !is_opc_relationships_element(&resolved_namespace, &element, b"Relationships") {
+                if !(is_opc_namespace && element.local_name().as_ref() == b"Relationships") {
                     return Err(invalid("relationships root must be Relationships"));
                 }
                 root_name = Some(element.name().as_ref().to_vec());
@@ -817,7 +818,7 @@ fn scan_relationship_source(
                 root_empty = true;
             },
             Event::Start(element) if depth == 1 => {
-                if is_opc_relationships_element(&resolved_namespace, &element, b"Relationship") {
+                if is_opc_namespace && element.local_name().as_ref() == b"Relationship" {
                     relationship_count = relationship_count
                         .checked_add(1)
                         .ok_or_else(|| invalid("relationship count overflows"))?;
@@ -831,7 +832,7 @@ fn scan_relationship_source(
                     .ok_or_else(|| invalid("relationship XML depth overflows"))?;
             },
             Event::Empty(element) if depth == 1 => {
-                if is_opc_relationships_element(&resolved_namespace, &element, b"Relationship") {
+                if is_opc_namespace && element.local_name().as_ref() == b"Relationship" {
                     relationship_count = relationship_count
                         .checked_add(1)
                         .ok_or_else(|| invalid("relationship count overflows"))?;
@@ -902,17 +903,21 @@ fn scan_relationship_source(
     })
 }
 
+fn is_opc_relationships_namespace(resolved_namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        resolved_namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == crate::constants::namespace::OPC_RELATIONSHIPS.as_bytes()
+    )
+}
+
 fn is_opc_relationships_element(
     resolved_namespace: &ResolveResult<'_>,
     element: &quick_xml::events::BytesStart<'_>,
     local_name: &[u8],
 ) -> bool {
     element.local_name().as_ref() == local_name
-        && matches!(
-            resolved_namespace,
-            ResolveResult::Bound(Namespace(value))
-                if *value == crate::constants::namespace::OPC_RELATIONSHIPS.as_bytes()
-        )
+        && is_opc_relationships_namespace(resolved_namespace)
 }
 
 pub(super) fn relationship_id(
@@ -1023,16 +1028,14 @@ impl OwnedRelationships {
         loop {
             let start = relationship_offset(&reader, origin)?;
             let (resolved_namespace, event) = reader.read_resolved_event()?;
+            let is_opc_namespace = is_opc_relationships_namespace(&resolved_namespace);
             let end = relationship_offset(&reader, origin)?;
             let empty = matches!(&event, Event::Empty(_));
             match event {
                 Event::Start(element) | Event::Empty(element) => {
                     if depth == 1
-                        && is_opc_relationships_element(
-                            &resolved_namespace,
-                            &element,
-                            b"Relationship",
-                        )
+                        && is_opc_namespace
+                        && element.local_name().as_ref() == b"Relationship"
                     {
                         let mut remove = false;
                         for attribute in element.checked_attributes() {
@@ -1159,14 +1162,11 @@ impl OwnedRelationships {
         loop {
             let start = relationship_offset(&reader, origin)?;
             let (resolved_namespace, event) = reader.read_resolved_event()?;
+            let is_opc_namespace = is_opc_relationships_namespace(&resolved_namespace);
             let end = relationship_offset(&reader, origin)?;
             match event {
                 Event::Start(element) if depth == 0 => {
-                    if !is_opc_relationships_element(
-                        &resolved_namespace,
-                        &element,
-                        b"Relationships",
-                    ) {
+                    if !(is_opc_namespace && element.local_name().as_ref() == b"Relationships") {
                         return Err(invalid("relationships root must be Relationships"));
                     }
                     root_tag = Some(start..end);
@@ -1174,11 +1174,7 @@ impl OwnedRelationships {
                     depth = 1;
                 },
                 Event::Empty(element) if depth == 0 => {
-                    if !is_opc_relationships_element(
-                        &resolved_namespace,
-                        &element,
-                        b"Relationships",
-                    ) {
+                    if !(is_opc_namespace && element.local_name().as_ref() == b"Relationships") {
                         return Err(invalid("relationships root must be Relationships"));
                     }
                     root_tag = Some(start..end);

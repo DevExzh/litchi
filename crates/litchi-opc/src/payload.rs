@@ -25,7 +25,7 @@
 //! contract this implements, in particular which refusals stay at `open()` and
 //! which become first-access refusals.
 
-use std::io::{self, BufRead};
+use std::io;
 use std::sync::Arc;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -244,18 +244,21 @@ impl DeferredPayload {
                 let mut offset = 0_usize;
                 let mut equal = true;
                 loop {
-                    let chunk = reader.fill_buf()?;
-                    if chunk.is_empty() {
-                        break;
-                    }
-                    let end = offset.checked_add(chunk.len()).ok_or_else(|| {
-                        io::Error::new(io::ErrorKind::Other, "deferred payload length overflow")
-                    })?;
-                    if expected.get(offset..end) != Some(chunk) {
-                        equal = false;
-                    }
-                    offset = end;
-                    reader.consume(chunk.len());
+                    let chunk_len = {
+                        let chunk = reader.fill_buf()?;
+                        if chunk.is_empty() {
+                            break;
+                        }
+                        let end = offset.checked_add(chunk.len()).ok_or_else(|| {
+                            io::Error::new(io::ErrorKind::Other, "deferred payload length overflow")
+                        })?;
+                        if expected.get(offset..end) != Some(chunk) {
+                            equal = false;
+                        }
+                        end - offset
+                    };
+                    offset += chunk_len;
+                    reader.consume(chunk_len);
                 }
                 Ok(equal && offset == expected.len())
             })
@@ -357,7 +360,7 @@ impl PartPayload {
             Self::Ready(bytes) => Ok(bytes.as_slice() == expected),
             Self::Deferred(deferred) => deferred.same_bytes(expected),
             Self::Transferred(transferred) => Ok(transferred.decoded().as_slice() == expected),
-            Self::Verified(verified) => Ok(verified.bytes() == expected),
+            Self::Verified(verified) => Ok(verified.bytes().as_slice() == expected),
         }
     }
 

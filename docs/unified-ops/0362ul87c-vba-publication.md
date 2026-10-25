@@ -218,3 +218,20 @@ the member. A no-root source regression checks the exact and one-byte-under
 metadata limits and verifies that publication emits the generated root member.
 The equal-payload and mutate-then-revert relationship cases also cover the
 same tight metadata boundary.
+
+## 87cj compiler repair
+
+The first isolated common-crate compiler pass exposed only integration errors
+in the shared OPC implementation. The retained graph admission branch now
+uses an ordinary `match` for its non-candidate case, and the writer passes
+byte-slice views to the exact source-payload predicate. Verified payloads use
+the same slice comparison as ready and transferred payloads; the deferred
+comparison keeps its fixed reader scratch buffer and ends each `fill_buf`
+borrow before `consume`.
+
+The namespace-aware content-types and relationships splicers extract a boolean
+for the exact OPC namespace before asking the reader for an event offset. This
+removes the `NsReader` borrow overlap without allocating a namespace string or
+weakening expanded-name matching. The missing shared `ContentType` import and
+the now-unused buffered-reader import are corrected as part of the same
+source-only repair.
