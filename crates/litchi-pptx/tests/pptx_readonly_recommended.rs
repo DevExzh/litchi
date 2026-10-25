@@ -133,10 +133,12 @@ fn replay_rechecks_readonly_output_with_the_recipient_profile() {
     // admits every unrelated package part and relationship member.
     let target_events = other_max + 100;
     let mut xml = format!(r#"<p:presentationPr xmlns:p="{P_NS}"><p:extLst>"#);
+    let mut events = xml_event_count(xml.as_bytes());
     let mut ext_count = 0;
-    while xml_event_count(xml.as_bytes()) < target_events - 3 {
+    while events < target_events - 3 {
         write!(xml, r#"<p:ext uri="urn:opaque:{ext_count}"/>"#).unwrap();
         ext_count += 1;
+        events += 1;
     }
     xml.push_str("</p:extLst></p:presentationPr>");
 
