@@ -4,7 +4,7 @@ Date: 2026-10-25
 
 ## Scope
 
-This follow-up is based on the accepted 128 source fix
+This follow-up is anchored to the 128 source fix
 `788ee37ffdc06f59c7dc0e59426d2e68492ea5cc`. It audits every source-backed
 reservation helper in `crates/litchi-pptx/src/presentation/source.rs`, not just
 the text-box path exposed by the preserved runtime diagnostic
@@ -37,11 +37,20 @@ The source test
 `source_edit_reservations_keep_output_and_memory_dimensions_independent`
 exercises all six reservation helpers with a tight serialized-output ceiling
 and a sufficient managed memory budget, verifies unmanaged calls do not retain
-a reservation, and verifies a hierarchical 1 KiB memory ceiling returns the
-typed `MemoryBytes` refusal. The existing integration test
+a reservation, and verifies a 1 KiB parent budget refuses a 4 MiB child
+reservation through the typed execution resource-limit path. The
+`source_slide_property_edit_accepts_valid_tight_output_with_managed_memory`
+test exercises a real source-backed slide-property edit whose output ceiling
+is only 128 bytes above the input while its managed transient envelope is
+larger. The existing integration test
 `caller_output_limits_precede_managed_memory_admission` continues to cover
 output-first behavior for text-box authoring under managed and unmanaged
 owners, including the tight retry path.
+
+Record 0152 scopes that output-before-memory guarantee to the text-box
+preflight; the adjacent exact stages retain their existing no-op/shortening
+ordering and do not pre-stage a candidate merely to manufacture a global
+output-first guarantee.
 
 ## Validation
 

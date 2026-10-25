@@ -7071,11 +7071,26 @@ mod tests {
         const INPUT_BYTES: usize = 8192;
         const TIGHT_OUTPUT: usize = 128;
         const MEMORY: u64 = 4 * 1024 * 1024;
-        let replacements: &[crate::opened::ShapePropertiesReplacement<'static>] = &[];
-        let admission = super::ChunkAdmission {
-            selections: 1,
-            text_bytes: 1,
-        };
+        let text_replacement = [crate::opened::ShapeTextReplacement::at(0, "x")];
+        let text_chunks = [&text_replacement[..]];
+        let admission = crate::opened::admit_shape_text_chunks(
+            &text_chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            TIGHT_OUTPUT,
+        )
+        .unwrap();
+        let replacements =
+            [
+                crate::opened::ShapePropertiesReplacement::new(litchi_core::Position::new(0))
+                    .with_text("x"),
+            ];
+        let property_chunks = [&replacements[..]];
+        let property_admission = crate::opened::admit_shape_property_chunks(
+            &property_chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            TIGHT_OUTPUT,
+        )
+        .unwrap();
         let text_box_output = INPUT_BYTES + 4096 + 6;
 
         fn assert_admitted(result: crate::Result<Option<Arc<litchi_core::Reservation>>>) {
@@ -7101,7 +7116,7 @@ mod tests {
         assert_admitted(super::reserve_source_shape_properties(
             Some(&context),
             INPUT_BYTES,
-            replacements,
+            &replacements,
             TIGHT_OUTPUT,
         ));
         assert_admitted(super::reserve_source_shape_text_chunks(
@@ -7113,7 +7128,7 @@ mod tests {
         assert_admitted(super::reserve_source_shape_property_chunks(
             Some(&context),
             INPUT_BYTES,
-            admission,
+            property_admission,
             TIGHT_OUTPUT,
         ));
         assert_admitted(super::reserve_source_text_box(
@@ -7137,7 +7152,7 @@ mod tests {
                 .is_none()
         );
         assert!(
-            super::reserve_source_shape_properties(None, INPUT_BYTES, replacements, TIGHT_OUTPUT,)
+            super::reserve_source_shape_properties(None, INPUT_BYTES, &replacements, TIGHT_OUTPUT,)
                 .unwrap()
                 .is_none()
         );
@@ -7146,81 +7161,124 @@ mod tests {
                 .unwrap()
                 .is_none()
         );
-        assert!(super::reserve_source_shape_property_chunks(
-            None,
-            INPUT_BYTES,
-            admission,
-            TIGHT_OUTPUT,
-        )
-        .unwrap()
-        .is_none());
+        assert!(
+            super::reserve_source_shape_property_chunks(
+                None,
+                INPUT_BYTES,
+                property_admission,
+                TIGHT_OUTPUT,
+            )
+            .unwrap()
+            .is_none()
+        );
         assert!(
             super::reserve_source_text_box(None, INPUT_BYTES, 1, text_box_output)
                 .unwrap()
                 .is_none()
         );
 
-        let (tight_budget, _cancel, tight_context) = source_backed_context(1024);
-        fn assert_memory_limit(
-            result: crate::Result<Option<Arc<litchi_core::Reservation>>>,
-            maximum: usize,
-        ) {
+        let root_budget = Budget::root(
+            "pptx-source-parent-budget",
+            Limits::new(1024, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let child_budget = root_budget.child(
+            "pptx-source-child-budget",
+            Limits::new(MEMORY, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (_cancel, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::MIN,
+            NonZeroUsize::MIN,
+            NonZeroU64::new(MEMORY).unwrap(),
+            0,
+        )
+        .unwrap();
+        let tight_context = ExecutionContext::new(child_budget, cancellation, execution_limits);
+
+        fn assert_hierarchical_limit(result: crate::Result<Option<Arc<litchi_core::Reservation>>>) {
             assert!(matches!(
                 result,
-                Err(Error::Limit {
-                    kind: crate::opened::LimitKind::Codec(
-                        crate::opened::CodecLimitKind::MemoryBytes
-                    ),
-                    maximum: actual,
-                    ..
-                }) if actual == maximum
+                Err(Error::Opc(litchi_opc::OpcError::Execution(
+                    ExecutionError::ResourceLimit(_)
+                )))
             ));
         }
-        assert_memory_limit(
-            super::reserve_source_shape_removal(Some(&tight_context), INPUT_BYTES, TIGHT_OUTPUT),
-            1024,
-        );
-        assert_memory_limit(
-            super::reserve_source_slide_properties(
-                Some(&tight_context),
-                INPUT_BYTES,
-                Some("name"),
-                TIGHT_OUTPUT,
-            ),
-            1024,
-        );
-        assert_memory_limit(
-            super::reserve_source_shape_properties(
-                Some(&tight_context),
-                INPUT_BYTES,
-                replacements,
-                TIGHT_OUTPUT,
-            ),
-            1024,
-        );
-        assert_memory_limit(
-            super::reserve_source_shape_text_chunks(
-                Some(&tight_context),
-                INPUT_BYTES,
-                admission,
-                TIGHT_OUTPUT,
-            ),
-            1024,
-        );
-        assert_memory_limit(
-            super::reserve_source_shape_property_chunks(
-                Some(&tight_context),
-                INPUT_BYTES,
-                admission,
-                TIGHT_OUTPUT,
-            ),
-            1024,
-        );
-        assert_memory_limit(
-            super::reserve_source_text_box(Some(&tight_context), INPUT_BYTES, 1, text_box_output),
-            1024,
-        );
-        assert_eq!(tight_budget.used(Resource::Memory), 0);
+        assert_hierarchical_limit(super::reserve_source_shape_removal(
+            Some(&tight_context),
+            INPUT_BYTES,
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_slide_properties(
+            Some(&tight_context),
+            INPUT_BYTES,
+            Some("name"),
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_shape_properties(
+            Some(&tight_context),
+            INPUT_BYTES,
+            &replacements,
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_shape_text_chunks(
+            Some(&tight_context),
+            INPUT_BYTES,
+            admission,
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_shape_property_chunks(
+            Some(&tight_context),
+            INPUT_BYTES,
+            property_admission,
+            TIGHT_OUTPUT,
+        ));
+        assert_hierarchical_limit(super::reserve_source_text_box(
+            Some(&tight_context),
+            INPUT_BYTES,
+            1,
+            text_box_output,
+        ));
+        assert_eq!(root_budget.used(Resource::Memory), 0);
+        assert_eq!(tight_context.budget().used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn source_slide_property_edit_accepts_valid_tight_output_with_managed_memory() {
+        const MEMORY: u64 = 4 * 1024 * 1024;
+        let archive = source_backed_pptx();
+        let baseline = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            archive.clone(),
+        )))
+        .unwrap();
+        let input_bytes = baseline.slide_snapshot(0).unwrap().xml.as_bytes().len();
+        drop(baseline);
+
+        let defaults = crate::shape::Limits::DEFAULT;
+        let tight_shape = crate::shape::Limits::new(
+            input_bytes,
+            input_bytes.checked_add(128).unwrap(),
+            defaults.depth(),
+            defaults.nodes(),
+            defaults.shapes(),
+            defaults.retained_text_bytes(),
+        )
+        .unwrap();
+        let (budget, _cancel, context) = source_backed_context(MEMORY);
+        let editor = SourceBackedPresentationEditor::from_read_at_with_options(
+            Arc::new(CountingSource::new(archive)),
+            crate::OpenOptions::default()
+                .shape_limits(tight_shape)
+                .execution_context(context),
+        )
+        .unwrap();
+        let mut edit = editor.edit_slide(0).unwrap();
+        assert!(edit.set_slide_properties(Some("x"), None).unwrap());
+        let commit = edit.commit_checked().unwrap();
+        assert!(commit.is_changed());
+        drop(commit);
+        drop(edit);
+        drop(editor);
+        assert_eq!(budget.used(Resource::Memory), 0);
     }
 
     fn publish_first_slide_update(editor: SourceBackedPresentationEditor) -> Vec<u8> {
