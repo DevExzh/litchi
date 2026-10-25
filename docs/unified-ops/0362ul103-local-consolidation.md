@@ -161,3 +161,92 @@ W8, formula, Markdown, font, PPT or XLS branches. Uncommitted dirty payloads
 are reviewed separately and preserved until disposition; active measurement
 baselines, current integration, runner and protected probe remain intact.
 This cleanup does not waive any final qualification obligation.
+
+
+## Runtime returns and signed invalid-target coverage
+
+The 34-row runtime packet on `ea5c95e212` stops at the common OOXML suite:
+526 tests pass and five fail. Root verifies the complete terminal capture.
+The failures concern Custom XML alias refusal classification, VBA limit
+precedence, two structurally inconsistent limit fixtures and the independent
+VBA manifest expectation. Reviewed repair chains 104/104b/104c
+(`b8b59dd0a1`) and 104a (`eb4dd3e8d6`) are committed separately. Metadata-only
+part checks precede one retained-archive metrics pass without payload
+hydration; the manifest oracle is independent of production composition.
+
+A separate diagnostic continuation omits only that failed common row. Eight
+rows pass: seven OPC checks and DOCX custom properties. DOCX signature policy
+then reports eight passing tests and one failure: its Ribbon consumer expects
+an OPC wrapper although the accepted facade fence returns `Error::Signed`.
+Reviewed test-only 105 (`7f83a90521`) corrects the three Ribbon assertions,
+retaining strict OPC assertions for other families, exact no-op bytes and
+explicit unsign coverage. The remaining 24 rows have not run. Neither failed
+packet is acceptance; all 34 rows remain required on repaired source.
+
+The external packets retain these root-verified terminal artifacts:
+
+| Packet / artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `ooxml-pptx-joint-ea5c95e212-f5-runtime/rows.json` | 4,333 | `d34e950ea9056b25bc538e6c1701c20657943592e396c4a6357cda4eac62e56b` |
+| same / `result.json` | 5,072 | `79fc4d2ac8f0f0caefaa65ab4c370b2a2ede79dae748272d983a47a06c181f00` |
+| `ooxml-pptx-joint-ea5c95e212-f5-runtime-remaining33/rows.json` | 35,685 | `c000b019f79028466eaeaff602021bcc9b48ae11b0f2c2997d9051dc0697f02d` |
+| same / `result.json` | 38,144 | `9d4f9cff506e53db59a00582d2a0475278865e24c70ca388221dba271b79eb2c` |
+
+Both packet directories are under the external `.coord` directory. Final
+runtime targets are 387,951,653 and 955,071,697 bytes respectively.
+
+Review of an older branch identifies additional signed invalid-target
+coverage. Reviewed 102a (`7d2cad55ae`) preserves the owner's immediate batch
+refusal with zero reads and no item index, while individual/closure invalid
+notes edits retain `PathNotFound` at item zero. Signed corpus closure checks
+compare the actual sequential outcome; unsigned equivalence remains strict.
+This corrects 102's overbroad individual-error expectation without changing
+production behavior. Actual repaired-source execution remains pending.
+
+## Cleanup74–76 and additional ref consolidation
+
+Local ref deletions now total 318: the previous 271, thirteen superseded
+DOC/OLE and raw DOCX refs, 27 superseded refs after cleanup74, five named refs
+after cleanup75, and two after cleanup76. Every deletion rechecks exact tip,
+registered worktrees and integrated ancestry or owned-change supersession.
+Source remains reachable through trunk/private integration where applicable;
+retired historical adapter bytes are preserved externally. No remote changes.
+
+| Additional receipt in `trunk-consolidation/` | SHA-256 |
+|---|---|
+| `wave74-27-ref-delete-receipt.json` | `e4735954684316e34b589ac253b712b8a4753a18d016ab8b9b290cacb9aeadc1` |
+| `wave75-five-ref-delete-receipt.json` | `f31df7399cb2665ddc3d8df10e2f74960ce55fd38a3f5c48c839b5a108212a08` |
+| `wave76-two-ref-delete-receipt.json` | `e665ada853747570dcf51577f49969af3fee82f8aae97e33ede670cf6443542d` |
+
+Cleanup74 removes 27 clean superseded worktrees without force, with 82
+restored source blobs and preserved lock evidence. Tracked evidence is
+retained in integration; the one unique retired raw-properties adapter is
+also saved externally as `trunk-consolidation/raw-properties-retired-adapter.rs`
+(57,602 bytes, SHA-256
+`41a2d93cb95db8fec68d90e443fafaa0018e4134d89b775547d7d5051d6cc1fd`).
+Measured net allocated reclaim is 46,035,292,160 bytes, before that small
+additional adapter archive. Its `quarantine/wave74-semantic-clean-27/receipt.tsv`
+has SHA-256 `3c22e7bfc74a4bcecd28fe1d0b45e4072131174d5a236e701f391c409dfc3f01`.
+
+Cleanup75 removes six partially hydrated or formatting-only worktrees after
+preserving actual modified files, focused patches, deletion/index inventories
+and the ignored lock, with restoration proofs. No unique implementation is
+lost. Root verifies all eleven preserved payloads and exact registry removal.
+The corrected v2 receipt reports approximately 31.8 GB of apparent-size
+reduction; allocated reclaim was not measured and is not added to the
+allocated total. The immutable original receipt's allocation wording is
+superseded by `trunk-consolidation/wave75-cleanup-receipt-v2.md`, SHA-256
+`fe40c9b083bd36be4f8ba68facffed477e71aff680a4651c0559f769c0f769a1`.
+
+Cleanup76 removes the formerly held 89q and 89at worktrees after their owners
+retire only the identified stale read-only audit groups. Fresh checks find
+clean source, no payload or holders; six restored blobs and both exact paths
+are verified. Net allocated reclaim is 52,764,672 bytes. Receipt
+`quarantine/wave76-89q-89at/receipt.tsv` has SHA-256
+`395cc6388b66dd872a9e456b1050cfc8c8d6ffea9348fa1ca11acd07185e1099`.
+
+Cleanup72–76 removes 47 worktrees. The measured allocated ledger, excluding
+cleanup75's unmeasured allocation and the small extra adapter archive, totals
+118,948,712,448 bytes. The protected constructor probe remains unchanged.
+The remaining registered worktree census continues; active qualification
+sources and baselines remain protected until their work is complete.

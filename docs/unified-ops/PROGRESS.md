@@ -5663,3 +5663,20 @@ See [0063](0063-source-pptx-modern-comments.md).
   integrated commits remain reachable, and seven retired old reference
   branches are deliberately discarded. Sixty-eight office-lineage siblings
   are outside scope. Dirty payload and remaining worktree review continues.
+
+
+  Runtime on ea5 stops with 526 common OOXML tests passing and five failing.
+  A diagnostic continuation passes eight more rows, then DOCX signature
+  policy reports eight passes and one stale Ribbon error assertion. Both
+  terminal captures are root-verified. Reviewed 104c, 104a and 105 address
+  those findings; reviewed 102a preserves individual signed invalid-target
+  errors while keeping the owner's zero-read batch refusal. Repaired-source
+  qualification remains required; no runtime/performance acceptance.
+
+  Local consolidation now deletes 318 refs and removes 47 worktrees across
+  cleanup72–76. The measured allocated ledger is 118,948,712,448 bytes before
+  the small extra adapter archive, excluding cleanup75's unmeasured allocation.
+  Cleanup75 separately removes about 31.8 GB of apparent size after reversible
+  quarantine. Root verifies preserved payloads, source/registry proofs and the
+  unchanged protected constructor probe. Remaining worktrees are still being
+  audited; 68 independent office siblings remain outside scope. No push.
