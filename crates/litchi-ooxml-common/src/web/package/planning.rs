@@ -333,19 +333,24 @@ pub(in crate::web::package) fn source_matches_conformance(
     limits: &Limits,
 ) -> Result<bool> {
     let expected_namespace = conformance.relationships_namespace();
+    let mut profile = RelationshipProfile::default();
     let task_panes = package.get_part(&graph.task_panes_name)?;
-    if !relationship_attributes_use_namespace(task_panes.blob(), expected_namespace, limits)? {
-        return Ok(false);
-    }
+    profile.merge(relationship_profile(
+        task_panes.blob(),
+        expected_namespace,
+        limits,
+    )?);
     for pane in graph.panes.iter() {
         let Some(extension_name) = graph.extensions_by_relationship.get(&pane.relationship_id)
         else {
             return Ok(false);
         };
         let extension = package.get_part(extension_name)?;
-        if !relationship_attributes_use_namespace(extension.blob(), expected_namespace, limits)? {
-            return Ok(false);
-        }
+        profile.merge(relationship_profile(
+            extension.blob(),
+            expected_namespace,
+            limits,
+        )?);
         for relationship in extension.rels().iter() {
             let image_type = relationship.reltype();
             if (image_type == IMAGE_RELATIONSHIP_TYPE
@@ -356,7 +361,11 @@ pub(in crate::web::package) fn source_matches_conformance(
             }
         }
     }
-    Ok(true)
+    if profile.actual_seen() {
+        Ok(profile.expected_seen && !profile.opposite_seen)
+    } else {
+        Ok(profile.root_expected && !profile.root_opposite)
+    }
 }
 
 /// Build a source-bound no-op patch with complete graph-part snapshots.  The
@@ -546,11 +555,32 @@ fn custom_function_graph_only_changed(
     Ok(changed)
 }
 
-fn relationship_attributes_use_namespace(
+#[derive(Debug, Default)]
+struct RelationshipProfile {
+    expected_seen: bool,
+    opposite_seen: bool,
+    root_expected: bool,
+    root_opposite: bool,
+}
+
+impl RelationshipProfile {
+    fn merge(&mut self, other: Self) {
+        self.expected_seen |= other.expected_seen;
+        self.opposite_seen |= other.opposite_seen;
+        self.root_expected |= other.root_expected;
+        self.root_opposite |= other.root_opposite;
+    }
+
+    fn actual_seen(&self) -> bool {
+        self.expected_seen || self.opposite_seen
+    }
+}
+
+fn relationship_profile(
     xml: &[u8],
     expected: &str,
     limits: &Limits,
-) -> Result<bool> {
+) -> Result<RelationshipProfile> {
     if xml.len() > limits.xml_bytes {
         return limit(LimitKind::XmlBytes, limits.xml_bytes, xml.len());
     }
@@ -566,57 +596,39 @@ fn relationship_attributes_use_namespace(
         limits,
     )?;
     let root = effective.root()?;
-    let mut opposite_seen = false;
-    let mut expected_seen = false;
-    let mut relationship_seen = false;
-    inspect_relationship_attributes(
-        root,
-        expected,
-        &mut opposite_seen,
-        &mut expected_seen,
-        &mut relationship_seen,
-    );
-    // A source part may declare an unused relationship prefix, or carry a
-    // vendor namespace whose value happens to be the other profile's URI.
-    // Neither is a relationship token and neither justifies rewriting an
-    // otherwise equal semantic graph.  Once a relationship-valued attribute
-    // is present, however, it must use the requested namespace.
-    Ok(!opposite_seen && (!relationship_seen || expected_seen))
-}
-
-fn inspect_relationship_attributes(
-    node: &Node,
-    expected: &str,
-    opposite_seen: &mut bool,
-    expected_seen: &mut bool,
-    relationship_seen: &mut bool,
-) {
     let opposite = if expected == TRANSITIONAL_RELATIONSHIPS_NAMESPACE {
         STRICT_RELATIONSHIPS_NAMESPACE
     } else {
         TRANSITIONAL_RELATIONSHIPS_NAMESPACE
     };
+    let mut profile = RelationshipProfile {
+        root_expected: effective.root_declares_namespace(expected),
+        root_opposite: effective.root_declares_namespace(opposite),
+        ..RelationshipProfile::default()
+    };
+    inspect_relationship_attributes(root, expected, opposite, &mut profile);
+    Ok(profile)
+}
+
+fn inspect_relationship_attributes(
+    node: &Node,
+    expected: &str,
+    opposite: &str,
+    profile: &mut RelationshipProfile,
+) {
     for attribute in &node.attributes {
         if !matches!(attribute.local_name.as_str(), "id" | "embed" | "link") {
             continue;
         }
         if attribute.namespace == expected {
-            *relationship_seen = true;
-            *expected_seen = true;
+            profile.expected_seen = true;
         }
         if attribute.namespace == opposite {
-            *relationship_seen = true;
-            *opposite_seen = true;
+            profile.opposite_seen = true;
         }
     }
     for child in &node.children {
-        inspect_relationship_attributes(
-            child,
-            expected,
-            opposite_seen,
-            expected_seen,
-            relationship_seen,
-        );
+        inspect_relationship_attributes(child, expected, opposite, profile);
     }
 }
 
