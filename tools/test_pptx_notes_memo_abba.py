@@ -190,6 +190,9 @@ class NotesMemoAbbaTests(unittest.TestCase):
         self.assertEqual(summary["rounds"], 4)
         self.assertEqual(summary["samples_per_round"], 4)
         self.assertEqual(len(summary["rows"]), 3)
+        self.assertEqual(summary["rows"][0]["output_identity"]["bytes"], 512)
+        self.assertEqual(summary["rows"][0]["source_inventory"]["source_member_count"], 20)
+        self.assertTrue(summary["rows"][0]["fidelity_evidence"]["semantic"]["verified"])
 
     def test_short_packet_is_rejected(self) -> None:
         short = copy.deepcopy(self.reports)
@@ -197,6 +200,15 @@ class NotesMemoAbbaTests(unittest.TestCase):
         short["a1"]["checked_iteration_count"] = 14
         with self.assertRaises(validator.ValidationError):
             validator.validate_abba(short)
+
+    def test_warmup_must_be_positive_and_mode_must_be_known(self) -> None:
+        zero_warmup = copy.deepcopy(self.reports)
+        zero_warmup["a1"]["warmup"] = 0
+        zero_warmup["a1"]["checked_iteration_count"] = 16
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(zero_warmup)
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(self.reports, mode="unknown")
 
     def test_false_raw_oracle_is_rejected(self) -> None:
         false_oracle = copy.deepcopy(self.reports)
@@ -217,6 +229,22 @@ class NotesMemoAbbaTests(unittest.TestCase):
         wrong_pair["a2"]["binary_identity"]["binary_sha256"] = "9" * 64
         with self.assertRaises(validator.ValidationError):
             validator.validate_abba(wrong_pair)
+
+    def test_binary_path_and_mode_bits_are_bounded(self) -> None:
+        relative_path = copy.deepcopy(self.reports)
+        relative_path["a1"]["binary_identity"]["path"] = "relative/binary"
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(relative_path)
+
+        wrong_mode = copy.deepcopy(self.reports)
+        wrong_mode["a1"]["binary_identity"]["mode_bits"] = 0o10000
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_mode)
+
+        wrong_pair_path = copy.deepcopy(self.reports)
+        wrong_pair_path["a2"]["binary_identity"]["path"] = "/tmp/another-control-binary"
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_pair_path)
 
     def test_control_and_candidate_binary_hashes_must_differ(self) -> None:
         same_binary = copy.deepcopy(self.reports)
@@ -289,6 +317,25 @@ class NotesMemoAbbaTests(unittest.TestCase):
         with self.assertRaises(validator.ValidationError):
             validator.validate_abba(wrong_scope)
 
+    def test_cross_report_output_fidelity_and_source_inventory_are_equal(self) -> None:
+        wrong_output = copy.deepcopy(self.reports)
+        wrong_output["b1"]["results"][0]["observations"][0]["output_sha256"] = "9" * 64
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_output)
+
+        wrong_fidelity = copy.deepcopy(self.reports)
+        wrong_fidelity["b1"]["results"][0]["observations"][0]["fidelity"]["semantic"][
+            "notes_text_sha256"
+        ] = "9" * 64
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_fidelity)
+
+        wrong_inventory = copy.deepcopy(self.reports)
+        for key in ("source_payload_sha256", "output_payload_sha256"):
+            wrong_inventory["b1"]["results"][0]["observations"][0]["fidelity"]["raw"][key] = "9" * 64
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_inventory)
+
     def test_allocator_identity_and_scope_are_exact(self) -> None:
         wrong_native_allocator = copy.deepcopy(self.reports)
         wrong_native_allocator["a1"]["allocator"] = "an allocator"
@@ -342,6 +389,18 @@ class NotesMemoAbbaTests(unittest.TestCase):
                     observation["allocation"] = copy.deepcopy(measured)
         summary = validator.validate_abba(allocator, mode="allocator")
         self.assertEqual(summary["instrumentation"], "system_allocator_operation_scoped")
+        wrong_arithmetic = copy.deepcopy(allocator)
+        wrong_arithmetic["a1"]["results"][0]["observations"][0]["allocation"][
+            "live_bytes_after"
+        ] = 1
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_arithmetic, mode="allocator")
+        wrong_peak = copy.deepcopy(allocator)
+        wrong_peak["a1"]["results"][0]["observations"][0]["allocation"][
+            "region_peak_live_bytes"
+        ] = 1
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_peak, mode="allocator")
         allocator["a1"]["results"][0]["observations"][0]["allocation"].pop("allocated_bytes")
         with self.assertRaises(validator.ValidationError):
             validator.validate_abba(allocator, mode="allocator")

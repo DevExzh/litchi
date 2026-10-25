@@ -45,6 +45,7 @@ REVISION = re.compile(r"[0-9a-f]{40}\Z")
 SAMPLES_PER_ROUND = 4
 MIN_ROUNDS = 4
 REQUIRED_SAMPLE_COUNT = SAMPLES_PER_ROUND * MIN_ROUNDS
+MAX_U64 = (1 << 64) - 1
 NATIVE_ALLOCATOR = "Rust system allocator"
 INSTRUMENTED_ALLOCATOR = "CountingSystemAllocator(std::alloc::System)"
 ALLOCATOR_COUNTER_REVISION = "serialized_region_peak_v3"
@@ -225,6 +226,13 @@ def _integer(value: Any, path: str, minimum: int = 0) -> int:
     return value
 
 
+def _u64(value: Any, path: str, minimum: int = 0) -> int:
+    result = _integer(value, path, minimum)
+    if result > MAX_U64:
+        raise ValidationError(f"{path} must fit in an unsigned 64-bit counter")
+    return result
+
+
 def _boolean(value: Any, path: str) -> bool:
     if not isinstance(value, bool):
         raise ValidationError(f"{path} must be boolean")
@@ -241,7 +249,7 @@ def _validate_binary(report: Mapping[str, Any], path: str) -> dict[str, Any]:
             f"{path}.binary_identity.binary_sha256",
             SHA256,
         ),
-        "binary_bytes": _integer(
+        "binary_bytes": _u64(
             _required(identity, "binary_bytes", f"{path}.binary_identity"),
             f"{path}.binary_identity.binary_bytes",
             1,
@@ -257,7 +265,11 @@ def _validate_binary(report: Mapping[str, Any], path: str) -> dict[str, Any]:
         ),
     }
     if result["mode_bits"] is not None:
-        _integer(result["mode_bits"], f"{path}.binary_identity.mode_bits")
+        mode_bits = _integer(result["mode_bits"], f"{path}.binary_identity.mode_bits")
+        if mode_bits > 0o7777:
+            raise ValidationError(f"{path}.binary_identity.mode_bits is outside the executable mode range")
+    if not Path(result["path"]).is_absolute():
+        raise ValidationError(f"{path}.binary_identity.path must be absolute")
     if not result["executable"] or result["profile"] != "release":
         raise ValidationError(f"{path}.binary_identity must be an executable release binary")
     return result
@@ -325,7 +337,7 @@ def _validate_statistics(value: Any, path: str, sample_count: int) -> tuple[list
     samples_value = _required(stats, "samples", path)
     if not isinstance(samples_value, list) or len(samples_value) != sample_count:
         raise ValidationError(f"{path}.samples must contain exactly {sample_count} values")
-    samples = [_integer(item, f"{path}.samples[{index}]", 1) for index, item in enumerate(samples_value)]
+    samples = [_u64(item, f"{path}.samples[{index}]", 1) for index, item in enumerate(samples_value)]
     order_value = _required(stats, "sample_order", path)
     if not isinstance(order_value, list) or len(order_value) != sample_count:
         raise ValidationError(f"{path}.sample_order must contain exactly {sample_count} values")
@@ -416,8 +428,25 @@ def _validate_allocation(value: Any, path: str, mode: str) -> str:
     else:
         if status != "measured" or scope != ALLOCATION_SCOPE:
             raise ValidationError(f"{path} must be measured system-allocator evidence")
-        for field in ALLOCATION_NUMERIC_FIELDS:
-            _integer(_required(allocation, field, path), f"{path}.{field}")
+        numeric = {
+            field: _u64(_required(allocation, field, path), f"{path}.{field}")
+            for field in ALLOCATION_NUMERIC_FIELDS
+        }
+        if numeric["allocation_calls"] < numeric["reallocation_calls"]:
+            raise ValidationError(f"{path}.allocation_calls is smaller than reallocation_calls")
+        live_before = numeric["live_bytes_before"]
+        live_after = numeric["live_bytes_after"]
+        allocated = numeric["allocated_bytes"]
+        deallocated = numeric["deallocated_bytes"]
+        if allocated > MAX_U64 - live_before or live_after != live_before + allocated - deallocated:
+            raise ValidationError(f"{path} live-byte arithmetic is inconsistent")
+        peak_before = numeric["peak_live_bytes_before"]
+        peak_after = numeric["peak_live_bytes_after"]
+        region_peak = numeric["region_peak_live_bytes"]
+        if peak_before < live_before or peak_after < peak_before or peak_after < live_after:
+            raise ValidationError(f"{path} peak-live bounds are inconsistent")
+        if region_peak < max(live_before, live_after) or region_peak > peak_after:
+            raise ValidationError(f"{path}.region_peak_live_bytes is outside the live-byte bounds")
     return status
 
 
@@ -478,7 +507,7 @@ def _validate_rows(report: Mapping[str, Any], path: str, mode: str) -> tuple[int
     samples = _integer(_required(report, "samples", path), f"{path}.samples", REQUIRED_SAMPLE_COUNT)
     if samples % SAMPLES_PER_ROUND != 0:
         raise ValidationError(f"{path}.samples must contain complete four-sample rounds")
-    warmup = _integer(_required(report, "warmup", path), f"{path}.warmup")
+    warmup = _integer(_required(report, "warmup", path), f"{path}.warmup", 1)
     if _integer(_required(report, "checked_iteration_count", path), f"{path}.checked_iteration_count") != samples + warmup:
         raise ValidationError(f"{path}.checked_iteration_count does not match samples plus warmup")
     rows_value = _required(report, "results", path)
@@ -627,6 +656,8 @@ def validate_report(report: Mapping[str, Any], label: str, mode: str = "native")
 
 
 def validate_abba(leg_reports: Mapping[str, Mapping[str, Any]], mode: str = "native") -> dict[str, Any]:
+    if mode not in ("native", "allocator"):
+        raise ValidationError("mode must be native or allocator")
     if tuple(leg_reports) != LEG_ORDER:
         raise ValidationError(f"leg order must be exactly {LEG_ORDER}")
     validated = [validate_report(leg_reports[leg], leg, mode) for leg in LEG_ORDER]
@@ -647,15 +678,53 @@ def validate_abba(leg_reports: Mapping[str, Mapping[str, Any]], mode: str = "nat
     for first_index, second_index, label in ((0, 3, "A"), (1, 2, "B")):
         first_binary = validated[first_index]["binary"]
         second_binary = validated[second_index]["binary"]
-        identity_keys = ("binary_sha256", "binary_bytes", "mode_bits", "executable", "profile")
+        identity_keys = ("path", "binary_sha256", "binary_bytes", "mode_bits", "executable", "profile")
         if any(first_binary[key] != second_binary[key] for key in identity_keys):
             raise ValidationError(f"{label} ABBA legs do not use the same binary identity")
     if validated[0]["binary"]["binary_sha256"] == validated[1]["binary"]["binary_sha256"]:
         raise ValidationError("A and B ABBA legs must use distinct binary identities")
     if first["samples"] < REQUIRED_SAMPLE_COUNT:
         raise ValidationError("ABBA requires at least four samples per round and four rounds")
+    source_inventory_baseline: dict[str, Any] | None = None
     rows = []
     for case in CASES:
+        cross_report_output_identity: tuple[int, str] | None = None
+        cross_report_fidelity: str | None = None
+        cross_report_source_inventory: dict[str, Any] | None = None
+        first_fidelity: dict[str, Any] | None = None
+        for item in validated:
+            observation = item["rows"][case]["observations"][0]
+            output_identity = (observation["output_bytes"], observation["output_sha256"])
+            fidelity = observation["fidelity"]
+            raw = fidelity["raw"]
+            source_inventory = {
+                key: raw[key]
+                for key in (
+                    "source_member_count",
+                    "output_member_count",
+                    "source_payload_sha256",
+                    "relationship_member_count",
+                    "master_theme_member_count",
+                    "slide_root_count",
+                    "notes_root_count",
+                )
+            }
+            if cross_report_output_identity is None:
+                cross_report_output_identity = output_identity
+                cross_report_fidelity = json.dumps(fidelity, sort_keys=True, separators=(",", ":"))
+                cross_report_source_inventory = source_inventory
+                first_fidelity = fidelity
+            else:
+                if output_identity != cross_report_output_identity:
+                    raise ValidationError(f"{case} output bytes/digest differ across ABBA reports")
+                if json.dumps(fidelity, sort_keys=True, separators=(",", ":")) != cross_report_fidelity:
+                    raise ValidationError(f"{case} fidelity evidence differs across ABBA reports")
+                if source_inventory != cross_report_source_inventory:
+                    raise ValidationError(f"{case} source inventory differs across ABBA reports")
+            if source_inventory_baseline is None:
+                source_inventory_baseline = source_inventory
+            elif source_inventory != source_inventory_baseline:
+                raise ValidationError("source inventory differs between probe rows")
         rows.append(
             {
                 "case": case,
@@ -664,6 +733,12 @@ def validate_abba(leg_reports: Mapping[str, Mapping[str, Any]], mode: str = "nat
                     leg: validated[index]["rows"][case]["elapsed_ns"]["samples"]
                     for index, leg in enumerate(LEG_ORDER)
                 },
+                "output_identity": {
+                    "bytes": cross_report_output_identity[0],
+                    "sha256": cross_report_output_identity[1],
+                },
+                "source_inventory": cross_report_source_inventory,
+                "fidelity_evidence": first_fidelity,
                 "fidelity_gate": "all observations passed semantic reopen, raw payload, relationship, master/theme, and changed-root gates",
                 "allocation_metric_gate": mode,
             }
