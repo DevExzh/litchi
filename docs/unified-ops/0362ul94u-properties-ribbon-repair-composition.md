@@ -24,9 +24,16 @@ hydration. Both replacement routes use the stored canonical part name for
 provenance, including case-insensitive aliases. Glossary signatures accompany
 the new low-level methods.
 
-Both complete chains are independently READY for source composition. Root
-checks formatting of every changed Rust path and the staged diff. No Cargo,
+Both complete chains are independently READY for source composition. The
+initial combined formatting script stopped at the PPTX failure before reaching
+this tree; the composition record originally overstated that check. This
+follow-up actually formats and checks all changed Rust paths successfully;
+the diff check passes. No Cargo,
 runtime, native or performance command accompanies this merge. The prior
 511-pass / 17-failure common-library capture remains historical: all four
 repair chains now require fresh compiler, runtime and glossary qualification.
 Performance and final workspace acceptance remain open; nothing is pushed.
+
+The formatter-only delta is retained externally at
+`.coord/composition-format-89ay-94u/uo2-ooxml-combined-0362ul94.patch` (0 bytes, SHA-256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`).
