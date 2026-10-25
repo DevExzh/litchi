@@ -397,7 +397,8 @@ fn rewrite_display_cell_metadata(
     budget.charge_retained_bytes(output_limit, path)?;
     budget.charge_transaction_work(work, path)?;
 
-    let mut cell = BncCell::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    let mut cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+        .map_err(|_| Error::InvalidSource { path })?;
     let source_value = cell.stored_value();
     let source_cache = cell
         .cached_scalar()
@@ -405,21 +406,9 @@ fn rewrite_display_cell_metadata(
     let source_numeric_type = cell.numeric_cell_type();
     cell.set_number_or_percentage_format_identifier_preserving_value(desired_identifier)
         .map_err(|_| Error::InvalidSource { path })?;
-    let output = cell
-        .try_encode_with_limit(output_limit)
-        .map_err(|error| match error {
-            litchi_numbers_wire::Error::Allocation { requested } => Error::Allocation {
-                amount: requested,
-                path,
-            },
-            litchi_numbers_wire::Error::InvalidFormat(_)
-            | litchi_numbers_wire::Error::ParseError(_)
-            | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => {
-                Error::InvalidSource { path }
-            },
-            _ => Error::InvalidSource { path },
-        })?;
-    let candidate_cell = BncCell::parse(&output).map_err(|_| Error::Verification)?;
+    let output = encode_bnc(&cell, source, output_limit, path)?;
+    let candidate_cell = BncCell::parse(&output, &crate::cell::wire::limits_for_source(&output))
+        .map_err(|_| Error::Verification)?;
     verify_display_cell_metadata(
         source_value,
         source_cache,
@@ -494,7 +483,8 @@ fn rewrite_date_time_cell_metadata(
     budget.charge_retained_bytes(output_limit, path)?;
     budget.charge_transaction_work(work, path)?;
 
-    let mut cell = BncCell::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    let mut cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+        .map_err(|_| Error::InvalidSource { path })?;
     let source_value = cell.stored_value();
     let source_cache = cell
         .cached_scalar()
@@ -507,21 +497,9 @@ fn rewrite_date_time_cell_metadata(
     }
     cell.set_date_time_format_identifier_preserving_value(desired_identifier)
         .map_err(|_| Error::InvalidSource { path })?;
-    let output = cell
-        .try_encode_with_limit(output_limit)
-        .map_err(|error| match error {
-            litchi_numbers_wire::Error::Allocation { requested } => Error::Allocation {
-                amount: requested,
-                path,
-            },
-            litchi_numbers_wire::Error::InvalidFormat(_)
-            | litchi_numbers_wire::Error::ParseError(_)
-            | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => {
-                Error::InvalidSource { path }
-            },
-            _ => Error::InvalidSource { path },
-        })?;
-    let candidate_cell = BncCell::parse(&output).map_err(|_| Error::Verification)?;
+    let output = encode_bnc(&cell, source, output_limit, path)?;
+    let candidate_cell = BncCell::parse(&output, &crate::cell::wire::limits_for_source(&output))
+        .map_err(|_| Error::Verification)?;
     verify_date_time_cell_metadata(
         source_value,
         source_cache,
@@ -590,7 +568,8 @@ fn rewrite_duration_cell_metadata(
     budget.charge_retained_bytes(output_limit, path)?;
     budget.charge_transaction_work(work, path)?;
 
-    let mut cell = BncCell::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    let mut cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+        .map_err(|_| Error::InvalidSource { path })?;
     let source_value = cell.stored_value();
     let source_cache = cell
         .cached_scalar()
@@ -603,21 +582,9 @@ fn rewrite_duration_cell_metadata(
     }
     cell.set_duration_format_identifier_preserving_value(desired_identifier)
         .map_err(|_| Error::InvalidSource { path })?;
-    let output = cell
-        .try_encode_with_limit(output_limit)
-        .map_err(|error| match error {
-            litchi_numbers_wire::Error::Allocation { requested } => Error::Allocation {
-                amount: requested,
-                path,
-            },
-            litchi_numbers_wire::Error::InvalidFormat(_)
-            | litchi_numbers_wire::Error::ParseError(_)
-            | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => {
-                Error::InvalidSource { path }
-            },
-            _ => Error::InvalidSource { path },
-        })?;
-    let candidate_cell = BncCell::parse(&output).map_err(|_| Error::Verification)?;
+    let output = encode_bnc(&cell, source, output_limit, path)?;
+    let candidate_cell = BncCell::parse(&output, &crate::cell::wire::limits_for_source(&output))
+        .map_err(|_| Error::Verification)?;
     verify_duration_cell_metadata(
         source_value,
         source_cache,
@@ -687,7 +654,8 @@ fn rewrite_currency_cell_metadata(
     budget.charge_retained_bytes(output_limit, path)?;
     budget.charge_transaction_work(work, path)?;
 
-    let mut cell = BncCell::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    let mut cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+        .map_err(|_| Error::InvalidSource { path })?;
     let source_value = cell.stored_value();
     let source_cache = cell
         .cached_scalar()
@@ -695,21 +663,9 @@ fn rewrite_currency_cell_metadata(
     let source_secondary = cell.secondary_format_identifier();
     cell.set_currency_format_identifier_preserving_value(desired_identifier)
         .map_err(|_| Error::InvalidSource { path })?;
-    let output = cell
-        .try_encode_with_limit(output_limit)
-        .map_err(|error| match error {
-            litchi_numbers_wire::Error::Allocation { requested } => Error::Allocation {
-                amount: requested,
-                path,
-            },
-            litchi_numbers_wire::Error::InvalidFormat(_)
-            | litchi_numbers_wire::Error::ParseError(_)
-            | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => {
-                Error::InvalidSource { path }
-            },
-            _ => Error::InvalidSource { path },
-        })?;
-    let candidate_cell = BncCell::parse(&output).map_err(|_| Error::Verification)?;
+    let output = encode_bnc(&cell, source, output_limit, path)?;
+    let candidate_cell = BncCell::parse(&output, &crate::cell::wire::limits_for_source(&output))
+        .map_err(|_| Error::Verification)?;
     verify_currency_cell_metadata(
         source_value,
         source_cache,
@@ -957,7 +913,8 @@ fn rewrite_text_cell_metadata(
     budget.charge_retained_bytes(output_limit, path)?;
     budget.charge_transaction_work(work, path)?;
 
-    let mut cell = BncCell::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    let mut cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+        .map_err(|_| Error::InvalidSource { path })?;
     let source_value = cell.stored_value();
     let source_cache = cell
         .cached_scalar()
@@ -1013,17 +970,16 @@ fn rewrite_text_cell_metadata(
             } else {
                 cell.set_data_format_identifier(identifier, CellDataFormatKind::Text, None)
                     .map_err(|_| Error::Refused(crate::package::table_cell_pop_up_menu::Refusal::UnsupportedDependency { path }))?;
-                cell.try_encode_with_limit(output_limit)
-                    .map_err(|error| map_bnc_error(error, path))?
+                encode_bnc(&cell, source, output_limit, path)?
             }
         },
         None => {
             cell.clear_explicit_format();
-            cell.try_encode_with_limit(output_limit)
-                .map_err(|error| map_bnc_error(error, path))?
+            encode_bnc(&cell, source, output_limit, path)?
         },
     };
-    let candidate = BncCell::parse(&output).map_err(|_| Error::Verification)?;
+    let candidate = BncCell::parse(&output, &crate::cell::wire::limits_for_source(&output))
+        .map_err(|_| Error::Verification)?;
     if candidate.stored_value() != source_value
         || candidate.cached_scalar().map_err(|_| Error::Verification)? != source_cache
     {
@@ -1061,9 +1017,22 @@ fn map_bnc_error(error: litchi_numbers_wire::Error, path: Path) -> Error {
         },
         litchi_numbers_wire::Error::InvalidFormat(_)
         | litchi_numbers_wire::Error::ParseError(_)
-        | litchi_numbers_wire::Error::OutputLimitExceeded { .. } => Error::InvalidSource { path },
+        | litchi_numbers_wire::Error::LimitExceeded { .. } => Error::InvalidSource { path },
         _ => Error::InvalidSource { path },
     }
+}
+
+fn encode_bnc(
+    cell: &BncCell,
+    source: &[u8],
+    max_output_bytes: usize,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let limits = crate::cell::wire::limits_for_source(source)
+        .with_output_bytes(max_output_bytes)
+        .map_err(|_| Error::InvalidSource { path })?;
+    cell.encode(&limits)
+        .map_err(|error| map_bnc_error(error, path))
 }
 
 /// Read one existing Number format with a fresh transaction ledger.
@@ -1629,7 +1598,11 @@ fn read_display_format_with_budget(
     )
     .map_err(|_| Error::InvalidSource { path })?;
     charge_owned_bnc_parse(cell_source.len(), path, budget)?;
-    let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
+    let cell = BncCell::parse(
+        cell_source,
+        &crate::cell::wire::limits_for_source(cell_source),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
     native::validate_bnc_format_metadata(cell_source, &cell, path)?;
     let format_identifier = cell.format_identifier();
     if cell.control_cell_spec_identifier().is_some() {
@@ -1960,7 +1933,11 @@ fn rewrite_display_format(
     )
     .map_err(|_| Error::InvalidSource { path })?;
     charge_owned_bnc_parse(cell_source.len(), path, budget)?;
-    let cell = BncCell::parse(cell_source).map_err(|_| Error::InvalidSource { path })?;
+    let cell = BncCell::parse(
+        cell_source,
+        &crate::cell::wire::limits_for_source(cell_source),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
     native::validate_bnc_format_metadata(cell_source, &cell, path)?;
     let old_format = cell.format_identifier();
     let old_secondary =
@@ -2573,7 +2550,11 @@ fn resolve_custom_cell_graph(
     .map_err(|_| Error::InvalidSource { path })?;
     let cell_source = cell_source.to_vec();
     charge_owned_bnc_parse(cell_source.len(), path, budget)?;
-    let cell = BncCell::parse(&cell_source).map_err(|_| Error::InvalidSource { path })?;
+    let cell = BncCell::parse(
+        &cell_source,
+        &crate::cell::wire::limits_for_source(&cell_source),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
     native::validate_bnc_format_metadata(&cell_source, &cell, path)?;
     if cell.control_cell_spec_identifier().is_some() {
         return Err(Error::Refused(
@@ -4272,15 +4253,18 @@ fn rewrite_custom_cell_clear(
     budget: &mut TransactionBudget,
 ) -> Result<Vec<u8>, Error> {
     charge_owned_bnc_parse(source.len(), path, budget)?;
-    let mut cell = BncCell::parse(source).map_err(|_| Error::InvalidSource { path })?;
+    let mut cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+        .map_err(|_| Error::InvalidSource { path })?;
     cell.clear_explicit_format();
-    cell.try_encode_with_limit(
+    encode_bnc(
+        &cell,
+        source,
         source
             .len()
             .checked_add(16)
             .ok_or(Error::InvalidSource { path })?,
+        path,
     )
-    .map_err(|_| Error::InvalidSource { path })
 }
 
 fn fresh_custom_uuid(entries: &[CustomRegistryEntry]) -> CustomUuid {
@@ -6055,7 +6039,8 @@ mod tests {
     #[test]
     fn native_marker_zero_text_is_valid_default_metadata() {
         let source = hex("050000000000000000100200050000000c000000");
-        let cell = BncCell::parse(&source).expect("native marker-zero Text cell");
+        let cell = BncCell::parse(&source, &crate::cell::wire::limits_for_source(&source))
+            .expect("native marker-zero Text cell");
         assert_eq!(cell.explicit_format_flags(), 0);
         let metadata = validate_text_cell_metadata(&source, &cell, Path::Package)
             .expect("marker-zero Text metadata");
@@ -6066,7 +6051,8 @@ mod tests {
     #[test]
     fn native_converted_text_retains_a_generic_number_edge() {
         let source = hex("0503000000008100083002000200000005000000010000000c000000");
-        let cell = BncCell::parse(&source).expect("native converted Text cell");
+        let cell = BncCell::parse(&source, &crate::cell::wire::limits_for_source(&source))
+            .expect("native converted Text cell");
         let metadata = validate_text_cell_metadata(&source, &cell, Path::Package)
             .expect("converted Text metadata");
         assert_eq!(metadata.generic_identifier, Some(1));
@@ -6080,7 +6066,8 @@ mod tests {
         flags |= 0x0010_0000;
         source[8..12].copy_from_slice(&flags.to_le_bytes());
         source.extend_from_slice(&[0; 4]);
-        let cell = BncCell::parse(&source).expect("reserved field remains parseable");
+        let cell = BncCell::parse(&source, &crate::cell::wire::limits_for_source(&source))
+            .expect("reserved field remains parseable");
         assert!(validate_text_cell_metadata(&source, &cell, Path::Package).is_err());
     }
 

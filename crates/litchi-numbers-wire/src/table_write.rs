@@ -11,7 +11,7 @@
 
 use litchi_iwa_common::wire::WireView;
 
-use crate::{BncCell, ListKind};
+use crate::{BncCell, LimitKind, Limits, ListKind};
 
 /// A malformed payload, or a native shape these writes do not own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -23,14 +23,45 @@ pub enum WriteError {
     /// formula or commented cell, a legacy tile, a shared string entry
     /// with an object).
     Unsupported,
+    /// A caller-selected raw-wire ceiling was exceeded before output was
+    /// published.
+    LimitExceeded {
+        /// Dimension that exceeded its ceiling.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: usize,
+        /// Selected maximum.
+        maximum: usize,
+    },
+    /// A fallible output or staging allocation failed.
+    Allocation {
+        /// Exact requested allocation size.
+        requested: usize,
+    },
 }
 
 impl std::fmt::Display for WriteError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.write_str(match self {
-            Self::Invalid => "malformed table payload",
-            Self::Unsupported => "table payload shape outside the shared cell writer",
-        })
+        match self {
+            Self::Invalid => formatter.write_str("malformed table payload"),
+            Self::Unsupported => {
+                formatter.write_str("table payload shape outside the shared cell writer")
+            },
+            Self::LimitExceeded {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                formatter,
+                "Numbers table {kind} limit exceeded: observed {observed}, maximum {maximum}"
+            ),
+            Self::Allocation { requested } => {
+                write!(
+                    formatter,
+                    "Numbers table writer allocation failed for {requested} bytes"
+                )
+            },
+        }
     }
 }
 
@@ -42,32 +73,80 @@ const MISSING: [u8; 2] = [0xff, 0xff];
 /// `owner_kind` of a table's merge owner.
 const MERGE_OWNER_KIND: u64 = 5;
 
-fn push_varint(output: &mut Vec<u8>, mut value: u64) {
-    loop {
-        let byte = (value & 0x7f) as u8;
-        value >>= 7;
-        if value == 0 {
-            output.push(byte);
-            return;
-        }
-        output.push(byte | 0x80);
+fn map_limits(error: crate::limits::Error) -> WriteError {
+    match error {
+        crate::limits::Error::InvalidLimit {
+            kind,
+            value,
+            maximum,
+        } => WriteError::LimitExceeded {
+            kind,
+            observed: value,
+            maximum,
+        },
+        crate::limits::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => WriteError::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        },
     }
 }
 
-fn varint_field(output: &mut Vec<u8>, number: u32, value: u64) {
-    push_varint(output, u64::from(number) << 3);
-    push_varint(output, value);
+fn reserve(output: &mut Vec<u8>, additional: usize) -> Result<()> {
+    output
+        .try_reserve(additional)
+        .map_err(|_| WriteError::Allocation {
+            requested: additional,
+        })
 }
 
-fn bytes_field(output: &mut Vec<u8>, number: u32, payload: &[u8]) {
-    push_varint(output, (u64::from(number) << 3) | 2);
-    push_varint(output, payload.len() as u64);
-    output.extend_from_slice(payload);
+fn append(output: &mut Vec<u8>, bytes: &[u8], limits: &Limits) -> Result<()> {
+    let length = output
+        .len()
+        .checked_add(bytes.len())
+        .ok_or(WriteError::LimitExceeded {
+            kind: LimitKind::OutputBytes,
+            observed: usize::MAX,
+            maximum: limits.max_output_bytes(),
+        })?;
+    limits.check_output(length).map_err(map_limits)?;
+    reserve(output, bytes.len())?;
+    output.extend_from_slice(bytes);
+    Ok(())
 }
 
-fn fixed32_field(output: &mut Vec<u8>, number: u32, value: u32) {
-    push_varint(output, (u64::from(number) << 3) | 5);
-    output.extend_from_slice(&value.to_le_bytes());
+fn push_varint(output: &mut Vec<u8>, mut value: u64, limits: &Limits) -> Result<()> {
+    let mut encoded = [0u8; 10];
+    let mut length = 0usize;
+    loop {
+        let byte = (value & 0x7f) as u8;
+        value >>= 7;
+        encoded[length] = if value == 0 { byte } else { byte | 0x80 };
+        length += 1;
+        if value == 0 {
+            return append(output, &encoded[..length], limits);
+        }
+    }
+}
+
+fn varint_field(output: &mut Vec<u8>, number: u32, value: u64, limits: &Limits) -> Result<()> {
+    push_varint(output, u64::from(number) << 3, limits)?;
+    push_varint(output, value, limits)
+}
+
+fn bytes_field(output: &mut Vec<u8>, number: u32, payload: &[u8], limits: &Limits) -> Result<()> {
+    push_varint(output, (u64::from(number) << 3) | 2, limits)?;
+    push_varint(output, payload.len() as u64, limits)?;
+    append(output, payload, limits)
+}
+
+fn fixed32_field(output: &mut Vec<u8>, number: u32, value: u32, limits: &Limits) -> Result<()> {
+    push_varint(output, (u64::from(number) << 3) | 5, limits)?;
+    append(output, &value.to_le_bytes(), limits)
 }
 
 struct Field<'a> {
@@ -77,18 +156,57 @@ struct Field<'a> {
     payload: &'a [u8],
 }
 
-fn fields(data: &[u8]) -> Result<Vec<Field<'_>>> {
-    let view = WireView::parse(data, litchi_iwa_common::WireLimits::DEFAULT)
-        .map_err(|_error| WriteError::Invalid)?;
-    Ok(view
-        .fields()
-        .map(|field| Field {
+fn fields<'a>(data: &'a [u8], limits: &Limits) -> Result<Vec<Field<'a>>> {
+    limits.check_input(data.len()).map_err(map_limits)?;
+    let view = WireView::parse(data, limits.wire()).map_err(map_wire_error)?;
+    let count = view.fields().count();
+    limits.check_fields(count).map_err(map_limits)?;
+    let mut fields = Vec::new();
+    fields
+        .try_reserve_exact(count)
+        .map_err(|_| WriteError::Allocation { requested: count })?;
+    for field in view.fields() {
+        fields.push(Field {
             number: field.number(),
             wire_type: field.wire_type(),
             raw: field.raw(),
             payload: field.payload(),
-        })
-        .collect())
+        });
+    }
+    Ok(fields)
+}
+
+fn map_wire_error(error: litchi_iwa_common::Error) -> WriteError {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => {
+            let kind = match kind {
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::Fields,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::RewriteWork
+                | litchi_iwa_common::LimitKind::TableRows
+                | litchi_iwa_common::LimitKind::TableColumns
+                | litchi_iwa_common::LimitKind::TableCells
+                | litchi_iwa_common::LimitKind::MaterializedCells
+                | litchi_iwa_common::LimitKind::Nesting => LimitKind::Items,
+            };
+            WriteError::LimitExceeded {
+                kind,
+                observed,
+                maximum: limit,
+            }
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => {
+            WriteError::Allocation { requested: amount }
+        },
+        litchi_iwa_common::Error::InvalidFormat(_)
+        | litchi_iwa_common::Error::InvalidLimit { .. } => WriteError::Invalid,
+        _ => WriteError::Invalid,
+    }
 }
 
 fn varint(payload: &[u8]) -> Result<u64> {
@@ -100,9 +218,9 @@ fn varint(payload: &[u8]) -> Result<u64> {
     Ok(value)
 }
 
-fn single_varint(data: &[u8], number: u32) -> Result<Option<u64>> {
+fn single_varint(data: &[u8], number: u32, limits: &Limits) -> Result<Option<u64>> {
     let mut found = None;
-    for field in fields(data)? {
+    for field in fields(data, limits)? {
         if field.number == number {
             if field.wire_type != 0 || found.replace(varint(field.payload)?).is_some() {
                 return Err(WriteError::Invalid);
@@ -112,9 +230,9 @@ fn single_varint(data: &[u8], number: u32) -> Result<Option<u64>> {
     Ok(found)
 }
 
-fn single_bytes(data: &[u8], number: u32) -> Result<Option<&[u8]>> {
+fn single_bytes<'a>(data: &'a [u8], number: u32, limits: &Limits) -> Result<Option<&'a [u8]>> {
     let mut found = None;
-    for field in fields(data)? {
+    for field in fields(data, limits)? {
         if field.number == number {
             if field.wire_type != 2 || found.replace(field.payload).is_some() {
                 return Err(WriteError::Invalid);
@@ -128,31 +246,106 @@ fn single_bytes(data: &[u8], number: u32) -> Result<Option<&[u8]>> {
 /// replacement drops the field).
 fn rebuild(
     data: &[u8],
+    limits: &Limits,
     mut map: impl FnMut(&Field<'_>) -> Result<Option<Vec<u8>>>,
 ) -> Result<Vec<u8>> {
-    let mut output = Vec::with_capacity(data.len());
-    for field in fields(data)? {
-        match map(&field)? {
-            Some(replacement) => output.extend_from_slice(&replacement),
-            None => output.extend_from_slice(field.raw),
-        }
+    limits.check_input(data.len()).map_err(map_limits)?;
+    let fields = fields(data, limits)?;
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(fields.len())
+        .map_err(|_| WriteError::Allocation {
+            requested: fields.len(),
+        })?;
+    if replacements.capacity() != fields.len() {
+        return Err(WriteError::Allocation {
+            requested: fields.len(),
+        });
+    }
+    for field in &fields {
+        replacements.push(map(field)?);
+    }
+
+    // Preflight the actual encoded representation before allocating the final
+    // output.  This counts replacements and retained raw fields separately;
+    // the old source-length reservation could under-reserve a larger rewrite
+    // and over-reserve a shrinking one.
+    let output_len =
+        fields
+            .iter()
+            .zip(&replacements)
+            .try_fold(0usize, |length, (field, replacement)| {
+                length
+                    .checked_add(replacement.as_ref().map_or(field.raw.len(), Vec::len))
+                    .ok_or(WriteError::LimitExceeded {
+                        kind: LimitKind::OutputBytes,
+                        observed: usize::MAX,
+                        maximum: limits.max_output_bytes(),
+                    })
+            })?;
+    limits.check_output(output_len).map_err(map_limits)?;
+
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|_| WriteError::Allocation {
+            requested: output_len,
+        })?;
+    if output.capacity() != output_len {
+        return Err(WriteError::Allocation {
+            requested: output_len,
+        });
+    }
+    for (field, replacement) in fields.iter().zip(replacements) {
+        output.extend_from_slice(replacement.as_deref().unwrap_or(field.raw));
+    }
+    if output.len() != output_len {
+        return Err(WriteError::Invalid);
     }
     Ok(output)
 }
 
 /// The cell slots of one BNC storage: `(start, end)` per column.
-fn slots(storage: &[u8], offsets: &[u8], unit: usize) -> Result<Vec<Option<(usize, usize)>>> {
+fn slots(
+    storage: &[u8],
+    offsets: &[u8],
+    unit: usize,
+    limits: &Limits,
+) -> Result<Vec<Option<(usize, usize)>>> {
+    if unit == 0 {
+        return Err(WriteError::Invalid);
+    }
     if offsets.len() % 2 != 0 {
         return Err(WriteError::Invalid);
     }
-    let starts: Vec<Option<usize>> = offsets
-        .chunks_exact(2)
-        .map(|pair| {
-            let raw = [pair[0], pair[1]];
-            (raw != MISSING).then(|| usize::from(u16::from_le_bytes(raw)) * unit)
-        })
-        .collect();
-    let present: Vec<usize> = starts.iter().flatten().copied().collect();
+    let count = offsets.len() / 2;
+    limits.check_items(count).map_err(map_limits)?;
+    let mut starts = Vec::new();
+    starts
+        .try_reserve_exact(count)
+        .map_err(|_| WriteError::Allocation { requested: count })?;
+    for pair in offsets.chunks_exact(2) {
+        let raw = [pair[0], pair[1]];
+        let start = if raw == MISSING {
+            None
+        } else {
+            Some(
+                usize::from(u16::from_le_bytes(raw))
+                    .checked_mul(unit)
+                    .ok_or(WriteError::Invalid)?,
+            )
+        };
+        starts.push(start);
+    }
+    let present_count = starts.iter().flatten().count();
+    limits.check_items(present_count).map_err(map_limits)?;
+    let mut present = Vec::new();
+    present
+        .try_reserve_exact(present_count)
+        .map_err(|_| WriteError::Allocation {
+            requested: present_count,
+        })?;
+    present.extend(starts.iter().flatten().copied());
     if present.windows(2).any(|pair| pair[0] >= pair[1])
         || present.last().is_some_and(|last| *last >= storage.len())
         || present.first().is_some_and(|first| *first != 0)
@@ -160,16 +353,72 @@ fn slots(storage: &[u8], offsets: &[u8], unit: usize) -> Result<Vec<Option<(usiz
         return Err(WriteError::Unsupported);
     }
     let mut next = present.iter().skip(1);
-    Ok(starts
-        .into_iter()
-        .map(|start| start.map(|start| (start, next.next().copied().unwrap_or(storage.len()))))
-        .collect())
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(starts.len())
+        .map_err(|_| WriteError::Allocation {
+            requested: starts.len(),
+        })?;
+    output.extend(
+        starts
+            .into_iter()
+            .map(|start| start.map(|start| (start, next.next().copied().unwrap_or(storage.len())))),
+    );
+    Ok(output)
 }
 
 /// Encode a cell list as BNC storage and offsets in `unit`-byte units.
-fn encode(cells: &[Option<&[u8]>], unit: usize) -> Result<(Vec<u8>, Vec<u8>)> {
+fn encode(cells: &[Option<&[u8]>], unit: usize, limits: &Limits) -> Result<(Vec<u8>, Vec<u8>)> {
+    if unit == 0 {
+        return Err(WriteError::Invalid);
+    }
+    limits.check_items(cells.len()).map_err(map_limits)?;
+    for cell in cells.iter().flatten() {
+        limits.check_input(cell.len()).map_err(map_limits)?;
+    }
+    let storage_len = cells
+        .iter()
+        .try_fold(0usize, |length, cell| {
+            let Some(cell) = cell else {
+                return Some(length);
+            };
+            let padding = (unit - (length % unit)) % unit;
+            length.checked_add(padding)?.checked_add(cell.len())
+        })
+        .ok_or(WriteError::LimitExceeded {
+            kind: LimitKind::OutputBytes,
+            observed: usize::MAX,
+            maximum: limits.max_output_bytes(),
+        })?;
+    let storage_len = storage_len
+        .checked_add((unit - (storage_len % unit)) % unit)
+        .ok_or(WriteError::LimitExceeded {
+            kind: LimitKind::OutputBytes,
+            observed: usize::MAX,
+            maximum: limits.max_output_bytes(),
+        })?;
+    limits.check_output(storage_len).map_err(map_limits)?;
+    let offset_len = cells.len().checked_mul(2).ok_or(WriteError::Invalid)?;
+    let combined_len = storage_len
+        .checked_add(offset_len)
+        .ok_or(WriteError::LimitExceeded {
+            kind: LimitKind::OutputBytes,
+            observed: usize::MAX,
+            maximum: limits.max_output_bytes(),
+        })?;
+    limits.check_output(combined_len).map_err(map_limits)?;
     let mut storage = Vec::new();
-    let mut offsets = Vec::with_capacity(cells.len() * 2);
+    storage
+        .try_reserve_exact(storage_len)
+        .map_err(|_| WriteError::Allocation {
+            requested: storage_len,
+        })?;
+    let mut offsets = Vec::new();
+    offsets
+        .try_reserve_exact(offset_len)
+        .map_err(|_| WriteError::Allocation {
+            requested: offset_len,
+        })?;
     for cell in cells {
         let Some(cell) = cell else {
             offsets.extend_from_slice(&MISSING);
@@ -206,28 +455,42 @@ pub struct TileCellWrite {
 /// # Errors
 ///
 /// [`WriteError::Invalid`] for a malformed tile.
-pub fn tile_cell(tile: &[u8], local_row: u32, column: u32) -> Result<Option<Vec<u8>>> {
-    for field in fields(tile)? {
-        if field.number != 5 || single_varint(field.payload, 1)? != Some(u64::from(local_row)) {
+pub fn tile_cell(
+    tile: &[u8],
+    local_row: u32,
+    column: u32,
+    limits: &Limits,
+) -> Result<Option<Vec<u8>>> {
+    for field in fields(tile, limits)? {
+        if field.number != 5
+            || single_varint(field.payload, 1, limits)? != Some(u64::from(local_row))
+        {
             continue;
         }
         let (Some(storage), Some(offsets)) = (
-            single_bytes(field.payload, 6)?,
-            single_bytes(field.payload, 7)?,
+            single_bytes(field.payload, 6, limits)?,
+            single_bytes(field.payload, 7, limits)?,
         ) else {
             return Err(WriteError::Unsupported);
         };
-        let unit = if single_varint(field.payload, 8)?.unwrap_or(0) != 0 {
+        let unit = if single_varint(field.payload, 8, limits)?.unwrap_or(0) != 0 {
             4
         } else {
             1
         };
-        let cells = slots(storage, offsets, unit)?;
-        return Ok(cells
-            .get(column as usize)
-            .copied()
-            .flatten()
-            .map(|(start, end)| storage[start..end].to_vec()));
+        let cells = slots(storage, offsets, unit, limits)?;
+        let column = usize::try_from(column).map_err(|_| WriteError::Invalid)?;
+        let Some((start, end)) = cells.get(column).copied().flatten() else {
+            return Ok(None);
+        };
+        limits.check_output(end - start).map_err(map_limits)?;
+        let mut copy = Vec::new();
+        copy.try_reserve_exact(end - start)
+            .map_err(|_| WriteError::Allocation {
+                requested: end - start,
+            })?;
+        copy.extend_from_slice(&storage[start..end]);
+        return Ok(Some(copy));
     }
     Ok(None)
 }
@@ -245,126 +508,178 @@ pub fn tile_set_cell(
     column: u32,
     columns: u32,
     cell: Option<&[u8]>,
+    limits: &Limits,
 ) -> Result<TileCellWrite> {
-    if single_varint(tile, 6)? != Some(5) || single_varint(tile, 7)? != Some(1) {
+    if single_varint(tile, 6, limits)? != Some(5) || single_varint(tile, 7, limits)? != Some(1) {
         return Err(WriteError::Unsupported);
     }
-    let column = column as usize;
-    let columns_usize = columns as usize;
+    let column = usize::try_from(column).map_err(|_| WriteError::Invalid)?;
+    let columns_usize = usize::try_from(columns).map_err(|_| WriteError::Invalid)?;
+    limits.check_items(columns_usize).map_err(map_limits)?;
+    if let Some(cell) = cell {
+        limits.check_input(cell.len()).map_err(map_limits)?;
+    }
     if column >= columns_usize {
         return Err(WriteError::Invalid);
     }
-    let rows: Vec<u64> = fields(tile)?
-        .iter()
-        .filter(|field| field.number == 5)
-        .map(|field| single_varint(field.payload, 1).and_then(|row| row.ok_or(WriteError::Invalid)))
-        .collect::<Result<_>>()?;
-    let numrows = single_varint(tile, 4)?.ok_or(WriteError::Invalid)?;
+    let tile_fields = fields(tile, limits)?;
+    let row_count = tile_fields.iter().filter(|field| field.number == 5).count();
+    limits.check_items(row_count).map_err(map_limits)?;
+    let mut rows = Vec::new();
+    rows.try_reserve_exact(row_count)
+        .map_err(|_| WriteError::Allocation {
+            requested: row_count,
+        })?;
+    for field in tile_fields.iter().filter(|field| field.number == 5) {
+        rows.push(single_varint(field.payload, 1, limits)?.ok_or(WriteError::Invalid)?);
+    }
+    limits.check_items(rows.len()).map_err(map_limits)?;
+    let numrows = single_varint(tile, 4, limits)?.ok_or(WriteError::Invalid)?;
     let counts_rows = numrows == rows.len() as u64;
     let mut previous = None;
     let mut found = false;
     let mut rewritten_row = |row: &[u8]| -> Result<Option<Vec<u8>>> {
-        let (Some(storage), Some(offsets)) = (single_bytes(row, 6)?, single_bytes(row, 7)?) else {
+        let (Some(storage), Some(offsets)) =
+            (single_bytes(row, 6, limits)?, single_bytes(row, 7, limits)?)
+        else {
             return Err(WriteError::Unsupported);
         };
-        let unit = if single_varint(row, 8)?.unwrap_or(0) != 0 {
+        let unit = if single_varint(row, 8, limits)?.unwrap_or(0) != 0 {
             4
         } else {
             1
         };
-        let mut cells: Vec<Option<&[u8]>> = slots(storage, offsets, unit)?
-            .into_iter()
-            .map(|slot| slot.map(|(start, end)| &storage[start..end]))
-            .collect();
+        let slots = slots(storage, offsets, unit, limits)?;
+        let mut cells = Vec::new();
+        cells
+            .try_reserve_exact(slots.len())
+            .map_err(|_| WriteError::Allocation {
+                requested: slots.len(),
+            })?;
+        for slot in slots {
+            cells.push(slot.map(|(start, end)| &storage[start..end]));
+        }
         if cells.len() < columns_usize {
+            limits.check_items(columns_usize).map_err(map_limits)?;
+            let additional = columns_usize - cells.len();
+            cells
+                .try_reserve_exact(additional)
+                .map_err(|_| WriteError::Allocation {
+                    requested: additional,
+                })?;
             cells.resize(columns_usize, None);
         }
-        previous = cells[column].map(<[u8]>::to_vec);
+        previous = match cells[column] {
+            Some(bytes) => {
+                limits.check_output(bytes.len()).map_err(map_limits)?;
+                let mut copy = Vec::new();
+                copy.try_reserve_exact(bytes.len())
+                    .map_err(|_| WriteError::Allocation {
+                        requested: bytes.len(),
+                    })?;
+                copy.extend_from_slice(bytes);
+                Some(copy)
+            },
+            None => None,
+        };
         cells[column] = cell;
         let count = cells.iter().filter(|cell| cell.is_some()).count() as u64;
-        let (storage, offsets) = encode(&cells, unit)?;
-        Ok(Some(rebuild(row, |field| {
-            Ok(match field.number {
-                2 => {
-                    let mut output = Vec::new();
-                    varint_field(&mut output, 2, count);
-                    Some(output)
-                },
-                6 => {
-                    let mut output = Vec::new();
-                    bytes_field(&mut output, 6, &storage);
-                    Some(output)
-                },
-                7 => {
-                    let mut output = Vec::new();
-                    bytes_field(&mut output, 7, &offsets);
-                    Some(output)
-                },
-                _ => None,
-            })
+        let (storage, offsets) = encode(&cells, unit, limits)?;
+        Ok(Some(rebuild(row, limits, |field| match field.number {
+            2 => {
+                let mut output = Vec::new();
+                varint_field(&mut output, 2, count, limits)?;
+                Ok(Some(output))
+            },
+            6 => {
+                let mut output = Vec::new();
+                bytes_field(&mut output, 6, &storage, limits)?;
+                Ok(Some(output))
+            },
+            7 => {
+                let mut output = Vec::new();
+                bytes_field(&mut output, 7, &offsets, limits)?;
+                Ok(Some(output))
+            },
+            _ => Ok(None),
         })?))
     };
     // A new row record for a missing row, in the canonical BNC shape.
     let new_row = |cell: &[u8]| -> Result<Vec<u8>> {
-        let mut cells: Vec<Option<&[u8]>> = vec![None; columns_usize];
+        limits.check_items(columns_usize).map_err(map_limits)?;
+        let mut cells = Vec::new();
+        cells
+            .try_reserve_exact(columns_usize)
+            .map_err(|_| WriteError::Allocation {
+                requested: columns_usize,
+            })?;
+        cells.resize(columns_usize, None);
         cells[column] = Some(cell);
-        let (storage, offsets) = encode(&cells, 1)?;
+        let (storage, offsets) = encode(&cells, 1, limits)?;
         let mut row = Vec::new();
-        varint_field(&mut row, 1, u64::from(local_row));
-        varint_field(&mut row, 2, 1);
-        bytes_field(&mut row, 3, &[]);
-        bytes_field(&mut row, 4, &[]);
-        varint_field(&mut row, 5, 5);
-        bytes_field(&mut row, 6, &storage);
-        bytes_field(&mut row, 7, &offsets);
-        varint_field(&mut row, 8, 0);
+        varint_field(&mut row, 1, u64::from(local_row), limits)?;
+        varint_field(&mut row, 2, 1, limits)?;
+        bytes_field(&mut row, 3, &[], limits)?;
+        bytes_field(&mut row, 4, &[], limits)?;
+        varint_field(&mut row, 5, 5, limits)?;
+        bytes_field(&mut row, 6, &storage, limits)?;
+        bytes_field(&mut row, 7, &offsets, limits)?;
+        varint_field(&mut row, 8, 0, limits)?;
         let mut field = Vec::new();
-        bytes_field(&mut field, 5, &row);
+        bytes_field(&mut field, 5, &row, limits)?;
         Ok(field)
     };
     let insert_before = rows.iter().position(|row| *row > u64::from(local_row));
     let exists = rows.contains(&u64::from(local_row));
     let mut row_index = 0_usize;
     let mut inserted = false;
-    let mut output = Vec::with_capacity(tile.len() + 64);
-    for field in fields(tile)? {
+    let mut output = Vec::new();
+    reserve(&mut output, tile.len().min(limits.max_output_bytes()))?;
+    for field in fields(tile, limits)? {
         if field.number == 5 {
             let this = row_index;
             row_index += 1;
             if !exists && Some(this) == insert_before {
                 if let Some(cell) = cell {
-                    output.extend_from_slice(&new_row(cell)?);
+                    let row = new_row(cell)?;
+                    append(&mut output, &row, limits)?;
                     inserted = true;
                 }
             }
-            if single_varint(field.payload, 1)? == Some(u64::from(local_row)) {
+            if single_varint(field.payload, 1, limits)? == Some(u64::from(local_row)) {
                 found = true;
                 let row = rewritten_row(field.payload)?.ok_or(WriteError::Invalid)?;
-                bytes_field(&mut output, 5, &row);
+                bytes_field(&mut output, 5, &row, limits)?;
                 continue;
             }
         }
-        output.extend_from_slice(field.raw);
+        append(&mut output, field.raw, limits)?;
     }
     if !exists && !inserted {
         if let Some(cell) = cell {
-            output.extend_from_slice(&new_row(cell)?);
+            let row = new_row(cell)?;
+            append(&mut output, &row, limits)?;
             inserted = true;
         }
     }
     let _ = found;
     if inserted {
         let new_numrows = if counts_rows {
-            numrows + 1
+            numrows.checked_add(1).ok_or(WriteError::Invalid)?
         } else {
-            numrows.max(u64::from(local_row) + 1)
+            numrows.max(
+                u64::from(local_row)
+                    .checked_add(1)
+                    .ok_or(WriteError::Invalid)?,
+            )
         };
-        output = rebuild(&output, |field| {
-            Ok((field.number == 4).then(|| {
-                let mut replacement = Vec::new();
-                varint_field(&mut replacement, 4, new_numrows);
-                replacement
-            }))
+        output = rebuild(&output, limits, |field| {
+            if field.number != 4 {
+                return Ok(None);
+            }
+            let mut replacement = Vec::new();
+            varint_field(&mut replacement, 4, new_numrows, limits)?;
+            Ok(Some(replacement))
         })?;
     }
     Ok(TileCellWrite {
@@ -379,31 +694,41 @@ pub fn tile_set_cell(
 /// # Errors
 ///
 /// [`WriteError::Unsupported`] when a count would drop below zero.
-pub fn header_adjust(bucket: &[u8], index: u32, delta: i64) -> Result<Vec<u8>> {
+pub fn header_adjust(bucket: &[u8], index: u32, delta: i64, limits: &Limits) -> Result<Vec<u8>> {
     if delta == 0 {
-        return Ok(bucket.to_vec());
+        limits.check_input(bucket.len()).map_err(map_limits)?;
+        limits.check_output(bucket.len()).map_err(map_limits)?;
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(bucket.len())
+            .map_err(|_| WriteError::Allocation {
+                requested: bucket.len(),
+            })?;
+        output.extend_from_slice(bucket);
+        return Ok(output);
     }
     let mut done = false;
-    let mut output = rebuild(bucket, |field| {
-        if field.number != 2 || single_varint(field.payload, 1)? != Some(u64::from(index)) {
+    let mut output = rebuild(bucket, limits, |field| {
+        if field.number != 2 || single_varint(field.payload, 1, limits)? != Some(u64::from(index)) {
             return Ok(None);
         }
         done = true;
-        let cells = single_varint(field.payload, 4)?.ok_or(WriteError::Invalid)?;
+        let cells = single_varint(field.payload, 4, limits)?.ok_or(WriteError::Invalid)?;
         let after = i64::try_from(cells)
             .ok()
             .and_then(|cells| cells.checked_add(delta))
             .filter(|after| *after >= 0)
             .ok_or(WriteError::Unsupported)?;
-        let header = rebuild(field.payload, |inner| {
-            Ok((inner.number == 4).then(|| {
-                let mut replacement = Vec::new();
-                varint_field(&mut replacement, 4, after as u64);
-                replacement
-            }))
+        let header = rebuild(field.payload, limits, |inner| {
+            if inner.number != 4 {
+                return Ok(None);
+            }
+            let mut replacement = Vec::new();
+            varint_field(&mut replacement, 4, after as u64, limits)?;
+            Ok(Some(replacement))
         })?;
         let mut replacement = Vec::new();
-        bytes_field(&mut replacement, 2, &header);
+        bytes_field(&mut replacement, 2, &header, limits)?;
         Ok(Some(replacement))
     })?;
     if !done {
@@ -412,26 +737,34 @@ pub fn header_adjust(bucket: &[u8], index: u32, delta: i64) -> Result<Vec<u8>> {
         }
         // Headers stay sorted by index.
         let mut header = Vec::new();
-        varint_field(&mut header, 1, u64::from(index));
-        fixed32_field(&mut header, 2, 0);
-        varint_field(&mut header, 3, 0);
-        varint_field(&mut header, 4, delta as u64);
+        varint_field(&mut header, 1, u64::from(index), limits)?;
+        fixed32_field(&mut header, 2, 0, limits)?;
+        varint_field(&mut header, 3, 0, limits)?;
+        varint_field(&mut header, 4, delta as u64, limits)?;
         let mut entry = Vec::new();
-        bytes_field(&mut entry, 2, &header);
+        bytes_field(&mut entry, 2, &header, limits)?;
         let mut placed = false;
-        let mut sorted = Vec::with_capacity(output.len() + entry.len());
-        for field in fields(&output)? {
+        let mut sorted = Vec::new();
+        reserve(
+            &mut sorted,
+            output
+                .len()
+                .saturating_add(entry.len())
+                .min(limits.max_output_bytes()),
+        )?;
+        for field in fields(&output, limits)? {
             if !placed
                 && field.number == 2
-                && single_varint(field.payload, 1)?.is_some_and(|other| other > u64::from(index))
+                && single_varint(field.payload, 1, limits)?
+                    .is_some_and(|other| other > u64::from(index))
             {
-                sorted.extend_from_slice(&entry);
+                append(&mut sorted, &entry, limits)?;
                 placed = true;
             }
-            sorted.extend_from_slice(field.raw);
+            append(&mut sorted, field.raw, limits)?;
         }
         if !placed {
-            sorted.extend_from_slice(&entry);
+            append(&mut sorted, &entry, limits)?;
         }
         output = sorted;
     }
@@ -444,49 +777,64 @@ pub fn header_adjust(bucket: &[u8], index: u32, delta: i64) -> Result<Vec<u8>> {
 /// # Errors
 ///
 /// [`WriteError::Unsupported`] for a segmented list.
-pub fn list_intern(list: &[u8], text: &str) -> Result<(Vec<u8>, u32)> {
-    if fields(list)?.iter().any(|field| field.number == 4) {
+pub fn list_intern(list: &[u8], text: &str, limits: &Limits) -> Result<(Vec<u8>, u32)> {
+    limits.check_input(text.len()).map_err(map_limits)?;
+    if fields(list, limits)?.iter().any(|field| field.number == 4) {
         return Err(WriteError::Unsupported);
     }
     let mut key = None;
-    let output = rebuild(list, |field| {
+    let output = rebuild(list, limits, |field| {
         if field.number != 3
             || key.is_some()
-            || single_bytes(field.payload, 3)? != Some(text.as_bytes())
+            || single_bytes(field.payload, 3, limits)? != Some(text.as_bytes())
         {
             return Ok(None);
         }
-        let entry_key = single_varint(field.payload, 1)?.ok_or(WriteError::Invalid)?;
+        let entry_key = single_varint(field.payload, 1, limits)?.ok_or(WriteError::Invalid)?;
         key = Some(u32::try_from(entry_key).map_err(|_error| WriteError::Invalid)?);
-        let count = single_varint(field.payload, 2)?.ok_or(WriteError::Invalid)?;
-        let entry = rebuild(field.payload, |inner| {
-            Ok((inner.number == 2).then(|| {
-                let mut replacement = Vec::new();
-                varint_field(&mut replacement, 2, count + 1);
-                replacement
-            }))
+        let count = single_varint(field.payload, 2, limits)?.ok_or(WriteError::Invalid)?;
+        let entry = rebuild(field.payload, limits, |inner| {
+            if inner.number != 2 {
+                return Ok(None);
+            }
+            let mut replacement = Vec::new();
+            varint_field(
+                &mut replacement,
+                2,
+                count.checked_add(1).ok_or(WriteError::Invalid)?,
+                limits,
+            )?;
+            Ok(Some(replacement))
         })?;
         let mut replacement = Vec::new();
-        bytes_field(&mut replacement, 3, &entry);
+        bytes_field(&mut replacement, 3, &entry, limits)?;
         Ok(Some(replacement))
     })?;
     if let Some(key) = key {
         return Ok((output, key));
     }
-    let next = single_varint(list, 2)?.ok_or(WriteError::Invalid)?.max(1);
+    let next = single_varint(list, 2, limits)?
+        .ok_or(WriteError::Invalid)?
+        .max(1);
     let key = u32::try_from(next).map_err(|_error| WriteError::Unsupported)?;
-    let mut output = rebuild(list, |field| {
-        Ok((field.number == 2).then(|| {
-            let mut replacement = Vec::new();
-            varint_field(&mut replacement, 2, next + 1);
-            replacement
-        }))
+    let mut output = rebuild(list, limits, |field| {
+        if field.number != 2 {
+            return Ok(None);
+        }
+        let mut replacement = Vec::new();
+        varint_field(
+            &mut replacement,
+            2,
+            next.checked_add(1).ok_or(WriteError::Invalid)?,
+            limits,
+        )?;
+        Ok(Some(replacement))
     })?;
     let mut entry = Vec::new();
-    varint_field(&mut entry, 1, next);
-    varint_field(&mut entry, 2, 1);
-    bytes_field(&mut entry, 3, text.as_bytes());
-    bytes_field(&mut output, 3, &entry);
+    varint_field(&mut entry, 1, next, limits)?;
+    varint_field(&mut entry, 2, 1, limits)?;
+    bytes_field(&mut entry, 3, text.as_bytes(), limits)?;
+    bytes_field(&mut output, 3, &entry, limits)?;
     Ok((output, key))
 }
 
@@ -497,29 +845,30 @@ pub fn list_intern(list: &[u8], text: &str) -> Result<(Vec<u8>, u32)> {
 ///
 /// [`WriteError::Unsupported`] for an entry holding an object reference or
 /// a key the list does not hold.
-pub fn list_release(list: &[u8], key: u32) -> Result<Vec<u8>> {
+pub fn list_release(list: &[u8], key: u32, limits: &Limits) -> Result<Vec<u8>> {
     let mut done = false;
-    let output = rebuild(list, |field| {
-        if field.number != 3 || single_varint(field.payload, 1)? != Some(u64::from(key)) {
+    let output = rebuild(list, limits, |field| {
+        if field.number != 3 || single_varint(field.payload, 1, limits)? != Some(u64::from(key)) {
             return Ok(None);
         }
-        if single_bytes(field.payload, 4)?.is_some() {
+        if single_bytes(field.payload, 4, limits)?.is_some() {
             return Err(WriteError::Unsupported);
         }
         done = true;
-        let count = single_varint(field.payload, 2)?.ok_or(WriteError::Invalid)?;
+        let count = single_varint(field.payload, 2, limits)?.ok_or(WriteError::Invalid)?;
         if count <= 1 {
             return Ok(Some(Vec::new()));
         }
-        let entry = rebuild(field.payload, |inner| {
-            Ok((inner.number == 2).then(|| {
-                let mut replacement = Vec::new();
-                varint_field(&mut replacement, 2, count - 1);
-                replacement
-            }))
+        let entry = rebuild(field.payload, limits, |inner| {
+            if inner.number != 2 {
+                return Ok(None);
+            }
+            let mut replacement = Vec::new();
+            varint_field(&mut replacement, 2, count - 1, limits)?;
+            Ok(Some(replacement))
         })?;
         let mut replacement = Vec::new();
-        bytes_field(&mut replacement, 3, &entry);
+        bytes_field(&mut replacement, 3, &entry, limits)?;
         Ok(Some(replacement))
     })?;
     if !done {
@@ -555,9 +904,10 @@ pub fn cell_bytes(
     previous: Option<&[u8]>,
     input: &CellInput<'_>,
     string_key: Option<u32>,
+    limits: &Limits,
 ) -> Result<(Option<Vec<u8>>, Option<u32>)> {
     let mut cell = match previous {
-        Some(bytes) => BncCell::parse(bytes).map_err(|_error| WriteError::Unsupported)?,
+        Some(bytes) => BncCell::parse(bytes, limits).map_err(map_bnc_error)?,
         None => BncCell::minimal(),
     };
     let mut released = None;
@@ -581,7 +931,10 @@ pub fn cell_bytes(
         CellInput::Boolean(value) => cell.set_boolean(*value),
         CellInput::Empty => {
             cell.clear_value_preserving_metadata();
-            if previous.is_some() && cell.list_keys().next().is_none() && cell_is_bare(&cell) {
+            if previous.is_some()
+                && cell.list_keys().next().is_none()
+                && cell_is_bare(&cell, limits)?
+            {
                 return Ok((None, released));
             }
             if previous.is_none() {
@@ -589,12 +942,29 @@ pub fn cell_bytes(
             }
         },
     }
-    Ok((Some(cell.encode()), released))
+    Ok((Some(cell.encode(limits).map_err(map_bnc_error)?), released))
 }
 
 /// Whether a cleared cell carries nothing worth storing.
-fn cell_is_bare(cell: &BncCell) -> bool {
-    cell.encode() == BncCell::minimal().encode()
+fn cell_is_bare(cell: &BncCell, limits: &Limits) -> Result<bool> {
+    Ok(cell.encode(limits).map_err(map_bnc_error)?
+        == BncCell::minimal().encode(limits).map_err(map_bnc_error)?)
+}
+
+fn map_bnc_error(error: crate::Error) -> WriteError {
+    match error {
+        crate::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => WriteError::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        },
+        crate::Error::Allocation { requested } => WriteError::Allocation { requested },
+        crate::Error::InvalidFormat(_) | crate::Error::ParseError(_) => WriteError::Invalid,
+    }
 }
 
 /// Why a table's calculation graph refuses a value write.
@@ -612,25 +982,50 @@ pub enum FormulaState {
 fn cell_records<'a>(
     owner: &'a [u8],
     object: &dyn Fn(u64) -> Option<&'a [u8]>,
+    limits: &Limits,
 ) -> Result<Vec<&'a [u8]>> {
     let mut records = Vec::new();
-    if let Some(inline) = single_bytes(owner, 4)? {
-        for field in fields(inline)? {
+    if let Some(inline) = single_bytes(owner, 4, limits)? {
+        for field in fields(inline, limits)? {
             if field.number == 1 {
+                let next = records
+                    .len()
+                    .checked_add(1)
+                    .ok_or(WriteError::LimitExceeded {
+                        kind: LimitKind::Items,
+                        observed: usize::MAX,
+                        maximum: limits.max_items(),
+                    })?;
+                limits.check_items(next).map_err(map_limits)?;
+                records
+                    .try_reserve(1)
+                    .map_err(|_| WriteError::Allocation { requested: 1 })?;
                 records.push(field.payload);
             }
         }
     }
-    if let Some(tiled) = single_bytes(owner, 13)? {
-        for field in fields(tiled)? {
+    if let Some(tiled) = single_bytes(owner, 13, limits)? {
+        for field in fields(tiled, limits)? {
             if field.number != 1 {
                 continue;
             }
-            let tile = single_varint(field.payload, 1)?
+            let tile = single_varint(field.payload, 1, limits)?
                 .and_then(object)
                 .ok_or(WriteError::Invalid)?;
-            for record in fields(tile)? {
+            for record in fields(tile, limits)? {
                 if record.number == 4 {
+                    let next = records
+                        .len()
+                        .checked_add(1)
+                        .ok_or(WriteError::LimitExceeded {
+                            kind: LimitKind::Items,
+                            observed: usize::MAX,
+                            maximum: limits.max_items(),
+                        })?;
+                    limits.check_items(next).map_err(map_limits)?;
+                    records
+                        .try_reserve(1)
+                        .map_err(|_| WriteError::Allocation { requested: 1 })?;
                     records.push(record.payload);
                 }
             }
@@ -639,28 +1034,61 @@ fn cell_records<'a>(
     Ok(records)
 }
 
-fn packed_or_single(field: &Field<'_>) -> Result<Vec<u64>> {
+fn packed_or_single(field: &Field<'_>, limits: &Limits) -> Result<Vec<u64>> {
     if field.wire_type == 2 {
         let mut values = Vec::new();
         let mut rest = field.payload;
         while !rest.is_empty() {
             let (value, length) = litchi_iwa_common::varint::decode_varint_from_bytes(rest)
                 .map_err(|_error| WriteError::Invalid)?;
+            let next = values
+                .len()
+                .checked_add(1)
+                .ok_or(WriteError::LimitExceeded {
+                    kind: LimitKind::Items,
+                    observed: usize::MAX,
+                    maximum: limits.max_items(),
+                })?;
+            limits.check_items(next).map_err(map_limits)?;
+            values
+                .try_reserve(1)
+                .map_err(|_| WriteError::Allocation { requested: 1 })?;
             values.push(value);
             rest = &rest[length..];
         }
         Ok(values)
     } else {
-        Ok(vec![varint(field.payload)?])
+        let mut values = Vec::new();
+        limits.check_items(1).map_err(map_limits)?;
+        values
+            .try_reserve_exact(1)
+            .map_err(|_| WriteError::Allocation { requested: 1 })?;
+        values.push(varint(field.payload)?);
+        Ok(values)
     }
 }
 
 /// The repeated (packed or not) varint field `number` of `data`.
-fn varints(data: &[u8], number: u32) -> Result<Vec<u64>> {
+fn varints(data: &[u8], number: u32, limits: &Limits) -> Result<Vec<u64>> {
     let mut output = Vec::new();
-    for field in fields(data)? {
+    for field in fields(data, limits)? {
         if field.number == number {
-            output.extend(packed_or_single(&field)?);
+            let values = packed_or_single(&field, limits)?;
+            let next = output
+                .len()
+                .checked_add(values.len())
+                .ok_or(WriteError::LimitExceeded {
+                    kind: LimitKind::Items,
+                    observed: usize::MAX,
+                    maximum: limits.max_items(),
+                })?;
+            limits.check_items(next).map_err(map_limits)?;
+            output
+                .try_reserve(values.len())
+                .map_err(|_| WriteError::Allocation {
+                    requested: values.len(),
+                })?;
+            output.extend(values);
         }
     }
     Ok(output)
@@ -682,11 +1110,13 @@ pub fn cell_formula_state<'a>(
     info: u64,
     row: u32,
     column: u32,
+    limits: &Limits,
 ) -> Result<FormulaState> {
+    limits.check_items(owners.len()).map_err(map_limits)?;
     let mut own = None;
     for owner in owners {
-        if let Some(reference) = single_bytes(owner, 11)?
-            && single_varint(reference, 1)? == Some(info)
+        if let Some(reference) = single_bytes(owner, 11, limits)?
+            && single_varint(reference, 1, limits)? == Some(info)
         {
             own = Some(*owner);
         }
@@ -695,18 +1125,20 @@ pub fn cell_formula_state<'a>(
         return Ok(FormulaState::Inert);
     };
     let (row, column) = (u64::from(row), u64::from(column));
-    if single_bytes(own, 5)?.is_some_and(|ranges| !ranges.is_empty())
-        || single_bytes(own, 15)?.is_some_and(|tiles| !tiles.is_empty())
+    if single_bytes(own, 5, limits)?.is_some_and(|ranges| !ranges.is_empty())
+        || single_bytes(own, 15, limits)?.is_some_and(|tiles| !tiles.is_empty())
     {
         return Ok(FormulaState::Formulas);
     }
-    for record in cell_records(own, object)? {
-        if single_varint(record, 1)? == Some(column) && single_varint(record, 2)? == Some(row) {
+    for record in cell_records(own, object, limits)? {
+        if single_varint(record, 1, limits)? == Some(column)
+            && single_varint(record, 2, limits)? == Some(row)
+        {
             return Ok(FormulaState::Formulas);
         }
-        if let Some(edges) = single_bytes(record, 6)? {
-            let rows = varints(edges, 1)?;
-            let columns = varints(edges, 2)?;
+        if let Some(edges) = single_bytes(record, 6, limits)? {
+            let rows = varints(edges, 1, limits)?;
+            let columns = varints(edges, 2, limits)?;
             if rows
                 .iter()
                 .zip(&columns)
@@ -716,24 +1148,24 @@ pub fn cell_formula_state<'a>(
             }
         }
     }
-    let internal = single_varint(own, 2)?.ok_or(WriteError::Invalid)?;
-    let own_uid = single_bytes(own, 1)?.ok_or(WriteError::Invalid)?;
+    let internal = single_varint(own, 2, limits)?.ok_or(WriteError::Invalid)?;
+    let own_uid = single_bytes(own, 1, limits)?.ok_or(WriteError::Invalid)?;
     for owner in owners {
         if std::ptr::eq(*owner, own) {
             continue;
         }
         // The table's merge owner (kind 5, based on the table's owner)
         // ranges over merged regions, not over values.
-        if single_varint(owner, 3)? == Some(MERGE_OWNER_KIND)
-            && single_bytes(owner, 12)? == Some(own_uid)
+        if single_varint(owner, 3, limits)? == Some(MERGE_OWNER_KIND)
+            && single_bytes(owner, 12, limits)? == Some(own_uid)
         {
             continue;
         }
-        for record in cell_records(owner, object)? {
-            if let Some(edges) = single_bytes(record, 6)? {
-                let rows = varints(edges, 3)?;
-                let columns = varints(edges, 4)?;
-                let targets = varints(edges, 5)?;
+        for record in cell_records(owner, object, limits)? {
+            if let Some(edges) = single_bytes(record, 6, limits)? {
+                let rows = varints(edges, 3, limits)?;
+                let columns = varints(edges, 4, limits)?;
+                let targets = varints(edges, 5, limits)?;
                 if targets
                     .iter()
                     .zip(rows.iter().zip(&columns))
@@ -743,30 +1175,30 @@ pub fn cell_formula_state<'a>(
                 }
             }
         }
-        if let Some(ranges) = single_bytes(owner, 5)? {
-            for dependency in fields(ranges)? {
+        if let Some(ranges) = single_bytes(owner, 5, limits)? {
+            for dependency in fields(ranges, limits)? {
                 if dependency.number != 2 {
                     continue;
                 }
-                if single_bytes(dependency.payload, 3)?.is_some() {
+                if single_bytes(dependency.payload, 3, limits)?.is_some() {
                     return Ok(FormulaState::Referenced);
                 }
-                if let Some(range) = single_bytes(dependency.payload, 4)?
-                    && single_varint(range, 1)? == Some(internal)
+                if let Some(range) = single_bytes(dependency.payload, 4, limits)?
+                    && single_varint(range, 1, limits)? == Some(internal)
                 {
                     return Ok(FormulaState::Referenced);
                 }
             }
         }
-        if let Some(tiled) = single_bytes(owner, 15)? {
-            for field in fields(tiled)? {
+        if let Some(tiled) = single_bytes(owner, 15, limits)? {
+            for field in fields(tiled, limits)? {
                 if field.number != 1 {
                     continue;
                 }
-                let tile = single_varint(field.payload, 1)?
+                let tile = single_varint(field.payload, 1, limits)?
                     .and_then(object)
                     .ok_or(WriteError::Invalid)?;
-                if single_varint(tile, 1)? == Some(internal) {
+                if single_varint(tile, 1, limits)? == Some(internal) {
                     return Ok(FormulaState::Referenced);
                 }
             }
@@ -786,11 +1218,13 @@ pub fn table_formula_state<'a>(
     owners: &[&'a [u8]],
     object: &dyn Fn(u64) -> Option<&'a [u8]>,
     info: u64,
+    limits: &Limits,
 ) -> Result<FormulaState> {
+    limits.check_items(owners.len()).map_err(map_limits)?;
     let mut own = None;
     for owner in owners {
-        if let Some(reference) = single_bytes(owner, 11)?
-            && single_varint(reference, 1)? == Some(info)
+        if let Some(reference) = single_bytes(owner, 11, limits)?
+            && single_varint(reference, 1, limits)? == Some(info)
         {
             own = Some(*owner);
         }
@@ -798,67 +1232,54 @@ pub fn table_formula_state<'a>(
     let Some(own) = own else {
         return Ok(FormulaState::Inert);
     };
-    if !cell_records(own, object)?.is_empty()
-        || single_bytes(own, 5)?.is_some_and(|ranges| !ranges.is_empty())
-        || single_bytes(own, 15)?.is_some_and(|tiles| !tiles.is_empty())
+    if !cell_records(own, object, limits)?.is_empty()
+        || single_bytes(own, 5, limits)?.is_some_and(|ranges| !ranges.is_empty())
+        || single_bytes(own, 15, limits)?.is_some_and(|tiles| !tiles.is_empty())
     {
         return Ok(FormulaState::Formulas);
     }
-    let internal = single_varint(own, 2)?.ok_or(WriteError::Invalid)?;
+    let internal = single_varint(own, 2, limits)?.ok_or(WriteError::Invalid)?;
     for owner in owners {
         if std::ptr::eq(*owner, own) {
             continue;
         }
-        for record in cell_records(owner, object)? {
-            if let Some(edges) = single_bytes(record, 6)? {
-                for field in fields(edges)? {
+        for record in cell_records(owner, object, limits)? {
+            if let Some(edges) = single_bytes(record, 6, limits)? {
+                for field in fields(edges, limits)? {
                     if field.number != 5 {
                         continue;
                     }
-                    let owners: Vec<u64> = if field.wire_type == 2 {
-                        let mut values = Vec::new();
-                        let mut rest = field.payload;
-                        while !rest.is_empty() {
-                            let (value, length) =
-                                litchi_iwa_common::varint::decode_varint_from_bytes(rest)
-                                    .map_err(|_error| WriteError::Invalid)?;
-                            values.push(value);
-                            rest = &rest[length..];
-                        }
-                        values
-                    } else {
-                        vec![varint(field.payload)?]
-                    };
+                    let owners = packed_or_single(&field, limits)?;
                     if owners.contains(&internal) {
                         return Ok(FormulaState::Referenced);
                     }
                 }
             }
         }
-        if let Some(ranges) = single_bytes(owner, 5)? {
-            for dependency in fields(ranges)? {
+        if let Some(ranges) = single_bytes(owner, 5, limits)? {
+            for dependency in fields(ranges, limits)? {
                 if dependency.number != 2 {
                     continue;
                 }
-                if single_bytes(dependency.payload, 3)?.is_some() {
+                if single_bytes(dependency.payload, 3, limits)?.is_some() {
                     return Ok(FormulaState::Referenced);
                 }
-                if let Some(range) = single_bytes(dependency.payload, 4)?
-                    && single_varint(range, 1)? == Some(internal)
+                if let Some(range) = single_bytes(dependency.payload, 4, limits)?
+                    && single_varint(range, 1, limits)? == Some(internal)
                 {
                     return Ok(FormulaState::Referenced);
                 }
             }
         }
-        if let Some(tiled) = single_bytes(owner, 15)? {
-            for field in fields(tiled)? {
+        if let Some(tiled) = single_bytes(owner, 15, limits)? {
+            for field in fields(tiled, limits)? {
                 if field.number != 1 {
                     continue;
                 }
-                let tile = single_varint(field.payload, 1)?
+                let tile = single_varint(field.payload, 1, limits)?
                     .and_then(object)
                     .ok_or(WriteError::Invalid)?;
-                if single_varint(tile, 1)? == Some(internal) {
+                if single_varint(tile, 1, limits)? == Some(internal) {
                     return Ok(FormulaState::Referenced);
                 }
             }
@@ -870,32 +1291,35 @@ pub fn table_formula_state<'a>(
 #[cfg(test)]
 mod tests {
     use super::{
-        CellInput, cell_bytes, header_adjust, list_intern, list_release, tile_cell, tile_set_cell,
+        CellInput, WriteError, cell_bytes, header_adjust, list_intern, list_release, tile_cell,
+        tile_set_cell,
     };
     use super::{bytes_field, varint_field};
-    use crate::BncCell;
+    use crate::{BncCell, Limits};
+
+    const TEST_LIMITS: Limits = Limits::DEFAULT;
 
     fn tile_with_row(row: u64) -> Vec<u8> {
         let mut tile = Vec::new();
         for number in 1..=3 {
-            varint_field(&mut tile, number, 0);
+            varint_field(&mut tile, number, 0, &TEST_LIMITS).unwrap();
         }
-        varint_field(&mut tile, 4, 1);
-        let cell = BncCell::minimal().encode();
+        varint_field(&mut tile, 4, 1, &TEST_LIMITS).unwrap();
+        let cell = BncCell::minimal().encode(&TEST_LIMITS).unwrap();
         let mut storage = cell.clone();
         storage.extend_from_slice(&[]);
         let mut entry = Vec::new();
-        varint_field(&mut entry, 1, row);
-        varint_field(&mut entry, 2, 1);
-        bytes_field(&mut entry, 3, &[]);
-        bytes_field(&mut entry, 4, &[]);
-        varint_field(&mut entry, 5, 5);
-        bytes_field(&mut entry, 6, &storage);
-        bytes_field(&mut entry, 7, &[0, 0, 0xff, 0xff]);
-        varint_field(&mut entry, 8, 0);
-        bytes_field(&mut tile, 5, &entry);
-        varint_field(&mut tile, 6, 5);
-        varint_field(&mut tile, 7, 1);
+        varint_field(&mut entry, 1, row, &TEST_LIMITS).unwrap();
+        varint_field(&mut entry, 2, 1, &TEST_LIMITS).unwrap();
+        bytes_field(&mut entry, 3, &[], &TEST_LIMITS).unwrap();
+        bytes_field(&mut entry, 4, &[], &TEST_LIMITS).unwrap();
+        varint_field(&mut entry, 5, 5, &TEST_LIMITS).unwrap();
+        bytes_field(&mut entry, 6, &storage, &TEST_LIMITS).unwrap();
+        bytes_field(&mut entry, 7, &[0, 0, 0xff, 0xff], &TEST_LIMITS).unwrap();
+        varint_field(&mut entry, 8, 0, &TEST_LIMITS).unwrap();
+        bytes_field(&mut tile, 5, &entry, &TEST_LIMITS).unwrap();
+        varint_field(&mut tile, 6, 5, &TEST_LIMITS).unwrap();
+        varint_field(&mut tile, 7, 1, &TEST_LIMITS).unwrap();
         tile
     }
 
@@ -904,39 +1328,65 @@ mod tests {
         let tile = tile_with_row(3);
         let mut number = BncCell::minimal();
         number.set_number(4.5).unwrap();
-        let number = number.encode();
-        let before = tile_set_cell(&tile, 1, 1, 2, Some(&number)).unwrap();
+        let number = number.encode(&TEST_LIMITS).unwrap();
+        let before = tile_set_cell(&tile, 1, 1, 2, Some(&number), &TEST_LIMITS).unwrap();
         assert_eq!(
-            tile_cell(&before.tile, 1, 1).unwrap().as_deref(),
+            tile_cell(&before.tile, 1, 1, &TEST_LIMITS)
+                .unwrap()
+                .as_deref(),
             Some(number.as_slice())
         );
-        assert!(tile_cell(&before.tile, 3, 0).unwrap().is_some());
-        let after = tile_set_cell(&before.tile, 3, 1, 2, Some(&number)).unwrap();
-        assert!(tile_cell(&after.tile, 3, 1).unwrap().is_some());
-        assert!(tile_cell(&after.tile, 3, 0).unwrap().is_some());
-        let removed = tile_set_cell(&after.tile, 3, 0, 2, None).unwrap();
+        assert!(
+            tile_cell(&before.tile, 3, 0, &TEST_LIMITS)
+                .unwrap()
+                .is_some()
+        );
+        let after = tile_set_cell(&before.tile, 3, 1, 2, Some(&number), &TEST_LIMITS).unwrap();
+        assert!(
+            tile_cell(&after.tile, 3, 1, &TEST_LIMITS)
+                .unwrap()
+                .is_some()
+        );
+        assert!(
+            tile_cell(&after.tile, 3, 0, &TEST_LIMITS)
+                .unwrap()
+                .is_some()
+        );
+        let removed = tile_set_cell(&after.tile, 3, 0, 2, None, &TEST_LIMITS).unwrap();
         assert!(removed.previous.is_some());
-        assert!(tile_cell(&removed.tile, 3, 0).unwrap().is_none());
+        assert!(
+            tile_cell(&removed.tile, 3, 0, &TEST_LIMITS)
+                .unwrap()
+                .is_none()
+        );
+
+        let narrow = TEST_LIMITS.with_output_bytes(1).unwrap();
+        assert!(matches!(
+            tile_set_cell(&tile, 1, 1, 2, Some(&number), &narrow),
+            Err(WriteError::LimitExceeded { .. })
+        ));
     }
 
     #[test]
     fn strings_intern_and_release() {
         let mut list = Vec::new();
-        varint_field(&mut list, 1, 1);
-        varint_field(&mut list, 2, 1);
-        let (list, key) = list_intern(&list, "hello").unwrap();
+        varint_field(&mut list, 1, 1, &TEST_LIMITS).unwrap();
+        varint_field(&mut list, 2, 1, &TEST_LIMITS).unwrap();
+        let (list, key) = list_intern(&list, "hello", &TEST_LIMITS).unwrap();
         assert_eq!(key, 1);
-        let (list, again) = list_intern(&list, "hello").unwrap();
+        let (list, again) = list_intern(&list, "hello", &TEST_LIMITS).unwrap();
         assert_eq!(again, 1);
-        let (list, other) = list_intern(&list, "world").unwrap();
+        let (list, other) = list_intern(&list, "world", &TEST_LIMITS).unwrap();
         assert_eq!(other, 2);
-        let list = list_release(&list, 1).unwrap();
-        let list = list_release(&list, 1).unwrap();
-        assert!(list_release(&list, 1).is_err());
-        let (cell, released) = cell_bytes(None, &CellInput::Text("x"), Some(2)).unwrap();
+        let list = list_release(&list, 1, &TEST_LIMITS).unwrap();
+        let list = list_release(&list, 1, &TEST_LIMITS).unwrap();
+        assert!(list_release(&list, 1, &TEST_LIMITS).is_err());
+        let (cell, released) =
+            cell_bytes(None, &CellInput::Text("x"), Some(2), &TEST_LIMITS).unwrap();
         assert!(cell.is_some());
         assert_eq!(released, None);
-        let (cleared, released) = cell_bytes(cell.as_deref(), &CellInput::Empty, None).unwrap();
+        let (cleared, released) =
+            cell_bytes(cell.as_deref(), &CellInput::Empty, None, &TEST_LIMITS).unwrap();
         assert_eq!(cleared, None);
         assert_eq!(released, Some(2));
     }
@@ -945,13 +1395,53 @@ mod tests {
     fn header_counts_are_adjusted_or_created() {
         let bucket = {
             let mut bucket = Vec::new();
-            varint_field(&mut bucket, 1, 1);
+            varint_field(&mut bucket, 1, 1, &TEST_LIMITS).unwrap();
             bucket
         };
-        let added = header_adjust(&bucket, 4, 1).unwrap();
-        let again = header_adjust(&added, 4, 1).unwrap();
-        let lowered = header_adjust(&again, 4, -2).unwrap();
-        assert!(header_adjust(&lowered, 4, -1).is_err());
-        assert!(header_adjust(&bucket, 2, -1).is_err());
+        let added = header_adjust(&bucket, 4, 1, &TEST_LIMITS).unwrap();
+        let again = header_adjust(&added, 4, 1, &TEST_LIMITS).unwrap();
+        let lowered = header_adjust(&again, 4, -2, &TEST_LIMITS).unwrap();
+        assert!(header_adjust(&lowered, 4, -1, &TEST_LIMITS).is_err());
+        assert!(header_adjust(&bucket, 2, -1, &TEST_LIMITS).is_err());
+    }
+
+    #[test]
+    fn packed_varints_charge_decoded_items_not_payload_bytes() {
+        let limits = TEST_LIMITS.with_items(1).unwrap();
+        let reference = {
+            let mut value = Vec::new();
+            varint_field(&mut value, 1, 42, &TEST_LIMITS).unwrap();
+            value
+        };
+        let packed_ten_byte = [0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x01];
+        let edges = {
+            let mut value = Vec::new();
+            bytes_field(&mut value, 1, &packed_ten_byte, &TEST_LIMITS).unwrap();
+            varint_field(&mut value, 2, 1, &TEST_LIMITS).unwrap();
+            value
+        };
+        let record = {
+            let mut value = Vec::new();
+            varint_field(&mut value, 1, 0, &TEST_LIMITS).unwrap();
+            varint_field(&mut value, 2, 0, &TEST_LIMITS).unwrap();
+            bytes_field(&mut value, 6, &edges, &TEST_LIMITS).unwrap();
+            value
+        };
+        let inline_records = {
+            let mut value = Vec::new();
+            bytes_field(&mut value, 1, &record, &TEST_LIMITS).unwrap();
+            value
+        };
+        let owner = {
+            let mut value = Vec::new();
+            bytes_field(&mut value, 11, &reference, &TEST_LIMITS).unwrap();
+            varint_field(&mut value, 2, 7, &TEST_LIMITS).unwrap();
+            bytes_field(&mut value, 1, b"owner", &TEST_LIMITS).unwrap();
+            bytes_field(&mut value, 4, &inline_records, &TEST_LIMITS).unwrap();
+            value
+        };
+        let owners = [owner.as_slice()];
+        let state = super::cell_formula_state(&owners, &|_object| None, 42, 1, 1, &limits).unwrap();
+        assert_eq!(state, super::FormulaState::Inert);
     }
 }

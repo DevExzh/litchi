@@ -937,7 +937,9 @@ fn set_property(
         .base_data_store
         .style_table
         .identifier;
-    let old_key = read_bnc(&staged, &location, column)?.text_style_identifier();
+    let old_key = read_bnc(&staged, &location, column)?
+        .0
+        .text_style_identifier();
     let resolved = storage::resolve_table_data_list(
         &staged,
         &locations,
@@ -1288,7 +1290,10 @@ fn text_style_key(
         location.tile_row,
         column,
     )?
-    .map(|data| BncCell::parse(&data).map(|cell| cell.text_style_identifier()))
+    .map(|data| {
+        BncCell::parse(&data, &crate::numbers::bnc_limits(&data))
+            .map(|cell| cell.text_style_identifier())
+    })
     .transpose()
     .map(Option::flatten)
     .map_err(Into::into)
@@ -1414,16 +1419,24 @@ fn read_bnc(
     package: &HostPackage,
     location: &model::CellLocation,
     column: usize,
-) -> Result<BncCell> {
-    storage::read_tile_cell(
+) -> Result<(BncCell, crate::numbers::bnc::Limits)> {
+    let data = storage::read_tile_cell(
         package,
         &location.tile_archive,
         location.tile_id,
         location.tile_row,
         column,
-    )?
-    .map_or_else(|| Ok(BncCell::minimal()), |data| BncCell::parse(&data))
-    .map_err(Into::into)
+    )?;
+    let limits = data
+        .as_deref()
+        .map(crate::numbers::bnc_limits)
+        .unwrap_or(crate::numbers::bnc::Limits::DEFAULT);
+    let cell = data
+        .as_deref()
+        .map(|data| BncCell::parse(data, &limits))
+        .transpose()?
+        .unwrap_or_else(BncCell::minimal);
+    Ok((cell, limits))
 }
 
 fn write_text_style_key(
@@ -1433,14 +1446,14 @@ fn write_text_style_key(
     column: usize,
     key: Option<u32>,
 ) -> Result<()> {
-    let mut cell = read_bnc(package, location, column)?;
+    let (mut cell, limits) = read_bnc(package, location, column)?;
     cell.set_text_style_identifier(key);
     storage::set_encoded_cell_value(
         package,
         location.descriptor.object_id,
         row,
         column,
-        EncodedValue::Raw(cell.encode()),
+        EncodedValue::Raw(crate::numbers::bnc_encode(&cell, &limits)?),
     )
 }
 
@@ -1625,7 +1638,7 @@ mod tests {
             .unwrap();
         let style_id = explicit_style_id(&editor, table_id, 1, 1);
         let location = model::locate_attached_cell(&editor.package, table_id, 1, 1).unwrap();
-        let cell = read_bnc(&editor.package, &location, 1).unwrap();
+        let cell = read_bnc(&editor.package, &location, 1).unwrap().0;
         assert!(cell.text_style_identifier().is_some());
         assert!(cell.style_identifier().is_none());
 
@@ -1651,6 +1664,7 @@ mod tests {
         assert!(
             read_bnc(&editor.package, &location, 1)
                 .unwrap()
+                .0
                 .text_style_identifier()
                 .is_none()
         );

@@ -513,7 +513,11 @@ fn rewrite_native_popup_menu_transition(
     let tile_message_index = unique_message_index(tile_object, TILE_TYPE)?;
     let tile_payload = &tile_object.messages[tile_message_index].data;
     let cell_source = tile_cell(tile_payload, input.tile_row, input.tile_column)?;
-    let cell = BncCell::parse(cell_source).map_err(|_| NativePopUpError::InvalidSource)?;
+    let cell = BncCell::parse(
+        cell_source,
+        &crate::cell::wire::limits_for_source(cell_source),
+    )
+    .map_err(|_| NativePopUpError::InvalidSource)?;
     let old_format = cell.format_identifier();
     let old_control = cell.control_cell_spec_identifier();
     if old_format.is_some() != old_control.is_some() {
@@ -1789,7 +1793,7 @@ fn census_bnc_row(
         // A minimal automatic BNC cell has an empty payload, so adjacent
         // materialized columns may legitimately share the same start offset.
         // Decreasing offsets remain invalid; equal offsets describe a
-        // zero-length cell and are parsed through `BncCell::parse(&[])`.
+        // zero-length cell and are parsed through `BncCell::parse(&[], &crate::cell::wire::limits_for_source(&[]))`.
         if start > storage.len() || previous.is_some_and(|prior| prior > start) {
             return Err(NativePopUpError::InvalidSource);
         }
@@ -1811,7 +1815,8 @@ fn census_bnc_row(
 }
 
 fn census_bnc_cell(bytes: &[u8], counts: &mut BncReferenceCounts) -> Result<()> {
-    let cell = BncCell::parse(bytes).map_err(|_| NativePopUpError::InvalidSource)?;
+    let cell = BncCell::parse(bytes, &crate::cell::wire::limits_for_source(bytes))
+        .map_err(|_| NativePopUpError::InvalidSource)?;
     match (
         cell.format_identifier(),
         cell.control_cell_spec_identifier(),

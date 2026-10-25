@@ -1335,8 +1335,13 @@ fn decode_row_cells(
         if start >= end || end > storage.len() {
             return Err(Error::InvalidSource { path });
         }
+        let source = &storage[start..end];
+        let limits = litchi_numbers_wire::Limits::DEFAULT
+            .with_input_bytes(source.len())
+            .and_then(|limits| limits.with_tail_bytes(source.len()))
+            .map_err(|_| Error::InvalidSource { path })?;
         let view =
-            BncCellView::parse(&storage[start..end]).map_err(|_| Error::InvalidSource { path })?;
+            BncCellView::parse(source, &limits).map_err(|_| Error::InvalidSource { path })?;
         let value = decode_cell(view, selection, strings, global_row, column)?;
         budget
             .work(

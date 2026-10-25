@@ -108,9 +108,11 @@ fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn normalized_cell(cell: &[u8]) -> TestResult<Vec<u8>> {
-    let mut parsed = BncCell::parse(cell)?;
+    let mut parsed = BncCell::parse(cell, &litchi_numbers_wire::Limits::DEFAULT)?;
     parsed.clear_explicit_format();
-    Ok(parsed.encode())
+    Ok(parsed
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap())
 }
 
 /// Verify that format ownership never rewrites a cell's scalar or unrelated
@@ -123,8 +125,8 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
     assert_eq!(before.len(), after.len());
     for (before, after) in before.iter().zip(after.iter()) {
         assert_eq!(
-            BncCell::parse(before)?.cached_scalar()?,
-            BncCell::parse(after)?.cached_scalar()?,
+            BncCell::parse(before, &litchi_numbers_wire::Limits::DEFAULT)?.cached_scalar()?,
+            BncCell::parse(after, &litchi_numbers_wire::Limits::DEFAULT)?.cached_scalar()?,
             "format edit changed the cached numeric scalar"
         );
         assert_eq!(
@@ -200,7 +202,9 @@ fn rewrite_flags_to_inherited(source: &[u8]) -> TestResult<Vec<u8>> {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut encoded = BncCell::parse(first)?.encode();
+        let mut encoded = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         if encoded.len() < 8 {
             return Err(io::Error::other("format fixture cell prefix is truncated").into());
         }
@@ -946,6 +950,7 @@ fn percentage_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResu
             cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?,
+            &litchi_numbers_wire::Limits::DEFAULT,
         )?;
         let mut replacement = first;
         replacement.set_data_format_identifier(
@@ -953,7 +958,9 @@ fn percentage_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResu
             CellDataFormatKind::NumericControlNumberOrPercentage,
             Some(77),
         )?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&control)?;
@@ -963,6 +970,7 @@ fn percentage_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResu
             cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?,
+            &litchi_numbers_wire::Limits::DEFAULT,
         )?;
         let mut replacement = first;
         replacement.set_string(7);
@@ -971,7 +979,9 @@ fn percentage_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResu
             CellDataFormatKind::Text,
             None,
         )?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&text)?;

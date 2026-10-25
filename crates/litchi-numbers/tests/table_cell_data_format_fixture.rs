@@ -38,8 +38,8 @@ fn shared_and_unshared_modes_have_stable_format_ownership() -> TestResult {
 
     let cells = tile_cells(&shared)?;
     assert_eq!(cells.len(), 2);
-    let first = BncCell::parse(&cells[0])?;
-    let second = BncCell::parse(&cells[1])?;
+    let first = BncCell::parse(&cells[0], &litchi_numbers_wire::Limits::DEFAULT)?;
+    let second = BncCell::parse(&cells[1], &litchi_numbers_wire::Limits::DEFAULT)?;
     assert_eq!(first.format_identifier(), Some(fixture::FIRST_FORMAT_KEY));
     assert_eq!(second.format_identifier(), Some(fixture::FIRST_FORMAT_KEY));
     Ok(())

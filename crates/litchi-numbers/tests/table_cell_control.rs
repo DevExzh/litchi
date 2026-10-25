@@ -249,18 +249,20 @@ fn cell_for_control(
     if let Some(scalar) = scalar {
         cell.set_number(scalar)?;
     }
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn empty_cell() -> Vec<u8> {
-    BncCell::minimal().encode()
+    BncCell::minimal()
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap()
 }
 
 fn number_cell(value: f64) -> TestResult<Vec<u8>> {
     let mut cell = BncCell::minimal();
     cell.set_data_format_identifier(1, CellDataFormatKind::NumberOrPercentage, None)?;
     cell.set_number(value)?;
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn pack_row(cells: Vec<Vec<u8>>) -> (Vec<u8>, Vec<u8>) {

@@ -248,7 +248,9 @@ fn tile_cells(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
 fn format_keys(source: &[u8]) -> TestResult<Vec<Option<u32>>> {
     tile_cells(source)?
         .into_iter()
-        .map(|cell| Ok(BncCell::parse(&cell)?.format_identifier()))
+        .map(|cell| {
+            Ok(BncCell::parse(&cell, &litchi_numbers_wire::Limits::DEFAULT)?.format_identifier())
+        })
         .collect()
 }
 
@@ -315,8 +317,8 @@ fn original_automatic_with_format_id(source: &[u8]) -> TestResult<Vec<u8>> {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let cell = BncCell::parse(first)?;
-        let mut encoded = cell.encode();
+        let cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
+        let mut encoded = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         if encoded.len() < 8 {
             return Err(io::Error::other("format fixture cell prefix is truncated").into());
         }

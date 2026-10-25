@@ -20421,6 +20421,142 @@
       "families": []
     },
     {
+      "id": "numbers-wire",
+      "package": "litchi-numbers-wire",
+      "default_features": true,
+      "features": [],
+      "banned_names": [],
+      "required_signatures": [
+        {
+          "method": "litchi_numbers_wire::BncCell::parse",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::BncCell::encode",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::BncCellView::parse",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::pre_bnc::PreBncCellView::parse",
+          "inputs": ["source", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::cell_value::decode_cell_value",
+          "inputs": ["source", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::BncCellView::rewrite_duration_format_identifier",
+          "inputs": ["self", "identifier", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::BncCellView::rewrite_scalar",
+          "inputs": ["self", "value", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::BncCellView::clear_value",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::BncCellView::clear_comment",
+          "inputs": ["self", "expected_identifier", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::BncCellView::rewrite_formula_cache",
+          "inputs": ["self", "value", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::BncCellView::rewrite_formula",
+          "inputs": ["self", "identifier", "cache", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::BncCellView::rewrite_formula_without_cache",
+          "inputs": ["self", "identifier", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_cells::read_table_cells",
+          "inputs": ["dimensions", "limits", "tile_references", "resolve_tile", "budget", "sink"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_write::tile_cell",
+          "inputs": ["tile", "local_row", "column", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_write::tile_set_cell",
+          "inputs": ["tile", "local_row", "column", "columns", "cell", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_write::header_adjust",
+          "inputs": ["bucket", "index", "delta", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_write::list_intern",
+          "inputs": ["list", "text", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_write::list_release",
+          "inputs": ["list", "key", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_write::cell_bytes",
+          "inputs": ["previous", "input", "string_key", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_write::cell_formula_state",
+          "inputs": ["owners", "object", "info", "row", "column", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        },
+        {
+          "method": "litchi_numbers_wire::table_write::table_formula_state",
+          "inputs": ["owners", "object", "info", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_numbers_wire::Limits"
+        }
+      ],
+      "families": []
+    },
+    {
       "id": "numbers-minimal",
       "features": [],
       "package": "litchi-numbers",

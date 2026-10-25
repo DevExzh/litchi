@@ -252,7 +252,7 @@ fn wire_comment_key(source: &[u8], row: usize) -> TestResult<Option<u32>> {
             let Some(bytes) = row_info.cell_storage_buffer.as_deref() else {
                 continue;
             };
-            let Ok(cell) = BncCell::parse(bytes) else {
+            let Ok(cell) = BncCell::parse(bytes, &litchi_numbers_wire::Limits::DEFAULT) else {
                 continue;
             };
             if let Some(key) = cell.comment_identifier() {

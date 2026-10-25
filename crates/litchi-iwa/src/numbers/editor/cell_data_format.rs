@@ -51,7 +51,7 @@ pub(super) fn cell_data_format(
     else {
         return Ok(DataFormat::Automatic);
     };
-    let cell = BncCell::parse(&data)?;
+    let cell = BncCell::parse(&data, &crate::numbers::bnc_limits(&data))?;
     match format_reference(&cell)? {
         CellFormatReference::Automatic { .. } => Ok(DataFormat::Automatic),
         CellFormatReference::Explicit { identifier, .. } => {
@@ -731,9 +731,13 @@ pub(super) fn set_cell_data_format(
         location.tile_row,
         column,
     )?;
+    let limits = existing_data
+        .as_deref()
+        .map(crate::numbers::bnc_limits)
+        .unwrap_or(bnc::Limits::DEFAULT);
     let mut cell = existing_data
         .as_deref()
-        .map(BncCell::parse)
+        .map(|data| BncCell::parse(data, &limits))
         .transpose()?
         .unwrap_or_else(BncCell::minimal);
     let old_reference = format_reference(&cell)?;
@@ -891,7 +895,7 @@ pub(super) fn set_cell_data_format(
         location.tile_row,
         column,
         location.descriptor.model.number_of_columns as usize,
-        model::EncodedValue::Raw(cell.encode()),
+        model::EncodedValue::Raw(crate::numbers::bnc_encode(&cell, &limits)?),
     )?;
     storage::update_row_header(
         package,
@@ -998,7 +1002,8 @@ pub(super) fn reset_cell_data_format(
     else {
         return Ok(false);
     };
-    let mut cell = BncCell::parse(&data)?;
+    let limits = crate::numbers::bnc_limits(&data);
+    let mut cell = BncCell::parse(&data, &limits)?;
     let reference = format_reference(&cell)?;
     let CellFormatReference::Explicit { .. } = reference else {
         return Ok(false);
@@ -1028,7 +1033,7 @@ pub(super) fn reset_cell_data_format(
         location.tile_row,
         column,
         location.descriptor.model.number_of_columns as usize,
-        model::EncodedValue::Raw(cell.encode()),
+        model::EncodedValue::Raw(crate::numbers::bnc_encode(&cell, &limits)?),
     )?;
     storage::update_row_header(
         package,
@@ -2274,7 +2279,7 @@ mod tests {
             0x05, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x10, 0x01, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x17, 0xad, 0x40, 0x04, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00,
         ];
-        let cell = BncCell::parse(&native).unwrap();
+        let cell = BncCell::parse(&native, &crate::numbers::bnc_limits(&native)).unwrap();
         let CellFormatReference::Automatic {
             identifier,
             secondary,
@@ -2294,7 +2299,7 @@ mod tests {
             0x05, 0x07, 0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x02, 0x10, 0x01, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x80, 0xaf, 0x4b, 0x41, 0x04, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
         ];
-        let cell = BncCell::parse(&native).unwrap();
+        let cell = BncCell::parse(&native, &crate::numbers::bnc_limits(&native)).unwrap();
         let CellFormatReference::Explicit {
             identifier,
             secondary,

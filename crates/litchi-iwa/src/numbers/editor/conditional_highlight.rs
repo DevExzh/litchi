@@ -106,7 +106,7 @@ fn info_at_location(
     else {
         return Ok(None);
     };
-    let bnc = BncCell::parse(&cell)?;
+    let bnc = BncCell::parse(&cell, &crate::numbers::bnc_limits(&cell))?;
     let Some(list_identifier) = bnc.conditional_style_identifier() else {
         return Ok(None);
     };
@@ -669,7 +669,11 @@ fn applied_rule_for_cell(
         location.tile_row,
         column,
     )?;
-    let value = match data.as_deref().map(BncCell::parse).transpose()? {
+    let value = match data
+        .as_deref()
+        .map(|data| BncCell::parse(data, &crate::numbers::bnc_limits(data)))
+        .transpose()?
+    {
         None => ConditionalCellValue::Blank,
         Some(cell) if cell.stored_value() == StoredValue::Empty => ConditionalCellValue::Blank,
         Some(cell) => match cell.stored_value() {

@@ -1099,7 +1099,7 @@ fn rewrite_numeric_body_keys(package: &[u8], values: [f64; BODY_COUNT]) -> TestR
             let mut cells = fixture_row_cells(row)?;
             let mut cell = BncCell::minimal();
             cell.set_plain_number(value)?;
-            cells[0] = Some(cell.encode());
+            cells[0] = Some(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap());
             let (storage, offsets) = encode_row(&cells);
             row.cell_storage_buffer = Some(storage);
             row.cell_offsets = Some(offsets);
@@ -1569,7 +1569,8 @@ fn numeric_body_key_markers(package: &[u8]) -> TestResult<Vec<(u64, String)>> {
                 .ok_or("missing BNC storage")?;
             let offsets = row.cell_offsets.as_ref().ok_or("missing BNC offsets")?;
             let (start, end) = cell_span_bounds(storage, offsets, 0)?;
-            let view = BncCellView::parse(&storage[start..end])?;
+            let view =
+                BncCellView::parse(&storage[start..end], &litchi_numbers_wire::Limits::DEFAULT)?;
             let bits = match view.cached_scalar() {
                 Some(CachedScalar::Number(value)) => value.get().to_bits(),
                 _ => return Err("body key is not a cached numeric scalar".into()),

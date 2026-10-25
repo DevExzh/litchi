@@ -933,6 +933,7 @@ pub(super) fn set_table_cell(
     use litchi_numbers_wire::table_write::{self, CellInput, FormulaState};
     let wire = workspace.wire;
     let package = workspace.package();
+    let limits = package.numbers_wire_limits().map_err(|_| table_storage())?;
     // The calculation graph: no formula reads or is read by the table.
     let mut owners: Vec<&[u8]> = Vec::new();
     for component in package.state.source.components().iter() {
@@ -950,7 +951,7 @@ pub(super) fn set_table_cell(
             .and_then(|(_, object)| object.messages.first())
             .map(|message| message.data.as_slice())
     };
-    match table_write::cell_formula_state(&owners, &object, info, row, column)
+    match table_write::cell_formula_state(&owners, &object, info, row, column, &limits)
         .map_err(|_| table_storage())?
     {
         FormulaState::Inert => {},
@@ -986,15 +987,15 @@ pub(super) fn set_table_cell(
     let local = u32::try_from(u64::from(row) % size).map_err(|_| Error::InvalidSource)?;
     let strings = first_reference(&store, 4, wire)?.ok_or(Error::InvalidSource)?;
     let (tile_index, tile_type, tile_payload) = payload_of(workspace, tile, &[TILE])?;
-    let previous =
-        table_write::tile_cell(tile_payload, local, column).map_err(|_| table_storage())?;
+    let previous = table_write::tile_cell(tile_payload, local, column, &limits)
+        .map_err(|_| table_storage())?;
     let (list_index, list_type, list_payload) = payload_of(workspace, strings, &DATA_LIST)?;
     let mut list = list_payload.to_vec();
     let mut string_key = None;
     let input = match value {
         super::TableCellValue::Text(text) => {
             let (interned, key) =
-                table_write::list_intern(&list, text).map_err(|_| table_storage())?;
+                table_write::list_intern(&list, text, &limits).map_err(|_| table_storage())?;
             list = interned;
             string_key = Some(key);
             CellInput::Text(text)
@@ -1003,13 +1004,21 @@ pub(super) fn set_table_cell(
         super::TableCellValue::Boolean(flag) => CellInput::Boolean(*flag),
         super::TableCellValue::Empty => CellInput::Empty,
     };
-    let (cell, released) = table_write::cell_bytes(previous.as_deref(), &input, string_key)
-        .map_err(|_| table_storage())?;
+    let (cell, released) =
+        table_write::cell_bytes(previous.as_deref(), &input, string_key, &limits)
+            .map_err(|_| table_storage())?;
     if let Some(released) = released {
-        list = table_write::list_release(&list, released).map_err(|_| table_storage())?;
+        list = table_write::list_release(&list, released, &limits).map_err(|_| table_storage())?;
     }
-    let written = table_write::tile_set_cell(tile_payload, local, column, columns, cell.as_deref())
-        .map_err(|_| table_storage())?;
+    let written = table_write::tile_set_cell(
+        tile_payload,
+        local,
+        column,
+        columns,
+        cell.as_deref(),
+        &limits,
+    )
+    .map_err(|_| table_storage())?;
     let delta = i64::from(cell.is_some()) - i64::from(written.previous.is_some());
     let mut replacements = vec![
         (tile, tile_index, tile_type, written.tile),
@@ -1031,14 +1040,14 @@ pub(super) fn set_table_cell(
             .get((row / HEADER_BUCKET_ROWS) as usize)
             .ok_or_else(table_storage)?;
         let (index, message_type, payload) = payload_of(workspace, bucket, &[HEADER_BUCKET])?;
-        let adjusted =
-            table_write::header_adjust(payload, row, delta).map_err(|_| table_storage())?;
+        let adjusted = table_write::header_adjust(payload, row, delta, &limits)
+            .map_err(|_| table_storage())?;
         replacements.push((bucket, index, message_type, adjusted));
         if let Some(column_headers) = first_reference(&store, 2, wire)? {
             let (index, message_type, payload) =
                 payload_of(workspace, column_headers, &[HEADER_BUCKET])?;
-            let adjusted =
-                table_write::header_adjust(payload, column, delta).map_err(|_| table_storage())?;
+            let adjusted = table_write::header_adjust(payload, column, delta, &limits)
+                .map_err(|_| table_storage())?;
             replacements.push((column_headers, index, message_type, adjusted));
         }
     }

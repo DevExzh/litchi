@@ -129,14 +129,15 @@ pub(super) fn rewrite_formula_asts(
         .ok_or_else(|| {
             Error::InvalidFormat(format!("iWork formula cell ({row}, {column}) is missing"))
         })?;
-        let identifier = match BncCell::parse(&stored)?.stored_value() {
-            StoredValue::Formula(identifier) => identifier,
-            _ => {
-                return Err(Error::InvalidFormat(format!(
-                    "iWork dependency cell ({row}, {column}) does not contain a formula"
-                )));
-            },
-        };
+        let identifier =
+            match BncCell::parse(&stored, &crate::numbers::bnc_limits(&stored))?.stored_value() {
+                StoredValue::Formula(identifier) => identifier,
+                _ => {
+                    return Err(Error::InvalidFormat(format!(
+                        "iWork dependency cell ({row}, {column}) does not contain a formula"
+                    )));
+                },
+            };
         let previous = formulas
             .entries
             .iter()

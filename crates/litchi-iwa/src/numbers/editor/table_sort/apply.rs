@@ -489,7 +489,7 @@ fn plan_body_sort(
                         "Numbers body row {global_row} stores a cell outside the table columns"
                     )));
                 }
-                let cell = BncCellView::parse(cell)?;
+                let cell = BncCellView::parse(cell, &crate::numbers::bnc_limits(cell))?;
                 validate_movable_body_cell(&cell, global_row, column)?;
                 if let Some(&rule_position) = rule_positions.get(&column) {
                     sort_values[rule_position] = Some(sort_scalar(&cell, global_row, column)?);

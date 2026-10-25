@@ -702,7 +702,7 @@ fn existing_storage_id(
     else {
         return Ok(None);
     };
-    match BncCell::parse(&data)?.stored_value() {
+    match BncCell::parse(&data, &crate::numbers::bnc_limits(&data))?.stored_value() {
         StoredValue::Empty | StoredValue::Text(_) => Ok(None),
         StoredValue::RichText(key) => Ok(Some(
             storage::rich_text_entry_location(
@@ -736,7 +736,7 @@ fn require_plain_cell_paragraph_start(
     )?;
     let stored = data
         .as_deref()
-        .map(BncCell::parse)
+        .map(|data| BncCell::parse(data, &crate::numbers::bnc_limits(data)))
         .transpose()?
         .map_or(StoredValue::Empty, |cell| cell.stored_value());
     let text = plain_cell_text(package, &location, stored)?;
@@ -869,7 +869,7 @@ fn ensure_storage(
     )?;
     let stored = data
         .as_deref()
-        .map(BncCell::parse)
+        .map(|data| BncCell::parse(data, &crate::numbers::bnc_limits(data)))
         .transpose()?
         .map_or(StoredValue::Empty, |cell| cell.stored_value());
     match stored {

@@ -85,7 +85,10 @@ fn date_value(package: &Package) -> TestResult<f64> {
 }
 
 fn date_cache(source: &[u8]) -> TestResult<CachedScalar> {
-    let cell = BncCell::parse(&native_date_cell(source)?)?;
+    let cell = BncCell::parse(
+        &native_date_cell(source)?,
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     if cell.stored_value() != StoredValue::Date {
         return Err(io::Error::other("native Date & Time B2 cell is not a date").into());
     }

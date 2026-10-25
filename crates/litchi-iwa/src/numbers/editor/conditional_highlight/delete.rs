@@ -22,7 +22,9 @@ pub(super) fn clear_at_location(
     else {
         return Ok(());
     };
-    let Some(list_identifier) = BncCell::parse(&cell)?.conditional_style_identifier() else {
+    let Some(list_identifier) =
+        BncCell::parse(&cell, &crate::numbers::bnc_limits(&cell))?.conditional_style_identifier()
+    else {
         return Ok(());
     };
     let locations = location.object_locations.clone();

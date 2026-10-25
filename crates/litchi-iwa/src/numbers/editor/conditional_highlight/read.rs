@@ -27,7 +27,9 @@ pub(super) fn rules_at_location(
     else {
         return Ok(None);
     };
-    let Some(list_identifier) = BncCell::parse(&cell)?.conditional_style_identifier() else {
+    let Some(list_identifier) =
+        BncCell::parse(&cell, &crate::numbers::bnc_limits(&cell))?.conditional_style_identifier()
+    else {
         return Ok(None);
     };
     let (_resolved, entry) = resolve_entry(package, location, list_identifier)?;

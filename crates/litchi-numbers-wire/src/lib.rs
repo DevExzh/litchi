@@ -40,9 +40,13 @@ pub mod function_map;
 /// Payload-level cell writes shared by the Pages and Keynote table owners.
 pub mod table_write;
 
+/// Caller-selected budgets for raw Numbers-wire parsing and rewrites.
+pub mod limits;
 /// Payload builders for new tables cloned from a template, shared by the
 /// Pages and Keynote table owners (record 0329).
 pub mod table_create;
+
+pub use limits::{LimitKind, Limits};
 
 use std::collections::BTreeMap;
 
@@ -191,11 +195,14 @@ pub const MAX_OWNED_BNC_PARSE_ALLOCATIONS: usize = FIELD_COUNT * 2 + 1;
 pub enum Error {
     InvalidFormat(String),
     ParseError(String),
-    /// A bounded encoder's exact output would exceed its caller-selected cap.
-    OutputLimitExceeded {
-        /// Exact bytes required by the encoded cell.
+    /// A source, retained tail, or encoded output exceeds its caller-selected
+    /// cap.
+    LimitExceeded {
+        /// Dimension that exceeded its caller-selected cap.
+        kind: LimitKind,
+        /// Exact observed or requested amount.
         observed: usize,
-        /// Maximum bytes authorized by the caller.
+        /// Maximum bytes/items authorized by the caller.
         maximum: usize,
     },
     /// A bounded encoder could not reserve its exact output allocation.
@@ -211,9 +218,13 @@ impl fmt::Display for Error {
             Self::InvalidFormat(message) | Self::ParseError(message) => {
                 formatter.write_str(message)
             },
-            Self::OutputLimitExceeded { observed, maximum } => write!(
+            Self::LimitExceeded {
+                kind,
+                observed,
+                maximum,
+            } => write!(
                 formatter,
-                "Numbers BNC output limit exceeded: observed {observed}, maximum {maximum}"
+                "Numbers BNC {kind} limit exceeded: observed {observed}, maximum {maximum}"
             ),
             Self::Allocation { requested } => {
                 write!(
@@ -226,6 +237,29 @@ impl fmt::Display for Error {
 }
 
 impl std::error::Error for Error {}
+
+impl From<limits::Error> for Error {
+    fn from(error: limits::Error) -> Self {
+        match error {
+            limits::Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => Self::ParseError(format!(
+                "invalid Numbers-wire {kind} limit {value}, maximum {maximum}"
+            )),
+            limits::Error::LimitExceeded {
+                kind,
+                observed,
+                maximum,
+            } => Self::LimitExceeded {
+                kind,
+                observed,
+                maximum,
+            },
+        }
+    }
+}
 
 /// Result type for BNC decoding and mutation.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -314,6 +348,7 @@ pub struct BncCellView<'a> {
     fields: [Option<&'a [u8]>; FIELD_COUNT],
     cached_scalar: Option<CachedScalar>,
     tail: &'a [u8],
+    limits: Limits,
 }
 
 #[derive(Clone, Copy)]
@@ -418,20 +453,35 @@ impl BncCell {
     /// Returns an error when the cell is truncated, uses an unsupported
     /// version, contains an unknown field flag, or decodes a non-finite
     /// scalar.
-    pub fn parse(data: &[u8]) -> Result<Self> {
-        let view = BncCellView::parse(data)?;
+    pub fn parse(data: &[u8], limits: &Limits) -> Result<Self> {
+        limits.check_input(data.len())?;
+        let view = BncCellView::parse(data, limits)?;
         let mut prefix = [0; BNC_PREFIX_LEN];
         prefix.copy_from_slice(&data[..BNC_PREFIX_LEN]);
+        limits.check_items(view.fields.iter().flatten().count())?;
         let mut fields = BTreeMap::new();
-        for ((flag, _size), field_bytes) in FIELD_LAYOUT.iter().zip(view.fields) {
+        for ((flag, _size), field_bytes) in FIELD_LAYOUT.iter().zip(view.fields.iter()) {
             if let Some(bytes) = field_bytes {
-                fields.insert(*flag, bytes.to_vec());
+                let mut owned = Vec::new();
+                owned
+                    .try_reserve_exact(bytes.len())
+                    .map_err(|_| Error::Allocation {
+                        requested: bytes.len(),
+                    })?;
+                owned.extend_from_slice(bytes);
+                fields.insert(*flag, owned);
             }
         }
+        let mut tail = Vec::new();
+        tail.try_reserve_exact(view.tail.len())
+            .map_err(|_| Error::Allocation {
+                requested: view.tail.len(),
+            })?;
+        tail.extend_from_slice(view.tail);
         Ok(Self {
             prefix,
             fields,
-            tail: view.tail.to_vec(),
+            tail,
         })
     }
 
@@ -1730,49 +1780,39 @@ impl BncCell {
         self.fields.retain(|field, _| VALUE_FLAGS & field == 0);
     }
 
-    pub fn encode(&self) -> Vec<u8> {
-        let flags = self.fields.keys().fold(0u32, |mask, flag| mask | flag);
-        let field_len = self.fields.values().map(Vec::len).sum::<usize>();
-        let mut output = Vec::with_capacity(BNC_HEADER_LEN + field_len + self.tail.len());
-        output.extend_from_slice(&self.prefix);
-        output.extend_from_slice(&flags.to_le_bytes());
-        for (flag, _) in FIELD_LAYOUT {
-            if let Some(value) = self.fields.get(flag) {
-                output.extend_from_slice(value);
+    pub fn encode(&self, limits: &Limits) -> Result<Vec<u8>> {
+        limits.check_fields(self.fields.len())?;
+        for (flag, value) in &self.fields {
+            let Some((_, expected_width)) = FIELD_LAYOUT
+                .iter()
+                .find(|(candidate, _)| candidate == flag)
+            else {
+                return Err(Error::ParseError(
+                    "Numbers BNC encoded field flag is unknown".to_owned(),
+                ));
+            };
+            if value.len() != *expected_width {
+                return Err(Error::ParseError(
+                    "Numbers BNC encoded field has an invalid width".to_owned(),
+                ));
             }
         }
-        output.extend_from_slice(&self.tail);
-        output
-    }
-
-    /// Encode this owned cell with an exact, fallible output allocation.
-    ///
-    /// The complete encoded length is checked before allocation. This method
-    /// retains the byte ordering and output of [`Self::encode`] while making
-    /// output-limit and allocation failures explicit.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::OutputLimitExceeded`] when the exact output exceeds
-    /// `max_output_bytes`, [`Error::Allocation`] when its allocation fails, or
-    /// [`Error::ParseError`] if stored field lengths overflow `usize`.
-    pub fn try_encode_with_limit(&self, max_output_bytes: usize) -> Result<Vec<u8>> {
-        let mut output_len = BNC_HEADER_LEN;
-        for value in self.fields.values() {
-            output_len = output_len.checked_add(value.len()).ok_or_else(|| {
-                Error::ParseError("Numbers BNC encoded length overflow".to_owned())
-            })?;
-        }
-        output_len = output_len
-            .checked_add(self.tail.len())
-            .ok_or_else(|| Error::ParseError("Numbers BNC encoded length overflow".to_owned()))?;
-        check_output_limit(output_len, max_output_bytes)?;
-
         let flags = self.fields.keys().fold(0u32, |mask, flag| mask | flag);
+        let field_len = self
+            .fields
+            .values()
+            .try_fold(0usize, |length, value| length.checked_add(value.len()))
+            .ok_or_else(|| Error::ParseError("Numbers BNC encoded length overflow".to_owned()))?;
+        let output_len = BNC_HEADER_LEN
+            .checked_add(field_len)
+            .and_then(|length| length.checked_add(self.tail.len()))
+            .ok_or_else(|| Error::ParseError("Numbers BNC encoded length overflow".to_owned()))?;
+        limits.check_tail(self.tail.len())?;
+        limits.check_output(output_len)?;
         let mut output = Vec::new();
         output
             .try_reserve_exact(output_len)
-            .map_err(|_error| Error::Allocation {
+            .map_err(|_| Error::Allocation {
                 requested: output_len,
             })?;
         if output.capacity() != output_len {
@@ -1853,10 +1893,12 @@ impl<'a> BncCellView<'a> {
                     })
                 }
             })?;
-        BNC_HEADER_LEN
+        let output_len = BNC_HEADER_LEN
             .checked_add(fields)
             .and_then(|v| v.checked_add(self.tail.len()))
-            .ok_or_else(|| Error::ParseError("Numbers BNC encoded length overflow".to_owned()))
+            .ok_or_else(|| Error::ParseError("Numbers BNC encoded length overflow".to_owned()))?;
+        self.limits.check_output(output_len)?;
+        Ok(output_len)
     }
 
     /// Plan one scalar rewrite without allocating output.
@@ -1947,7 +1989,8 @@ impl<'a> BncCellView<'a> {
     /// Returns an error when the cell is truncated, uses an unsupported
     /// version, contains an unknown field flag, or decodes a non-finite
     /// scalar.
-    pub fn parse(data: &'a [u8]) -> Result<Self> {
+    pub fn parse(data: &'a [u8], limits: &Limits) -> Result<Self> {
+        limits.check_input(data.len())?;
         if data.len() < BNC_HEADER_LEN {
             return Err(Error::ParseError(
                 "Truncated Numbers BNC cell header".to_string(),
@@ -1973,10 +2016,15 @@ impl<'a> BncCellView<'a> {
 
         let mut cursor = BNC_HEADER_LEN;
         let mut fields = [None; FIELD_COUNT];
+        let mut field_count = 0usize;
         for (index, &(flag, size)) in FIELD_LAYOUT.iter().enumerate() {
             if flags & flag == 0 {
                 continue;
             }
+            field_count = field_count
+                .checked_add(1)
+                .ok_or_else(|| Error::ParseError("Numbers BNC field count overflow".to_owned()))?;
+            limits.check_fields(field_count)?;
             let end = cursor.checked_add(size).ok_or_else(|| {
                 Error::ParseError("Numbers BNC field offset overflow".to_string())
             })?;
@@ -1986,6 +2034,8 @@ impl<'a> BncCellView<'a> {
             cursor = end;
         }
 
+        limits.check_tail(data.len().saturating_sub(cursor))?;
+
         let decoded_scalar_fields = decode_scalar_fields(|flag| field_from_layout(&fields, flag))?;
         Ok(Self {
             prefix: &data[..BNC_PREFIX_LEN],
@@ -1994,6 +2044,7 @@ impl<'a> BncCellView<'a> {
             fields,
             cached_scalar: cached_scalar_from(data[1], decoded_scalar_fields),
             tail: &data[cursor..],
+            limits: *limits,
         })
     }
 
@@ -2200,10 +2251,10 @@ impl<'a> BncCellView<'a> {
     /// prefix byte outside the explicit-format marker, and opaque tail are
     /// retained exactly. Automatic Duration tuples and malformed or
     /// cross-family metadata are rejected before allocation.
-    pub fn rewrite_duration_format_identifier_with_limit(
+    pub fn rewrite_duration_format_identifier(
         &self,
         identifier: Option<u32>,
-        max_output_bytes: usize,
+        limits: &Limits,
     ) -> Result<Vec<u8>> {
         let transition = self.validate_duration_transition(identifier)?;
         let removed_flags =
@@ -2230,7 +2281,7 @@ impl<'a> BncCellView<'a> {
             self.cell_type,
             removed_flags,
             &replacements[..replacement_count],
-            max_output_bytes,
+            limits,
         )?;
         let explicit_flags = identifier.map_or(0, |_| {
             explicit_duration_format_flags(transition.secondary.is_some())
@@ -2238,7 +2289,8 @@ impl<'a> BncCellView<'a> {
         output[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&explicit_flags.to_le_bytes());
 
-        let candidate = BncCellView::parse(&output)?;
+        let candidate_limits = limits.for_generated_output(output.len())?;
+        let candidate = BncCellView::parse(&output, &candidate_limits)?;
         if candidate.stored_value() != self.stored_value()
             || candidate.cached_scalar() != self.cached_scalar()
             || candidate.opaque_tail() != self.opaque_tail()
@@ -2298,7 +2350,7 @@ impl<'a> BncCellView<'a> {
     /// stored value unchanged.
     ///
     /// This comparison is allocation-free and follows the same format-aware
-    /// number conversion as [`Self::rewrite_scalar_with_limit`]. It compares
+    /// number conversion as [`Self::rewrite_scalar`]. It compares
     /// semantic scalar state only; retained styles, formats, comments, and the
     /// opaque tail do not affect the result.
     #[must_use]
@@ -2346,18 +2398,18 @@ impl<'a> BncCellView<'a> {
     /// # Errors
     ///
     /// Returns an error when a format-aware number conversion or decimal128
-    /// encoding fails, the exact output exceeds `max_output_bytes`, encoded
+    /// encoding fails, the exact output exceeds `limits.max_output_bytes()`, encoded
     /// length arithmetic overflows, or the output allocation fails.
-    pub fn rewrite_scalar_with_limit(
+    pub fn rewrite_scalar(
         &self,
         value: ScalarValue,
-        max_output_bytes: usize,
+        limits: &Limits,
     ) -> Result<Vec<u8>> {
         let encoded = self.encode_scalar(value)?;
         self.rewrite_value_fields(
             encoded.cell_type,
             Some((encoded.flag, &encoded.bytes[..encoded.length])),
-            max_output_bytes,
+            limits,
         )
     }
 
@@ -2366,13 +2418,13 @@ impl<'a> BncCellView<'a> {
     ///
     /// The minimal empty BNC representation returns [`ClearValue::Delete`]
     /// without allocating. Otherwise the retained representation uses one
-    /// exact fallible allocation bounded by `max_output_bytes`.
+    /// exact fallible allocation bounded by `limits.max_output_bytes()`.
     ///
     /// # Errors
     ///
-    /// Returns an error when the retained output exceeds `max_output_bytes`,
+    /// Returns an error when the retained output exceeds `limits.max_output_bytes()`,
     /// encoded length arithmetic overflows, or allocation fails.
-    pub fn clear_value_with_limit(&self, max_output_bytes: usize) -> Result<ClearValue> {
+    pub fn clear_value(&self, limits: &Limits) -> Result<ClearValue> {
         let retained_flags = self.flags & !VALUE_FLAGS;
         if retained_flags == 0
             && self.tail.is_empty()
@@ -2381,7 +2433,7 @@ impl<'a> BncCellView<'a> {
         {
             return Ok(ClearValue::Delete);
         }
-        self.rewrite_value_fields(CELL_TYPE_EMPTY, None, max_output_bytes)
+        self.rewrite_value_fields(CELL_TYPE_EMPTY, None, limits)
             .map(ClearValue::Retain)
     }
 
@@ -2391,10 +2443,10 @@ impl<'a> BncCellView<'a> {
     /// The exact output length is checked before one fallible allocation. A
     /// missing or different comment identifier is rejected so callers cannot
     /// accidentally authorize a stale graph deletion.
-    pub fn clear_comment_with_limit(
+    pub fn clear_comment(
         &self,
         expected_identifier: u32,
-        max_output_bytes: usize,
+        limits: &Limits,
     ) -> Result<Vec<u8>> {
         if expected_identifier == 0 || self.comment_identifier() != Some(expected_identifier) {
             return Err(Error::InvalidFormat(
@@ -2402,8 +2454,9 @@ impl<'a> BncCellView<'a> {
             ));
         }
         let output =
-            self.rewrite_selected_fields_many(self.cell_type, COMMENT_FLAG, &[], max_output_bytes)?;
-        let candidate = BncCellView::parse(&output)?;
+            self.rewrite_selected_fields_many(self.cell_type, COMMENT_FLAG, &[], limits)?;
+        let candidate_limits = limits.for_generated_output(output.len())?;
+        let candidate = BncCellView::parse(&output, &candidate_limits)?;
         if candidate.comment_identifier().is_some()
             || candidate.stored_value() != self.stored_value()
             || candidate.tail != self.tail
@@ -2445,11 +2498,11 @@ impl<'a> BncCellView<'a> {
     ///
     /// Returns an error when the target is not a formula cell, the requested
     /// cache is not numeric or Boolean, encoding fails, the exact output
-    /// exceeds `max_output_bytes`, or allocation fails.
-    pub fn rewrite_formula_cache_with_limit(
+    /// exceeds `limits.max_output_bytes()`, or allocation fails.
+    pub fn rewrite_formula_cache(
         &self,
         value: CachedScalar,
-        max_output_bytes: usize,
+        limits: &Limits,
     ) -> Result<Vec<u8>> {
         if !matches!(self.stored_value(), StoredValue::Formula(_)) {
             return Err(Error::InvalidFormat(
@@ -2484,7 +2537,7 @@ impl<'a> BncCellView<'a> {
             encoded.cell_type,
             FORMULA_CACHE_FLAGS,
             Some((encoded.flag, &encoded.bytes[..encoded.length])),
-            max_output_bytes,
+            limits,
         )
     }
 
@@ -2494,11 +2547,11 @@ impl<'a> BncCellView<'a> {
     /// The encoded cache is independently checked for exact kind and finite
     /// bits before any result is returned. In particular, a duration-formatted
     /// source cannot coerce a requested number into a duration cache.
-    pub fn rewrite_formula_with_limit(
+    pub fn rewrite_formula(
         &self,
         identifier: u32,
         cache: ScalarValue,
-        max_output_bytes: usize,
+        limits: &Limits,
     ) -> Result<Vec<u8>> {
         if identifier == 0 || matches!(cache, ScalarValue::RichText(_)) {
             return Err(Error::InvalidFormat(
@@ -2520,9 +2573,10 @@ impl<'a> BncCellView<'a> {
             encoded.cell_type,
             VALUE_FLAGS,
             &replacements,
-            max_output_bytes,
+            limits,
         )?;
-        let view = BncCellView::parse(&output)?;
+        let candidate_limits = limits.for_generated_output(output.len())?;
+        let view = BncCellView::parse(&output, &candidate_limits)?;
         if view.stored_value() != StoredValue::Formula(identifier)
             || !view.formula_cache_matches_scalar(cache)?
         {
@@ -2534,10 +2588,10 @@ impl<'a> BncCellView<'a> {
     }
 
     /// Replace all value fields with a formula reference and no display cache.
-    pub fn rewrite_formula_without_cache_with_limit(
+    pub fn rewrite_formula_without_cache(
         &self,
         identifier: u32,
-        max_output_bytes: usize,
+        limits: &Limits,
     ) -> Result<Vec<u8>> {
         if identifier == 0 {
             return Err(Error::InvalidFormat(
@@ -2549,9 +2603,10 @@ impl<'a> BncCellView<'a> {
             CELL_TYPE_EMPTY,
             VALUE_FLAGS,
             &[(FORMULA_FLAG, formula.as_slice())],
-            max_output_bytes,
+            limits,
         )?;
-        let view = BncCellView::parse(&output)?;
+        let candidate_limits = limits.for_generated_output(output.len())?;
+        let view = BncCellView::parse(&output, &candidate_limits)?;
         if view.stored_value() != StoredValue::Formula(identifier) || view.cached_scalar().is_some()
         {
             return Err(Error::InvalidFormat(
@@ -2703,9 +2758,9 @@ impl<'a> BncCellView<'a> {
         &self,
         cell_type: u8,
         replacement: Option<(u32, &[u8])>,
-        max_output_bytes: usize,
+        limits: &Limits,
     ) -> Result<Vec<u8>> {
-        self.rewrite_selected_fields(cell_type, VALUE_FLAGS, replacement, max_output_bytes)
+        self.rewrite_selected_fields(cell_type, VALUE_FLAGS, replacement, limits)
     }
 
     fn rewrite_selected_fields(
@@ -2713,17 +2768,17 @@ impl<'a> BncCellView<'a> {
         cell_type: u8,
         removed_flags: u32,
         replacement: Option<(u32, &[u8])>,
-        max_output_bytes: usize,
+        limits: &Limits,
     ) -> Result<Vec<u8>> {
         match replacement {
             Some(replacement) => self.rewrite_selected_fields_many(
                 cell_type,
                 removed_flags,
                 &[replacement],
-                max_output_bytes,
+                limits,
             ),
             None => {
-                self.rewrite_selected_fields_many(cell_type, removed_flags, &[], max_output_bytes)
+                self.rewrite_selected_fields_many(cell_type, removed_flags, &[], limits)
             },
         }
     }
@@ -2733,7 +2788,7 @@ impl<'a> BncCellView<'a> {
         cell_type: u8,
         removed_flags: u32,
         replacements: &[(u32, &[u8])],
-        max_output_bytes: usize,
+        limits: &Limits,
     ) -> Result<Vec<u8>> {
         let retained_flags = self.flags & !removed_flags;
         let mut output_flags = retained_flags;
@@ -2776,7 +2831,7 @@ impl<'a> BncCellView<'a> {
         output_len = output_len
             .checked_add(self.tail.len())
             .ok_or_else(|| Error::ParseError("Numbers BNC encoded length overflow".to_owned()))?;
-        check_output_limit(output_len, max_output_bytes)?;
+        limits.check_output(output_len)?;
 
         let mut output = Vec::new();
         output
@@ -2847,13 +2902,6 @@ fn field_from_layout<'a>(
         .get(index)
         .filter(|(flag, _size)| *flag == requested_flag)?;
     fields.get(index).copied().flatten()
-}
-
-fn check_output_limit(observed: usize, maximum: usize) -> Result<()> {
-    if observed > maximum {
-        return Err(Error::OutputLimitExceeded { observed, maximum });
-    }
-    Ok(())
 }
 
 fn validate_duration_field_storage(fields: &BTreeMap<u32, Vec<u8>>) -> Result<()> {
@@ -3218,6 +3266,8 @@ mod tests {
 
     use super::*;
 
+    const TEST_LIMITS: Limits = Limits::DEFAULT;
+
     fn finite(value: f64) -> FiniteF64 {
         FiniteF64::new(value).expect("finite test scalar")
     }
@@ -3233,12 +3283,12 @@ mod tests {
     #[test]
     fn changes_value_without_changing_style_fields() {
         let original = hex("050300000000000008100200040000000500000001000000");
-        let mut cell = BncCell::parse(&original).unwrap();
+        let mut cell = BncCell::parse(&original, &TEST_LIMITS).unwrap();
         assert_eq!(cell.stored_value(), StoredValue::Text(4));
 
         cell.set_number(42.5).unwrap();
-        let encoded = cell.encode();
-        let reparsed = BncCell::parse(&encoded).unwrap();
+        let encoded = cell.encode(&TEST_LIMITS).unwrap();
+        let reparsed = BncCell::parse(&encoded, &TEST_LIMITS).unwrap();
         assert_eq!(reparsed.stored_value(), StoredValue::Number);
         assert_eq!(reparsed.fields[&0x0000_1000], 5u32.to_le_bytes());
         assert_eq!(reparsed.fields[&0x0002_0000], 1u32.to_le_bytes());
@@ -3257,8 +3307,8 @@ mod tests {
             .fields
             .insert(FORMULA_ERROR_FLAG, 37u32.to_le_bytes().to_vec());
         source.tail.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
-        let source_bytes = source.encode();
-        let view = BncCellView::parse(&source_bytes).unwrap();
+        let source_bytes = source.encode(&TEST_LIMITS).unwrap();
+        let view = BncCellView::parse(&source_bytes, &TEST_LIMITS).unwrap();
 
         for scalar in [
             ScalarValue::String(41),
@@ -3268,7 +3318,7 @@ mod tests {
             ScalarValue::Date(finite(53.25)),
             ScalarValue::Duration(finite(59.75)),
         ] {
-            let rewritten = view.rewrite_scalar_with_limit(scalar, usize::MAX).unwrap();
+            let rewritten = view.rewrite_scalar(scalar, &TEST_LIMITS).unwrap();
             let mut expected = source.clone();
             match scalar {
                 ScalarValue::String(identifier) => expected.set_string(identifier),
@@ -3278,7 +3328,7 @@ mod tests {
                 ScalarValue::Date(value) => expected.set_date(value.get()).unwrap(),
                 ScalarValue::Duration(value) => expected.set_duration(value.get()).unwrap(),
             }
-            assert_eq!(rewritten, expected.encode());
+            assert_eq!(rewritten, expected.encode(&TEST_LIMITS).unwrap());
             assert_eq!(&rewritten[..1], &source_bytes[..1]);
             assert_eq!(
                 &rewritten[2..BNC_PREFIX_LEN],
@@ -3288,9 +3338,9 @@ mod tests {
         }
 
         let rewritten = view
-            .rewrite_scalar_with_limit(ScalarValue::Boolean(true), usize::MAX)
+            .rewrite_scalar(ScalarValue::Boolean(true), &TEST_LIMITS)
             .unwrap();
-        let reparsed = BncCell::parse(&rewritten).unwrap();
+        let reparsed = BncCell::parse(&rewritten, &TEST_LIMITS).unwrap();
         assert_eq!(reparsed.stored_value(), StoredValue::Boolean);
         assert_eq!(
             reparsed.cached_scalar().unwrap(),
@@ -3307,17 +3357,17 @@ mod tests {
         cell.set_data_format_identifier(7, CellDataFormatKind::Duration, None)
             .unwrap();
         cell.set_number(2.0).unwrap();
-        let bytes = cell.encode();
-        let view = BncCellView::parse(&bytes).unwrap();
+        let bytes = cell.encode(&TEST_LIMITS).unwrap();
+        let view = BncCellView::parse(&bytes, &TEST_LIMITS).unwrap();
         assert!(view.scalar_equals(ScalarValue::Number(finite(2.0))));
         assert!(view.scalar_equals(ScalarValue::Duration(finite(172_800.0))));
         assert!(!view.scalar_equals(ScalarValue::Number(finite(3.0))));
         assert!(!view.scalar_equals(ScalarValue::Boolean(true)));
 
         let rewritten = view
-            .rewrite_scalar_with_limit(ScalarValue::Number(finite(3.0)), usize::MAX)
+            .rewrite_scalar(ScalarValue::Number(finite(3.0)), &TEST_LIMITS)
             .unwrap();
-        let rewritten = BncCellView::parse(&rewritten).unwrap();
+        let rewritten = BncCellView::parse(&rewritten, &TEST_LIMITS).unwrap();
         assert_eq!(rewritten.stored_value(), StoredValue::Duration);
         assert_eq!(
             rewritten.cached_scalar(),
@@ -3327,24 +3377,41 @@ mod tests {
 
     #[test]
     fn raw_clear_distinguishes_deleted_and_retained_cells() {
-        let minimal = BncCell::minimal().encode();
-        let view = BncCellView::parse(&minimal).unwrap();
-        assert_eq!(view.clear_value_with_limit(0).unwrap(), ClearValue::Delete);
+        let minimal = BncCell::minimal().encode(&TEST_LIMITS).unwrap();
+        let view = BncCellView::parse(&minimal, &TEST_LIMITS).unwrap();
+        assert_eq!(view.clear_value(&TEST_LIMITS).unwrap(), ClearValue::Delete);
 
         let mut retained = BncCell::minimal();
         retained.set_number(42.0).unwrap();
         retained.set_comment_identifier(Some(9));
         retained.tail.extend_from_slice(&[0xca, 0xfe]);
-        let retained_bytes = retained.encode();
-        let view = BncCellView::parse(&retained_bytes).unwrap();
-        let cleared = match view.clear_value_with_limit(usize::MAX).unwrap() {
+        let retained_bytes = retained.encode(&TEST_LIMITS).unwrap();
+        let view = BncCellView::parse(&retained_bytes, &TEST_LIMITS).unwrap();
+        let cleared = match view.clear_value(&TEST_LIMITS).unwrap() {
             ClearValue::Delete => panic!("metadata-bearing cell was deleted"),
             ClearValue::Retain(bytes) => bytes,
         };
-        let parsed = BncCell::parse(&cleared).unwrap();
+        let parsed = BncCell::parse(&cleared, &TEST_LIMITS).unwrap();
         assert_eq!(parsed.stored_value(), StoredValue::Empty);
         assert_eq!(parsed.comment_identifier(), Some(9));
         assert_eq!(parsed.tail, [0xca, 0xfe]);
+    }
+
+    #[test]
+    fn generated_rewrite_readback_uses_output_profile_after_source_cap() {
+        let source = BncCell::minimal().encode(&TEST_LIMITS).unwrap();
+        let source_limits = TEST_LIMITS.with_input_bytes(source.len()).unwrap();
+        let view = BncCellView::parse(&source, &source_limits).unwrap();
+        let rewritten = view
+            .rewrite_formula_without_cache(17, &source_limits)
+            .expect("a bounded generated formula candidate is valid");
+        assert!(rewritten.len() > source.len());
+        assert_eq!(
+            BncCellView::parse(&rewritten, &TEST_LIMITS)
+                .unwrap()
+                .stored_value(),
+            StoredValue::Formula(17)
+        );
     }
 
     #[test]
@@ -3353,45 +3420,97 @@ mod tests {
         cell.set_string(11);
         cell.set_style_identifier(Some(13));
         cell.tail.extend_from_slice(&[1, 2, 3]);
-        let encoded = cell.encode();
-        assert_eq!(cell.try_encode_with_limit(encoded.len()).unwrap(), encoded);
+        let encoded = cell.encode(&TEST_LIMITS).unwrap();
+        let exact_limits = TEST_LIMITS.with_output_bytes(encoded.len()).unwrap();
+        assert_eq!(cell.encode(&exact_limits).unwrap(), encoded);
+        let narrow_limits = TEST_LIMITS.with_output_bytes(encoded.len() - 1).unwrap();
         assert!(matches!(
-            cell.try_encode_with_limit(encoded.len() - 1),
-            Err(Error::OutputLimitExceeded {
+            cell.encode(&narrow_limits),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::OutputBytes,
                 observed,
                 maximum
             }) if observed == encoded.len() && maximum + 1 == observed
         ));
 
-        let view = BncCellView::parse(&encoded).unwrap();
+        let view = BncCellView::parse(&encoded, &TEST_LIMITS).unwrap();
         let expected = view
-            .rewrite_scalar_with_limit(ScalarValue::RichText(17), usize::MAX)
+            .rewrite_scalar(ScalarValue::RichText(17), &TEST_LIMITS)
             .unwrap();
         assert_eq!(
-            view.rewrite_scalar_with_limit(ScalarValue::RichText(17), expected.len())
+            view.rewrite_scalar(
+                ScalarValue::RichText(17),
+                &TEST_LIMITS.with_output_bytes(expected.len()).unwrap(),
+            )
                 .unwrap(),
             expected
         );
         assert!(matches!(
-            view.rewrite_scalar_with_limit(ScalarValue::RichText(17), expected.len() - 1),
-            Err(Error::OutputLimitExceeded {
+            view.rewrite_scalar(
+                ScalarValue::RichText(17),
+                &TEST_LIMITS.with_output_bytes(expected.len() - 1).unwrap(),
+            ),
+            Err(Error::LimitExceeded {
                 observed,
-                maximum
+                maximum,
+                ..
             }) if observed == expected.len() && maximum + 1 == observed
         ));
+    }
+
+    #[test]
+    fn raw_policy_bounds_input_fields_and_opaque_tail() {
+        let mut cell = BncCell::minimal();
+        cell.set_string(11);
+        cell.set_style_identifier(Some(13));
+        cell.tail.extend_from_slice(b"opaque");
+        let encoded = cell.encode(&TEST_LIMITS).unwrap();
+
+        let input = TEST_LIMITS.with_input_bytes(encoded.len() - 1).unwrap();
+        assert!(matches!(
+            BncCellView::parse(&encoded, &input),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::InputBytes,
+                observed,
+                maximum,
+            }) if observed == encoded.len() && maximum + 1 == observed
+        ));
+
+        let tail = TEST_LIMITS.with_tail_bytes(5).unwrap();
+        assert!(matches!(
+            BncCell::parse(&encoded, &tail),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::TailBytes,
+                observed,
+                maximum,
+            }) if observed == 6 && maximum == 5
+        ));
+
+        let fields = TEST_LIMITS.with_fields(1).unwrap();
+        assert!(matches!(
+            BncCellView::parse(&encoded, &fields),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Fields,
+                observed,
+                maximum,
+            }) if observed == 2 && maximum == 1
+        ));
+
+        let owned = BncCell::parse(&encoded, &TEST_LIMITS).unwrap();
+        assert_eq!(owned.encode(&TEST_LIMITS).unwrap(), encoded);
     }
 
     #[test]
     fn rejects_unknown_flags_and_non_finite_numbers() {
         let mut data = vec![5, 2, 0, 0, 0, 0, 0, 0];
         data.extend_from_slice(&0x8000_0000u32.to_le_bytes());
-        assert!(BncCell::parse(&data).is_err());
+        assert!(BncCell::parse(&data, &TEST_LIMITS).is_err());
         assert!(BncCell::minimal().set_number(f64::NAN).is_err());
 
         let mut non_finite_binary = vec![5, 2, 0, 0, 0, 0, 0, 0];
         non_finite_binary.extend_from_slice(&NUMBER_FLAG.to_le_bytes());
         non_finite_binary.extend_from_slice(&f64::NAN.to_le_bytes());
-        assert!(BncCell::parse(&non_finite_binary).is_err());
+        assert!(BncCell::parse(&non_finite_binary, &TEST_LIMITS).is_err());
 
         let mut non_finite_decimal = vec![5, 2, 0, 0, 0, 0, 0, 0];
         non_finite_decimal.extend_from_slice(&DECIMAL_FLAG.to_le_bytes());
@@ -3399,7 +3518,7 @@ mod tests {
         decimal128_overflow[14] = 0xff;
         decimal128_overflow[15] = 0x7f;
         non_finite_decimal.extend_from_slice(&decimal128_overflow);
-        assert!(BncCell::parse(&non_finite_decimal).is_err());
+        assert!(BncCell::parse(&non_finite_decimal, &TEST_LIMITS).is_err());
         assert!(read_decimal128_le(&decimal128_overflow).is_err());
 
         for (cell_type, field) in [
@@ -3411,7 +3530,7 @@ mod tests {
             let mut non_finite = vec![5, cell_type, 0, 0, 0, 0, 0, 0];
             non_finite.extend_from_slice(&field.to_le_bytes());
             non_finite.extend_from_slice(&f64::INFINITY.to_le_bytes());
-            assert!(BncCell::parse(&non_finite).is_err());
+            assert!(BncCell::parse(&non_finite, &TEST_LIMITS).is_err());
         }
     }
 
@@ -3472,25 +3591,25 @@ mod tests {
         cell.fields
             .insert(FORMULA_ERROR_FLAG, 23u32.to_le_bytes().to_vec());
         cell.tail.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
-        let original = cell.encode();
-        let view = BncCellView::parse(&original).unwrap();
+        let original = cell.encode(&TEST_LIMITS).unwrap();
+        let view = BncCellView::parse(&original, &TEST_LIMITS).unwrap();
         let expected = CachedScalar::Number(finite(324.0));
         assert!(!view.formula_cache_equals(expected));
 
         let plan = view.plan_formula_cache_rewrite(expected).unwrap();
 
         let rewritten = view
-            .rewrite_formula_cache_with_limit(expected, usize::MAX)
+            .rewrite_formula_cache(expected, &TEST_LIMITS)
             .unwrap();
         assert_eq!(plan.output_len(), Some(rewritten.len()));
-        let reparsed = BncCellView::parse(&rewritten).unwrap();
+        let reparsed = BncCellView::parse(&rewritten, &TEST_LIMITS).unwrap();
         assert!(reparsed.formula_cache_equals(expected));
         assert_eq!(reparsed.stored_value(), StoredValue::Formula(17));
         assert_eq!(reparsed.formula_error_identifier(), Some(23));
         assert_eq!(reparsed.comment_identifier(), Some(9));
 
-        let before = BncCell::parse(&original).unwrap();
-        let after = BncCell::parse(&rewritten).unwrap();
+        let before = BncCell::parse(&original, &TEST_LIMITS).unwrap();
+        let after = BncCell::parse(&rewritten, &TEST_LIMITS).unwrap();
         assert_eq!(before.prefix[0], after.prefix[0]);
         assert_eq!(&before.prefix[2..], &after.prefix[2..]);
         assert_eq!(before.tail, after.tail);
@@ -3501,15 +3620,18 @@ mod tests {
         }
 
         assert!(matches!(
-            view.rewrite_formula_cache_with_limit(expected, rewritten.len() - 1),
-            Err(Error::OutputLimitExceeded { observed, maximum })
+            view.rewrite_formula_cache(
+                expected,
+                &TEST_LIMITS.with_output_bytes(rewritten.len() - 1).unwrap(),
+            ),
+            Err(Error::LimitExceeded { observed, maximum, .. })
                 if observed == rewritten.len() && maximum == rewritten.len() - 1
         ));
-        let boolean = BncCellView::parse(&rewritten)
+        let boolean = BncCellView::parse(&rewritten, &TEST_LIMITS)
             .unwrap()
-            .rewrite_formula_cache_with_limit(CachedScalar::Boolean(true), usize::MAX)
+            .rewrite_formula_cache(CachedScalar::Boolean(true), &TEST_LIMITS)
             .unwrap();
-        let boolean = BncCellView::parse(&boolean).unwrap();
+        let boolean = BncCellView::parse(&boolean, &TEST_LIMITS).unwrap();
         assert!(boolean.formula_cache_equals(CachedScalar::Boolean(true)));
         assert_eq!(boolean.stored_value(), StoredValue::Formula(17));
         assert_eq!(boolean.formula_error_identifier(), Some(23));
@@ -3523,7 +3645,7 @@ mod tests {
         cell.set_comment_identifier(Some(9));
         cell.fields.insert(STYLE_FLAG, 5u32.to_le_bytes().to_vec());
         cell.tail.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
-        let source = cell.encode();
+        let source = cell.encode(&TEST_LIMITS).unwrap();
 
         for cache in [
             ScalarValue::String(27),
@@ -3532,18 +3654,18 @@ mod tests {
             ScalarValue::Date(finite(789_332_889.25)),
             ScalarValue::Duration(finite(3_723.5)),
         ] {
-            let source_view = BncCellView::parse(&source).unwrap();
+            let source_view = BncCellView::parse(&source, &TEST_LIMITS).unwrap();
             let plan = source_view.plan_formula_rewrite(41, Some(cache)).unwrap();
             let rewritten = source_view
-                .rewrite_formula_with_limit(41, cache, usize::MAX)
+                .rewrite_formula(41, cache, &TEST_LIMITS)
                 .unwrap();
             assert_eq!(plan.output_len(), Some(rewritten.len()));
-            let view = BncCellView::parse(&rewritten).unwrap();
+            let view = BncCellView::parse(&rewritten, &TEST_LIMITS).unwrap();
             assert!(view.formula_and_cache_equal(41, cache).unwrap());
             assert_eq!(view.comment_identifier(), Some(9));
 
-            let before = BncCell::parse(&source).unwrap();
-            let after = BncCell::parse(&rewritten).unwrap();
+            let before = BncCell::parse(&source, &TEST_LIMITS).unwrap();
+            let after = BncCell::parse(&rewritten, &TEST_LIMITS).unwrap();
             assert_eq!(before.prefix[0], after.prefix[0]);
             assert_eq!(&before.prefix[2..], &after.prefix[2..]);
             assert_eq!(before.tail, after.tail);
@@ -3554,23 +3676,30 @@ mod tests {
             }
 
             assert!(matches!(
-                BncCellView::parse(&source)
+                BncCellView::parse(&source, &TEST_LIMITS)
                     .unwrap()
-                    .rewrite_formula_with_limit(41, cache, rewritten.len() - 1),
-                Err(Error::OutputLimitExceeded { observed, maximum })
+                    .rewrite_formula(
+                        41,
+                        cache,
+                        &TEST_LIMITS.with_output_bytes(rewritten.len() - 1).unwrap(),
+                    ),
+                Err(Error::LimitExceeded { observed, maximum, .. })
                     if observed == rewritten.len() && maximum == rewritten.len() - 1
             ));
         }
 
-        let view = BncCellView::parse(&source).unwrap();
+        let view = BncCellView::parse(&source, &TEST_LIMITS).unwrap();
         let plan = view.plan_formula_rewrite(41, None).unwrap();
         let rewritten = view
-            .rewrite_formula_without_cache_with_limit(41, usize::MAX)
+            .rewrite_formula_without_cache(41, &TEST_LIMITS)
             .unwrap();
         assert_eq!(plan.output_len(), Some(rewritten.len()));
         assert!(matches!(
-            view.rewrite_formula_without_cache_with_limit(41, rewritten.len() - 1),
-            Err(Error::OutputLimitExceeded { observed, maximum })
+            view.rewrite_formula_without_cache(
+                41,
+                &TEST_LIMITS.with_output_bytes(rewritten.len() - 1).unwrap(),
+            ),
+                Err(Error::LimitExceeded { observed, maximum, .. })
                 if observed == rewritten.len() && maximum == rewritten.len() - 1
         ));
     }
@@ -3581,15 +3710,17 @@ mod tests {
         duration
             .set_data_format_identifier(9, CellDataFormatKind::Duration, None)
             .unwrap();
-        let source = duration.encode();
+        let source = duration.encode(&TEST_LIMITS).unwrap();
         assert!(matches!(
-            BncCellView::parse(&source)
+            BncCellView::parse(&source, &TEST_LIMITS)
                 .unwrap()
-                .rewrite_formula_with_limit(41, ScalarValue::Number(finite(1.0)), usize::MAX),
+                .rewrite_formula(41, ScalarValue::Number(finite(1.0)), &TEST_LIMITS),
             Err(Error::InvalidFormat(_))
         ));
         assert_eq!(
-            BncCell::parse(&source).unwrap().stored_value(),
+            BncCell::parse(&source, &TEST_LIMITS)
+                .unwrap()
+                .stored_value(),
             StoredValue::Empty
         );
     }
@@ -3635,9 +3766,9 @@ mod tests {
         ] {
             cell.fields
                 .insert(RICH_TEXT_FLAG, 17u32.to_le_bytes().to_vec());
-            let bytes = cell.encode();
-            let owned = BncCell::parse(&bytes).unwrap();
-            let view = BncCellView::parse(&bytes).unwrap();
+            let bytes = cell.encode(&TEST_LIMITS).unwrap();
+            let owned = BncCell::parse(&bytes, &TEST_LIMITS).unwrap();
+            let view = BncCellView::parse(&bytes, &TEST_LIMITS).unwrap();
 
             assert_eq!(owned.rich_text_identifier(), Some(17));
             assert_eq!(view.rich_text_identifier(), Some(17));
@@ -3649,19 +3780,23 @@ mod tests {
     fn rich_text_identifier_preserves_zero_presence() {
         let mut cell = BncCell::minimal();
         cell.set_number(1.0).unwrap();
-        let without_rich_text_bytes = cell.encode();
-        let without_rich_text = BncCellView::parse(&without_rich_text_bytes).unwrap();
+        let without_rich_text_bytes = cell.encode(&TEST_LIMITS).unwrap();
+        let without_rich_text = BncCellView::parse(&without_rich_text_bytes, &TEST_LIMITS).unwrap();
         assert_eq!(without_rich_text.rich_text_identifier(), None);
 
         cell.fields
             .insert(RICH_TEXT_FLAG, 0u32.to_le_bytes().to_vec());
-        let bytes = cell.encode();
+        let bytes = cell.encode(&TEST_LIMITS).unwrap();
         assert_eq!(
-            BncCell::parse(&bytes).unwrap().rich_text_identifier(),
+            BncCell::parse(&bytes, &TEST_LIMITS)
+                .unwrap()
+                .rich_text_identifier(),
             Some(0)
         );
         assert_eq!(
-            BncCellView::parse(&bytes).unwrap().rich_text_identifier(),
+            BncCellView::parse(&bytes, &TEST_LIMITS)
+                .unwrap()
+                .rich_text_identifier(),
             Some(0)
         );
     }
@@ -3673,25 +3808,28 @@ mod tests {
         cell.set_style_identifier(Some(17));
         cell.set_comment_identifier(Some(9));
         cell.tail.extend_from_slice(b"opaque-tail");
-        let source = cell.encode();
-        let view = BncCellView::parse(&source).unwrap();
+        let source = cell.encode(&TEST_LIMITS).unwrap();
+        let view = BncCellView::parse(&source, &TEST_LIMITS).unwrap();
 
-        let output = view.clear_comment_with_limit(9, source.len()).unwrap();
-        let candidate = BncCellView::parse(&output).unwrap();
+        let output = view.clear_comment(9, &TEST_LIMITS).unwrap();
+        let candidate = BncCellView::parse(&output, &TEST_LIMITS).unwrap();
         assert_eq!(candidate.comment_identifier(), None);
         assert_eq!(candidate.stored_value(), view.stored_value());
         assert_eq!(candidate.tail, b"opaque-tail");
         assert_eq!(output.len(), source.len() - 4);
         assert!(matches!(
-            view.clear_comment_with_limit(9, output.len() - 1),
-            Err(Error::OutputLimitExceeded { .. })
+            view.clear_comment(
+                9,
+                &TEST_LIMITS.with_output_bytes(output.len() - 1).unwrap(),
+            ),
+            Err(Error::LimitExceeded { .. })
         ));
-        assert!(view.clear_comment_with_limit(8, usize::MAX).is_err());
-        let no_comment = BncCell::minimal().encode();
+        assert!(view.clear_comment(8, &TEST_LIMITS).is_err());
+        let no_comment = BncCell::minimal().encode(&TEST_LIMITS).unwrap();
         assert!(
-            BncCellView::parse(&no_comment)
+            BncCellView::parse(&no_comment, &TEST_LIMITS)
                 .unwrap()
-                .clear_comment_with_limit(9, usize::MAX)
+                .clear_comment(9, &TEST_LIMITS)
                 .is_err()
         );
     }
@@ -3702,13 +3840,15 @@ mod tests {
         cell.set_number(42.0).unwrap();
         cell.set_conditional_style(Some(11), Some(15));
 
-        let mut reparsed = BncCell::parse(&cell.encode()).unwrap();
+        let mut reparsed =
+            BncCell::parse(&cell.encode(&TEST_LIMITS).unwrap(), &TEST_LIMITS).unwrap();
         assert_eq!(reparsed.conditional_style_identifier(), Some(11));
         assert_eq!(reparsed.conditional_style_applied_rule(), Some(15));
         assert_eq!(reparsed.stored_value(), StoredValue::Number);
 
         reparsed.set_conditional_style(None, None);
-        let cleared = BncCell::parse(&reparsed.encode()).unwrap();
+        let cleared =
+            BncCell::parse(&reparsed.encode(&TEST_LIMITS).unwrap(), &TEST_LIMITS).unwrap();
         assert_eq!(cleared.conditional_style_identifier(), None);
         assert_eq!(cleared.conditional_style_applied_rule(), None);
         assert_eq!(cleared.stored_value(), StoredValue::Number);
@@ -3721,13 +3861,15 @@ mod tests {
         cell.set_style_identifier(Some(7));
         cell.set_text_style_identifier(Some(11));
 
-        let mut reparsed = BncCell::parse(&cell.encode()).unwrap();
+        let mut reparsed =
+            BncCell::parse(&cell.encode(&TEST_LIMITS).unwrap(), &TEST_LIMITS).unwrap();
         assert_eq!(reparsed.style_identifier(), Some(7));
         assert_eq!(reparsed.text_style_identifier(), Some(11));
         assert_eq!(reparsed.stored_value(), StoredValue::Text(3));
 
         reparsed.set_text_style_identifier(None);
-        let cleared = BncCell::parse(&reparsed.encode()).unwrap();
+        let cleared =
+            BncCell::parse(&reparsed.encode(&TEST_LIMITS).unwrap(), &TEST_LIMITS).unwrap();
         assert_eq!(cleared.style_identifier(), Some(7));
         assert_eq!(cleared.text_style_identifier(), None);
         assert_eq!(cleared.stored_value(), StoredValue::Text(3));
@@ -3746,8 +3888,8 @@ mod tests {
             .unwrap();
         cell.tail.extend_from_slice(b"opaque-tail");
 
-        let bytes = cell.encode();
-        let view = BncCellView::parse(&bytes).unwrap();
+        let bytes = cell.encode(&TEST_LIMITS).unwrap();
+        let view = BncCellView::parse(&bytes, &TEST_LIMITS).unwrap();
         assert_eq!(view.numeric_cell_type(), Some(NumericCellType::Number));
         assert_eq!(view.style_identifier(), Some(7));
         assert_eq!(view.text_style_identifier(), Some(11));
@@ -3778,8 +3920,8 @@ mod tests {
         cell.fields
             .insert(RESERVED_KNOWN_FIELD_FLAG, 29u32.to_le_bytes().to_vec());
 
-        let bytes = cell.encode();
-        let view = BncCellView::parse(&bytes).unwrap();
+        let bytes = cell.encode(&TEST_LIMITS).unwrap();
+        let view = BncCellView::parse(&bytes, &TEST_LIMITS).unwrap();
         assert_eq!(
             view.numeric_cell_type(),
             Some(NumericCellType::AlternateNumber)
@@ -3812,7 +3954,7 @@ mod tests {
         data.extend_from_slice(&DECIMAL_CELL_FORMAT_KIND.to_le_bytes());
         data.extend_from_slice(&2u32.to_le_bytes());
 
-        let cell = BncCell::parse(&data).unwrap();
+        let cell = BncCell::parse(&data, &TEST_LIMITS).unwrap();
         assert_eq!(cell.conditional_style_identifier(), Some(1));
         assert_eq!(cell.conditional_style_applied_rule(), Some(15));
         assert_eq!(
@@ -3833,7 +3975,7 @@ mod tests {
         assert_eq!(cell.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
         assert_eq!(cell.format_identifier(), Some(2));
 
-        let reparsed = BncCell::parse(&cell.encode()).unwrap();
+        let reparsed = BncCell::parse(&cell.encode(&TEST_LIMITS).unwrap(), &TEST_LIMITS).unwrap();
         assert_eq!(reparsed.stored_value(), StoredValue::Number);
         assert_eq!(reparsed.style_identifier(), Some(7));
         assert_eq!(reparsed.format_identifier(), Some(2));
@@ -3858,15 +4000,18 @@ mod tests {
         assert_eq!(cell.format_identifier(), Some(4));
         assert_eq!(cell.stored_value(), StoredValue::Number);
 
-        let converted_native = BncCell::parse(&hex(
-            "050a0000000003080170000039300000000000000000000000003ab0020000000200000004000000",
-        ))
+        let converted_native = BncCell::parse(
+            &hex(
+                "050a0000000003080170000039300000000000000000000000003ab0020000000200000004000000",
+            ),
+            &TEST_LIMITS,
+        )
         .unwrap();
         assert_eq!(converted_native.format_identifier(), Some(4));
         assert_eq!(converted_native.secondary_format_identifier(), Some(2));
 
         cell.set_number(42.0).unwrap();
-        let reparsed = BncCell::parse(&cell.encode()).unwrap();
+        let reparsed = BncCell::parse(&cell.encode(&TEST_LIMITS).unwrap(), &TEST_LIMITS).unwrap();
         assert_eq!(reparsed.explicit_format_flags(), EXPLICIT_CURRENCY_FORMAT);
         assert_eq!(reparsed.format_identifier(), Some(4));
 
@@ -3889,7 +4034,7 @@ mod tests {
         assert_eq!(cell.format_identifier(), Some(7));
         assert_eq!(cell.stored_value(), StoredValue::Date);
         assert_eq!(
-            cell.encode(),
+            cell.encode(&TEST_LIMITS).unwrap(),
             hex("050500000000080004900000000080cc2186c7410300000007000000")
         );
 
@@ -3913,7 +4058,7 @@ mod tests {
     #[test]
     fn duration_formats_use_native_duration_metadata_and_scalar_units() {
         let native_automatic = hex("050700000000000002100100000000000017ad400400000008000000");
-        let automatic = BncCell::parse(&native_automatic).unwrap();
+        let automatic = BncCell::parse(&native_automatic, &TEST_LIMITS).unwrap();
         assert_eq!(automatic.stored_value(), StoredValue::Duration);
         assert_eq!(automatic.explicit_format_flags(), 0);
         assert_eq!(
@@ -3926,11 +4071,11 @@ mod tests {
             automatic.cached_scalar().unwrap(),
             Some(CachedScalar::Duration(finite(3_723.5)))
         );
-        assert_eq!(automatic.encode(), native_automatic);
+        assert_eq!(automatic.encode(&TEST_LIMITS).unwrap(), native_automatic);
 
         let native_converted =
             hex("050700000000050002300100000000000f6e99c1040000000100000009000000");
-        let converted = BncCell::parse(&native_converted).unwrap();
+        let converted = BncCell::parse(&native_converted, &TEST_LIMITS).unwrap();
         assert_eq!(
             converted.explicit_format_flags(),
             EXPLICIT_DURATION_WITH_NUMBER_FORMAT
@@ -3941,7 +4086,7 @@ mod tests {
             converted.cached_scalar().unwrap(),
             Some(CachedScalar::Duration(finite(-106_660_800.0)))
         );
-        assert_eq!(converted.encode(), native_converted);
+        assert_eq!(converted.encode(&TEST_LIMITS).unwrap(), native_converted);
 
         let mut number = BncCell::minimal();
         number.set_number(1.5).unwrap();
@@ -4006,23 +4151,23 @@ mod tests {
         rich_text.set_rich_text(29);
 
         for mut cell in [text, date, boolean, error, rich_text] {
-            let before = cell.encode();
+            let before = cell.encode(&TEST_LIMITS).unwrap();
             assert!(
                 cell.set_data_format_identifier(41, CellDataFormatKind::Duration, None)
                     .is_err()
             );
-            assert_eq!(cell.encode(), before);
+            assert_eq!(cell.encode(&TEST_LIMITS).unwrap(), before);
         }
 
         let mut unsupported = BncCell::minimal();
         unsupported.prefix[1] = 42;
-        let before = unsupported.encode();
+        let before = unsupported.encode(&TEST_LIMITS).unwrap();
         assert!(
             unsupported
                 .set_data_format_identifier(41, CellDataFormatKind::Duration, None)
                 .is_err()
         );
-        assert_eq!(unsupported.encode(), before);
+        assert_eq!(unsupported.encode(&TEST_LIMITS).unwrap(), before);
     }
 
     #[test]
@@ -4032,13 +4177,13 @@ mod tests {
         cell.set_style_identifier(Some(47));
         cell.set_comment_identifier(Some(53));
         cell.tail.extend_from_slice(b"duration-zero-id");
-        let before = cell.encode();
+        let before = cell.encode(&TEST_LIMITS).unwrap();
 
         assert!(
             cell.set_data_format_identifier(0, CellDataFormatKind::Duration, None)
                 .is_err()
         );
-        assert_eq!(cell.encode(), before);
+        assert_eq!(cell.encode(&TEST_LIMITS).unwrap(), before);
     }
 
     #[test]
@@ -4217,11 +4362,11 @@ mod tests {
         assert_eq!(value_fields(&duration), original_value_fields);
         assert_eq!(non_format_encoding(&duration), original_non_format);
 
-        let explicit = duration.encode();
+        let explicit = duration.encode(&TEST_LIMITS).unwrap();
         duration
             .set_duration_format_identifier_preserving_value(Some(41))
             .unwrap();
-        assert_eq!(duration.encode(), explicit);
+        assert_eq!(duration.encode(&TEST_LIMITS).unwrap(), explicit);
 
         duration
             .set_duration_format_identifier_preserving_value(Some(43))
@@ -4253,7 +4398,7 @@ mod tests {
     #[test]
     fn focused_duration_format_identifier_preserves_native_number_secondary() {
         let source = hex("050700000000050002300100000000000f6e99c1040000000100000009000000");
-        let mut duration = BncCell::parse(&source).unwrap();
+        let mut duration = BncCell::parse(&source, &TEST_LIMITS).unwrap();
         let original_value_fields = value_fields(&duration);
         let original_cached_scalar = duration.cached_scalar().unwrap();
 
@@ -4270,8 +4415,8 @@ mod tests {
         assert_eq!(value_fields(&duration), original_value_fields);
         assert_eq!(duration.cached_scalar().unwrap(), original_cached_scalar);
 
-        let rewritten = duration.encode();
-        let reparsed = BncCell::parse(&rewritten).unwrap();
+        let rewritten = duration.encode(&TEST_LIMITS).unwrap();
+        let reparsed = BncCell::parse(&rewritten, &TEST_LIMITS).unwrap();
         assert_eq!(
             reparsed.explicit_format_flags(),
             EXPLICIT_DURATION_WITH_NUMBER_FORMAT
@@ -4315,8 +4460,8 @@ mod tests {
         duration.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&EXPLICIT_DURATION_WITH_NUMBER_FORMAT.to_le_bytes());
 
-        let source = duration.encode();
-        let source_view = BncCellView::parse(&source).unwrap();
+        let source = duration.encode(&TEST_LIMITS).unwrap();
+        let source_view = BncCellView::parse(&source, &TEST_LIMITS).unwrap();
         assert!(source_view.is_duration_format_compatible());
         assert!(source_view.has_only_duration_format_metadata());
         assert_eq!(source_view.format_identifier(), Some(137));
@@ -4326,10 +4471,10 @@ mod tests {
             .plan_duration_format_identifier_rewrite(Some(149))
             .unwrap();
         let rewritten = source_view
-            .rewrite_duration_format_identifier_with_limit(Some(149), usize::MAX)
+            .rewrite_duration_format_identifier(Some(149), &TEST_LIMITS)
             .unwrap();
         assert_eq!(plan.output_len(), Some(rewritten.len()));
-        let rewritten_view = BncCellView::parse(&rewritten).unwrap();
+        let rewritten_view = BncCellView::parse(&rewritten, &TEST_LIMITS).unwrap();
         assert_eq!(
             rewritten_view.explicit_format_flags(),
             EXPLICIT_DURATION_WITH_NUMBER_FORMAT
@@ -4349,12 +4494,15 @@ mod tests {
         assert_eq!(&rewritten[..6], &source[..6]);
         assert_eq!(&rewritten[8..12], &source[8..12]);
         assert_eq!(
-            non_format_encoding(&BncCell::parse(&rewritten).unwrap()),
+            non_format_encoding(&BncCell::parse(&rewritten, &TEST_LIMITS).unwrap()),
             non_format_encoding(&duration)
         );
 
         let no_op = source_view
-            .rewrite_duration_format_identifier_with_limit(Some(137), source.len())
+            .rewrite_duration_format_identifier(
+                Some(137),
+                &TEST_LIMITS.with_output_bytes(source.len()).unwrap(),
+            )
             .unwrap();
         assert_eq!(no_op, source);
 
@@ -4362,10 +4510,10 @@ mod tests {
             .plan_duration_format_identifier_rewrite(None)
             .unwrap();
         let cleared = rewritten_view
-            .rewrite_duration_format_identifier_with_limit(None, usize::MAX)
+            .rewrite_duration_format_identifier(None, &TEST_LIMITS)
             .unwrap();
         assert_eq!(cleared_plan.output_len(), Some(cleared.len()));
-        let cleared_view = BncCellView::parse(&cleared).unwrap();
+        let cleared_view = BncCellView::parse(&cleared, &TEST_LIMITS).unwrap();
         assert_eq!(cleared_view.explicit_format_flags(), 0);
         assert_eq!(cleared_view.cell_format_kind(), None);
         assert_eq!(cleared_view.format_identifier(), None);
@@ -4374,13 +4522,16 @@ mod tests {
         assert_eq!(cleared_view.cached_scalar(), source_view.cached_scalar());
         assert_eq!(cleared_view.opaque_tail(), source_view.opaque_tail());
         assert_eq!(
-            non_format_encoding(&BncCell::parse(&cleared).unwrap()),
+            non_format_encoding(&BncCell::parse(&cleared, &TEST_LIMITS).unwrap()),
             non_format_encoding(&duration)
         );
 
         assert!(matches!(
-            source_view.rewrite_duration_format_identifier_with_limit(Some(149), rewritten.len() - 1),
-            Err(Error::OutputLimitExceeded { observed, maximum })
+            source_view.rewrite_duration_format_identifier(
+                Some(149),
+                &TEST_LIMITS.with_output_bytes(rewritten.len() - 1).unwrap(),
+            ),
+            Err(Error::LimitExceeded { observed, maximum, .. })
                 if observed == rewritten.len() && maximum == rewritten.len() - 1
         ));
     }
@@ -4392,7 +4543,7 @@ mod tests {
         empty.set_style_identifier(Some(151));
         empty.set_comment_identifier(Some(157));
         empty.tail.extend_from_slice(b"duration-empty-tail");
-        let original = empty.encode();
+        let original = empty.encode(&TEST_LIMITS).unwrap();
         let original_non_format = non_format_encoding(&empty);
 
         assert!(empty.is_duration_format_compatible());
@@ -4400,12 +4551,12 @@ mod tests {
         empty
             .set_duration_format_identifier_preserving_value(None)
             .unwrap();
-        assert_eq!(empty.encode(), original);
+        assert_eq!(empty.encode(&TEST_LIMITS).unwrap(), original);
 
         empty
             .set_duration_format_identifier_preserving_value(Some(163))
             .unwrap();
-        let explicit = empty.encode();
+        let explicit = empty.encode(&TEST_LIMITS).unwrap();
         assert_eq!(empty.explicit_format_flags(), EXPLICIT_DURATION_FORMAT);
         assert_eq!(empty.cell_format_kind(), Some(DURATION_CELL_FORMAT_KIND));
         assert_eq!(empty.format_identifier(), Some(163));
@@ -4416,24 +4567,24 @@ mod tests {
         empty
             .set_duration_format_identifier_preserving_value(Some(163))
             .unwrap();
-        assert_eq!(empty.encode(), explicit);
+        assert_eq!(empty.encode(&TEST_LIMITS).unwrap(), explicit);
         empty
             .set_duration_format_identifier_preserving_value(None)
             .unwrap();
-        assert_eq!(empty.encode(), original);
+        assert_eq!(empty.encode(&TEST_LIMITS).unwrap(), original);
         assert_eq!(non_format_encoding(&empty), original_non_format);
 
-        let source_view = BncCellView::parse(&original).unwrap();
+        let source_view = BncCellView::parse(&original, &TEST_LIMITS).unwrap();
         assert!(source_view.is_duration_format_compatible());
         let rewritten = source_view
-            .rewrite_duration_format_identifier_with_limit(Some(167), usize::MAX)
+            .rewrite_duration_format_identifier(Some(167), &TEST_LIMITS)
             .unwrap();
-        let rewritten_view = BncCellView::parse(&rewritten).unwrap();
+        let rewritten_view = BncCellView::parse(&rewritten, &TEST_LIMITS).unwrap();
         assert_eq!(rewritten_view.stored_value(), StoredValue::Empty);
         assert_eq!(rewritten_view.cached_scalar(), None);
         assert_eq!(rewritten_view.format_identifier(), Some(167));
         assert_eq!(
-            non_format_encoding(&BncCell::parse(&rewritten).unwrap()),
+            non_format_encoding(&BncCell::parse(&rewritten, &TEST_LIMITS).unwrap()),
             original_non_format
         );
     }
@@ -4441,19 +4592,19 @@ mod tests {
     #[test]
     fn focused_duration_format_identifier_rejects_automatic_and_cross_family_metadata_atomically() {
         let automatic_bytes = hex("050700000000000002100100000000000017ad400400000008000000");
-        let mut automatic = BncCell::parse(&automatic_bytes).unwrap();
+        let mut automatic = BncCell::parse(&automatic_bytes, &TEST_LIMITS).unwrap();
         assert!(automatic.is_duration_format_compatible());
         assert!(automatic.has_only_duration_format_metadata());
-        let before = automatic.encode();
+        let before = automatic.encode(&TEST_LIMITS).unwrap();
         for identifier in [None, Some(173)] {
             assert!(
                 automatic
                     .set_duration_format_identifier_preserving_value(identifier)
                     .is_err()
             );
-            assert_eq!(automatic.encode(), before);
+            assert_eq!(automatic.encode(&TEST_LIMITS).unwrap(), before);
         }
-        let automatic_view = BncCellView::parse(&automatic_bytes).unwrap();
+        let automatic_view = BncCellView::parse(&automatic_bytes, &TEST_LIMITS).unwrap();
         assert!(automatic_view.is_duration_format_compatible());
         assert!(
             automatic_view
@@ -4462,7 +4613,7 @@ mod tests {
         );
         assert!(
             automatic_view
-                .rewrite_duration_format_identifier_with_limit(None, usize::MAX)
+                .rewrite_duration_format_identifier(None, &TEST_LIMITS)
                 .is_err()
         );
 
@@ -4479,18 +4630,18 @@ mod tests {
         wrong_family.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&EXPLICIT_DATE_TIME_FORMAT.to_le_bytes());
         assert!(!wrong_family.has_only_duration_format_metadata());
-        let before = wrong_family.encode();
+        let before = wrong_family.encode(&TEST_LIMITS).unwrap();
         assert!(
             wrong_family
                 .set_duration_format_identifier_preserving_value(Some(187))
                 .is_err()
         );
-        assert_eq!(wrong_family.encode(), before);
-        let wrong_family_view = BncCellView::parse(&before).unwrap();
+        assert_eq!(wrong_family.encode(&TEST_LIMITS).unwrap(), before);
+        let wrong_family_view = BncCellView::parse(&before, &TEST_LIMITS).unwrap();
         assert!(!wrong_family_view.has_only_duration_format_metadata());
         assert!(
             wrong_family_view
-                .rewrite_duration_format_identifier_with_limit(Some(191), usize::MAX)
+            .rewrite_duration_format_identifier(Some(191), &TEST_LIMITS)
                 .is_err()
         );
 
@@ -4506,13 +4657,13 @@ mod tests {
         );
         wrong_marker.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&EXPLICIT_DECIMAL_FORMAT.to_le_bytes());
-        let before = wrong_marker.encode();
+        let before = wrong_marker.encode(&TEST_LIMITS).unwrap();
         assert!(
             wrong_marker
                 .set_duration_format_identifier_preserving_value(None)
                 .is_err()
         );
-        assert_eq!(wrong_marker.encode(), before);
+        assert_eq!(wrong_marker.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut base_with_secondary = BncCell::minimal();
         base_with_secondary.set_duration(7.0).unwrap();
@@ -4529,13 +4680,13 @@ mod tests {
             .insert(CELL_FORMAT_IDENTIFIER_FLAG, 199u32.to_le_bytes().to_vec());
         base_with_secondary.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&EXPLICIT_DURATION_FORMAT.to_le_bytes());
-        let before = base_with_secondary.encode();
+        let before = base_with_secondary.encode(&TEST_LIMITS).unwrap();
         assert!(
             base_with_secondary
                 .set_duration_format_identifier_preserving_value(Some(211))
                 .is_err()
         );
-        assert_eq!(base_with_secondary.encode(), before);
+        assert_eq!(base_with_secondary.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut with_number_without_secondary = BncCell::minimal();
         with_number_without_secondary.set_duration(7.0).unwrap();
@@ -4550,26 +4701,29 @@ mod tests {
         with_number_without_secondary.prefix
             [EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&EXPLICIT_DURATION_WITH_NUMBER_FORMAT.to_le_bytes());
-        let before = with_number_without_secondary.encode();
+        let before = with_number_without_secondary.encode(&TEST_LIMITS).unwrap();
         assert!(
             with_number_without_secondary
                 .set_duration_format_identifier_preserving_value(None)
                 .is_err()
         );
-        assert_eq!(with_number_without_secondary.encode(), before);
+        assert_eq!(
+            with_number_without_secondary.encode(&TEST_LIMITS).unwrap(),
+            before
+        );
     }
 
     #[test]
     fn focused_duration_format_identifier_rejects_zero_malformed_and_ambiguous_shapes() {
         let mut zero_requested = BncCell::minimal();
         zero_requested.set_duration(7.0).unwrap();
-        let before = zero_requested.encode();
+        let before = zero_requested.encode(&TEST_LIMITS).unwrap();
         assert!(
             zero_requested
                 .set_duration_format_identifier_preserving_value(Some(0))
                 .is_err()
         );
-        assert_eq!(zero_requested.encode(), before);
+        assert_eq!(zero_requested.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut zero_existing = BncCell::minimal();
         zero_existing.set_duration(7.0).unwrap();
@@ -4582,13 +4736,13 @@ mod tests {
             .insert(DURATION_FORMAT_IDENTIFIER_FLAG, 0u32.to_le_bytes().to_vec());
         zero_existing.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&EXPLICIT_DURATION_FORMAT.to_le_bytes());
-        let before = zero_existing.encode();
+        let before = zero_existing.encode(&TEST_LIMITS).unwrap();
         assert!(
             zero_existing
                 .set_duration_format_identifier_preserving_value(None)
                 .is_err()
         );
-        assert_eq!(zero_existing.encode(), before);
+        assert_eq!(zero_existing.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut zero_secondary = BncCell::minimal();
         zero_secondary.set_duration(7.0).unwrap();
@@ -4605,13 +4759,13 @@ mod tests {
             .insert(CELL_FORMAT_IDENTIFIER_FLAG, 0u32.to_le_bytes().to_vec());
         zero_secondary.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&EXPLICIT_DURATION_WITH_NUMBER_FORMAT.to_le_bytes());
-        let before = zero_secondary.encode();
+        let before = zero_secondary.encode(&TEST_LIMITS).unwrap();
         assert!(
             zero_secondary
                 .set_duration_format_identifier_preserving_value(Some(199))
                 .is_err()
         );
-        assert_eq!(zero_secondary.encode(), before);
+        assert_eq!(zero_secondary.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut malformed = BncCell::minimal();
         malformed.set_duration(7.0).unwrap();
@@ -4624,75 +4778,82 @@ mod tests {
             .insert(DURATION_FORMAT_IDENTIFIER_FLAG, vec![1, 2, 3]);
         malformed.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&EXPLICIT_DURATION_FORMAT.to_le_bytes());
-        let before = malformed.encode();
+        // The owned constructor can represent an invalid field only while a
+        // test deliberately seeds its private state.  `encode` rejects that
+        // state by design, so capture the state directly to verify the
+        // transition remains atomic instead of using the encoder to create a
+        // malformed wire value that no parser could accept.
+        let before_fields = malformed.fields.clone();
+        let before_prefix = malformed.prefix;
         assert!(
             malformed
                 .set_duration_format_identifier_preserving_value(Some(211))
                 .is_err()
         );
-        assert_eq!(malformed.encode(), before);
+        assert_eq!(malformed.fields, before_fields);
+        assert_eq!(malformed.prefix, before_prefix);
 
         let mut decimal_cache = BncCell::minimal();
         decimal_cache.set_duration(7.0).unwrap();
         decimal_cache
             .fields
             .insert(DECIMAL_FLAG, decimal128_le(7.0).unwrap().to_vec());
-        let before = decimal_cache.encode();
+        let before = decimal_cache.encode(&TEST_LIMITS).unwrap();
         assert!(!decimal_cache.is_duration_format_compatible());
         assert!(
             decimal_cache
                 .set_duration_format_identifier_preserving_value(Some(223))
                 .is_err()
         );
-        assert_eq!(decimal_cache.encode(), before);
+        assert_eq!(decimal_cache.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut cache_without_formula = BncCell::minimal();
         cache_without_formula.set_duration(7.0).unwrap();
         cache_without_formula
             .fields
             .insert(STRING_FLAG, 227u32.to_le_bytes().to_vec());
-        let before = cache_without_formula.encode();
+        let before = cache_without_formula.encode(&TEST_LIMITS).unwrap();
         assert!(!cache_without_formula.is_duration_format_compatible());
         assert!(
             cache_without_formula
                 .set_duration_format_identifier_preserving_value(Some(229))
                 .is_err()
         );
-        assert_eq!(cache_without_formula.encode(), before);
+        assert_eq!(cache_without_formula.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut zero_formula = BncCell::minimal();
         zero_formula.set_duration(7.0).unwrap();
         zero_formula
             .fields
             .insert(FORMULA_FLAG, 0u32.to_le_bytes().to_vec());
-        let before = zero_formula.encode();
+        let before = zero_formula.encode(&TEST_LIMITS).unwrap();
         assert!(!zero_formula.is_duration_format_compatible());
         assert!(
             zero_formula
                 .set_duration_format_identifier_preserving_value(Some(233))
                 .is_err()
         );
-        assert_eq!(zero_formula.encode(), before);
+        assert_eq!(zero_formula.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut reserved = BncCell::minimal();
         reserved.set_duration(7.0).unwrap();
         reserved
             .fields
             .insert(RESERVED_KNOWN_FIELD_FLAG, 239u32.to_le_bytes().to_vec());
-        let before = reserved.encode();
+        let before = reserved.encode(&TEST_LIMITS).unwrap();
         assert!(
             reserved
                 .set_duration_format_identifier_preserving_value(Some(241))
                 .is_err()
         );
-        assert_eq!(reserved.encode(), before);
+        assert_eq!(reserved.encode(&TEST_LIMITS).unwrap(), before);
     }
 
     #[test]
     fn checkbox_formats_match_native_boolean_metadata_and_conversion() {
         let native_checked =
             hex("050600000000200002140400000000000000f03f01000000060000000a000000");
-        let checked = BncCell::parse(&native_checked).unwrap();
+        let checked = BncCell::parse(&native_checked, &TEST_LIMITS).unwrap();
         assert_eq!(checked.stored_value(), StoredValue::Boolean);
         assert_eq!(
             checked.cached_scalar().unwrap(),
@@ -4702,22 +4863,22 @@ mod tests {
         assert_eq!(checked.cell_format_kind(), Some(CHECKBOX_CELL_FORMAT_KIND));
         assert_eq!(checked.format_identifier(), Some(10));
         assert_eq!(checked.secondary_format_identifier(), None);
-        assert_eq!(checked.encode(), native_checked);
+        assert_eq!(checked.encode(&TEST_LIMITS).unwrap(), native_checked);
 
         let native_unchecked =
             hex("050600000000200002140400000000000000000001000000060000000a000000");
-        let unchecked = BncCell::parse(&native_unchecked).unwrap();
+        let unchecked = BncCell::parse(&native_unchecked, &TEST_LIMITS).unwrap();
         assert_eq!(
             unchecked.cached_scalar().unwrap(),
             Some(CachedScalar::Boolean(false))
         );
-        assert_eq!(unchecked.encode(), native_unchecked);
+        assert_eq!(unchecked.encode(&TEST_LIMITS).unwrap(), native_unchecked);
 
         let mut empty = BncCell::minimal();
         empty
             .set_data_format_identifier(10, CellDataFormatKind::Checkbox, Some(1))
             .unwrap();
-        assert_eq!(empty.encode(), native_unchecked);
+        assert_eq!(empty.encode(&TEST_LIMITS).unwrap(), native_unchecked);
         empty.clear_explicit_format();
         assert_eq!(empty.stored_value(), StoredValue::Boolean);
         assert_eq!(empty.explicit_format_flags(), 0);
@@ -4728,14 +4889,14 @@ mod tests {
         number
             .set_data_format_identifier(10, CellDataFormatKind::Checkbox, Some(1))
             .unwrap();
-        assert_eq!(number.encode(), native_checked);
+        assert_eq!(number.encode(&TEST_LIMITS).unwrap(), native_checked);
     }
 
     #[test]
     fn star_rating_formats_match_native_numeric_metadata_and_conversion() {
         let native_three =
             hex("0502000000000100013400000300000000000000000000000000403002000000010000000b000000");
-        let three = BncCell::parse(&native_three).unwrap();
+        let three = BncCell::parse(&native_three, &TEST_LIMITS).unwrap();
         assert_eq!(three.stored_value(), StoredValue::Number);
         assert_eq!(
             three.cached_scalar().unwrap(),
@@ -4745,7 +4906,7 @@ mod tests {
         assert_eq!(three.cell_format_kind(), Some(STAR_RATING_CELL_FORMAT_KIND));
         assert_eq!(three.control_cell_spec_identifier(), Some(2));
         assert_eq!(three.format_identifier(), Some(11));
-        assert_eq!(three.encode(), native_three);
+        assert_eq!(three.encode(&TEST_LIMITS).unwrap(), native_three);
 
         let mut empty = BncCell::minimal();
         empty
@@ -4784,7 +4945,8 @@ mod tests {
                 Some(CachedScalar::Number(finite(1.5)))
             );
 
-            let reparsed = BncCell::parse(&number.encode()).unwrap();
+            let reparsed =
+                BncCell::parse(&number.encode(&TEST_LIMITS).unwrap(), &TEST_LIMITS).unwrap();
             assert_eq!(value_fields(&reparsed), original_number);
             number = reparsed;
         }
@@ -4848,8 +5010,8 @@ mod tests {
             original_fields
         );
 
-        let encoded = cell.try_encode_with_limit(usize::MAX).unwrap();
-        let mut reparsed = BncCell::parse(&encoded).unwrap();
+        let encoded = cell.encode(&TEST_LIMITS).unwrap();
+        let mut reparsed = BncCell::parse(&encoded, &TEST_LIMITS).unwrap();
         reparsed
             .set_number_or_percentage_format_identifier_preserving_value(None)
             .unwrap();
@@ -4863,13 +5025,13 @@ mod tests {
         assert_eq!(value_fields(&reparsed), original_value);
         assert_eq!(reparsed.tail, original_tail);
 
-        let before_rejection = reparsed.encode();
+        let before_rejection = reparsed.encode(&TEST_LIMITS).unwrap();
         assert!(
             reparsed
                 .set_number_or_percentage_format_identifier_preserving_value(Some(0))
                 .is_err()
         );
-        assert_eq!(reparsed.encode(), before_rejection);
+        assert_eq!(reparsed.encode(&TEST_LIMITS).unwrap(), before_rejection);
     }
 
     #[test]
@@ -4946,7 +5108,8 @@ mod tests {
         assert_eq!(cell.comment_identifier(), original_comment);
         assert_eq!(cell.tail, original_tail);
 
-        let mut reparsed = BncCell::parse(&cell.encode()).unwrap();
+        let mut reparsed =
+            BncCell::parse(&cell.encode(&TEST_LIMITS).unwrap(), &TEST_LIMITS).unwrap();
         reparsed
             .set_currency_format_identifier_preserving_value(None)
             .unwrap();
@@ -4969,13 +5132,13 @@ mod tests {
         assert_eq!(reparsed.comment_identifier(), original_comment);
         assert_eq!(reparsed.tail, original_tail);
 
-        let before_rejection = reparsed.encode();
+        let before_rejection = reparsed.encode(&TEST_LIMITS).unwrap();
         assert!(
             reparsed
                 .set_currency_format_identifier_preserving_value(Some(0))
                 .is_err()
         );
-        assert_eq!(reparsed.encode(), before_rejection);
+        assert_eq!(reparsed.encode(&TEST_LIMITS).unwrap(), before_rejection);
     }
 
     #[test]
@@ -5044,7 +5207,7 @@ mod tests {
         assert_eq!(cell.comment_identifier(), original_comment);
         assert_eq!(cell.tail, original_tail);
 
-        let reparsed = BncCell::parse(&cell.encode()).unwrap();
+        let reparsed = BncCell::parse(&cell.encode(&TEST_LIMITS).unwrap(), &TEST_LIMITS).unwrap();
         assert_eq!(reparsed.explicit_format_flags(), EXPLICIT_DECIMAL_FORMAT);
         assert_eq!(reparsed.cell_format_kind(), Some(DECIMAL_CELL_FORMAT_KIND));
         assert_eq!(reparsed.format_identifier(), Some(43));
@@ -5098,10 +5261,13 @@ mod tests {
         // The format-list payload, not the BNC cell, distinguishes Scientific
         // from Number and Percentage.  A wire-only reader must not infer a
         // specific family from this identical decimal cell shape.
-        assert_eq!(scientific.encode(), number_or_percentage.encode());
+        assert_eq!(
+            scientific.encode(&TEST_LIMITS).unwrap(),
+            number_or_percentage.encode(&TEST_LIMITS).unwrap()
+        );
 
-        let encoded = scientific.encode();
-        let mut reparsed = BncCell::parse(&encoded).unwrap();
+        let encoded = scientific.encode(&TEST_LIMITS).unwrap();
+        let mut reparsed = BncCell::parse(&encoded, &TEST_LIMITS).unwrap();
         reparsed
             .set_number_or_percentage_format_identifier_preserving_value(None)
             .unwrap();
@@ -5191,7 +5357,8 @@ mod tests {
         assert_eq!(fraction.comment_identifier(), original_comment);
         assert_eq!(fraction.tail, original_tail);
 
-        let mut cleared = BncCell::parse(&fraction.encode()).unwrap();
+        let mut cleared =
+            BncCell::parse(&fraction.encode(&TEST_LIMITS).unwrap(), &TEST_LIMITS).unwrap();
         cleared
             .set_number_or_percentage_format_identifier_preserving_value(None)
             .unwrap();
@@ -5273,12 +5440,21 @@ mod tests {
         // The format-list payload, not the BNC cell, distinguishes Fraction
         // from Number, Percentage, and Scientific. A wire-only reader must
         // not infer a specific family from this identical decimal shape.
-        assert_eq!(fraction.encode(), number.encode());
-        assert_eq!(fraction.encode(), percentage.encode());
-        assert_eq!(fraction.encode(), scientific.encode());
+        assert_eq!(
+            fraction.encode(&TEST_LIMITS).unwrap(),
+            number.encode(&TEST_LIMITS).unwrap()
+        );
+        assert_eq!(
+            fraction.encode(&TEST_LIMITS).unwrap(),
+            percentage.encode(&TEST_LIMITS).unwrap()
+        );
+        assert_eq!(
+            fraction.encode(&TEST_LIMITS).unwrap(),
+            scientific.encode(&TEST_LIMITS).unwrap()
+        );
 
-        let encoded = fraction.encode();
-        let mut cleared = BncCell::parse(&encoded).unwrap();
+        let encoded = fraction.encode(&TEST_LIMITS).unwrap();
+        let mut cleared = BncCell::parse(&encoded, &TEST_LIMITS).unwrap();
         cleared
             .set_number_or_percentage_format_identifier_preserving_value(None)
             .unwrap();
@@ -5302,7 +5478,7 @@ mod tests {
     fn slider_formats_match_native_number_and_currency_metadata() {
         let native_number =
             hex("0502000000000100013400001900000000000000000000000000403004000000010000000c000000");
-        let number = BncCell::parse(&native_number).unwrap();
+        let number = BncCell::parse(&native_number, &TEST_LIMITS).unwrap();
         assert_eq!(number.stored_value(), StoredValue::Number);
         assert_eq!(
             number.cached_scalar().unwrap(),
@@ -5313,12 +5489,12 @@ mod tests {
         assert_eq!(number.control_cell_spec_identifier(), Some(4));
         assert_eq!(number.format_identifier(), Some(12));
         assert_eq!(number.secondary_format_identifier(), None);
-        assert_eq!(number.encode(), native_number);
+        assert_eq!(number.encode(&TEST_LIMITS).unwrap(), native_number);
 
         let native_currency = hex(
             "050a000000000308017400001900000000000000000000000000403004000000020000000c0000000b000000",
         );
-        let currency = BncCell::parse(&native_currency).unwrap();
+        let currency = BncCell::parse(&native_currency, &TEST_LIMITS).unwrap();
         assert_eq!(currency.stored_value(), StoredValue::Number);
         assert_eq!(
             currency.cached_scalar().unwrap(),
@@ -5333,7 +5509,7 @@ mod tests {
         assert_eq!(currency.format_identifier(), Some(11));
         assert_eq!(currency.secondary_format_identifier(), Some(12));
         assert!(!currency.has_only_decimal_format_metadata());
-        assert_eq!(currency.encode(), native_currency);
+        assert_eq!(currency.encode(&TEST_LIMITS).unwrap(), native_currency);
 
         let mut empty = BncCell::minimal();
         empty.set_plain_number(10.0).unwrap();
@@ -5362,25 +5538,25 @@ mod tests {
     #[test]
     fn pop_up_menu_format_matches_native_text_metadata() {
         let native = hex("0503000000008000081402000100000006000000050000000d000000");
-        let cell = BncCell::parse(&native).unwrap();
+        let cell = BncCell::parse(&native, &TEST_LIMITS).unwrap();
         assert_eq!(cell.explicit_format_flags(), EXPLICIT_TEXT_FORMAT);
         assert_eq!(cell.cell_format_kind(), Some(TEXT_CELL_FORMAT_KIND));
         assert_eq!(cell.control_cell_spec_identifier(), Some(6));
         assert_eq!(cell.format_identifier(), Some(13));
         assert_eq!(cell.stored_value(), StoredValue::Text(1));
-        assert_eq!(cell.encode(), native);
+        assert_eq!(cell.encode(&TEST_LIMITS).unwrap(), native);
 
         let native_empty = hex("050000000000800000100200050000000c000000");
-        let empty = BncCell::parse(&native_empty).unwrap();
+        let empty = BncCell::parse(&native_empty, &TEST_LIMITS).unwrap();
         assert_eq!(empty.stored_value(), StoredValue::Empty);
         assert_eq!(empty.explicit_format_flags(), EXPLICIT_TEXT_FORMAT);
         assert_eq!(empty.cell_format_kind(), Some(TEXT_CELL_FORMAT_KIND));
         assert_eq!(empty.control_cell_spec_identifier(), None);
         assert_eq!(empty.format_identifier(), Some(12));
-        assert_eq!(empty.encode(), native_empty);
+        assert_eq!(empty.encode(&TEST_LIMITS).unwrap(), native_empty);
 
         let native_converted = hex("0503000000008100083002000200000005000000010000000c000000");
-        let converted = BncCell::parse(&native_converted).unwrap();
+        let converted = BncCell::parse(&native_converted, &TEST_LIMITS).unwrap();
         assert_eq!(converted.stored_value(), StoredValue::Text(2));
         assert_eq!(
             converted.explicit_format_flags(),
@@ -5389,7 +5565,7 @@ mod tests {
         assert_eq!(converted.cell_format_kind(), Some(TEXT_CELL_FORMAT_KIND));
         assert_eq!(converted.control_cell_spec_identifier(), None);
         assert_eq!(converted.format_identifier(), Some(12));
-        assert_eq!(converted.encode(), native_converted);
+        assert_eq!(converted.encode(&TEST_LIMITS).unwrap(), native_converted);
 
         let mut created = BncCell::minimal();
         created
@@ -5409,19 +5585,19 @@ mod tests {
         empty.set_style_identifier(Some(7));
         empty.set_comment_identifier(Some(11));
         empty.tail.extend_from_slice(b"date-time-empty-tail");
-        let original = empty.encode();
+        let original = empty.encode(&TEST_LIMITS).unwrap();
         let original_non_format = non_format_encoding(&empty);
 
         assert!(empty.is_date_time_format_compatible());
         empty
             .set_date_time_format_identifier_preserving_value(None)
             .unwrap();
-        assert_eq!(empty.encode(), original);
+        assert_eq!(empty.encode(&TEST_LIMITS).unwrap(), original);
 
         empty
             .set_date_time_format_identifier_preserving_value(Some(13))
             .unwrap();
-        let explicit = empty.encode();
+        let explicit = empty.encode(&TEST_LIMITS).unwrap();
         assert_eq!(empty.explicit_format_flags(), EXPLICIT_DATE_TIME_FORMAT);
         assert_eq!(empty.cell_format_kind(), Some(DATE_TIME_CELL_FORMAT_KIND));
         assert_eq!(empty.format_identifier(), Some(13));
@@ -5432,12 +5608,12 @@ mod tests {
         empty
             .set_date_time_format_identifier_preserving_value(Some(13))
             .unwrap();
-        assert_eq!(empty.encode(), explicit);
+        assert_eq!(empty.encode(&TEST_LIMITS).unwrap(), explicit);
 
         empty
             .set_date_time_format_identifier_preserving_value(None)
             .unwrap();
-        assert_eq!(empty.encode(), original);
+        assert_eq!(empty.encode(&TEST_LIMITS).unwrap(), original);
         assert_eq!(non_format_encoding(&empty), original_non_format);
     }
 
@@ -5468,10 +5644,10 @@ mod tests {
         assert_eq!(value_fields(&date), original_value);
         assert_eq!(non_format_encoding(&date), original_non_format);
 
-        let explicit = date.encode();
+        let explicit = date.encode(&TEST_LIMITS).unwrap();
         date.set_date_time_format_identifier_preserving_value(Some(41))
             .unwrap();
-        assert_eq!(date.encode(), explicit);
+        assert_eq!(date.encode(&TEST_LIMITS).unwrap(), explicit);
         date.set_date_time_format_identifier_preserving_value(Some(43))
             .unwrap();
         assert_eq!(date.format_identifier(), Some(43));
@@ -5570,33 +5746,33 @@ mod tests {
             .fields
             .insert(DATE_FLAG, 7.0f64.to_le_bytes().to_vec());
         assert!(!dirty_empty.is_date_time_format_compatible());
-        let before = dirty_empty.encode();
+        let before = dirty_empty.encode(&TEST_LIMITS).unwrap();
         assert!(
             dirty_empty
                 .set_date_time_format_identifier_preserving_value(Some(3))
                 .is_err()
         );
-        assert_eq!(dirty_empty.encode(), before);
+        assert_eq!(dirty_empty.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut zero = BncCell::minimal();
         zero.set_date(7.0).unwrap();
-        let before = zero.encode();
+        let before = zero.encode(&TEST_LIMITS).unwrap();
         assert!(
             zero.set_date_time_format_identifier_preserving_value(Some(0))
                 .is_err()
         );
-        assert_eq!(zero.encode(), before);
+        assert_eq!(zero.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut ordinary_number = BncCell::minimal();
         ordinary_number.set_number(7.0).unwrap();
-        let before = ordinary_number.encode();
+        let before = ordinary_number.encode(&TEST_LIMITS).unwrap();
         assert!(!ordinary_number.is_date_time_format_compatible());
         assert!(
             ordinary_number
                 .set_date_time_format_identifier_preserving_value(Some(11))
                 .is_err()
         );
-        assert_eq!(ordinary_number.encode(), before);
+        assert_eq!(ordinary_number.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut wrong_family = BncCell::minimal();
         wrong_family.set_date(7.0).unwrap();
@@ -5609,26 +5785,26 @@ mod tests {
             .insert(CELL_FORMAT_IDENTIFIER_FLAG, 13u32.to_le_bytes().to_vec());
         wrong_family.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&EXPLICIT_DECIMAL_FORMAT.to_le_bytes());
-        let before = wrong_family.encode();
+        let before = wrong_family.encode(&TEST_LIMITS).unwrap();
         assert!(
             wrong_family
                 .set_date_time_format_identifier_preserving_value(Some(17))
                 .is_err()
         );
-        assert_eq!(wrong_family.encode(), before);
+        assert_eq!(wrong_family.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut control = BncCell::minimal();
         control.set_date(7.0).unwrap();
         control
             .fields
             .insert(CONTROL_CELL_SPEC_FLAG, 19u32.to_le_bytes().to_vec());
-        let before = control.encode();
+        let before = control.encode(&TEST_LIMITS).unwrap();
         assert!(
             control
                 .set_date_time_format_identifier_preserving_value(Some(23))
                 .is_err()
         );
-        assert_eq!(control.encode(), before);
+        assert_eq!(control.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut automatic = BncCell::minimal();
         automatic.set_date(7.0).unwrap();
@@ -5640,13 +5816,13 @@ mod tests {
             DATE_TIME_FORMAT_IDENTIFIER_FLAG,
             29u32.to_le_bytes().to_vec(),
         );
-        let before = automatic.encode();
+        let before = automatic.encode(&TEST_LIMITS).unwrap();
         assert!(
             automatic
                 .set_date_time_format_identifier_preserving_value(None)
                 .is_err()
         );
-        assert_eq!(automatic.encode(), before);
+        assert_eq!(automatic.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut incomplete = BncCell::minimal();
         incomplete.set_date(7.0).unwrap();
@@ -5656,13 +5832,13 @@ mod tests {
         );
         incomplete.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&EXPLICIT_DATE_TIME_FORMAT.to_le_bytes());
-        let before = incomplete.encode();
+        let before = incomplete.encode(&TEST_LIMITS).unwrap();
         assert!(
             incomplete
                 .set_date_time_format_identifier_preserving_value(Some(31))
                 .is_err()
         );
-        assert_eq!(incomplete.encode(), before);
+        assert_eq!(incomplete.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut ambiguous_value = BncCell::minimal();
         ambiguous_value.set_number(7.0).unwrap();
@@ -5670,27 +5846,27 @@ mod tests {
         ambiguous_value
             .fields
             .insert(NUMBER_FLAG, 7.0f64.to_le_bytes().to_vec());
-        let before = ambiguous_value.encode();
+        let before = ambiguous_value.encode(&TEST_LIMITS).unwrap();
         assert!(!ambiguous_value.is_date_time_format_compatible());
         assert!(
             ambiguous_value
                 .set_date_time_format_identifier_preserving_value(Some(37))
                 .is_err()
         );
-        assert_eq!(ambiguous_value.encode(), before);
+        assert_eq!(ambiguous_value.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut reserved = BncCell::minimal();
         reserved.set_date(7.0).unwrap();
         reserved
             .fields
             .insert(RESERVED_KNOWN_FIELD_FLAG, 41u32.to_le_bytes().to_vec());
-        let before = reserved.encode();
+        let before = reserved.encode(&TEST_LIMITS).unwrap();
         assert!(
             reserved
                 .set_date_time_format_identifier_preserving_value(Some(43))
                 .is_err()
         );
-        assert_eq!(reserved.encode(), before);
+        assert_eq!(reserved.encode(&TEST_LIMITS).unwrap(), before);
     }
 
     #[test]
@@ -5707,13 +5883,13 @@ mod tests {
         );
         wrong_marker.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&EXPLICIT_DECIMAL_FORMAT.to_le_bytes());
-        let before = wrong_marker.encode();
+        let before = wrong_marker.encode(&TEST_LIMITS).unwrap();
         assert!(
             wrong_marker
                 .set_date_time_format_identifier_preserving_value(None)
                 .is_err()
         );
-        assert_eq!(wrong_marker.encode(), before);
+        assert_eq!(wrong_marker.encode(&TEST_LIMITS).unwrap(), before);
 
         let mut zero_existing = BncCell::minimal();
         zero_existing.set_date(7.0).unwrap();
@@ -5727,13 +5903,13 @@ mod tests {
         );
         zero_existing.prefix[EXPLICIT_FORMAT_FLAGS_START..EXPLICIT_FORMAT_FLAGS_END]
             .copy_from_slice(&EXPLICIT_DATE_TIME_FORMAT.to_le_bytes());
-        let before = zero_existing.encode();
+        let before = zero_existing.encode(&TEST_LIMITS).unwrap();
         assert!(
             zero_existing
                 .set_date_time_format_identifier_preserving_value(None)
                 .is_err()
         );
-        assert_eq!(zero_existing.encode(), before);
+        assert_eq!(zero_existing.encode(&TEST_LIMITS).unwrap(), before);
     }
 
     fn non_format_encoding(cell: &BncCell) -> Vec<u8> {
@@ -5742,7 +5918,7 @@ mod tests {
         non_format
             .fields
             .retain(|field, _| FORMAT_METADATA_FLAGS & field == 0);
-        non_format.encode()
+        non_format.encode(&TEST_LIMITS).unwrap()
     }
 
     fn hex(value: &str) -> Vec<u8> {

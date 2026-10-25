@@ -6974,9 +6974,9 @@ mod tests {
         let row_one_wide = row_one.has_wide_offsets.unwrap_or(false);
         let mut row_one_cells = decoded_test_row(row_one, 7);
         assert!(row_one_cells[1].is_some());
-        row_one_cells[1] = Some(a2.encode());
-        row_one_cells[2] = Some(b2.encode());
-        row_one_cells[3] = Some(c2.encode());
+        row_one_cells[1] = Some(a2.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap());
+        row_one_cells[2] = Some(b2.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap());
+        row_one_cells[3] = Some(c2.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap());
         let (row_one_storage, row_one_offsets) = encoded_test_row(&row_one_cells, row_one_wide);
         row_one.cell_count =
             u32::try_from(row_one_cells.iter().flatten().count()).expect("count fits");
@@ -6990,7 +6990,7 @@ mod tests {
         let row_two_wide = row_two.has_wide_offsets.unwrap_or(false);
         let mut row_two_cells = decoded_test_row(row_two, 7);
         assert!(row_two_cells[1].is_some());
-        row_two_cells[1] = Some(a3.encode());
+        row_two_cells[1] = Some(a3.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap());
         let (row_two_storage, row_two_offsets) = encoded_test_row(&row_two_cells, row_two_wide);
         row_two.cell_count =
             u32::try_from(row_two_cells.iter().flatten().count()).expect("count fits");
@@ -7157,7 +7157,11 @@ mod tests {
             if host_row == 0 {
                 let mut source_cell = BncCell::minimal();
                 source_cell.set_number(1.0).expect("finite formula source");
-                cells[7] = Some(source_cell.encode());
+                cells[7] = Some(
+                    source_cell
+                        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                        .unwrap(),
+                );
             }
             let start = host_row * HOSTS_PER_ROW;
             let end = formulas.min(start + HOSTS_PER_ROW);
@@ -7167,7 +7171,7 @@ mod tests {
                 host.set_number(2.0).expect("finite formula cache");
                 host.set_formula_reference(1);
                 cells[usize::try_from(column).expect("formula column fits usize")] =
-                    Some(host.encode());
+                    Some(host.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap());
                 records.push(tsce::CellRecordExpandedArchive {
                     row: row_index,
                     column,
@@ -7387,7 +7391,11 @@ mod tests {
         let mut cells = decoded_test_row(row, 7);
         let mut rich_cell = BncCell::minimal();
         rich_cell.set_rich_text(1);
-        cells[usize::try_from(position.column()).expect("column fits")] = Some(rich_cell.encode());
+        cells[usize::try_from(position.column()).expect("column fits")] = Some(
+            rich_cell
+                .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                .unwrap(),
+        );
         let (storage, offsets) = encoded_test_row(&cells, wide);
         row.cell_count = u32::try_from(cells.iter().flatten().count()).expect("cell count fits");
         row.cell_storage_buffer = Some(storage);
@@ -7579,7 +7587,11 @@ mod tests {
             .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
             .find(|offset| *offset != u16::MAX)
             .map_or(storage.len(), usize::from);
-        let cell = BncCell::parse(&storage[start..end]).expect("formula BNC parses");
+        let cell = BncCell::parse(
+            &storage[start..end],
+            &crate::cell::wire::limits_for_source(&storage[start..end]),
+        )
+        .expect("formula BNC parses");
         match cell.cached_scalar().expect("cached scalar decodes") {
             Some(CachedScalar::Number(value)) => value.get(),
             other => panic!("expected numeric formula cache, got {other:?}"),

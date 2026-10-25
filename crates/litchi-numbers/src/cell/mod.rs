@@ -38,9 +38,35 @@ pub(crate) mod wire {
 
     use super::FiniteF64;
 
+    pub(crate) use native::Limits;
     #[cfg(test)]
     pub(crate) use native::decimal128_le;
     pub(crate) use native::{ClearValue, Error, RewritePlan, StoredValue};
+
+    /// Derive the raw-cell profile from the owner-selected source extent.
+    ///
+    /// Fixed-width field checks are derived from the retained source extent;
+    /// the output ceiling stays at the raw leaf's finite hard maximum because
+    /// an owner may add metadata fields during a rewrite. Callers still pass
+    /// the checked profile explicitly at every raw parse/encode boundary.
+    pub(crate) fn limits_for_source(source: &[u8]) -> Limits {
+        if source.is_empty() {
+            return Limits::DEFAULT;
+        }
+        Limits::DEFAULT
+            .with_input_bytes(source.len())
+            .and_then(|limits| limits.with_tail_bytes(source.len()))
+            .expect("source-derived BNC limits stay within the checked hard ceilings")
+    }
+
+    /// Encode one owned native cell under the package adapter's bounded raw
+    /// profile. Callers still handle the native error at their own boundary.
+    pub(crate) fn encode(
+        cell: &native::BncCell,
+        limits: &Limits,
+    ) -> Result<Vec<u8>, Error> {
+        cell.encode(limits)
+    }
 
     /// A finite scalar accepted by the private BNC rewrite adapter.
     #[derive(Debug, Clone, Copy, PartialEq)]
@@ -116,8 +142,8 @@ pub(crate) mod wire {
     }
 
     impl BncCell {
-        pub(crate) fn parse(data: &[u8]) -> Result<Self, Error> {
-            native::BncCell::parse(data).map(Self)
+        pub(crate) fn parse(data: &[u8], limits: &Limits) -> Result<Self, Error> {
+            native::BncCell::parse(data, limits).map(Self)
         }
 
         #[cfg(test)]
@@ -138,8 +164,8 @@ pub(crate) mod wire {
     pub(crate) struct BncCellView<'a>(native::BncCellView<'a>);
 
     impl<'a> BncCellView<'a> {
-        pub(crate) fn parse(data: &'a [u8]) -> Result<Self, Error> {
-            native::BncCellView::parse(data).map(Self)
+        pub(crate) fn parse(data: &'a [u8], limits: &Limits) -> Result<Self, Error> {
+            native::BncCellView::parse(data, limits).map(Self)
         }
 
         #[must_use]
@@ -186,29 +212,26 @@ pub(crate) mod wire {
             self.0.plan_clear_value(retain_empty)
         }
 
-        pub(crate) fn rewrite_scalar_with_limit(
+        pub(crate) fn rewrite_scalar(
             &self,
             value: ScalarValue,
-            max_output_bytes: usize,
+            limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
             self.0
-                .rewrite_scalar_with_limit(value.into_native(), max_output_bytes)
+                .rewrite_scalar(value.into_native(), limits)
         }
 
-        pub(crate) fn clear_value_with_limit(
-            &self,
-            max_output_bytes: usize,
-        ) -> Result<ClearValue, Error> {
-            self.0.clear_value_with_limit(max_output_bytes)
+        pub(crate) fn clear_value(&self, limits: &Limits) -> Result<ClearValue, Error> {
+            self.0.clear_value(limits)
         }
 
-        pub(crate) fn clear_comment_with_limit(
+        pub(crate) fn clear_comment(
             &self,
             expected_identifier: u32,
-            max_output_bytes: usize,
+            limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
             self.0
-                .clear_comment_with_limit(expected_identifier, max_output_bytes)
+                .clear_comment(expected_identifier, limits)
         }
 
         pub(crate) fn formula_cache_equals(&self, value: CachedScalar) -> bool {
@@ -223,32 +246,32 @@ pub(crate) mod wire {
             self.0.formula_value_equals(identifier, value.into_native())
         }
 
-        pub(crate) fn rewrite_formula_with_limit(
+        pub(crate) fn rewrite_formula(
             &self,
             identifier: u32,
             cache: ScalarValue,
-            max_output_bytes: usize,
+            limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
             self.0
-                .rewrite_formula_with_limit(identifier, cache.into_native(), max_output_bytes)
+                .rewrite_formula(identifier, cache.into_native(), limits)
         }
 
-        pub(crate) fn rewrite_formula_without_cache_with_limit(
+        pub(crate) fn rewrite_formula_without_cache(
             &self,
             identifier: u32,
-            max_output_bytes: usize,
+            limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
             self.0
-                .rewrite_formula_without_cache_with_limit(identifier, max_output_bytes)
+                .rewrite_formula_without_cache(identifier, limits)
         }
 
-        pub(crate) fn rewrite_formula_cache_with_limit(
+        pub(crate) fn rewrite_formula_cache(
             &self,
             cache: CachedScalar,
-            max_output_bytes: usize,
+            limits: &Limits,
         ) -> Result<Vec<u8>, Error> {
             self.0
-                .rewrite_formula_cache_with_limit(cache.into_native(), max_output_bytes)
+                .rewrite_formula_cache(cache.into_native(), limits)
         }
 
         #[must_use]

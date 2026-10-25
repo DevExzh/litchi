@@ -88,7 +88,10 @@ fn first_cell(source: &[u8]) -> TestResult<BncCell> {
     let bytes = cells
         .first()
         .ok_or_else(|| io::Error::other("custom fixture first cell is missing"))?;
-    Ok(BncCell::parse(bytes)?)
+    Ok(BncCell::parse(
+        bytes,
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?)
 }
 
 fn assert_non_format_cell_state(source: &[u8], target: &[u8]) -> TestResult {
@@ -96,15 +99,22 @@ fn assert_non_format_cell_state(source: &[u8], target: &[u8]) -> TestResult {
     let after = fixture::tile_cells(target)?;
     assert_eq!(before.len(), after.len());
     for (before, after) in before.iter().zip(after.iter()) {
-        let before_cell = BncCell::parse(before)?;
-        let after_cell = BncCell::parse(after)?;
+        let before_cell = BncCell::parse(before, &litchi_numbers_wire::Limits::DEFAULT)?;
+        let after_cell = BncCell::parse(after, &litchi_numbers_wire::Limits::DEFAULT)?;
         assert_eq!(before_cell.stored_value(), after_cell.stored_value());
         assert_eq!(before_cell.cached_scalar()?, after_cell.cached_scalar()?);
         let mut before_metadata_free = before_cell;
         let mut after_metadata_free = after_cell;
         before_metadata_free.clear_explicit_format();
         after_metadata_free.clear_explicit_format();
-        assert_eq!(before_metadata_free.encode(), after_metadata_free.encode());
+        assert_eq!(
+            before_metadata_free
+                .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                .unwrap(),
+            after_metadata_free
+                .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                .unwrap()
+        );
     }
     Ok(())
 }

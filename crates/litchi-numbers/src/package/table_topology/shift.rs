@@ -1450,8 +1450,11 @@ fn formula_key(package: &Package, store: &[u8], row: u32, column: u32) -> Out<u6
             if stored_column != column {
                 continue;
             }
-            let cell = litchi_numbers_wire::BncCell::parse(bytes)
-                .map_err(|_error| Failure::Fault(Fault::Invalid))?;
+            let cell = litchi_numbers_wire::BncCell::parse(
+                bytes,
+                &crate::cell::wire::limits_for_source(bytes),
+            )
+            .map_err(|_error| Failure::Fault(Fault::Invalid))?;
             let key = cell
                 .list_keys()
                 .find(|(kind, _)| *kind == litchi_numbers_wire::ListKind::Formula)

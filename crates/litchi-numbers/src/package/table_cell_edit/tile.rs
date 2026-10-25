@@ -1279,7 +1279,8 @@ fn scan_formula_cell(
         .work
         .checked_add(u64_from_usize(bytes.len())?)
         .ok_or(TileError::InvalidSource)?;
-    let view = BncCellView::parse(bytes).map_err(|_| TileError::InvalidSource)?;
+    let view = BncCellView::parse(bytes, &crate::cell::wire::limits_for_source(bytes))
+        .map_err(|_| TileError::InvalidSource)?;
     let StoredValue::Formula(identifier) = view.stored_value() else {
         return Ok(());
     };
@@ -2461,7 +2462,11 @@ fn prepare_borrowed_row<'source>(
                 kind,
             });
         }
-        let output_len = plan_cell_mutation(previous, change.change)?;
+        let output_len = plan_cell_mutation(
+            previous,
+            change.change,
+            counters.limits.max_output_bytes,
+        )?;
         counters.charge(
             u64_from_usize(previous.map_or(0, <[u8]>::len))?
                 .checked_mul(2)
@@ -2562,7 +2567,7 @@ fn prepare_canonical_row<'source>(
         ) {
             continue;
         }
-        let output_len = plan_cell_mutation(None, change.change)?;
+        let output_len = plan_cell_mutation(None, change.change, counters.limits.max_output_bytes)?;
         let transition = planned_transition(row, change.column, None, change.change, output_len)?;
         slots[column] = PreparedSlot::Mutation {
             previous: None,
@@ -2966,8 +2971,14 @@ enum CellMutation {
     Replace(Vec<u8>),
 }
 
-fn plan_cell_mutation(previous: Option<&[u8]>, change: BncChange) -> Result<Option<usize>> {
-    let view = BncCellView::parse(previous.unwrap_or(&MINIMAL_BNC_CELL)).map_err(map_bnc_error)?;
+fn plan_cell_mutation(
+    previous: Option<&[u8]>,
+    change: BncChange,
+    max_output_bytes: usize,
+) -> Result<Option<usize>> {
+    let source = previous.unwrap_or(&MINIMAL_BNC_CELL);
+    let limits = bnc_limits(source, max_output_bytes)?;
+    let view = BncCellView::parse(source, &limits).map_err(map_bnc_error)?;
     let plan = match change {
         BncChange::Clear => view.plan_clear_value(false),
         BncChange::FormulaClear => view.plan_clear_value(true),
@@ -2980,17 +2991,16 @@ fn plan_cell_mutation(previous: Option<&[u8]>, change: BncChange) -> Result<Opti
             expected_identifier,
         } => {
             return view
-                .clear_comment_with_limit(expected_identifier, usize::MAX)
+                .clear_comment(expected_identifier, &limits)
                 .map(|bytes| Some(bytes.len()))
                 .map_err(map_bnc_error);
         },
         BncChange::CommentSet { identifier } => {
             let mut cell =
-                litchi_numbers_wire::BncCell::parse(previous.unwrap_or(&MINIMAL_BNC_CELL))
-                    .map_err(map_bnc_error)?;
+                litchi_numbers_wire::BncCell::parse(source, &limits).map_err(map_bnc_error)?;
             cell.set_comment_identifier(Some(identifier));
             return cell
-                .try_encode_with_limit(usize::MAX)
+                .encode(&limits)
                 .map(|bytes| Some(bytes.len()))
                 .map_err(map_bnc_error);
         },
@@ -3010,31 +3020,34 @@ fn mutate_cell(
                 Ok(CellMutation::Unchanged)
             },
             BncChange::CommentSet { identifier } => {
-                let mut cell = litchi_numbers_wire::BncCell::parse(&MINIMAL_BNC_CELL)
+                let limits = bnc_limits(&MINIMAL_BNC_CELL, max_output_bytes)?;
+                let mut cell = litchi_numbers_wire::BncCell::parse(&MINIMAL_BNC_CELL, &limits)
                     .map_err(|_| TileError::InvalidSource)?;
                 cell.set_comment_identifier(Some(identifier));
-                cell.try_encode_with_limit(max_output_bytes)
+                cell.encode(&limits)
                     .map(CellMutation::Replace)
                     .map_err(map_bnc_error)
             },
             BncChange::Set(input) => {
-                let view =
-                    BncCellView::parse(&MINIMAL_BNC_CELL).map_err(|_| TileError::InvalidSource)?;
-                view.rewrite_scalar_with_limit(input.as_wire(), max_output_bytes)
+                let limits = bnc_limits(&MINIMAL_BNC_CELL, max_output_bytes)?;
+                let view = BncCellView::parse(&MINIMAL_BNC_CELL, &limits)
+                    .map_err(|_| TileError::InvalidSource)?;
+                view.rewrite_scalar(input.as_wire(), &limits)
                     .map(CellMutation::Replace)
                     .map_err(map_bnc_error)
             },
             BncChange::FormulaSet { identifier, cache } => {
-                let view =
-                    BncCellView::parse(&MINIMAL_BNC_CELL).map_err(|_| TileError::InvalidSource)?;
+                let limits = bnc_limits(&MINIMAL_BNC_CELL, max_output_bytes)?;
+                let view = BncCellView::parse(&MINIMAL_BNC_CELL, &limits)
+                    .map_err(|_| TileError::InvalidSource)?;
                 match cache {
-                    Some(cache) => view.rewrite_formula_with_limit(
+                    Some(cache) => view.rewrite_formula(
                         identifier,
                         cache.as_wire(),
-                        max_output_bytes,
+                        &limits,
                     ),
                     None => {
-                        view.rewrite_formula_without_cache_with_limit(identifier, max_output_bytes)
+                        view.rewrite_formula_without_cache(identifier, &limits)
                     },
                 }
                 .map(CellMutation::Replace)
@@ -3043,10 +3056,11 @@ fn mutate_cell(
             BncChange::FormulaCache(_) => Err(TileError::UnsupportedSource { row: 0, column: 0 }),
         };
     };
-    let view = BncCellView::parse(previous).map_err(|_| TileError::InvalidSource)?;
+    let limits = bnc_limits(previous, max_output_bytes)?;
+    let view = BncCellView::parse(previous, &limits).map_err(|_| TileError::InvalidSource)?;
     match change {
         BncChange::Clear | BncChange::FormulaClear => match view
-            .clear_value_with_limit(max_output_bytes)
+            .clear_value(&limits)
             .map_err(map_bnc_error)?
         {
             ClearValue::Delete if matches!(change, BncChange::Clear) => Ok(CellMutation::Delete),
@@ -3054,32 +3068,32 @@ fn mutate_cell(
             ClearValue::Retain(bytes) => Ok(CellMutation::Replace(bytes)),
         },
         BncChange::Set(input) => view
-            .rewrite_scalar_with_limit(input.as_wire(), max_output_bytes)
+            .rewrite_scalar(input.as_wire(), &limits)
             .map(CellMutation::Replace)
             .map_err(map_bnc_error),
         BncChange::FormulaSet { identifier, cache } => match cache {
             Some(cache) => {
-                view.rewrite_formula_with_limit(identifier, cache.as_wire(), max_output_bytes)
+                view.rewrite_formula(identifier, cache.as_wire(), &limits)
             },
-            None => view.rewrite_formula_without_cache_with_limit(identifier, max_output_bytes),
+            None => view.rewrite_formula_without_cache(identifier, &limits),
         }
         .map(CellMutation::Replace)
         .map_err(map_bnc_error),
         BncChange::FormulaCache(input) => view
-            .rewrite_formula_cache_with_limit(input.as_wire(), max_output_bytes)
+            .rewrite_formula_cache(input.as_wire(), &limits)
             .map(CellMutation::Replace)
             .map_err(map_bnc_error),
         BncChange::CommentClear {
             expected_identifier,
         } => view
-            .clear_comment_with_limit(expected_identifier, max_output_bytes)
+            .clear_comment(expected_identifier, &limits)
             .map(CellMutation::Replace)
             .map_err(map_bnc_error),
         BncChange::CommentSet { identifier } => {
-            let mut cell = litchi_numbers_wire::BncCell::parse(previous)
+            let mut cell = litchi_numbers_wire::BncCell::parse(previous, &limits)
                 .map_err(|_| TileError::InvalidSource)?;
             cell.set_comment_identifier(Some(identifier));
-            cell.try_encode_with_limit(max_output_bytes)
+            cell.encode(&limits)
                 .map(CellMutation::Replace)
                 .map_err(map_bnc_error)
         },
@@ -3132,7 +3146,11 @@ impl CacheScalarInput {
 
 fn map_bnc_error(error: BncError) -> TileError {
     match error {
-        BncError::OutputLimitExceeded { observed, maximum } => {
+        BncError::LimitExceeded {
+            kind: _,
+            observed,
+            maximum,
+        } => {
             let Ok(observed) = u64::try_from(observed) else {
                 return TileError::InvalidSource;
             };
@@ -3147,12 +3165,19 @@ fn map_bnc_error(error: BncError) -> TileError {
     }
 }
 
+fn bnc_limits(source: &[u8], max_output_bytes: usize) -> Result<crate::cell::wire::Limits> {
+    crate::cell::wire::limits_for_source(source)
+        .with_output_bytes(max_output_bytes)
+        .map_err(|_| TileError::InvalidSource)
+}
+
 /// Classify one optional raw BNC slot without taking ownership of it.
 pub(crate) fn classify_bnc_cell(cell: Option<&[u8]>) -> Result<CellValue> {
     let Some(cell) = cell else {
         return Ok(CellValue::Missing);
     };
-    let cell = BncCellView::parse(cell).map_err(|_| TileError::InvalidSource)?;
+    let cell = BncCellView::parse(cell, &crate::cell::wire::limits_for_source(cell))
+        .map_err(|_| TileError::InvalidSource)?;
     Ok(classify_bnc_view(&cell))
 }
 
@@ -3179,7 +3204,8 @@ pub(crate) fn bnc_references(cell: Option<&[u8]>) -> Result<CellReferences> {
     let Some(cell) = cell else {
         return Ok(CellReferences::default());
     };
-    let cell = BncCellView::parse(cell).map_err(|_| TileError::InvalidSource)?;
+    let cell = BncCellView::parse(cell, &crate::cell::wire::limits_for_source(cell))
+        .map_err(|_| TileError::InvalidSource)?;
     Ok(bnc_references_view(&cell))
 }
 
@@ -3206,7 +3232,8 @@ fn classify_bnc_with_references(
     let Some(cell) = cell else {
         return Ok((CellValue::Missing, CellReferences::default(), None));
     };
-    let view = BncCellView::parse(cell).map_err(|_| TileError::InvalidSource)?;
+    let view = BncCellView::parse(cell, &crate::cell::wire::limits_for_source(cell))
+        .map_err(|_| TileError::InvalidSource)?;
     let formula_cache = if matches!(view.stored_value(), StoredValue::Formula(_)) {
         match view.cached_scalar() {
             Some(CachedScalar::Number(value)) => Some(FormulaCacheValue::Number(value)),
@@ -3233,7 +3260,8 @@ pub(crate) fn bnc_change_is_noop(cell: Option<&[u8]>, change: BncChange) -> Resu
     let Some(cell) = cell else {
         return Ok(matches!(change, BncChange::Clear));
     };
-    let view = BncCellView::parse(cell).map_err(|_| TileError::InvalidSource)?;
+    let view = BncCellView::parse(cell, &crate::cell::wire::limits_for_source(cell))
+        .map_err(|_| TileError::InvalidSource)?;
     Ok(match change {
         BncChange::Clear => matches!(view.stored_value(), StoredValue::Empty),
         BncChange::FormulaClear => false,
@@ -4353,16 +4381,16 @@ mod tests {
     fn grouped_scalar_and_formula_cache_changes_serialize_one_tile_once() {
         let mut a2 = BncCell::minimal();
         a2.set_number(120.0).unwrap();
-        let a2 = a2.encode();
+        let a2 = a2.encode(&crate::cell::wire::Limits::DEFAULT).unwrap();
         let mut b2 = BncCell::minimal();
         b2.set_comment_identifier(Some(9));
         b2.set_number(323.0).unwrap();
         b2.set_formula_reference(17);
-        let mut b2 = b2.encode();
+        let mut b2 = b2.encode(&crate::cell::wire::Limits::DEFAULT).unwrap();
         b2.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
         let mut c2 = BncCell::minimal();
         c2.set_rich_text(29);
-        let c2 = c2.encode();
+        let c2 = c2.encode(&crate::cell::wire::Limits::DEFAULT).unwrap();
         let source = one_row_tile(1, &[Some(a2), Some(b2.clone()), Some(c2)]);
 
         let cache_noop = [CacheChange {
@@ -4409,12 +4437,19 @@ mod tests {
         let (_, rows) = decode_rows(payload);
         let row = &rows.values[0];
         assert_eq!(
-            BncCellView::parse(row_cell(row, 0))
-                .unwrap()
-                .cached_scalar(),
+            BncCellView::parse(
+                row_cell(row, 0),
+                &crate::cell::wire::limits_for_source(row_cell(row, 0))
+            )
+            .unwrap()
+            .cached_scalar(),
             Some(CachedScalar::Number(FiniteF64::new(121.0).unwrap()))
         );
-        let cached_formula = BncCellView::parse(row_cell(row, 1)).unwrap();
+        let cached_formula = BncCellView::parse(
+            row_cell(row, 1),
+            &crate::cell::wire::limits_for_source(row_cell(row, 1)),
+        )
+        .unwrap();
         assert_eq!(cached_formula.stored_value(), StoredValue::Formula(17));
         assert_eq!(
             cached_formula.cached_scalar(),
@@ -4460,7 +4495,12 @@ mod tests {
         let mut cell = BncCell::minimal();
         cell.set_number(42.0).unwrap();
         cell.set_comment_identifier(Some(9));
-        let source = one_row_tile(0, &[Some(cell.encode())]);
+        let source = one_row_tile(
+            0,
+            &[Some(
+                cell.encode(&crate::cell::wire::Limits::DEFAULT).unwrap(),
+            )],
+        );
         let changes = [TileChange {
             row: 0,
             column: 0,
@@ -4479,7 +4519,8 @@ mod tests {
         let payload = outcome.payload.as_deref().unwrap();
         let (_, rows) = decode_rows(payload);
         let rewritten = row_cell(&rows.values[0], 0);
-        let view = BncCellView::parse(rewritten).unwrap();
+        let view = BncCellView::parse(rewritten, &crate::cell::wire::limits_for_source(rewritten))
+            .unwrap();
         assert_eq!(view.stored_value(), StoredValue::Number);
         assert_eq!(view.comment_identifier(), None);
         assert_eq!(outcome.transitions.len(), 1);
@@ -4508,7 +4549,7 @@ mod tests {
     fn comment_set_materializes_a_missing_slot_and_preserves_siblings() {
         let mut sibling = BncCell::minimal();
         sibling.set_number(42.0).unwrap();
-        let sibling = sibling.encode();
+        let sibling = sibling.encode(&crate::cell::wire::Limits::DEFAULT).unwrap();
         let source = one_row_tile(0, &[Some(sibling.clone()), None]);
         let changes = [TileChange {
             row: 0,
@@ -4532,9 +4573,12 @@ mod tests {
         let row = &rows.values[0];
         assert_eq!(row_cell(row, 0), sibling);
         assert_eq!(
-            BncCellView::parse(row_cell(row, 1))
-                .unwrap()
-                .comment_identifier(),
+            BncCellView::parse(
+                row_cell(row, 1),
+                &crate::cell::wire::limits_for_source(row_cell(row, 1))
+            )
+            .unwrap()
+            .comment_identifier(),
             Some(7)
         );
         assert_eq!(outcome.transitions.len(), 1);
@@ -4554,7 +4598,7 @@ mod tests {
         let mut formula = BncCell::minimal();
         formula.set_number(50.0).expect("finite cache");
         formula.set_formula_reference(17);
-        let formula = formula.encode();
+        let formula = formula.encode(&crate::cell::wire::Limits::DEFAULT).unwrap();
         let source = one_row_tile(2, &[Some(formula.clone())]);
         let changes = [TileChange {
             row: 2,
@@ -4577,7 +4621,11 @@ mod tests {
             .as_deref()
             .expect("explicit empty replacement");
         let (_, rows) = decode_rows(payload);
-        let cell = BncCellView::parse(row_cell(&rows.values[0], 0)).expect("empty BNC");
+        let cell = BncCellView::parse(
+            row_cell(&rows.values[0], 0),
+            &crate::cell::wire::limits_for_source(row_cell(&rows.values[0], 0)),
+        )
+        .expect("empty BNC");
         assert_eq!(cell.stored_value(), StoredValue::Empty);
         assert_eq!(cell.formula_error_identifier(), None);
         assert_eq!(outcome.final_rows[0].cell_count, 1);
@@ -4616,7 +4664,13 @@ mod tests {
         let mut formula = BncCell::minimal();
         formula.set_number(7.0).unwrap();
         formula.set_formula_reference(11);
-        let source = one_row_tile(1, &[Some(formula.encode()), None]);
+        let source = one_row_tile(
+            1,
+            &[
+                Some(formula.encode(&crate::cell::wire::Limits::DEFAULT).unwrap()),
+                None,
+            ],
+        );
         let changes = [
             TileChange {
                 row: 1,
@@ -4647,15 +4701,21 @@ mod tests {
             [1, 2]
         );
         assert_eq!(
-            BncCellView::parse(row_cell(&rows.values[0], 0))
-                .unwrap()
-                .stored_value(),
+            BncCellView::parse(
+                row_cell(&rows.values[0], 0),
+                &crate::cell::wire::limits_for_source(row_cell(&rows.values[0], 0))
+            )
+            .unwrap()
+            .stored_value(),
             StoredValue::Empty
         );
         assert!(matches!(
-            BncCellView::parse(row_cell(&rows.values[1], 1))
-                .unwrap()
-                .stored_value(),
+            BncCellView::parse(
+                row_cell(&rows.values[1], 1),
+                &crate::cell::wire::limits_for_source(row_cell(&rows.values[1], 1))
+            )
+            .unwrap()
+            .stored_value(),
             StoredValue::Formula(12)
         ));
         assert_eq!(outcome.transitions.len(), 2);
@@ -4684,7 +4744,13 @@ mod tests {
         let mut formula = BncCell::minimal();
         formula.set_number(7.0).unwrap();
         formula.set_formula_reference(11);
-        let source = one_row_tile(1, &[Some(formula.encode()), None]);
+        let source = one_row_tile(
+            1,
+            &[
+                Some(formula.encode(&crate::cell::wire::Limits::DEFAULT).unwrap()),
+                None,
+            ],
+        );
         let changes = [
             TileChange {
                 row: 1,
@@ -4774,7 +4840,12 @@ mod tests {
         let mut formula = BncCell::minimal();
         formula.set_string(27);
         formula.set_formula_reference(11);
-        let source = one_row_tile(2, &[Some(formula.encode())]);
+        let source = one_row_tile(
+            2,
+            &[Some(
+                formula.encode(&crate::cell::wire::Limits::DEFAULT).unwrap(),
+            )],
+        );
 
         let scan = scan_formula_cells(&source, 1, limits()).expect("formula scan");
 

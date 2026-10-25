@@ -20,7 +20,7 @@ fn applied_rule(editor: &Draft, table_id: u64, row: usize, column: usize) -> Opt
     )
     .unwrap()
     .unwrap();
-    BncCell::parse(&cell)
+    BncCell::parse(&cell, &crate::numbers::bnc_limits(&cell))
         .unwrap()
         .conditional_style_applied_rule()
 }
@@ -1781,7 +1781,7 @@ fn text_predicates_are_case_insensitive_and_round_trip_from_scratch() {
     .unwrap()
     .unwrap();
     assert_eq!(
-        BncCell::parse(&cell)
+        BncCell::parse(&cell, &crate::numbers::bnc_limits(&cell))
             .unwrap()
             .conditional_style_applied_rule(),
         Some(0)

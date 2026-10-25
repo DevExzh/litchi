@@ -89,15 +89,22 @@ fn assert_non_format_cell_state(source: &[u8], target: &[u8]) -> TestResult {
     let after = fixture::tile_cells(target)?;
     assert_eq!(before.len(), after.len());
     for (before, after) in before.iter().zip(after.iter()) {
-        let before_cell = BncCell::parse(before)?;
-        let after_cell = BncCell::parse(after)?;
+        let before_cell = BncCell::parse(before, &litchi_numbers_wire::Limits::DEFAULT)?;
+        let after_cell = BncCell::parse(after, &litchi_numbers_wire::Limits::DEFAULT)?;
         assert_eq!(before_cell.stored_value(), after_cell.stored_value());
         assert_eq!(before_cell.cached_scalar()?, after_cell.cached_scalar()?);
         let mut before_metadata_free = before_cell;
         let mut after_metadata_free = after_cell;
         before_metadata_free.clear_explicit_format();
         after_metadata_free.clear_explicit_format();
-        assert_eq!(before_metadata_free.encode(), after_metadata_free.encode());
+        assert_eq!(
+            before_metadata_free
+                .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                .unwrap(),
+            after_metadata_free
+                .encode(&litchi_numbers_wire::Limits::DEFAULT)
+                .unwrap()
+        );
     }
     Ok(())
 }
@@ -107,7 +114,10 @@ fn first_cell(source: &[u8]) -> TestResult<BncCell> {
     let bytes = cells
         .first()
         .ok_or_else(|| io::Error::other("Date & Time fixture first cell is missing"))?;
-    Ok(BncCell::parse(bytes)?)
+    Ok(BncCell::parse(
+        bytes,
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?)
 }
 
 fn assert_owner_rejects(source: &[u8]) -> TestResult {
@@ -351,7 +361,9 @@ fn date_time_wrong_family_and_automatic_marker_fail_closed() -> TestResult {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Date & Time fixture first cell is missing"))?;
-        let mut encoded = BncCell::parse(first)?.encode();
+        let mut encoded = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         let flags = u32::from_le_bytes(
             encoded[8..12]
                 .try_into()
@@ -398,7 +410,9 @@ fn date_time_accepts_empty_and_evidenced_type_nine_but_rejects_plain_number() ->
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Date & Time fixture first cell is missing"))?;
-        *first = BncCell::minimal().encode();
+        *first = BncCell::minimal()
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     // The selected cell no longer references key 1, so keep the fixture's
@@ -443,11 +457,16 @@ fn date_time_accepts_empty_and_evidenced_type_nine_but_rejects_plain_number() ->
             CellDataFormatKind::DateTime,
             None,
         )?;
-        *first = cell.encode();
+        *first = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     let type_nine_cell = first_cell(&type_nine)?;
-    assert_eq!(type_nine_cell.encode()[1], 9);
+    assert_eq!(
+        type_nine_cell
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap()[1],
+        9
+    );
     assert_eq!(
         type_nine_cell.explicit_format_flags(),
         litchi_numbers_wire::EXPLICIT_DATE_TIME_FORMAT
@@ -484,7 +503,9 @@ fn date_time_accepts_empty_and_evidenced_type_nine_but_rejects_plain_number() ->
             CellDataFormatKind::DateTime,
             None,
         )?;
-        let mut encoded = type_nine.encode();
+        let mut encoded = type_nine
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         assert_eq!(encoded.get(1), Some(&9));
         encoded[1] = 2;
         *first = encoded;
@@ -511,7 +532,7 @@ fn date_time_accepts_empty_and_evidenced_type_nine_but_rejects_plain_number() ->
             .ok_or_else(|| io::Error::other("Date & Time fixture first cell is missing"))?;
         let mut cell = BncCell::minimal();
         cell.set_plain_number(42.5)?;
-        *first = cell.encode();
+        *first = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     let unformatted_number =
@@ -705,9 +726,9 @@ fn date_time_malformed_format_entries_fail_closed_atomically() -> TestResult {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Date & Time fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_data_format_identifier(0, CellDataFormatKind::DateTime, None)?;
-        *first = cell.encode();
+        *first = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&zero_key)?;

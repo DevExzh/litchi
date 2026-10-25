@@ -55,13 +55,13 @@ fn row(
 fn modern_number(value: f64) -> TestResult<Vec<u8>> {
     let mut cell = BncCell::minimal();
     cell.set_number(value)?;
-    Ok(cell.encode())
+    Ok(cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap())
 }
 
 fn modern_boolean(value: bool) -> Vec<u8> {
     let mut cell = BncCell::minimal();
     cell.set_boolean(value);
-    cell.encode()
+    cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap()
 }
 
 fn tile_payload(malformed_later_row: bool) -> TestResult<Vec<u8>> {

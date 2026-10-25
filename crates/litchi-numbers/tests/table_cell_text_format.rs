@@ -100,9 +100,11 @@ fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn normalized_cell(cell: &[u8]) -> TestResult<Vec<u8>> {
-    let mut parsed = BncCell::parse(cell)?;
+    let mut parsed = BncCell::parse(cell, &litchi_numbers_wire::Limits::DEFAULT)?;
     parsed.clear_explicit_format();
-    Ok(parsed.encode())
+    Ok(parsed
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap())
 }
 
 fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
@@ -111,8 +113,8 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
     assert_eq!(before.len(), after.len());
     for (before, after) in before.iter().zip(after.iter()) {
         assert_eq!(
-            BncCell::parse(before)?.stored_value(),
-            BncCell::parse(after)?.stored_value(),
+            BncCell::parse(before, &litchi_numbers_wire::Limits::DEFAULT)?.stored_value(),
+            BncCell::parse(after, &litchi_numbers_wire::Limits::DEFAULT)?.stored_value(),
             "Text format edit changed the stored scalar"
         );
         assert_eq!(
@@ -175,7 +177,7 @@ fn assert_text_cell(source: &[u8], expected_flags: u16, expected_primary: u32) -
         .into_iter()
         .next()
         .ok_or_else(|| io::Error::other("Text fixture first cell is missing"))?;
-    let cell = BncCell::parse(&cell_bytes)?;
+    let cell = BncCell::parse(&cell_bytes, &litchi_numbers_wire::Limits::DEFAULT)?;
     assert_eq!(cell.explicit_format_flags(), expected_flags);
     assert_eq!(
         cell.cell_format_kind(),
@@ -195,7 +197,7 @@ fn converted_generic_identifier(source: &[u8]) -> TestResult<u32> {
         .into_iter()
         .next()
         .ok_or_else(|| io::Error::other("Text fixture first cell is missing"))?;
-    let parsed = BncCell::parse(&cell)?;
+    let parsed = BncCell::parse(&cell, &litchi_numbers_wire::Limits::DEFAULT)?;
     assert_eq!(
         parsed.explicit_format_flags(),
         litchi_numbers_wire::EXPLICIT_CONVERTED_TEXT_FORMAT
@@ -418,7 +420,10 @@ fn text_plain_0x80_reads_and_same_value_is_an_exact_noop() -> TestResult {
         litchi_numbers_wire::EXPLICIT_TEXT_FORMAT,
         fixture::FIRST_FORMAT_KEY,
     )?;
-    let first = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
+    let first = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(first.secondary_format_identifier(), None);
     assert_eq!(first.stored_value(), StoredValue::Text(1));
 
@@ -469,7 +474,10 @@ fn text_converted_0x81_requires_and_preserves_generic_number_reference() -> Test
         .clear()
         .commit()?;
     let cleared_bytes = cleared.package().exact_bytes();
-    let cleared_cell = BncCell::parse(&fixture::tile_cells(&cleared_bytes)?[0])?;
+    let cleared_cell = BncCell::parse(
+        &fixture::tile_cells(&cleared_bytes)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(cleared_cell.explicit_format_flags(), 0);
     assert_eq!(cleared_cell.cell_format_kind(), None);
     assert_eq!(cleared_cell.format_identifier(), None);
@@ -843,7 +851,7 @@ fn text_native_fixture_marker_zero_promotes_and_number_boundary_is_typed() -> Te
     let source = package.exact_bytes();
     let b2 = At::from_a1("B2")?;
     let b2_before = native_fixture_cell(&source, 1, 1)?;
-    let b2_before = BncCell::parse(&b2_before)?;
+    let b2_before = BncCell::parse(&b2_before, &litchi_numbers_wire::Limits::DEFAULT)?;
     assert_eq!(b2_before.explicit_format_flags(), 0);
     assert_eq!(
         b2_before.cell_format_kind(),
@@ -875,7 +883,7 @@ fn text_native_fixture_marker_zero_promotes_and_number_boundary_is_typed() -> Te
         .set(Text)
         .commit()?;
     let b2_after = native_fixture_cell(&b2_set.package().exact_bytes(), 1, 1)?;
-    let b2_after = BncCell::parse(&b2_after)?;
+    let b2_after = BncCell::parse(&b2_after, &litchi_numbers_wire::Limits::DEFAULT)?;
     assert_eq!(
         b2_after.explicit_format_flags(),
         litchi_numbers_wire::EXPLICIT_TEXT_FORMAT
@@ -912,16 +920,19 @@ fn text_rewrite_preserves_scalar_style_comment_and_opaque_cell_bytes() -> TestRe
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Text fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_style_identifier(Some(23));
         cell.set_text_style_identifier(Some(29));
         cell.set_comment_identifier(Some(31));
-        let mut encoded = cell.encode();
+        let mut encoded = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         encoded.extend_from_slice(b"text-format-tail");
         *first = encoded;
         Ok(())
     })?;
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(before.stored_value(), StoredValue::Text(1));
     let target = Package::from_bytes(&source)?
         .edit_table_cell_text_format(0usize, 0usize, selected_position())?
@@ -929,7 +940,10 @@ fn text_rewrite_preserves_scalar_style_comment_and_opaque_cell_bytes() -> TestRe
         .commit()?
         .package()
         .exact_bytes();
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.stored_value(), before.stored_value());
     assert_eq!(after.style_identifier(), before.style_identifier());
     assert_eq!(
@@ -1282,11 +1296,11 @@ fn text_bnc_shape_rejects_non_text_storage_without_mutation() -> TestResult {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Text fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_number_or_percentage_format_identifier_preserving_value(Some(
             fixture::FIRST_FORMAT_KEY,
         ))?;
-        *first = cell.encode();
+        *first = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     assert_rejected_or_owner(&numeric)?;
@@ -1295,13 +1309,13 @@ fn text_bnc_shape_rejects_non_text_storage_without_mutation() -> TestResult {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("Text fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_data_format_identifier(
             fixture::FIRST_FORMAT_KEY,
             CellDataFormatKind::PopUpMenu,
             Some(77),
         )?;
-        *first = cell.encode();
+        *first = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     assert_rejected_or_owner(&control)?;

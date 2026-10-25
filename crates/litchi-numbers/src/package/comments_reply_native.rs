@@ -351,14 +351,27 @@ fn map_comment_codec_error(error: comment_storage_codec::DecodeError) -> NativeR
 
 fn map_bnc_cell_error(error: litchi_numbers_wire::Error) -> NativeReplyError {
     match error {
-        litchi_numbers_wire::Error::OutputLimitExceeded { observed, maximum } => {
-            native_limit(BudgetLimitKind::WireOutputBytes, observed, maximum)
-        },
+        litchi_numbers_wire::Error::LimitExceeded {
+            kind: litchi_numbers_wire::LimitKind::OutputBytes,
+            observed,
+            maximum,
+        } => native_limit(BudgetLimitKind::WireOutputBytes, observed, maximum),
         litchi_numbers_wire::Error::Allocation { .. } => NativeReplyError::Allocation,
         litchi_numbers_wire::Error::InvalidFormat(_)
         | litchi_numbers_wire::Error::ParseError(_) => NativeReplyError::Codec,
         _ => NativeReplyError::Codec,
     }
+}
+
+fn encode_bnc_cell(
+    cell: &BncCell,
+    source: &[u8],
+    maximum: usize,
+) -> Result<Vec<u8>> {
+    let limits = crate::cell::wire::limits_for_source(source)
+        .with_output_bytes(maximum)
+        .map_err(|_| NativeReplyError::InvalidSource)?;
+    cell.encode(&limits).map_err(map_bnc_cell_error)
 }
 
 const fn map_reply_core_limit_kind(kind: litchi_iwa_core::LimitKind) -> BudgetLimitKind {
@@ -780,7 +793,8 @@ fn census_row_comments(
 }
 
 fn census_one_cell(source: &[u8], counts: &mut Vec<(u32, u32)>) -> Result<()> {
-    let cell = BncCell::parse(source).map_err(|_| NativeReplyError::InvalidSource)?;
+    let cell = BncCell::parse(source, &crate::cell::wire::limits_for_source(source))
+        .map_err(|_| NativeReplyError::InvalidSource)?;
     if let Some(identifier) = cell.comment_identifier() {
         increment_count(counts, identifier)?;
     }
@@ -3022,14 +3036,16 @@ pub(super) fn rewrite_native_comment_reply(
     let source_cell = popup_native::tile_cell(tile_payload, request.tile_row, request.tile_column)
         .map_err(|_| NativeReplyError::InvalidSource)?
         .to_owned();
-    let mut cell = BncCell::parse(&source_cell).map_err(|_| NativeReplyError::InvalidSource)?;
+    let mut cell = BncCell::parse(
+        &source_cell,
+        &crate::cell::wire::limits_for_source(&source_cell),
+    )
+    .map_err(|_| NativeReplyError::InvalidSource)?;
     if cell.comment_identifier() != Some(request.comment_key) {
         return Err(NativeReplyError::InvalidSource);
     }
     cell.set_comment_identifier(Some(new_key));
-    let target_cell = cell
-        .try_encode_with_limit(request.limits.max_message_bytes())
-        .map_err(map_bnc_cell_error)?;
+    let target_cell = encode_bnc_cell(&cell, &source_cell, request.limits.max_message_bytes())?;
     let rewritten_tile = popup_native::patch_tile_cell(
         tile_payload,
         request.tile_row,
@@ -3329,7 +3345,8 @@ mod tests {
 
     #[test]
     fn native_bnc_limit_mapping_keeps_output_payload() {
-        let error = map_bnc_cell_error(litchi_numbers_wire::Error::OutputLimitExceeded {
+        let error = map_bnc_cell_error(litchi_numbers_wire::Error::LimitExceeded {
+            kind: litchi_numbers_wire::LimitKind::OutputBytes,
             observed: 43,
             maximum: 17,
         });

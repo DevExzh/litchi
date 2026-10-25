@@ -3777,7 +3777,7 @@ pub(super) fn attached_cell_is_formula(
         return Ok(false);
     };
     Ok(matches!(
-        BncCell::parse(&data)?.stored_value(),
+        BncCell::parse(&data, &crate::numbers::bnc_limits(&data))?.stored_value(),
         StoredValue::Formula(_)
     ))
 }
@@ -3969,7 +3969,10 @@ fn set_cell_with_context(
         ));
     }
     let old_cell = read_tile_cell(package, tile_archive, *tile_id, *tile_row, column)?;
-    let old_bnc = old_cell.as_deref().map(BncCell::parse).transpose()?;
+    let old_bnc = old_cell
+        .as_deref()
+        .map(|data| BncCell::parse(data, &crate::numbers::bnc_limits(data)))
+        .transpose()?;
     let old_formula_error = old_bnc.as_ref().and_then(BncCell::formula_error_identifier);
     let old_comment = old_bnc.as_ref().and_then(BncCell::comment_identifier);
     let old_value = old_bnc
@@ -4321,7 +4324,9 @@ fn cell_comment_at_location(
     else {
         return Ok(None);
     };
-    let Some(identifier) = BncCell::parse(&cell)?.comment_identifier() else {
+    let Some(identifier) =
+        BncCell::parse(&cell, &crate::numbers::bnc_limits(&cell))?.comment_identifier()
+    else {
         return Ok(None);
     };
     let entry = comment_entry_location(
@@ -4903,7 +4908,7 @@ fn set_cell_comment_at_location(
         column,
     )?
     .as_deref()
-    .map(BncCell::parse)
+    .map(|data| BncCell::parse(data, &crate::numbers::bnc_limits(data)))
     .transpose()?
     .and_then(|cell| cell.comment_identifier());
 
@@ -5059,7 +5064,7 @@ fn required_cell_comment_root_at_location(
         column,
     )?
     .as_deref()
-    .map(BncCell::parse)
+    .map(|data| BncCell::parse(data, &crate::numbers::bnc_limits(data)))
     .transpose()?
     .and_then(|cell| cell.comment_identifier())
     .ok_or_else(|| {
@@ -5403,7 +5408,9 @@ fn clear_cell_comment_at_location(
     else {
         return Ok(());
     };
-    let Some(identifier) = BncCell::parse(&cell)?.comment_identifier() else {
+    let Some(identifier) =
+        BncCell::parse(&cell, &crate::numbers::bnc_limits(&cell))?.comment_identifier()
+    else {
         return Ok(());
     };
     let entry = comment_entry_location(

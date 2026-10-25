@@ -95,9 +95,11 @@ fn assert_exact_locality(source: &[u8], target: &[u8]) -> TestResult {
 }
 
 fn normalized_cell(cell: &[u8]) -> TestResult<Vec<u8>> {
-    let mut parsed = BncCell::parse(cell)?;
+    let mut parsed = BncCell::parse(cell, &litchi_numbers_wire::Limits::DEFAULT)?;
     parsed.clear_explicit_format();
-    Ok(parsed.encode())
+    Ok(parsed
+        .encode(&litchi_numbers_wire::Limits::DEFAULT)
+        .unwrap())
 }
 
 fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
@@ -106,8 +108,8 @@ fn assert_non_format_bnc_bytes(source: &[u8], target: &[u8]) -> TestResult {
     assert_eq!(before.len(), after.len());
     for (before, after) in before.iter().zip(after.iter()) {
         assert_eq!(
-            BncCell::parse(before)?.cached_scalar()?,
-            BncCell::parse(after)?.cached_scalar()?,
+            BncCell::parse(before, &litchi_numbers_wire::Limits::DEFAULT)?.cached_scalar()?,
+            BncCell::parse(after, &litchi_numbers_wire::Limits::DEFAULT)?.cached_scalar()?,
             "Scientific format edit changed the cached numeric scalar"
         );
         assert_eq!(
@@ -183,7 +185,9 @@ fn rewrite_flags_to_inherited(source: &[u8]) -> TestResult<Vec<u8>> {
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut encoded = BncCell::parse(first)?.encode();
+        let mut encoded = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         if encoded.len() < 8 {
             return Err(io::Error::other("format fixture cell prefix is truncated").into());
         }
@@ -599,9 +603,9 @@ fn scientific_does_not_reuse_a_number_or_percentage_entry() -> TestResult {
         let sibling = cells
             .get_mut(1)
             .ok_or_else(|| io::Error::other("format fixture sibling cell is missing"))?;
-        let mut cell = BncCell::parse(sibling)?;
+        let mut cell = BncCell::parse(sibling, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_number_or_percentage_format_identifier_preserving_value(None)?;
-        *sibling = cell.encode();
+        *sibling = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         Ok(())
     })?;
     let source = fixture::rewrite_format_list_payload_for_test(&source, |list| {
@@ -656,11 +660,11 @@ fn scientific_rewrite_preserves_scalar_style_comment_and_opaque_cell_bytes() -> 
         let first = cells
             .first_mut()
             .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?;
-        let mut cell = BncCell::parse(first)?;
+        let mut cell = BncCell::parse(first, &litchi_numbers_wire::Limits::DEFAULT)?;
         cell.set_style_identifier(Some(23));
         cell.set_text_style_identifier(Some(29));
         cell.set_comment_identifier(Some(31));
-        let mut encoded = cell.encode();
+        let mut encoded = cell.encode(&litchi_numbers_wire::Limits::DEFAULT).unwrap();
         encoded.extend_from_slice(&[0xde, 0xad, 0xbe, 0xef]);
         *first = encoded;
         Ok(())
@@ -672,8 +676,14 @@ fn scientific_rewrite_preserves_scalar_style_comment_and_opaque_cell_bytes() -> 
         .commit()?;
     let target = commit.package().exact_bytes();
     assert_non_format_bnc_bytes(&source, &target)?;
-    let before = BncCell::parse(&fixture::tile_cells(&source)?[0])?;
-    let after = BncCell::parse(&fixture::tile_cells(&target)?[0])?;
+    let before = BncCell::parse(
+        &fixture::tile_cells(&source)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
+    let after = BncCell::parse(
+        &fixture::tile_cells(&target)?[0],
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     assert_eq!(after.style_identifier(), before.style_identifier());
     assert_eq!(
         after.text_style_identifier(),
@@ -896,6 +906,7 @@ fn scientific_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResu
             cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?,
+            &litchi_numbers_wire::Limits::DEFAULT,
         )?;
         let mut replacement = first;
         replacement.set_data_format_identifier(
@@ -903,7 +914,9 @@ fn scientific_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResu
             CellDataFormatKind::NumericControlNumberOrPercentage,
             Some(77),
         )?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&control)?;
@@ -913,6 +926,7 @@ fn scientific_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResu
             cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?,
+            &litchi_numbers_wire::Limits::DEFAULT,
         )?;
         let mut replacement = first;
         replacement.set_string(7);
@@ -921,7 +935,9 @@ fn scientific_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResu
             CellDataFormatKind::Text,
             None,
         )?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&text)?;
@@ -931,6 +947,7 @@ fn scientific_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResu
             cells
                 .first()
                 .ok_or_else(|| io::Error::other("format fixture first cell is missing"))?,
+            &litchi_numbers_wire::Limits::DEFAULT,
         )?;
         let mut replacement = first;
         replacement
@@ -938,7 +955,9 @@ fn scientific_wrong_bnc_family_shapes_are_refused_without_mutation() -> TestResu
         replacement.set_number_or_percentage_format_identifier_preserving_value(Some(
             fixture::FIRST_FORMAT_KEY,
         ))?;
-        cells[0] = replacement.encode();
+        cells[0] = replacement
+            .encode(&litchi_numbers_wire::Limits::DEFAULT)
+            .unwrap();
         Ok(())
     })?;
     assert_owner_rejects(&alternate_number)?;

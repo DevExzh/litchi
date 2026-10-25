@@ -68,7 +68,10 @@ fn duration_value(package: &Package) -> TestResult<f64> {
 }
 
 fn duration_cache(source: &[u8]) -> TestResult<CachedScalar> {
-    let cell = BncCell::parse(&native_duration_cell(source)?)?;
+    let cell = BncCell::parse(
+        &native_duration_cell(source)?,
+        &litchi_numbers_wire::Limits::DEFAULT,
+    )?;
     if cell.stored_value() != StoredValue::Duration {
         return Err(io::Error::other("native Duration B2 cell is not a duration").into());
     }

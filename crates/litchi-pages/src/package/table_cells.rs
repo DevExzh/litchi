@@ -147,6 +147,7 @@ pub(crate) struct SelectedBodyTableStorage<'source> {
     data_store: storage::DataStoreSnapshot<'source>,
     tile_size: u32,
     tiles: Vec<wire_cells::TileReference>,
+    limits: litchi_numbers_wire::Limits,
 }
 
 impl<'source> SelectedBodyTableStorage<'source> {
@@ -187,6 +188,7 @@ impl<'source> SelectedBodyTableStorage<'source> {
         let tile_references = self.tiles.iter().copied();
         wire_cells::read_table_cells(
             self.dimensions(),
+            &self.limits,
             tile_references,
             resolve_tile,
             budget,
@@ -1556,6 +1558,15 @@ fn map_table_cell_issue(issue: wire_cells::TableCellIssue) -> Error {
     match issue {
         wire_cells::TableCellIssue::StorageDecode(error) => map_storage_error(error),
         wire_cells::TableCellIssue::Allocation { amount, .. } => Error::Allocation { amount },
+        wire_cells::TableCellIssue::RawLimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: map_raw_limit_kind(kind),
+            observed: usize_as_u64(observed),
+            maximum: usize_as_u64(maximum),
+        },
         wire_cells::TableCellIssue::MissingTile { .. }
         | wire_cells::TableCellIssue::MissingTilePayload { .. }
         | wire_cells::TableCellIssue::DuplicateTilePayload { .. }
@@ -1567,6 +1578,17 @@ fn map_table_cell_issue(issue: wire_cells::TableCellIssue) -> Error {
         | wire_cells::TableCellIssue::CounterOverflow
         | wire_cells::TableCellIssue::CellStorageOutOfBounds { .. }
         | wire_cells::TableCellIssue::CellValueDecode { .. } => Error::InvalidSource,
+    }
+}
+
+const fn map_raw_limit_kind(kind: litchi_numbers_wire::LimitKind) -> LimitKind {
+    match kind {
+        litchi_numbers_wire::LimitKind::InputBytes
+        | litchi_numbers_wire::LimitKind::TailBytes => LimitKind::WireBytes,
+        litchi_numbers_wire::LimitKind::OutputBytes => LimitKind::WireOutputBytes,
+        litchi_numbers_wire::LimitKind::Fields => LimitKind::WireFields,
+        litchi_numbers_wire::LimitKind::Items => LimitKind::PayloadItems,
+        _ => LimitKind::WireBytes,
     }
 }
 
@@ -1865,6 +1887,9 @@ pub(crate) fn selected_body_table_storage<'source>(
     selector: BodyTableSelector<'_>,
     budget: &mut table_lock::WireBudget,
 ) -> Result<SelectedBodyTableStorage<'source>, Error> {
+    let limits = package
+        .numbers_wire_limits()
+        .map_err(|_| Error::InvalidSource)?;
     let target = package
         .resolve_body_table_with_budget(selector, budget)
         .map_err(map_lock_error)?;
@@ -1912,6 +1937,7 @@ pub(crate) fn selected_body_table_storage<'source>(
         data_store,
         tile_size,
         tiles: routes.values,
+        limits,
     })
 }
 
