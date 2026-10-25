@@ -87,7 +87,7 @@ impl Presentation {
             let _ = options;
             if let Some(parsed_current_user) = current_user_data
                 .as_deref()
-                .map(CurrentUser::parse)
+                .map(|bytes| CurrentUser::parse(bytes, &source_limits))
                 .transpose()?
                 && parsed_current_user.is_encrypted()
             {
@@ -280,7 +280,7 @@ impl Presentation {
             let _ = options;
             if let Some(parsed_current_user) = current_user_data
                 .as_deref()
-                .map(CurrentUser::parse)
+                .map(|bytes| CurrentUser::parse(bytes, &source_limits))
                 .transpose()?
                 && parsed_current_user.is_encrypted()
             {
