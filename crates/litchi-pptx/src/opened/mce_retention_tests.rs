@@ -607,7 +607,10 @@ fn malformed_root_name_and_notes_inputs_keep_typed_refusal_precedence() -> Resul
     let error = name
         .opened_presentation_with_limits(Limits::default())
         .expect_err("malformed slide name must remain a typed refusal");
-    assert!(error.to_string().contains("duplicated attribute"));
+    // Physical source admission runs before MCE, including duplicate
+    // attributes in a name projection. It intentionally reports the
+    // content-free physical refusal rather than exposing parser text.
+    assert!(error.to_string().contains("PPTX XML is malformed"));
 
     let mut notes = marked_slides_package(2, &[0, 1])?;
     replace_notes_root(&mut notes)?;

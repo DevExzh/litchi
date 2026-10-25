@@ -1009,15 +1009,17 @@ fn capture_internal(
         });
     }
     let _notes = match slide_root_proofs.as_deref() {
-        Some(proofs) => crate::notes::load_snapshot_with_slide_root_proofs_and_limits(
-            package,
-            &presentation_name,
-            references.len(),
-            proofs,
-            crate::open_options::selected(semantic_limits.as_ref())
-                .notes()
-                .constrained_by_source(package.read_limits()),
-        )?,
+        Some(proofs) => {
+            let proof_limits = crate::open_options::selected(semantic_limits.as_ref()).notes();
+            crate::notes::load_snapshot_with_slide_root_proofs_and_limits(
+                package,
+                &presentation_name,
+                references.len(),
+                proofs,
+                proof_limits.constrained_by_source(package.read_limits()),
+                proof_limits,
+            )?
+        },
         None => crate::notes::load_snapshot_with_limits(
             package,
             &presentation_name,

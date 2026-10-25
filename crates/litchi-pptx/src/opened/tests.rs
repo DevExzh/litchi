@@ -23,11 +23,12 @@ macro_rules! assert_refused_kind {
 }
 
 /// Reproduce the capture sequence that preceded the capture-local projection
-/// helper.  This deliberately uses the ordinary public presentation slide
+/// helper. This deliberately uses the ordinary public presentation slide
 /// resolver and keeps the relationship, identity, notes, and name checks in
-/// their old order.  The candidate capture is compared with this oracle, but
-/// malformed cases also assert an independent expected error fragment below
-/// so a shared implementation mistake cannot make both sides pass.
+/// their established order. Well-formed semantic failures are compared with
+/// this oracle; physical source-admission failures assert their content-free
+/// refusal independently because the legacy route did not run that admission
+/// before MCE.
 fn legacy_capture_catalog(package: &Package) -> Result<Vec<super::Slide>> {
     let presentation = crate::parts::PresentationPart::from_package(&package.opc)?;
     let presentation_name = presentation.part().partname().clone();
@@ -232,6 +233,16 @@ fn replace_notes_slide_root(package: &mut Package) -> Result<()> {
     Ok(())
 }
 
+fn replace_slide_root(package: &mut Package, index: usize, root: &str) -> Result<()> {
+    rewrite_slide_xml(package, index, |xml| {
+        xml.replacen("<p:sld ", &format!("<{root} "), 1).replacen(
+            "</p:sld>",
+            &format!("</{root}>"),
+            1,
+        )
+    })
+}
+
 fn rewrite_presentation_xml(
     package: &mut Package,
     rewrite: impl FnOnce(String) -> String,
@@ -317,7 +328,7 @@ fn capture_projection_matches_legacy_across_conformance_names_and_mce() -> Resul
 }
 
 #[test]
-fn capture_projection_keeps_first_name_error_bounded_and_ordered() -> Result<()> {
+fn capture_projection_keeps_deferred_name_projection_but_admits_physical_errors() -> Result<()> {
     let mut package = opened_two_slide_package()?;
     set_slide_name_attribute(&mut package, 0, r#" name="Slide 256" name="first""#)?;
     set_slide_name_attribute(&mut package, 1, r#" name="Slide 257" name="later""#)?;
@@ -326,33 +337,28 @@ fn capture_projection_keeps_first_name_error_bounded_and_ordered() -> Result<()>
     assert_eq!(projected.len(), 2);
     assert_eq!(projected[0].2, None);
     assert_eq!(projected[1].2, None);
-    let (index, error) = first_name_error.expect("the first name error must be retained");
+    let (index, error) = first_name_error.expect("the legacy projection retains the first error");
     assert_eq!(index, 0);
     assert!(error.contains("duplicated attribute"));
 
-    // The later malformed name is never retained: the post-error path checks
-    // only the later slide root, and the capture loop replays the first error
-    // at its original slide position.
-    assert_capture_error_contains(&package, "duplicated attribute")?;
+    // The public opened route admits the raw source before MCE, so the
+    // content-free physical refusal supersedes the legacy deferred parser
+    // ordering.
+    let error = package
+        .opened_presentation()
+        .expect_err("opened capture must use the same physical admission");
+    assert!(error.to_string().contains("PPTX XML is malformed"));
     Ok(())
 }
 
 #[test]
 fn capture_projection_preserves_root_and_catalog_error_precedence() -> Result<()> {
     let mut root_after_name = opened_two_slide_package()?;
-    set_slide_name_attribute(&mut root_after_name, 0, r#" name="Slide 256" name="first""#)?;
-    rewrite_slide_xml(&mut root_after_name, 1, |xml| {
-        xml.replacen("<p:sld ", "<p:wrong ", 1)
-    })?;
-    // All slide roots are validated before any deferred name is replayed.
+    replace_slide_root(&mut root_after_name, 1, "p:wrong")?;
+    // A well-formed later root error remains a semantic capture error.
     assert_capture_error_contains(&root_after_name, "slide part does not have a p:sld root")?;
 
     let mut duplicate_catalog = opened_two_slide_package()?;
-    set_slide_name_attribute(
-        &mut duplicate_catalog,
-        0,
-        r#" name="Slide 256" name="first""#,
-    )?;
     rewrite_presentation_xml(&mut duplicate_catalog, |xml| {
         xml.replacen(r#"<p:sldId id="257""#, r#"<p:sldId id="256""#, 1)
     })?;
@@ -372,13 +378,8 @@ fn capture_projection_keeps_notes_validation_after_slide_identity_and_names() ->
     assert_capture_error_contains(&invalid_notes, "invalid notes root or namespace")?;
 
     let mut invalid_name_and_notes = opened_two_slide_package()?;
-    set_slide_name_attribute(
-        &mut invalid_name_and_notes,
-        0,
-        r#" name="Slide 256" name="first""#,
-    )?;
     replace_notes_slide_root(&mut invalid_name_and_notes)?;
-    assert_capture_error_contains(&invalid_name_and_notes, "duplicated attribute")?;
+    assert_capture_error_contains(&invalid_name_and_notes, "invalid notes root or namespace")?;
 
     let mut malformed_tail = opened_two_slide_package()?;
     add_malformed_slide_tail(&mut malformed_tail, 0)?;
@@ -388,9 +389,7 @@ fn capture_projection_keeps_notes_validation_after_slide_identity_and_names() ->
     assert_capture_error_contains(&malformed_tail, "invalid sld root or namespace")?;
 
     let mut invalid_slide_and_notes = opened_two_slide_package()?;
-    rewrite_slide_xml(&mut invalid_slide_and_notes, 0, |xml| {
-        xml.replacen("<p:sld ", "<p:wrong ", 1)
-    })?;
+    replace_slide_root(&mut invalid_slide_and_notes, 0, "p:wrong")?;
     replace_notes_slide_root(&mut invalid_slide_and_notes)?;
     assert_capture_error_contains(
         &invalid_slide_and_notes,
@@ -461,6 +460,7 @@ fn notes_snapshot_proofs_fall_back_for_reordered_equal_length_sources() -> Resul
         2,
         &swapped,
         notes_limits,
+        crate::notes::Limits::DEFAULT,
     )?;
     assert!(
         snapshot.is_some(),
@@ -479,6 +479,7 @@ fn notes_snapshot_proofs_fall_back_for_reordered_equal_length_sources() -> Resul
         2,
         &exact,
         notes_limits,
+        crate::notes::Limits::DEFAULT,
     )
     .expect_err("exact invalid proofs must refuse the notes graph");
     assert!(matches!(
@@ -490,29 +491,20 @@ fn notes_snapshot_proofs_fall_back_for_reordered_equal_length_sources() -> Resul
 
 #[test]
 fn notes_capture_matrix_preserves_name_root_and_notes_error_order() -> Result<()> {
-    // All slide roots are checked before the deferred first-name result is
-    // replayed. A later slide-root error therefore wins over an earlier name
-    // error.
+    // A well-formed later slide-root error remains ahead of notes loading.
     let mut later_root = opened_two_slide_package()?;
-    set_slide_name_attribute(&mut later_root, 0, r#" name="Slide 256" name="bad""#)?;
-    rewrite_slide_xml(&mut later_root, 1, |xml| {
-        xml.replacen("<p:sld ", "<p:wrong ", 1)
-    })?;
+    replace_slide_root(&mut later_root, 1, "p:wrong")?;
     assert_capture_error_contains(&later_root, "slide part does not have a p:sld root")?;
 
-    // Notes graph validation remains after the name replay. A malformed notes
-    // root must not preempt an earlier name error.
+    // Notes graph validation remains after slide capture.
     let mut name_and_notes = opened_two_slide_package()?;
-    set_slide_name_attribute(&mut name_and_notes, 0, r#" name="Slide 256" name="bad""#)?;
     replace_notes_slide_root(&mut name_and_notes)?;
-    assert_capture_error_contains(&name_and_notes, "duplicated attribute")?;
+    assert_capture_error_contains(&name_and_notes, "invalid notes root or namespace")?;
 
     // A malformed later slide root remains earlier than the notes graph even
     // when both failures are present.
     let mut root_and_notes = opened_two_slide_package()?;
-    rewrite_slide_xml(&mut root_and_notes, 1, |xml| {
-        xml.replacen("<p:sld ", "<p:wrong ", 1)
-    })?;
+    replace_slide_root(&mut root_and_notes, 1, "p:wrong")?;
     replace_notes_slide_root(&mut root_and_notes)?;
     assert_capture_error_contains(&root_and_notes, "slide part does not have a p:sld root")?;
     Ok(())
@@ -536,7 +528,10 @@ fn notes_capture_matrix_falls_back_when_notes_inventory_has_a_foreign_sld_id() -
     let mut name_and_missing = opened_two_slide_package()?;
     set_slide_name_attribute(&mut name_and_missing, 0, r#" name="Slide 256" name="bad""#)?;
     add_foreign_notes_inventory_sld_id(&mut name_and_missing, "rIdLookalike")?;
-    assert_capture_error_contains(&name_and_missing, "duplicated attribute")?;
+    let error = name_and_missing
+        .opened_presentation()
+        .expect_err("physical admission must precede the deferred name error");
+    assert!(error.to_string().contains("PPTX XML is malformed"));
     Ok(())
 }
 
@@ -616,20 +611,34 @@ fn notes_capture_matrix_does_not_cross_contaminate_immutable_package_sources() -
 
 #[test]
 fn capture_projection_preserves_relationship_and_part_identity_error_order() -> Result<()> {
-    // The catalog permits a missing edge until contextual resolution. That
-    // later failure must still beat a name error from the first slide.
+    // The catalog permits a missing edge until contextual resolution. The
+    // well-formed relationship failure remains observable at that boundary.
     let mut missing = opened_plain_slides_package(2)?;
     let presentation_name = PackURI::new("/ppt/presentation.xml").map_err(Error::Invalid)?;
     let relationship_id = crate::parts::PresentationPart::from_package(&missing.opc)?
         .slide_references()?[1]
         .relationship_id()
         .to_owned();
-    set_slide_name_attribute(&mut missing, 0, r#" name="Slide 256" name="first""#)?;
     std::sync::Arc::make_mut(&mut missing.opc)
         .get_part_mut(&presentation_name)?
         .rels_mut()
         .remove(&relationship_id);
     assert_capture_error_contains(&missing, "missing relationship")?;
+
+    let mut malformed_name = opened_plain_slides_package(2)?;
+    let relationship_id = crate::parts::PresentationPart::from_package(&malformed_name.opc)?
+        .slide_references()?[1]
+        .relationship_id()
+        .to_owned();
+    set_slide_name_attribute(&mut malformed_name, 0, r#" name="Slide 256" name="first""#)?;
+    std::sync::Arc::make_mut(&mut malformed_name.opc)
+        .get_part_mut(&presentation_name)?
+        .rels_mut()
+        .remove(&relationship_id);
+    let error = malformed_name
+        .opened_presentation()
+        .expect_err("physical admission must precede relationship replay");
+    assert!(error.to_string().contains("PPTX XML is malformed"));
 
     for earlier_name_error in [false, true] {
         let mut duplicate = opened_plain_slides_package(3)?;
@@ -647,11 +656,19 @@ fn capture_projection_preserves_relationship_and_part_identity_error_order() -> 
             relationship_id,
             TargetMode::Internal,
         )?;
-        let index = if earlier_name_error { 0 } else { 2 };
-        set_slide_name_attribute(&mut duplicate, index, r#" name="bad" name="duplicate""#)?;
-        // Stable graphs fail the earlier catalog's case-folded target check;
-        // the capture loop's duplicate-part guard remains defensive.
-        assert_capture_error_contains(&duplicate, "slide reference targets must be unique")?;
+        if earlier_name_error {
+            set_slide_name_attribute(&mut duplicate, 0, r#" name="bad" name="duplicate""#)?;
+            let error = duplicate
+                .opened_presentation()
+                .expect_err("physical admission must precede duplicate-target replay");
+            assert!(error.to_string().contains("PPTX XML is malformed"));
+        } else {
+            // Stable graphs fail the earlier catalog's case-folded target
+            // check; the capture loop's duplicate-part guard remains
+            // defensive. With no earlier malformed payload, the comparator
+            // still proves relationship/identity ordering.
+            assert_capture_error_contains(&duplicate, "slide reference targets must be unique")?;
+        }
     }
     Ok(())
 }

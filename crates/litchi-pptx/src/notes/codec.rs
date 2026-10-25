@@ -1432,6 +1432,7 @@ mod tests {
         conformance: Conformance,
         expected_root: &str,
     ) -> Result<XmlScan> {
+        let max = effective_xml_limit(max, expected_root, Limits::DEFAULT);
         if raw_len > max {
             return Err(limit(crate::error::CodecLimitKind::XmlBytes, raw_len, max));
         }
