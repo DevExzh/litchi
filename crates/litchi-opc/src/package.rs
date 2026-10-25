@@ -2495,7 +2495,9 @@ impl OpcPackage {
     /// expanded-name edits cannot be ambiguous, while a whole-part authored
     /// replacement preserves the caller's namespace spelling byte-for-byte.
     /// The shared payload is retained without copying and is published through
-    /// the same source-preserving writer as an exact source part.
+    /// the same source-preserving writer as an exact source part. The retained
+    /// allocation is publication provenance only; this does not create an
+    /// [`crate::OwnedXmlPart`] or [`crate::SourceXmlPart`] range-splice token.
     pub fn try_add_authored_xml_part_bytes(
         &mut self,
         name: PackURI,
@@ -2512,14 +2514,17 @@ impl OpcPackage {
             ));
         }
         let limits = self.read_limits.min(limits);
-        self.validate_new_part_name(&name)?;
-        crate::OwnedXmlPart::check_capture_size(&name, bytes.len(), limits)?;
-        let verified =
-            verified_source_payload_with_source_limits(&name, Arc::clone(&bytes), limits)?;
-        crate::xml_splice::validate_authored_xml_bytes(&name, &bytes, limits)?;
-        let mut part = BlobPart::new_shared(name, content_type, bytes);
+        let mut part = BlobPart::new_shared(name, content_type, Arc::clone(&bytes));
+        let source_xml = self.preflight_source_part_addition(&part, limits)?;
+        crate::OwnedXmlPart::check_capture_size(part.partname(), bytes.len(), limits)?;
+        let verified = verified_source_payload_with_source_limits(
+            part.partname(),
+            Arc::clone(&bytes),
+            limits,
+        )?;
+        crate::xml_splice::validate_authored_xml_bytes(part.partname(), &bytes, limits)?;
         part.set_blob_verified(verified);
-        self.try_add_source_part(Box::new(part))
+        self.install_prevalidated_source_part(Box::new(part), source_xml)
     }
 
     /// Replace one exact XML payload with caller-authored bytes while
@@ -2528,7 +2533,9 @@ impl OpcPackage {
     /// The expected payload is an exact stale-source guard. The replacement
     /// is admitted by the bounded publication audit rather than the stricter
     /// source-splice namespace proof, because the format owner is replacing
-    /// the whole opaque XML member and does not splice its internals.
+    /// the whole opaque XML member and does not splice its internals. Equal
+    /// replacement bytes are an audited no-op, including for a signed package;
+    /// non-no-op failures leave package and signature state untouched.
     pub fn try_replace_authored_xml_part_bytes(
         &mut self,
         partname: &PackURI,
@@ -2536,9 +2543,6 @@ impl OpcPackage {
         replacement: Arc<Vec<u8>>,
         limits: SourceLimits,
     ) -> Result<()> {
-        if self.requires_signature_edit_policy() {
-            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
-        }
         let content_type = self.get_part(partname)?.content_type().to_owned();
         if !xml_minifier::audit::package::is_xml_part(partname.as_str(), &content_type) {
             return Err(OpcError::XmlError(
@@ -2553,10 +2557,18 @@ impl OpcPackage {
             ));
         }
         let limits = self.read_limits.min(limits);
+        let unchanged = current.blob() == replacement.as_slice();
+        if self.requires_signature_edit_policy() && !unchanged {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
         crate::OwnedXmlPart::check_capture_size(partname, replacement.len(), limits)?;
+        self.check_authored_xml_replacement_limits(partname, replacement.len(), limits)?;
         let verified =
             verified_source_payload_with_source_limits(partname, Arc::clone(&replacement), limits)?;
         crate::xml_splice::validate_authored_xml_bytes(partname, &replacement, limits)?;
+        if unchanged {
+            return Ok(());
+        }
         self.source_xml_parts
             .try_reserve(1)
             .map_err(|source| OpcError::Allocation {
@@ -3105,31 +3117,145 @@ impl OpcPackage {
     /// the publication audit. Source-backed conversion uses this narrow seam
     /// so unchanged opaque XML remains publishable without reparsing or
     /// normalizing it. The source blob is shared with the inserted part and
-    /// the metadata map grows through a fallible reservation.
+    /// the metadata map grows through a fallible reservation. The retained
+    /// bytes are publication provenance only; this path does not create an
+    /// [`crate::OwnedXmlPart`] or [`crate::SourceXmlPart`] range-splice token.
     pub(crate) fn try_add_source_part(&mut self, part: Box<dyn Part + Send + Sync>) -> Result<()> {
-        self.revoke_exact_source();
-        self.signature_graph_tracked = true;
-        self.content_types_source_state.reset();
+        let source_xml = self.preflight_source_part_addition(&*part, self.read_limits)?;
+        self.install_prevalidated_source_part(part, source_xml)
+    }
+
+    fn preflight_source_part_addition(
+        &self,
+        part: &dyn Part,
+        limits: SourceLimits,
+    ) -> Result<bool> {
+        let partname = part.partname();
+        let maximum_parts = u64::try_from(limits.max_parts()).unwrap_or(u64::MAX);
+        limits.check(
+            SourceLimitKind::ArchiveMemberNameBytes,
+            u64::try_from(partname.membername().len()).unwrap_or(u64::MAX),
+            limits.max_archive_member_name_bytes(),
+        )?;
+        self.validate_new_part_name(partname)?;
+        let payload_len = part.payload_len()?;
+        let payload_bytes = u64::try_from(payload_len).map_err(|_| OpcError::Limit {
+            kind: SourceLimitKind::PartBytes,
+            observed: u64::MAX,
+            maximum: limits.max_part_bytes(),
+        })?;
+        limits.check(
+            SourceLimitKind::PartBytes,
+            payload_bytes,
+            limits.max_part_bytes(),
+        )?;
+        let next_parts = self.parts.len().checked_add(1).ok_or(OpcError::Limit {
+            kind: SourceLimitKind::Parts,
+            observed: u64::MAX,
+            maximum: maximum_parts,
+        })?;
+        limits.check(
+            SourceLimitKind::Parts,
+            u64::try_from(next_parts).unwrap_or(u64::MAX),
+            maximum_parts,
+        )?;
+        let mut total_bytes = payload_bytes;
+        for existing in self.parts.values() {
+            let bytes = u64::try_from(existing.payload_len()?).map_err(|_| OpcError::Limit {
+                kind: SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
+                maximum: limits.max_total_part_bytes(),
+            })?;
+            total_bytes = total_bytes.checked_add(bytes).ok_or(OpcError::Limit {
+                kind: SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
+                maximum: limits.max_total_part_bytes(),
+            })?;
+        }
+        limits.check(
+            SourceLimitKind::TotalPartBytes,
+            total_bytes,
+            limits.max_total_part_bytes(),
+        )?;
+        Ok(xml_minifier::audit::package::is_xml_part(
+            partname.as_str(),
+            part.content_type(),
+        ))
+    }
+
+    fn check_authored_xml_replacement_limits(
+        &self,
+        partname: &PackURI,
+        replacement_len: usize,
+        limits: SourceLimits,
+    ) -> Result<()> {
+        let replacement_bytes = u64::try_from(replacement_len).map_err(|_| OpcError::Limit {
+            kind: SourceLimitKind::PartBytes,
+            observed: u64::MAX,
+            maximum: limits.max_part_bytes(),
+        })?;
+        limits.check(
+            SourceLimitKind::PartBytes,
+            replacement_bytes,
+            limits.max_part_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::Parts,
+            u64::try_from(self.parts.len()).unwrap_or(u64::MAX),
+            u64::try_from(limits.max_parts()).unwrap_or(u64::MAX),
+        )?;
+        let mut total_bytes = 0u64;
+        for existing in self.parts.values() {
+            let bytes = if existing
+                .partname()
+                .as_str()
+                .eq_ignore_ascii_case(partname.as_str())
+            {
+                replacement_bytes
+            } else {
+                u64::try_from(existing.payload_len()?).map_err(|_| OpcError::Limit {
+                    kind: SourceLimitKind::TotalPartBytes,
+                    observed: u64::MAX,
+                    maximum: limits.max_total_part_bytes(),
+                })?
+            };
+            total_bytes = total_bytes.checked_add(bytes).ok_or(OpcError::Limit {
+                kind: SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
+                maximum: limits.max_total_part_bytes(),
+            })?;
+        }
+        limits.check(
+            SourceLimitKind::TotalPartBytes,
+            total_bytes,
+            limits.max_total_part_bytes(),
+        )
+    }
+
+    fn install_prevalidated_source_part(
+        &mut self,
+        part: Box<dyn Part + Send + Sync>,
+        source_xml: bool,
+    ) -> Result<()> {
         let partname = part.partname().clone();
-        self.validate_new_part_name(&partname)?;
         self.parts
             .try_reserve(1)
             .map_err(|source| OpcError::Allocation {
                 resource: "OPC source-materialized parts",
                 source,
             })?;
-        let source_blob =
-            if xml_minifier::audit::package::is_xml_part(partname.as_str(), part.content_type()) {
-                self.source_xml_parts
-                    .try_reserve(1)
-                    .map_err(|source| OpcError::Allocation {
-                        resource: "OPC source-preserved XML parts",
-                        source,
-                    })?;
-                Some(part.payload_handle())
-            } else {
-                None
-            };
+        if source_xml {
+            self.source_xml_parts
+                .try_reserve(1)
+                .map_err(|source| OpcError::Allocation {
+                    resource: "OPC source-preserved XML parts",
+                    source,
+                })?;
+        }
+        let source_blob = source_xml.then(|| part.payload_handle());
+        self.revoke_exact_source();
+        self.signature_graph_tracked = true;
+        self.content_types_source_state.reset();
         self.source_relationships_xml.remove(&partname);
         self.parts.insert(partname.clone(), part);
         if let Some(source_blob) = source_blob {

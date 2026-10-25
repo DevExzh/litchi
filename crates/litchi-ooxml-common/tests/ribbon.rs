@@ -1,10 +1,12 @@
 use litchi_ooxml_common::ribbon::{self, Family, Version};
 use litchi_opc::constants::relationship_type as rt;
-use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, XmlPart};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, SourceLimits, XmlPart};
 
 const OFFICE_2007_XML: &[u8] = include_bytes!("../../../test-data/ooxml/ribbonx/office2007.xml");
 const OFFICE_2010_XML: &[u8] = include_bytes!("../../../test-data/ooxml/ribbonx/office2010.xml");
 const CUSTOM_UI2_XML: &[u8] = include_bytes!("../../../test-data/ooxml/ribbonx/customui2.xml");
+const ESCAPED_NAMESPACE_XML: &[u8] = br#"<?xml version="1.0"?><customUI xmlns="http://schemas.microsoft.com/office/2006/01/customu&#x69;"><?original retained?></customUI>"#;
+const ESCAPED_REPLACEMENT_XML: &[u8] = br#"<?xml version="1.0"?><customUI xmlns="http://schemas.microsoft.com/office/2006/01/customu&#x69;"><?replacement retained?></customUI>"#;
 
 fn put(package: &mut OpcPackage, version: Version, xml: Vec<u8>) {
     let mut edit = ribbon::Edit::new(package).unwrap();
@@ -102,6 +104,73 @@ fn staged_edit_publishes_both_families_and_replays_without_mutating_source() {
             .next()
             .is_none()
     );
+}
+
+#[test]
+fn ribbon_edit_replay_inverse_save_reopen_preserve_authored_namespace_bytes() {
+    let mut source = OpcPackage::new();
+    put(&mut source, Version::V2007, ESCAPED_NAMESPACE_XML.to_vec());
+    let original = source.clone();
+
+    let mut edit = ribbon::Edit::new(&source).unwrap();
+    assert!(
+        edit.put(Version::V2007, ESCAPED_REPLACEMENT_XML.to_vec())
+            .unwrap()
+    );
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(ribbon_xml(commit.package()), ESCAPED_REPLACEMENT_XML);
+
+    let replayed = commit.patch().apply(&source).unwrap();
+    assert_eq!(ribbon_xml(replayed.package()), ESCAPED_REPLACEMENT_XML);
+    let restored = commit.patch().inverse().apply(commit.package()).unwrap();
+    assert_eq!(ribbon_xml(restored.package()), ESCAPED_NAMESPACE_XML);
+    assert_eq!(ribbon_xml(&original), ESCAPED_NAMESPACE_XML);
+
+    let saved = PackageWriter::to_bytes(commit.package()).unwrap();
+    let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
+    assert_eq!(ribbon_xml(&reopened), ESCAPED_REPLACEMENT_XML);
+
+    let mut stale = source.clone();
+    stale.add_part(Box::new(BlobPart::new(
+        PackURI::new("/unrelated.xml").unwrap(),
+        "application/xml".into(),
+        b"<unrelated/>".to_vec(),
+    )));
+    assert!(matches!(
+        commit.patch().apply(&stale),
+        Err(ribbon::Error::PatchConflict)
+    ));
+    assert_eq!(ribbon_xml(&stale), ESCAPED_NAMESPACE_XML);
+
+    let mut limited = ribbon::Edit::new_with_options(
+        &source,
+        ribbon::EditOptions {
+            limits: ribbon::Limits {
+                xml_bytes: ESCAPED_REPLACEMENT_XML.len() - 1,
+                ..ribbon::Limits::standard()
+            },
+        },
+    )
+    .unwrap();
+    assert!(
+        limited
+            .put(Version::V2007, ESCAPED_REPLACEMENT_XML.to_vec())
+            .is_err()
+    );
+    assert_eq!(ribbon_xml(&source), ESCAPED_NAMESPACE_XML);
+
+    let mut signed = source.clone();
+    signed.relate_to(
+        "_xmlsignatures/origin.sigs",
+        litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+    );
+    let mut signed_edit = ribbon::Edit::new(&signed).unwrap();
+    assert!(matches!(
+        signed_edit.put(Version::V2007, ESCAPED_REPLACEMENT_XML.to_vec()),
+        Err(ribbon::Error::Signed)
+    ));
+    assert_eq!(ribbon_xml(&signed), ESCAPED_NAMESPACE_XML);
 }
 
 #[test]
@@ -207,4 +276,13 @@ fn rejects_a_root_that_does_not_match_its_relationship_family() {
     package.relate_to("customUI/customUI.xml", Version::V2007.relationship());
 
     assert!(ribbon::load(&package, &ribbon::Limits::standard()).is_err());
+}
+
+fn ribbon_xml(package: &OpcPackage) -> Vec<u8> {
+    ribbon::load(package, &ribbon::Limits::standard())
+        .unwrap()
+        .legacy()
+        .unwrap()
+        .xml()
+        .to_vec()
 }

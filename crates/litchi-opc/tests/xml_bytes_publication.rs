@@ -3,7 +3,8 @@
 
 use std::sync::Arc;
 
-use litchi_opc::{OpcPackage, PackURI, SourceLimits};
+use litchi_opc::constants::relationship_type;
+use litchi_opc::{OpcError, OpcPackage, PackURI, SourceLimitKind, SourceLimits};
 
 fn source_package() -> OpcPackage {
     let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
@@ -81,5 +82,132 @@ fn shared_xml_replace_checks_source_and_limits_before_mutation() {
     assert!(Arc::ptr_eq(
         &package.get_part(&name).unwrap().blob_arc(),
         &exact
+    ));
+}
+
+#[test]
+fn authored_xml_add_checks_attribute_part_and_aggregate_limits_atomically() {
+    let name = PackURI::new("/added.xml").unwrap();
+    let authored = Arc::new(b"<root a=\"1234\"/>".to_vec());
+
+    let mut package = source_package();
+    let item = PackURI::new("/item.xml").unwrap();
+    let before = package.get_part(&item).unwrap().blob_arc();
+    let limits = SourceLimits::builder()
+        .max_xml_attribute_bytes(3)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        package.try_add_authored_xml_part_bytes(
+            name.clone(),
+            "application/xml".into(),
+            Arc::clone(&authored),
+            limits,
+        ),
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::XmlAttributeBytes,
+            ..
+        })
+    ));
+    assert!(package.get_part(&name).is_err());
+    assert!(Arc::ptr_eq(
+        &package.get_part(&item).unwrap().blob_arc(),
+        &before
+    ));
+
+    let mut package = source_package();
+    let limits = SourceLimits::builder()
+        .max_parts(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        package.try_add_authored_xml_part_bytes(
+            name.clone(),
+            "application/xml".into(),
+            Arc::new(b"<root/>".to_vec()),
+            limits,
+        ),
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::Parts,
+            ..
+        })
+    ));
+    assert_eq!(package.part_count(), 1);
+
+    let mut package = source_package();
+    let limits = SourceLimits::builder()
+        .max_total_part_bytes(7)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        package.try_add_authored_xml_part_bytes(
+            name,
+            "application/xml".into(),
+            Arc::new(b"<root/>".to_vec()),
+            limits,
+        ),
+        Err(OpcError::Limit {
+            kind: SourceLimitKind::TotalPartBytes,
+            ..
+        })
+    ));
+    assert_eq!(package.part_count(), 1);
+}
+
+#[test]
+fn authored_xml_replacement_is_stale_safe_and_signed_noop_preserving() {
+    let mut package = source_package();
+    let name = PackURI::new("/item.xml").unwrap();
+    let original = package.get_part(&name).unwrap().blob_arc();
+
+    assert!(matches!(
+        package.try_replace_authored_xml_part_bytes(
+            &name,
+            b"<stale/>",
+            Arc::new(b"<root changed=\"1\"/>".to_vec()),
+            SourceLimits::default(),
+        ),
+        Err(OpcError::XmlError(message)) if message.contains("stale")
+    ));
+    assert!(Arc::ptr_eq(
+        &package.get_part(&name).unwrap().blob_arc(),
+        &original
+    ));
+
+    assert!(
+        package
+            .try_replace_authored_xml_part_bytes(
+                &name,
+                &original,
+                Arc::new(b"<root>&unknown;</root>".to_vec()),
+                SourceLimits::default(),
+            )
+            .is_err()
+    );
+    assert!(Arc::ptr_eq(
+        &package.get_part(&name).unwrap().blob_arc(),
+        &original
+    ));
+
+    package.relate_to(
+        "_xmlsignatures/origin.sigs",
+        relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+    );
+    assert!(package.is_signed());
+    package
+        .try_replace_authored_xml_part_bytes(
+            &name,
+            &original,
+            Arc::clone(&original),
+            SourceLimits::default(),
+        )
+        .unwrap();
+    assert!(package.is_signed());
+    assert!(Arc::ptr_eq(
+        &package.get_part(&name).unwrap().blob_arc(),
+        &original
     ));
 }

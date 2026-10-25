@@ -727,6 +727,17 @@ primitive, not a registered six-type transaction family. General topology
 application, added/authored XML provenance and canonical source DOCX owner
 integration remain required.
 
+Record 0362ul94sa adds two explicit OPC publication seams for format-owned
+opaque XML: `OpcPackage::try_add_authored_xml_part_bytes(name, content_type,
+bytes, limits)` and `OpcPackage::try_replace_authored_xml_part_bytes(partname,
+expected, replacement, limits)`. Both require `SourceLimits`, admit part,
+aggregate-part, XML-event/depth, and XML-attribute ceilings before mutation,
+and retain exact bytes only as publication provenance. They never manufacture
+an `OwnedXmlPart` or `SourceXmlPart` range-splice token; the strict
+source-splice namespace proof remains unchanged. Equal replacement bytes are
+an audited no-op, including on a signed package, and every failed add or
+replace leaves the package and its signature state untouched.
+
 ## 19. Owned effective read foundation (record 0026)
 
 `PreparedTopology::part`, `iter_parts` and `main_document_part` return owned
