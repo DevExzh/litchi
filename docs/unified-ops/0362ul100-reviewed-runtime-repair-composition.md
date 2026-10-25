@@ -58,3 +58,43 @@ The prior PPTX 1,374-pass / 12-failure and common OOXML 511-pass / 17-failure
 captures remain historical. The repairs require actual reruns; source review
 alone does not discharge them. Final gate, inventory dispositions, native
 fidelity and quiet ABBA remain open. Only audit22 is deferred; nothing is pushed.
+
+
+## Compiler return and cleanup71
+
+The fresh eight-row packet on `fc5ef75a9e` passes formatting in 3.291 seconds
+and fails minimal all-target compilation in 55.221 seconds (exit101;
+141,380,662-byte target). Root verifies all terminal receipts, logs, source,
+locks and process guards before modifying the candidate. Later rows do not run.
+The diagnostics are an unused `mut` and two `String` arguments requiring byte
+slices in the new date-time test. Root independently reviews the exact three
+corrections at `2ac6bca410532e4d610f7bd995f364d4e4d1a5cd` (89az), fast-forwards
+the private candidate and verifies formatting. Behavior and assertions remain
+unchanged. Both compiler and runtime packets need fresh bindings; no compiler
+or runtime pass is claimed for 89az.
+
+Packet `.coord/pptx-combined-0362ul89-f5-consumer-fc5ef75a9e` is retained:
+`rows.json` 32,605 bytes, SHA-256
+`5f76adcb13d42c6b3f3eb97f529cf30c72e5cc5327c456230e392473c37f922e`;
+`result.json` 34,318 bytes, SHA-256
+`ad5aa86c9236e156cab414a0b486c666fa5400c24b96cc3f016f3e4151cb4ab9`.
+The prepared five-row fc5 runtime packet remains inert and unaccepted.
+
+Cleanup71 removes exactly the retired 89as, 89aq, 94p and 94q worktrees
+without force. Root verifies their retained branches, ancestry, twelve actual
+restored blob hashes, clean/no-payload evidence, absent paths and registry
+entries, zero remaining holders and unchanged protected probe. The live-holder
+89at tree is preserved. Net recovery is 7,692,996,608 bytes; cleanup68–71 totals
+60,657,246,208 bytes. External captures and targets remain untouched.
+
+Evidence directory:
+`.coord/worktree-cleanup-2026-10-25/quarantine/wave71-pptx-89as-89aq-ooxml-94p-94q/`.
+
+| Artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `manifest.json` | 5,514 | `be8d297757d7e1f2d0446bb52d57a8dc2f29ae6a24fb43a049e7945c4333c633` |
+| `restore-proof.json` | 6,001 | `ae45306cf3ee713385db32c38992d137208b42cc81844a1aafbf9799e9d505f7` |
+| `receipt.json` | 4,848 | `853dfc066467b65f061ee98440c2569df45b11a87c94af7b1d4a45bb971387e5` |
+
+The receipt accurately distinguishes concurrent root/integration documentation
+advances from the frozen production candidates. Final acceptance remains open.
