@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import math
 import sys
 import unittest
 from pathlib import Path
@@ -17,6 +18,21 @@ def statistics(values: list[int]) -> dict[str, object]:
     sorted_values = [value for _index, value in ordered]
     sample_order = [index for index, _value in ordered]
     count = len(values)
+    mean = 0.0
+    squared_deviation_sum = 0.0
+    for index, value in enumerate(sorted_values):
+        value_as_float = float(value)
+        next_count = float(index + 1)
+        delta = value_as_float - mean
+        next_mean = mean + delta / next_count
+        squared_deviation_sum += delta * (value_as_float - next_mean)
+        mean = next_mean
+    standard_deviation = math.sqrt(squared_deviation_sum / float(count - 1))
+    margin = (
+        validator._student_t_critical_95(count - 1)
+        * standard_deviation
+        / math.sqrt(float(count))
+    )
     p50 = (
         sorted_values[(count - 1) // 2] // 2
         + sorted_values[count // 2] // 2
@@ -35,12 +51,12 @@ def statistics(values: list[int]) -> dict[str, object]:
         "p95": sorted_values[max(1, (count * 95 + 99) // 100) - 1],
         "p99": sorted_values[max(1, (count * 99 + 99) // 100) - 1],
         "max": max(sorted_values),
-        "mean": float(sum(values)) / count,
-        "standard_deviation": 1.0,
+        "mean": mean,
+        "standard_deviation": standard_deviation,
         "confidence_interval_95": {
-            "method": "synthetic test evidence",
-            "lower": 1.0,
-            "upper": 2.0,
+            "method": "two-sided Student's t interval for the mean",
+            "lower": max(mean - margin, 0.0),
+            "upper": mean + margin,
         },
     }
 
@@ -154,8 +170,8 @@ def report(revision: str, binary_sha: str) -> dict[str, object]:
         "samples": 16,
         "warmup": 2,
         "checked_iteration_count": 18,
-        "memo_scope": "synthetic memo scope",
-        "fidelity_scope": "synthetic fidelity scope",
+        "memo_scope": validator.MEMO_SCOPE,
+        "fidelity_scope": validator.FIDELITY_SCOPE,
         "results": rows,
     }
 
@@ -244,6 +260,34 @@ class NotesMemoAbbaTests(unittest.TestCase):
         ] = "9" * 64
         with self.assertRaises(validator.ValidationError):
             validator.validate_abba(drifting_oracle)
+
+    def test_statistics_are_recomputed_and_method_is_exact(self) -> None:
+        for field in ("mean", "standard_deviation"):
+            wrong = copy.deepcopy(self.reports)
+            wrong["a1"]["results"][0]["elapsed_ns"][field] += 1.0
+            with self.subTest(field=field), self.assertRaises(validator.ValidationError):
+                validator.validate_abba(wrong)
+
+        wrong_interval = copy.deepcopy(self.reports)
+        wrong_interval["a1"]["results"][0]["elapsed_ns"]["confidence_interval_95"]["lower"] += 1.0
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_interval)
+
+        wrong_method = copy.deepcopy(self.reports)
+        wrong_method["a1"]["results"][0]["elapsed_ns"]["confidence_interval_95"]["method"] = "synthetic test evidence"
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_method)
+
+    def test_fixture_and_report_metadata_are_pinned(self) -> None:
+        wrong_recipe = copy.deepcopy(self.reports)
+        wrong_recipe["a1"]["fixture"]["recipe"] = "another fixture"
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_recipe)
+
+        wrong_scope = copy.deepcopy(self.reports)
+        wrong_scope["a1"]["memo_scope"] = "another memo scope"
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_abba(wrong_scope)
 
     def test_allocator_identity_and_scope_are_exact(self) -> None:
         wrong_native_allocator = copy.deepcopy(self.reports)

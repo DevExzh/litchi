@@ -50,6 +50,42 @@ INSTRUMENTED_ALLOCATOR = "CountingSystemAllocator(std::alloc::System)"
 ALLOCATOR_COUNTER_REVISION = "serialized_region_peak_v3"
 ALLOCATION_SCOPE = "operation_global_system_allocator"
 REPORT_ALLOCATION_SCOPE = "one non-nested operation-scoped global-allocator region around each timed API operation"
+MEMO_SCOPE = "source-audited SlideRootMemo eligibility; runtime proved-root counters remain internal and are covered by the focused crate test"
+FIDELITY_SCOPE = "untimed semantic reopen plus exact three-slide/notes and raw ZIP member, relationship, master/theme, and root oracle after every retained operation"
+FIXTURE_RECIPE = "three authored slides; title notes slide {i}, one body text box, speaker notes {i}"
+STUDENT_T_CRITICAL_95 = (
+    12.706,
+    4.303,
+    3.182,
+    2.776,
+    2.571,
+    2.447,
+    2.365,
+    2.306,
+    2.262,
+    2.228,
+    2.201,
+    2.179,
+    2.160,
+    2.145,
+    2.131,
+    2.120,
+    2.110,
+    2.101,
+    2.093,
+    2.086,
+    2.080,
+    2.074,
+    2.069,
+    2.064,
+    2.060,
+    2.056,
+    2.052,
+    2.048,
+    2.045,
+    2.042,
+)
+STUDENT_T_Z_975 = 1.959_963_984_540_054
 ALLOCATION_NUMERIC_FIELDS = (
     "allocation_calls",
     "deallocation_calls",
@@ -248,7 +284,37 @@ def _validate_fixture(report: Mapping[str, Any], path: str) -> dict[str, Any]:
         raise ValidationError(f"{path}.fixture.generator is not the pinned three-slide fixture")
     if result["slides"] != 3 or result["notes_slides"] != 3 or result["authored_shapes_per_slide"] != 1:
         raise ValidationError(f"{path}.fixture shape/count identity is not the pinned recipe")
+    if result["recipe"] != FIXTURE_RECIPE:
+        raise ValidationError(f"{path}.fixture.recipe is not the pinned fixture recipe")
     return result
+
+
+def _student_t_critical_95(degrees_of_freedom: int) -> float:
+    if degrees_of_freedom == 0:
+        return 0.0
+    if degrees_of_freedom <= len(STUDENT_T_CRITICAL_95):
+        return STUDENT_T_CRITICAL_95[degrees_of_freedom - 1]
+    degrees = float(degrees_of_freedom)
+    z = STUDENT_T_Z_975
+    z2 = z * z
+    z3 = z2 * z
+    z5 = z3 * z2
+    z7 = z5 * z2
+    return (
+        z
+        + (z3 + z) / (4.0 * degrees)
+        + (5.0 * z5 + 16.0 * z3 + 3.0 * z) / (96.0 * degrees * degrees)
+        + (3.0 * z7 + 19.0 * z5 + 17.0 * z3 - 15.0 * z)
+        / (384.0 * degrees * degrees * degrees)
+    )
+
+
+def _float_close(reported: Any, expected: float, path: str) -> None:
+    if isinstance(reported, bool) or not isinstance(reported, (int, float)) or not math.isfinite(reported):
+        raise ValidationError(f"{path} must be finite numeric evidence")
+    tolerance = max(1e-12, abs(expected) * 1e-12)
+    if abs(float(reported) - expected) > tolerance:
+        raise ValidationError(f"{path} does not match the samples")
 
 
 def _validate_statistics(value: Any, path: str, sample_count: int) -> tuple[list[int], list[int]]:
@@ -268,36 +334,63 @@ def _validate_statistics(value: Any, path: str, sample_count: int) -> tuple[list
         raise ValidationError(f"{path}.sample_order is not a permutation")
     if samples != sorted(samples):
         raise ValidationError(f"{path}.samples is not sorted")
+    mean = 0.0
+    squared_deviation_sum = 0.0
+    for index, sample in enumerate(samples):
+        value = float(sample)
+        next_count = float(index + 1)
+        delta = value - mean
+        next_mean = mean + delta / next_count
+        squared_deviation_sum += delta * (value - next_mean)
+        mean = next_mean
+    standard_deviation = (
+        math.sqrt(squared_deviation_sum / float(sample_count - 1))
+        if sample_count > 1
+        else 0.0
+    )
+    margin = (
+        _student_t_critical_95(sample_count - 1)
+        * standard_deviation
+        / math.sqrt(float(sample_count))
+        if sample_count > 1
+        else 0.0
+    )
+    left = samples[(sample_count - 1) // 2]
+    right = samples[sample_count // 2]
     expected = {
-        "min": min(samples),
-        "max": max(samples),
-        "p50": (
-            samples[(sample_count - 1) // 2] // 2
-            + samples[sample_count // 2] // 2
-            + ((
-                samples[(sample_count - 1) // 2] % 2
-                + samples[sample_count // 2] % 2
-            ) // 2)
-        ),
+        "min": samples[0],
+        "max": samples[-1],
+        "p50": left // 2 + right // 2 + (left % 2 + right % 2) // 2,
+        "p95": samples[max(1, (95 * sample_count + 99) // 100) - 1],
+        "p99": samples[max(1, (99 * sample_count + 99) // 100) - 1],
     }
-    rank95 = max(1, math.ceil(sample_count * 0.95)) - 1
-    rank99 = max(1, math.ceil(sample_count * 0.99)) - 1
-    expected["p95"] = samples[rank95]
-    expected["p99"] = samples[rank99]
     for key, expected_value in expected.items():
         if _required(stats, key, path) != expected_value:
             raise ValidationError(f"{path}.{key} does not match the samples")
-    for key in ("mean", "standard_deviation"):
-        value = _required(stats, key, path)
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-            raise ValidationError(f"{path}.{key} must be finite numeric evidence")
+    _float_close(_required(stats, "mean", path), mean, f"{path}.mean")
+    _float_close(
+        _required(stats, "standard_deviation", path),
+        standard_deviation,
+        f"{path}.standard_deviation",
+    )
     interval = _require_mapping(_required(stats, "confidence_interval_95", path), f"{path}.confidence_interval_95")
     _exact_keys(interval, CONFIDENCE_INTERVAL_KEYS, f"{path}.confidence_interval_95")
-    _string(_required(interval, "method", f"{path}.confidence_interval_95"), f"{path}.confidence_interval_95.method")
-    for key in ("lower", "upper"):
-        value = _required(interval, key, f"{path}.confidence_interval_95")
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
-            raise ValidationError(f"{path}.confidence_interval_95.{key} must be finite numeric evidence")
+    method = _string(
+        _required(interval, "method", f"{path}.confidence_interval_95"),
+        f"{path}.confidence_interval_95.method",
+    )
+    if method != "two-sided Student's t interval for the mean":
+        raise ValidationError(f"{path}.confidence_interval_95.method does not match the harness")
+    _float_close(
+        _required(interval, "lower", f"{path}.confidence_interval_95"),
+        max(mean - margin, 0.0),
+        f"{path}.confidence_interval_95.lower",
+    )
+    _float_close(
+        _required(interval, "upper", f"{path}.confidence_interval_95"),
+        mean + margin,
+        f"{path}.confidence_interval_95.upper",
+    )
     return samples, order
 
 
@@ -514,8 +607,10 @@ def validate_report(report: Mapping[str, Any], label: str, mode: str = "native")
         raise ValidationError(f"{path}.timing_claim does not match the instrumentation mode")
     if _required(report, "allocation_scope", path) != REPORT_ALLOCATION_SCOPE:
         raise ValidationError(f"{path}.allocation_scope is not the pinned operation scope")
-    _string(_required(report, "memo_scope", path), f"{path}.memo_scope")
-    _string(_required(report, "fidelity_scope", path), f"{path}.fidelity_scope")
+    if _required(report, "memo_scope", path) != MEMO_SCOPE:
+        raise ValidationError(f"{path}.memo_scope is not the pinned memo scope")
+    if _required(report, "fidelity_scope", path) != FIDELITY_SCOPE:
+        raise ValidationError(f"{path}.fidelity_scope is not the pinned fidelity scope")
     binary = _validate_binary(report, path)
     fixture = _validate_fixture(report, path)
     samples, rows = _validate_rows(report, path, mode)
