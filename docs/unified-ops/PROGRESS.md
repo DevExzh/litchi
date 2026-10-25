@@ -5744,3 +5744,94 @@ See [0063](0063-source-pptx-modern-comments.md).
   allocation ledger is 488,902,098,944 bytes under record103's exclusions,
   including no allocation claim for waves88/90. Remaining ancestor snapshots
   and retired leaves are being consolidated. No push or final acceptance.
+
+  Record117 removes the obsolete Web Extensions import found after the
+  formatting return. Repaired integration `a8d32513b8` passes all eight joint
+  compiler/consumer checks, including strict leaves/ops/facade Clippy and the
+  performance/native harnesses. Root verifies the complete terminal capture;
+  fresh runtime/glossary qualification follows on this frozen source (118).
+
+  Consolidation reaches 422 deleted refs and 231 removed worktrees. Root
+  verifies dirty overlays and old blob identities before deleting nineteen
+  retired refs. The notes control is detached at measured `c5d2b30740`, with
+  its old provenance branch archived/deleted and eight harness blobs verified.
+  Only unified trunk, private integration and the active runner remain as
+  unified-derived branches; main/office and 68 independent office siblings
+  are untouched. The measured allocated ledger is 676,827,754,496 bytes under
+  the recorded exclusions and evidence limitations. Further detached-candidate
+  cleanup continues. Full runtime, workspace/wsdoc, API/fidelity and performance
+  acceptance remain open. No push.
+
+  The fresh a8 runtime packet stops in the common library with 529 passing
+  tests and two VBA failures: relationship-size fixture accounting and source
+  fixture publication. Record119 returns these for 119a diagnosis/repair;
+  remaining groups continue diagnostically on frozen a8. No preservation or
+  limit rule is waived. Compiler8 remains passing, full runtime stays open.
+  Cleanup95's first seven snapshots are root-verified and removed, bringing
+  totals to 422 refs and 238 worktrees. Its missing pre-allocation measurement
+  is disclosed; the allocated ledger remains unchanged. Further stale after
+  snapshots are reviewed while canonical before controls remain available.
+
+  Common residual runtime exposes two Ribbon failures after the core/custom
+  and markup/MCE groups pass; Web Extensions integration passes all five tests.
+  Glossary finds the missing VBA Error export and an OPC rustdoc link. Returns
+  120/120a are committed; 119b passes independent review after correcting the
+  remaining ineligible fixture, and 121 is under replay/fidelity review (122).
+  Diagnostics continue on frozen a8; no failed capture is relabeled. The
+  full53 proposal is returned for using obsolete runner safety code. Cleanup95
+  reaches 422 deleted refs and 247 removed worktrees, with archived dirty
+  patches replayed and verified. The measured allocation ledger reaches
+  730,280,955,904 bytes under the recorded exclusions. Three active repair
+  branches remain for composition; final qualification and cleanup stay open.
+
+  Further a8 diagnostics pass twelve common/OPC/DOCX groups, then return one
+  DOCX durable tamper assertion. Follow-up123a uses typed errors throughout
+  that test while preserving atomic publication checks. Three more DOCX
+  groups pass; the PPTX helper passes 1,396 library tests (one ignored) and
+  five integration chunks before a signed-policy consumer rejects typed
+  VBA `Signed`. Reviewed124a corrects that consumer and its documentation.
+  Ribbon121c passes replay, fidelity and ordering review after two further
+  returns. Five reviewed repair leaves await composition; later diagnostics
+  and all repaired-source acceptance remain open (125).
+
+  Cleanup96 removes six archived DML/RTF diagnostic checkouts after actual
+  payload restoration and patch replay. Canonical before controls remain.
+  Root verifies 253 total worktree removals and 422 ref deletions, preserving
+  prior evidence limitations and disclosing process visibility limits. The
+  conservative allocated ledger reaches 737,962,319,872 bytes; this is not a
+  filesystem free-space delta. Final API census requires fresh 84-profile
+  captures and the 68-package inventory with the approved current lock.
+  Root remains on `feat/unified-ops-api`; no push or final acceptance.
+
+  Twenty-four further PPTX chunks pass before readonly replay exposes a real
+  physical XML event-admission gap. Reviewed126 applies the existing raw
+  scanner before semantic parsing and migrates readonly, math and metadata
+  callers atomically. Its added bounded pass still requires performance
+  qualification. Six source-reviewed leaves await composition. A guarded
+  diagnostic continuation preserves aggregate failure while examining the
+  remaining rows; primary-text-box and streaming-authoring failures are
+  returned as128/129. No repaired-source pass is claimed (127).
+
+  Cleanup97 removes three archived obsolete candidates. Root restores all
+  seven payloads and verifies absent paths/registrations, bringing totals to
+  422 refs and 256 worktrees. Process visibility limits remain explicit. The
+  conservative allocated ledger is 753,344,364,544 bytes under the recorded
+  exclusions. Raw census preparation is returned for three receipt/identity
+  defects; no census execution is authorized by a plan alone. Final gates,
+  fidelity, performance and consolidation remain open; nothing is pushed.
+
+  The remaining43 packet terminates with 24 passing rows and three failures.
+  The minimal PPTX profile reproduces readonly126 after chunks0–30 pass;
+  its remaining tests stay unrun. Root verifies the complete capture and
+  diagnostic admission decisions. Reviewed129 corrects exact InvalidLimit
+  classification. Root returns128/128a for five adjacent memory/output
+  dimension bugs and a regression-constructor error;128b is required before
+  composition. The final sixteen outer diagnostic rows are separate (130).
+
+  Census adapterv5 passes root/independent review and nine build-free tests
+  after correcting the real inventory receipt schema; final-source binding
+  and execution remain open. Cleanup98 removes one deletion-only obsolete
+  DrawingML checkout after exact manifest/history and permission-aware guard
+  checks. Totals reach257 worktrees and422 refs. Preserving its full deletion
+  manifest costs57,864,192 net allocated bytes, reducing the ledger to
+  753,286,500,352 bytes under the same exclusions. No push or final acceptance.
