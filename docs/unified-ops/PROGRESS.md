@@ -4691,3 +4691,41 @@ See [0063](0063-source-pptx-modern-comments.md).
   being corrected with failed evidence retained. Fresh full-gate capture,
   signed-batch contract choice, font budget adaptation and final native
   qualification remain required. Nothing is pushed.
+
+- Coordinator composed tooling and remaining validation update (2026-10-25):
+  The fresh 35-module tooling row runs all 1,688 tests on clean `319690ffc6`
+  and reports one failure in 108.883 seconds: DrawingML's reviewed adapter
+  hash still names the earlier performance-harness library. RTF's canonical
+  streaming rename changes exactly two source paths in that library. The
+  historical DrawingML adapter copies the library into older source trees,
+  so record 0362ul57 must preserve both historical and current API roles
+  while deliberately rebinding the reviewed bytes. Updating a digest alone
+  would not establish historical-build compatibility. All failed artifacts
+  remain retained; target and Cargo trace stay empty and owned processes
+  terminate. This current tooling row is failed, not accepted.
+
+  Its external state is
+  `.coord/tooling-row-319690ffc6-20261025T-state/state.json` (20,236 bytes,
+  SHA-256 `3eaa75e98885aa3c249fcd49846f6e6c1721ecfd9dac6fab838c68bc34b8569d`).
+  The 636,346-byte child log has SHA-256
+  `1f52db64e95036ff40de1ef51bc5793fd5b085f0b9a8c86991f2b79323d1bf59`.
+  Root verifies those artifacts; the integration hold is released.
+
+  ODF `6672bde714` passes independent review of the remaining script-wrapper
+  limits and has a prepared validation plan, awaiting a build slot. Crypto's
+  compile/Clippy corrections at `3c843b9e9f` also pass source review; its
+  final guarded run remains active. Its eventual DOC/OLE composition must
+  retain the selected custom-XML policy and migrate the new writer arguments.
+  PPT is correcting the final shape-click aggregate projection after repairing
+  existing-list accounting. The new Allsorts adapter `1bb2e207ec` is under
+  independent review, including a separate audit of pinned decompressor
+  allocations; no dependency-budget exception or lock update is accepted.
+
+  SpreadsheetDrawing atomic `9f43932dd0` has passing bounded diagnostic runs,
+  but those runs did not use the required ownership/target guard. Root verifies
+  that the approved f5 runner is available and returns the packet for actual
+  guarded validation in its existing slot. Diagnostic results and temporary
+  directory failures remain preserved. Its final source delta also receives
+  independent review. Slots 1–4 remain XLS, DOCX, SpreadsheetDrawing and
+  crypto. All final capture, gate and performance obligations remain active;
+  nothing is pushed.
