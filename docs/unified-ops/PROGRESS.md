@@ -6082,3 +6082,10 @@ See [0063](0063-source-pptx-modern-comments.md).
   checks for the merged IWA graph/index and owned PPT record changes. C stays
   fixed for that run; final source freeze, full gates and measurements remain
   open. Nothing is pushed.
+
+  Focused Rust verification catches one graph test-consumer compile error;
+  157b fixes the optional-iterator assertion without a production change.
+  The fresh approved run on 49fc1721 passes 18 graph tests, 26 index tests and
+  the owned PPT record fidelity test (160a). Root verifies logs, target
+  traces, unchanged source/locks and clean process exits. PPT 158a and final
+  corrected-source qualification remain open; no acceptance or push.
