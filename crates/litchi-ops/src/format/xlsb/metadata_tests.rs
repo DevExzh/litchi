@@ -138,6 +138,7 @@ fn a_source_backed_set_rejects_unstorable_fields_and_changes_nothing() {
         .set("/metadata", props! { "contentType" => "text/plain" })
         .expect_err("unstorable");
     assert_eq!(error.code(), Code::UnsupportedProperty);
+    assert_eq!(error.property(), Some("content_type"));
     assert!(xlsb(&file).is_source_backed());
 }
 

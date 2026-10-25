@@ -101,7 +101,7 @@ fn the_root_refuses_other_keys_by_name() {
     let docx = create(FileFormat::Docx).expect("create");
     let error = docx.set("/", props! { "contentType" => "x" }).unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedProperty);
-    assert_eq!(error.property(), Some("contentType"));
+    assert_eq!(error.property(), Some("content_type"));
     // Every OOXML format writes application properties on the root too
     // (DOCX: record 0342).
     for format in [FileFormat::Docx, FileFormat::Xlsx, FileFormat::Pptx] {
