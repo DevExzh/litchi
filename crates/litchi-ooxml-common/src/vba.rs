@@ -1590,7 +1590,9 @@ fn validate_recipient_metadata_limits(
         let relationship_members = relationships.members;
         let physical_members = metrics
             .opaque_members()
-            .saturating_add(2)
+            // `relationship_members` already includes the package-level
+            // `_rels/.rels` member; add only the content-types member here.
+            .saturating_add(1)
             .saturating_add(parts)
             .saturating_add(relationship_members);
         check_vba_limit(
@@ -1602,7 +1604,7 @@ fn validate_recipient_metadata_limits(
             LimitKind::ArchiveTotalEntries,
             metrics
                 .opaque_entries()
-                .saturating_add(2)
+                .saturating_add(1)
                 .saturating_add(parts)
                 .saturating_add(relationship_members) as u64,
             limits.max_archive_total_entries() as u64,
@@ -1830,14 +1832,16 @@ fn validate_archive_structural_limits(
     let projected_content_type_bytes =
         u64::try_from(projected_content_types.bytes().len()).unwrap_or(u64::MAX);
     if let Some(metrics) = admission.retained.as_ref() {
-        // The targeted writer always has one content-types member and one
-        // package-level `.rels` member. Everything else comes from the
-        // current known part map, its retained/created part `.rels` members,
-        // and immutable opaque source entries. No historical source count is
-        // used to infer a relationship member.
+        // The targeted writer always has one content-types member. The
+        // projected relationship count already includes the package-level
+        // `.rels` member; everything else comes from the current known part
+        // map and immutable opaque source entries. No historical source count
+        // is used to infer a relationship member.
         let physical_members = metrics
             .opaque_members()
-            .saturating_add(2)
+            // `projected_physical_relationship_parts` retains the package
+            // root relationship member, so only content types is added here.
+            .saturating_add(1)
             .saturating_add(projected_parts)
             .saturating_add(projected_physical_relationship_parts);
         check_vba_limit(
@@ -1849,7 +1853,7 @@ fn validate_archive_structural_limits(
             LimitKind::ArchiveTotalEntries,
             metrics
                 .opaque_entries()
-                .saturating_add(2)
+                .saturating_add(1)
                 .saturating_add(projected_parts)
                 .saturating_add(projected_physical_relationship_parts) as u64,
             limits.max_archive_total_entries() as u64,
@@ -1886,7 +1890,6 @@ fn validate_archive_structural_limits(
             .filter(|member| !member.name().ends_with('/'))
             .count();
         let physical_members = 1_u64
-            .saturating_add(1)
             .saturating_add(u64::try_from(projected_parts).unwrap_or(u64::MAX))
             .saturating_add(
                 u64::try_from(projected_physical_relationship_parts).unwrap_or(u64::MAX),
@@ -1946,32 +1949,11 @@ fn validate_archive_structural_limits(
         u64::try_from("[Content_Types].xml".len()).unwrap_or(u64::MAX),
         limits.max_archive_member_name_bytes(),
     )?;
-    for metadata in package.iter_parts() {
-        check_vba_limit(
-            LimitKind::ArchiveMemberNameBytes,
-            u64::try_from(metadata.partname().membername().len()).unwrap_or(u64::MAX),
-            limits.max_archive_member_name_bytes(),
-        )?;
-        let relationships = metadata
-            .partname()
-            .rels_uri()
-            .map_err(|error| Error::Uri(error.clone()))?;
-        check_vba_limit(
-            LimitKind::ArchiveMemberNameBytes,
-            u64::try_from(relationships.membername().len()).unwrap_or(u64::MAX),
-            limits.max_archive_member_name_bytes(),
-        )?;
-        let bytes = u64::try_from(metadata.payload_len()?).unwrap_or(u64::MAX);
-        check_vba_limit(LimitKind::PartBytes, bytes, limits.max_part_bytes())?;
-        check_vba_limit(LimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
-    }
-    for member in package.non_part_members() {
-        check_vba_limit(
-            LimitKind::ArchiveMemberNameBytes,
-            u64::try_from(member.name().len()).unwrap_or(u64::MAX),
-            limits.max_archive_member_name_bytes(),
-        )?;
-    }
+    // Recipient-wide part, relationship, opaque-member, and payload checks
+    // were completed by `validate_recipient_metadata_limits` and are carried
+    // in `admission`. Only graph entries changed by this publication are
+    // checked above; repeating the package scan here would rewalk and may
+    // hydrate unrelated deferred payloads.
     Ok(())
 }
 
@@ -3767,6 +3749,15 @@ mod tests {
         assert!(final_entries >= final_members);
         assert!(final_aggregate > 0);
         assert!(final_metadata > 0);
+        let final_relationships = relationship_totals(&reopened, SourceLimits::default()).unwrap();
+        assert_eq!(
+            final_members,
+            projected
+                .opaque_members()
+                .saturating_add(1)
+                .saturating_add(reopened.part_count())
+                .saturating_add(final_relationships.members)
+        );
 
         let limits = |members, entries, aggregate, metadata| {
             SourceLimits::builder()

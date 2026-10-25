@@ -261,40 +261,17 @@ pub(crate) struct SourcePart {
 
 /// Apply the same source-payload decision used by targeted publication.
 ///
-/// A deferred current payload is an untouched-source proof and therefore does
-/// not need to be decoded. Once a caller supplied a payload allocation, the
-/// writer compares bytes as well as provenance: equal replacement bytes are
-/// still safe to copy with the source central record and compressed stream.
-/// Metadata admission passes `false` for `force_deferred`, using the checked
-/// declared length as a conservative proof and leaving unrelated deferred
-/// members untouched. The selected writer plan passes `true` when it must make
-/// the exact copy/regenerate decision. Keeping both branches here prevents
-/// the two paths from drifting.
-pub(crate) fn source_blob_retained(
-    source_part: &SourcePart,
-    current: Option<&[u8]>,
-    force_deferred: bool,
-) -> bool {
+/// A deferred current payload is compared through the retained archive's
+/// bounded verified reader rather than being inflated into a payload-sized
+/// allocation. Equal replacement bytes are safe to copy with the source
+/// central record and compressed stream, while a same-length but different
+/// replacement is regenerated. Admission and the selected writer therefore
+/// make the same exact decision without a conservative length-only branch.
+pub(crate) fn source_blob_retained(source_part: &SourcePart, current: Option<&[u8]>) -> bool {
     let Some(current) = current else {
         return true;
     };
-    if let Some(source) = source_part.blob.decoded() {
-        return std::ptr::eq(source.as_slice(), current) || source.as_slice() == current;
-    }
-    if !force_deferred {
-        // Admission must not hydrate an unrelated deferred source member just
-        // to predict a writer branch. A declared-length mismatch proves the
-        // writer cannot copy it; equal lengths remain conservatively charged
-        // as retained until the selected publication plan compares bytes.
-        return source_part
-            .blob
-            .payload_len()
-            .is_ok_and(|length| length == current.len());
-    }
-    source_part
-        .blob
-        .force()
-        .is_ok_and(|source| source.as_slice() == current)
+    source_part.blob.same_bytes(current).is_ok_and(|same| same)
 }
 
 /// A compact semantic fingerprint for one relationship collection.
@@ -942,7 +919,7 @@ impl OpcPackage {
                     .zip(self.parts.get(partname))
                     .is_some_and(|(source_part, current)| {
                         source_part.member_present
-                            && source_blob_retained(source_part, current.decoded_blob(), false)
+                            && source_blob_retained(source_part, current.decoded_blob())
                     }),
                 SourceMemberKind::PartRelationships(partname) => {
                     let Some((source_part, current)) =
@@ -1645,8 +1622,7 @@ impl OpcPackage {
             .as_deref()
             .and_then(|provenance| provenance.parts.get(part.partname()))
             .is_some_and(|source_part| {
-                source_part.member_present
-                    && source_blob_retained(source_part, part.decoded_blob(), true)
+                source_part.member_present && source_blob_retained(source_part, part.decoded_blob())
             })
     }
 
@@ -5312,6 +5288,85 @@ mod tests {
                 maximum,
             }) if actual == content_types.len() as u64 && maximum == (content_types.len() - 1) as u64
         ));
+    }
+
+    #[test]
+    fn same_length_deferred_replacement_is_regenerated_without_hydrating_twice() {
+        let target = PackURI::new("/custom/unrelated.bin").unwrap();
+        let mut original_payload = Vec::with_capacity(64 * 1024);
+        let mut state = 0x1234_5678_u32;
+        for _ in 0..64 * 1024 {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            original_payload.push((state >> 24) as u8);
+        }
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/document.xml").unwrap(),
+            crate::constants::content_type::XML.to_owned(),
+            b"<document/>".to_vec(),
+        )));
+        package.add_part(Box::new(BlobPart::new(
+            target.clone(),
+            "application/octet-stream".to_owned(),
+            original_payload.clone(),
+        )));
+        let source = crate::PackageWriter::to_bytes(&package).unwrap();
+        let archive = soapberry_zip::ZipArchive::from_slice(&source).unwrap();
+        let target_member = target.membername().as_bytes().to_owned();
+        let mut target_compressed = 0_u64;
+        let mut retained_compressed = 0_u64;
+        for entry in archive.entries() {
+            let entry = entry.unwrap();
+            if entry.is_dir() {
+                continue;
+            }
+            let compressed = entry.compressed_size_hint();
+            if entry.file_path().as_ref() == target_member.as_slice() {
+                target_compressed = compressed;
+            } else {
+                retained_compressed = retained_compressed.max(compressed);
+            }
+        }
+        assert!(target_compressed > retained_compressed);
+
+        let mut recipient = OpcPackage::from_vec(source, SourceLimits::default()).unwrap();
+        assert_eq!(recipient.deferred_decode_counters(), Some((0, 0)));
+        let original_len = original_payload.len() as u64;
+        let mut replacement = original_payload;
+        replacement[0] ^= 0xff;
+        let replacement_for_assertion = replacement.clone();
+        recipient
+            .replace_part_payloads(vec![(target, replacement)])
+            .unwrap();
+        let after_replacement = recipient.deferred_decode_counters();
+        assert_eq!(after_replacement, Some((1, original_len)));
+
+        let final_metrics = recipient
+            .retained_archive_metrics(SourceLimits::default())
+            .unwrap()
+            .unwrap();
+        let limits = SourceLimits::builder()
+            .max_archive_compressed_bytes(retained_compressed)
+            .unwrap()
+            .max_archive_metadata_bytes(final_metrics.metadata_bytes())
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(recipient.retained_archive_metrics(limits).is_ok());
+        assert_eq!(recipient.deferred_decode_counters(), after_replacement);
+        recipient.read_limits = limits;
+        let output = crate::PackageWriter::to_bytes(&recipient).unwrap();
+        let reopened = OpcPackage::from_vec(output, SourceLimits::default()).unwrap();
+        assert_eq!(
+            reopened
+                .get_part(&PackURI::new("/custom/unrelated.bin").unwrap())
+                .unwrap()
+                .blob(),
+            replacement_for_assertion.as_slice()
+        );
+        assert_eq!(recipient.deferred_decode_counters(), after_replacement);
     }
 
     #[test]

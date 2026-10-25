@@ -1,8 +1,8 @@
 # 0362ul87c — shared OOXML VBA publication boundary
 
 Status: source-only implementation on `uo2/ooxml-vba-publication-0362ul87c`;
-87cc, 87cd, 87ce, 87cf, and 87cg review repairs are included in the follow-up
-commit.
+87cc, 87cd, 87ce, 87cf, 87cg, and 87ch review repairs are included in the
+follow-up commit.
 This slice follows the boundary audit in 0362ul87. It has not run Cargo,
 rustdoc, native qualification, or performance measurements; those require a
 coordinator validation slot after the four OOXML consumers are composed.
@@ -149,8 +149,9 @@ central-directory sizes. Missing preservation provenance is a typed refusal,
 not an historical-source fallback.
 
 Final archive member and entry counts are composed from the actual current
-known parts, retained empty relationships members, the two mandatory
-content-types/package-relationships members, and immutable opaque entries.
+known parts, retained empty relationships members, one mandatory content-types
+member, the relationship members (including the package-level `.rels` member),
+and immutable opaque entries.
 The former source-count-minus-current-part-count estimate is gone. Store and
 remove staging use the same metadata-only recipient admission as replay before
 selected graph capture. A serialized/reopened recipient regression removes a
@@ -177,3 +178,31 @@ opaque source records and their metadata. Exact and one-byte-under metadata
 limits cover a serialized VBA replay. A compact recipient admission summary is
 carried from staging/preflight into publication validation, avoiding a second
 retained-central-directory or whole-recipient relationship scan.
+
+## 87ch review repair
+
+The physical relationship-member projection now uses one convention end to
+end: `RelationshipTotals::members` already includes the package-level
+`_rels/.rels` member, so recipient and structural archive counts add only the
+single `[Content_Types].xml` member. Authored and retained projections use the
+same formula, and the serialized replay boundary test asserts the resulting
+member count against the relationship total rather than a historical source
+count.
+
+The admission and targeted writer preservation predicates now use one exact
+bounded comparison. When a caller replaces a deferred source payload with a
+same-length candidate, the retained ZIP member is streamed through the fixed
+verified reader and compared byte-for-byte; a mismatch is regenerated, while
+equal bytes still copy the source central record and compressed representation.
+The comparison does not call deferred `force()` and therefore does not retain a
+payload-sized allocation or charge the deferred decode counter. The regression
+uses a same-length unrelated replacement, a tight compressed-size and metadata
+policy, and verifies that the replacement is published without a second
+deferred hydration. Existing equal-byte central-metadata and relationship
+round-trip coverage remains in place.
+
+Structural archive validation reuses the completed recipient admission summary
+for package-wide names, sizes, payload, and opaque-entry checks. It validates
+only the prospective target graph entries after composition, so store, remove,
+and replay do not repeat the package-wide scan or hydrate unrelated deferred
+payloads before publication.
