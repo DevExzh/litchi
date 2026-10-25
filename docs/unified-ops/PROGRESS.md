@@ -6026,3 +6026,13 @@ See [0063](0063-source-pptx-modern-comments.md).
   remain live. The baseline materializer is returned before real execution
   for full/sparse checkout metadata, unrelated-ref and completion-order fixes.
   P stays frozen until the live emitter finishes. No acceptance or push.
+
+  The signed streaming repair passes independent review and 16 focused tests
+  (153); it waits for P installation. The archive-reuse v5 recipe is returned
+  for standalone finalizer path containment and immediate reuse identity
+  checks. DrawingML materializer v5a passes 13 source/seam checks and root's
+  actual read-only ten-profile plan. Its capped source-only execution starts;
+  terminal verification is pending. P/C remain frozen during both source jobs.
+  Root verifies 32 passing final65 rows; the gate remains live. Common-P
+  installation, final gates, measurements, census review, merge and cleanup
+  remain required. Nothing is pushed.
