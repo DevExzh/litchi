@@ -833,6 +833,27 @@ fn metadata_noop_commit_rechecks_stale_source() {
 }
 
 #[test]
+fn metadata_noop_commit_checks_cancellation_before_stale_source() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let edit = workbook.edit_metadata().unwrap();
+    source.change();
+    cancellation_source.cancel();
+
+    assert!(matches!(
+        edit.commit(),
+        Err(MetadataError::Package(OoxmlError::Opc(OpcError::Cancelled)))
+    ));
+}
+
+#[test]
 fn metadata_revised_noop_replay_rechecks_stale_source() {
     let source = Arc::new(VersionedSource::new(fixture()));
     let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
@@ -848,6 +869,31 @@ fn metadata_revised_noop_replay_rechecks_stale_source() {
         Err(MetadataError::Package(OoxmlError::Opc(
             OpcError::SourceChanged { .. }
         )))
+    ));
+}
+
+#[test]
+fn metadata_revised_noop_replay_checks_cancellation_before_stale_source() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let mut edit = workbook.edit_metadata().unwrap();
+    edit.update(|metadata| metadata.title = Some("revised".to_owned()))
+        .unwrap();
+    let revised = edit.commit().unwrap().into_package();
+    let no_op = revised.edit_metadata().unwrap().commit().unwrap();
+    source.change();
+    cancellation_source.cancel();
+
+    assert!(matches!(
+        revised.apply_metadata(no_op.patch()),
+        Err(MetadataError::Package(OoxmlError::Opc(OpcError::Cancelled)))
     ));
 }
 

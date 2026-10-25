@@ -197,6 +197,7 @@ impl Edit {
             // edit captured a source version when it started; publishing the
             // unchanged owner after that source changed would otherwise make
             // the stale edit look valid.
+            source.check_execution()?;
             source.source_version()?;
             return Ok(Commit {
                 package: workbook,
@@ -352,6 +353,7 @@ impl SourceBackedWorkbook {
                 // Composing an empty patch only authenticates the retained
                 // property revision. It cannot observe a change to the
                 // external source, so fence that source independently.
+                source.check_execution()?;
                 source.source_version()?;
                 revision.patch.compose(patch)?;
             } else {
