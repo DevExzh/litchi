@@ -5644,3 +5644,39 @@ See [0063](0063-source-pptx-modern-comments.md).
   from unified work. Already-integrated refs are being checked for guarded
   deletion; unique work and active measurement baselines remain under review.
   Record 0362ul103 tracks this consolidation. No push or final acceptance.
+
+  The first cleanup is complete: 70 already-trunk local branch refs are
+  deleted with exact-tip guards and all commits remain reachable. Cleanup72
+  removes retired W7 docfix without force, preserves its ignored lock and
+  reclaims 10,166,382,592 bytes; root verifies the unchanged protected probe.
+  Sixty-six independent Office/iWork sibling branches are outside scope.
+  Remaining unique rows receive semantic review against their squashed
+  replacements. The 14 signed-policy tests pass and the fresh eight-row
+  compiler packet is running on frozen joint source `ea5c95e212`.
+
+  Joint source `ea5c95e212` passes all eight compiler/consumer rows, including
+  strict six-package/ops/facade Clippy and standalone perf/native harnesses.
+  Root verifies the complete receipt; the 34-row runtime packet is now active.
+  Cleanup73 removes eleven unused worktrees without force, preserves eight
+  locks and reclaims 62,694,273,024 bytes. Cleanup72–73 totals 72,860,655,616
+  bytes. Local ref consolidation has deleted 271 refs with exact-tip guards;
+  integrated commits remain reachable, and seven retired old reference
+  branches are deliberately discarded. Sixty-eight office-lineage siblings
+  are outside scope. Dirty payload and remaining worktree review continues.
+
+
+  Runtime on ea5 stops with 526 common OOXML tests passing and five failing.
+  A diagnostic continuation passes eight more rows, then DOCX signature
+  policy reports eight passes and one stale Ribbon error assertion. Both
+  terminal captures are root-verified. Reviewed 104c, 104a and 105 address
+  those findings; reviewed 102a preserves individual signed invalid-target
+  errors while keeping the owner's zero-read batch refusal. Repaired-source
+  qualification remains required; no runtime/performance acceptance.
+
+  Local consolidation now deletes 318 refs and removes 47 worktrees across
+  cleanup72–76. The measured allocated ledger is 118,948,712,448 bytes before
+  the small extra adapter archive, excluding cleanup75's unmeasured allocation.
+  Cleanup75 separately removes about 31.8 GB of apparent size after reversible
+  quarantine. Root verifies preserved payloads, source/registry proofs and the
+  unchanged protected constructor probe. Remaining worktrees are still being
+  audited; 68 independent office siblings remain outside scope. No push.
