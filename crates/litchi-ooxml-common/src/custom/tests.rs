@@ -31,7 +31,11 @@ fn document(body: &str) -> String {
     format!("{PREFIX}{body}</Properties>")
 }
 
-fn publish(package: &mut OpcPackage, props: Props, host: Host) -> crate::Result<bool> {
+fn publish(
+    package: &mut OpcPackage,
+    props: Props,
+    host: Host,
+) -> std::result::Result<bool, crate::properties::Error> {
     let mut edit = crate::properties::Edit::new(package, host)?;
     edit.set_custom_props(props);
     let commit = edit.commit()?;
@@ -289,9 +293,7 @@ fn package_write_read_and_clear_remove_the_complete_graph() {
     // the signature is removed explicitly (ADR 0006).
     assert!(matches!(
         publish(&mut package, props.clone(), Host::Word),
-        Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
+        Err(crate::properties::Error::Signed)
     ));
     assert!(package.is_signed());
     assert!(package.get_part(&custom_part_name().expect("URI")).is_err());
@@ -327,9 +329,7 @@ fn package_write_read_and_clear_remove_the_complete_graph() {
 
     assert!(matches!(
         publish(&mut package, Props::new(), Host::Word),
-        Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
+        Err(crate::properties::Error::Signed)
     ));
     assert!(package.is_signed());
     assert!(package.get_part(&custom_part_name().expect("URI")).is_ok());

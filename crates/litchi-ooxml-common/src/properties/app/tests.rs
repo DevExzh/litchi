@@ -6,7 +6,7 @@
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcError, OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI};
 
 use super::*;
 use crate::Error;
@@ -169,7 +169,10 @@ fn sign(package: &mut OpcPackage) {
     assert!(package.is_signed());
 }
 
-fn publish(package: &mut OpcPackage, props: Option<Props>) -> crate::Result<bool> {
+fn publish(
+    package: &mut OpcPackage,
+    props: Option<Props>,
+) -> std::result::Result<bool, crate::properties::Error> {
     let mut edit = crate::properties::Edit::new(package, crate::custom::Host::Word)?;
     edit.set_app_props(props);
     let commit = edit.commit()?;
@@ -212,11 +215,11 @@ fn signed_packages_keep_noops_and_refuse_changes() {
     assert!(!publish(&mut package, Some(word())).unwrap());
     assert!(matches!(
         publish(&mut package, Some(Props::new())),
-        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+        Err(crate::properties::Error::Signed)
     ));
     assert!(matches!(
         publish(&mut package, None),
-        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+        Err(crate::properties::Error::Signed)
     ));
     assert_eq!(read(&package).unwrap(), Some(word()));
     assert!(package.is_signed());
@@ -239,7 +242,7 @@ fn graph_anomalies_are_errors() {
     shared.relate_to("docProps/app.xml", "urn:test:other");
     assert!(matches!(
         publish(&mut shared, None),
-        Err(Error::Relationship(_))
+        Err(crate::properties::Error::Package(Error::Relationship(_)))
     ));
     assert_eq!(read(&shared).unwrap(), Some(word()));
 }
