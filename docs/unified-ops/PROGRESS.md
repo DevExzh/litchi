@@ -4489,3 +4489,114 @@ See [0063](0063-source-pptx-modern-comments.md).
   because measured CFB/PPT paths have changed. A final run of that same
   workload is being prepared separately from the diagnostic primary-noop
   cold probe. Actual qualification and the signed-batch decision remain open.
+
+- Coordinator consumer and PPT tooling integration (2026-10-24):
+  RTF/CLI/DOC/XLSB consumer and guide repairs merge at `1ff6aae60a` from
+  `2cb3cdd55d`. The actual locked RTF fuzz check passes in 72.066 seconds,
+  with a maximum sampled target of 118,970,506 bytes. Root independently
+  verifies the receipt and all 83 registry identities against the approved
+  root lock's 518 identities. The current fuzz gate also covers RTF and
+  observes its standalone lock. Record 0362ul37 retains the initial sparse
+  metadata failure and distinguishes the later successful check.
+
+  Reviewed PPT tooling merges at `30aaafbf98` from `8d8dfce1f`. Public
+  execution validates its build projection and child-event provenance;
+  26 composed tests pass with the tools import path configured. The initial
+  plain module invocation exposes an import failure, so 0362ul41 is assigned
+  to fix the current tooling row and register both new suites. The frozen
+  28-route workload is unchanged. Cold primary-noop observations remain
+  supplemental; neither tooling readiness nor old 472b builds are final
+  performance acceptance.
+
+  A further source review finds public PPT record/codec decoders that still
+  choose limits internally. Required engineering record 0362ul39 migrates
+  their canonical entry points to explicit limits and updates current
+  consumers, preserving package-selected profiles and public capabilities.
+  An independent sweep is checking other formats for the same gap. Final
+  candidate API and performance bindings must be refreshed after this repair;
+  the CLI run remains held during source stabilization. The signed-batch
+  contract choice is still pending.
+
+  Review returns the changed-commit qualification handoff for executable
+  setup, changed-output oracle, quiet-process and target-size corrections.
+  A newly found fast-exit output/TMP cap race is repaired in 0362ul40 and is
+  under independent review. No native measurements are claimed. Cleanup
+  wave 55 remains in preflight; the owner has retired an obsolete scanner
+  that pinned inactive leaves. No additional worktree has been removed, and
+  nothing is pushed.
+
+- Coordinator raw-codec integration and cleanup update (2026-10-25):
+  Required raw-profile signature enforcement merges at `c51a539757` from
+  reviewed `939d401609`. The checker resolves local and external nominal
+  limits types, rejects ambiguous identities, and verifies exact required
+  arguments. All 55 composed checker tests pass. XLSX drawing limits and
+  every current consumer merge atomically at `b21bb1ff82` from `34e6b0c6c`;
+  its 20 unit tests, 12 integration tests and all-target/all-feature clippy
+  pass. Root verifies the final source tree matches the tested tree and the
+  composed glossary policy parses successfully.
+
+  Ink's fast-exit output/TMP cap repair merges at `267ea71526` from reviewed
+  `18da76e3fb`. All eleven composed boundary tests pass, including exact-cap
+  acceptance and final snapshots after child exit. The earlier systemd
+  preflight remains attributed to its original wrapper; this repair does
+  not claim a new native measurement.
+
+  Cleanup wave 55 removes the inactive, merged constructors checkout without
+  force and retains its branch. All 21,662 ignored/untracked files, including
+  its target, are preserved with exact identities. Sparse restoration passes.
+  Record 0362ul53 binds root review, the external manifest and a payload-based
+  regeneration command. The allocation difference after quarantine and its
+  supplements is 7,535,771,648 bytes; no isolated free-space delta is claimed.
+  No active source root, target or foreign process is removed.
+
+  Raw-codec repairs continue for DOCX/OOXML, PPT, DOC/OLE, XLS, ODF, image
+  codecs, fonts, SpreadsheetDrawing, crypto and RTF; iWork result names also
+  require consumer validation. DOC/OLE's scoped suites and clippy pass and
+  await independent source review. DOCX and ODF were returned for concrete
+  nested-budget and owner-policy defects; corrected commits are under review.
+  Four bounded build slots are allocated to DOCX, XLS, RTF and image codecs.
+  Tooling-row and PPT qualification repairs remain under review. Final source
+  capture, full gate, signed-batch contract choice and actual performance
+  qualification remain open. Nothing is pushed.
+
+- Coordinator tooling, review and cleanup update (2026-10-25):
+  Reviewed tooling environment and process-lifecycle repairs merge at
+  `f86d2e90e3`. The lifecycle regression now observes child exit without
+  reaping it, preserving the actual `Popen` return code; 43 composed tests
+  pass. PPT qualification guards and the strengthened forward/inverse replay
+  oracle merge at `a10687e3b2`; 44 focused composition tests pass. The
+  unchanged timed workload remains separate from the correctness companion.
+
+  The full current tooling row then passes on clean `a10687e3b2`: 1,687 tests
+  in 110.974 seconds, with zero target bytes, empty Cargo trace, unchanged
+  source/locks and no remaining owned processes. Record 0362ul55 binds the
+  independently verified receipt and preserves the separate setup failure.
+  Both runner and external `.coord/gate.sh` now register the same 35 modules.
+  This is one row of the 53-step gate, not full acceptance.
+
+  Independent source review returns the raw-codec lanes for concrete repairs:
+  DOC/OLE output admission and opaque Custom XML fidelity (0362ul45a), XLS
+  tooltip and source-backed reader policy retention (0362ul46b), image
+  compatibility-converter policies (0362ul47a), SpreadsheetDrawing raw
+  append/rewrite budgets (0362ul51a), crypto output/typed-limit paths
+  (0362ul52a), and PPT nested aggregate/editor limits (0362ul39b). RTF chained
+  edits must retain their originating open options. ODF 0362ul44b repairs
+  are source-ready for review. DOCX 0362ul42b now passes independent source
+  review at `25ed716942`; actual corrected Cargo validation remains required.
+  Fonts' automatic-loader fix is preserved, while bounded subset planning
+  remains engineering work; unproven allocation multipliers are not accepted.
+
+  The earlier XLS clippy failures were caused by absent tracked
+  `clippy.toml` in the sparse checkout. Configured current and original-base
+  checks pass, matching the frozen gate's policy; no lint exemption is added.
+  New source-review findings still prevent accepting that lane. Four bounded
+  validation slots are assigned to DOC/OLE, image codecs, iWork and RTF;
+  PPT and DOCX source work does not launch competing builds.
+
+  Cleanup wave 56 removes the clean, merged XLSX rich-transfer checkout,
+  retains its branch and quarantines its sole ignored lockfile. Sparse
+  restoration and root postchecks pass. Record 0362ul54 reports approximately
+  7.55 GB of checkout-allocation reduction after the complete quarantine.
+  No target, source capture, foreign process or protected probe is removed.
+  Final capture, full gate, the signed-batch contract decision and actual
+  native/performance qualification remain open. Nothing is pushed.
