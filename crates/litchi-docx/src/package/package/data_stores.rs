@@ -725,7 +725,7 @@ impl Package {
 }
 
 fn part_is_referenced_in(package: &OpcPackage, target: &PackURI) -> Result<bool> {
-    for relationship in package.rels() {
+    for relationship in package.rels().iter() {
         if !relationship.is_external() {
             let part = relationship.target_partname()?;
             if &part == target {
@@ -734,7 +734,7 @@ fn part_is_referenced_in(package: &OpcPackage, target: &PackURI) -> Result<bool>
         }
     }
     for part in package.iter_parts() {
-        for relationship in part.rels() {
+        for relationship in part.rels().iter() {
             if !relationship.is_external() {
                 let target_part = relationship.target_partname()?;
                 if &target_part == target {

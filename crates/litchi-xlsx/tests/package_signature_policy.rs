@@ -1195,7 +1195,7 @@ mod shared_owners {
     fn a_signed_package_keeps_equal_custom_properties_and_refuses_their_removal() {
         let plain = Package::from_opc(unsigned_fixture(SIGNED[0])).unwrap();
         let plain = set_custom_props(&plain, props()).unwrap();
-        let signed = sign(plain.opc());
+        let signed = sign(&plain.into_plain_opc());
         let package = Package::from_bytes(&signed).unwrap();
 
         let package = set_custom_props(&package, props()).unwrap();
