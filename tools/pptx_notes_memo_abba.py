@@ -187,6 +187,36 @@ class ValidationError(ValueError):
     """A report failed a protocol identity, metric, or fidelity gate."""
 
 
+def _strict_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    """Build JSON objects without silently accepting duplicate member names."""
+
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValidationError(f"duplicate JSON object member {key!r}")
+        result[key] = value
+    return result
+
+
+def _reject_nonfinite_json_constant(value: str) -> None:
+    raise ValidationError(f"non-finite JSON constant {value!r} is not permitted")
+
+
+def load_strict_json(text: str, path: str) -> Any:
+    """Parse protocol JSON with duplicate-key and non-finite-number rejection."""
+
+    try:
+        return json.loads(
+            text,
+            object_pairs_hook=_strict_object,
+            parse_constant=_reject_nonfinite_json_constant,
+        )
+    except ValidationError:
+        raise
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise ValidationError(f"cannot parse {path}: {error}") from error
+
+
 def _require_mapping(value: Any, path: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise ValidationError(f"{path} must be an object")
@@ -605,6 +635,8 @@ def _validate_rows(report: Mapping[str, Any], path: str, mode: str) -> tuple[int
 
 def validate_report(report: Mapping[str, Any], label: str, mode: str = "native") -> dict[str, Any]:
     path = label
+    if mode not in ("native", "allocator"):
+        raise ValidationError(f"{path}: mode must be native or allocator")
     _exact_keys(report, REPORT_KEYS, path)
     if _required(report, "schema", path) != SCHEMA:
         raise ValidationError(f"{path}.schema is not {SCHEMA}")
@@ -762,9 +794,9 @@ def validate_abba(leg_reports: Mapping[str, Mapping[str, Any]], mode: str = "nat
 
 def _load(path: Path) -> Mapping[str, Any]:
     try:
-        with path.open("r", encoding="utf-8") as handle:
-            value = json.load(handle)
-    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        text = path.read_text(encoding="utf-8")
+        value = load_strict_json(text, str(path))
+    except (OSError, UnicodeError, ValidationError) as error:
         raise ValidationError(f"cannot read {path}: {error}") from error
     return _require_mapping(value, str(path))
 
@@ -773,11 +805,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("native", "allocator"), default="native")
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument(
+        "--descriptive-only",
+        action="store_true",
+        help="explicitly mark this direct four-report check as descriptive-only; use the process runner for acceptance",
+    )
     parser.add_argument("a1", type=Path)
     parser.add_argument("b1", type=Path)
     parser.add_argument("b2", type=Path)
     parser.add_argument("a2", type=Path)
     arguments = parser.parse_args(argv)
+    if not arguments.descriptive_only:
+        parser.error(
+            "direct four-report validation is descriptive-only; pass --descriptive-only or use run_pptx_notes_memo_abba.py"
+        )
     try:
         reports = {
             "a1": _load(arguments.a1),

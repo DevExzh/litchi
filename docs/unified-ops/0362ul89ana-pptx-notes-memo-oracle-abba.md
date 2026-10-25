@@ -44,10 +44,18 @@ native unavailable allocation samples
 or measured allocator-region vectors. It rejects unknown fields at every
 fixed report-object layer, fewer than four samples per round or fewer than
 four rounds, and writes a create-new descriptive summary without inferring a
-speedup. Native invocation:
+speedup. The direct four-report command is explicitly descriptive-only and
+is not the process-boundary acceptance path:
 
 ```text
-python3 tools/pptx_notes_memo_abba.py --output SUMMARY.json A1.json B1.json B2.json A2.json
+python3 tools/pptx_notes_memo_abba.py --descriptive-only --output SUMMARY.json A1.json B1.json B2.json A2.json
+```
+
+Acceptance requires the repeated fresh-process runner, whose manifest has at
+least four explicit `A1, B1, B2, A2` rounds (16 child processes minimum):
+
+```text
+python3 tools/run_pptx_notes_memo_abba.py --manifest MANIFEST.json --receipt RECEIPT.json
 ```
 
 Allocator evidence uses `--mode allocator` and requires the exact

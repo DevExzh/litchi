@@ -4,8 +4,10 @@
 from __future__ import annotations
 
 import copy
+import json
 import math
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -209,6 +211,34 @@ class NotesMemoAbbaTests(unittest.TestCase):
             validator.validate_abba(zero_warmup)
         with self.assertRaises(validator.ValidationError):
             validator.validate_abba(self.reports, mode="unknown")
+        with self.assertRaises(validator.ValidationError):
+            validator.validate_report(self.reports["a1"], "a1", mode="unknown")
+
+    def test_strict_json_rejects_duplicate_members_and_nonfinite_numbers(self) -> None:
+        with self.assertRaises(validator.ValidationError):
+            validator.load_strict_json('{"schema": 1, "schema": 2}', "duplicate.json")
+        with self.assertRaises(validator.ValidationError):
+            validator.load_strict_json('{"value": NaN}', "nonfinite.json")
+        with self.assertRaises(validator.ValidationError):
+            validator.load_strict_json('{"value": Infinity}', "nonfinite.json")
+
+    def test_direct_cli_requires_descriptive_only_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = []
+            for label in validator.LEG_ORDER:
+                path = root / f"{label}.json"
+                path.write_text(json.dumps(self.reports[label]), encoding="utf-8")
+                paths.append(path)
+            with self.assertRaises(SystemExit) as error:
+                validator.main(
+                    [
+                        "--output",
+                        str(root / "summary.json"),
+                        *(str(path) for path in paths),
+                    ]
+                )
+            self.assertEqual(error.exception.code, 2)
 
     def test_false_raw_oracle_is_rejected(self) -> None:
         false_oracle = copy.deepcopy(self.reports)

@@ -14,16 +14,20 @@ retains the output identity, source inventory, and complete first-leg fidelity
 evidence instead of reducing these checks to a boolean claim.
 
 `tools/run_pptx_notes_memo_abba.py` adds the process boundary. A strict
-manifest admits exactly `A1, B1, B2, A2`, requires absolute unique report
-paths under a fresh output directory, launches each command as a separate
-process without a shell, records PID plus `/proc` start-time and executable
-identity, bounds timeout/report/log sizes, requires unique report content, and
-validates the complete finite matrix through the dedicated validator. Its
-create-new receipt preserves process identities, commands, report paths and
-hashes, source revisions, binary identities, and the validated ABBA summary.
-The runner requires at least four four-sample rounds and rejects unknown modes,
-manifest fields, reused paths, reused report content, and incomplete output
-directories.
+manifest admits an explicit sequence of at least four fresh
+`A1, B1, B2, A2` process rounds (16 child processes at the minimum), requires
+absolute unique report paths under a fresh output directory, launches each
+command as a separate process without a shell, records PID plus `/proc`
+start-time and same-PID target executable observation, bounds
+timeout/report/log sizes, requires unique report content, and validates every
+round through the dedicated validator. Each leg carries its expected source
+revision and absolute target path/hash/size/mode; the receipt also hashes the
+exact manifest and records the command, target, report, and validated binary
+identity for every process. Per-round summaries and the process cardinality
+are kept distinct from the validator's in-process sample-round count. The
+runner rejects unknown modes/fields, duplicate or non-finite JSON, missing
+execute bits, changed bindings, reused paths, reused report content, and
+incomplete output directories.
 
 Allocator validation now checks exact mode-specific allocator identity and
 counter revision, positive warmup, unsigned-64-bit numeric bounds, live-byte
@@ -35,7 +39,7 @@ path, while control and candidate hashes must differ.
 Validation performed:
 
 ```text
-PYTHONWARNINGS=error python3 -m unittest tools/test_pptx_notes_memo_abba.py tools/test_run_pptx_notes_memo_abba.py  # 18 passed
+PYTHONWARNINGS=error python3 -m unittest tools/test_pptx_notes_memo_abba.py tools/test_run_pptx_notes_memo_abba.py  # 23 passed
 python3 -m py_compile tools/pptx_notes_memo_abba.py tools/test_pptx_notes_memo_abba.py tools/run_pptx_notes_memo_abba.py tools/test_run_pptx_notes_memo_abba.py
 rustfmt --edition 2024 --config-path rustfmt.toml --check tools/perf-baseline/src/pptx_notes_memo.rs
 ```
