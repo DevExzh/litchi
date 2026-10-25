@@ -5897,3 +5897,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   Native135b/136a must repair actual execution/receipt paths;137a is under
   independent review after 43 focused tests. Final gates, measurements,
   trunk integration and leaf cleanup remain open. Nothing is pushed.
+
+  The minimal PPTX diagnostic reproduces the known134 consumer failure after
+  1,395 library tests and chunks1–30 pass. Root verifies it, then merges134a
+  and138a without conflicts at private integration e7841dd222 (140). All five
+  reviewed files and three locks match; 75 integrated checker tests pass.
+  Final qualification uses full53 plus six compiler and five runtime profile
+  supplements, preserving isolated wsdoc and complete glossary coverage.
+  Native135c/136b/137c still need actual execution-path repairs before final
+  composition; no native pass is claimed. Trunk and cleanup work continue.
