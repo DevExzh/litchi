@@ -67,7 +67,7 @@ pub enum Error {
     Drawing(#[from] litchi_drawingml::Error),
     /// A host-neutral OOXML package service failed.
     #[error("shared OOXML service error: {0}")]
-    Common(#[from] litchi_ooxml_common::Error),
+    Common(litchi_ooxml_common::Error),
     /// A caller-owned resource budget refused an operation.
     ///
     /// Retains the resource, observed amount, limit, and budget scope so callers
@@ -240,6 +240,19 @@ pub enum Error {
     /// A patch expected different source bytes and was not applied.
     #[error("patch conflict in '{part}': target content differs from the expected state")]
     PatchConflict { part: String },
+
+    /// A source-backed package changed while the operation was in progress.
+    #[error("XLSX source changed while the operation was in progress")]
+    SourceChanged {
+        /// Version captured before the operation.
+        expected: litchi_core::SourceVersion,
+        /// Version observed when the operation completed.
+        observed: litchi_core::SourceVersion,
+    },
+
+    /// A generated staging or publication invariant was not satisfied.
+    #[error("XLSX internal invariant failed: {0}")]
+    Internal(&'static str),
     /// A bounded durable patch envelope was invalid or exceeded its limits.
     #[error("durable XLSX patch error: {0}")]
     DurablePatch(#[from] litchi_core::PatchError),
@@ -274,6 +287,23 @@ impl Error {
             kind: kind.into(),
             observed: u64::try_from(observed).unwrap_or(u64::MAX),
             maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        }
+    }
+}
+
+impl From<litchi_ooxml_common::Error> for Error {
+    fn from(error: litchi_ooxml_common::Error) -> Self {
+        match error {
+            litchi_ooxml_common::Error::Refused(refusal) => Self::Refused(refusal),
+            litchi_ooxml_common::Error::PatchConflict => Self::PatchConflict {
+                part: "shared OOXML graph".to_owned(),
+            },
+            litchi_ooxml_common::Error::Signed => Self::Signed,
+            litchi_ooxml_common::Error::SourceChanged { expected, observed } => {
+                Self::SourceChanged { expected, observed }
+            },
+            litchi_ooxml_common::Error::Internal(reason) => Self::Internal(reason),
+            other => Self::Common(other),
         }
     }
 }

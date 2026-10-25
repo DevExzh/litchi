@@ -106,7 +106,9 @@ fn mce_selects_fallback_schema_reference() {
         r#"<ds:datastoreItem xmlns:ds="{TRANSITIONAL_NAMESPACE}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:unsupported" ds:itemID="{{11111111-1111-1111-1111-111111111111}}"><ds:schemaRefs><mc:AlternateContent><mc:Choice Requires="x"><ds:schemaRef ds:uri="urn:wrong"/></mc:Choice><mc:Fallback><ds:schemaRef ds:uri="urn:right"/></mc:Fallback></mc:AlternateContent></ds:schemaRefs></ds:datastoreItem>"#
     );
     assert_eq!(
-        read_props(xml.as_bytes(), &source_limits()).unwrap().schemas,
+        read_props(xml.as_bytes(), &source_limits())
+            .unwrap()
+            .schemas,
         ["urn:right"]
     );
 }
@@ -135,12 +137,7 @@ fn package_writer_round_trips_without_interpreting_payload() {
     // Adding an item changes the signed package, so it is refused before any
     // part is inserted until the signature is removed explicitly (ADR 0006).
     let parts = package.part_count();
-    assert!(matches!(
-        add(&mut package, item()),
-        Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
-    ));
+    assert!(matches!(add(&mut package, item()), Err(Error::Signed)));
     assert!(package.is_signed());
     assert_eq!(package.part_count(), parts);
     package.unsign();
@@ -319,13 +316,7 @@ fn properties_writer_checks_before_allocating_and_noop_retain_budget() {
         })
     ));
     assert!(matches!(
-        codec::rewrite_props(
-            &output,
-            &props,
-            &props,
-            Conformance::Strict,
-            &tight,
-        ),
+        codec::rewrite_props(&output, &props, &props, Conformance::Strict, &tight,),
         Err(Error::Limit {
             kind: crate::LimitKind::CustomXml(LimitKind::SerializedPropertiesBytes),
             ..
@@ -335,16 +326,16 @@ fn properties_writer_checks_before_allocating_and_noop_retain_budget() {
 
 #[test]
 fn rejects_invalid_declarations_attributes_and_xml_characters() {
-    assert!(validate_payload(
-        br#" <!--before--><?xml version="1.0"?><root/>"#,
-        &source_limits()
-    )
-    .is_err());
-    assert!(validate_payload(
-        br#"<?xml version="1.0" bad="x"?><root/>"#,
-        &source_limits()
-    )
-    .is_err());
+    assert!(
+        validate_payload(
+            br#" <!--before--><?xml version="1.0"?><root/>"#,
+            &source_limits()
+        )
+        .is_err()
+    );
+    assert!(
+        validate_payload(br#"<?xml version="1.0" bad="x"?><root/>"#, &source_limits()).is_err()
+    );
     assert!(
         validate_payload(
             br#"<?xml version="1.0" standalone="yes" encoding="UTF-8"?><root/>"#,
@@ -352,11 +343,13 @@ fn rejects_invalid_declarations_attributes_and_xml_characters() {
         )
         .is_err()
     );
-    assert!(validate_payload(
-        br#"<?xml version="1.0" standalone="maybe"?><root/>"#,
-        &source_limits()
-    )
-    .is_err());
+    assert!(
+        validate_payload(
+            br#"<?xml version="1.0" standalone="maybe"?><root/>"#,
+            &source_limits()
+        )
+        .is_err()
+    );
     assert!(validate_payload(br#"<p:root/>"#, &source_limits()).is_err());
     assert!(validate_payload(br#"<root 1id="value"/>"#, &source_limits()).is_err());
     assert!(
@@ -628,18 +621,8 @@ fn changed_transactions_and_patches_refuse_a_signed_package() {
     // A changed transaction and a changed patch are refused (ADR 0006).
     let mut edit = Edit::new(&package).unwrap();
     edit.insert(item()).unwrap();
-    assert!(matches!(
-        edit.commit(),
-        Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
-    ));
-    assert!(matches!(
-        patch.apply(&package),
-        Err(Error::Opc(
-            litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-        ))
-    ));
+    assert!(matches!(edit.commit(), Err(Error::Signed)));
+    assert!(matches!(patch.apply(&package), Err(Error::Signed)));
     assert!(package.is_signed());
     assert_eq!(package.part_count(), parts);
 

@@ -91,7 +91,7 @@ pub(crate) fn store(
 ///
 /// # Errors
 ///
-/// Returns [`Error::Opc`] for a change to a signed package, and an error if
+/// Returns [`Error::Signed`] for a change to a signed package, and an error if
 /// the operation fails.
 pub(crate) fn remove(package: &mut OpcPackage, _source: &PackURI) -> Result<bool> {
     let mut edit =
@@ -111,6 +111,15 @@ fn map_common(error: litchi_ooxml_common::Error) -> Error {
         },
         litchi_ooxml_common::Error::Relationship(message) => Error::Relationship(message),
         litchi_ooxml_common::Error::PatchConflict => Error::PatchConflict,
+        litchi_ooxml_common::Error::Refused(refusal) => Error::Refused(refusal),
+        litchi_ooxml_common::Error::Signed => Error::Signed,
+        litchi_ooxml_common::Error::SourceChanged { expected, observed } => {
+            Error::SourceChanged { expected, observed }
+        },
+        litchi_ooxml_common::Error::Internal(reason) => Error::Internal {
+            operation: "vba",
+            reason,
+        },
         litchi_ooxml_common::Error::Invalid(message) => Error::Invalid(message),
         litchi_ooxml_common::Error::Limit { kind, maximum, .. } => Error::Limit {
             resource: kind.as_str(),

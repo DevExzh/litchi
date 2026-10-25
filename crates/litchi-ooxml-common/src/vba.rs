@@ -629,13 +629,17 @@ fn store_project_graph_in_place(
     let limits = options.effective(package).source_limits;
     let _ = admit_selected_part(package, source_part, limits)?;
     if host == Host::Word && word_supplemental_xml.is_none() {
-        return Err(Error::Invalid(
-            "Word VBA project storage requires supplemental-data XML".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "store_vba_project",
+            "Word VBA project storage requires supplemental-data XML",
         ));
     }
     if host != Host::Word && word_supplemental_xml.is_some() {
-        return Err(Error::Invalid(
-            "VBA supplemental-data XML is only valid for Word".to_string(),
+        return Err(Error::refused(
+            litchi_core::edit::RefusalKind::UnsupportedContent,
+            "store_vba_project",
+            "VBA supplemental-data XML is only valid for Word",
         ));
     }
 
@@ -1150,9 +1154,9 @@ impl<'a> Edit<'a> {
                 Diagnostics::UNCHANGED,
             ));
         };
-        let before = self.before.ok_or_else(|| {
-            Error::Invalid("VBA edit candidate has no captured graph base".to_string())
-        })?;
+        let before = self.before.ok_or(Error::Internal(
+            "VBA edit candidate has no captured graph base",
+        ))?;
         let after = GraphSnapshot::capture(
             &candidate,
             &self.source_part,
@@ -1175,13 +1179,13 @@ impl<'a> Edit<'a> {
         let before = patch
             .before
             .as_ref()
-            .expect("changed VBA patch has a graph base");
+            .ok_or(Error::Internal("changed VBA patch has no graph base"))?;
         let after = patch
             .after
             .as_ref()
-            .expect("changed VBA patch has a graph target");
+            .ok_or(Error::Internal("changed VBA patch has no graph target"))?;
         let admission = self.base_admission.ok_or_else(|| {
-            Error::Invalid("VBA edit candidate has no recipient admission summary".to_string())
+            Error::Internal("VBA edit candidate has no recipient admission summary")
         })?;
         validate_snapshot_limits(
             self.source,
@@ -1250,7 +1254,7 @@ impl Patch {
             let proof = self
                 .proof
                 .as_ref()
-                .ok_or_else(|| Error::Invalid("VBA patch has no replay base".to_string()))?;
+                .ok_or(Error::Internal("VBA patch has no replay base"))?;
             let recipient_limits = self.options.effective(package).source_limits;
             let _admission = validate_recipient_metadata_limits(package, recipient_limits)?;
             let current =
@@ -1267,7 +1271,7 @@ impl Patch {
         let after = self
             .after
             .as_ref()
-            .ok_or_else(|| Error::Invalid("VBA patch has no target graph".to_string()))?;
+            .ok_or(Error::Internal("VBA patch has no target graph"))?;
         let recipient_limits = self.options.effective(package).source_limits;
         let admission = validate_recipient_metadata_limits(package, recipient_limits)?;
         let current =
@@ -1316,7 +1320,9 @@ impl Patch {
             || (preserve_content_types
                 && resulting.content_types.bytes() != after.content_types.bytes())
         {
-            return Err(Error::PatchConflict);
+            return Err(Error::Internal(
+                "VBA patch publication changed the selected graph",
+            ));
         }
         Ok(Commit::new(candidate, self.clone(), Diagnostics::CHANGED))
     }
@@ -1446,11 +1452,11 @@ fn map_source_limit_error(error: Error) -> Error {
 fn authored_current_archive_metadata_bytes(package: &OpcPackage) -> Result<u64> {
     let mut total = member_name_metadata("[Content_Types].xml")?
         .checked_add(member_name_metadata("_rels/.rels")?)
-        .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+        .ok_or(Error::Internal("VBA archive metadata overflows"))?;
     for metadata in package.iter_parts() {
         total = total
             .checked_add(member_name_metadata(metadata.partname().membername())?)
-            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+            .ok_or(Error::Internal("VBA archive metadata overflows"))?;
         if !metadata.rels().is_empty() {
             let relationship_name = metadata
                 .partname()
@@ -1458,13 +1464,13 @@ fn authored_current_archive_metadata_bytes(package: &OpcPackage) -> Result<u64> 
                 .map_err(|error| Error::Uri(error.clone()))?;
             total = total
                 .checked_add(member_name_metadata(relationship_name.membername())?)
-                .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+                .ok_or(Error::Internal("VBA archive metadata overflows"))?;
         }
     }
     for member in package.non_part_members() {
         total = total
             .checked_add(member_name_metadata(member.name())?)
-            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+            .ok_or(Error::Internal("VBA archive metadata overflows"))?;
     }
     Ok(total)
 }
@@ -1823,9 +1829,8 @@ fn validate_archive_structural_limits(
         .physical_relationship_members
         .checked_sub(current_graph_relationships.members)
         .ok_or_else(|| {
-            Error::Invalid(
-                "selected graph relationship members exceed the recipient physical namespace"
-                    .to_owned(),
+            Error::Internal(
+                "selected graph relationship members exceed the recipient physical namespace",
             )
         })?
         .saturating_add(target_graph_relationships.members);
@@ -1959,7 +1964,7 @@ fn validate_archive_structural_limits(
 
 fn member_name_metadata(name: &str) -> Result<u64> {
     u64::try_from(name.len())
-        .map_err(|_| Error::Invalid("OPC generated member-name metadata overflows".to_owned()))
+        .map_err(|_| Error::Internal("OPC generated member-name metadata overflows"))
 }
 
 fn source_or_generated_part_metadata(
@@ -2026,16 +2031,16 @@ fn selected_graph_metadata(
             metrics,
             &graph.source,
         )?)
-        .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+        .ok_or(Error::Internal("VBA archive metadata overflows"))?;
     for part in graph.project.iter().chain(graph.supplemental.iter()) {
         total = total
             .checked_add(source_or_generated_part_metadata(package, metrics, part)?)
-            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+            .ok_or(Error::Internal("VBA archive metadata overflows"))?;
         total = total
             .checked_add(source_or_generated_relationship_metadata(
                 package, metrics, part,
             )?)
-            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+            .ok_or(Error::Internal("VBA archive metadata overflows"))?;
     }
     Ok(total)
 }
@@ -2058,7 +2063,7 @@ fn projected_archive_metadata_bytes(
         .and_then(|bytes| bytes.checked_sub(current_manifest))
         .and_then(|bytes| bytes.checked_add(target_selected))
         .and_then(|bytes| bytes.checked_add(target_manifest))
-        .ok_or_else(|| Error::Invalid("VBA archive metadata underflows".to_owned()))
+        .ok_or(Error::Internal("VBA archive metadata underflows"))
 }
 
 fn authored_archive_metadata_bytes(
@@ -2069,11 +2074,11 @@ fn authored_archive_metadata_bytes(
 ) -> Result<u64> {
     let mut total = member_name_metadata("[Content_Types].xml")?
         .checked_add(member_name_metadata("_rels/.rels")?)
-        .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+        .ok_or(Error::Internal("VBA archive metadata overflows"))?;
     for metadata in package.iter_parts() {
         total = total
             .checked_add(member_name_metadata(metadata.partname().membername())?)
-            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+            .ok_or(Error::Internal("VBA archive metadata overflows"))?;
         if !metadata.rels().is_empty() {
             let relationship_name = metadata
                 .partname()
@@ -2081,13 +2086,13 @@ fn authored_archive_metadata_bytes(
                 .map_err(|error| Error::Uri(error.clone()))?;
             total = total
                 .checked_add(member_name_metadata(relationship_name.membername())?)
-                .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+                .ok_or(Error::Internal("VBA archive metadata overflows"))?;
         }
     }
     for member in package.non_part_members() {
         total = total
             .checked_add(member_name_metadata(member.name())?)
-            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+            .ok_or(Error::Internal("VBA archive metadata overflows"))?;
     }
     let current_selected = selected_graph_metadata_authored(current)?;
     let target_selected = selected_graph_metadata_authored(target)?;
@@ -2105,7 +2110,7 @@ fn selected_graph_metadata_authored(graph: &GraphSnapshot) -> Result<u64> {
     for part in graph_part_states(graph) {
         total = total
             .checked_add(member_name_metadata(part.name.membername())?)
-            .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+            .ok_or(Error::Internal("VBA archive metadata overflows"))?;
         if part.relationships_source.member_present() {
             let relationship_name = part
                 .name
@@ -2113,7 +2118,7 @@ fn selected_graph_metadata_authored(graph: &GraphSnapshot) -> Result<u64> {
                 .map_err(|error| Error::Uri(error.clone()))?;
             total = total
                 .checked_add(member_name_metadata(relationship_name.membername())?)
-                .ok_or_else(|| Error::Invalid("VBA archive metadata overflows".to_owned()))?;
+                .ok_or(Error::Internal("VBA archive metadata overflows"))?;
         }
     }
     Ok(total)
@@ -2741,10 +2746,12 @@ pub fn ensure_exclusive_inbound_reference(
     Ok(())
 }
 
-fn invalid_main_content_type(host: Host, actual: &str) -> Error {
-    Error::Invalid(format!(
-        "{host:?} main part has unsupported content type '{actual}'"
-    ))
+fn invalid_main_content_type(_host: Host, _actual: &str) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedTarget,
+        "vba_project",
+        "the selected host does not own the main part",
+    )
 }
 
 #[cfg(test)]
@@ -2928,14 +2935,7 @@ mod tests {
     fn signed_store_and_remove_are_refused_until_unsigned() {
         let source_name = PackURI::new("/xl/workbook.xml").unwrap();
         let project_name = PackURI::new(EXCEL_PROJECT_PART).unwrap();
-        let refused = |result: Result<_>| {
-            matches!(
-                result,
-                Err(Error::Opc(
-                    litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-                ))
-            )
-        };
+        let refused = |result: Result<_>| matches!(result, Err(Error::Signed));
         let mut package = OpcPackage::new();
         package
             .try_add_part(Box::new(BlobPart::new(

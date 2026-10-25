@@ -13,7 +13,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     /// The underlying OPC graph is malformed or could not be mutated safely.
     #[error("OPC error: {0}")]
-    Opc(#[from] litchi_opc::error::OpcError),
+    Opc(litchi_opc::error::OpcError),
 
     /// A bounded durable semantic patch failed decoding or validation.
     #[error("invalid durable OOXML patch: {0}")]
@@ -41,8 +41,29 @@ pub enum Error {
     Relationship(String),
 
     /// A semantic patch was built from a different selected graph base.
-    #[error("VBA patch base does not match recipient")]
+    #[error("OOXML patch base does not match recipient")]
     PatchConflict,
+
+    /// A well-formed operation was refused without exposing package content.
+    #[error("OOXML operation refused: {0}")]
+    Refused(litchi_core::edit::Refusal),
+
+    /// A changed package still carries signature infrastructure.
+    #[error("signed OOXML package requires an explicit signature disposition")]
+    Signed,
+
+    /// A source-backed package changed while an operation was in progress.
+    #[error("OOXML source changed while the operation was in progress")]
+    SourceChanged {
+        /// Version captured before the operation.
+        expected: litchi_core::SourceVersion,
+        /// Version observed when the operation completed.
+        observed: litchi_core::SourceVersion,
+    },
+
+    /// A generated staging or publication invariant was not satisfied.
+    #[error("OOXML internal invariant failed: {0}")]
+    Internal(&'static str),
 
     /// Parsed data violates a structural, cardinality, or value constraint.
     #[error("invalid OOXML data: {0}")]
@@ -97,6 +118,32 @@ pub enum Error {
     /// A formatting operation failed.
     #[error("OOXML formatting error")]
     Fmt(#[from] std::fmt::Error),
+}
+
+impl Error {
+    /// Creates a content-free typed refusal for a well-formed request.
+    pub(crate) const fn refused(
+        kind: litchi_core::edit::RefusalKind,
+        operation: &'static str,
+        reason: &'static str,
+    ) -> Self {
+        Self::Refused(litchi_core::edit::Refusal::new(kind, operation, reason))
+    }
+}
+
+impl From<litchi_opc::error::OpcError> for Error {
+    fn from(error: litchi_opc::error::OpcError) -> Self {
+        match error {
+            litchi_opc::error::OpcError::SourceChanged { expected, actual } => {
+                Self::SourceChanged {
+                    expected,
+                    observed: actual,
+                }
+            },
+            litchi_opc::error::OpcError::SignedSourceRequiresExplicitPolicy => Self::Signed,
+            other => Self::Opc(other),
+        }
+    }
 }
 
 impl From<quick_xml::Error> for Error {

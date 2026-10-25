@@ -73,9 +73,7 @@ pub fn load<'a>(package: &'a OpcPackage, limits: &Limits) -> Result<Set<'a>> {
 /// facade's `unsign`. Input must be UTF-8 XML.
 /// # Errors
 ///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a change to a signed package, and an error when input violates OOXML
+/// Returns [`Error::Signed`] for a change to a signed package, and an error when input violates OOXML
 /// constraints, exceeds a configured bound, or an underlying XML or package
 /// operation fails.
 fn put_mut(
@@ -353,7 +351,7 @@ impl Patch {
         let hints = part_names(&self.before);
         let current = capture_state(package, &self.limits, &hints)?;
         if current != self.before {
-            return Err(Error::Relationship("Ribbon patch source changed".into()));
+            return Err(Error::PatchConflict);
         }
         if self.is_noop() {
             return Ok(Commit::new(
@@ -367,8 +365,8 @@ impl Patch {
         apply_graph_state(&mut candidate, &self.before, &self.after)?;
         let resulting = capture_state(&candidate, &self.limits, &part_names(&self.after))?;
         if !destination_matches(&resulting, &self.after) {
-            return Err(Error::Relationship(
-                "Ribbon patch publication changed the selected graph".into(),
+            return Err(Error::Internal(
+                "Ribbon patch publication changed the selected graph",
             ));
         }
         settle_unsigned_change(&mut candidate)?;
@@ -642,8 +640,10 @@ fn remove_part_state(package: &OpcPackage, before: &GraphState, after: &GraphSta
             })
         });
         if root_inbound || part_inbound {
-            return Err(Error::Relationship(
-                "Ribbon patch leaves an opaque dependency on a removed part".into(),
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedContent,
+                "ribbon.apply",
+                "the Ribbon graph has an opaque dependency on a removed part",
             ));
         }
     }
@@ -683,9 +683,7 @@ fn apply_graph_state(
             },
             Some(source) => {
                 if source.content_type != target.content_type {
-                    return Err(Error::Invalid(
-                        "Ribbon patch changes an existing part content type".into(),
-                    ));
+                    return Err(Error::PatchConflict);
                 }
                 if source.bytes.as_slice() != target.bytes.as_slice() {
                     package.try_replace_owned_xml_part_bytes(
@@ -780,9 +778,7 @@ fn available_part_name(package: &OpcPackage, version: Version) -> Result<PackURI
             return Ok(candidate);
         }
     }
-    Err(Error::Invalid(
-        "unable to allocate a unique Ribbon part name".into(),
-    ))
+    Err(Error::Internal("Ribbon part-name allocation exhausted"))
 }
 
 fn sorted_part_names(package: &OpcPackage) -> Result<Vec<String>> {
