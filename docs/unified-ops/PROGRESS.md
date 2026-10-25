@@ -5819,3 +5819,19 @@ See [0063](0063-source-pptx-modern-comments.md).
   exclusions. Raw census preparation is returned for three receipt/identity
   defects; no census execution is authorized by a plan alone. Final gates,
   fidelity, performance and consolidation remain open; nothing is pushed.
+
+  The remaining43 packet terminates with 24 passing rows and three failures.
+  The minimal PPTX profile reproduces readonly126 after chunks0–30 pass;
+  its remaining tests stay unrun. Root verifies the complete capture and
+  diagnostic admission decisions. Reviewed129 corrects exact InvalidLimit
+  classification. Root returns128/128a for five adjacent memory/output
+  dimension bugs and a regression-constructor error;128b is required before
+  composition. The final sixteen outer diagnostic rows are separate (130).
+
+  Census adapterv5 passes root/independent review and nine build-free tests
+  after correcting the real inventory receipt schema; final-source binding
+  and execution remain open. Cleanup98 removes one deletion-only obsolete
+  DrawingML checkout after exact manifest/history and permission-aware guard
+  checks. Totals reach257 worktrees and422 refs. Preserving its full deletion
+  manifest costs57,864,192 net allocated bytes, reducing the ledger to
+  753,286,500,352 bytes under the same exclusions. No push or final acceptance.
