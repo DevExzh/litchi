@@ -40,11 +40,12 @@ ADAPTER_PATHS = (
     "tools/native_qualification/fixtures/drawingml_raw_fixtures.json",
 )
 
-# The DrawingML probe is shared with historical RTF and XLS benchmark
-# parents. Their canonical leaves renamed three consumer spellings, while the
-# historical baseline still exposes the old APIs. The baseline adapter below
-# changes exactly these three consumer references while leaving every
-# DrawingML route byte-identical. Candidate sources are never transformed.
+# The DrawingML probe is shared with historical RTF, XLS, DOCX, and PPTX
+# benchmark parents. The historical baseline retains the former RTF/XLS
+# consumer spellings, while the current DOCX/PPTX exports moved under their
+# validation modules. The baseline adapter below applies exactly these six
+# reviewed role-specific substitutions while leaving every DrawingML route
+# byte-identical. Candidate sources are never transformed.
 CONSUMER_API_ADAPTER_PATH = "tools/perf-baseline/src/lib.rs"
 CONSUMER_API_REPLACEMENTS = (
     (
@@ -59,11 +60,23 @@ CONSUMER_API_REPLACEMENTS = (
         b"litchi_xls::validation::Limits::default()",
         b"litchi_xls::validation::XlsValidationLimits::default()",
     ),
+    (
+        b"litchi_docx::validation::validate_read_at",
+        b"litchi_docx::validate_read_at",
+    ),
+    (
+        b"litchi_pptx::validation::validate_source",
+        b"litchi_pptx::validate_source",
+    ),
+    (
+        b"litchi_pptx::validation::Limits::default()",
+        b"litchi_pptx::PptxValidationLimits::default()",
+    ),
 )
 CONSUMER_API_TRANSFORM_COUNT = len(CONSUMER_API_REPLACEMENTS)
 # This hash is the checked-in composed candidate identity. The historical
 # baseline adapter below reverses these spellings only in the baseline copy.
-CONSUMER_API_CURRENT_SHA256 = "c28d436cdbd6c1746fc0be31b7b1ca28d46526143d6186ceb2c7bf5dbcdecf02"
+CONSUMER_API_CURRENT_SHA256 = "4acd072fd68c094e24524862194da9676260e1fb25f6ea3dbb539197d2838b5b"
 CONSUMER_API_HISTORICAL_SHA256 = "280d61ae1f714af78be6cecf21a4432a9ea2a27478e89c237b5d358bc02db02a"
 CONSUMER_API_TRANSFORM_BYTES = sum(
     len(historical) - len(current)
@@ -137,7 +150,7 @@ def _consumer_api_adapter_receipt() -> dict[str, Any]:
 
 
 def _adapt_baseline_consumer_adapter(relative: str, source: bytes) -> bytes:
-    """Apply only the historical RTF/XLS consumer spellings to a baseline."""
+    """Apply only the reviewed historical consumer spellings to a baseline."""
 
     if relative != CONSUMER_API_ADAPTER_PATH:
         return source

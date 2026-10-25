@@ -494,7 +494,7 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
             preparation.CONSUMER_API_CURRENT_SHA256,
         )
 
-    def test_historical_consumer_adapter_changes_only_three_spellings(self) -> None:
+    def test_historical_consumer_adapter_changes_only_six_spellings(self) -> None:
         path = ROOT / preparation.CONSUMER_API_ADAPTER_PATH
         source = path.read_bytes()
         self.assertEqual(
@@ -513,16 +513,16 @@ class DrawingMlRawProtocolTests(unittest.TestCase):
             hashlib.sha256(adapted).hexdigest(),
             preparation.CONSUMER_API_HISTORICAL_SHA256,
         )
-        self.assertEqual(preparation.CONSUMER_API_TRANSFORM_COUNT, 3)
-        self.assertEqual(preparation.CONSUMER_API_TRANSFORM_BYTES, 29)
+        self.assertEqual(preparation.CONSUMER_API_TRANSFORM_COUNT, 6)
+        self.assertEqual(preparation.CONSUMER_API_TRANSFORM_BYTES, 7)
         self.assertEqual(
             preparation._consumer_api_adapter_receipt(),
             {
                 "path": preparation.CONSUMER_API_ADAPTER_PATH,
                 "candidate_sha256": preparation.CONSUMER_API_CURRENT_SHA256,
                 "baseline_sha256": preparation.CONSUMER_API_HISTORICAL_SHA256,
-                "replacement_count": 3,
-                "changed_bytes": 29,
+                "replacement_count": 6,
+                "changed_bytes": 7,
                 "replacements": [
                     {
                         "candidate": current.decode("ascii"),
