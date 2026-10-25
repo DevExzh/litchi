@@ -1,5 +1,6 @@
 //! Bounded protection XML codec.
 
+use super::super::{Limits, process_str};
 use super::model::{Algorithm, Settings, Verifier};
 use crate::{Error, Result};
 use base64::Engine;
@@ -41,11 +42,11 @@ fn password_hash(password: &str, salt: &[u8], spin_count: u32) -> Zeroizing<Sha5
     hash
 }
 
-pub(crate) fn generate_verifier(password: &str) -> Result<Verifier> {
-    if password.len() > 1 << 20 {
+pub(crate) fn generate_verifier(password: &str, limits: Limits) -> Result<Verifier> {
+    if password.len() > limits.max_string_bytes() {
         return Err(Error::Limit {
             resource: "protection password",
-            limit: 1 << 20,
+            limit: limits.max_string_bytes(),
         });
     }
 
@@ -69,24 +70,86 @@ impl Settings {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_xml(xml: &str) -> Result<Self> {
-        let processed = litchi_ooxml_common::mce::process_str(xml)?;
+    pub fn parse_xml(xml: &str, limits: Limits) -> Result<Self> {
+        if xml.len() > limits.max_input_bytes() {
+            return Err(Error::Limit {
+                resource: "protection XML input",
+                limit: limits.max_input_bytes(),
+            });
+        }
+        let processed = process_str(xml, limits)?;
+        if processed.len() > limits.max_output_bytes() {
+            return Err(Error::Limit {
+                resource: "processed protection XML",
+                limit: limits.max_output_bytes(),
+            });
+        }
         let mut reader = Reader::from_str(processed.as_ref());
         reader.config_mut().trim_text(true);
         let mut settings = Self::new();
         let mut seen = false;
+        let mut nodes = 0usize;
+        let mut depth = 0usize;
         loop {
             match reader.read_event()? {
-                Event::Empty(element) | Event::Start(element)
-                    if element.local_name().as_ref() == b"modifyVerifier" =>
-                {
-                    if seen {
-                        return Err(Error::Invalid(
-                            "duplicate presentation modifyVerifier".into(),
-                        ));
+                Event::Start(element) => {
+                    depth = depth.checked_add(1).ok_or(Error::Limit {
+                        resource: "protection XML depth",
+                        limit: limits.max_depth(),
+                    })?;
+                    if depth > limits.max_depth() {
+                        return Err(Error::Limit {
+                            resource: "protection XML depth",
+                            limit: limits.max_depth(),
+                        });
                     }
-                    seen = true;
-                    settings.modify = Some(parse_verifier(&element, reader.decoder())?);
+                    nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                        resource: "protection XML nodes",
+                        limit: limits.max_nodes(),
+                    })?;
+                    if nodes > limits.max_nodes() {
+                        return Err(Error::Limit {
+                            resource: "protection XML nodes",
+                            limit: limits.max_nodes(),
+                        });
+                    }
+                    check_attributes(&element, reader.decoder(), limits)?;
+                    if element.local_name().as_ref() == b"modifyVerifier" {
+                        if seen {
+                            return Err(Error::Invalid(
+                                "duplicate presentation modifyVerifier".into(),
+                            ));
+                        }
+                        seen = true;
+                        settings.modify = Some(parse_verifier(&element, reader.decoder(), limits)?);
+                    }
+                },
+                Event::Empty(element) => {
+                    nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                        resource: "protection XML nodes",
+                        limit: limits.max_nodes(),
+                    })?;
+                    if nodes > limits.max_nodes() {
+                        return Err(Error::Limit {
+                            resource: "protection XML nodes",
+                            limit: limits.max_nodes(),
+                        });
+                    }
+                    check_attributes(&element, reader.decoder(), limits)?;
+                    if element.local_name().as_ref() == b"modifyVerifier" {
+                        if seen {
+                            return Err(Error::Invalid(
+                                "duplicate presentation modifyVerifier".into(),
+                            ));
+                        }
+                        seen = true;
+                        settings.modify = Some(parse_verifier(&element, reader.decoder(), limits)?);
+                    }
+                },
+                Event::End(_) => {
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        Error::Invalid("protection XML has an unmatched end tag".into())
+                    })?;
                 },
                 Event::Eof => break,
                 Event::DocType(_) | Event::PI(_) => {
@@ -97,26 +160,38 @@ impl Settings {
                 _ => {},
             }
         }
+        if depth != 0 {
+            return Err(Error::Invalid(
+                "protection XML has an unterminated element".into(),
+            ));
+        }
         Ok(settings)
     }
 
     #[must_use]
-    pub fn to_xml(&self) -> String {
+    pub fn to_xml(&self, limits: Limits) -> Result<String> {
         let Some(verifier) = &self.modify else {
-            return String::new();
+            return Ok(String::new());
         };
-        format!(
+        let value = format!(
             r#"<p:modifyVerifier cryptProviderType="rsaAES" cryptAlgorithmClass="hash" cryptAlgorithmType="typeAny" cryptAlgorithmSid="{}" spinCount="{}" saltData="{}" hashData="{}"/>"#,
             verifier.algorithm.sid(),
             verifier.spin_count,
             verifier.salt,
             verifier.hash,
-        )
+        );
+        if value.len() > limits.max_output_bytes() {
+            return Err(Error::Limit {
+                resource: "serialized protection XML",
+                limit: limits.max_output_bytes(),
+            });
+        }
+        Ok(value)
     }
 
     #[must_use]
-    pub fn to_pres_props_xml(&self) -> String {
-        if self.read_only_recommended {
+    pub fn to_pres_props_xml(&self, limits: Limits) -> Result<String> {
+        let value = if self.read_only_recommended {
             format!(
                 r#"<p:extLst><p:ext uri="{}"><p1710:readonlyRecommended xmlns:p1710="{}" val="1"/></p:ext></p:extLst>"#,
                 crate::presentation_properties::READONLY_RECOMMENDED_URI,
@@ -124,24 +199,49 @@ impl Settings {
             )
         } else {
             String::new()
+        };
+        if value.len() > limits.max_output_bytes() {
+            return Err(Error::Limit {
+                resource: "serialized protection presentation-properties XML",
+                limit: limits.max_output_bytes(),
+            });
         }
+        Ok(value)
     }
 }
 
 fn parse_verifier(
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
+    limits: Limits,
 ) -> Result<Verifier> {
     let mut hash = None;
     let mut salt = None;
     let mut spins = None;
     let mut algorithm = None;
+    let mut attributes = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        attributes = attributes.checked_add(1).ok_or(Error::Limit {
+            resource: "protection XML attributes",
+            limit: limits.max_attributes(),
+        })?;
+        if attributes > limits.max_attributes() {
+            return Err(Error::Limit {
+                resource: "protection XML attributes",
+                limit: limits.max_attributes(),
+            });
+        }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
+        if value.len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "protection XML attribute",
+                limit: limits.max_string_bytes(),
+            });
+        }
         match attribute.key.as_ref() {
             b"hashValue" | b"hashData" => set_once(&mut hash, value, "hash")?,
             b"saltValue" | b"saltData" => set_once(&mut salt, value, "salt")?,
@@ -204,6 +304,37 @@ fn parse_verifier(
         hash,
         salt,
     })
+}
+
+fn check_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    limits: Limits,
+) -> Result<()> {
+    let mut attributes = 0usize;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        attributes = attributes.checked_add(1).ok_or(Error::Limit {
+            resource: "protection XML attributes",
+            limit: limits.max_attributes(),
+        })?;
+        if attributes > limits.max_attributes() {
+            return Err(Error::Limit {
+                resource: "protection XML attributes",
+                limit: limits.max_attributes(),
+            });
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        if value.len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "protection XML attribute",
+                limit: limits.max_string_bytes(),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn set_once<T>(slot: &mut Option<T>, value: T, field: &str) -> Result<()> {
@@ -273,18 +404,25 @@ mod tests {
     #[test]
     fn parses_and_republishes_a_legacy_verifier() {
         let xml = r#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:modifyVerifier cryptAlgorithmSid="14" spinCount="1000" saltData="AA==" hashData="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="/></p:presentation>"#;
-        let settings = Settings::parse_xml(xml).expect("verifier");
+        let settings = Settings::parse_xml(xml, Limits::DEFAULT).expect("verifier");
         assert_eq!(
             settings.modify().expect("modifier").algorithm(),
             Algorithm::Sha512
         );
-        assert!(settings.to_xml().contains("cryptAlgorithmSid=\"14\""));
+        assert!(
+            settings
+                .to_xml(Limits::DEFAULT)
+                .expect("serialize verifier")
+                .contains("cryptAlgorithmSid=\"14\"")
+        );
     }
 
     #[test]
     fn password_generation_is_explicitly_dependency_bound() {
         let mut settings = Settings::new();
-        settings.set_modify_password("secret").unwrap();
+        settings
+            .set_modify_password("secret", Limits::DEFAULT)
+            .unwrap();
         let verifier = settings.modify().unwrap();
         assert_eq!(verifier.algorithm(), Algorithm::Sha512);
         assert_eq!(verifier.spins(), SPIN_COUNT);

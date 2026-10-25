@@ -3065,6 +3065,114 @@
           "inputs": ["slide_index", "slide", "limits", "usage"],
           "limits_argument": "limits",
           "limits_type": "litchi_pptx::laser::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::custom_show::List::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::custom_show::List::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::custom_show::List::to_xml_with_rel_map",
+          "inputs": ["self", "slide_id_to_rel_id", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::guides::Guides::from_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::guides::Guides::to_xml",
+          "inputs": ["self", "strict", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::sections::List::from_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::sections::List::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::sections::Section::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::structure::load",
+          "inputs": ["package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::structure::load_snapshot",
+          "inputs": ["package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::color_map::parse_master",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::color_map::parse_override",
+          "inputs": ["xml", "root_name", "root_label", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::handout::Master::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::handout::Master::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::protection::Settings::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::protection::Settings::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::protection::Settings::to_pres_props_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::template::pres_props_xml_with_handout",
+          "inputs": ["prn_what", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
         }
       ],
       "result_methods": [
@@ -4077,6 +4185,114 @@
           "inputs": ["slide_index", "slide", "limits", "usage"],
           "limits_argument": "limits",
           "limits_type": "litchi_pptx::laser::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::custom_show::List::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::custom_show::List::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::custom_show::List::to_xml_with_rel_map",
+          "inputs": ["self", "slide_id_to_rel_id", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::guides::Guides::from_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::guides::Guides::to_xml",
+          "inputs": ["self", "strict", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::sections::List::from_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::sections::List::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::sections::Section::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::structure::load",
+          "inputs": ["package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::structure::load_snapshot",
+          "inputs": ["package", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::color_map::parse_master",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::color_map::parse_override",
+          "inputs": ["xml", "root_name", "root_label", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::handout::Master::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::handout::Master::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::protection::Settings::parse_xml",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::protection::Settings::to_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::protection::Settings::to_pres_props_xml",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
+        },
+        {
+          "method": "litchi_pptx::presentation_properties::metadata::template::pres_props_xml_with_handout",
+          "inputs": ["prn_what", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_pptx::presentation_properties::metadata::Limits"
         }
       ],
       "result_methods": [

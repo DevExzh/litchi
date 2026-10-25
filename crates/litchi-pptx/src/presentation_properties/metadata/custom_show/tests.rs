@@ -75,7 +75,7 @@ fn fixture() -> OpcPackage {
 #[test]
 fn snapshot_crud_preserves_opaque_xml_and_relationships() {
     let mut package = fixture();
-    let original = load_snapshot(&package).unwrap();
+    let original = load_snapshot(&package, super::Limits::DEFAULT).unwrap();
     assert_eq!(original.list().shows[0].name, "Opening & More");
     assert_eq!(original.list().shows[0].slide_ids, [256, 258]);
 
@@ -100,7 +100,7 @@ fn snapshot_crud_preserves_opaque_xml_and_relationships() {
     assert!(output.contains("<x:afterOpaque/>"));
     apply_commit(&mut package, commit).unwrap();
 
-    let current = load_snapshot(&package).unwrap();
+    let current = load_snapshot(&package, super::Limits::DEFAULT).unwrap();
     assert_eq!(
         current
             .list()
@@ -129,7 +129,7 @@ fn snapshot_crud_preserves_opaque_xml_and_relationships() {
 #[test]
 fn no_op_commit_is_byte_exact() {
     let mut package = fixture();
-    let snapshot = load_snapshot(&package).unwrap();
+    let snapshot = load_snapshot(&package, super::Limits::DEFAULT).unwrap();
     let source = snapshot.source_xml().to_vec();
     let commit = snapshot.edit().commit().unwrap();
     assert!(!commit.diagnostics().changed());
@@ -144,7 +144,7 @@ fn no_op_commit_is_byte_exact() {
 #[test]
 fn stale_patch_rejection_is_atomic_and_inverse_restores_bytes() {
     let mut package = fixture();
-    let original = load_snapshot(&package).unwrap();
+    let original = load_snapshot(&package, super::Limits::DEFAULT).unwrap();
     let mut edit = original.edit();
     edit.set_name(7, "Changed").unwrap();
     let patch = edit.commit().unwrap().into_patch();
@@ -166,7 +166,7 @@ fn stale_patch_rejection_is_atomic_and_inverse_restores_bytes() {
     );
 
     let mut restored = fixture();
-    let source = load_snapshot(&restored).unwrap();
+    let source = load_snapshot(&restored, super::Limits::DEFAULT).unwrap();
     patch.apply(&mut restored).unwrap();
     patch.inverse().apply(&mut restored).unwrap();
     assert_eq!(
@@ -178,7 +178,7 @@ fn stale_patch_rejection_is_atomic_and_inverse_restores_bytes() {
 #[test]
 fn invalid_slide_references_leave_staged_list_unchanged() {
     let package = fixture();
-    let snapshot = load_snapshot(&package).unwrap();
+    let snapshot = load_snapshot(&package, super::Limits::DEFAULT).unwrap();
     let mut edit = snapshot.edit();
     let before = edit.list().clone();
     assert!(edit.set_slides(7, vec![999]).is_err());

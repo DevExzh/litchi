@@ -11,7 +11,7 @@
 use litchi_pptx::Package;
 use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
 use litchi_pptx::chart::{Chart, Series, Type as ChartType, encode as encode_chart};
-use litchi_pptx::presentation_properties::metadata::custom_show::{List as ShowList, Show};
+use litchi_pptx::presentation_properties::metadata::custom_show::{Limits, List as ShowList, Show};
 use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
 use litchi_pptx::presentation_properties::metadata::protection::Settings;
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
@@ -194,14 +194,16 @@ fn section_demo() -> Result<String, Box<dyn StdError>> {
     sections.add_section(
         Section::new("Metadata", "{00000000-0000-4000-8000-000000000002}").with_slides([258]),
     );
-    Ok(sections.to_xml()?)
+    Ok(sections.to_xml(Limits::DEFAULT)?)
 }
 
 fn custom_show_demo() -> String {
     let mut shows = ShowList::new();
     shows.add(Show::new(1, "Quick overview").with_slides(vec![256, 258]));
     shows.add(Show::new(2, "Full presentation").with_slides(vec![256, 257, 258]));
-    shows.to_xml()
+    shows
+        .to_xml(Limits::DEFAULT)
+        .expect("default metadata limits accept the example")
 }
 
 fn handout_demo() -> String {
@@ -211,14 +213,15 @@ fn handout_demo() -> String {
         .with_footer("Created with Litchi")
         .with_slide_numbers()
         .with_date_time()
-        .to_xml()
+        .to_xml(Limits::DEFAULT)
+        .expect("default metadata limits accept the example")
 }
 
 fn protection_demo() -> Result<String, Box<dyn StdError>> {
     let settings = Settings::new()
         .with_read_only_recommended(true)
         .with_structure_protection(true);
-    let xml = settings.to_xml();
+    let xml = settings.to_xml(Limits::DEFAULT)?;
     assert!(settings.is_protected());
     Ok(xml)
 }

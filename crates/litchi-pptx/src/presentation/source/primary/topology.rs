@@ -397,6 +397,10 @@ impl Revision {
                 limits,
                 crate::open_options::selected(package.owner.semantic_limits.as_ref()).shape(),
             ),
+            protection_limits:
+                crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                    limits,
+                ),
             semantic_limits: package.owner.semantic_limits.clone(),
             source_version,
             lineage: package.owner.package.source_lineage(),

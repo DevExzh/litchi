@@ -7,6 +7,7 @@
 
 use super::super::custom_show::{List as ShowList, Show};
 use super::super::sections::{List as SectionList, Section};
+use super::super::{Limits, process_ooxml};
 use super::model::{Graph, Reference};
 use crate::package::signature::settle_unsigned_change;
 use crate::presentation_properties::metadata::{escape_xml, new_guid};
@@ -27,9 +28,6 @@ const RS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
 const SLIDE_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide";
 const SLIDE_REL_STRICT: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/slide";
 const SECTION_URI: &str = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}";
-const MAX_BYTES: usize = 8 * 1024 * 1024;
-const MAX_NODES: usize = 100_000;
-const MAX_DEPTH: usize = 128;
 const MAX_SLIDE_ID: u32 = 2_147_483_647;
 
 /// Load and validate the presentation structure graph.
@@ -37,10 +35,10 @@ const MAX_SLIDE_ID: u32 = 2_147_483_647;
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load(package: &OpcPackage) -> Result<Graph> {
+pub fn load(package: &OpcPackage, limits: Limits) -> Result<Graph> {
     let presentation = package.main_document_part()?;
     require_presentation(presentation.content_type())?;
-    parse_structure_blob(package, presentation.blob(), true)
+    parse_structure_blob(package, presentation.blob(), true, limits)
 }
 
 /// Atomically replace custom shows and sections while preserving unrelated XML.
@@ -56,17 +54,18 @@ pub fn load(package: &OpcPackage) -> Result<Graph> {
 ///
 /// Returns an error if the output cannot be encoded or written.
 pub(crate) fn store(package: &mut OpcPackage, value: &Graph) -> Result<()> {
-    validate_graph(package, value)?;
+    let limits = Limits::from_source_limits(package.read_limits());
+    validate_graph(package, value, limits)?;
     let presentation_name = package.main_document_part()?.partname().clone();
     let original = package.get_part(&presentation_name)?.blob().to_vec();
-    let original_graph = parse_structure_blob(package, &original, true)?;
-    let staged = rewrite(&original, &original_graph, value)?;
+    let original_graph = parse_structure_blob(package, &original, true, limits)?;
+    let staged = rewrite(&original, &original_graph, value, limits)?;
 
     if staged == original {
         return Ok(());
     }
 
-    let reparsed = parse_structure_blob(package, &staged, true)?;
+    let reparsed = parse_structure_blob(package, &staged, true, limits)?;
     if reparsed.slides != value.slides
         || reparsed.custom_shows.shows != value.custom_shows.shows
         || reparsed.sections != value.sections
@@ -83,8 +82,13 @@ pub(crate) fn store(package: &mut OpcPackage, value: &Graph) -> Result<()> {
 /// Rewrite only the changed structure owners in one validated presentation
 /// document. The slide relationship graph is intentionally immutable here;
 /// slide insertion and removal belong to the presentation package facade.
-pub(crate) fn rewrite(source: &[u8], original: &Graph, value: &Graph) -> Result<Vec<u8>> {
-    validate_detached_graph(original, value)?;
+pub(crate) fn rewrite(
+    source: &[u8],
+    original: &Graph,
+    value: &Graph,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    validate_detached_graph(original, value, limits)?;
     if equivalent_graph(original, value) {
         return Ok(source.to_vec());
     }
@@ -92,16 +96,21 @@ pub(crate) fn rewrite(source: &[u8], original: &Graph, value: &Graph) -> Result<
     let (p_namespace, r_namespace) = document_namespaces(source);
     let mut staged = source.to_vec();
     if original.custom_shows.shows != value.custom_shows.shows {
-        let custom_xml =
-            write_custom_shows(&value.custom_shows, &value.slides, p_namespace, r_namespace)?;
-        staged = patch_custom_shows(&staged, custom_xml.as_bytes())?;
+        let custom_xml = write_custom_shows(
+            &value.custom_shows,
+            &value.slides,
+            p_namespace,
+            r_namespace,
+            limits,
+        )?;
+        staged = patch_custom_shows(&staged, custom_xml.as_bytes(), limits)?;
     }
     if original.sections != value.sections {
-        let section_xml = write_section_extension(&value.sections, p_namespace)?;
-        staged = patch_sections(&staged, section_xml.as_bytes(), p_namespace)?;
+        let section_xml = write_section_extension(&value.sections, p_namespace, limits)?;
+        staged = patch_sections(&staged, section_xml.as_bytes(), p_namespace, limits)?;
     }
 
-    let reparsed = parse_detached(&staged, &value.slides)?;
+    let reparsed = parse_detached(&staged, &value.slides, limits)?;
     if !equivalent_graph(&reparsed, value) {
         return Err(invalid("staged presentation structure did not round-trip"));
     }
@@ -110,12 +119,18 @@ pub(crate) fn rewrite(source: &[u8], original: &Graph, value: &Graph) -> Result<
 
 /// Parse a rewritten presentation against its already validated relationship
 /// topology without needing to reopen any slide part.
-pub(crate) fn parse_detached(xml: &[u8], slides: &[Reference]) -> Result<Graph> {
-    if xml.len() > MAX_BYTES {
-        return Err(invalid("presentation structure exceeds 8 MiB"));
+pub(crate) fn parse_detached(xml: &[u8], slides: &[Reference], limits: Limits) -> Result<Graph> {
+    if xml.len() > limits.max_input_bytes() {
+        return Err(limit("presentation structure", limits.max_input_bytes()));
     }
-    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
-    let (raw_slides, raw_shows) = parse_core(processed.as_ref())?;
+    let processed = process_ooxml(xml, limits)?;
+    if processed.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "processed presentation structure",
+            limits.max_output_bytes(),
+        ));
+    }
+    let (raw_slides, raw_shows) = parse_core(processed.as_ref(), limits)?;
     let expected_slides = slides
         .iter()
         .map(|slide| (slide.slide_id, slide.relationship_id.clone()))
@@ -129,20 +144,24 @@ pub(crate) fn parse_detached(xml: &[u8], slides: &[Reference]) -> Result<Graph> 
     let graph = Graph {
         slides: slides.to_vec(),
         custom_shows,
-        sections: SectionList::from_xml(xml)?,
+        sections: SectionList::from_xml(xml, limits)?,
     };
-    validate_graph_shape(&graph)?;
+    validate_graph_shape(&graph, limits)?;
     Ok(graph)
 }
 
 /// Validate detached edits against the source's immutable slide graph.
-pub(crate) fn validate_detached_graph(original: &Graph, value: &Graph) -> Result<()> {
+pub(crate) fn validate_detached_graph(
+    original: &Graph,
+    value: &Graph,
+    limits: Limits,
+) -> Result<()> {
     if value.slides != original.slides {
         return Err(invalid(
             "presentation slide ordering and relationship topology are immutable in a structure transaction",
         ));
     }
-    validate_graph_shape(value)
+    validate_graph_shape(value, limits)
 }
 
 pub(crate) fn equivalent_graph(left: &Graph, right: &Graph) -> bool {
@@ -155,7 +174,12 @@ pub(crate) fn equivalent_graph(left: &Graph, right: &Graph) -> bool {
 ///
 /// Returns an error if the operation fails.
 pub fn find_custom_show(package: &OpcPackage, id: u32) -> Result<Option<Show>> {
-    Ok(load(package)?.custom_shows.get_by_id(id).cloned())
+    Ok(
+        load(package, Limits::from_source_limits(package.read_limits()))?
+            .custom_shows
+            .get_by_id(id)
+            .cloned(),
+    )
 }
 
 /// A change to a signed package is refused with
@@ -211,7 +235,7 @@ pub(crate) fn update_custom_show(
 ///
 /// Returns an error if the operation fails.
 pub(crate) fn remove_custom_show(package: &mut OpcPackage, id: u32) -> Result<bool> {
-    let mut graph = load(package)?;
+    let mut graph = load(package, Limits::from_source_limits(package.read_limits()))?;
     let removed = graph.custom_shows.remove_by_id(id).is_some();
     if removed {
         store(package, &graph)?;
@@ -277,7 +301,7 @@ pub(crate) fn remove_custom_show_slide(
     show_id: u32,
     slide_id: u32,
 ) -> Result<bool> {
-    let mut graph = load(package)?;
+    let mut graph = load(package, Limits::from_source_limits(package.read_limits()))?;
     let show = graph
         .custom_shows
         .get_by_id_mut(show_id)
@@ -320,7 +344,12 @@ pub(crate) fn reorder_custom_show_slides(
 ///
 /// Returns an error if the operation fails.
 pub fn find_section(package: &OpcPackage, id: &str) -> Result<Option<Section>> {
-    Ok(load(package)?.sections.get_by_id(id).cloned())
+    Ok(
+        load(package, Limits::from_source_limits(package.read_limits()))?
+            .sections
+            .get_by_id(id)
+            .cloned(),
+    )
 }
 
 /// A change to a signed package is refused with
@@ -375,8 +404,9 @@ pub(crate) fn update_section(
     replacement: Section,
 ) -> Result<()> {
     let id = id.to_owned();
+    let limits = Limits::from_source_limits(package.read_limits());
     mutate(package, move |graph| {
-        graph.sections.replace_by_id(&id, replacement)?;
+        graph.sections.replace_by_id(&id, replacement, limits)?;
         graph.sections.sort_slide_membership(
             &graph
                 .slides
@@ -399,7 +429,7 @@ pub(crate) fn update_section(
 ///
 /// Returns an error if the operation fails.
 pub(crate) fn remove_section(package: &mut OpcPackage, id: &str) -> Result<bool> {
-    let mut graph = load(package)?;
+    let mut graph = load(package, Limits::from_source_limits(package.read_limits()))?;
     let removed = graph.sections.remove_by_id(id).is_some();
     if removed {
         store(package, &graph)?;
@@ -479,7 +509,7 @@ pub(crate) fn remove_section_slide(
     section_id: &str,
     slide_id: u32,
 ) -> Result<bool> {
-    let mut graph = load(package)?;
+    let mut graph = load(package, Limits::from_source_limits(package.read_limits()))?;
     let section = graph
         .sections
         .get_by_id_mut(section_id)
@@ -523,7 +553,7 @@ fn mutate<F>(package: &mut OpcPackage, operation: F) -> Result<()>
 where
     F: FnOnce(&mut Graph) -> Result<()>,
 {
-    let mut graph = load(package)?;
+    let mut graph = load(package, Limits::from_source_limits(package.read_limits()))?;
     operation(&mut graph)?;
     store(package, &graph)
 }
@@ -532,12 +562,19 @@ fn parse_structure_blob(
     package: &OpcPackage,
     xml: &[u8],
     strict_references: bool,
+    limits: Limits,
 ) -> Result<Graph> {
-    if xml.len() > MAX_BYTES {
-        return Err(invalid("presentation structure exceeds 8 MiB"));
+    if xml.len() > limits.max_input_bytes() {
+        return Err(limit("presentation structure", limits.max_input_bytes()));
     }
-    let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
-    let (raw_slides, raw_shows) = parse_core(processed.as_ref())?;
+    let processed = process_ooxml(xml, limits)?;
+    if processed.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "processed presentation structure",
+            limits.max_output_bytes(),
+        ));
+    }
+    let (raw_slides, raw_shows) = parse_core(processed.as_ref(), limits)?;
     let presentation = package.main_document_part()?;
     let mut slides = Vec::with_capacity(raw_slides.len());
     for (slide_id, relationship_id) in raw_slides {
@@ -572,10 +609,10 @@ fn parse_structure_blob(
     let graph = Graph {
         slides,
         custom_shows,
-        sections: SectionList::from_xml(xml)?,
+        sections: SectionList::from_xml(xml, limits)?,
     };
     if strict_references {
-        validate_graph(package, &graph)?;
+        validate_graph(package, &graph, limits)?;
     }
     Ok(graph)
 }
@@ -637,7 +674,10 @@ struct Attribute {
     clippy::type_complexity,
     reason = "raw-show tuple mirrors the persisted XML structure"
 )]
-pub(super) fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
+pub(super) fn parse_core(xml: &[u8], limits: Limits) -> Result<(Vec<(u32, String)>, Vec<RawShow>)> {
+    if xml.len() > limits.max_output_bytes() {
+        return Err(limit("presentation core XML", limits.max_output_bytes()));
+    }
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(true);
     let mut ancestors = Vec::<CoreElement>::new();
@@ -656,10 +696,16 @@ pub(super) fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>
         match event {
             Event::Start(element) => {
                 nodes += 1;
-                resource(nodes, ancestors.len())?;
+                resource(nodes, ancestors.len(), limits)?;
                 let kind = core_element(&namespace, element.name())?;
                 if is_direct_slide_reference(&ancestors, kind) {
-                    slides.push(parse_slide_reference(&element, decoder, &reader)?);
+                    if slides.len() >= limits.max_slide_references() {
+                        return Err(limit(
+                            "presentation slide references",
+                            limits.max_slide_references(),
+                        ));
+                    }
+                    slides.push(parse_slide_reference(&element, decoder, &reader, limits)?);
                 } else if kind == CoreElement::CustomShow {
                     if ancestors.as_slice()
                         != [CoreElement::Presentation, CoreElement::CustomShowList]
@@ -669,16 +715,22 @@ pub(super) fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>
                     if current_show.is_some() {
                         return Err(invalid("nested custom shows are rejected"));
                     }
-                    current_show = Some(parse_show(&element, decoder, &reader)?);
+                    current_show = Some(parse_show(&element, decoder, &reader, limits)?);
                 }
                 ancestors.push(kind);
             },
             Event::Empty(element) => {
                 nodes += 1;
-                resource(nodes, ancestors.len())?;
+                resource(nodes, ancestors.len(), limits)?;
                 let kind = core_element(&namespace, element.name())?;
                 if is_direct_slide_reference(&ancestors, kind) {
-                    slides.push(parse_slide_reference(&element, decoder, &reader)?);
+                    if slides.len() >= limits.max_slide_references() {
+                        return Err(limit(
+                            "presentation slide references",
+                            limits.max_slide_references(),
+                        ));
+                    }
+                    slides.push(parse_slide_reference(&element, decoder, &reader, limits)?);
                 } else if kind == CoreElement::Slide
                     && ancestors.as_slice()
                         == [
@@ -688,12 +740,20 @@ pub(super) fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>
                             CoreElement::SlideList,
                         ]
                 {
-                    let relationship_id = relationship_id(&element, decoder, &reader)?;
+                    let relationship_id = relationship_id(&element, decoder, &reader, limits)?;
                     current_show
                         .as_mut()
                         .ok_or_else(|| invalid("custom-show slide appears outside a custom show"))?
                         .relationship_ids
                         .push(relationship_id);
+                    if current_show.as_ref().is_some_and(|show| {
+                        show.relationship_ids.len() > limits.max_slide_references()
+                    }) {
+                        return Err(limit(
+                            "custom-show slide references",
+                            limits.max_slide_references(),
+                        ));
+                    }
                 }
             },
             Event::End(element) => {
@@ -705,6 +765,9 @@ pub(super) fn parse_core(xml: &[u8]) -> Result<(Vec<(u32, String)>, Vec<RawShow>
                     return Err(invalid("mismatched presentation element"));
                 }
                 if kind == CoreElement::CustomShow {
+                    if shows.len() >= limits.max_custom_shows() {
+                        return Err(limit("custom shows", limits.max_custom_shows()));
+                    }
                     shows.push(
                         current_show
                             .take()
@@ -762,12 +825,16 @@ fn parse_show(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
     reader: &NsReader<&[u8]>,
+    limits: Limits,
 ) -> Result<RawShow> {
-    let attributes = attributes_ns(element, decoder, reader)?;
+    let attributes = attributes_ns(element, decoder, reader, limits)?;
     let id = required(&attributes, "id")?
         .parse::<u32>()
         .map_err(|_err| invalid("invalid custom-show ID"))?;
     let name = required(&attributes, "name")?.to_owned();
+    if name.len() > limits.max_string_bytes() {
+        return Err(limit("custom-show name", limits.max_string_bytes()));
+    }
     if name.is_empty() {
         return Err(invalid("custom-show name cannot be empty"));
     }
@@ -782,8 +849,9 @@ fn parse_slide_reference(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
     reader: &NsReader<&[u8]>,
+    limits: Limits,
 ) -> Result<(u32, String)> {
-    let attributes = attributes_ns(element, decoder, reader)?;
+    let attributes = attributes_ns(element, decoder, reader, limits)?;
     let id = required_unqualified(&attributes, "id")?
         .parse::<u32>()
         .map_err(|_err| invalid("invalid presentation slide ID"))?;
@@ -797,8 +865,9 @@ fn relationship_id(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
     reader: &NsReader<&[u8]>,
+    limits: Limits,
 ) -> Result<String> {
-    let attributes = attributes_ns(element, decoder, reader)?;
+    let attributes = attributes_ns(element, decoder, reader, limits)?;
     Ok(required_qualified(&attributes, "id")?.to_owned())
 }
 
@@ -806,11 +875,18 @@ fn attributes_ns(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
     reader: &NsReader<&[u8]>,
+    limits: Limits,
 ) -> Result<Vec<Attribute>> {
     let mut values = Vec::new();
     let mut seen = HashSet::new();
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if values.len() >= limits.max_attributes() {
+            return Err(limit(
+                "presentation structure attributes",
+                limits.max_attributes(),
+            ));
+        }
         let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
         let namespace = match namespace {
             ResolveResult::Bound(Namespace(value)) => Some(value.to_vec()),
@@ -830,6 +906,12 @@ fn attributes_ns(
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
+        if value.len() > limits.max_string_bytes() {
+            return Err(limit(
+                "presentation structure attribute",
+                limits.max_string_bytes(),
+            ));
+        }
         values.push(Attribute {
             namespace,
             local,
@@ -842,11 +924,18 @@ fn attributes_ns(
 fn attributes(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
+    limits: Limits,
 ) -> Result<Vec<(String, String)>> {
     let mut values = Vec::new();
     let mut seen = HashSet::new();
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if values.len() >= limits.max_attributes() {
+            return Err(limit(
+                "presentation structure attributes",
+                limits.max_attributes(),
+            ));
+        }
         let name = std::str::from_utf8(attribute.key.as_ref())
             .map_err(|error| Error::Xml(error.to_string()))?
             .to_owned();
@@ -857,6 +946,12 @@ fn attributes(
             .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?
             .into_owned();
+        if value.len() > limits.max_string_bytes() {
+            return Err(limit(
+                "presentation structure attribute",
+                limits.max_string_bytes(),
+            ));
+        }
         values.push((name, value));
     }
     Ok(values)
@@ -887,8 +982,8 @@ fn required_qualified<'a>(values: &'a [Attribute], local: &str) -> Result<&'a st
         .ok_or_else(|| invalid(format!("missing relationship attribute '{local}'")))
 }
 
-fn validate_graph(package: &OpcPackage, graph: &Graph) -> Result<()> {
-    validate_graph_shape(graph)?;
+fn validate_graph(package: &OpcPackage, graph: &Graph, limits: Limits) -> Result<()> {
+    validate_graph_shape(graph, limits)?;
 
     let presentation = package.main_document_part()?;
     for slide in &graph.slides {
@@ -911,7 +1006,7 @@ fn validate_graph(package: &OpcPackage, graph: &Graph) -> Result<()> {
     Ok(())
 }
 
-fn validate_graph_shape(graph: &Graph) -> Result<()> {
+fn validate_graph_shape(graph: &Graph, limits: Limits) -> Result<()> {
     let mut slide_ids = HashSet::new();
     let mut rel_ids = HashSet::new();
     let mut part_names = HashSet::new();
@@ -929,6 +1024,10 @@ fn validate_graph_shape(graph: &Graph) -> Result<()> {
     }
     let mut show_ids = HashSet::new();
     let mut show_names = HashSet::new();
+    if graph.custom_shows.shows.len() > limits.max_custom_shows() {
+        return Err(limit("custom shows", limits.max_custom_shows()));
+    }
+    let mut total_show_slides = 0usize;
     for show in &graph.custom_shows.shows {
         if show.name.is_empty()
             || !show_ids.insert(show.id)
@@ -941,6 +1040,15 @@ fn validate_graph_shape(graph: &Graph) -> Result<()> {
             if !slide_ids.contains(slide_id) || !membership.insert(*slide_id) {
                 return Err(invalid("duplicate or orphan custom-show slide reference"));
             }
+        }
+        total_show_slides = total_show_slides
+            .checked_add(show.slide_ids.len())
+            .ok_or_else(|| invalid("custom-show slide reference count overflow"))?;
+        if total_show_slides > limits.max_slide_references() {
+            return Err(limit(
+                "custom-show slide references",
+                limits.max_slide_references(),
+            ));
         }
     }
     let positions = graph
@@ -974,7 +1082,10 @@ fn validate_graph_shape(graph: &Graph) -> Result<()> {
             previous = Some(position);
         }
     }
-    graph.sections.to_xml()?;
+    if graph.sections.sections().len() > limits.max_sections() {
+        return Err(limit("presentation sections", limits.max_sections()));
+    }
+    graph.sections.to_xml(limits)?;
     Ok(())
 }
 
@@ -983,9 +1094,13 @@ fn write_custom_shows(
     slides: &[Reference],
     p_namespace: &str,
     r_namespace: &str,
+    limits: Limits,
 ) -> Result<String> {
     if shows.is_empty() {
         return Ok(String::new());
+    }
+    if shows.shows.len() > limits.max_custom_shows() {
+        return Err(limit("custom shows", limits.max_custom_shows()));
     }
     let relationships = slides
         .iter()
@@ -993,6 +1108,9 @@ fn write_custom_shows(
         .collect::<HashMap<_, _>>();
     let mut xml = format!("<p:custShowLst xmlns:p=\"{p_namespace}\" xmlns:r=\"{r_namespace}\">");
     for show in &shows.shows {
+        if show.name.len() > limits.max_string_bytes() {
+            return Err(limit("custom-show name", limits.max_string_bytes()));
+        }
         xml.push_str("<p:custShow name=\"");
         xml.push_str(&escape_xml(&show.name));
         xml.push_str("\" id=\"");
@@ -1009,14 +1127,18 @@ fn write_custom_shows(
         xml.push_str("</p:sldLst></p:custShow>");
     }
     xml.push_str("</p:custShowLst>");
-    if xml.len() > MAX_BYTES {
-        return Err(invalid("serialized custom shows exceed 8 MiB"));
+    if xml.len() > limits.max_output_bytes() {
+        return Err(limit("serialized custom shows", limits.max_output_bytes()));
     }
     Ok(xml)
 }
 
-fn write_section_extension(sections: &SectionList, p_namespace: &str) -> Result<String> {
-    let full = sections.to_xml()?;
+fn write_section_extension(
+    sections: &SectionList,
+    p_namespace: &str,
+    limits: Limits,
+) -> Result<String> {
+    let full = sections.to_xml(limits)?;
     if full.is_empty() {
         return Ok(String::new());
     }
@@ -1050,7 +1172,13 @@ struct XmlLayout {
     section_extensions: Vec<Span>,
 }
 
-fn scan_layout(xml: &[u8]) -> Result<XmlLayout> {
+fn scan_layout(xml: &[u8], limits: Limits) -> Result<XmlLayout> {
+    if xml.len() > limits.max_input_bytes() {
+        return Err(limit(
+            "presentation structure input",
+            limits.max_input_bytes(),
+        ));
+    }
     let mut reader = Reader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     let mut stack = Vec::<Frame>::new();
@@ -1067,10 +1195,10 @@ fn scan_layout(xml: &[u8]) -> Result<XmlLayout> {
         match reader.read_event() {
             Ok(Event::Start(element)) => {
                 nodes += 1;
-                resource(nodes, stack.len())?;
+                resource(nodes, stack.len(), limits)?;
                 let local = local_name(element.name().as_ref())?;
                 let target_section = local == "ext"
-                    && attributes(&element, decoder)?
+                    && attributes(&element, decoder, limits)?
                         .iter()
                         .any(|(name, value)| name == "uri" && value == SECTION_URI);
                 stack.push(Frame {
@@ -1083,7 +1211,7 @@ fn scan_layout(xml: &[u8]) -> Result<XmlLayout> {
             },
             Ok(Event::Empty(element)) => {
                 nodes += 1;
-                resource(nodes, stack.len())?;
+                resource(nodes, stack.len(), limits)?;
                 let local = local_name(element.name().as_ref())?;
                 let span = Span {
                     start: before,
@@ -1100,7 +1228,7 @@ fn scan_layout(xml: &[u8]) -> Result<XmlLayout> {
                     custom.push(span.clone());
                 }
                 if local == "ext"
-                    && attributes(&element, decoder)?
+                    && attributes(&element, decoder, limits)?
                         .iter()
                         .any(|(name, value)| name == "uri" && value == SECTION_URI)
                 {
@@ -1152,10 +1280,10 @@ fn scan_layout(xml: &[u8]) -> Result<XmlLayout> {
     })
 }
 
-fn patch_custom_shows(xml: &[u8], replacement: &[u8]) -> Result<Vec<u8>> {
-    let layout = scan_layout(xml)?;
+fn patch_custom_shows(xml: &[u8], replacement: &[u8], limits: Limits) -> Result<Vec<u8>> {
+    let layout = scan_layout(xml, limits)?;
     if !layout.custom.is_empty() {
-        return replace_spans(xml, &layout.custom, replacement);
+        return replace_spans(xml, &layout.custom, replacement, limits);
     }
     if replacement.is_empty() {
         return Ok(xml.to_vec());
@@ -1165,13 +1293,18 @@ fn patch_custom_shows(xml: &[u8], replacement: &[u8]) -> Result<Vec<u8>> {
         .iter()
         .find(|span| schema_rank(&span.local).is_some_and(|rank| rank > 8))
         .map_or(layout.root_close, |span| span.start);
-    insert_bytes(xml, insert, replacement)
+    insert_bytes(xml, insert, replacement, limits)
 }
 
-fn patch_sections(xml: &[u8], replacement: &[u8], p_namespace: &str) -> Result<Vec<u8>> {
-    let layout = scan_layout(xml)?;
+fn patch_sections(
+    xml: &[u8],
+    replacement: &[u8],
+    p_namespace: &str,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    let layout = scan_layout(xml, limits)?;
     if !layout.section_extensions.is_empty() {
-        return replace_spans(xml, &layout.section_extensions, replacement);
+        return replace_spans(xml, &layout.section_extensions, replacement, limits);
     }
     if replacement.is_empty() {
         return Ok(xml.to_vec());
@@ -1182,18 +1315,28 @@ fn patch_sections(xml: &[u8], replacement: &[u8], p_namespace: &str) -> Result<V
                 "<p:extLst xmlns:p=\"{p_namespace}\">{}</p:extLst>",
                 std::str::from_utf8(replacement).map_err(|error| Error::Xml(error.to_string()))?
             );
-            return replace_spans(xml, std::slice::from_ref(ext_list), wrapped.as_bytes());
+            return replace_spans(
+                xml,
+                std::slice::from_ref(ext_list),
+                wrapped.as_bytes(),
+                limits,
+            );
         }
-        return insert_bytes(xml, ext_list.close_start, replacement);
+        return insert_bytes(xml, ext_list.close_start, replacement, limits);
     }
     let wrapped = format!(
         "<p:extLst xmlns:p=\"{p_namespace}\">{}</p:extLst>",
         std::str::from_utf8(replacement).map_err(|error| Error::Xml(error.to_string()))?
     );
-    insert_bytes(xml, layout.root_close, wrapped.as_bytes())
+    insert_bytes(xml, layout.root_close, wrapped.as_bytes(), limits)
 }
 
-fn replace_spans(xml: &[u8], spans: &[Span], replacement: &[u8]) -> Result<Vec<u8>> {
+fn replace_spans(
+    xml: &[u8],
+    spans: &[Span],
+    replacement: &[u8],
+    limits: Limits,
+) -> Result<Vec<u8>> {
     let mut ordered = spans.to_vec();
     ordered.sort_by_key(|span| span.start);
     for pair in ordered.windows(2) {
@@ -1205,19 +1348,25 @@ fn replace_spans(xml: &[u8], spans: &[Span], replacement: &[u8]) -> Result<Vec<u
     for span in ordered.iter().rev() {
         output.splice(span.start..span.end, replacement.iter().copied());
     }
-    if output.len() > MAX_BYTES {
-        return Err(invalid("patched presentation structure exceeds 8 MiB"));
+    if output.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "patched presentation structure",
+            limits.max_output_bytes(),
+        ));
     }
     Ok(output)
 }
 
-fn insert_bytes(xml: &[u8], offset: usize, value: &[u8]) -> Result<Vec<u8>> {
+fn insert_bytes(xml: &[u8], offset: usize, value: &[u8], limits: Limits) -> Result<Vec<u8>> {
     let mut output = Vec::with_capacity(xml.len().saturating_add(value.len()));
     output.extend_from_slice(&xml[..offset]);
     output.extend_from_slice(value);
     output.extend_from_slice(&xml[offset..]);
-    if output.len() > MAX_BYTES {
-        return Err(invalid("patched presentation structure exceeds 8 MiB"));
+    if output.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "patched presentation structure",
+            limits.max_output_bytes(),
+        ));
     }
     Ok(output)
 }
@@ -1282,10 +1431,11 @@ fn require_presentation(content_type: &str) -> Result<()> {
     }
 }
 
-fn resource(nodes: usize, depth: usize) -> Result<()> {
-    if nodes > MAX_NODES || depth >= MAX_DEPTH {
-        Err(invalid(
-            "presentation structure XML resource limit exceeded",
+fn resource(nodes: usize, depth: usize, limits: Limits) -> Result<()> {
+    if nodes > limits.max_nodes() || depth >= limits.max_depth() {
+        Err(limit(
+            "presentation structure XML resource",
+            limits.max_nodes(),
         ))
     } else {
         Ok(())
@@ -1304,6 +1454,13 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
+fn limit(resource: &'static str, maximum: usize) -> Error {
+    Error::Limit {
+        resource,
+        limit: maximum,
+    }
+}
+
 #[cfg(test)]
 #[allow(
     clippy::unwrap_used,
@@ -1315,12 +1472,12 @@ mod tests {
 
     #[test]
     fn malformed_xml_is_rejected_and_mce_branches_patch_without_overlap() {
-        assert!(parse_core(b"<!DOCTYPE x><p:presentation/>").is_err());
-        assert!(parse_core(b"<p:presentation><p:sldIdLst>").is_err());
+        assert!(parse_core(b"<!DOCTYPE x><p:presentation/>", Limits::DEFAULT).is_err());
+        assert!(parse_core(b"<p:presentation><p:sldIdLst>", Limits::DEFAULT).is_err());
 
         let xml = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:AlternateContent><mc:Choice Requires="p"><p:custShowLst><p:custShow name="old" id="1"><p:sldLst/></p:custShow></p:custShowLst></mc:Choice><mc:Fallback><p:custShowLst/></mc:Fallback></mc:AlternateContent><!--keep--></p:presentation>"#;
         let replacement = br#"<p:custShowLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
-        let patched = patch_custom_shows(xml, replacement).unwrap();
+        let patched = patch_custom_shows(xml, replacement, Limits::DEFAULT).unwrap();
         assert_eq!(
             patched
                 .windows(replacement.len())
@@ -1339,7 +1496,7 @@ mod tests {
     fn non_empty_slide_ids_are_recorded_once_and_indirect_lookalikes_are_ignored() {
         let xml = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:x="urn:future"><p:sldIdLst><p:sldId id="256" r:id="rIdOne"><p:extLst><p:ext uri="{opaque}"><x:future><p:sldId id="999" r:id="rIdNested"/></x:future></p:ext></p:extLst></p:sldId><p:extLst><p:sldId id="998" r:id="rIdIndirect"/></p:extLst><p:sldId id="257" r:id="rIdTwo"/></p:sldIdLst><p:extLst><p:sldId id="997" r:id="rIdOutside"/></p:extLst></p:presentation>"#;
 
-        let (slides, shows) = parse_core(xml).unwrap();
+        let (slides, shows) = parse_core(xml, Limits::DEFAULT).unwrap();
 
         assert_eq!(
             slides,

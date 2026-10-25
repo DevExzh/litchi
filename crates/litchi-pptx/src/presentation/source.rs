@@ -1109,6 +1109,7 @@ pub(crate) struct SourceBackedSlideSnapshot {
     xml: SourcePayload,
     closure: SlideClosure,
     max_output_bytes: usize,
+    protection_limits: crate::presentation_properties::metadata::protection::Limits,
     semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     source_version: SourceVersion,
     lineage: SourceLineage,
@@ -2265,6 +2266,10 @@ impl SourceBackedPresentationEditor {
                 self.limits,
                 crate::open_options::selected(self.semantic_limits.as_ref()).shape(),
             ),
+            protection_limits:
+                crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                    self.limits,
+                ),
             semantic_limits: self.semantic_limits.clone(),
             source_version,
             lineage,
@@ -2503,6 +2508,10 @@ impl SourceBackedPresentationEditor {
                 self.limits,
                 crate::open_options::selected(self.semantic_limits.as_ref()).shape(),
             ),
+            protection_limits:
+                crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                    self.limits,
+                ),
             semantic_limits: self.semantic_limits.clone(),
             source_version,
             lineage,
@@ -2742,6 +2751,7 @@ impl SourceBackedSlideEdit {
             self.source.max_output_bytes,
             crate::open_options::selected(self.source.semantic_limits.as_ref()).transition(),
             operation,
+            self.source.protection_limits,
         )?;
         if let Some(xml) = xml {
             self.working = SourcePayload::Edited(Arc::new(xml));
@@ -3228,6 +3238,7 @@ impl SourceBackedSlideEdit {
             xml: self.working,
             closure: source.closure.clone(),
             max_output_bytes: self.source_max_output_bytes,
+            protection_limits: source.protection_limits,
             semantic_limits: source.semantic_limits.clone(),
             source_version: source.source_version,
             lineage: source.lineage.clone(),
@@ -6225,6 +6236,7 @@ mod tests {
             xml: SourcePayload::Edited(Arc::new(after_xml)),
             closure: before.closure.clone(),
             max_output_bytes: before.max_output_bytes,
+            protection_limits: before.protection_limits,
             semantic_limits: before.semantic_limits.clone(),
             source_version: before.source_version,
             lineage: before.lineage.clone(),

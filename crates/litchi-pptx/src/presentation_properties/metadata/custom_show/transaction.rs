@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::OpcPackage;
 
+use super::Limits;
 use super::model::{List, Show};
 use super::{package, wire};
 use crate::{Error, Result};
@@ -20,6 +21,7 @@ pub struct Snapshot {
     pub(crate) layout: wire::Layout,
     pub(crate) relationships: Vec<wire::RelationshipState>,
     pub(crate) revision: Revision,
+    pub(crate) limits: Limits,
 }
 
 impl Snapshot {
@@ -28,8 +30,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn load(package: &OpcPackage) -> Result<Self> {
-        package::load_snapshot(package)
+    pub fn load(package: &OpcPackage, limits: Limits) -> Result<Self> {
+        package::load_snapshot(package, limits)
     }
 
     /// Alias emphasizing that the result is bound to exact source bytes.
@@ -37,8 +39,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::load(package)
+    pub fn read(package: &OpcPackage, limits: Limits) -> Result<Self> {
+        Self::load(package, limits)
     }
 
     pub(crate) fn from_located(
@@ -46,11 +48,13 @@ impl Snapshot {
         presentation_content_type: String,
         source_xml: Arc<Vec<u8>>,
         located: wire::Located,
+        limits: Limits,
     ) -> Result<Self> {
-        if source_xml.len() > wire::MAX_BYTES {
-            return Err(invalid(
-                "custom-show PresentationML source bytes exceed 8 MiB",
-            ));
+        if source_xml.len() > limits.max_input_bytes() {
+            return Err(Error::Limit {
+                resource: "custom-show PresentationML source bytes",
+                limit: limits.max_input_bytes(),
+            });
         }
         let revision = fingerprint(
             source_xml.as_slice(),
@@ -66,6 +70,7 @@ impl Snapshot {
             layout: located.layout,
             relationships: located.relationships,
             revision,
+            limits,
         })
     }
 
@@ -156,14 +161,14 @@ impl Draft {
         self.list()
     }
 
-    fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         self.original.list.shows != self.working.shows
     }
 
     /// The outcome of this edit or commit.
     #[must_use]
     pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
+        crate::diagnostics::Diagnostics::new(self.has_changes())
     }
 
     /// Replace the complete typed list after validating all slide references.
@@ -412,7 +417,7 @@ impl Draft {
     ///
     /// Returns an error if the operation fails.
     pub(crate) fn commit(self) -> Result<Prepared> {
-        if !self.is_changed() {
+        if !self.has_changes() {
             let patch = Change::new(self.original.clone(), self.original.clone());
             return Ok(Prepared {
                 snapshot: self.original,
@@ -426,8 +431,10 @@ impl Draft {
             &self.original.layout,
             &self.original.list,
             &self.working,
+            self.original.limits,
         )?;
-        let (list, layout) = wire::decode_rewritten(&source, &self.original.layout)?;
+        let (list, layout) =
+            wire::decode_rewritten(&source, &self.original.layout, self.original.limits)?;
         if list.shows != self.working.shows {
             return Err(invalid(
                 "custom-show serialization changed the typed semantic list",
@@ -442,6 +449,7 @@ impl Draft {
                 layout,
                 relationships: self.original.relationships.clone(),
             },
+            self.original.limits,
         )?;
         let patch = Change::new(self.original, snapshot.clone());
         Ok(Prepared {
@@ -470,7 +478,7 @@ pub(crate) struct Prepared {
 
 impl Prepared {
     #[cfg(test)]
-    fn is_changed(&self) -> bool {
+    fn has_changes(&self) -> bool {
         self.changed
     }
 
@@ -478,7 +486,7 @@ impl Prepared {
     #[must_use]
     #[cfg(test)]
     pub(crate) fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
-        crate::diagnostics::Diagnostics::new(self.is_changed())
+        crate::diagnostics::Diagnostics::new(self.has_changes())
     }
 
     #[inline]
@@ -557,7 +565,11 @@ impl Change {
 }
 
 fn validate(original: &Snapshot, value: &List) -> Result<()> {
-    wire::validate_list(value, original.layout.slide_id_to_relationship.keys())
+    wire::validate_list(
+        value,
+        original.layout.slide_id_to_relationship.keys(),
+        original.limits,
+    )
 }
 
 fn fingerprint(

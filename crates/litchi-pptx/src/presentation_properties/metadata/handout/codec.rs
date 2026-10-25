@@ -3,6 +3,7 @@
 //! Handout masters define the layout for printed handouts that show
 //! multiple slides per page.
 
+use super::super::{Limits, process_str};
 use super::model::Master;
 use crate::presentation_properties::metadata::new_guid;
 use crate::{Error, Result};
@@ -16,51 +17,59 @@ impl Master {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_xml(xml: &str) -> Result<Self> {
+    pub fn parse_xml(xml: &str, limits: Limits) -> Result<Self> {
+        if xml.len() > limits.max_input_bytes() {
+            return Err(Error::Limit {
+                resource: "handout-master XML input",
+                limit: limits.max_input_bytes(),
+            });
+        }
         let mut master = Self::default();
-        let xml = litchi_ooxml_common::mce::process_str(xml)?;
+        let xml = process_str(xml, limits)?;
+        if xml.len() > limits.max_output_bytes() {
+            return Err(Error::Limit {
+                resource: "processed handout-master XML",
+                limit: limits.max_output_bytes(),
+            });
+        }
         let mut reader = Reader::from_str(xml.as_ref());
         reader.config_mut().trim_text(true);
+        let mut nodes = 0usize;
+        let mut depth = 0usize;
 
         loop {
             match reader.read_event() {
-                Ok(Event::Start(e) | Event::Empty(e)) => match e.local_name().as_ref() {
-                    b"hf" => {
-                        for attr in first_wins(&e).flatten() {
-                            match attr.key.as_ref() {
-                                b"hdr" => {
-                                    master.header_footer.show_header = attr.value.as_ref() == b"1";
-                                },
-                                b"ftr" => {
-                                    master.header_footer.show_footer = attr.value.as_ref() == b"1";
-                                },
-                                b"sldNum" => {
-                                    master.header_footer.show_slide_number =
-                                        attr.value.as_ref() == b"1";
-                                },
-                                b"dt" => {
-                                    master.header_footer.show_date_time =
-                                        attr.value.as_ref() == b"1";
-                                },
-                                _ => {},
-                            }
-                        }
-                    },
-                    b"srgbClr" => {
-                        for attr in first_wins(&e).flatten() {
-                            if attr.key.as_ref() == b"val"
-                                && let Ok(color) = std::str::from_utf8(&attr.value)
-                            {
-                                master.background_color = Some(color.to_string());
-                            }
-                        }
-                    },
-                    _ => {},
+                Ok(Event::Start(element)) => {
+                    depth = depth.checked_add(1).ok_or(Error::Limit {
+                        resource: "handout-master XML depth",
+                        limit: limits.max_depth(),
+                    })?;
+                    if depth > limits.max_depth() {
+                        return Err(Error::Limit {
+                            resource: "handout-master XML depth",
+                            limit: limits.max_depth(),
+                        });
+                    }
+                    parse_element(&element, reader.decoder(), &mut master, &mut nodes, limits)?;
+                },
+                Ok(Event::Empty(element)) => {
+                    parse_element(&element, reader.decoder(), &mut master, &mut nodes, limits)?
+                },
+                Ok(Event::End(_)) => {
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        Error::Invalid("handout-master XML has an unmatched end tag".into())
+                    })?;
                 },
                 Ok(Event::Eof) => break,
                 Err(e) => return Err(Error::Xml(e.to_string())),
                 _ => {},
             }
+        }
+
+        if depth != 0 {
+            return Err(Error::Invalid(
+                "handout-master XML has an unterminated element".into(),
+            ));
         }
 
         Ok(master)
@@ -69,7 +78,7 @@ impl Master {
     /// Generate handout master XML.
     /// Structure matches Apache POI PowerPoint-created files.
     #[must_use]
-    pub fn to_xml(&self) -> String {
+    pub fn to_xml(&self, limits: Limits) -> Result<String> {
         let mut xml = String::with_capacity(8192);
 
         xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
@@ -114,8 +123,91 @@ impl Master {
 
         xml.push_str("</p:handoutMaster>");
 
-        xml
+        if xml.len() > limits.max_output_bytes() {
+            return Err(Error::Limit {
+                resource: "serialized handout-master XML",
+                limit: limits.max_output_bytes(),
+            });
+        }
+        Ok(xml)
     }
+}
+
+fn parse_element(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    master: &mut Master,
+    nodes: &mut usize,
+    limits: Limits,
+) -> Result<()> {
+    *nodes = nodes.checked_add(1).ok_or(Error::Limit {
+        resource: "handout-master XML nodes",
+        limit: limits.max_nodes(),
+    })?;
+    if *nodes > limits.max_nodes() {
+        return Err(Error::Limit {
+            resource: "handout-master XML nodes",
+            limit: limits.max_nodes(),
+        });
+    }
+    check_attributes(element, decoder, limits)?;
+    match element.local_name().as_ref() {
+        b"hf" => {
+            for attr in first_wins(element).flatten() {
+                match attr.key.as_ref() {
+                    b"hdr" => master.header_footer.show_header = attr.value.as_ref() == b"1",
+                    b"ftr" => master.header_footer.show_footer = attr.value.as_ref() == b"1",
+                    b"sldNum" => {
+                        master.header_footer.show_slide_number = attr.value.as_ref() == b"1";
+                    },
+                    b"dt" => master.header_footer.show_date_time = attr.value.as_ref() == b"1",
+                    _ => {},
+                }
+            }
+        },
+        b"srgbClr" => {
+            for attr in first_wins(element).flatten() {
+                if attr.key.as_ref() == b"val"
+                    && let Ok(color) = std::str::from_utf8(&attr.value)
+                {
+                    master.background_color = Some(color.to_string());
+                }
+            }
+        },
+        _ => {},
+    }
+    Ok(())
+}
+
+fn check_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    limits: Limits,
+) -> Result<()> {
+    let mut count = 0usize;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        count = count.checked_add(1).ok_or(Error::Limit {
+            resource: "handout-master XML attributes",
+            limit: limits.max_attributes(),
+        })?;
+        if count > limits.max_attributes() {
+            return Err(Error::Limit {
+                resource: "handout-master XML attributes",
+                limit: limits.max_attributes(),
+            });
+        }
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        if value.len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "handout-master XML attribute",
+                limit: limits.max_string_bytes(),
+            });
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -169,6 +261,7 @@ mod tests {
     fn parsed_handout_attributes_keep_their_first_occurrence() {
         let single = Master::parse_xml(
             r#"<p:handoutMaster><p:hf hdr="0" ftr="1" sldNum="1" dt="0"/><a:srgbClr val="112233"/></p:handoutMaster>"#,
+            Limits::DEFAULT,
         )
         .unwrap();
         assert!(!single.header_footer.show_header);
@@ -179,6 +272,7 @@ mod tests {
 
         let repeated = Master::parse_xml(
             r#"<p:handoutMaster><p:hf hdr="0" ftr="1" hdr="1" ftr="0" sldNum="1" dt="0" dt="1" sldNum="0"/><a:srgbClr val="112233" val="445566"/></p:handoutMaster>"#,
+            Limits::DEFAULT,
         )
         .unwrap();
         assert!(!repeated.header_footer.show_header);
@@ -195,7 +289,7 @@ mod tests {
             crowded("hdr", "1", "0"),
             crowded("val", "112233", "445566"),
         );
-        let master = Master::parse_xml(&xml).unwrap();
+        let master = Master::parse_xml(&xml, Limits::DEFAULT).unwrap();
         assert!(master.header_footer.show_header);
         assert!(master.header_footer.show_footer);
         assert!(!master.header_footer.show_slide_number);

@@ -1,7 +1,7 @@
 //! Presentation protection example - demonstrates security settings.
 
 use litchi::pptx::presentation_properties::metadata::protection::{
-    Algorithm, Settings, Slide, Type,
+    Algorithm, Limits, Settings, Slide, Type,
 };
 use litchi::pptx::{Package, encryption::Mode};
 
@@ -45,7 +45,7 @@ fn main() {
 
     // Test password protection
     let mut password_protected = Settings::new();
-    if let Err(e) = password_protected.set_modify_password(&password) {
+    if let Err(e) = password_protected.set_modify_password(&password, Limits::DEFAULT) {
         println!("\nError setting modify password: {e}");
         return;
     }
@@ -123,12 +123,18 @@ fn main() {
 
     // Generate XML
     let mut with_password = Settings::new();
-    if let Err(error) = with_password.set_modify_password(&password) {
+    if let Err(error) = with_password.set_modify_password(&password, Limits::DEFAULT) {
         println!("\nError setting XML example password: {error}");
         return;
     }
 
-    let xml = with_password.to_xml();
+    let xml = match with_password.to_xml(Limits::DEFAULT) {
+        Ok(xml) => xml,
+        Err(error) => {
+            println!("\nError serializing XML example: {error}");
+            return;
+        },
+    };
     println!("\nGenerated protection XML:");
     println!("  Length: {} bytes", xml.len());
     assert!(xml.contains("modifyVerifier"));

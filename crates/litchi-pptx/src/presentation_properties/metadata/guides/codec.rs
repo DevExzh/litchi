@@ -1,5 +1,6 @@
 //! Typed, bounded `PowerPoint` 2013 extended presentation guides.
 
+use super::super::{Limits, process_ooxml};
 use super::model::{Color, ColorKind, Guide, Guides, List, Orientation};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
@@ -19,12 +20,6 @@ const AS: &str = "http://purl.oclc.org/ooxml/drawingml/main";
 const P15: &str = "http://schemas.microsoft.com/office/powerpoint/2012/main";
 const SLIDE_GUIDES_URI: &str = "{EFAFB233-063F-42B5-8137-9DF3F51BA10A}";
 const NOTES_GUIDES_URI: &str = "{2D200454-40CA-4A62-9FC3-DE9A4176ACB9}";
-pub(crate) const MAX_BYTES: usize = 8 * 1024 * 1024;
-const MAX_DEPTH: usize = 128;
-const MAX_NODES: usize = 100_000;
-const MAX_GUIDES: usize = 16_384;
-const MAX_EXTENSIONS: usize = 1_024;
-const MAX_STRING_BYTES: usize = 1024 * 1024;
 
 impl Guides {
     /// Parse guide extensions from a complete `p:presentation` document.
@@ -32,15 +27,18 @@ impl Guides {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_xml(xml: &[u8]) -> Result<Self> {
-        if xml.len() > MAX_BYTES {
-            return Err(invalid("presentation guides exceed 8 MiB"));
+    pub fn from_xml(xml: &[u8], limits: Limits) -> Result<Self> {
+        if xml.len() > limits.max_input_bytes() {
+            return Err(limit("presentation guides input", limits.max_input_bytes()));
         }
-        let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
-        if processed.len() > MAX_BYTES {
-            return Err(invalid("processed presentation guides exceed 8 MiB"));
+        let processed = process_ooxml(xml, limits)?;
+        if processed.len() > limits.max_output_bytes() {
+            return Err(limit(
+                "processed presentation guides",
+                limits.max_output_bytes(),
+            ));
         }
-        parse_presentation(&parse_dom(processed.as_ref())?)
+        parse_presentation(&parse_dom(processed.as_ref(), limits)?)
     }
 
     /// Serialize the guide entries as a complete `p:extLst` fragment.
@@ -48,30 +46,47 @@ impl Guides {
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn to_xml(&self, strict: bool) -> Result<String> {
-        validate(self)?;
+    pub fn to_xml(&self, strict: bool, limits: Limits) -> Result<String> {
+        validate(self, limits)?;
         if self.slide.is_none() && self.notes.is_none() {
             return Ok(String::new());
         }
         let mut xml = String::with_capacity(1024);
         xml.push_str("<p:extLst>");
         if let Some(list) = &self.slide {
-            write_list_extension(&mut xml, SLIDE_GUIDES_URI, "sldGuideLst", list, strict)?;
+            write_list_extension(
+                &mut xml,
+                SLIDE_GUIDES_URI,
+                "sldGuideLst",
+                list,
+                strict,
+                limits,
+            )?;
         }
         if let Some(list) = &self.notes {
-            write_list_extension(&mut xml, NOTES_GUIDES_URI, "notesGuideLst", list, strict)?;
+            write_list_extension(
+                &mut xml,
+                NOTES_GUIDES_URI,
+                "notesGuideLst",
+                list,
+                strict,
+                limits,
+            )?;
         }
         xml.push_str("</p:extLst>");
-        if xml.len() > MAX_BYTES {
-            return Err(invalid("serialized presentation guides exceed 8 MiB"));
+        if xml.len() > limits.max_output_bytes() {
+            return Err(limit(
+                "serialized presentation guides",
+                limits.max_output_bytes(),
+            ));
         }
         Ok(xml)
     }
 }
 
 /// Validate a programmatically staged guide value before package publication.
-pub(crate) fn validate_value(value: &Guides) -> Result<()> {
-    validate(value)
+pub(crate) fn validate_value(value: &Guides, limits: Limits) -> Result<()> {
+    validate(value, limits)
 }
 
 /// Replace only the known guide extension entries in one presentation source.
@@ -79,18 +94,21 @@ pub(crate) fn validate_value(value: &Guides) -> Result<()> {
 /// The source is preprocessed through the shared MCE baseline before a changed
 /// edit is written. The no-op transaction path deliberately skips this helper,
 /// so an untouched source is returned byte-for-byte unchanged.
-pub(crate) fn rewrite_source(source: &[u8], value: &Guides) -> Result<Vec<u8>> {
-    if source.len() > MAX_BYTES {
-        return Err(invalid("presentation guides exceed 8 MiB"));
+pub(crate) fn rewrite_source(source: &[u8], value: &Guides, limits: Limits) -> Result<Vec<u8>> {
+    if source.len() > limits.max_input_bytes() {
+        return Err(limit("presentation guides input", limits.max_input_bytes()));
     }
-    validate(value)?;
-    let processed = litchi_ooxml_common::mce::process_ooxml(source)?;
-    if processed.len() > MAX_BYTES {
-        return Err(invalid("processed presentation guides exceed 8 MiB"));
+    validate(value, limits)?;
+    let processed = process_ooxml(source, limits)?;
+    if processed.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "processed presentation guides",
+            limits.max_output_bytes(),
+        ));
     }
     let source = processed.as_ref();
-    let layout = scan_source(source)?;
-    let entries = target_entries(value, layout.strict, layout.presentation_namespace)?;
+    let layout = scan_source(source, limits)?;
+    let entries = target_entries(value, layout.strict, layout.presentation_namespace, limits)?;
 
     let Some(ext_list) = layout.ext_list.as_ref() else {
         if entries.iter().all(Option::is_none) {
@@ -105,13 +123,17 @@ pub(crate) fn rewrite_source(source: &[u8], value: &Guides) -> Result<Vec<u8>> {
                 .collect::<String>()
         );
         return if layout.root.empty {
-            let replacement = expand_empty(source, &layout.root, &fragment)?;
-            replace_spans(source, &[(layout.root.start, layout.root.end, replacement)])
+            let replacement = expand_empty(source, &layout.root, &fragment, limits)?;
+            replace_spans(
+                source,
+                &[(layout.root.start, layout.root.end, replacement)],
+                limits,
+            )
         } else {
             let root_close = layout
                 .root_close
                 .ok_or_else(|| invalid("presentation root is missing its end tag"))?;
-            insert_bytes(source, root_close, fragment.as_bytes())
+            insert_bytes(source, root_close, fragment.as_bytes(), limits)
         };
     };
 
@@ -126,8 +148,12 @@ pub(crate) fn rewrite_source(source: &[u8], value: &Guides) -> Result<Vec<u8>> {
                     .iter()
                     .filter_map(|entry| entry.as_deref())
                     .collect::<String>();
-                let replacement = expand_empty_bytes(source, ext_list, body.as_bytes())?;
-                return replace_spans(source, &[(ext_list.start, ext_list.end, replacement)]);
+                let replacement = expand_empty_bytes(source, ext_list, body.as_bytes(), limits)?;
+                return replace_spans(
+                    source,
+                    &[(ext_list.start, ext_list.end, replacement)],
+                    limits,
+                );
             }
             replacements.push((
                 ext_list.close_start,
@@ -136,7 +162,7 @@ pub(crate) fn rewrite_source(source: &[u8], value: &Guides) -> Result<Vec<u8>> {
             ));
         }
     }
-    replace_spans(source, &replacements)
+    replace_spans(source, &replacements, limits)
 }
 
 #[derive(Clone, Copy)]
@@ -171,7 +197,7 @@ struct SourceLayout {
     strict: bool,
 }
 
-fn scan_source(source: &[u8]) -> Result<SourceLayout> {
+fn scan_source(source: &[u8], limits: Limits) -> Result<SourceLayout> {
     let mut reader = NsReader::from_reader(source);
     let origin = ReaderOrigin::of(source);
     let mut stack: Vec<SourceFrame> = Vec::new();
@@ -191,9 +217,10 @@ fn scan_source(source: &[u8]) -> Result<SourceLayout> {
         match event {
             Event::Start(element) => {
                 nodes += 1;
-                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(invalid("presentation-guide XML resource limit exceeded"));
+                if nodes > limits.max_nodes() || stack.len() >= limits.max_depth() {
+                    return Err(limit("presentation-guide XML resource", limits.max_nodes()));
                 }
+                check_source_attributes(&element, decoder, limits)?;
                 let local = local_name(element.local_name().as_ref())?;
                 let qname = std::str::from_utf8(element.name().as_ref())
                     .map_err(xml_error)?
@@ -227,9 +254,10 @@ fn scan_source(source: &[u8]) -> Result<SourceLayout> {
             },
             Event::Empty(element) => {
                 nodes += 1;
-                if nodes > MAX_NODES {
-                    return Err(invalid("presentation-guide XML node limit exceeded"));
+                if nodes > limits.max_nodes() {
+                    return Err(limit("presentation-guide XML nodes", limits.max_nodes()));
                 }
+                check_source_attributes(&element, decoder, limits)?;
                 let local = local_name(element.local_name().as_ref())?;
                 let qname = std::str::from_utf8(element.name().as_ref())
                     .map_err(xml_error)?
@@ -379,6 +407,34 @@ fn element_uri(element: &BytesStart<'_>, decoder: Decoder) -> Result<Option<Stri
     Ok(value)
 }
 
+fn check_source_attributes(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    limits: Limits,
+) -> Result<()> {
+    let mut count = 0usize;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        count += 1;
+        if count > limits.max_attributes() {
+            return Err(limit(
+                "presentation-guide XML attributes",
+                limits.max_attributes(),
+            ));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map_err(xml_error)?;
+        if value.len() > limits.max_string_bytes() {
+            return Err(limit(
+                "presentation-guide XML attribute",
+                limits.max_string_bytes(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn target_from_uri(uri: Option<String>) -> Option<Target> {
     match uri.as_deref() {
         Some(SLIDE_GUIDES_URI) => Some(Target::Slide),
@@ -398,6 +454,7 @@ fn target_entries(
     value: &Guides,
     strict: bool,
     presentation_namespace: &str,
+    limits: Limits,
 ) -> Result<[Option<String>; 2]> {
     Ok([
         value
@@ -410,6 +467,7 @@ fn target_entries(
                     list,
                     strict,
                     presentation_namespace,
+                    limits,
                 )
             })
             .transpose()?,
@@ -423,6 +481,7 @@ fn target_entries(
                     list,
                     strict,
                     presentation_namespace,
+                    limits,
                 )
             })
             .transpose()?,
@@ -435,19 +494,29 @@ fn extension_xml(
     list: &List,
     strict: bool,
     presentation_namespace: &str,
+    limits: Limits,
 ) -> Result<String> {
     let mut xml = String::new();
-    write_list_extension(&mut xml, uri, local, list, strict)?;
+    write_list_extension(&mut xml, uri, local, list, strict, limits)?;
     let declaration = format!("<p:ext xmlns:p=\"{presentation_namespace}\" ");
-    Ok(xml.replacen("<p:ext ", &declaration, 1))
+    let value = xml.replacen("<p:ext ", &declaration, 1);
+    if value.len() > limits.max_output_bytes() {
+        return Err(limit("guide extension output", limits.max_output_bytes()));
+    }
+    Ok(value)
 }
 
-fn expand_empty(source: &[u8], span: &SourceSpan, body: &str) -> Result<Vec<u8>> {
-    let replacement = expand_empty_bytes(source, span, body.as_bytes())?;
+fn expand_empty(source: &[u8], span: &SourceSpan, body: &str, limits: Limits) -> Result<Vec<u8>> {
+    let replacement = expand_empty_bytes(source, span, body.as_bytes(), limits)?;
     Ok(replacement)
 }
 
-fn expand_empty_bytes(source: &[u8], span: &SourceSpan, body: &[u8]) -> Result<Vec<u8>> {
+fn expand_empty_bytes(
+    source: &[u8],
+    span: &SourceSpan,
+    body: &[u8],
+    limits: Limits,
+) -> Result<Vec<u8>> {
     let token = source[span.start..span.end].trim_ascii_end();
     let open = token
         .strip_suffix(b"/>")
@@ -465,13 +534,20 @@ fn expand_empty_bytes(source: &[u8], span: &SourceSpan, body: &[u8]) -> Result<V
     replacement.extend_from_slice(b"</");
     replacement.extend_from_slice(span.qname.as_bytes());
     replacement.push(b'>');
-    if replacement.len() > MAX_BYTES {
-        return Err(invalid("patched presentation guides exceed 8 MiB"));
+    if replacement.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "patched presentation guides",
+            limits.max_output_bytes(),
+        ));
     }
     Ok(replacement)
 }
 
-fn replace_spans(source: &[u8], spans: &[(usize, usize, Vec<u8>)]) -> Result<Vec<u8>> {
+fn replace_spans(
+    source: &[u8],
+    spans: &[(usize, usize, Vec<u8>)],
+    limits: Limits,
+) -> Result<Vec<u8>> {
     let mut ordered = spans.to_vec();
     ordered.sort_by_key(|(start, _, _)| *start);
     for pair in ordered.windows(2) {
@@ -483,13 +559,21 @@ fn replace_spans(source: &[u8], spans: &[(usize, usize, Vec<u8>)]) -> Result<Vec
     for (start, end, replacement) in ordered.iter().rev() {
         output.splice(*start..*end, replacement.iter().copied());
     }
-    if output.len() > MAX_BYTES {
-        return Err(invalid("patched presentation guides exceed 8 MiB"));
+    if output.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "patched presentation guides",
+            limits.max_output_bytes(),
+        ));
     }
     Ok(output)
 }
 
-fn insert_bytes(source: &[u8], offset: usize, replacement: &[u8]) -> Result<Vec<u8>> {
+fn insert_bytes(
+    source: &[u8],
+    offset: usize,
+    replacement: &[u8],
+    limits: Limits,
+) -> Result<Vec<u8>> {
     if offset > source.len() {
         return Err(invalid(
             "presentation-guide insertion offset is out of bounds",
@@ -499,8 +583,11 @@ fn insert_bytes(source: &[u8], offset: usize, replacement: &[u8]) -> Result<Vec<
     output.extend_from_slice(&source[..offset]);
     output.extend_from_slice(replacement);
     output.extend_from_slice(&source[offset..]);
-    if output.len() > MAX_BYTES {
-        return Err(invalid("patched presentation guides exceed 8 MiB"));
+    if output.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "patched presentation guides",
+            limits.max_output_bytes(),
+        ));
     }
     Ok(output)
 }
@@ -529,9 +616,16 @@ struct Node {
     attributes: Vec<Attr>,
     bindings: Vec<(String, String)>,
     content: Vec<Content>,
+    limits: Limits,
 }
 
-fn parse_dom(xml: &[u8]) -> Result<Node> {
+fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
+    if xml.len() > limits.max_output_bytes() {
+        return Err(limit(
+            "presentation-guide XML input",
+            limits.max_output_bytes(),
+        ));
+    }
     std::str::from_utf8(xml).map_err(xml_error)?;
     let mut reader = Reader::from_reader(xml);
     let mut stack: Vec<Node> = Vec::new();
@@ -542,17 +636,17 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
         match reader.read_event() {
             Ok(Event::Start(element)) => {
                 count += 1;
-                if count > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(invalid("presentation-guide XML resource limit exceeded"));
+                if count > limits.max_nodes() || stack.len() >= limits.max_depth() {
+                    return Err(limit("presentation-guide XML resource", limits.max_nodes()));
                 }
-                stack.push(make_node(&element, decoder, &stack)?);
+                stack.push(make_node(&element, decoder, &stack, limits)?);
             },
             Ok(Event::Empty(element)) => {
                 count += 1;
-                if count > MAX_NODES {
-                    return Err(invalid("presentation-guide node limit exceeded"));
+                if count > limits.max_nodes() {
+                    return Err(limit("presentation-guide XML nodes", limits.max_nodes()));
                 }
-                let node = make_node(&element, decoder, &stack)?;
+                let node = make_node(&element, decoder, &stack, limits)?;
                 attach(&mut stack, &mut root, node)?;
             },
             Ok(Event::End(_)) => {
@@ -563,6 +657,12 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
             },
             Ok(Event::Text(text)) => {
                 let text = text.decode().map_err(xml_error)?.into_owned();
+                if text.len() > limits.max_string_bytes() {
+                    return Err(limit(
+                        "presentation-guide XML text",
+                        limits.max_string_bytes(),
+                    ));
+                }
                 if let Some(node) = stack.last_mut() {
                     node.content.push(Content::Text(text));
                 } else if !text.trim().is_empty() {
@@ -571,6 +671,12 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
             },
             Ok(Event::CData(text)) => {
                 let text = text.decode().map_err(xml_error)?.into_owned();
+                if text.len() > limits.max_string_bytes() {
+                    return Err(limit(
+                        "presentation-guide XML CDATA",
+                        limits.max_string_bytes(),
+                    ));
+                }
                 if let Some(node) = stack.last_mut() {
                     node.content.push(Content::CData(text));
                 } else {
@@ -578,14 +684,25 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
                 }
             },
             Ok(Event::Comment(text)) => {
-                if let Some(node) = stack.last_mut() {
-                    node.content.push(Content::Comment(
-                        text.decode().map_err(xml_error)?.into_owned(),
+                let text = text.decode().map_err(xml_error)?.into_owned();
+                if text.len() > limits.max_string_bytes() {
+                    return Err(limit(
+                        "presentation-guide XML comment",
+                        limits.max_string_bytes(),
                     ));
+                }
+                if let Some(node) = stack.last_mut() {
+                    node.content.push(Content::Comment(text));
                 }
             },
             Ok(Event::GeneralRef(reference)) => {
                 let text = litchi_ooxml_common::xml::decode_xml_reference(&reference)?;
+                if text.len() > limits.max_string_bytes() {
+                    return Err(limit(
+                        "presentation-guide XML reference",
+                        limits.max_string_bytes(),
+                    ));
+                }
                 if let Some(node) = stack.last_mut() {
                     node.content.push(Content::Text(text));
                 } else {
@@ -606,7 +723,12 @@ fn parse_dom(xml: &[u8]) -> Result<Node> {
     root.ok_or_else(|| invalid("missing presentation root"))
 }
 
-fn make_node(element: &BytesStart<'_>, decoder: Decoder, stack: &[Node]) -> Result<Node> {
+fn make_node(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    stack: &[Node],
+    limits: Limits,
+) -> Result<Node> {
     let qname = std::str::from_utf8(element.name().as_ref())
         .map_err(xml_error)?
         .to_owned();
@@ -617,6 +739,12 @@ fn make_node(element: &BytesStart<'_>, decoder: Decoder, stack: &[Node]) -> Resu
     let mut raw = Vec::new();
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(xml_error)?;
+        if raw.len() >= limits.max_attributes() {
+            return Err(limit(
+                "presentation-guide XML attributes",
+                limits.max_attributes(),
+            ));
+        }
         raw.push((
             std::str::from_utf8(attribute.key.as_ref())
                 .map_err(xml_error)?
@@ -626,6 +754,15 @@ fn make_node(element: &BytesStart<'_>, decoder: Decoder, stack: &[Node]) -> Resu
                 .map_err(xml_error)?
                 .into_owned(),
         ));
+        if raw
+            .last()
+            .is_some_and(|(_, value)| value.len() > limits.max_string_bytes())
+        {
+            return Err(limit(
+                "presentation-guide XML attribute",
+                limits.max_string_bytes(),
+            ));
+        }
     }
     for (name, value) in &raw {
         if name == "xmlns" || name.starts_with("xmlns:") {
@@ -666,6 +803,7 @@ fn make_node(element: &BytesStart<'_>, decoder: Decoder, stack: &[Node]) -> Resu
         attributes,
         bindings,
         content: Vec::new(),
+        limits,
     })
 }
 
@@ -679,6 +817,7 @@ fn attach(stack: &mut [Node], root: &mut Option<Node>, node: Node) -> Result<()>
 }
 
 fn parse_presentation(root: &Node) -> Result<Guides> {
+    let limits = root.limits;
     expect(root, &[P, PS], "presentation")?;
     let mut root_ext = None;
     for child in children(root)? {
@@ -708,13 +847,13 @@ fn parse_presentation(root: &Node) -> Result<Guides> {
                 return Err(invalid(format!("{local} extension requires one payload")));
             }
             expect(payload[0], &[P15], local)?;
-            *slot = Some(parse_list(payload[0])?);
+            *slot = Some(parse_list(payload[0], limits)?);
         }
     }
     Ok(value)
 }
 
-fn parse_list(node: &Node) -> Result<List> {
+fn parse_list(node: &Node, limits: Limits) -> Result<List> {
     no_attributes(node)?;
     let content = children(node)?;
     let mut guides = Vec::new();
@@ -725,10 +864,10 @@ fn parse_list(node: &Node) -> Result<List> {
             if extension_xml.is_some() {
                 return Err(invalid("guide appears after guide-list extLst"));
             }
-            if guides.len() >= MAX_GUIDES {
-                return Err(invalid("extended guide count exceeds limit"));
+            if guides.len() >= limits.max_guides() {
+                return Err(limit("extended guide count", limits.max_guides()));
             }
-            let guide = parse_guide(child)?;
+            let guide = parse_guide(child, limits)?;
             if !ids.insert(guide.id) {
                 return Err(invalid("duplicate extended guide ID"));
             }
@@ -737,7 +876,7 @@ fn parse_list(node: &Node) -> Result<List> {
             if extension_xml.is_some() {
                 return Err(invalid("duplicate guide-list extLst"));
             }
-            validate_extension_list(child)?;
+            validate_extension_list(child, limits)?;
             extension_xml = Some(node_xml(child, false)?);
         } else {
             return Err(invalid("unexpected extended guide-list child"));
@@ -749,13 +888,13 @@ fn parse_list(node: &Node) -> Result<List> {
     })
 }
 
-fn parse_guide(node: &Node) -> Result<Guide> {
+fn parse_guide(node: &Node, limits: Limits) -> Result<Guide> {
     let id = required_attr(node, "id")?
         .parse::<u32>()
         .map_err(|_err| invalid("invalid extended guide ID"))?;
     let name = optional_attr(node, "name")?;
     if let Some(name) = &name {
-        bounded_string(name)?;
+        bounded_string(name, limits)?;
     }
     let orientation = optional_attr(node, "orient")?
         .map(|value| match value.as_str() {
@@ -783,9 +922,9 @@ fn parse_guide(node: &Node) -> Result<Guide> {
     {
         return Err(invalid("guide requires clr followed by optional extLst"));
     }
-    let color = parse_color(content[0])?;
+    let color = parse_color(content[0], limits)?;
     let extension_xml = if content.len() == 2 {
-        validate_extension_list(content[1])?;
+        validate_extension_list(content[1], limits)?;
         Some(node_xml(content[1], false)?)
     } else {
         None
@@ -801,7 +940,7 @@ fn parse_guide(node: &Node) -> Result<Guide> {
     })
 }
 
-fn parse_color(node: &Node) -> Result<Color> {
+fn parse_color(node: &Node, limits: Limits) -> Result<Color> {
     no_attributes(node)?;
     let colors = children(node)?;
     if colors.len() != 1 {
@@ -823,12 +962,12 @@ fn parse_color(node: &Node) -> Result<Color> {
     })
 }
 
-fn validate_extension_list(node: &Node) -> Result<()> {
+fn validate_extension_list(node: &Node, limits: Limits) -> Result<()> {
     expect(node, &[P, PS], "extLst")?;
     no_attributes(node)?;
     let extensions = children(node)?;
-    if extensions.len() > MAX_EXTENSIONS {
-        return Err(invalid("guide extension count exceeds limit"));
+    if extensions.len() > limits.max_extensions() {
+        return Err(limit("guide extension count", limits.max_extensions()));
     }
     for extension in extensions {
         expect(extension, &[P, PS], "ext")?;
@@ -836,16 +975,16 @@ fn validate_extension_list(node: &Node) -> Result<()> {
         if uri.is_empty() {
             return Err(invalid("guide extension URI is empty"));
         }
-        bounded_string(&uri)?;
+        bounded_string(&uri, limits)?;
         only_unqualified(extension, &["uri"])?;
     }
     Ok(())
 }
 
-fn validate(value: &Guides) -> Result<()> {
+fn validate(value: &Guides, limits: Limits) -> Result<()> {
     for list in value.slide.iter().chain(value.notes.iter()) {
-        if list.guides.len() > MAX_GUIDES {
-            return Err(invalid("extended guide count exceeds limit"));
+        if list.guides.len() > limits.max_guides() {
+            return Err(limit("extended guide count", limits.max_guides()));
         }
         let mut ids = HashSet::new();
         for guide in &list.guides {
@@ -853,25 +992,25 @@ fn validate(value: &Guides) -> Result<()> {
                 return Err(invalid("duplicate extended guide ID"));
             }
             if let Some(name) = &guide.name {
-                bounded_string(name)?;
+                bounded_string(name, limits)?;
             }
-            validate_color(&guide.color)?;
+            validate_color(&guide.color, limits)?;
             if let Some(extension) = &guide.extension_xml {
-                validate_opaque_extension(extension)?;
+                validate_opaque_extension(extension, limits)?;
             }
         }
         if let Some(extension) = &list.extension_xml {
-            validate_opaque_extension(extension)?;
+            validate_opaque_extension(extension, limits)?;
         }
     }
     Ok(())
 }
 
-fn validate_color(color: &Color) -> Result<()> {
-    if color.xml.len() > MAX_BYTES {
-        return Err(invalid("extended guide color XML exceeds limit"));
+fn validate_color(color: &Color, limits: Limits) -> Result<()> {
+    if color.xml.len() > limits.max_string_bytes() {
+        return Err(limit("extended guide color XML", limits.max_string_bytes()));
     }
-    let node = parse_dom(&color.xml)?;
+    let node = parse_dom(&color.xml, limits)?;
     let parsed = parse_color_node(&node)?;
     if parsed != color.kind {
         return Err(invalid("extended guide color kind does not match XML"));
@@ -891,11 +1030,11 @@ fn parse_color_node(node: &Node) -> Result<ColorKind> {
     }
 }
 
-fn validate_opaque_extension(xml: &[u8]) -> Result<()> {
-    if xml.len() > MAX_BYTES {
-        return Err(invalid("guide extension XML exceeds limit"));
+fn validate_opaque_extension(xml: &[u8], limits: Limits) -> Result<()> {
+    if xml.len() > limits.max_string_bytes() {
+        return Err(limit("guide extension XML", limits.max_string_bytes()));
     }
-    validate_extension_list(&parse_dom(xml)?)
+    validate_extension_list(&parse_dom(xml, limits)?, limits)
 }
 
 fn write_list_extension(
@@ -904,6 +1043,7 @@ fn write_list_extension(
     local: &str,
     list: &List,
     strict: bool,
+    limits: Limits,
 ) -> Result<()> {
     write!(
         xml,
@@ -911,16 +1051,19 @@ fn write_list_extension(
     )
     .map_err(|error| Error::Xml(error.to_string()))?;
     for guide in &list.guides {
-        write_guide(xml, guide, strict)?;
+        write_guide(xml, guide, strict, limits)?;
     }
     if let Some(extension) = &list.extension_xml {
-        write_opaque(xml, extension, strict)?;
+        write_opaque(xml, extension, strict, limits)?;
     }
     write!(xml, "</p15:{local}></p:ext>").map_err(|error| Error::Xml(error.to_string()))?;
+    if xml.len() > limits.max_output_bytes() {
+        return Err(limit("guide extension output", limits.max_output_bytes()));
+    }
     Ok(())
 }
 
-fn write_guide(xml: &mut String, guide: &Guide, strict: bool) -> Result<()> {
+fn write_guide(xml: &mut String, guide: &Guide, strict: bool, limits: Limits) -> Result<()> {
     write!(xml, "<p15:guide id=\"{}\"", guide.id).map_err(|error| Error::Xml(error.to_string()))?;
     if let Some(name) = &guide.name {
         xml.push_str(" name=\"");
@@ -943,16 +1086,19 @@ fn write_guide(xml: &mut String, guide: &Guide, strict: bool) -> Result<()> {
             .map_err(|error| Error::Xml(error.to_string()))?;
     }
     xml.push_str("><p15:clr>");
-    write_opaque(xml, &guide.color.xml, strict)?;
+    write_opaque(xml, &guide.color.xml, strict, limits)?;
     xml.push_str("</p15:clr>");
     if let Some(extension) = &guide.extension_xml {
-        write_opaque(xml, extension, strict)?;
+        write_opaque(xml, extension, strict, limits)?;
     }
     xml.push_str("</p15:guide>");
     Ok(())
 }
 
-fn write_opaque(output: &mut String, xml: &[u8], strict: bool) -> Result<()> {
+fn write_opaque(output: &mut String, xml: &[u8], strict: bool, limits: Limits) -> Result<()> {
+    if xml.len() > limits.max_string_bytes() {
+        return Err(limit("guide opaque XML", limits.max_string_bytes()));
+    }
     let mut text = std::str::from_utf8(xml).map_err(xml_error)?.to_owned();
     if strict {
         text = text.replace(P, PS).replace(A, AS);
@@ -960,6 +1106,9 @@ fn write_opaque(output: &mut String, xml: &[u8], strict: bool) -> Result<()> {
         text = text.replace(PS, P).replace(AS, A);
     }
     output.push_str(&text);
+    if output.len() > limits.max_output_bytes() {
+        return Err(limit("guide output", limits.max_output_bytes()));
+    }
     Ok(())
 }
 
@@ -1021,9 +1170,12 @@ fn no_attributes(node: &Node) -> Result<()> {
     only_unqualified(node, &[])
 }
 
-fn bounded_string(value: &str) -> Result<()> {
-    if value.len() > MAX_STRING_BYTES {
-        Err(invalid("presentation guide string exceeds 1 MiB"))
+fn bounded_string(value: &str, limits: Limits) -> Result<()> {
+    if value.len() > limits.max_string_bytes() {
+        Err(limit(
+            "presentation guide string",
+            limits.max_string_bytes(),
+        ))
     } else {
         Ok(())
     }
@@ -1040,6 +1192,12 @@ fn parse_bool(value: &str, name: &str) -> Result<bool> {
 fn node_xml(node: &Node, strict: bool) -> Result<Vec<u8>> {
     let mut xml = String::new();
     write_node(&mut xml, node, strict)?;
+    if xml.len() > node.limits.max_string_bytes() {
+        return Err(limit(
+            "presentation guide node XML",
+            node.limits.max_string_bytes(),
+        ));
+    }
     Ok(xml.into_bytes())
 }
 
@@ -1114,6 +1272,12 @@ fn write_node(xml: &mut String, node: &Node, strict: bool) -> Result<()> {
     xml.push_str("</");
     xml.push_str(&node.qname);
     xml.push('>');
+    if xml.len() > node.limits.max_string_bytes() {
+        return Err(limit(
+            "presentation guide node XML",
+            node.limits.max_string_bytes(),
+        ));
+    }
     Ok(())
 }
 
@@ -1166,6 +1330,13 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
+fn limit(resource: &'static str, maximum: usize) -> Error {
+    Error::Limit {
+        resource,
+        limit: maximum,
+    }
+}
+
 fn xml_error(error: impl std::fmt::Display) -> Error {
     Error::Xml(error.to_string())
 }
@@ -1190,7 +1361,7 @@ mod tests {
         let xml = wrap(&format!(
             r#"<p:extLst><p:ext uri="{SLIDE_GUIDES_URI}"><p15:sldGuideLst xmlns:p15="{P15}"><p15:guide id="7" name="Named" orient="vert" pos="-20" userDrawn="0"><p15:clr><a:schemeClr val="accent1"/></p15:clr><p:extLst><p:ext uri="urn:guide"><v:data xmlns:v="urn:vendor" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rIdNeverFetched" href="https://example.invalid/not-opened"/></p:ext></p:extLst></p15:guide><p:extLst><p:ext uri="urn:list"><v:list xmlns:v="urn:vendor"/></p:ext></p:extLst></p15:sldGuideLst></p:ext><p:ext uri="{NOTES_GUIDES_URI}"><p15:notesGuideLst xmlns:p15="{P15}"/></p:ext></p:extLst>"#
         ));
-        let value = Guides::from_xml(xml.as_bytes()).unwrap();
+        let value = Guides::from_xml(xml.as_bytes(), Limits::DEFAULT).unwrap();
         let guide = &value.slide.as_ref().unwrap().guides[0];
         assert_eq!(guide.name.as_deref(), Some("Named"));
         assert_eq!(guide.color.kind, ColorKind::Scheme);
@@ -1199,8 +1370,8 @@ mod tests {
         assert!(opaque.contains("https://example.invalid/not-opened"));
         assert!(value.notes.as_ref().unwrap().guides.is_empty());
         for strict in [false, true] {
-            let written = value.to_xml(strict).unwrap();
-            let again = Guides::from_xml(wrap(&written).as_bytes()).unwrap();
+            let written = value.to_xml(strict, Limits::DEFAULT).unwrap();
+            let again = Guides::from_xml(wrap(&written).as_bytes(), Limits::DEFAULT).unwrap();
             assert_eq!(again.slide.as_ref().unwrap().guides[0].id, 7);
             assert!(
                 std::str::from_utf8(
@@ -1245,7 +1416,10 @@ mod tests {
             format!(r#"<!DOCTYPE x><p:presentation xmlns:p="{P}"/>"#),
         ];
         for xml in cases {
-            assert!(Guides::from_xml(xml.as_bytes()).is_err(), "accepted {xml}");
+            assert!(
+                Guides::from_xml(xml.as_bytes(), Limits::DEFAULT).is_err(),
+                "accepted {xml}"
+            );
         }
     }
 
@@ -1266,14 +1440,14 @@ mod tests {
         };
         let mut value = Guides {
             slide: Some(List {
-                guides: vec![guide; MAX_GUIDES + 1],
+                guides: vec![guide; Limits::DEFAULT.max_guides() + 1],
                 extension_xml: None,
             }),
             notes: None,
         };
-        assert!(value.to_xml(false).is_err());
+        assert!(value.to_xml(false, Limits::DEFAULT).is_err());
         value.slide.as_mut().unwrap().guides.truncate(1);
         value.slide.as_mut().unwrap().guides[0].color.kind = ColorKind::Scheme;
-        assert!(value.to_xml(false).is_err());
+        assert!(value.to_xml(false, Limits::DEFAULT).is_err());
     }
 }

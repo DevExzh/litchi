@@ -948,6 +948,9 @@ impl Edit {
             } else {
                 "clear_slide_transition"
             },
+            crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                self.working.read_limits(),
+            ),
         )?;
         if let Some(xml) = xml {
             self.working

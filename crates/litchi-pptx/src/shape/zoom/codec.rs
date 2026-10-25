@@ -1588,7 +1588,12 @@ pub(crate) fn validate_in_package(
     source: &dyn Part,
 ) -> Result<()> {
     validate_entries(&owner.entries)?;
-    let graph = crate::presentation_properties::metadata::structure::load(package)?;
+    let graph = crate::presentation_properties::metadata::structure::load(
+        package,
+        crate::presentation_properties::metadata::structure::Limits::from_source_limits(
+            package.read_limits(),
+        ),
+    )?;
     let slide_ids = graph
         .slides
         .iter()

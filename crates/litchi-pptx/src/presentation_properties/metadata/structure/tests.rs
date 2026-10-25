@@ -117,7 +117,7 @@ fn set_presentation_xml(package: &mut OpcPackage, xml: Vec<u8>) {
 #[test]
 fn non_empty_slide_id_is_shared_by_ordering_custom_shows_and_sections() {
     let package = fixture();
-    let graph = load(&package).unwrap();
+    let graph = load(&package, Limits::DEFAULT).unwrap();
 
     assert_eq!(
         graph
@@ -159,7 +159,7 @@ fn non_empty_slide_id_uses_the_same_duplicate_and_relationship_validation() {
         let xml = String::from_utf8(presentation_xml(&package)).unwrap();
         let malformed = xml.replacen(source, replacement, 1).into_bytes();
         set_presentation_xml(&mut package, malformed);
-        assert!(load(&package).is_err());
+        assert!(load(&package, Limits::DEFAULT).is_err());
     }
 }
 
@@ -169,7 +169,7 @@ fn structure_names_are_resolved_and_accept_transitional_and_strict_aliases() {
         let xml = format!(
             r#"<main:presentation xmlns:main="{presentationml}" xmlns:rel="{relationships}"><main:sldIdLst><main:sldId id="256" rel:id="slide"/></main:sldIdLst><main:custShowLst><main:custShow name="show" id="1"><main:sldLst><main:sld rel:id="slide"/></main:sldLst></main:custShow></main:custShowLst></main:presentation>"#
         );
-        let (slides, shows) = codec::parse_core(xml.as_bytes()).unwrap();
+        let (slides, shows) = codec::parse_core(xml.as_bytes(), Limits::DEFAULT).unwrap();
         assert_eq!(slides, [(256, "slide".to_owned())]);
         assert_eq!(shows.len(), 1);
         assert_eq!(shows[0].relationship_ids, ["slide"]);
@@ -200,7 +200,7 @@ fn structure_parser_rejects_namespace_lookalikes_and_arbitrary_id_prefixes() {
             &mut package,
             xml.replacen(source, replacement, 1).into_bytes(),
         );
-        assert!(load(&package).is_err());
+        assert!(load(&package, Limits::DEFAULT).is_err());
     }
 }
 
@@ -211,7 +211,7 @@ fn presentation_slide_id_enforces_the_full_schema_range() {
             r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}"><p:sldIdLst><p:sldId id="{id}" r:id="slide"/></p:sldIdLst></p:presentation>"#
         );
         assert!(
-            codec::parse_core(xml.as_bytes()).is_err(),
+            codec::parse_core(xml.as_bytes(), Limits::DEFAULT).is_err(),
             "accepted slide ID {id}"
         );
     }
@@ -221,7 +221,9 @@ fn presentation_slide_id_enforces_the_full_schema_range() {
             r#"<p:presentation xmlns:p="{P}" xmlns:r="{R}"><p:sldIdLst><p:sldId id="{id}" r:id="slide"/></p:sldIdLst></p:presentation>"#
         );
         assert_eq!(
-            codec::parse_core(xml.as_bytes()).unwrap().0[0]
+            codec::parse_core(xml.as_bytes(), Limits::DEFAULT)
+                .unwrap()
+                .0[0]
                 .0
                 .to_string(),
             id
@@ -232,7 +234,7 @@ fn presentation_slide_id_enforces_the_full_schema_range() {
 #[test]
 fn no_op_and_inverse_patches_preserve_exact_source_and_opaque_xml() {
     let mut package = fixture();
-    let source = Snapshot::load(&package).unwrap();
+    let source = Snapshot::load(&package, Limits::DEFAULT).unwrap();
     let source_xml = source.source_xml().to_vec();
 
     let no_op = source.edit().commit().unwrap();
@@ -279,7 +281,7 @@ fn no_op_and_inverse_patches_preserve_exact_source_and_opaque_xml() {
 #[test]
 fn stale_source_and_relationship_topology_are_rejected_without_mutation() {
     let mut package = fixture();
-    let source = Snapshot::load(&package).unwrap();
+    let source = Snapshot::load(&package, Limits::DEFAULT).unwrap();
     let mut edit = source.edit();
     edit.edit_custom_shows(|shows| {
         shows.get_by_id_mut(8).unwrap().slide_ids.push(256);
@@ -316,7 +318,7 @@ fn stale_source_and_relationship_topology_are_rejected_without_mutation() {
 #[test]
 fn custom_show_and_section_edits_round_trip_as_one_validated_graph() {
     let mut package = fixture();
-    let snapshot = Snapshot::load(&package).unwrap();
+    let snapshot = Snapshot::load(&package, Limits::DEFAULT).unwrap();
     let mut edit = snapshot.edit();
     edit.edit(|graph| {
         graph
@@ -343,5 +345,8 @@ fn custom_show_and_section_edits_round_trip_as_one_validated_graph() {
         [256, 257, 258]
     );
     assert_eq!(published.sections().sections().len(), 3);
-    assert_eq!(load(&package).unwrap(), published.graph().clone());
+    assert_eq!(
+        load(&package, Limits::DEFAULT).unwrap(),
+        published.graph().clone()
+    );
 }

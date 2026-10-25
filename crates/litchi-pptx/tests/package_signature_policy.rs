@@ -300,7 +300,7 @@ fn changes_part() -> ChangesPart {
 }
 
 fn first_slide_id(opc: &OpcPackage) -> Result<u32> {
-    Ok(structure::load(opc)?.slides[0].slide_id)
+    Ok(structure::load(opc, structure::Limits::DEFAULT)?.slides[0].slide_id)
 }
 
 fn legacy_author(id: u32, name: &str) -> LegacyAuthor {
@@ -606,7 +606,15 @@ fn families() -> Vec<Family> {
                         edit.set(&shows)
                     })
                 },
-                shows: |package| package.with_opc(|opc| Ok(!custom_show::load(opc)?.is_empty())),
+                shows: |package| {
+                    package.with_opc(|opc| {
+                        Ok(!custom_show::load(
+                            opc,
+                            custom_show::Limits::from_source_limits(opc.read_limits()),
+                        )?
+                        .is_empty())
+                    })
+                },
             }),
             no_op: Some(|package| {
                 package.edit_custom_shows_in_place(|edit| {

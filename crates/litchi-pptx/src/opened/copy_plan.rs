@@ -210,6 +210,9 @@ impl Snapshot {
             .map_err(|error| Error::Xml(format!("presentation XML is not UTF-8: {error}")))?;
         if crate::presentation_properties::metadata::protection::Settings::parse_xml(
             presentation_text,
+            crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                self.package.read_limits(),
+            ),
         )?
         .is_protected()
         {

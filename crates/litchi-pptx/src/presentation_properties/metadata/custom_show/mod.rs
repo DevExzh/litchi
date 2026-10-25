@@ -11,6 +11,7 @@ mod wire;
 #[cfg(test)]
 mod tests;
 
+pub use super::Limits;
 pub use model::{List, Show};
 pub use package::{load, load_snapshot};
 pub use transaction::{Draft, Revision, Snapshot};

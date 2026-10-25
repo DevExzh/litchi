@@ -5,6 +5,7 @@ use std::sync::Arc;
 use litchi_opc::constants::content_type as ct;
 use litchi_opc::{OpcPackage, PackURI};
 
+use super::Limits;
 use super::model::Guides;
 use super::transaction::{Change, Prepared, Snapshot};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
@@ -15,8 +16,8 @@ use crate::{Error, Result};
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load(package: &OpcPackage) -> Result<Guides> {
-    Ok(load_snapshot(package)?.guides().clone())
+pub fn load(package: &OpcPackage, limits: Limits) -> Result<Guides> {
+    Ok(load_snapshot(package, limits)?.guides().clone())
 }
 
 /// Capture the typed guide value and exact owning presentation source.
@@ -24,13 +25,14 @@ pub fn load(package: &OpcPackage) -> Result<Guides> {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
+pub fn load_snapshot(package: &OpcPackage, limits: Limits) -> Result<Snapshot> {
     let presentation = package.main_document_part()?;
     require_presentation(presentation.content_type())?;
     Snapshot::from_wire(
         presentation.partname().to_string(),
         presentation.content_type().to_owned(),
         presentation.blob_arc(),
+        limits,
     )
 }
 
@@ -47,7 +49,7 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Snapshot> {
 ///
 /// Returns an error if the output cannot be encoded or written.
 pub(crate) fn store(package: &mut OpcPackage, value: &Guides) -> Result<()> {
-    let source = load_snapshot(package)?;
+    let source = load_snapshot(package, Limits::from_source_limits(package.read_limits()))?;
     let mut edit = source.edit();
     edit.replace(value.clone())?;
     apply_commit(package, edit.commit()?)?;
@@ -67,7 +69,7 @@ pub(crate) fn store(package: &mut OpcPackage, value: &Guides) -> Result<()> {
 ///
 /// Returns an error if the operation fails.
 pub(crate) fn remove(package: &mut OpcPackage) -> Result<Guides> {
-    let source = load_snapshot(package)?;
+    let source = load_snapshot(package, Limits::from_source_limits(package.read_limits()))?;
     let previous = source.guides().clone();
     let mut edit = source.edit();
     edit.replace(Guides::default())?;
@@ -88,7 +90,8 @@ pub(crate) fn remove(package: &mut OpcPackage) -> Result<Guides> {
 ///
 /// Returns an error if the operation fails.
 pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
-    let current = load_snapshot(package)?;
+    let limits = Limits::from_source_limits(package.read_limits());
+    let current = load_snapshot(package, limits)?;
     if !current.same_source(patch.before()) {
         return Err(invalid("extended-guide source is stale"));
     }
@@ -109,7 +112,7 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Sn
     candidate
         .get_part_mut(&presentation_name)?
         .set_blob_shared(Arc::clone(patch.after().source_arc()));
-    let result = load_snapshot(&candidate)?;
+    let result = load_snapshot(&candidate, limits)?;
     if !result.same_source(patch.after()) {
         return Err(invalid(
             "published extended-guide source differs from the commit",

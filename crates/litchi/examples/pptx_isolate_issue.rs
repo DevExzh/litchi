@@ -7,7 +7,7 @@
 
 use litchi_pptx::Package;
 use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
-use litchi_pptx::presentation_properties::metadata::custom_show::{List as ShowList, Show};
+use litchi_pptx::presentation_properties::metadata::custom_show::{Limits, List as ShowList, Show};
 use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
 use std::error::Error as StdError;
@@ -143,14 +143,16 @@ fn sections_xml() -> Result<String, Box<dyn StdError>> {
     sections.add_section(
         Section::new("Section 2", "{00000000-0000-4000-8000-000000000002}").with_slides([257]),
     );
-    Ok(sections.to_xml()?)
+    Ok(sections.to_xml(Limits::DEFAULT)?)
 }
 
 fn custom_shows_xml() -> String {
     let mut shows = ShowList::new();
     shows.add(Show::new(1, "My Show").with_slides(vec![256, 257]));
-    let xml = shows.to_xml();
-    let parsed = ShowList::parse_xml(&xml).expect("valid typed custom-show model");
+    let xml = shows
+        .to_xml(Limits::DEFAULT)
+        .expect("default metadata limits accept the example");
+    let parsed = ShowList::parse_xml(&xml, Limits::DEFAULT).expect("valid typed custom-show model");
     assert_eq!(parsed.len(), 1);
     xml
 }
@@ -161,7 +163,9 @@ fn handout_xml() -> String {
         .with_header("Issue isolation")
         .with_footer("Litchi");
     assert_eq!(handout.layout, Layout::SixSlides);
-    let xml = handout.to_xml();
+    let xml = handout
+        .to_xml(Limits::DEFAULT)
+        .expect("default metadata limits accept the example");
     assert!(xml.contains("handoutMaster"));
     xml
 }

@@ -2,6 +2,7 @@
 //!
 //! Custom slide shows allow defining named subsets of slides that can be
 //! presented independently of the full presentation.
+use super::super::{Limits, process_str};
 use super::model::{List, Show};
 use crate::presentation_properties::metadata::escape_xml;
 use crate::{Error, Result};
@@ -16,17 +17,62 @@ impl List {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_xml(xml: &str) -> Result<Self> {
+    pub fn parse_xml(xml: &str, limits: Limits) -> Result<Self> {
+        if xml.len() > limits.max_input_bytes() {
+            return Err(Error::Limit {
+                resource: "custom-show XML input",
+                limit: limits.max_input_bytes(),
+            });
+        }
         let mut list = Self::new();
-        let xml = litchi_ooxml_common::mce::process_str(xml)?;
+        let xml = process_str(xml, limits)?;
+        if xml.len() > limits.max_output_bytes() {
+            return Err(Error::Limit {
+                resource: "processed custom-show XML",
+                limit: limits.max_output_bytes(),
+            });
+        }
         let mut reader = Reader::from_str(xml.as_ref());
         reader.config_mut().trim_text(true);
 
         let mut current_show: Option<Show> = None;
+        let mut nodes = 0usize;
+        let mut depth = 0usize;
+        let mut shows = 0usize;
 
         loop {
             match reader.read_event() {
                 Ok(Event::Start(e)) if e.local_name().as_ref() == b"custShow" => {
+                    check_attributes(&e, reader.decoder(), limits)?;
+                    nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                        resource: "custom-show XML nodes",
+                        limit: limits.max_nodes(),
+                    })?;
+                    depth = depth.checked_add(1).ok_or(Error::Limit {
+                        resource: "custom-show XML depth",
+                        limit: limits.max_depth(),
+                    })?;
+                    if nodes > limits.max_nodes() || depth > limits.max_depth() {
+                        return Err(Error::Limit {
+                            resource: "custom-show XML nodes or depth",
+                            limit: limits.max_nodes(),
+                        });
+                    }
+                    shows = shows.checked_add(1).ok_or(Error::Limit {
+                        resource: "custom-show entries",
+                        limit: limits.max_custom_shows(),
+                    })?;
+                    if shows > limits.max_custom_shows() {
+                        return Err(Error::Limit {
+                            resource: "custom-show entries",
+                            limit: limits.max_custom_shows(),
+                        });
+                    }
+                    if current_show.is_some() {
+                        return Err(Error::Invalid(
+                            "nested custom-show elements are not supported".into(),
+                        ));
+                    }
                     let mut name = String::new();
                     let mut id = 0u32;
                     for attr in first_wins(&e).flatten() {
@@ -45,7 +91,35 @@ impl List {
                     }
                     current_show = Some(Show::new(id, name));
                 },
+                Ok(Event::Start(e)) => {
+                    nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                        resource: "custom-show XML nodes",
+                        limit: limits.max_nodes(),
+                    })?;
+                    depth = depth.checked_add(1).ok_or(Error::Limit {
+                        resource: "custom-show XML depth",
+                        limit: limits.max_depth(),
+                    })?;
+                    if nodes > limits.max_nodes() || depth > limits.max_depth() {
+                        return Err(Error::Limit {
+                            resource: "custom-show XML nodes or depth",
+                            limit: limits.max_nodes(),
+                        });
+                    }
+                    check_attributes(&e, reader.decoder(), limits)?;
+                },
                 Ok(Event::Empty(e)) => {
+                    check_attributes(&e, reader.decoder(), limits)?;
+                    nodes = nodes.checked_add(1).ok_or(Error::Limit {
+                        resource: "custom-show XML nodes",
+                        limit: limits.max_nodes(),
+                    })?;
+                    if nodes > limits.max_nodes() {
+                        return Err(Error::Limit {
+                            resource: "custom-show XML nodes",
+                            limit: limits.max_nodes(),
+                        });
+                    }
                     if e.local_name().as_ref() == b"sld"
                         && let Some(ref mut show) = current_show
                     {
@@ -64,10 +138,17 @@ impl List {
                     }
                 },
                 Ok(Event::End(e)) => {
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        Error::Invalid("custom-show XML has an unmatched end tag".into())
+                    })?;
                     if e.local_name().as_ref() == b"custShow"
                         && let Some(show) = current_show.take()
                     {
                         list.add(show);
+                    } else if e.local_name().as_ref() == b"custShow" {
+                        return Err(Error::Invalid(
+                            "custom-show XML closes an unopened show".into(),
+                        ));
                     }
                 },
                 Ok(Event::Eof) => break,
@@ -76,6 +157,12 @@ impl List {
             }
         }
 
+        if depth != 0 || current_show.is_some() {
+            return Err(Error::Invalid(
+                "custom-show XML has an unterminated element".into(),
+            ));
+        }
+        validate(&list, limits)?;
         Ok(list)
     }
 
@@ -83,12 +170,12 @@ impl List {
     ///
     /// This is a convenience wrapper that emits a best-effort mapping by treating
     /// numeric slide IDs as their corresponding `rId` values (e.g. slide 5 → `rId5`).
-    /// For full fidelity, prefer [`Self::to_xml_with_rel_map`] and pass the workbook's
+    /// For full fidelity, prefer [`Self::to_xml_with_rel_map`] and pass the presentation's
     /// actual slide relationship map.
     #[must_use]
-    pub fn to_xml(&self) -> String {
+    pub fn to_xml(&self, limits: Limits) -> Result<String> {
         if self.is_empty() {
-            return String::new();
+            return Ok(String::new());
         }
 
         let mut fallback_map = HashMap::new();
@@ -100,7 +187,7 @@ impl List {
             }
         }
 
-        self.to_xml_with_rel_map(&fallback_map)
+        self.to_xml_with_rel_map(&fallback_map, limits)
     }
 
     /// Generate custom shows XML with proper relationship ID mapping.
@@ -108,9 +195,14 @@ impl List {
     /// # Arguments
     /// * `slide_id_to_rel_id` - Mapping from slide ID (e.g., 256) to relationship ID (e.g., "rId6")
     #[must_use]
-    pub fn to_xml_with_rel_map(&self, slide_id_to_rel_id: &HashMap<u32, String>) -> String {
+    pub fn to_xml_with_rel_map(
+        &self,
+        slide_id_to_rel_id: &HashMap<u32, String>,
+        limits: Limits,
+    ) -> Result<String> {
+        validate(self, limits)?;
         if self.is_empty() {
-            return String::new();
+            return Ok(String::new());
         }
 
         let mut xml = String::with_capacity(1024);
@@ -127,7 +219,7 @@ impl List {
             for slide_id in &show.slide_ids {
                 // Look up the relationship ID for this slide ID
                 if let Some(rel_id) = slide_id_to_rel_id.get(slide_id) {
-                    xml.push_str(&format!(r#"<p:sld r:id="{rel_id}"/>"#));
+                    xml.push_str(&format!(r#"<p:sld r:id="{}"/>"#, escape_xml(rel_id)));
                 }
             }
             xml.push_str("</p:sldLst>");
@@ -136,8 +228,66 @@ impl List {
 
         xml.push_str("</p:custShowLst>");
 
-        xml
+        if xml.len() > limits.max_output_bytes() {
+            return Err(Error::Limit {
+                resource: "serialized custom-show XML",
+                limit: limits.max_output_bytes(),
+            });
+        }
+        Ok(xml)
     }
+}
+
+fn validate(value: &List, limits: Limits) -> Result<()> {
+    if value.shows.len() > limits.max_custom_shows() {
+        return Err(Error::Limit {
+            resource: "custom-show entries",
+            limit: limits.max_custom_shows(),
+        });
+    }
+    for show in &value.shows {
+        if show.name.len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "custom-show name",
+                limit: limits.max_string_bytes(),
+            });
+        }
+        if show.slide_ids.len() > limits.max_slide_references() {
+            return Err(Error::Limit {
+                resource: "custom-show slide references",
+                limit: limits.max_slide_references(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn check_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    limits: Limits,
+) -> Result<()> {
+    let mut count = 0usize;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        count += 1;
+        if count > limits.max_attributes() {
+            return Err(Error::Limit {
+                resource: "custom-show XML attributes",
+                limit: limits.max_attributes(),
+            });
+        }
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        if value.len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                resource: "custom-show XML attribute",
+                limit: limits.max_string_bytes(),
+            });
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -172,7 +322,7 @@ mod tests {
         let mut list = List::new();
         list.create("Demo", vec![1, 2, 3]);
 
-        let xml = list.to_xml();
+        let xml = list.to_xml(Limits::DEFAULT).unwrap();
         assert!(xml.contains("Demo"));
         assert!(xml.contains("custShow"));
     }
@@ -198,6 +348,7 @@ mod tests {
     fn parsed_custom_show_attributes_keep_their_first_occurrence() {
         let single = List::parse_xml(
             r#"<p:custShowLst><p:custShow name="Recap" id="8"><p:sldLst><p:sld r:id="rId2"/></p:sldLst></p:custShow></p:custShowLst>"#,
+            Limits::DEFAULT,
         )
         .unwrap();
         assert_eq!(
@@ -209,6 +360,7 @@ mod tests {
         // both; a repeated name is read once, at its first occurrence.
         let repeated = List::parse_xml(
             r#"<p:custShowLst><p:custShow name="First" id="7" name="Second" id="9"><p:sldLst><p:sld r:id="rId3" r:id="rId4"/><p:sld id="5" r:id="rId6" id="10"/></p:sldLst></p:custShow></p:custShowLst>"#,
+            Limits::DEFAULT,
         )
         .unwrap();
         assert_eq!(
@@ -224,7 +376,7 @@ mod tests {
             crowded("name", "First", "Later"),
             crowded("r:id", "rId3", "rId4"),
         );
-        let list = List::parse_xml(&xml).unwrap();
+        let list = List::parse_xml(&xml, Limits::DEFAULT).unwrap();
         assert_eq!(list.shows, vec![Show::new(9, "First").with_slides(vec![3])]);
     }
 }
