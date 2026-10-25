@@ -629,6 +629,36 @@ class QuietAbbaWrapperTests(unittest.TestCase):
             self.assertIsNotNone(process.poll())
             self.assertEqual(cleanup["remaining_processes"], [])
 
+    def test_cleanup_preserves_top_level_popen_return_code(self) -> None:
+        process = subprocess.Popen(
+            [sys.executable, "-c", "import sys; sys.exit(7)"],
+            start_new_session=True,
+        )
+        deadline = time.monotonic() + 5.0
+        while True:
+            observed = os.waitid(
+                os.P_PID,
+                process.pid,
+                os.WEXITED | os.WNOHANG | os.WNOWAIT,
+            )
+            if observed is not None and observed.si_pid == process.pid:
+                break
+            if time.monotonic() >= deadline:
+                process.kill()
+                process.wait()
+                self.fail("top-level Popen child did not exit within the observation deadline")
+            time.sleep(0.01)
+        identity = wrapper.proc_identity(process.pid)
+        self.assertIsNotNone(identity)
+        state = {
+            "seen_scope_processes": {f"{identity['pid']}:{identity['starttime']}": identity},
+            "last_cgroup_path": None,
+        }
+        cleanup = wrapper.cleanup_owned(None, None, process, None, state)
+        self.assertEqual(cleanup["errors"], [])
+        self.assertEqual(process.returncode, 7)
+        self.assertEqual(process.wait(timeout=0), 7)
+
     def test_cleanup_reaps_analyzer_process_group(self) -> None:
         with tempfile.TemporaryDirectory() as _directory:
             process = subprocess.Popen(["sleep", "30"], start_new_session=True)

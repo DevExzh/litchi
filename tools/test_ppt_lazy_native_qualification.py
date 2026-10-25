@@ -6,7 +6,10 @@ import subprocess
 import tempfile
 import unittest
 
-import ppt_lazy_native_qualification as protocol
+try:
+    from tools import ppt_lazy_native_qualification as protocol
+except ImportError:  # Support direct execution from the tools directory.
+    import ppt_lazy_native_qualification as protocol
 
 
 ROOT = Path(__file__).resolve().parent.parent

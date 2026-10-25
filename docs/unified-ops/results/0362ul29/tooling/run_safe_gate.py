@@ -167,6 +167,14 @@ def enable_child_subreaper() -> None:
     _SUBREAPER_ERROR = None
 
 
+def ensure_child_subreaper() -> None:
+    """Give the hermetic Python row ownership of its test grandchildren."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    if libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error))
+
+
 def builders(exclude: set[int], root: Path, target: Path) -> list[dict]:
     rows = []
     info = process_table()
@@ -727,8 +735,14 @@ def direct(
     isolated: bool = False,
     env: dict[str, str] | None = None,
     pass_fds: tuple[int, ...] = (),
+    target_guard: bool = True,
 ) -> dict:
     step = {"name": name, "kind": "argv", "argv": argv, "isolated": isolated, "env": env or {}}
+    if not target_guard:
+        # Python tooling tests are hermetic and must not inherit the Cargo
+        # target override.  The runner still monitors the shared target path;
+        # only Cargo-producing steps receive CARGO_TARGET_DIR in their env.
+        step["target_guard"] = False
     if pass_fds:
         step["pass_fds"] = list(pass_fds)
     return step
@@ -788,7 +802,7 @@ def make_steps(root: Path, state_dir: Path, target: Path) -> list[dict]:
         shell("native-resave-check", "cd tools/native-resave && cargo check --locked --all-targets"),
         direct("api-glossary", ["python3", "tools/check_api_glossary.py", "--target-dir", str(target)], env={"RUSTC_BOOTSTRAP": "1"}),
         direct("iwork-leaf-api", ["python3", "-m", "unittest", "tools.test_check_iwork_leaf_public_api"]),
-        direct("tooling-unit", ["python3", "-m", "unittest", "tools.test_check_api_glossary", "tools.test_api_debt_inventory", "tools.test_validate_api_disposition", "tools.test_final_api_inventory", "tools.test_w8_file_provenance", "tools.test_w8_original_baseline", "tools.test_w8_projection_policy", "tools.test_officecli_corpus", "tools.test_officecli_capability_delta", "tools.test_no_3rdparty_references", "tools.test_check_crate_boundaries", "tools.test_non_iwork_gate", "tools.test_unified_bench_matrix", "tools.test_check_iwork_leaf_public_api", "tools.test_native_qualification_runner", "tools.test_legacy_native_qualification", "tools.test_prepare_xlsx_raw_inputs", "tools.test_xlsx_raw_native_qualification", "tools.test_prepare_ole_owner_inputs", "tools.test_ole_owner_paired_runner", "tools.test_validate_ole_owner_run", "tools.test_ppt_lazy_native_qualification", "tools.test_prepare_ppt_lazy_native_inputs", "tools.test_drawingml_compile_driver", "tools.test_drawingml_raw_qualification", "docs/unified-ops/results/0362ul29/tooling/test_safe_chunked_tests.py", "tools.test_ink_safe_runner", "docs/unified-ops/results/0362ul24/test_prepare_signed_native_consumer.py", "tools.test_opc_read_ahead_timing_guard", "tools.test_xls_f3_qualification_abba", "docs/unified-ops/results/0362ul24/test_validate_signed_native.py"]),
+        direct("tooling-unit", ["python3", "-m", "unittest", "tools.test_check_api_glossary", "tools.test_api_debt_inventory", "tools.test_validate_api_disposition", "tools.test_final_api_inventory", "tools.test_w8_file_provenance", "tools.test_w8_original_baseline", "tools.test_w8_projection_policy", "tools.test_officecli_corpus", "tools.test_officecli_capability_delta", "tools.test_no_3rdparty_references", "tools.test_check_crate_boundaries", "tools.test_non_iwork_gate", "tools.test_unified_bench_matrix", "tools.test_check_iwork_leaf_public_api", "tools.test_native_qualification_runner", "tools.test_legacy_native_qualification", "tools.test_prepare_xlsx_raw_inputs", "tools.test_xlsx_raw_native_qualification", "tools.test_prepare_ole_owner_inputs", "tools.test_ole_owner_paired_runner", "tools.test_validate_ole_owner_run", "tools.test_ppt_lazy_build_receipt_adapter", "tools.test_ppt_lazy_cold_first_commit", "tools.test_ppt_lazy_native_qualification", "tools.test_prepare_ppt_lazy_native_inputs", "tools.test_drawingml_compile_driver", "tools.test_drawingml_raw_qualification", "docs/unified-ops/results/0362ul29/tooling/test_safe_chunked_tests.py", "tools.test_ink_safe_runner", "docs/unified-ops/results/0362ul24/test_prepare_signed_native_consumer.py", "tools.test_opc_read_ahead_timing_guard", "tools.test_xls_f3_qualification_abba", "docs/unified-ops/results/0362ul24/test_validate_signed_native.py"], target_guard=False),
         direct("crate-boundaries", ["python3", "tools/check_crate_boundaries.py"]),
         direct("non-iwork-gate", ["python3", "tools/non_iwork_gate.py", "verify"]),
         direct("bench-matrix", ["python3", "tools/unified_bench_matrix.py", "--check"]),
@@ -823,6 +837,10 @@ def run_step(step: dict, root: Path, target: Path, state_dir: Path, source: dict
     pre = preflight(root, target, source, bool(step.get("isolated")))
     started = time.time()
     env = cargo_env(root, target, state_dir)
+    target_guard = step.get("target_guard", True)
+    if not target_guard:
+        env.pop("CARGO_TARGET_DIR", None)
+        env.pop("LITCHI_GATE_TARGET_ROOT", None)
     env.update(step.get("env", {}))
     env["LITCHI_GATE_ATTEMPT"] = attempt
     log, trace = attempt_paths(state_dir, index, step["name"], attempt)
@@ -833,10 +851,10 @@ def run_step(step: dict, root: Path, target: Path, state_dir: Path, source: dict
     enable_child_subreaper()
     if step["kind"] == "argv":
         command = step["argv"]
-        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True, pass_fds=tuple(step.get("pass_fds", ())))
+        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True, pass_fds=tuple(step.get("pass_fds", ())), preexec_fn=None if target_guard else ensure_child_subreaper)
     else:
         command = ["bash", "-c", step["command"]]
-        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True, pass_fds=tuple(step.get("pass_fds", ())))
+        process = subprocess.Popen(command, cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True, pass_fds=tuple(step.get("pass_fds", ())), preexec_fn=None if target_guard else ensure_child_subreaper)
     ownership = new_ownership(process.pid, root, target, prelaunch, process_table())
     monitor = threading.Thread(target=capture_step_identities, args=(process, ownership), name=f"gate-owner-{process.pid}")
     monitor.start()
