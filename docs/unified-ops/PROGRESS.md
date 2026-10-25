@@ -5720,3 +5720,13 @@ See [0063](0063-source-pptx-modern-comments.md).
   228,248,707,072 bytes with the recorded exclusions; cleanup83 allocation is
   unknown. Further leaf cleanup continues. The protected probe and active
   baselines remain intact. Final acceptance stays open; nothing is pushed.
+
+
+  The final four diagnostic rows pass on e130. Across those diagnostic
+  packets, 28 original rows pass and five fail; the minimal PPTX profile
+  remains unrun. Reviewed metadata context repair 114a joins the other seven
+  repairs at private integration `0da85f43e6` (115), without conflicts. Root
+  verifies all twenty changed crate files against their reviewed leaves and
+  refreshes only the common crate's test dependency in the ignored root lock.
+  Compiler/runtime/glossary and final qualification must now bind this repaired
+  source. No result from e130 is relabeled as a repaired-source pass.
