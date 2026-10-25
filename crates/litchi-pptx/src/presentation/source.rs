@@ -554,7 +554,13 @@ fn reserve_source_text_box(
     let Some(context) = context else {
         return Ok(None);
     };
-    let maximum = max_output_bytes;
+    // The caller's semantic output ceiling and the managed execution budget
+    // are independent policies.  Output admission above already ran first;
+    // use the context's memory ceiling for the transient envelope so a
+    // modest output limit does not reject a valid edit merely because its
+    // scene indexes need more bytes than the serialized candidate.
+    let maximum = usize::try_from(context.budget().limit(litchi_core::Resource::Memory))
+        .unwrap_or(usize::MAX);
     let input_scene = input_bytes
         .checked_mul(64)
         .and_then(|size| size.checked_add(1024))
