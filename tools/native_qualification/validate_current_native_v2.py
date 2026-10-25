@@ -16,14 +16,18 @@ import sys
 from typing import Any, Mapping, Sequence
 
 from native_qualification.current_native_policy_v2 import (
+    ADAPTER_FEATURES,
     ABBA_ORDER,
+    ABBA_BLOCKS,
     EXECUTION_RECEIPT_RELATIVE,
+    EXECUTION_SCHEMA,
     POLICY_SCHEMA,
     PREPARATION_SCHEMA,
     QUALIFICATION_SCHEMA,
     PolicyError,
     PolicyIncomplete,
     PolicyMismatch,
+    RUNNER_KIND,
     TRUSTED_POLICY,
     validate_routes,
     validate_source,
@@ -71,6 +75,10 @@ def _same_observation(expected: Mapping[str, Any], actual: Mapping[str, Any], la
         raise ValidationError(f"{label}.artifacts is malformed")
     for name, recorded in expected_artifacts.items():
         current = actual_artifacts.get(name)
+        if name in {"probes", "source_manifests", "adapter_overlays"}:
+            if recorded != current:
+                raise ValidationError(f"{label}.{name} changed since preparation")
+            continue
         if not isinstance(recorded, Mapping) or not isinstance(current, Mapping):
             raise ValidationError(f"{label}.{name} artifact is malformed")
         if recorded != current:
@@ -127,6 +135,8 @@ def _validate_manifest(receipt: Mapping[str, Any]) -> None:
         raise ValidationError("qualification manifest schema is not current-native v2")
     if value.get("lane") != receipt.get("lane"):
         raise ValidationError("qualification manifest lane differs from preparation receipt")
+    if value.get("trusted_inputs") != TRUSTED_POLICY.manifest_binding():
+        raise ValidationError("qualification manifest trusted source/lock/fixture binding differs from policy")
     try:
         validate_routes(str(receipt.get("lane")), value.get("routes", []))
     except PolicyError as error:
@@ -210,6 +220,74 @@ def _validate_output_artifact(evidence: Mapping[str, Any], expected: Any, output
         raise ValidationError(f"{label} output artifact changed")
 
 
+def _validate_abba_evidence(
+    evidence: Mapping[str, Any],
+    route: Any,
+    output_root: Path,
+    source_bindings: Mapping[str, str],
+    binary_provenance: Mapping[str, Any],
+    source_roots: Mapping[str, Path],
+    blocks: int,
+    label: str,
+) -> None:
+    legs = evidence.get("abba")
+    if not isinstance(legs, list) or len(legs) != len(ABBA_ORDER) * blocks:
+        raise ValidationError(f"{label} ABBA evidence does not contain the fixed block/leg count")
+    seen: set[str] = set()
+    for ordinal, record in enumerate(legs):
+        block = ordinal // len(ABBA_ORDER) + 1
+        index = ordinal % len(ABBA_ORDER)
+        leg = ABBA_ORDER[index]
+        if not isinstance(record, Mapping):
+            raise ValidationError(f"{label} ABBA block {block} leg {index} is malformed")
+        if record.get("route") != route.route or record.get("role") != leg or record.get("index") != index or record.get("block") != block:
+            raise ValidationError(f"{label} ABBA block/leg order differs from policy")
+        if record.get("returncode") != 0 or record.get("source_binding") != source_bindings.get(leg):
+            raise ValidationError(f"{label} ABBA block {block} leg {index} is not source-bound and successful")
+        if record.get("cwd") != str(source_roots[leg]):
+            raise ValidationError(f"{label} ABBA block {block} leg {index} ran outside its source root")
+        binary = record.get("binary")
+        expected_binary = binary_provenance.get(leg)
+        if not isinstance(binary, Mapping) or not isinstance(expected_binary, list) or not expected_binary:
+            raise ValidationError(f"{label} ABBA block {block} leg {index} has no binary provenance")
+        binary_index = 1 if route.program == "scoped_patch_correctness" else 0
+        if len(expected_binary) <= binary_index or dict(binary) != dict(expected_binary[binary_index]):
+            raise ValidationError(f"{label} ABBA block {block} leg {index} binary identity differs")
+        argv = record.get("argv")
+        if not isinstance(argv, list):
+            raise ValidationError(f"{label} ABBA block {block} leg {index} argv is malformed")
+        if route.kind == "build":
+            if "cargo" not in argv or "--release" not in argv:
+                raise ValidationError(f"{label} ABBA block {block} leg {index} build argv is not reviewed")
+        elif route.kind in {"probe", "refusal"} and binary.get("path") not in argv:
+            raise ValidationError(f"{label} ABBA block {block} leg {index} argv is not binary-bound")
+        artifact = record.get("output_artifact")
+        if not isinstance(artifact, Mapping):
+            raise ValidationError(f"{label} ABBA block {block} leg {index} has no output artifact")
+        relative = artifact.get("relative_path")
+        if not isinstance(relative, str) or Path(relative).is_absolute() or ".." in Path(relative).parts or not relative.startswith(".abba/"):
+            raise ValidationError(f"{label} ABBA block {block} leg {index} output path is unsafe")
+        path = output_root / relative
+        cursor = output_root
+        for component in Path(relative).parts:
+            cursor /= component
+            if cursor.is_symlink():
+                raise ValidationError(f"{label} ABBA block {block} leg {index} output contains a symlink component")
+        try:
+            path.absolute().relative_to(output_root.absolute())
+        except ValueError as error:
+            raise ValidationError(f"{label} ABBA block {block} leg {index} output escapes the prepared root") from error
+        if not isinstance(artifact.get("path"), str) or Path(artifact["path"]).absolute() != path.absolute():
+            raise ValidationError(f"{label} ABBA block {block} leg {index} output path is not bound")
+        actual = _file_identity(path, f"{label} ABBA block {block} leg {index}")
+        expected_identity = {**actual, "relative_path": relative}
+        if dict(artifact) != expected_identity:
+            raise ValidationError(f"{label} ABBA block {block} leg {index} output identity changed")
+        if relative in seen:
+            raise ValidationError(f"{label} ABBA output path is reused")
+        seen.add(relative)
+
+
 def _validate_execution_receipt(value: Mapping[str, Any], prepared: Mapping[str, Any]) -> None:
     output_root = prepared.get("output_root")
     if not isinstance(output_root, Path):
@@ -229,9 +307,12 @@ def _validate_execution_receipt(value: Mapping[str, Any], prepared: Mapping[str,
     }
     if dict(artifact) != actual_identity:
         raise ValidationError("runner execution receipt identity changed")
-    if execution.get("schema") != "litchi.current-native-execution.v2" or execution.get("status") != "completed":
+    if execution.get("schema") != EXECUTION_SCHEMA or execution.get("status") != "completed":
         raise ValidationError("runner execution receipt is not a completed v2 execution")
-    for field in ("policy_sha256", "preparation_receipt_sha256", "lane", "output_root", "routes", "source_artifacts", "tooling"):
+    for field in (
+        "policy_sha256", "preparation_receipt_sha256", "lane", "output_root", "routes",
+        "source_artifacts", "tooling", "abba_blocks", "binary_provenance",
+    ):
         expected = value.get("policy_sha256") if field == "policy_sha256" else (
             prepared.get("receipt_sha256") if field == "preparation_receipt_sha256" else value.get(field)
         )
@@ -239,8 +320,30 @@ def _validate_execution_receipt(value: Mapping[str, Any], prepared: Mapping[str,
             raise ValidationError(f"runner execution receipt {field} is not bound to qualification")
     runner = execution.get("runner")
     expected_runner = _file_identity(Path(__file__).resolve().parents[1] / "native_qualification_runner.py", "runner")
-    if not isinstance(runner, Mapping) or dict(runner) != expected_runner:
-        raise ValidationError("runner execution receipt is not bound to the reviewed generic runner")
+    current_runner = _file_identity(Path(__file__).with_name("current_native_policy_v2.py"), "current-native v2 runner")
+    if isinstance(runner, Mapping) and dict(runner) == current_runner:
+        if execution.get("runner_kind") != RUNNER_KIND:
+            raise ValidationError("current-native v2 runner kind is missing")
+    elif not isinstance(runner, Mapping) or dict(runner) != expected_runner:
+        raise ValidationError("runner execution receipt is not bound to a reviewed runner")
+    if execution.get("abba_order") != list(ABBA_ORDER):
+        raise ValidationError("runner execution receipt ABBA order differs from the fixed protocol")
+    lane = execution.get("lane")
+    if lane not in ABBA_BLOCKS or execution.get("abba_blocks") != ABBA_BLOCKS[lane]:
+        raise ValidationError("runner execution receipt ABBA block count differs from the fixed lane contract")
+    expected_features = {
+        side: list(ADAPTER_FEATURES[lane]["baseline" if side == "before" else "candidate"])
+        for side in ("before", "after")
+    }
+    if execution.get("adapter_features") != expected_features:
+        raise ValidationError("runner execution adapter features differ from the fixed lane contract")
+    binaries = execution.get("binary_provenance")
+    if not isinstance(binaries, Mapping) or set(binaries) != {"before", "after"}:
+        raise ValidationError("runner execution binary provenance is incomplete")
+    for side in ("before", "after"):
+        values = binaries.get(side)
+        if not isinstance(values, list) or not values or any(not isinstance(item, Mapping) for item in values):
+            raise ValidationError(f"runner execution {side} binary provenance is malformed")
     if execution.get("route_receipts") != value.get("results"):
         raise ValidationError("runner execution receipt route evidence differs from qualification")
 
@@ -308,6 +411,10 @@ def validate_qualification(path: Path, preparation_path: Path) -> dict[str, Any]
         raise ValidationError("qualification lane differs from its preparation receipt")
     if value.get("abba_order") != list(ABBA_ORDER):
         raise ValidationError("qualification ABBA order differs from the fixed protocol")
+    lane = prepared["lane"]
+    blocks = ABBA_BLOCKS.get(lane)
+    if blocks is None or value.get("abba_blocks") != blocks:
+        raise ValidationError("qualification ABBA block count differs from the fixed lane contract")
     if prepared["output_root"] is None or value.get("output_root") != str(prepared["output_root"]):
         raise ValidationError("qualification output root is not the prepared disjoint root")
     if value.get("source_artifacts") != prepared["receipt"].get("identities"):
@@ -337,7 +444,24 @@ def validate_qualification(path: Path, preparation_path: Path) -> dict[str, Any]
         }
         if evidence.get("source_bindings") != expected_bindings:
             raise ValidationError(f"qualification result {index} source bindings differ from preparation")
+        binary_provenance = value.get("binary_provenance")
+        if not isinstance(binary_provenance, Mapping) or evidence.get("binary_provenance") != binary_provenance:
+            raise ValidationError(f"qualification result {index} binary provenance differs from execution")
+        source_roots = {
+            side: Path(str(prepared["receipt"]["identities"][side]["source_root"])).resolve()
+            for side in ("before", "after")
+        }
         _validate_output_artifact(evidence, expected, prepared["output_root"], f"qualification result {index}")
+        _validate_abba_evidence(
+            evidence,
+            expected,
+            prepared["output_root"],
+            expected_bindings,
+            binary_provenance,
+            source_roots,
+            blocks,
+            f"qualification result {index}",
+        )
     _validate_execution_receipt(value, prepared)
     return {"schema": QUALIFICATION_SCHEMA, "lane": lane, "policy_sha256": TRUSTED_POLICY.digest(), "sha256": value_sha256}
 

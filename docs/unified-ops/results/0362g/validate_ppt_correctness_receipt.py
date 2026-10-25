@@ -89,7 +89,7 @@ def main(argv: list[str]) -> int:
             int(value, 16)
         except ValueError:
             fail(f"{field} is not a SHA-256 hex digest")
-    print(json.dumps({
+    summary = {
         "status": "passed",
         "source_sha256": row["source_sha256"],
         "target_sha256": row["target_sha256"],
@@ -97,7 +97,8 @@ def main(argv: list[str]) -> int:
         "replay_matches_target": row["replay_matches_target"],
         "external_media_path": row["external_media_path"],
         "inverse_matches_source": row["inverse_matches_source"],
-    }, sort_keys=True))
+    }
+    print(json.dumps(summary, sort_keys=True))
     return 0
 
 
