@@ -252,6 +252,15 @@ class RawApiCoverageTests(unittest.TestCase):
         with self.assertRaises(coverage.CoverageError):
             coverage.load_manifest(path)
 
+    def test_callable_source_anchor_must_be_rust_item(self) -> None:
+        value = manifest([entry("fixture::describe", "semantic_method", "semantic_value")])
+        value["entries"][0]["source"]["symbol_kind"] = "descriptive"
+        value["entries"][0]["source"]["symbol"] = "arbitrary-label"
+        path = self.root / "manifest.json"
+        path.write_text(json.dumps(value), encoding="utf-8")
+        with self.assertRaisesRegex(coverage.CoverageError, "rust_item"):
+            coverage.load_manifest(path)
+
     def test_source_anchor_requires_blob_bounds_and_verified_symbol(self) -> None:
         root = Path(__file__).resolve().parents[1]
         head = coverage._git_head(root)
@@ -274,6 +283,12 @@ class RawApiCoverageTests(unittest.TestCase):
         loaded = coverage.load_manifest(path)
         self.assertEqual(coverage.verify_source_anchors(loaded, root), [])
 
+        tree = coverage._git_object(root, head, "tools")
+        self.assertIsNotNone(tree)
+        loaded["source_commit"] = tree[0]
+        self.assertIn("does not resolve to a Git commit", coverage.verify_source_anchors(loaded, root)[0])
+        loaded["source_commit"] = head
+
         loaded["lanes"][0]["source"]["blob"] = "c" * 40
         self.assertIn("blob", coverage.verify_source_anchors(loaded, root)[0])
         loaded["lanes"][0]["source"]["blob"] = blob
@@ -285,8 +300,6 @@ class RawApiCoverageTests(unittest.TestCase):
         loaded["lanes"][0]["source"]["symbol_kind"] = "rust_item"
         self.assertIn("does not contain rust item", coverage.verify_source_anchors(loaded, root)[0])
 
-        tree = coverage._git_object(root, head, "tools")
-        self.assertIsNotNone(tree)
         loaded["lanes"][0]["source"]["path"] = "tools"
         loaded["lanes"][0]["source"]["blob"] = tree[0]
         loaded["lanes"][0]["source"]["symbol_kind"] = "descriptive"

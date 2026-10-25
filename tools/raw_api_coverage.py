@@ -184,7 +184,9 @@ def _entry(value: Any, index: int, profile_ids: set[str]) -> dict[str, Any]:
     disposition = value["disposition"]
     if disposition not in DISPOSITIONS:
         raise CoverageError(f"{label}.disposition {disposition!r} is not allowed")
-    _source_anchor(value["source"], f"{label}.source")
+    anchor = _source_anchor(value["source"], f"{label}.source")
+    if anchor.symbol_kind != "rust_item":
+        raise CoverageError(f"{label}.source.symbol_kind must be rust_item for callable entries")
     _nonempty_string(value["evidence"], f"{label}.evidence")
     if disposition == "required_raw_limits":
         if kind not in RAW_KINDS:
@@ -284,6 +286,15 @@ def load_manifest(path: Path) -> dict[str, Any]:
     return manifest
 
 
+def _git_type(root: Path, object_id: str) -> str | None:
+    result = subprocess.run(
+        ["git", "cat-file", "-t", object_id],
+        cwd=root, check=False, capture_output=True, text=True,
+    )
+    object_type = result.stdout.strip()
+    return object_type if result.returncode == 0 and object_type else None
+
+
 def _git_object(root: Path, commit: str, relative_path: str) -> tuple[str, str] | None:
     result = subprocess.run(
         ["git", "rev-parse", "--verify", f"{commit}:{relative_path}"],
@@ -294,12 +305,8 @@ def _git_object(root: Path, commit: str, relative_path: str) -> tuple[str, str] 
     object_id = result.stdout.strip()
     if not HEX40.fullmatch(object_id):
         return None
-    kind = subprocess.run(
-        ["git", "cat-file", "-t", object_id],
-        cwd=root, check=False, capture_output=True, text=True,
-    )
-    object_type = kind.stdout.strip()
-    return (object_id, object_type) if object_type else None
+    object_type = _git_type(root, object_id)
+    return (object_id, object_type) if object_type is not None else None
 
 
 def _git_blob(root: Path, commit: str, relative_path: str) -> str | None:
@@ -367,6 +374,8 @@ def verify_source_anchors(manifest: Mapping[str, Any], root: Path, *, current: b
     commit = _git_head(root) if current else manifest["source_commit"]
     if commit is None:
         return ["cannot resolve a current HEAD for source-anchor verification"]
+    if not current and _git_type(root, commit) != "commit":
+        return [f"source_commit {commit} does not resolve to a Git commit"]
     for index, entry in enumerate(manifest["entries"]):
         anchor = entry["source"]
         failure = _anchor_failure(root, commit, f"entries[{index}] {entry['path']}", anchor)
