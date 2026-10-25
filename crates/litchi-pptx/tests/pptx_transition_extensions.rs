@@ -72,7 +72,7 @@ fn transition_writer_round_trips_powerpoint_2010_ripple_with_fade_fallback() {
         .with_duration(Ms::new(1500).unwrap())
         .with_click(false)
         .with_after(Ms::new(4250).unwrap());
-    let xml = write(&expected).unwrap();
+    let xml = write(&expected, litchi_pptx::transition::Limits::DEFAULT).unwrap();
     assert!(xml.contains("<mc:AlternateContent"));
     assert!(xml.contains(r#"<p14:ripple dir="ld"/>"#));
     assert!(xml.contains("<p:fade/>"));
@@ -94,7 +94,7 @@ fn transition_writer_round_trips_custom_duration_through_compatibility_markup() 
         .with_duration(Ms::new(750).unwrap())
         .with_click(false)
         .with_after(Ms::new(1250).unwrap());
-    let xml = write(&expected).unwrap();
+    let xml = write(&expected, litchi_pptx::transition::Limits::DEFAULT).unwrap();
     assert!(xml.contains(r#"p14:dur="750""#));
     assert!(xml.contains("<mc:Fallback>"));
     assert!(
