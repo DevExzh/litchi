@@ -6,7 +6,9 @@ Date: 2026-10-25
 
 This leaf repairs the returned `89ar` collaboration replay change on top of
 `e7c19964b28085753a8c9ff2955225e796098a73`.  The source commit is
-`abc8874b84` (`fix(pptx): bound selected collaboration replay before parsing`).
+`abc8874b84` plus follow-up `8d2866c8f8` (`fix(pptx): check raw comment
+attributes before ownership`).  The first record commit is `41bece51cb`; the
+final worktree tip also includes the small record update below.
 It is an external patch for the coordinator's current composed candidate; this
 worktree does not modify the candidate, merge branches, or `PROGRESS.md`.
 
@@ -39,6 +41,11 @@ source-bound collaboration scan reject an over-sized raw attribute value before
 decoding or owning it.  The selected semantic budget may therefore be tighter
 than the physical ceiling without charging inactive presence or threading
 values; source-constrained profiles reduce both ceilings together.
+
+The follow-up also checks borrowed raw start/empty events before the
+source-bound scan calls `into_owned`, and the ordinary parser now uses the
+borrowed slice reader.  This keeps the physical attribute admission ahead of
+decoded attribute ownership on both related paths.
 
 The source tests cover exact/one-under selected aggregate admission, active
 ordinary-field growth, `dt`, inactive presence and threading values, strict
