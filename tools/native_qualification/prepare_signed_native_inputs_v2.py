@@ -82,6 +82,7 @@ SIGNED_BATCH_POLICY = {
 
 FULL_SHA = re.compile(r"^[0-9a-f]{40}$")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_STREAM_CHUNK_BYTES = 1024 * 1024
 
 # The current signature policy test matrix.  Keep this set/order in lockstep
 # with crates/litchi-ops/src/tests/signature.rs and the historical route
@@ -368,6 +369,44 @@ def _git_blob_sha1(payload: bytes) -> str:
     return hashlib.sha1(f"blob {len(payload)}\0".encode("ascii") + payload).hexdigest()
 
 
+def _stream_sha256(path: Path) -> tuple[int, str]:
+    """Return a file's size and SHA-256 without materialising its payload."""
+
+    digest = hashlib.sha256()
+    size = 0
+    with path.open("rb") as payload:
+        while True:
+            chunk = payload.read(_STREAM_CHUNK_BYTES)
+            if not chunk:
+                break
+            size += len(chunk)
+            digest.update(chunk)
+    return size, digest.hexdigest()
+
+
+def _stream_archive_member(file_stream: Any, declared_size: int) -> tuple[int, str, str]:
+    """Hash one tar member with bounded reads.
+
+    ``declared_size`` is the tar header size, which is the only size available
+    before the member bytes are consumed.  Git's blob header is therefore
+    updated with that size while the stream is read, and the returned count
+    remains available to retain the existing ignored-file size check.
+    """
+
+    _expect(isinstance(declared_size, int) and declared_size >= 0, "source archive member size is malformed")
+    sha256 = hashlib.sha256()
+    git_blob = hashlib.sha1(f"blob {declared_size}\0".encode("ascii"))
+    size = 0
+    while True:
+        chunk = file_stream.read(_STREAM_CHUNK_BYTES)
+        if not chunk:
+            break
+        size += len(chunk)
+        sha256.update(chunk)
+        git_blob.update(chunk)
+    return size, sha256.hexdigest(), git_blob.hexdigest()
+
+
 def _reject_symlink_components(path: Path, label: str) -> None:
     lexical = path.absolute()
     cursor = Path(lexical.anchor)
@@ -517,8 +556,8 @@ def _artifact_identity(path: Path, label: str) -> dict[str, Any]:
         except ValueError:
             continue
         raise PolicyError(f"{label} must remain outside {root}")
-    payload = resolved.read_bytes()
-    return {"path": str(resolved), "bytes": len(payload), "sha256": _sha256_bytes(payload)}
+    size, digest = _stream_sha256(resolved)
+    return {"path": str(resolved), "bytes": size, "sha256": digest}
 
 
 def _under(path: Path, parent: Path) -> bool:
@@ -693,20 +732,20 @@ def _archive_tree_identity(
             seen.add(relative)
             file_stream = stream.extractfile(member)
             _expect(file_stream is not None, f"source archive member cannot be read: {relative}")
-            payload = file_stream.read()
+            member_size, member_sha256, member_git_blob_sha1 = _stream_archive_member(file_stream, member.size)
             expected = expected_by_path.get(relative)
             if expected is not None:
                 _expect(expected["mode"] in {"100644", "100755"}, f"selected Git tree contains a non-regular file: {relative}")
                 actual_mode = "100755" if member.mode & 0o111 else "100644"
                 _expect(actual_mode == expected["mode"], f"source archive mode differs from Git tree: {relative}")
-                _expect(_git_blob_sha1(payload) == expected["object"], f"source archive blob differs from Git tree: {relative}")
+                _expect(member_git_blob_sha1 == expected["object"], f"source archive blob differs from Git tree: {relative}")
             else:
                 expected_ignored = ignored.get(relative)
                 _expect(expected_ignored is not None, f"source archive contains an unbound file: {relative}")
                 actual_mode = "100755" if member.mode & 0o111 else "100644"
                 _expect(actual_mode == expected_ignored["mode"], f"source archive ignored-file mode differs: {relative}")
-                _expect(len(payload) == expected_ignored["bytes"], f"source archive ignored-file size differs: {relative}")
-                _expect(_sha256_bytes(payload) == expected_ignored["sha256"], f"source archive ignored-file digest differs: {relative}")
+                _expect(member_size == expected_ignored["bytes"], f"source archive ignored-file size differs: {relative}")
+                _expect(member_sha256 == expected_ignored["sha256"], f"source archive ignored-file digest differs: {relative}")
     except (OSError, tarfile.TarError) as error:
         raise PolicyError(f"cannot read source archive: {error}") from error
     finally:

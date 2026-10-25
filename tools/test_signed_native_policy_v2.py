@@ -6,11 +6,13 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 
 import sys
 
@@ -212,10 +214,11 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
             self._git_repo(root, {"src/lib.rs": b"original\n", "README": b"read me\n"})
             self._write_git_archive(root, archive, "capture/")
             tree = policy._tree_entries(root)
+            archive_identity = policy._artifact_identity(archive, "source archive")
             descriptor = {
                 "path": str(archive),
-                "bytes": archive.stat().st_size,
-                "sha256": policy._sha256_bytes(archive.read_bytes()),
+                "bytes": archive_identity["bytes"],
+                "sha256": archive_identity["sha256"],
                 "format": "git-tree-tar-v1",
                 "prefix": "capture/",
                 "git_tree": policy._tree_id(root, "HEAD"),
@@ -231,16 +234,113 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
             (root / "src/lib.rs").write_bytes(b"different tree\n")
             wrong = Path(name) / "different.tar"
             self._write_git_archive(root, wrong, "capture/")
+            wrong_identity = policy._artifact_identity(wrong, "source archive")
             wrong_descriptor = dict(descriptor)
             wrong_descriptor.update(
                 {
                     "path": str(wrong),
-                    "bytes": wrong.stat().st_size,
-                    "sha256": hashlib.sha256(wrong.read_bytes()).hexdigest(),
+                    "bytes": wrong_identity["bytes"],
+                    "sha256": wrong_identity["sha256"],
                 }
             )
             with self.assertRaisesRegex(policy.PolicyError, "blob differs from Git tree"):
                 policy._archive_tree_identity(root, "HEAD", wrong_descriptor)
+
+    def test_archive_member_reads_are_bounded_and_bind_ignored_files(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="signed-native-v2-streamed-archive-") as name:
+            root = Path(name) / "source"
+            archive = Path(name) / "source.tar"
+            self._git_repo(root, {"src/lib.rs": b"tracked\n"})
+            self._write_git_archive(root, archive, "capture/")
+            ignored = root / "ignored.lock"
+            ignored.write_bytes(b"ignored\n" * 250_000)
+            with tarfile.open(archive, mode="a") as stream:
+                info = stream.gettarinfo(str(ignored), arcname="capture/ignored.lock")
+                with ignored.open("rb") as payload:
+                    stream.addfile(info, payload)
+            tree = policy._tree_entries(root)
+            archive_identity = policy._artifact_identity(archive, "source archive")
+            ignored_identity = policy._stream_sha256(ignored)
+            descriptor = {
+                "path": str(archive),
+                "bytes": archive_identity["bytes"],
+                "sha256": archive_identity["sha256"],
+                "format": "git-tree-tar-v1",
+                "prefix": "capture/",
+                "git_tree": policy._tree_id(root, "HEAD"),
+                "tree_sha256": policy._source_tree_digest(tree),
+                "ignored_files": [
+                    {
+                        "path": "ignored.lock",
+                        "mode": "100644",
+                        "bytes": ignored_identity[0],
+                        "sha256": ignored_identity[1],
+                    }
+                ],
+            }
+            original_read = tarfile.ExFileObject.read
+            requests: list[int] = []
+
+            def bounded_read(file_stream: object, size: int = -1) -> bytes:
+                requests.append(size)
+                if size < 0 or size > policy._STREAM_CHUNK_BYTES:
+                    raise AssertionError(f"unbounded tar member read: {size}")
+                return original_read(file_stream, size)
+
+            with mock.patch.object(tarfile.ExFileObject, "read", bounded_read):
+                verified = policy._archive_tree_identity(root, "HEAD", descriptor)
+            self.assertEqual(verified["tracked_files"], len(tree))
+            self.assertEqual(verified["ignored_files"], ["ignored.lock"])
+            self.assertTrue(requests)
+
+    def test_large_sparse_artifact_streams_under_a_memory_cap(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="signed-native-v2-sparse-artifact-") as name:
+            artifact = Path(name) / "candidate-source.tar"
+            size = 192 * 1024 * 1024
+            with artifact.open("wb") as payload:
+                payload.truncate(size)
+            expected_digest = hashlib.sha256()
+            zero_chunk = b"\0" * policy._STREAM_CHUNK_BYTES
+            remaining = size
+            while remaining:
+                count = min(remaining, len(zero_chunk))
+                expected_digest.update(zero_chunk[:count])
+                remaining -= count
+            script = """
+import importlib.util
+import resource
+import sys
+from pathlib import Path
+
+spec = importlib.util.spec_from_file_location("streaming_policy", sys.argv[3])
+assert spec is not None and spec.loader is not None
+policy = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(policy)
+
+resource.setrlimit(resource.RLIMIT_AS, (128 * 1024 * 1024, 128 * 1024 * 1024))
+identity = policy._artifact_identity(Path(sys.argv[1]), "sparse source archive")
+assert identity["bytes"] == int(sys.argv[2])
+print(identity["sha256"])
+"""
+            environment = dict(os.environ)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    script,
+                    str(artifact),
+                    str(size),
+                    os.environ.get(
+                        "SIGNED_NATIVE_STREAMING_POLICY",
+                        str(Path(__file__).parent / "native_qualification" / "prepare_signed_native_inputs_v2.py"),
+                    ),
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+            self.assertEqual(result.stdout.strip(), expected_digest.hexdigest())
 
     def test_source_archive_output_paths_must_be_fully_disjoint(self) -> None:
         with tempfile.TemporaryDirectory(prefix="signed-native-v2-paths-") as name:
