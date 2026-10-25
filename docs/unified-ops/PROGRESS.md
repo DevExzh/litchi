@@ -5680,3 +5680,53 @@ See [0063](0063-source-pptx-modern-comments.md).
   quarantine. Root verifies preserved payloads, source/registry proofs and the
   unchanged protected constructor probe. Remaining worktrees are still being
   audited; 68 independent office siblings remain outside scope. No push.
+
+
+  Four reviewed runtime repairs compose at 3c291 (106). Its first runtime
+  row exposes missing Result wrappers in Custom XML 104a before tests compile;
+  root verifies the failed capture and fixes both at e130 (104aa), with
+  independent review. The next common suite compiles: 528 pass, three VBA
+  fixtures/oracle assertions still fail and are returned as 104d. Fresh full
+  qualification remains required; no runtime/performance acceptance.
+
+  Cleanup77–79 removes 34 more worktrees and deletes 23 refs after exact-tip,
+  source/payload/registry checks. Totals are 81 worktrees and 341 refs; the
+  measured allocation ledger is 120,572,608,512 bytes, with the same wave75
+  allocation and small adapter-archive caveats. The DrawingML deletion-only
+  checkout's signed invalid-target coverage is now preserved by composed102a.
+  Remaining validation worktrees receive explicit disposition review; the
+  protected probe is unchanged. Completed changes are committed; no push.
+
+
+  Further diagnostic runtime rows expose DOCX web-extension consumer and
+  conformance failures, ten PPTX library failures (1,386 pass, one ignored),
+  and one signed ops ordering assertion. Seven repair chains pass source
+  review: 104e, 107, 108a, 110, 111a, 112 and 113. The proposed 111 aggregate
+  relaxation is returned; 111a preserves production limits and corrects the
+  stale fixture boundaries. Signed batch zero-read refusal remains settled;
+  113 tests the distinct closure/individual error order explicitly. The
+  next continuation passes ten XLSX/XLSB rows, then ops metadata reports five
+  passes and two missing-property-context failures, returned as 114. The last
+  four diagnostic rows run on frozen e130. Composition and full repaired-source
+  qualification remain required.
+
+  Cleanup80–82 brings fully verified removals to 106 worktrees. Another 21
+  are removed in cleanup83; its scope-hash difference is proved comment-only,
+  but the failed ignored-payload inventory prevents a complete preservation
+  claim. All committed source remains reachable, and local ref deletions
+  total 370. Cleanup85 then removes three more verified leaves and their refs:
+  totals are 373 refs and 109 fully verified removals, plus cleanup83's 21 with
+  the recorded inventory gap. The measured allocated ledger reaches
+  228,248,707,072 bytes with the recorded exclusions; cleanup83 allocation is
+  unknown. Further leaf cleanup continues. The protected probe and active
+  baselines remain intact. Final acceptance stays open; nothing is pushed.
+
+
+  The final four diagnostic rows pass on e130. Across those diagnostic
+  packets, 28 original rows pass and five fail; the minimal PPTX profile
+  remains unrun. Reviewed metadata context repair 114a joins the other seven
+  repairs at private integration `0da85f43e6` (115), without conflicts. Root
+  verifies all twenty changed crate files against their reviewed leaves and
+  refreshes only the common crate's test dependency in the ignored root lock.
+  Compiler/runtime/glossary and final qualification must now bind this repaired
+  source. No result from e130 is relabeled as a repaired-source pass.

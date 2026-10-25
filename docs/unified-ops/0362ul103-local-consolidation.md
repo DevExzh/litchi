@@ -250,3 +250,190 @@ cleanup75's unmeasured allocation and the small extra adapter archive, totals
 118,948,712,448 bytes. The protected constructor probe remains unchanged.
 The remaining registered worktree census continues; active qualification
 sources and baselines remain protected until their work is complete.
+
+
+## Repair composition and compiler correction
+
+Reviewed 104c, 104a, 102a and 105 compose at `3c291e3b62` (record 106).
+The two coordinator-document conflicts retain root's exact-prefix supersets;
+all four owned source blobs match their reviewed leaves. Its runtime packet
+stops before tests compile: 104a omitted `Err(...)` around both alias refusal
+values. Root verifies the capture and corrects both wrappers at `e130751fc5`
+(record 104aa), independently reviewed. This was missed in source review.
+
+The e130 common suite compiles, with 528 tests passing and three failing.
+Custom XML alias classification and VBA metadata-only part-limit precedence
+now pass. Two VBA fixture limit combinations remain inconsistent, and the
+independent lexical manifest expectation puts a preserved recipient comment
+after the inserted overrides instead of before them. These findings are
+returned as 104d; no production behavior or performance loss is accepted.
+The complete 34-row packet remains required after repair.
+
+Root verifies e130's terminal capture and inner helper log. External packet
+`.coord/ooxml-pptx-joint-e130751fc5-f5-runtime` retains `rows.json`
+(4,333 bytes, SHA-256
+`a6d67c39223cb374f70a7cd0130d08b230322358308b40f3da2114ab9a8738ec`),
+`result.json` (5,072 bytes, SHA-256
+`031c660784cc16cf900cc65092f0dc45c2888a42fd61b8df2ba63613c3ea0c5c`)
+and inner `common-tests/0000.log` (220,277 bytes, SHA-256
+`08316d62904616356cd6edb2fe6637fee3c383d16f3a964ae33d1e3a91202a61`).
+The outer row takes 84.627 seconds; target ends at 387,960,757 bytes.
+
+## Cleanup77–79
+
+Root verifies another 34 removed worktrees and deletes their 23 named refs
+with exact-tip guards. Totals for cleanup72–79 are 81 worktrees and 341 local
+refs. Wave77 removes twelve clean source worktrees and eleven detached
+compile/driver snapshots; 69 restored blobs are verified. Wave78 removes
+nine clean composed leaves and discards only two ordinary bytecode files in
+the released signed predecessor; 27 restored blobs are verified. Wave79
+removes that clean predecessor and the DrawingML checkout containing exactly
+6,848 tracked deletions, with no staged, untracked or ignored changes.
+Root verifies all 6,848 old-blob identities against its source tree and six
+additional restoration blobs. Its useful signed invalid-target coverage is
+preserved by composed 102a; obsolete error expectations are not imported.
+
+| Wave | Net allocated bytes | Cleanup receipt SHA-256 | Ref-deletion receipt SHA-256 |
+|---|---:|---|---|
+| 77 | 673,243,136 | `074ce113943e32ceae5b745c4dde4de41e055096e733388c44a8f7fc04f15578` | `cf9765e6c64ceb8e1b9fd86b362cc4f828e7cb20c58beec029e394916cd7ef18` |
+| 78 | 857,747,456 | `bb64fd12252be473f4e59b2c2351da838d7ea4b23e6fae5ed969d08b61060e7b` | `18ca070cc9961248582f1eabf40a8ebe4e6798d0f2ecd8223b7b4ad3c59fdb51` |
+| 79 | 92,905,472 | `b716ad173b3c7f9edadbdfedeaadbbc9e87d0378fbeaf6581aaae4aea2f00735` | `48157c341c0774cce8bd08e37c56289a8b9b69cf56323abc9ec6ddcda3091656` |
+
+Cleanup receipts are under external `quarantine/wave77-ancestor-leaves/`,
+`quarantine/wave78-coord-small/` and `quarantine/wave79-signed102-drawingml/`.
+Ref receipts are `trunk-consolidation/wave77-twelve-ref-delete-receipt.json`,
+`wave78-nine-ref-delete-receipt.json` and `wave79-two-ref-delete-receipt.json`.
+The measured allocation ledger reaches 120,572,608,512 bytes, excluding
+wave75's unmeasured allocation and the small extra adapter archive. All
+preserved inventories, current source and the protected probe remain intact.
+Remaining detached validation payloads and older qualification baselines are
+under explicit supersession review; merely being a validation tree does not
+justify permanent retention. Main and independent office siblings stay out
+of scope. Nothing is pushed, and final acceptance remains open.
+
+## Continued runtime returns
+
+Diagnostic continuations keep integration frozen at `e130751fc5`. The first
+passes eleven rows, then reports 26 passes and eight failures in DOCX web
+extensions. Reviewed 107 (`9f46e7ba84`) migrates seven obsolete diagnostic
+assertions to the exact public PatchConflict variant. Reviewed 108a
+(`b44e185939`) determines conformance from actual relationship attributes,
+falling back to retained root declarations only for an empty relationship
+graph. It preserves signed empty-graph intent without another XML scan.
+
+The next continuation passes DOCX web-owner, VBA encryption and VBA project
+tests. The PPTX library then reports 1,386 passes, ten failures and one
+existing ignored test. Reviewed 110 (`b0daaa9805`) removes the extra quote
+after two already-quoted XML attributes; seven failures share those writers.
+Reviewed 112 (`8b29377ead`) restores physical XML error precedence while
+reusing the tolerant catalog memo, with the same two catalog scans on a cold
+valid capture. Two inactive-MCE fixtures use a 128-byte selected budget below
+their active aggregate. The proposed parser relaxation in 111 is rejected:
+it bypasses aggregate admission before allocation. Reviewed 111a
+(`c5cac709d1`) restores the production codec exactly and independently counts
+251/288-byte fixture boundaries, including selected namespace attributes.
+Inactive values remain larger than those caps; exact and one-under checks
+remain required.
+
+The subsequent PPTX ops row reports three passes and one failure. The owner
+decision remains immediate signed batch refusal with zero item reads. The
+test incorrectly also requires closure and individual edits to fail at the
+same item. Reviewed 113 (`dd546d439c`) proves the exact two-item order:
+individual publication refuses the first signed change, while the closure
+resolves a later invalid target before its final publication fence. Unsigned
+corpus equivalence is unchanged. Reviewed VBA 104e (`bb740a6e8a`) also fixes
+the three common-suite fixture/oracle failures, using independent serialized
+ZIP directory counts and cross-field-valid limits. Its ZIP reader dependency
+is test-only and requires a fresh root lock binding after composition.
+
+All seven repairs are committed and source-reviewed, pending composition and
+actual repaired-source qualification. The next continuation passes all ten
+XLSX/XLSB rows, then reports five passes and two failures in ops OOXML
+metadata: the error's fixed property context is absent where `content_type`
+is expected. This is returned as 114 for contract review. The last four
+diagnostic rows run on unchanged e130. Neither these continuations nor source
+review replace the complete runtime, compiler, glossary and performance gates.
+
+Root verifies the terminal outer receipts and PPTX inner helper receipt/log:
+
+| External packet / artifact | Bytes | SHA-256 |
+|---|---:|---|
+| `ooxml-pptx-joint-e130751fc5-f5-runtime-remaining33/rows.json` | 47,523 | `6103868865452151da909ba944795e36bd86685c1b125d7c6279c4dd14f8b601` |
+| same / `result.json` | 50,630 | `3e8fe530cfd05f94927f8169bd9357a59b766c2772e0c31115dd5690bd40ce2d` |
+| `ooxml-pptx-joint-e130751fc5-f5-runtime-remaining21/rows.json` | 16,205 | `36638e084765b7d372ae34eabf67312bcadd08901204b6cdd83c461eff5be80e` |
+| same / `result.json` | 17,592 | `336b72bb23b5a6fe858811d14e2f7d2a1c5476a5b41692ba270c4be666d8023c` |
+| same / `pptx-full-tests/0000.log` | 367,908 | `3e405745bf5070a33804ffab53cd1bfad67107e8478985b23b6559449e014860` |
+| `ooxml-pptx-joint-e130751fc5-f5-runtime-remaining16/rows.json` | 3,971 | `cb550769121aa76e88cabca57cdc21b56380c37ca3671637d53c04667834a0cb` |
+| same / `result.json` | 4,706 | `636748fc0791ba242ec712ea17e1cecdaf0e4247c731f2b856c4a28a291a5dbf` |
+| `ooxml-pptx-joint-e130751fc5-f5-runtime-remaining15/rows.json` | 43,294 | `bee3a56757c44290f053f7b690786c0ba2485c100e2466df475ddb152819b985` |
+| same / `result.json` | 46,191 | `c60998b9a5a6b994ab25fe544a7eacaac29b8fdf580d99a246bc4f5e949c582e` |
+
+## Cleanup80–82 and audit of cleanup83
+
+Cleanup80 removes the two superseded combined PPTX/OOXML worktrees after
+their terminal captures are verified. Twelve source/evidence blobs and both
+ignored root locks are preserved and checked. Two additional unattached
+ancestor refs are also deleted. Cleanup81 removes fourteen superseded
+validation worktrees: eight clean trees and six explicitly reviewed W4b
+snapshots with preserved CRUD/probe/lock overlays. Root reruns the independent
+verifier, checking all twenty payload records, fourteen source proofs, exact
+path/registry absence, the retained canonical W4b baseline and protected
+constructor probe. Its four refs are then deleted by exact-tip transaction.
+The original source-proof typo for row34 is corrected in a separate artifact.
+
+Cleanup82 removes nine detached dirty scaffolds and duplicate baselines after
+preserving their actual staged/working payloads. Root verifies 724 manifest
+entries and all absent paths/admin directories. Its corrected allocation
+calculation includes the receipt's own 12,288 bytes. These three waves bring
+verified totals to 106 removed worktrees and 349 deleted local refs.
+
+| Wave | Net allocated bytes | Cleanup receipt SHA-256 | Ref-deletion receipt SHA-256 |
+|---|---:|---|---|
+| 80 | 15,133,560,832 | `c4c5f0d57ef04083f7e55fec1c8b4be1dc6f5fb57d222b88f65ecf4a5c9c5093` | `2416b9364de931523d9e0b5c14de33ad129174bd5c07af378b834bdda968fcf2` |
+| 81 | 76,336,410,624 | `bb0ecb91e332aeac65a204cecdc73f0973ac26dc6701e8d33c5adf062675c7ff` | `9ccd68be42ecff9ae87c9c5d7ca9ef116afadeaff1a2dd911ea8509ae36911c6` |
+| 82 | 669,835,264 | `253cb3b64677f1af34bd1369c73fb1778b140176ac9748ee6aa79b09cd67d3b9` | detached trees; no refs |
+
+The measured allocated ledger reaches 212,712,415,232 bytes, excluding
+wave75's unknown allocation and the small extra adapter archive. Later
+wave81 verifier/correction artifacts consume a further 32,768 bytes; no
+filesystem-wide free-space delta is claimed. Root-verification receipts are
+`trunk-consolidation/wave81-root-verification.json` (SHA-256
+`4c39299eb4a8fb7b8416da2aebfeb4bdca788f3864cca9dc5c7a7d23e58db71a`)
+and `wave82-root-verification.json` (SHA-256
+`a15d68c0c43858a0be062042582784b7d7aa5e91e31addf7a37bb5d2aa25a946`).
+
+Cleanup83 removes another 21 clean ancestor worktrees without force. Root
+verifies all 282 preserved files, declared locks, ancestry and path/registry
+removal. The scope-hash difference is exactly two added comment lines:
+removing those lines reproduces the original authorized hash, with identical
+table rows. Its preservation audit remains incomplete because an ignored
+directory inventory command failed before removal. No complete absence of
+other payload is supported; the original receipts remain unchanged. No
+pre-removal allocation was captured, so this wave contributes no claimed
+reclaimed bytes. These 21 are reported separately from the 106 fully verified
+removals. Their committed source remains reachable through integration; root
+deletes the 21 redundant refs by exact-tip transaction, bringing the local
+ref total to 370. Receipt `trunk-consolidation/wave83-21-ref-delete-receipt.json`
+has SHA-256 `82f1848bf58609a86f280ecc42d194b0f4d12a40c4944ea69098cccffd8e9dc1`.
+
+Five stale read-only Git audit groups in three completed leaves are retired
+after exact process-identity checks. Foreign filesystem scanners are left
+untouched. Fresh checks find no holders in the four previously skipped
+worktrees; three clean leaves proceed to cleanup85, while the dirty OLE leaf
+receives separate review. Remaining baseline and superseded-branch review
+continues. Main and independent office siblings remain outside scope.
+
+Cleanup85 subsequently removes those three clean leaves without force. Root
+verifies their source blobs, complete ignored-file inventories, the preserved
+139,606-byte lock and exact path/registry absence, then deletes their refs.
+Ninety ordinary bytecode files are discarded after recording their identities.
+Receipt `quarantine/wave85-cleanup85/receipt.tsv` has SHA-256
+`18342dc1de522a319650c9e8691f27859a46773b685fb781f68fe2280450a676`;
+root verification is `trunk-consolidation/wave85-root-verification.json`
+(`f8ede693f7b3d2d00f7071d64338ab71ac8a0fac17e0a6698e0f5f249e48d873`),
+and ref receipt `wave85-three-ref-delete-receipt.json` has SHA-256
+`dc2c947fcf45ff065242c8b75ba9c12caef838ab4d17173faf96490df94e2c42`.
+Net allocated reclaim is 15,536,291,840 bytes. Totals are 373 refs, 109 fully
+verified worktree removals plus cleanup83's 21 with the recorded inventory
+gap, and a measured allocation ledger of 228,248,707,072 bytes under the
+same accounting caveats. Cleanup84, 86 and 87 are separately in progress.
