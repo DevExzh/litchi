@@ -2135,7 +2135,7 @@ mod tests {
     #[test]
     fn mce_expansion_uses_output_budget_for_processed_parse() {
         let xml = format!(
-            r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:n="urn:namespace-closure-expands-each-descendant"><p:extLst><p:ext uri="urn:opaque"><a value="&amp;"><b/><c/><d/></a></p:ext></p:extLst></p:presentationPr>"#
+            r#"<p:presentationPr xmlns:p="{P_NS}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:n="urn:namespace-closure-expands-each-descendant"><p:webPr/></p:presentationPr>"#
         );
         let processed = process_markup_compatibility(
             xml.as_bytes(),

@@ -1572,7 +1572,7 @@ mod tests {
     #[test]
     fn mce_expansion_uses_output_budget_for_processed_parse() {
         let xml = format!(
-            r#"<p:viewPr xmlns:p="{P}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:n="urn:namespace-closure-expands-each-descendant"><p:extLst><u:fragment xmlns:u="urn:opaque"><a value="&amp;"><b/><c/><d/></a></u:fragment></p:extLst></p:viewPr>"#
+            r#"<p:viewPr xmlns:p="{P}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:n="urn:namespace-closure-expands-each-descendant"><p:gridSpacing cx="1" cy="2"/></p:viewPr>"#
         );
         let processed = litchi_ooxml_common::mce::process_markup_compatibility(
             xml.as_bytes(),
