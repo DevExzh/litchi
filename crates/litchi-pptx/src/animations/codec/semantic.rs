@@ -6,10 +6,14 @@ use super::super::model::{
 };
 use super::validation::{check_xml_size, validate_template_time_node};
 use super::xml::{
-    parse_processed_timing, parse_recursive_timing_tree, write_animation_xml, write_timing_child,
+    BoundedXml, parse_processed_timing, parse_recursive_timing_tree, write_animation_xml,
+    write_timing_child,
 };
 use crate::Result;
+use crate::animations::Limits;
 use crate::leniency::ToleranceReport;
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
+use std::borrow::Cow;
 
 impl TemplateTimeNode {
     /// Validate and store one bounded `p:par` template time node.
@@ -17,8 +21,8 @@ impl TemplateTimeNode {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(xml: &str) -> Result<Self> {
-        validate_template_time_node(xml)?;
+    pub fn parse(xml: &str, limits: Limits) -> Result<Self> {
+        validate_template_time_node(xml, limits)?;
         Ok(Self {
             xml: xml.to_string().into_boxed_str(),
         })
@@ -35,13 +39,13 @@ impl TimingTree {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(xml: &str) -> Result<Self> {
-        check_xml_size(xml.len())?;
-        let processed = litchi_ooxml_common::mce::process_str(xml)?;
-        parse_recursive_timing_tree(&processed)
+    pub fn parse(xml: &str, limits: Limits) -> Result<Self> {
+        check_xml_size(xml.len(), limits)?;
+        let processed = process_timing_xml(xml, limits)?;
+        check_xml_size(processed.len(), limits)?;
+        parse_recursive_timing_tree(&processed, limits)
     }
-    #[must_use]
-    pub fn to_xml(&self) -> String {
+    pub fn to_xml(&self, limits: Limits) -> Result<String> {
         if let (Some(xml), Some(roots), Some(opaque)) = (
             &self.source_xml,
             &self.source_roots,
@@ -49,9 +53,10 @@ impl TimingTree {
         ) && self.roots.as_slice() == roots.as_ref()
             && self.opaque_children.as_slice() == opaque.as_ref()
         {
-            return xml.to_string();
+            return bounded_output(xml, limits);
         }
-        let mut xml = String::from("<p:timing><p:tnLst>");
+        let mut xml = BoundedXml::new(limits.max_output_bytes);
+        xml.push_str("<p:timing><p:tnLst>");
         for child in &self.roots {
             write_timing_child(&mut xml, child);
         }
@@ -60,7 +65,7 @@ impl TimingTree {
             xml.push_str(child);
         }
         xml.push_str("</p:timing>");
-        xml
+        xml.finish()
     }
 }
 
@@ -70,11 +75,11 @@ impl Sequence {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_timing_xml(xml: &str) -> Result<Self> {
-        check_xml_size(xml.len())?;
-        let xml = litchi_ooxml_common::mce::process_str(xml)?;
-        check_xml_size(xml.len())?;
-        parse_processed_timing(xml.as_bytes(), false)
+    pub fn parse_timing_xml(xml: &str, limits: Limits) -> Result<Self> {
+        check_xml_size(xml.len(), limits)?;
+        let xml = process_timing_xml(xml, limits)?;
+        check_xml_size(xml.len(), limits)?;
+        parse_processed_timing(xml.as_bytes(), false, limits)
     }
 
     /// Parse the timing tree of a slide, repairing stale cross-references the
@@ -92,9 +97,9 @@ impl Sequence {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_slide_xml(xml: &[u8]) -> Result<Self> {
-        check_xml_size(xml.len())?;
-        parse_processed_timing(xml, true)
+    pub fn parse_slide_xml(xml: &[u8], limits: Limits) -> Result<Self> {
+        check_xml_size(xml.len(), limits)?;
+        parse_processed_timing(xml, true, limits)
     }
 
     /// [`Self::parse_slide_xml`], additionally merging every repair the parse
@@ -110,9 +115,10 @@ impl Sequence {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_slide_xml_with_tolerance(
         xml: &[u8],
+        limits: Limits,
         tolerance: &mut ToleranceReport,
     ) -> Result<Self> {
-        let sequence = Self::parse_slide_xml(xml)?;
+        let sequence = Self::parse_slide_xml(xml, limits)?;
         tolerance.append(sequence.tolerance_report());
         Ok(sequence)
     }
@@ -131,8 +137,8 @@ impl Sequence {
     /// Returns every error [`Self::parse_slide_xml`] returns, and
     /// [`crate::Error::Invalid`] naming the first defect when the parse had to
     /// repair an orphaned target or a duplicated shape ID.
-    pub fn parse_slide_xml_strict(xml: &[u8]) -> Result<Self> {
-        let sequence = Self::parse_slide_xml(xml)?;
+    pub fn parse_slide_xml_strict(xml: &[u8], limits: Limits) -> Result<Self> {
+        let sequence = Self::parse_slide_xml(xml, limits)?;
         if let Some(first) = sequence.tolerance_report().defects().first() {
             return Err(crate::Error::Invalid(format!(
                 "slide timing tree is not self-consistent at shape ID {} ({} defect(s)); a lenient read would have {}",
@@ -150,8 +156,7 @@ impl Sequence {
     }
 
     /// Generate timing XML for a slide.
-    #[must_use]
-    pub fn to_xml(&self) -> String {
+    pub fn to_xml(&self, limits: Limits) -> Result<String> {
         if let (
             Some(xml),
             Some(source),
@@ -175,7 +180,7 @@ impl Sequence {
             && self.ole_chart_builds.as_slice() == source_ole_chart_builds.as_ref()
             && self.timing_tree.as_ref() == source_timing_tree.as_deref()
         {
-            return xml.to_string();
+            return bounded_output(xml, limits);
         }
         if self.animations.as_slice() == self.source_animations.as_deref().unwrap_or_default()
             && self.paragraph_builds.as_slice()
@@ -188,13 +193,13 @@ impl Sequence {
                 == self.source_ole_chart_builds.as_deref().unwrap_or_default()
             && let Some(timing_tree) = &self.timing_tree
         {
-            return timing_tree.to_xml();
+            return timing_tree.to_xml(limits);
         }
         if self.is_empty() {
-            return String::new();
+            return Ok(String::new());
         }
 
-        let mut xml = String::with_capacity(2048);
+        let mut xml = BoundedXml::new(limits.max_output_bytes);
         xml.push_str("<p:timing>");
         xml.push_str("<p:tnLst>");
         xml.push_str(r#"<p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot">"#);
@@ -380,6 +385,37 @@ impl Sequence {
         }
         xml.push_str("</p:timing>");
 
-        xml
+        xml.finish()
+    }
+}
+
+fn bounded_output(xml: &str, limits: Limits) -> Result<String> {
+    if xml.len() > limits.max_output_bytes {
+        return Err(crate::Error::Limit {
+            kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: limits.max_output_bytes,
+        });
+    }
+    Ok(xml.to_owned())
+}
+
+fn process_timing_xml<'a>(xml: &'a str, limits: Limits) -> Result<Cow<'a, str>> {
+    let mce_limits = MceLimits {
+        max_input_bytes: limits.max_input_bytes,
+        max_output_bytes: limits.max_input_bytes,
+        max_depth: limits.max_depth,
+        ..MceLimits::default()
+    };
+    let processed =
+        process_markup_compatibility(xml.as_bytes(), &Capabilities::ooxml_baseline(), &mce_limits)?
+            .xml;
+    match processed {
+        Cow::Borrowed(bytes) => std::str::from_utf8(bytes)
+            .map(Cow::Borrowed)
+            .map_err(|error| crate::Error::Invalid(format!("animation XML is not UTF-8: {error}"))),
+        Cow::Owned(bytes) => String::from_utf8(bytes)
+            .map(Cow::Owned)
+            .map_err(|error| crate::Error::Invalid(format!("animation XML is not UTF-8: {error}"))),
     }
 }

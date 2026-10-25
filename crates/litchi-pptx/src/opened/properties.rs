@@ -5,48 +5,41 @@ use std::ops::Range;
 
 use crate::{Error, Result};
 
-/// Stage one same-slide batch of shape text and complete local transform
-/// replacements.
-///
-/// The scene and every selector are resolved before a candidate is published.
-/// Text is spliced first and geometry is then rewritten against that local
-/// candidate; the transaction owner receives a new payload only after the
-/// final scene has read back with the requested semantic values.
-pub(crate) fn stage_shape_properties(
+pub(crate) fn stage_shape_properties_with_limits(
     xml: &[u8],
     replacements: &[super::ShapePropertiesReplacement<'_>],
     max_text_bytes: usize,
     max_output_bytes: usize,
+    shape_limits: crate::shape::Limits,
 ) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_shape_properties_admitted(
+    stage_shape_properties_admitted_with_limits(
         xml,
         replacements,
         max_text_bytes,
         max_output_bytes,
         super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
         max_text_bytes,
+        shape_limits,
     )
 }
 
-/// Stage a property batch after its caller has admitted the aggregate shape
-/// budget. The regular entry point above keeps the historical 256-selection
-/// and aggregate-text limits; chunked operations use the larger whole-slide
-/// limits through this inner path.
-pub(super) fn stage_shape_properties_admitted(
+pub(super) fn stage_shape_properties_admitted_with_limits(
     xml: &[u8],
     replacements: &[super::ShapePropertiesReplacement<'_>],
     max_text_bytes: usize,
     max_output_bytes: usize,
     selection_limit: usize,
     aggregate_text_limit: usize,
+    shape_limits: crate::shape::Limits,
 ) -> Result<(Option<Vec<u8>>, usize)> {
     if replacements.is_empty() {
         return Ok((None, 0));
     }
     if replacements.len() > selection_limit {
         return Err(Error::Limit {
-            resource: "opened-presentation shape property replacements",
-            limit: selection_limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: replacements.len(),
+            maximum: selection_limit,
         });
     }
     let aggregate_text_bytes = replacements.iter().try_fold(0usize, |total, replacement| {
@@ -59,12 +52,13 @@ pub(super) fn stage_shape_properties_admitted(
     })?;
     if aggregate_text_bytes > aggregate_text_limit {
         return Err(Error::Limit {
-            resource: "opened-presentation aggregate shape text bytes",
-            limit: aggregate_text_limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            observed: aggregate_text_bytes,
+            maximum: aggregate_text_limit,
         });
     }
 
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -74,8 +68,9 @@ pub(super) fn stage_shape_properties_admitted(
     }
     if replacements.len() > scene.len() {
         return Err(Error::Limit {
-            resource: "opened-presentation selected shape properties",
-            limit: scene.len(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: replacements.len(),
+            maximum: scene.len(),
         });
     }
 
@@ -163,23 +158,25 @@ pub(super) fn stage_shape_properties_admitted(
     let mut candidate = if text_replacements.is_empty() {
         None
     } else {
-        super::xml::stage_shape_texts_admitted(
+        super::xml::stage_shape_texts_admitted_with_limits(
             xml,
             &text_replacements,
             max_text_bytes,
             max_output_bytes,
             selection_limit,
             aggregate_text_limit,
+            shape_limits,
         )?
         .0
     };
 
     if !bounds_replacements.is_empty() {
         let input = candidate.as_deref().unwrap_or(xml);
-        if let Some(next) = super::geometry::rewrite_shape_bounds_many(
+        if let Some(next) = super::geometry::rewrite_shape_bounds_many_with_limits(
             input,
             &bounds_replacements,
             max_output_bytes,
+            shape_limits,
         )? {
             candidate = Some(next);
         }
@@ -194,7 +191,7 @@ pub(super) fn stage_shape_properties_admitted(
         }
         return Ok((None, 0));
     };
-    let published = crate::shape::Scene::read(&candidate)?;
+    let published = crate::shape::Scene::read(&candidate, shape_limits)?;
     if published.is_rewritten() || published.len() != scene.len() {
         return Err(Error::Invalid(
             "opened-presentation shape property batch changed the semantic shape graph".into(),

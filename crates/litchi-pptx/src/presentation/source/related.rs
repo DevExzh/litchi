@@ -69,15 +69,18 @@ const MAX_CHART_XML: usize = 64 * 1024 * 1024;
 pub(crate) fn load_eager_notes<'a>(
     package: &'a litchi_opc::OpcPackage,
     slide: &SlidePart<'a>,
+    shape_limits: crate::shape::Limits,
+    notes_limits: crate::notes::Limits,
 ) -> Result<Option<Notes>> {
-    eager_notes::load(package, slide)
+    eager_notes::load(package, slide, shape_limits, notes_limits)
 }
 
 pub(crate) fn load_eager_comments<'a>(
     package: &'a litchi_opc::OpcPackage,
     slide: &SlidePart<'a>,
+    limits: crate::comments::Limits,
 ) -> Result<Option<Comments>> {
-    comments::load_eager(package, slide)
+    comments::load_eager(package, slide, limits)
 }
 
 /// A source part retained by a detached related-part snapshot.
@@ -277,8 +280,9 @@ pub(super) fn load_part(
     }
     if declared > semantic_maximum as u64 {
         return Err(Error::Limit {
-            resource: "source related part bytes",
-            limit: semantic_maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+            observed: usize::try_from(declared).unwrap_or(usize::MAX),
+            maximum: semantic_maximum,
         });
     }
 
@@ -318,8 +322,9 @@ pub(super) fn process_eager_part(
 ) -> Result<BlobPart> {
     if part.blob().len() > maximum {
         return Err(Error::Limit {
-            resource: "source related part bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
+            observed: part.blob().len(),
+            maximum,
         });
     }
     crate::source_limits::validate_xml_limits(part.blob(), source_limits)?;
@@ -466,6 +471,7 @@ fn selected_relationship(
 fn selected_source_authors(
     owner: &SourceInner,
     comments: &[crate::comments::Comment],
+    limits: crate::comments::Limits,
 ) -> Result<Option<(String, SourcePart, Vec<crate::comments::Author>)>> {
     // A non-empty legacy comments part requires the presentation-level author
     // relationship and its selected closure before any values are projected.
@@ -498,18 +504,13 @@ fn selected_source_authors(
     let target = relationship.target_partname().map_err(|_| {
         Error::Relationship("source comment-author relationship target is invalid".into())
     })?;
-    let part = load_part(
-        owner,
-        &target,
-        AUTHORS_CONTENT_TYPE,
-        crate::comments::MAX_PART_BYTES,
-    )?;
+    let part = load_part(owner, &target, AUTHORS_CONTENT_TYPE, limits.max_input_bytes)?;
     if !part.source_relationships().is_empty() {
         return Err(Error::Relationship(
             "source comment-author part must not have relationships".into(),
         ));
     }
-    let authors = parse_comment_authors(part.blob())?;
+    let authors = parse_comment_authors(part.blob(), limits)?;
     Ok(Some((relationship.r_id().to_owned(), part, authors)))
 }
 
@@ -519,17 +520,21 @@ fn chart_relationships(rels: &litchi_opc::Relationships) -> Result<Vec<&Relation
             .filter(|relationship| is_relationship_type(relationship.reltype(), CHART_REL, "chart"))
     };
     let count = selected().count();
-    let limit = || Error::Limit {
-        resource: "source chart relationships",
-        limit: MAX_CHARTS_PER_SLIDE,
+    let limit = |observed| Error::Limit {
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+        observed,
+        maximum: MAX_CHARTS_PER_SLIDE,
     };
     if count > MAX_CHARTS_PER_SLIDE {
-        return Err(limit());
+        return Err(limit(count));
     }
     let mut relationships = Vec::new();
     relationships
         .try_reserve_exact(count)
-        .map_err(|_| limit())?;
+        .map_err(|source| Error::Allocation {
+            resource: "source chart relationship snapshots",
+            source,
+        })?;
     relationships.extend(selected());
     relationships.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
     Ok(relationships)
@@ -619,7 +624,12 @@ fn prepare_layout(
     };
     let candidate = acquire_scene(owner, &part, |source| {
         let layout = SlideLayoutPart::from_part(source)?;
-        let scene = OwnedScene::from_source(layout.shapes()?, source.source_data().clone())?;
+        let scene = OwnedScene::from_source(
+            layout.shapes_with_limits(
+                crate::open_options::selected(owner.semantic_limits.as_ref()).shape(),
+            )?,
+            source.source_data().clone(),
+        )?;
         strict_scene(&scene, "layout")?;
         Ok(scene)
     })?;
@@ -660,7 +670,9 @@ pub(super) fn layout_for_target(
             owner,
             target,
             CT_SLIDE_LAYOUT,
-            crate::shape::Limits::DEFAULT.input_bytes(),
+            crate::open_options::selected(owner.semantic_limits.as_ref())
+                .shape()
+                .input_bytes(),
         )?;
         prepare_layout(owner, part, relationship_id)
     })?;
@@ -678,7 +690,9 @@ impl SourceSlide {
                 &self.owner,
                 &self.data.part_uri,
                 CT_SLIDE,
-                crate::shape::Limits::DEFAULT.input_bytes(),
+                crate::open_options::selected(self.owner.semantic_limits.as_ref())
+                    .shape()
+                    .input_bytes(),
             )?;
             SlidePart::from_part(&part)?.is_hidden()
         })
@@ -696,7 +710,9 @@ impl SourceSlide {
                 SLIDE_LAYOUT_REL,
                 "slideLayout",
                 CT_SLIDE_LAYOUT,
-                crate::shape::Limits::DEFAULT.input_bytes(),
+                crate::open_options::selected(self.owner.semantic_limits.as_ref())
+                    .shape()
+                    .input_bytes(),
                 "source slide has multiple layout relationships",
             )?
             else {
@@ -716,22 +732,25 @@ impl SourceSlide {
     /// Returns typed source, execution, limit, relationship or XML errors.
     pub fn notes(&self) -> Result<Option<Notes>> {
         let pending = with_fences(&self.owner, || {
+            let semantic = crate::open_options::selected(self.owner.semantic_limits.as_ref());
+            let shape_limits = semantic.shape();
+            let notes_limits = semantic.notes().constrained_by_source(self.owner.limits);
             let Some((relationship_id, part)) = selected_relationship(
                 &self.owner,
                 self,
                 NOTES_SLIDE_REL,
                 "notesSlide",
                 CT_NOTES_SLIDE,
-                crate::notes::MAX_NOTES_XML,
+                notes_limits.max_input_bytes,
                 "source slide has multiple notes relationships",
             )?
             else {
                 return Ok(None);
             };
 
-            notes::validate(&self.owner, &self.data.part_uri, &part)?;
+            notes::validate_with_limits(&self.owner, &self.data.part_uri, &part, notes_limits)?;
             let candidate = acquire_scene(&self.owner, &part, |source| {
-                let parsed = crate::shape::Scene::read(source.blob())?;
+                let parsed = crate::shape::Scene::read(source.blob(), shape_limits)?;
                 let scene = OwnedScene::from_source(parsed, source.source_data().clone())?;
                 strict_scene(&scene, "notes")?;
                 Ok(scene)
@@ -756,13 +775,16 @@ impl SourceSlide {
     /// Returns typed source, execution, limit, relationship or XML errors.
     pub fn comments(&self) -> Result<Option<Comments>> {
         with_fences(&self.owner, || {
+            let comment_limits = crate::open_options::selected(self.owner.semantic_limits.as_ref())
+                .comments()
+                .constrained_by_source(self.owner.limits);
             let Some((relationship_id, part)) = selected_relationship(
                 &self.owner,
                 self,
                 COMMENTS_REL,
                 "comments",
                 CT_COMMENTS,
-                crate::comments::MAX_PART_BYTES,
+                comment_limits.max_input_bytes,
                 "source slide has multiple comments relationships",
             )?
             else {
@@ -774,14 +796,17 @@ impl SourceSlide {
                     "source comments part must not have relationships".into(),
                 ));
             }
-            let comments = parse_slide_comments_strict(part.blob())?;
+            let comments = parse_slide_comments_strict(part.blob(), comment_limits)?;
             if comments.len() > crate::comments::MAX_COMMENTS_PER_SLIDE {
                 return Err(Error::Limit {
-                    resource: "source comments entries",
-                    limit: crate::comments::MAX_COMMENTS_PER_SLIDE,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::CommentEntries,
+                    ),
+                    observed: comments.len(),
+                    maximum: crate::comments::MAX_COMMENTS_PER_SLIDE,
                 });
             }
-            let authors = selected_source_authors(&self.owner, &comments)?;
+            let authors = selected_source_authors(&self.owner, &comments, comment_limits)?;
             let (author_related, author_values) = match authors {
                 Some((relationship_id, part, authors)) => (
                     Some(RelatedPart::new(part, &relationship_id)),
@@ -810,9 +835,9 @@ impl SourceSlide {
             let mut charts = Vec::new();
             charts
                 .try_reserve_exact(relationships.len())
-                .map_err(|_| Error::Limit {
+                .map_err(|source| Error::Allocation {
                     resource: "source chart snapshots",
-                    limit: MAX_CHARTS_PER_SLIDE,
+                    source,
                 })?;
 
             for relationship in relationships {
@@ -866,11 +891,16 @@ impl SourceSlide {
             // markup-compatibility choice the processed part drops.
             let view = self.owner.package.part(&self.data.part_uri)?;
             let declared = view.declared_uncompressed_size()?;
-            let maximum = crate::shape::Limits::DEFAULT.input_bytes();
+            let maximum = crate::open_options::selected(self.owner.semantic_limits.as_ref())
+                .shape()
+                .input_bytes();
             if declared > maximum as u64 {
                 return Err(Error::Limit {
-                    resource: "source slide bytes",
-                    limit: maximum,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::SourceBytes,
+                    ),
+                    observed: usize::try_from(declared).unwrap_or(usize::MAX),
+                    maximum,
                 });
             }
             let data = view.data()?;

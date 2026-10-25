@@ -372,90 +372,111 @@ impl<'a> TextAssignment<'a> {
     }
 }
 
-/// Stage a same-slide batch of text formatting edits, applied in order.
-///
-/// Returns the candidate slide XML and the number of edits whose bytes
-/// changed, or `None` when nothing changed. The candidate is read back as a
-/// complete shape scene whose shape count and identities must match.
-pub(crate) fn stage_text_properties(
+pub(crate) fn stage_text_properties_with_limits(
     xml: &[u8],
     edits: &[TextAssignment<'_>],
     max_text_bytes: usize,
     max_output_bytes: usize,
+    shape_limits: crate::shape::Limits,
 ) -> Result<(Option<Vec<u8>>, usize)> {
     if edits.is_empty() {
         return Ok((None, 0));
     }
     if edits.len() > super::MAX_SHAPE_PROPERTIES_REPLACEMENTS {
         return Err(Error::Limit {
-            resource: "opened-presentation text property edits",
-            limit: super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: edits.len(),
+            maximum: super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
         });
     }
     let mut text_bytes = 0usize;
     for edit in edits {
         validate(edit)?;
-        text_bytes = text_bytes.saturating_add(edit.properties.text.map_or(0, str::len));
+        text_bytes = text_bytes
+            .checked_add(edit.properties.text.map_or(0, str::len))
+            .ok_or(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: usize::MAX,
+                maximum: max_text_bytes,
+            })?;
     }
     if text_bytes > max_text_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation aggregate text property bytes",
-            limit: max_text_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            observed: text_bytes,
+            maximum: max_text_bytes,
         });
     }
-    stage_admitted_text_edits(xml, edits, max_output_bytes, None)
+    stage_admitted_text_edits(xml, edits, max_output_bytes, None, shape_limits)
 }
 
 /// Stage several already bounded batches of text formatting edits, applied
 /// in order, in one scene read and one read-back (record 0333). Each chunk
-/// keeps the limits of [`stage_text_properties`]; the chunk count is bounded
+/// keeps the limits of [`stage_text_properties_with_limits`]; the chunk count is bounded
 /// by the scene's shape limit and the total by 100,000 edits.
 ///
 /// With `changes`, it is cleared and then receives, for each edit in order,
 /// whether that edit changed the bytes of its target element as the earlier
 /// edits left them (record 0348), as one edit applied after the other
 /// reports it.
-pub(crate) fn stage_text_property_chunks(
+pub(crate) fn stage_text_property_chunks_with_limits(
     xml: &[u8],
     chunks: &[&[TextAssignment<'_>]],
     max_text_bytes: usize,
     max_output_bytes: usize,
     mut changes: Option<&mut Vec<bool>>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<(Option<Vec<u8>>, usize)> {
     if let Some(changes) = changes.as_deref_mut() {
         changes.clear();
     }
-    if chunks.len() > crate::shape::Limits::DEFAULT.shapes() {
+    if chunks.len() > shape_limits.shapes() {
         return Err(Error::Limit {
-            resource: "opened-presentation text property chunks",
-            limit: crate::shape::Limits::DEFAULT.shapes(),
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: chunks.len(),
+            maximum: shape_limits.shapes(),
         });
     }
     let mut total = 0usize;
     for chunk in chunks {
         if chunk.len() > super::MAX_SHAPE_PROPERTIES_REPLACEMENTS {
             return Err(Error::Limit {
-                resource: "opened-presentation text property edits",
-                limit: super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ShapeProperties,
+                ),
+                observed: chunk.len(),
+                maximum: super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
             });
         }
         let mut text_bytes = 0usize;
         for edit in *chunk {
             validate(edit)?;
-            text_bytes = text_bytes.saturating_add(edit.properties.text.map_or(0, str::len));
+            text_bytes = text_bytes
+                .checked_add(edit.properties.text.map_or(0, str::len))
+                .ok_or(Error::Limit {
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                    observed: usize::MAX,
+                    maximum: max_text_bytes,
+                })?;
         }
         if text_bytes > max_text_bytes {
             return Err(Error::Limit {
-                resource: "opened-presentation aggregate text property bytes",
-                limit: max_text_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: text_bytes,
+                maximum: max_text_bytes,
             });
         }
-        total = total.saturating_add(chunk.len());
+        total = total.checked_add(chunk.len()).ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: usize::MAX,
+            maximum: 100_000,
+        })?;
     }
     if total > 100_000 {
         return Err(Error::Limit {
-            resource: "opened-presentation text property edits",
-            limit: 100_000,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ShapeProperties),
+            observed: total,
+            maximum: 100_000,
         });
     }
     if total == 0 {
@@ -471,7 +492,7 @@ pub(crate) fn stage_text_property_chunks(
     for chunk in chunks {
         edits.extend_from_slice(chunk);
     }
-    stage_admitted_text_edits(xml, &edits, max_output_bytes, changes)
+    stage_admitted_text_edits(xml, &edits, max_output_bytes, changes, shape_limits)
 }
 
 /// The staging of admitted text formatting edits: one scene read, the
@@ -484,6 +505,7 @@ fn stage_admitted_text_edits(
     edits: &[TextAssignment<'_>],
     max_output_bytes: usize,
     mut changes: Option<&mut Vec<bool>>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<(Option<Vec<u8>>, usize)> {
     if let Some(changes) = changes.as_deref_mut() {
         changes
@@ -502,7 +524,7 @@ fn stage_admitted_text_edits(
             *last = true;
         }
     };
-    let original = crate::shape::Scene::read(xml)?;
+    let original = crate::shape::Scene::read(xml, shape_limits)?;
     if original.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -705,11 +727,18 @@ fn stage_admitted_text_edits(
     }
     let removed: usize = elements.iter().map(|(_, span, _)| span.len()).sum();
     let added: usize = elements.iter().map(|(_, _, bytes)| bytes.len()).sum();
-    let length = (xml.len() - removed).saturating_add(added);
+    let length = (xml.len() - removed)
+        .checked_add(added)
+        .ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: max_output_bytes,
+        })?;
     if length > max_output_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation text property output bytes",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: length,
+            maximum: max_output_bytes,
         });
     }
     let mut candidate = Vec::new();
@@ -729,7 +758,7 @@ fn stage_admitted_text_edits(
     if candidate == xml {
         return Ok((None, 0));
     }
-    let published = crate::shape::Scene::read(&candidate)?;
+    let published = crate::shape::Scene::read(&candidate, shape_limits)?;
     if published.is_rewritten() || published.len() != original.len() {
         return Err(Error::Invalid(
             "opened-presentation text property batch changed the semantic shape graph".into(),
@@ -2274,4 +2303,4 @@ fn rewrite_body_text(
 #[path = "text_structure.rs"]
 mod structure;
 pub use structure::TextBody;
-pub(crate) use structure::{Change as TextChange, stage_text_structure};
+pub(crate) use structure::{Change as TextChange, stage_text_structure_with_limits};

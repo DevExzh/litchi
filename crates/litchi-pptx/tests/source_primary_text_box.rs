@@ -149,9 +149,12 @@ fn caller_output_limits_precede_managed_memory_admission() {
             assert!(matches!(
                 edit.add_text_box(0, &oversized, BOUNDS),
                 Err(Error::Limit {
-                    resource: "opened-presentation appended shape XML",
-                    limit,
-                }) if limit == ceiling
+                    kind: litchi_pptx::opened::LimitKind::Codec(
+                        litchi_pptx::opened::CodecLimitKind::OutputBytes
+                    ),
+                    maximum,
+                    ..
+                }) if maximum == ceiling
             ));
             assert_eq!(budget.used(Resource::Memory), MEMORY);
             drop(pressure);
@@ -454,7 +457,7 @@ fn final_shape_identity_is_usable_and_exhaustion_is_atomic() {
     for name in archive.file_names() {
         let payload = archive.read(name).unwrap();
         if name == "ppt/slides/slide1.xml" {
-            let id = litchi_pptx::shape::Scene::read(&payload)
+            let id = litchi_pptx::shape::Scene::read(&payload, litchi_pptx::shape::Limits::DEFAULT)
                 .unwrap()
                 .roots()
                 .next()

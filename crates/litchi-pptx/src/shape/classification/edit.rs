@@ -45,10 +45,14 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_shape_classification(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_shape_classification")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_shape_classification",
+            |package, target, patch| {
+                patch.validate_changed_shape_parts(target, package.semantic_limits().shape())
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
@@ -68,8 +72,9 @@ impl Edit<'_> {
     ) -> Result<Option<Snapshot>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let shape_limits = self.staged.shape_limits();
         self.staged
-            .update(move |opc| super::put(opc, &slide, shape, outcome))
+            .update(move |opc| super::put_with_limits(opc, &slide, shape, outcome, shape_limits))
     }
 
     /// Remove the classification of the selected shape. Returns the removed
@@ -86,8 +91,9 @@ impl Edit<'_> {
     ) -> Result<Option<Snapshot>> {
         let slide = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
         let shape = shape.into();
+        let shape_limits = self.staged.shape_limits();
         self.staged
-            .update(move |opc| super::remove(opc, &slide, shape))
+            .update(move |opc| super::remove_with_limits(opc, &slide, shape, shape_limits))
     }
 
     /// Discard every staged change.

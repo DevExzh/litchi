@@ -7208,6 +7208,16 @@ struct AdmittedCatalog {
     content_types: Arc<ContentTypeMap>,
     package_relationships: Relationships,
     parts: Vec<CatalogPart>,
+    /// Aggregate declared bytes of ordinary parts, computed by the source
+    /// catalog's existing central-directory admission pass.
+    declared_part_bytes: u64,
+    /// Aggregate declared bytes of every physical archive member, retained
+    /// from that same admission pass for O(affected) publication checks.
+    declared_archive_bytes: u64,
+    /// Relationship XML aggregate counters retained by the parser's existing
+    /// relationship admission walk.
+    declared_relationship_xml_bytes: u64,
+    declared_relationship_xml_events: u64,
     relationship_xml_metrics: HashMap<PackURI, RelationshipXmlMetrics>,
     parts_by_name: HashMap<PackURI, usize>,
     /// Positions in `parts`, sorted by ASCII-case-insensitive Part spelling.
@@ -7273,6 +7283,17 @@ impl SourceBackedPackage {
     #[must_use]
     pub const fn read_limits(&self) -> SourceLimits {
         self.limits
+    }
+
+    /// Return the admitted aggregate payload bytes of ordinary parts.
+    ///
+    /// The value comes from the central-directory pass that admitted this
+    /// source catalog; querying it performs no payload reads and no package
+    /// walk. It is a physical owner metric only: semantic family limits keep
+    /// their own affected-closure counters.
+    #[must_use]
+    pub fn admitted_part_bytes(&self) -> u64 {
+        self.catalog.declared_part_bytes
     }
 
     /// Return the source-read policy captured when this package was opened.
@@ -7376,6 +7397,10 @@ impl SourceBackedPackage {
         let SourceCatalog {
             pkg_srels,
             parts,
+            declared_part_bytes,
+            declared_archive_bytes,
+            declared_relationship_xml_bytes,
+            declared_relationship_xml_events,
             content_types,
             relationship_xml_metrics,
             non_part_members,
@@ -7444,6 +7469,10 @@ impl SourceBackedPackage {
                 content_types,
                 package_relationships,
                 parts: catalog_parts,
+                declared_part_bytes,
+                declared_archive_bytes,
+                declared_relationship_xml_bytes,
+                declared_relationship_xml_events,
                 relationship_xml_metrics,
                 parts_by_name,
                 casefold_order,
@@ -7689,6 +7718,10 @@ impl SourceBackedPackage {
         let SourceCatalog {
             pkg_srels,
             parts,
+            declared_part_bytes,
+            declared_archive_bytes,
+            declared_relationship_xml_bytes,
+            declared_relationship_xml_events,
             content_types,
             relationship_xml_metrics,
             non_part_members,
@@ -7788,6 +7821,10 @@ impl SourceBackedPackage {
                 content_types,
                 package_relationships,
                 parts: catalog_parts,
+                declared_part_bytes,
+                declared_archive_bytes,
+                declared_relationship_xml_bytes,
+                declared_relationship_xml_events,
                 relationship_xml_metrics,
                 parts_by_name,
                 casefold_order,
@@ -8825,29 +8862,11 @@ impl SourceBackedPackage {
     /// aggregate part-byte limits, as an owning open does before it defers
     /// or reads any payload.
     fn check_declared_part_bytes(&self) -> Result<()> {
-        let mut total = 0u64;
-        for part in &self.catalog.parts {
-            let declared = self
-                .archive
-                .metadata_for(part.entry_id)?
-                .uncompressed_size();
-            self.limits.check(
-                SourceLimitKind::PartBytes,
-                declared,
-                self.limits.max_part_bytes(),
-            )?;
-            total = total.checked_add(declared).ok_or(OpcError::Limit {
-                kind: SourceLimitKind::TotalPartBytes,
-                observed: u64::MAX,
-                maximum: self.limits.max_total_part_bytes(),
-            })?;
-            self.limits.check(
-                SourceLimitKind::TotalPartBytes,
-                total,
-                self.limits.max_total_part_bytes(),
-            )?;
-        }
-        Ok(())
+        self.limits.check(
+            SourceLimitKind::TotalPartBytes,
+            self.catalog.declared_part_bytes,
+            self.limits.max_total_part_bytes(),
+        )
     }
 
     fn cloned_non_part_members(&self) -> Result<Vec<NonPartMember>> {
@@ -8944,6 +8963,10 @@ impl SourceBackedPackage {
         }
         let result = package.try_add_materialized_parts(parts, || self.finish_stage(Ok(())));
         self.finish_stage(result)?;
+        // The catalog already admitted and summed every ordinary part's
+        // declared payload. Transfer that proof instead of making the eager
+        // owner rescan the complete part map at the conversion seam.
+        package.set_admitted_part_bytes(self.catalog.declared_part_bytes);
         package.set_non_part_members(non_part_members);
         package.set_tolerance_report(self.catalog.tolerance_report.clone());
         if let Some(source) = source {
@@ -12942,28 +12965,8 @@ impl SourceBackedPackage {
             )?;
         }
 
-        let mut part_total = 0_u64;
-        let mut archive_total = 0_u64;
-        for part in &self.catalog.parts {
-            let bytes = self
-                .archive
-                .metadata_for(part.entry_id)?
-                .uncompressed_size();
-            part_total = checked_overlay_total(
-                part_total,
-                bytes,
-                SourceLimitKind::TotalPartBytes,
-                limits.max_total_part_bytes(),
-            )?;
-        }
-        for name in self.archive.file_names() {
-            archive_total = checked_overlay_total(
-                archive_total,
-                self.archive.metadata(name)?.uncompressed_size(),
-                SourceLimitKind::AggregateBytes,
-                limits.max_aggregate_bytes(),
-            )?;
-        }
+        let part_total = self.catalog.declared_part_bytes;
+        let archive_total = self.catalog.declared_archive_bytes;
         let mut adjusted_parts = part_total;
         let mut adjusted_archive = archive_total;
         for (target, replacement_len) in overlays {
@@ -13020,28 +13023,8 @@ impl SourceBackedPackage {
             limits.max_relationship_xml_bytes() as u64,
         )?;
 
-        let mut archive_total = 0_u64;
-        let mut relationship_total = 0_u64;
-        for (index, name) in self.archive.file_names().enumerate() {
-            if index & 0xff == 0 {
-                self.check_topology_progress()?;
-            }
-            let bytes = self.archive.metadata(name)?.uncompressed_size();
-            archive_total = checked_overlay_total(
-                archive_total,
-                bytes,
-                SourceLimitKind::AggregateBytes,
-                limits.max_aggregate_bytes(),
-            )?;
-            if is_relationship_member_name(name) {
-                relationship_total = checked_overlay_total(
-                    relationship_total,
-                    bytes,
-                    SourceLimitKind::TotalRelationshipXmlBytes,
-                    limits.max_total_relationship_xml_bytes() as u64,
-                )?;
-            }
-        }
+        let archive_total = self.catalog.declared_archive_bytes;
+        let relationship_total = self.catalog.declared_relationship_xml_bytes;
         let original_part = self
             .archive
             .metadata_for(self.catalog.parts[target].entry_id)?
@@ -13115,42 +13098,9 @@ impl SourceBackedPackage {
                 limits.max_relationship_xml_bytes() as u64,
             )?;
         }
-        let mut archive_total = 0_u64;
-        let mut part_total = 0_u64;
-        let mut relationship_total = 0_u64;
-        for (index, name) in self.archive.file_names().enumerate() {
-            if index & 0xff == 0 {
-                self.check_topology_progress()?;
-            }
-            let bytes = self.archive.metadata(name)?.uncompressed_size();
-            archive_total = checked_overlay_total(
-                archive_total,
-                bytes,
-                SourceLimitKind::AggregateBytes,
-                limits.max_aggregate_bytes(),
-            )?;
-            if is_relationship_member_name(name) {
-                relationship_total = checked_overlay_total(
-                    relationship_total,
-                    bytes,
-                    SourceLimitKind::TotalRelationshipXmlBytes,
-                    limits.max_total_relationship_xml_bytes() as u64,
-                )?;
-            }
-        }
-        for (index, part) in self.catalog.parts.iter().enumerate() {
-            if index & 0xff == 0 {
-                self.check_topology_progress()?;
-            }
-            part_total = checked_overlay_total(
-                part_total,
-                self.archive
-                    .metadata_for(part.entry_id)?
-                    .uncompressed_size(),
-                SourceLimitKind::TotalPartBytes,
-                limits.max_total_part_bytes(),
-            )?;
-        }
+        let archive_total = self.catalog.declared_archive_bytes;
+        let part_total = self.catalog.declared_part_bytes;
+        let relationship_total = self.catalog.declared_relationship_xml_bytes;
         let mut adjusted_archive = archive_total;
         let mut adjusted_parts = part_total;
         let mut adjusted_relationships = relationship_total;
@@ -13218,38 +13168,10 @@ impl SourceBackedPackage {
         raw_relationship_removed_entries: &[(EntryId, u64)],
         limits: SourceLimits,
     ) -> Result<PreparedTopologyTotals> {
-        let mut part_total = 0_u64;
-        let mut archive_total = 0_u64;
-        let mut relationship_total = 0_u64;
-        let mut relationship_event_total = 0_u64;
-        for (index, (entry_id, name)) in self.archive.file_entries().enumerate() {
-            if index & 0xff == 0 {
-                self.check_topology_progress()?;
-            }
-            let bytes = self.archive.metadata_for(entry_id)?.uncompressed_size();
-            archive_total = checked_overlay_total(
-                archive_total,
-                bytes,
-                SourceLimitKind::AggregateBytes,
-                limits.max_aggregate_bytes(),
-            )?;
-            if is_relationship_member_name(name) {
-                relationship_total = checked_overlay_total(
-                    relationship_total,
-                    bytes,
-                    SourceLimitKind::TotalRelationshipXmlBytes,
-                    limits.max_total_relationship_xml_bytes() as u64,
-                )?;
-            }
-        }
-        for metrics in self.catalog.relationship_xml_metrics.values() {
-            relationship_event_total = checked_overlay_total(
-                relationship_event_total,
-                metrics.event_count,
-                SourceLimitKind::TotalRelationshipXmlEvents,
-                limits.max_total_relationship_xml_events() as u64,
-            )?;
-        }
+        let mut part_total = self.catalog.declared_part_bytes;
+        let mut archive_total = self.catalog.declared_archive_bytes;
+        let mut relationship_total = self.catalog.declared_relationship_xml_bytes;
+        let mut relationship_event_total = self.catalog.declared_relationship_xml_events;
         // The source totals above include every physical member.  A prepared
         // removal drops its Part member and, when present, its derived
         // relationships member before replacement/addition deltas are applied.
@@ -13342,19 +13264,6 @@ impl SourceBackedPackage {
                 0,
                 SourceLimitKind::TotalRelationshipXmlEvents,
                 limits.max_total_relationship_xml_events() as u64,
-            )?;
-        }
-        for (index, part) in self.catalog.parts.iter().enumerate() {
-            if index & 0xff == 0 {
-                self.check_topology_progress()?;
-            }
-            part_total = checked_overlay_total(
-                part_total,
-                self.archive
-                    .metadata_for(part.entry_id)?
-                    .uncompressed_size(),
-                SourceLimitKind::TotalPartBytes,
-                limits.max_total_part_bytes(),
             )?;
         }
         for (index, target) in removals.iter().enumerate() {

@@ -6,6 +6,7 @@
 
 //! Regression tests for the `PresentationML` package facade.
 
+use litchi_opc::PackURI;
 use litchi_opc::constants::relationship_type as rt;
 
 use super::Package;
@@ -34,6 +35,32 @@ fn owned_presentation_noop_output_preserves_exact_archive() {
         .expect("open owned presentation");
 
     assert_eq!(package.to_bytes().expect("serialize no-op package"), source);
+}
+
+#[test]
+fn replay_index_ingress_does_not_decode_unrelated_slide_payload() {
+    let mut builder = crate::builder::Builder::new().expect("new presentation");
+    builder
+        .presentation()
+        .expect("presentation")
+        .add_slide()
+        .expect("slide");
+    let source = builder
+        .build()
+        .expect("build presentation")
+        .to_bytes()
+        .expect("serialize presentation");
+    let package = Package::from_reader(std::io::Cursor::new(source)).expect("open presentation");
+    let slide_name = PackURI::new("/ppt/slides/slide1.xml").expect("slide name");
+    let slide = package
+        .opc
+        .iter_parts()
+        .find(|part| part.partname() == &slide_name)
+        .expect("slide metadata");
+    assert!(
+        !slide.payload_is_decoded(),
+        "replay ingress must use admitted metadata lengths, not hydrate unrelated slides"
+    );
 }
 
 fn task_panes() -> Panes {

@@ -65,10 +65,14 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_master_layout(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_master_layout")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_master_layout",
+            |package, target, patch| {
+                patch.validate_changed_shape_parts(target, package.semantic_limits().shape())
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
@@ -138,11 +142,18 @@ impl Edit<'_> {
         spec: &PlaceholderSpec,
     ) -> Result<()> {
         let part_name = &super::package::resolve_owner(self.staged.opc(), owner.into())?;
-        if super::preflight_store_placeholder_shape(self.staged.opc(), part_name, spec)? {
+        let shape_limits = self.staged.shape_limits();
+        if super::preflight_store_placeholder_shape_with_shape_limits(
+            self.staged.opc(),
+            part_name,
+            spec,
+            shape_limits,
+        )? {
             return Ok(());
         }
-        self.staged
-            .update(|opc| super::store_placeholder_shape(opc, part_name, spec))
+        self.staged.update(|opc| {
+            super::store_placeholder_shape_with_shape_limits(opc, part_name, spec, shape_limits)
+        })
     }
 
     /// Discard every staged change.

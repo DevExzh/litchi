@@ -117,7 +117,7 @@ fn enforces_content_part_count_limit() {
     assert!(matches!(
         error,
         Error::Limit {
-            resource: "content-part count",
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ContentParts),
             ..
         }
     ));

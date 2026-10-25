@@ -688,8 +688,9 @@ fn checked_relationship_count(
         .ok_or_else(|| Error::Invalid("slide-removal relationship count overflow".into()))?;
     if next > limit {
         return Err(Error::Limit {
-            resource: "slide-removal relationship scan",
-            limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+            observed: next,
+            maximum: limit,
         });
     }
     Ok(next)
@@ -722,8 +723,13 @@ fn reject_package_features(package: &SourceBackedPackage, presentation_xml: &[u8
     }
     let text = std::str::from_utf8(presentation_xml)
         .map_err(|error| Error::Xml(format!("presentation XML is not UTF-8: {error}")))?;
-    if crate::presentation_properties::metadata::protection::Settings::parse_xml(text)?
-        .is_protected()
+    if crate::presentation_properties::metadata::protection::Settings::parse_xml(
+        text,
+        crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+            package.read_limits(),
+        ),
+    )?
+    .is_protected()
     {
         return refusal(
             SlideRemovalRefusal::ProtectedPresentation,

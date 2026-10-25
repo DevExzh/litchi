@@ -29,8 +29,6 @@ use crate::presentation_properties::metadata::sections::List as MetadataList;
 
 use super::SourceInner;
 
-const MAX_SECTION_XML: usize = 8 * 1024 * 1024;
-
 /// An immutable, detached section projection.
 #[derive(Clone)]
 pub struct List {
@@ -166,9 +164,15 @@ fn read_sections(owner: &SourceInner) -> Result<List> {
         owner,
         owner._presentation.source_partname(),
         owner._presentation.content_type(),
-        MAX_SECTION_XML,
+        usize::try_from(owner.limits.max_part_bytes()).unwrap_or(usize::MAX),
     )?;
-    let metadata = MetadataList::from_processed(part.blob()).map_err(|error| match error {
+    let metadata = MetadataList::from_processed(
+        part.blob(),
+        crate::presentation_properties::metadata::sections::Limits::from_source_limits(
+            owner.limits,
+        ),
+    )
+    .map_err(|error| match error {
         // The legacy codec includes a few parser token names in diagnostics.
         // Keep this canonical source surface content-free while preserving
         // typed allocation/OPC failures from the owner boundary.

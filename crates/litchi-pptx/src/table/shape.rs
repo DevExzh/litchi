@@ -165,7 +165,11 @@ impl<'a> Table<'a> {
         let table = self.xml()?;
         let count = scan_with_context(table, b"tr", self.context)?.len();
         if count > MAX_ROWS {
-            return Err(limit("table row count", MAX_ROWS));
+            return Err(limit(
+                crate::error::CodecLimitKind::TableRows,
+                count,
+                MAX_ROWS,
+            ));
         }
         Ok(count)
     }
@@ -211,14 +215,22 @@ impl<'a> Table<'a> {
         let scope = context.resolver()?;
         let rows = scan_with_scope(table, b"tr", Some(scope.clone()), false)?;
         if rows.len() > MAX_ROWS {
-            return Err(limit("table row count", MAX_ROWS));
+            return Err(limit(
+                crate::error::CodecLimitKind::TableRows,
+                rows.len(),
+                MAX_ROWS,
+            ));
         }
         let mut out = Vec::new();
         for row_span in rows {
             let row = row_span.get(table)?;
             let spans = scan_with_scope(row, b"tc", Some(scope.clone()), false)?;
             if spans.len() > MAX_CELLS {
-                return Err(limit("table cell count", MAX_CELLS));
+                return Err(limit(
+                    crate::error::CodecLimitKind::TableCells,
+                    spans.len(),
+                    MAX_CELLS,
+                ));
             }
             let row_context = context.child(row_span.start)?;
             let mut cells = Vec::new();
@@ -244,7 +256,11 @@ impl<'a> Table<'a> {
         let table = self.xml()?;
         let spans = scan_with_context(table, b"tr", self.context)?;
         if spans.len() > MAX_ROWS {
-            return Err(limit("table row count", MAX_ROWS));
+            return Err(limit(
+                crate::error::CodecLimitKind::TableRows,
+                spans.len(),
+                MAX_ROWS,
+            ));
         }
         spans
             .into_iter()
@@ -276,7 +292,11 @@ impl<'a> Table<'a> {
         };
         let table = self.xml()?;
         if table.len() > MAX_XML_BYTES {
-            return Err(limit("table XML bytes", MAX_XML_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                table.len(),
+                MAX_XML_BYTES,
+            ));
         }
         let mut reader = NsReader::from_reader(table);
         *reader.resolver_mut() = context.resolver()?;
@@ -303,7 +323,11 @@ impl<'a> Table<'a> {
                     match (local.as_deref(), parent, grandparent) {
                         (Some(b"tr"), Some(b"tbl"), _) => {
                             if counts.len() >= MAX_ROWS {
-                                return Err(limit("table row count", MAX_ROWS));
+                                return Err(limit(
+                                    crate::error::CodecLimitKind::TableRows,
+                                    counts.len().checked_add(1).unwrap_or(usize::MAX),
+                                    MAX_ROWS,
+                                ));
                             }
                             counts.push(0);
                         },
@@ -1216,7 +1240,11 @@ impl<'a> Row<'a> {
         let row = self.xml()?;
         let spans = scan_with_context(row, b"tc", self.context)?;
         if spans.len() > MAX_CELLS {
-            return Err(limit("table cell count", MAX_CELLS));
+            return Err(limit(
+                crate::error::CodecLimitKind::TableCells,
+                spans.len(),
+                MAX_CELLS,
+            ));
         }
         spans
             .into_iter()
@@ -1531,8 +1559,12 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 fn is_drawingml(
@@ -1585,7 +1617,11 @@ fn scan_with_scope(
     }
 
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("table XML bytes", MAX_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_XML_BYTES,
+        ));
     }
     let mut reader = NsReader::from_reader(xml);
     if let Some(scope) = scope {
@@ -1653,7 +1689,11 @@ fn scan_with_scope(
             .checked_add(1)
             .ok_or_else(|| invalid("table XML node count overflow"))?;
         if nodes > MAX_NODES {
-            return Err(limit("table XML nodes", MAX_NODES));
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlNodes,
+                nodes,
+                MAX_NODES,
+            ));
         }
 
         match event {
@@ -1663,7 +1703,11 @@ fn scan_with_scope(
                     .checked_add(1)
                     .ok_or_else(|| invalid("table XML depth overflow"))?;
                 if depth > MAX_DEPTH {
-                    return Err(limit("table XML depth", MAX_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_DEPTH,
+                    ));
                 }
                 stack.push((start, local, matched));
             },
@@ -1886,7 +1930,11 @@ fn on_off(
 
 fn extract_text(xml: &[u8], context: Option<NamespaceContext<'_>>) -> Result<String> {
     if xml.len() > MAX_XML_BYTES {
-        return Err(limit("table cell XML bytes", MAX_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            MAX_XML_BYTES,
+        ));
     }
     let allow_fragment_fallback = context.is_none();
     let mut reader = NsReader::from_reader(xml);
@@ -1915,7 +1963,11 @@ fn extract_text(xml: &[u8], context: Option<NamespaceContext<'_>>) -> Result<Str
                     .checked_add(1)
                     .ok_or_else(|| invalid("table cell XML depth overflow"))?;
                 if depth > MAX_DEPTH {
-                    return Err(limit("table cell XML depth", MAX_DEPTH));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        MAX_DEPTH,
+                    ));
                 }
                 if is_drawingml(
                     &namespace,

@@ -1,4 +1,5 @@
 use super::model::{GraphicBuildMode, Sequence};
+use super::{Limits, limit};
 use crate::leniency::ToleranceReport;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -116,15 +117,27 @@ struct AlternateState {
 ///
 /// Returns an error if the input cannot be read or is malformed.
 pub fn parse_package_slide(package: &OpcPackage, slide_part_name: &PackURI) -> Result<Sequence> {
+    parse_package_slide_with_limits(
+        package,
+        slide_part_name,
+        Limits::from_source(package.read_limits()),
+    )
+}
+
+pub(crate) fn parse_package_slide_with_limits(
+    package: &OpcPackage,
+    slide_part_name: &PackURI,
+    limits: Limits,
+) -> Result<Sequence> {
     let slide = package.get_part(slide_part_name)?;
     if slide.content_type() != SLIDE_CT {
         return invalid_relationship(
             "animation package validation requires a presentation slide part",
         );
     }
-    let mut sequence = Sequence::parse_slide_xml(slide.blob())?;
+    let mut sequence = Sequence::parse_slide_xml(slide.blob(), limits)?;
     sequence.tolerance.locate_in_part(slide_part_name.as_str());
-    validate_build_relationships(package, slide, slide.blob(), &sequence)?;
+    validate_build_relationships(package, slide, slide.blob(), &sequence, limits)?;
     Ok(sequence)
 }
 
@@ -154,8 +167,9 @@ fn validate_build_relationships(
     slide: &dyn Part,
     xml: &[u8],
     sequence: &Sequence,
+    limits: Limits,
 ) -> Result<()> {
-    let hosts = scan_hosts(xml)?;
+    let hosts = scan_hosts_with_limits(xml, limits)?;
     for build in &sequence.graphic_builds {
         let host = hosts.get(&build.shape_id).ok_or_else(|| {
             animation_relationship_error("graphical-object build has no package-resolvable host")
@@ -322,9 +336,19 @@ fn validate_relationship_id(value: &str) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 fn scan_hosts(xml: &[u8]) -> Result<HashMap<u32, HostReference>> {
-    if xml.len() > MAX_SLIDE_XML {
-        return invalid_relationship("slide XML exceeds animation relationship scan limit");
+    scan_hosts_with_limits(xml, Limits::DEFAULT)
+}
+
+fn scan_hosts_with_limits(xml: &[u8], limits: Limits) -> Result<HashMap<u32, HostReference>> {
+    let input_limit = MAX_SLIDE_XML.min(limits.max_input_bytes);
+    if xml.len() > input_limit {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            input_limit,
+        ));
     }
     // Branches are chosen below on namespace values as written; a declaration
     // that spells the markup-compatibility namespace with references would
@@ -358,6 +382,7 @@ fn scan_hosts(xml: &[u8]) -> Result<HashMap<u32, HostReference>> {
                     &element,
                     depth,
                     false,
+                    limits.max_attributes.min(MAX_ATTRIBUTES),
                     &mut frame,
                     &mut alternate,
                 )?;
@@ -373,6 +398,7 @@ fn scan_hosts(xml: &[u8]) -> Result<HashMap<u32, HostReference>> {
                     &element,
                     depth,
                     true,
+                    limits.max_attributes.min(MAX_ATTRIBUTES),
                     &mut frame,
                     &mut alternate,
                 )?;
@@ -409,9 +435,28 @@ fn scan_hosts(xml: &[u8]) -> Result<HashMap<u32, HostReference>> {
             Event::Eof => break,
             _ => {},
         }
-        nodes += 1;
-        if nodes > MAX_NODES || depth > MAX_DEPTH {
-            return invalid_relationship("slide XML exceeds animation relationship scan bounds");
+        nodes = nodes.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlNodes,
+                usize::MAX,
+                MAX_NODES.min(limits.max_nodes),
+            )
+        })?;
+        let node_limit = MAX_NODES.min(limits.max_nodes);
+        if nodes > node_limit {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlNodes,
+                nodes,
+                node_limit,
+            ));
+        }
+        let depth_limit = MAX_DEPTH.min(limits.max_depth);
+        if depth > depth_limit {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlDepth,
+                depth,
+                depth_limit,
+            ));
         }
     }
     if depth != 0 || frame.is_some() || alternate.is_some() {
@@ -426,13 +471,16 @@ fn inspect_start(
     element: &BytesStart<'_>,
     depth: usize,
     empty: bool,
+    max_attributes: usize,
     frame: &mut Option<FrameState>,
     alternate: &mut Option<AlternateState>,
 ) -> Result<()> {
-    if count_up_to(element, MAX_ATTRIBUTES) > MAX_ATTRIBUTES {
-        return invalid_relationship(
-            "slide element exceeds animation relationship attribute limit",
-        );
+    if count_up_to(element, max_attributes) > max_attributes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlAttributes,
+            max_attributes.checked_add(1).unwrap_or(usize::MAX),
+            max_attributes,
+        ));
     }
     if is_name(namespace, element.name(), &[MC_NS], b"AlternateContent") {
         if alternate.is_some() || empty {
@@ -827,7 +875,7 @@ mod tests {
         timing.add_graphic_build(GraphicBuild::chart(5, GroupId::new(1)));
         let xml = format!(
             r#"<p:sld xmlns:p="{P}" xmlns:a="{A}" xmlns:c="{C}" xmlns:r="{R}"><p:cSld><p:spTree><p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="5" name="Chart"/></p:nvGraphicFramePr><a:graphic><a:graphicData uri="{C}"><c:chart r:id="rIdChart"/></a:graphicData></a:graphic></p:graphicFrame></p:spTree></p:cSld>{}</p:sld>"#,
-            timing.to_xml(),
+            timing.to_xml(Limits::DEFAULT).unwrap(),
             P = std::str::from_utf8(P_NS).unwrap(),
             A = std::str::from_utf8(A_NS).unwrap(),
             C = std::str::from_utf8(C_NS).unwrap(),
@@ -882,8 +930,13 @@ mod tests {
         let is_attribute_limit = |result: Result<HashMap<u32, HostReference>>| {
             matches!(
                 result,
-                Err(Error::Invalid(message))
-                    if message == "slide element exceeds animation relationship attribute limit"
+                Err(Error::Limit {
+                    kind: crate::error::LimitKind::Codec(
+                        crate::error::CodecLimitKind::XmlAttributes
+                    ),
+                    observed,
+                    maximum,
+                }) if observed > maximum && maximum == MAX_ATTRIBUTES
             )
         };
 

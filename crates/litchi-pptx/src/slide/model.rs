@@ -106,13 +106,46 @@ impl From<MasterId> for Owner<'_> {
 pub struct Slide<'a> {
     package: &'a OpcPackage,
     part: SlidePart<'a>,
+    pub(crate) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    pub(crate) shape_limits: crate::shape::Limits,
 }
 
 impl<'a> Slide<'a> {
     /// Construct a slide view from its package and validated part view.
     #[must_use]
     pub fn new(package: &'a OpcPackage, part: SlidePart<'a>) -> Self {
-        Self { package, part }
+        Self::new_with_semantic_limits(package, part, None)
+    }
+
+    pub(crate) fn new_with_semantic_limits(
+        package: &'a OpcPackage,
+        part: SlidePart<'a>,
+        semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    ) -> Self {
+        Self {
+            package,
+            part,
+            shape_limits: crate::open_options::selected(semantic_limits.as_ref()).shape(),
+            semantic_limits,
+        }
+    }
+
+    pub(crate) fn new_with_shape_and_semantic_limits(
+        package: &'a OpcPackage,
+        part: SlidePart<'a>,
+        shape_limits: crate::shape::Limits,
+        semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    ) -> Self {
+        Self {
+            package,
+            part,
+            shape_limits,
+            semantic_limits,
+        }
+    }
+
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        crate::open_options::selected(self.semantic_limits.as_ref())
     }
 
     /// Borrow the underlying validated slide part view.
@@ -169,7 +202,7 @@ impl<'a> Slide<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        codec::slide_shapes(&self.part)
+        codec::slide_shapes_with_limits(&self.part, self.shape_limits)
     }
 
     /// Retain an independently owned shape scene sharing this part's payload.
@@ -178,7 +211,10 @@ impl<'a> Slide<'a> {
     /// # Errors
     /// Returns the same validation and parse errors as [`Self::shapes`].
     pub fn scene(&self) -> Result<crate::shape::owned::Scene> {
-        crate::shape::owned::Scene::from_parsed(self.part.shapes()?, self.part.part().blob_arc())
+        crate::shape::owned::Scene::from_parsed(
+            self.part.shapes_with_limits(self.shape_limits)?,
+            self.part.part().blob_arc(),
+        )
     }
 
     /// Parse this slide's animation timing tree and build list.
@@ -199,7 +235,13 @@ impl<'a> Slide<'a> {
     /// or carries a structurally invalid timing tree, or if a surviving build
     /// entry's host relationship cannot be resolved inside the package.
     pub fn animations(&self) -> Result<crate::animations::Sequence> {
-        crate::animations::parse_package_slide(self.package, self.part.part().partname())
+        crate::animations::parse_package_slide_with_limits(
+            self.package,
+            self.part.part().partname(),
+            self.semantic_limits()
+                .animations()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Read the optional direct programmable-tag list attached to this slide.
@@ -208,7 +250,13 @@ impl<'a> Slide<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn tags(&self) -> Result<Option<crate::tag::List>> {
-        package::slide_tags(self.package, &self.part)
+        package::slide_tags(
+            self.package,
+            &self.part,
+            self.semantic_limits()
+                .tag()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Read the optional programmable-tag list attached to one semantic shape.
@@ -220,7 +268,15 @@ impl<'a> Slide<'a> {
         &self,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::tag::List>> {
-        package::slide_shape_tags(self.package, &self.part, shape)
+        package::slide_shape_tags(
+            self.package,
+            &self.part,
+            shape,
+            self.semantic_limits()
+                .tag()
+                .constrained_by_source(self.package.read_limits()),
+            self.shape_limits,
+        )
     }
 
     /// Read the optional typed classification outcome attached to one shape.
@@ -232,7 +288,7 @@ impl<'a> Slide<'a> {
         &self,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::shape::classification::Snapshot>> {
-        package::slide_shape_classification(self.package, &self.part, shape)
+        package::slide_shape_classification(self.package, &self.part, shape, self.shape_limits)
     }
 
     /// Capture this slide's inert `[MS-PPTX]` change-tracking identifiers.
@@ -242,7 +298,11 @@ impl<'a> Slide<'a> {
     /// Returns an error when the bounded extension XML is malformed. Duplicate
     /// producer values remain readable for checked-position repair.
     pub fn change_tracking(&self) -> Result<crate::change_tracking::Snapshot> {
-        crate::change_tracking::load(self.package, self.part.part().partname())
+        crate::change_tracking::load_with_limits(
+            self.package,
+            self.part.part().partname(),
+            self.shape_limits,
+        )
     }
 
     /// Read the optional typed `p15:designElem` value attached to one shape.
@@ -254,7 +314,7 @@ impl<'a> Slide<'a> {
         &self,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::shape::designer::Snapshot>> {
-        package::slide_shape_design_element(self.package, &self.part, shape)
+        package::slide_shape_design_element(self.package, &self.part, shape, self.shape_limits)
     }
 
     /// Read one shape's source-bound Designer drawing properties.
@@ -279,7 +339,13 @@ impl<'a> Slide<'a> {
         shape: impl Into<crate::shape::Key<'k>>,
         limits: crate::shape::designer::Limits,
     ) -> Result<crate::shape::designer::properties::Snapshot> {
-        package::slide_shape_designer_properties(self.package, &self.part, shape, limits)
+        package::slide_shape_designer_properties(
+            self.package,
+            &self.part,
+            shape,
+            limits,
+            self.shape_limits,
+        )
     }
 
     /// Read the source-bound Designer tags owned by this slide's stable ID.
@@ -311,7 +377,8 @@ impl<'a> Slide<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn model3ds(&self) -> Result<Vec<crate::model3d::Model>> {
-        crate::model3d::package::load_all(self.package, self.part.part().partname())
+        let limits = crate::model3d::codec::Limits::from_source_limits(self.package.read_limits());
+        crate::model3d::package::load_all(self.package, self.part.part().partname(), limits)
     }
 
     /// Read the model3d owner attached to one semantic shape, if present.
@@ -323,7 +390,13 @@ impl<'a> Slide<'a> {
         &self,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::model3d::Model>> {
-        crate::model3d::package::load(self.package, self.part.part().partname(), shape.into())
+        let limits = crate::model3d::codec::Limits::from_source_limits(self.package.read_limits());
+        crate::model3d::package::load(
+            self.package,
+            self.part.part().partname(),
+            shape.into(),
+            limits,
+        )
     }
 
     /// Inspect all tag relationships on this slide in stable relationship-ID
@@ -334,7 +407,13 @@ impl<'a> Slide<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn tag_inventory(&self) -> Result<Vec<crate::tag::Source>> {
-        package::slide_tag_inventory(self.package, &self.part)
+        package::slide_tag_inventory(
+            self.package,
+            &self.part,
+            self.semantic_limits()
+                .tag()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Resolve the ordinary charts attached to this slide.
@@ -506,7 +585,13 @@ impl<'a> Slide<'a> {
     /// Returns an error when the selected relationships, content types,
     /// author closure, or comments XML are malformed.
     pub fn comment_snapshot(&self) -> Result<Option<crate::presentation::related::Comments>> {
-        package::slide_comment_snapshot(self.package, &self.part)
+        package::slide_comment_snapshot(
+            self.package,
+            &self.part,
+            self.semantic_limits()
+                .comments()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Resolve the optional modern-comment list attached to this slide.
@@ -536,7 +621,14 @@ impl<'a> Slide<'a> {
     /// Returns an error when the relationship is duplicated, external, or
     /// points to a missing, mistyped, malformed, or non-strict notes part.
     pub fn notes(&self) -> Result<Option<crate::presentation::related::Notes>> {
-        package::slide_notes(self.package, &self.part)
+        package::slide_notes(
+            self.package,
+            &self.part,
+            self.shape_limits,
+            self.semantic_limits()
+                .notes()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Read typed section, slide, and summary zoom metadata in this slide.
@@ -565,7 +657,13 @@ impl<'a> Slide<'a> {
     pub fn slide_sync(
         &self,
     ) -> Result<Option<crate::presentation_properties::metadata::slide_sync::Properties>> {
-        package::slide_sync(self.package, &self.part)
+        package::slide_sync(
+            self.package,
+            &self.part,
+            crate::open_options::selected(self.semantic_limits.as_ref())
+                .slide_sync()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Resolve the slide's optional layout in package context.
@@ -574,8 +672,11 @@ impl<'a> Slide<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn layout(&self) -> Result<Option<SlideLayout<'a>>> {
-        package::slide_layout(self.package, &self.part)
-            .map(|part| part.map(|part| SlideLayout::new(self.package, part)))
+        package::slide_layout(self.package, &self.part).map(|part| {
+            part.map(|part| {
+                SlideLayout::new_with_shape_limits(self.package, part, self.shape_limits)
+            })
+        })
     }
 }
 
@@ -583,13 +684,26 @@ impl<'a> Slide<'a> {
 pub struct SlideLayout<'a> {
     package: &'a OpcPackage,
     part: SlideLayoutPart<'a>,
+    shape_limits: crate::shape::Limits,
 }
 
 impl<'a> SlideLayout<'a> {
     /// Construct a layout view from its package and validated part view.
     #[must_use]
     pub fn new(package: &'a OpcPackage, part: SlideLayoutPart<'a>) -> Self {
-        Self { package, part }
+        Self::new_with_shape_limits(package, part, crate::shape::Limits::DEFAULT)
+    }
+
+    pub(crate) fn new_with_shape_limits(
+        package: &'a OpcPackage,
+        part: SlideLayoutPart<'a>,
+        shape_limits: crate::shape::Limits,
+    ) -> Self {
+        Self {
+            package,
+            part,
+            shape_limits,
+        }
     }
 
     /// Borrow the underlying validated layout part view.
@@ -640,7 +754,7 @@ impl<'a> SlideLayout<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        codec::layout_shapes(&self.part)
+        codec::layout_shapes_with_limits(&self.part, self.shape_limits)
     }
 
     /// Retain an independently owned shape scene sharing this part's payload.
@@ -649,7 +763,10 @@ impl<'a> SlideLayout<'a> {
     /// # Errors
     /// Returns the same validation and parse errors as [`Self::shapes`].
     pub fn scene(&self) -> Result<crate::shape::owned::Scene> {
-        crate::shape::owned::Scene::from_parsed(self.part.shapes()?, self.part.part().blob_arc())
+        crate::shape::owned::Scene::from_parsed(
+            self.part.shapes_with_limits(self.shape_limits)?,
+            self.part.part().blob_arc(),
+        )
     }
 
     /// Read the optional theme override attached to this layout.
@@ -668,7 +785,7 @@ impl<'a> SlideLayout<'a> {
     /// Returns an error if the operation fails.
     pub fn master(&self) -> Result<SlideMaster<'a>> {
         package::layout_master(self.package, &self.part)
-            .map(|part| SlideMaster::new(self.package, part))
+            .map(|part| SlideMaster::new_with_shape_limits(self.package, part, self.shape_limits))
     }
 }
 
@@ -676,13 +793,26 @@ impl<'a> SlideLayout<'a> {
 pub struct SlideMaster<'a> {
     package: &'a OpcPackage,
     part: SlideMasterPart<'a>,
+    shape_limits: crate::shape::Limits,
 }
 
 impl<'a> SlideMaster<'a> {
     /// Construct a master view from its package and validated part view.
     #[must_use]
     pub fn new(package: &'a OpcPackage, part: SlideMasterPart<'a>) -> Self {
-        Self { package, part }
+        Self::new_with_shape_limits(package, part, crate::shape::Limits::DEFAULT)
+    }
+
+    pub(crate) fn new_with_shape_limits(
+        package: &'a OpcPackage,
+        part: SlideMasterPart<'a>,
+        shape_limits: crate::shape::Limits,
+    ) -> Self {
+        Self {
+            package,
+            part,
+            shape_limits,
+        }
     }
 
     /// Borrow the underlying validated master part view.
@@ -733,7 +863,7 @@ impl<'a> SlideMaster<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        codec::master_shapes(&self.part)
+        codec::master_shapes_with_limits(&self.part, self.shape_limits)
     }
 
     /// Retain an independently owned shape scene sharing this part's payload.
@@ -742,7 +872,10 @@ impl<'a> SlideMaster<'a> {
     /// # Errors
     /// Returns the same validation and parse errors as [`Self::shapes`].
     pub fn scene(&self) -> Result<crate::shape::owned::Scene> {
-        crate::shape::owned::Scene::from_parsed(self.part.shapes()?, self.part.part().blob_arc())
+        crate::shape::owned::Scene::from_parsed(
+            self.part.shapes_with_limits(self.shape_limits)?,
+            self.part.part().blob_arc(),
+        )
     }
 
     /// Read the theme reached from this slide master.
@@ -763,7 +896,9 @@ impl<'a> SlideMaster<'a> {
         package::master_layouts(self.package, &self.part).map(|parts| {
             parts
                 .into_iter()
-                .map(|part| SlideLayout::new(self.package, part))
+                .map(|part| {
+                    SlideLayout::new_with_shape_limits(self.package, part, self.shape_limits)
+                })
                 .collect()
         })
     }

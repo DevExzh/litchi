@@ -430,7 +430,7 @@ impl<'a> Common<'a> {
             self.xml,
             range.start,
             length,
-            &litchi_ooxml_common::mce::Limits::default(),
+            &shape_mce_limits(self.limits),
         )?)
     }
 
@@ -701,12 +701,8 @@ impl<'a> Common<'a> {
             }
             return Ok(resolver);
         }
-        let scope = InScopeNamespaces::at_offset(
-            self.xml,
-            offset,
-            &litchi_ooxml_common::mce::Limits::default(),
-        )
-        .map_err(|_| Error::Invalid("shape text body namespace scope is invalid".into()))?;
+        let scope = InScopeNamespaces::at_offset(self.xml, offset, &shape_mce_limits(self.limits))
+            .map_err(|_| Error::Invalid("shape text body namespace scope is invalid".into()))?;
         let mut resolver = NamespaceResolver::default();
         for (prefix, namespace) in scope.iter() {
             let declaration = if prefix.is_empty() {
@@ -719,6 +715,15 @@ impl<'a> Common<'a> {
                 .map_err(|_| Error::Invalid("shape text body namespace scope is invalid".into()))?;
         }
         Ok(resolver)
+    }
+}
+
+fn shape_mce_limits(limits: super::reader::Limits) -> litchi_ooxml_common::mce::Limits {
+    litchi_ooxml_common::mce::Limits {
+        max_input_bytes: limits.input_bytes(),
+        max_output_bytes: limits.output_bytes(),
+        max_depth: limits.depth(),
+        ..litchi_ooxml_common::mce::Limits::default()
     }
 }
 

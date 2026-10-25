@@ -144,8 +144,9 @@ pub(crate) fn scan(xml: &[u8]) -> Result<Option<Sections>> {
             bump(&mut nodes)?;
             if stack.len() >= MAX_XML_DEPTH {
                 return Err(Error::Limit {
-                    resource: "opened-presentation XML depth",
-                    limit: MAX_XML_DEPTH,
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                    observed: stack.len().checked_add(1).unwrap_or(usize::MAX),
+                    maximum: MAX_XML_DEPTH,
                 });
             }
             let parent = stack.last().copied();

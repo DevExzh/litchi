@@ -143,8 +143,9 @@ impl Edit {
         }
         let max_patch_bytes = self.source_ref()?.limits.max_patch_bytes();
         if resource.data.len() > max_patch_bytes {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed: resource.data.len(),
                 maximum: max_patch_bytes,
             });
         }
@@ -163,7 +164,8 @@ impl Edit {
         let key = shape.into();
         let owner = self.working.get_part(&selected.part_name)?;
         let xml = owner.blob();
-        let scene = crate::shape::Scene::read(xml)?;
+        let shape_limits = self.semantic_limits().shape();
+        let scene = crate::shape::Scene::read(xml, shape_limits)?;
         if scene.is_rewritten() {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -213,7 +215,12 @@ impl Edit {
         {
             return Ok(false);
         }
-        let conformance = crate::media_parts::document_conformance(xml)?;
+        let conformance = crate::media_parts::document_conformance_with_limits(
+            xml,
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(self.working.read_limits()),
+        )?;
         let reserved: HashSet<_> = self
             .working
             .iter_parts()
@@ -235,7 +242,7 @@ impl Edit {
         next.extend_from_slice(&xml[..absolute.start]);
         next.extend_from_slice(new_id.as_bytes());
         next.extend_from_slice(&xml[absolute.end..]);
-        let staged = crate::shape::Scene::read(&next)?;
+        let staged = crate::shape::Scene::read(&next, shape_limits)?;
         if staged.len() != scene.len()
             || scene
                 .iter()
@@ -292,7 +299,8 @@ impl Edit {
         let key = shape.into();
         let owner = self.working.get_part(&selected.part_name)?;
         let xml = owner.blob();
-        let scene = crate::shape::Scene::read(xml)?;
+        let shape_limits = self.semantic_limits().shape();
+        let scene = crate::shape::Scene::read(xml, shape_limits)?;
         if scene.is_rewritten() {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -347,7 +355,7 @@ impl Edit {
         next.extend_from_slice(&xml[..tag.start]);
         next.extend_from_slice(&rewritten);
         next.extend_from_slice(&xml[tag.end..]);
-        let staged = crate::shape::Scene::read(&next)?;
+        let staged = crate::shape::Scene::read(&next, shape_limits)?;
         if staged.len() != scene.len()
             || staged.shape(key)?.description()?.as_deref() != description
             || scene
@@ -389,7 +397,8 @@ impl Edit {
         let key = shape.into();
         let owner = self.working.get_part(&selected.part_name)?;
         let xml = owner.blob();
-        let scene = crate::shape::Scene::read(xml)?;
+        let shape_limits = self.semantic_limits().shape();
+        let scene = crate::shape::Scene::read(xml, shape_limits)?;
         if scene.is_rewritten() {
             return Err(Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -433,7 +442,7 @@ impl Edit {
         next.extend_from_slice(&xml[..tag.start]);
         next.extend_from_slice(&rewritten);
         next.extend_from_slice(&xml[tag.end..]);
-        let staged = crate::shape::Scene::read(&next)?;
+        let staged = crate::shape::Scene::read(&next, shape_limits)?;
         if staged.len() != scene.len()
             || scene
                 .iter()

@@ -70,8 +70,14 @@ impl Edit {
         let mut candidate = self.working.clone();
         crate::package::signature::refuse_signed_change(&candidate)?;
         let slide_part = candidate.get_part(&selected.part_name)?;
-        let conformance = crate::media_parts::document_conformance(slide_part.blob())?;
-        let scene = crate::shape::Scene::read(slide_part.blob())?;
+        let media_limits = self
+            .semantic_limits()
+            .media_parts()
+            .constrained_by_source(candidate.read_limits());
+        let shape_limits = self.semantic_limits().shape();
+        let conformance =
+            crate::media_parts::document_conformance_with_limits(slide_part.blob(), media_limits)?;
+        let scene = crate::shape::Scene::read(slide_part.blob(), shape_limits)?;
         let shape_id = next_shape_id(&scene, "media picture")?;
         drop(scene);
         let rels = slide_part.rels();
@@ -113,14 +119,18 @@ impl Edit {
         let list = List {
             pictures: vec![picture],
         };
-        crate::media_parts::store_with(
+        crate::media_parts::store_with_limits(
             &mut candidate,
             &selected.part_name,
             &list,
             conformance,
             true,
+            media_limits,
         )?;
-        let staged = crate::shape::Scene::read(candidate.get_part(&selected.part_name)?.blob())?;
+        let staged = crate::shape::Scene::read(
+            candidate.get_part(&selected.part_name)?.blob(),
+            shape_limits,
+        )?;
         let added = staged
             .iter()
             .find(|shape| shape.id() == Some(shape_id))

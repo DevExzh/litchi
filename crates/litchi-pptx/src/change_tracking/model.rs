@@ -125,6 +125,7 @@ pub struct Snapshot {
     pub(super) owner: PackURI,
     pub(super) source: Vec<u8>,
     pub(super) state: State,
+    pub(super) shape_limits: crate::shape::Limits,
 }
 
 impl Snapshot {
@@ -142,12 +143,22 @@ impl Snapshot {
         super::Draft::new(self.clone())
     }
 
+    #[cfg(test)]
     pub(super) fn from_source(owner: PackURI, source: Vec<u8>) -> Result<Self> {
-        let state = super::codec::read_state(&source)?;
+        Self::from_source_with_limits(owner, source, crate::shape::Limits::DEFAULT)
+    }
+
+    pub(super) fn from_source_with_limits(
+        owner: PackURI,
+        source: Vec<u8>,
+        shape_limits: crate::shape::Limits,
+    ) -> Result<Self> {
+        let state = super::codec::read_state_with_limits(&source, shape_limits)?;
         Ok(Self {
             owner,
             source,
             state,
+            shape_limits,
         })
     }
 }

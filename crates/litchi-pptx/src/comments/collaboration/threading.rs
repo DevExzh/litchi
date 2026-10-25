@@ -45,14 +45,35 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_comment_threading(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_comment_threading")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_comment_threading",
+            |package, target, patch| {
+                let limits = package
+                    .semantic_limits()
+                    .comments()
+                    .constrained_by_source(target.read_limits());
+                patch.validate_changed_parts(target, |_, part| {
+                    if part.content_type() == crate::comments::COMMENTS_CONTENT_TYPE {
+                        super::validate_threading_replay(part.blob(), limits)
+                    } else {
+                        crate::comments::validate_replay_part(part, limits)
+                    }
+                })
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
 impl Edit<'_> {
+    fn limits(&self) -> super::super::Limits {
+        self.staged
+            .semantic_limits()
+            .comments()
+            .constrained_by_source(self.staged.opc().read_limits())
+    }
+
     /// The staged threading extension of the legacy comment `index` (its
     /// `p:cm/@idx`) by the author `author_id` on the selected slide.
     ///
@@ -66,12 +87,14 @@ impl Edit<'_> {
         index: u32,
     ) -> Result<Option<ThreadingInfo>> {
         let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
-        package::load_threading(
+        Ok(package::load_threading_snapshot_with_limits(
             self.staged.opc(),
             slide_part_name.as_str(),
             author_id,
             index,
-        )
+            self.limits(),
+        )?
+        .and_then(|snapshot| snapshot.value().cloned()))
     }
 
     /// Create or replace the threading extension of one legacy comment.
@@ -89,8 +112,16 @@ impl Edit<'_> {
         value: ThreadingInfo,
     ) -> Result<Option<ThreadingInfo>> {
         let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        let limits = self.limits();
         self.staged.update(move |opc| {
-            package::put_threading(opc, slide_part_name.as_str(), author_id, index, value)
+            package::put_threading_with_limits(
+                opc,
+                slide_part_name.as_str(),
+                author_id,
+                index,
+                value,
+                limits,
+            )
         })
     }
 
@@ -108,8 +139,15 @@ impl Edit<'_> {
         index: u32,
     ) -> Result<Option<ThreadingInfo>> {
         let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        let limits = self.limits();
         self.staged.update(move |opc| {
-            package::remove_threading(opc, slide_part_name.as_str(), author_id, index)
+            package::remove_threading_with_limits(
+                opc,
+                slide_part_name.as_str(),
+                author_id,
+                index,
+                limits,
+            )
         })
     }
 

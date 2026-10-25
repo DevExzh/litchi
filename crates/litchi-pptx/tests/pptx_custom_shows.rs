@@ -9,7 +9,7 @@ use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::Error;
 use litchi_pptx::Package;
-use litchi_pptx::presentation_properties::metadata::structure::load;
+use litchi_pptx::presentation_properties::metadata::structure::{Limits, load};
 
 const PRESENTATION_XML: &[u8] =
     include_bytes!("../../../test-data/ooxml/pptx/custom-shows/presentation.xml");
@@ -18,7 +18,7 @@ const SLIDE_XML: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/custom-sh
 #[test]
 fn presentation_structure_owner_resolves_custom_show_membership() {
     let package = package_with_custom_shows();
-    let graph = load(&package).unwrap();
+    let graph = load(&package, Limits::DEFAULT).unwrap();
     let custom_shows = graph.custom_shows;
 
     assert_eq!(custom_shows.shows.len(), 2);
@@ -44,7 +44,7 @@ fn presentation_structure_owner_validates_slide_relationships() {
     );
 
     assert!(matches!(
-        load(&package),
+        load(&package, Limits::DEFAULT),
         Err(Error::Invalid(message))
             if message.contains("is not an internal slide relationship")
     ));

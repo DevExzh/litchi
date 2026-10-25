@@ -4,6 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use super::codec::Limits;
 use super::model::{Caption, CaptionTarget, DisplayLocation, MediaKey, MediaMetadata, TracksInfo};
 use super::tracks_info;
 use super::transaction::Snapshot;
@@ -40,7 +41,7 @@ fn snapshot() -> Snapshot {
         slide_part_name: "/ppt/slides/slide1.xml".into(),
         shape_id: 7,
     };
-    let found = tracks_info::discover(&bytes, &key)
+    let found = tracks_info::discover(&bytes, &key, Limits::DEFAULT)
         .unwrap()
         .expect("fixture media shape");
     let metadata = MediaMetadata {
@@ -60,7 +61,14 @@ fn snapshot() -> Snapshot {
         }),
         narration: Some(true),
     };
-    Snapshot::from_wire("/ppt/slides/slide1.xml".into(), bytes, found, metadata).unwrap()
+    Snapshot::from_wire(
+        "/ppt/slides/slide1.xml".into(),
+        bytes,
+        found,
+        metadata,
+        Limits::DEFAULT,
+    )
+    .unwrap()
 }
 
 #[test]
@@ -116,5 +124,5 @@ fn malformed_track_metadata_is_rejected_without_a_partial_snapshot() {
         slide_part_name: "/ppt/slides/slide1.xml".into(),
         shape_id: 7,
     };
-    assert!(tracks_info::discover(&bytes, &key).is_err());
+    assert!(tracks_info::discover(&bytes, &key, Limits::DEFAULT).is_err());
 }

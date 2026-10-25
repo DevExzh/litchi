@@ -1,6 +1,7 @@
 //! Strict XML codec for the presentation-level a14:m extension.
 
 use super::model::{BinaryBreak, BinarySubtractionBreak, Properties};
+use crate::presentation_properties::Limits;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::{OMML_NAMESPACE_URI, xsd_token_atom};
@@ -32,11 +33,15 @@ enum ResolvedNamespace {
 }
 
 /// Parse one complete a14:m payload.
-pub(crate) fn parse(xml: &[u8]) -> Result<Properties> {
-    if xml.len() > MAX_BYTES {
+pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
+    let max_bytes = limits.max_input_bytes().min(MAX_BYTES);
+    let max_nodes = limits.max_nodes().min(MAX_NODES);
+    let max_depth = limits.max_depth().min(MAX_DEPTH);
+    if xml.len() > max_bytes {
         return Err(Error::Limit {
-            resource: "presentation math XML",
-            limit: MAX_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: max_bytes,
         });
     }
 
@@ -59,19 +64,26 @@ pub(crate) fn parse(xml: &[u8]) -> Result<Properties> {
         match event {
             Event::Start(element) => {
                 nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                    resource: "presentation math XML nodes",
-                    limit: MAX_NODES,
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                    observed: usize::MAX,
+                    maximum: max_nodes,
                 })?;
-                if nodes > MAX_NODES {
+                if nodes > max_nodes {
                     return Err(Error::Limit {
-                        resource: "presentation math XML nodes",
-                        limit: MAX_NODES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: max_nodes,
                     });
                 }
-                if stack.len() >= MAX_DEPTH {
+                if stack.len() >= max_depth {
                     return Err(Error::Limit {
-                        resource: "presentation math XML depth",
-                        limit: MAX_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        maximum: max_depth,
                     });
                 }
                 if root_closed {
@@ -90,13 +102,17 @@ pub(crate) fn parse(xml: &[u8]) -> Result<Properties> {
             },
             Event::Empty(element) => {
                 nodes = nodes.checked_add(1).ok_or(Error::Limit {
-                    resource: "presentation math XML nodes",
-                    limit: MAX_NODES,
+                    kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                    observed: usize::MAX,
+                    maximum: max_nodes,
                 })?;
-                if nodes > MAX_NODES {
+                if nodes > max_nodes {
                     return Err(Error::Limit {
-                        resource: "presentation math XML nodes",
-                        limit: MAX_NODES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: nodes,
+                        maximum: max_nodes,
                     });
                 }
                 if root_closed {
@@ -152,7 +168,12 @@ pub(crate) fn parse(xml: &[u8]) -> Result<Properties> {
 }
 
 /// Write one complete a14:m payload in the requested package conformance.
-pub(crate) fn write(out: &mut String, value: &Properties, strict: bool) -> Result<()> {
+pub(crate) fn write(
+    out: &mut super::super::codec::XmlSink,
+    value: &Properties,
+    strict: bool,
+    _limits: Limits,
+) -> Result<()> {
     value.validate()?;
     let omml = if strict {
         "http://purl.oclc.org/ooxml/officeDocument/math"
@@ -176,7 +197,7 @@ pub(crate) fn write(out: &mut String, value: &Properties, strict: bool) -> Resul
         out.push_str("\"/>");
     }
     out.push_str("</m:mathPr></a14:m>");
-    Ok(())
+    out.check()
 }
 
 fn start_kind(

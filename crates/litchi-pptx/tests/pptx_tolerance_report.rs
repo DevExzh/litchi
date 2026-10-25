@@ -66,7 +66,7 @@ fn lazy_slide_access_leaves_the_open_report_clean() {
 // ---------------------------------------------------------------------------
 
 use litchi_opc::PackURI;
-use litchi_pptx::animations::{Sequence, parse_package_slide_with_tolerance};
+use litchi_pptx::animations::{Limits, Sequence, parse_package_slide_with_tolerance};
 use litchi_pptx::{Defect, TimingDefect};
 
 const SLIDE1: &str = "/ppt/slides/slide1.xml";
@@ -210,7 +210,7 @@ fn conformant_timing_tree_opens_unchanged_with_an_empty_report() {
     // A conformant tree keeps its verbatim timing subtree for round-trip.
     assert!(sequence.preserved_timing_xml().is_some());
     // The strict verification form accepts the same slide.
-    assert!(Sequence::parse_slide_xml_strict(&xml).is_ok());
+    assert!(Sequence::parse_slide_xml_strict(&xml, Limits::DEFAULT).is_ok());
 }
 
 #[test]
@@ -246,13 +246,13 @@ fn stale_shape_target_opens_by_default_and_is_recorded() {
     assert_clean(package.tolerance_report());
 
     // The repaired model regenerates timing XML that parses cleanly.
-    let regenerated = sequence.to_xml();
+    let regenerated = sequence.to_xml(Limits::DEFAULT).unwrap();
     assert!(!regenerated.contains(r#"spid="99""#));
-    let reparsed = Sequence::parse_timing_xml(&regenerated).unwrap();
+    let reparsed = Sequence::parse_timing_xml(&regenerated, Limits::DEFAULT).unwrap();
     assert_eq!(reparsed.animations.len(), 2);
 
     // Strict verification still rejects the stale reference.
-    let error = Sequence::parse_slide_xml_strict(&xml).unwrap_err();
+    let error = Sequence::parse_slide_xml_strict(&xml, Limits::DEFAULT).unwrap_err();
     assert!(error.to_string().contains("99"), "{error}");
 }
 
@@ -296,7 +296,7 @@ fn duplicate_shape_id_opens_by_default_first_wins_and_is_recorded() {
             Some(SLIDE1)
         )]
     );
-    assert!(Sequence::parse_slide_xml_strict(&xml).is_err());
+    assert!(Sequence::parse_slide_xml_strict(&xml, Limits::DEFAULT).is_err());
 }
 
 #[test]
@@ -333,8 +333,11 @@ fn per_slide_reports_aggregate_into_one_deck_report() {
     );
 
     // A bare-XML parse has no part to name.
-    let bare =
-        Sequence::parse_slide_xml(package.opc().unwrap().get_part(&part).unwrap().blob()).unwrap();
+    let bare = Sequence::parse_slide_xml(
+        package.opc().unwrap().get_part(&part).unwrap().blob(),
+        Limits::DEFAULT,
+    )
+    .unwrap();
     assert!(
         bare.tolerance_report()
             .defects()
@@ -348,13 +351,13 @@ fn per_slide_reports_aggregate_into_one_deck_report() {
 fn structural_timing_corruption_stays_fatal() {
     // Unbalanced timing XML is still a hard error, stale target or not.
     let broken = slide_xml(&timing(&["4", "99"]), |xml| xml.replace("</p:bldLst>", ""));
-    assert!(Sequence::parse_slide_xml(&broken).is_err());
+    assert!(Sequence::parse_slide_xml(&broken, Limits::DEFAULT).is_err());
     // A malformed spid value is grammar, not a stale reference.
     let malformed = slide_xml(&timing(&["4", "nope"]), |xml| xml);
-    assert!(Sequence::parse_slide_xml(&malformed).is_err());
+    assert!(Sequence::parse_slide_xml(&malformed, Limits::DEFAULT).is_err());
     // A duplicate build shape/group pair is grammar too.
     let duplicate_pair = slide_xml(&timing(&["4", "4"]), |xml| xml);
-    assert!(Sequence::parse_slide_xml(&duplicate_pair).is_err());
+    assert!(Sequence::parse_slide_xml(&duplicate_pair, Limits::DEFAULT).is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -452,7 +455,7 @@ fn ill_formed_shape_xml_stays_fatal() {
             r#"<a:off x="914400" y="914400">"#,
         )
     });
-    assert!(litchi_pptx::shape::Scene::read(&slide).is_err());
+    assert!(litchi_pptx::shape::Scene::read(&slide, litchi_pptx::shape::Limits::DEFAULT).is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -780,7 +783,9 @@ fn processing_instructions_are_skipped_and_recorded_once_per_part() {
         .unwrap()
         .blob()
         .to_vec();
-    let transition = litchi_pptx::transition::read(&blob).unwrap().unwrap();
+    let transition = litchi_pptx::transition::read(&blob, litchi_pptx::transition::Limits::DEFAULT)
+        .unwrap()
+        .unwrap();
     assert_eq!(transition.kind(), &TransitionKind::Fade { black: None });
 
     // DOCTYPE stays rejected.
@@ -788,7 +793,10 @@ fn processing_instructions_are_skipped_and_recorded_once_per_part() {
         String::from_utf8(blob)
             .unwrap()
             .replacen("<p:sld ", "<!DOCTYPE p:sld><p:sld ", 1);
-    assert!(litchi_pptx::shape::Scene::read(doctype.as_bytes()).is_err());
+    assert!(
+        litchi_pptx::shape::Scene::read(doctype.as_bytes(), litchi_pptx::shape::Limits::DEFAULT)
+            .is_err()
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -1073,9 +1081,12 @@ fn comment_index_zero_and_duplicate_keys_are_kept_and_recorded() {
         r#"<p:cm authorId="3" idx="4"><p:pos x="0" y="0"/><p:text>b</p:text></p:cm></p:cmLst>"#,
     );
     let mut report = litchi_pptx::ToleranceReport::default();
-    let list =
-        litchi_pptx::comments::parse_slide_comments_with_tolerance(xml.as_bytes(), &mut report)
-            .unwrap();
+    let list = litchi_pptx::comments::parse_slide_comments_with_tolerance(
+        xml.as_bytes(),
+        litchi_pptx::comments::Limits::DEFAULT,
+        &mut report,
+    )
+    .unwrap();
     assert_eq!(list.len(), 2);
     assert_eq!(
         located_items(&report),
@@ -1086,7 +1097,13 @@ fn comment_index_zero_and_duplicate_keys_are_kept_and_recorded() {
             None
         )]
     );
-    assert!(litchi_pptx::comments::parse_slide_comments_strict(xml.as_bytes()).is_err());
+    assert!(
+        litchi_pptx::comments::parse_slide_comments_strict(
+            xml.as_bytes(),
+            litchi_pptx::comments::Limits::DEFAULT,
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -1274,10 +1291,13 @@ const VIEW_PROPS: &str = "/ppt/viewProps.xml";
 fn view_properties_ignore_unknown_markup_and_accept_any_order() {
     let package = Package::from_bytes(SHAPES).unwrap();
     let mut report = litchi_pptx::ToleranceReport::default();
-    let conformant =
-        view_properties::load_from_package_with_tolerance(package.opc().unwrap(), &mut report)
-            .unwrap()
-            .unwrap();
+    let conformant = view_properties::load_from_package_with_tolerance(
+        package.opc().unwrap(),
+        &mut report,
+        view_properties::Limits::default(),
+    )
+    .unwrap()
+    .unwrap();
     assert_clean(&report);
 
     let deck = shapes_with_member("ppt/viewProps.xml", |xml| {
@@ -1296,10 +1316,13 @@ fn view_properties_ignore_unknown_markup_and_accept_any_order() {
     });
     let package = Package::from_reader(std::io::Cursor::new(deck)).unwrap();
     let mut report = litchi_pptx::ToleranceReport::default();
-    let repaired =
-        view_properties::load_from_package_with_tolerance(package.opc().unwrap(), &mut report)
-            .unwrap()
-            .unwrap();
+    let repaired = view_properties::load_from_package_with_tolerance(
+        package.opc().unwrap(),
+        &mut report,
+        view_properties::Limits::default(),
+    )
+    .unwrap()
+    .unwrap();
     assert_eq!(repaired, conformant);
     let at = |defect| (Defect::View(defect), 0, Some(VIEW_PROPS));
     assert_eq!(
@@ -1313,7 +1336,11 @@ fn view_properties_ignore_unknown_markup_and_accept_any_order() {
         ]
     );
     assert_eq!(
-        view_properties::load_from_package(package.opc().unwrap()).unwrap(),
+        view_properties::load_from_package(
+            package.opc().unwrap(),
+            view_properties::Limits::default(),
+        )
+        .unwrap(),
         Some(conformant)
     );
 
@@ -1326,11 +1353,11 @@ fn view_properties_ignore_unknown_markup_and_accept_any_order() {
         .unwrap()
         .blob()
         .to_vec();
-    assert!(ViewProperties::parse_strict(&blob).is_err());
+    assert!(ViewProperties::parse_strict(&blob, view_properties::Limits::default()).is_err());
     let invalid = String::from_utf8(blob)
         .unwrap()
         .replace(r#"sz="34615""#, r#"sz="wide""#);
-    assert!(ViewProperties::parse(invalid.as_bytes()).is_err());
+    assert!(ViewProperties::parse(invalid.as_bytes(), view_properties::Limits::default()).is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -1359,10 +1386,13 @@ fn feature_readers_skip_and_record_processing_instructions() {
     let deck = shapes_with_member("ppt/viewProps.xml", with_instruction);
     let package = Package::from_reader(std::io::Cursor::new(deck)).unwrap();
     let mut report = litchi_pptx::ToleranceReport::default();
-    let view =
-        view_properties::load_from_package_with_tolerance(package.opc().unwrap(), &mut report)
-            .unwrap()
-            .unwrap();
+    let view = view_properties::load_from_package_with_tolerance(
+        package.opc().unwrap(),
+        &mut report,
+        view_properties::Limits::default(),
+    )
+    .unwrap()
+    .unwrap();
     assert!(view.normal.is_some());
     assert_eq!(located(&report), [instruction_at(VIEW_PROPS)]);
     let blob = package
@@ -1372,7 +1402,7 @@ fn feature_readers_skip_and_record_processing_instructions() {
         .unwrap()
         .blob()
         .to_vec();
-    assert!(ViewProperties::parse_strict(&blob).is_err());
+    assert!(ViewProperties::parse_strict(&blob, view_properties::Limits::default()).is_err());
 
     // Presentation properties.
     let deck = shapes_with_member("ppt/presProps.xml", with_instruction);
@@ -1382,6 +1412,7 @@ fn feature_readers_skip_and_record_processing_instructions() {
         litchi_pptx::presentation_properties::load_from_package_with_tolerance(
             package.opc().unwrap(),
             &mut report,
+            litchi_pptx::presentation_properties::Limits::default(),
         )
         .unwrap()
         .is_some()
@@ -1429,5 +1460,5 @@ fn feature_readers_skip_and_record_processing_instructions() {
         String::from_utf8(blob)
             .unwrap()
             .replacen("<p:viewPr", "<!DOCTYPE p:viewPr><p:viewPr", 1);
-    assert!(ViewProperties::parse(doctype.as_bytes()).is_err());
+    assert!(ViewProperties::parse(doctype.as_bytes(), view_properties::Limits::default()).is_err());
 }

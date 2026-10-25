@@ -11,9 +11,25 @@ use crate::{Error, Result};
 /// Main entry point for `PresentationML` package ownership.
 pub struct Package {
     pub(crate) opc: std::sync::Arc<OpcPackage>,
+    /// Aggregate ordinary-part payload bytes retained from ingress or the
+    /// existing publication/capture pass. Replay updates this by the patch's
+    /// changed-part delta instead of rescanning unrelated recipient parts.
+    pub(crate) part_bytes: u64,
+    /// Complete visible-content identity used by exact raw-patch no-ops.
+    ///
+    /// The slot is populated by opened captures or by the first no-op patch
+    /// check. Keeping it separate from the payload-digest memo lets a raw
+    /// patch prove its recorded base in constant time after the normal
+    /// package-open/capture work, without making a no-op replay rewalk the
+    /// recipient graph.
+    pub(crate) content_revision: std::sync::Arc<std::sync::OnceLock<[u8; 32]>>,
     /// Whether ingress retained the exact source archive needed for physical
     /// revision authorization of topology-changing cross-package edits.
     pub(crate) physical_source_provenance: bool,
+    /// Non-default semantic codec policies selected at ingress.  Keeping the
+    /// override bundle optional leaves ordinary package owners at the same
+    /// footprint while edits and source projections retain custom policy.
+    pub(crate) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     /// Every non-structural defect repaired while the package was opened, in
     /// discovery order: the OPC manifest repairs folded from
     /// `litchi_opc` ([`crate::Defect::Package`]), the slide-list repairs of
@@ -41,6 +57,10 @@ pub struct Package {
     /// snapshot still empties it.
     pub(crate) part_digests:
         std::sync::Arc<std::sync::OnceLock<std::sync::Arc<crate::opened::PartDigests>>>,
+    /// Retained source-backed relationship closures for semantic replay.
+    /// The index is updated by changed-part deltas, not rescanned on every
+    /// package publication.
+    pub(crate) replay_index: std::sync::Arc<crate::package::replay_index::ReplayIndex>,
     #[cfg(feature = "encryption")]
     pub(crate) encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
     /// Limits of the encrypted container this package was opened under,
@@ -63,6 +83,7 @@ impl std::fmt::Debug for Package {
 #[derive(Clone, Default)]
 pub(crate) struct OpenedOwnerState {
     tolerance: crate::leniency::ToleranceReport,
+    pub(crate) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     #[cfg(feature = "encryption")]
     encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
     #[cfg(feature = "encryption")]
@@ -70,6 +91,15 @@ pub(crate) struct OpenedOwnerState {
 }
 
 impl OpenedOwnerState {
+    pub(crate) fn with_semantic_limits(
+        semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    ) -> Self {
+        Self {
+            semantic_limits,
+            ..Self::default()
+        }
+    }
+
     /// Refuse a typed mutation of a package with retained encryption
     /// provenance, as [`Package`]'s typed families do.
     pub(crate) fn ensure_plain_mutation(&self, operation: &'static str) -> Result<()> {
@@ -83,6 +113,55 @@ impl OpenedOwnerState {
 }
 
 impl Package {
+    pub(crate) fn part_bytes_for(opc: &OpcPackage) -> Result<u64> {
+        if let Some(bytes) = opc.admitted_part_bytes() {
+            return Ok(bytes);
+        }
+        opc.iter_parts().try_fold(0_u64, |total, part| {
+            let bytes = u64::try_from(part.payload_len()?).map_err(|_| {
+                Error::internal(
+                    "part_bytes_for",
+                    "ordinary-part payload length exceeds the owner metric range",
+                )
+            })?;
+            total.checked_add(bytes).ok_or_else(|| {
+                Error::internal(
+                    "part_bytes_for",
+                    "ordinary-part payload aggregate exceeds the owner metric range",
+                )
+            })
+        })
+    }
+
+    /// Complete visible-content identity for raw patch base matching.
+    ///
+    /// A package that has not yet entered the opened facade computes this once
+    /// and retains the result when a replay needs an independent-content
+    /// proof. Subsequent no-op patch replays are O(1), while independent equal
+    /// opens converge on the same content identity.
+    pub(crate) fn content_revision(&self) -> Result<[u8; 32]> {
+        if let Some(revision) = self.content_revision.get() {
+            return Ok(*revision);
+        }
+        let (revision, memo) =
+            crate::opened::package_fingerprint_with_memo(&self.opc, self.part_digest_memo())?;
+        if self.part_digests.get().is_none() {
+            let _ = self.part_digests.set(std::sync::Arc::new(memo));
+        }
+        let _ = self.content_revision.set(revision);
+        Ok(revision)
+    }
+
+    /// Return a previously established complete-content identity without
+    /// starting a cold fingerprint pass.
+    pub(crate) fn cached_content_revision(&self) -> Option<[u8; 32]> {
+        self.content_revision.get().copied()
+    }
+
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        crate::open_options::selected(self.semantic_limits.as_ref())
+    }
+
     /// Every non-structural defect the reader repaired while opening this
     /// package, in discovery order.
     ///
@@ -133,9 +212,10 @@ impl Package {
     ///
     /// Returns an error if the operation fails.
     pub fn presentation(&self) -> Result<Presentation<'_>> {
-        Ok(Presentation::new(
+        Ok(Presentation::new_with_semantic_limits(
             PresentationPart::from_package(&self.opc)?,
             &self.opc,
+            self.semantic_limits.clone(),
         ))
     }
 
@@ -192,6 +272,7 @@ impl Package {
     ) -> Result<crate::opened::Edit> {
         Ok(crate::opened::Edit::new_lazy(
             std::sync::Arc::clone(&self.opc),
+            std::sync::Arc::clone(&self.replay_index),
             options.limits_value(),
             self.physical_source_provenance,
             std::sync::Arc::new(self.opened_owner_state()),
@@ -204,18 +285,21 @@ impl Package {
         limits: crate::opened::Limits,
     ) -> Result<crate::opened::Snapshot> {
         let mut snapshot = match self.part_digest_memo() {
-            Some(parent) => crate::opened::capture_with_parent_digests(
+            Some(parent) => crate::opened::capture_with_parent_digests_and_semantic_limits(
                 &self.opc,
                 limits,
                 self.physical_source_provenance,
                 parent,
+                self.semantic_limits.clone(),
             )?,
-            None => crate::opened::capture_with_provenance(
+            None => crate::opened::capture_with_provenance_and_semantic_limits(
                 &self.opc,
                 limits,
                 self.physical_source_provenance,
+                self.semantic_limits.clone(),
             )?,
         };
+        snapshot.replay_index = Some(std::sync::Arc::clone(&self.replay_index));
         snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
         self.offer_part_digests(&snapshot);
         Ok(snapshot)
@@ -259,9 +343,18 @@ impl Package {
     ) -> Result<(Self, crate::opened::Snapshot)> {
         self.ensure_plain_mutation("remove_slide")?;
         let mut opc = (*self.opc).clone();
-        let snapshot =
-            crate::opened::apply_removal_patch(&mut opc, patch, self.physical_source_provenance)?;
-        Ok(self.published(opc, snapshot))
+        let snapshot = crate::opened::apply_removal_patch_with_semantic_limits(
+            &mut opc,
+            patch,
+            self.physical_source_provenance,
+            self.semantic_limits.clone(),
+        )?;
+        let changed = patch
+            .opened_patch()
+            .resources()
+            .cloned()
+            .collect::<Vec<_>>();
+        self.published(opc, snapshot, &changed)
     }
 
     fn require_physical_provenance(&self, source: &Self) -> Result<()> {
@@ -293,8 +386,15 @@ impl Package {
                 source: source.part_digest_memo(),
                 destination: self.part_digest_memo(),
             },
+            source.semantic_limits.clone(),
+            self.semantic_limits.clone(),
         )?;
-        Ok(self.published(opc, snapshot))
+        let changed = patch
+            .opened_patch()
+            .resources()
+            .cloned()
+            .collect::<Vec<_>>();
+        self.published(opc, snapshot, &changed)
     }
 
     /// Apply a durable complete-revision-bound slide-removal patch (or its
@@ -355,19 +455,21 @@ impl Package {
         &self,
         opc: OpcPackage,
         mut snapshot: crate::opened::Snapshot,
-    ) -> (Self, crate::opened::Snapshot) {
+        changed: &[PackURI],
+    ) -> Result<(Self, crate::opened::Snapshot)> {
+        snapshot.replay_index = Some(std::sync::Arc::new(
+            self.replay_index.update(&self.opc, &opc, changed)?,
+        ));
         snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
-        let package = Self::from_opened_candidate(opc, &snapshot);
-        (package, snapshot)
+        let package = Self::from_opened_candidate(opc, &snapshot)?;
+        Ok((package, snapshot))
     }
 
     /// Compare exact visible OPC content using the native revision proof.
     /// Pending mutable authoring state is refused; ZIP record encoding is not compared.
     pub fn same_content(&self, other: &Self) -> Result<bool> {
-        let left =
-            crate::opened::package_fingerprint_with_memo(&self.opc, self.part_digest_memo())?.0;
-        let right =
-            crate::opened::package_fingerprint_with_memo(&other.opc, other.part_digest_memo())?.0;
+        let left = self.content_revision()?;
+        let right = other.content_revision()?;
         Ok(left == right)
     }
 
@@ -405,15 +507,24 @@ impl Package {
             .part_digests
             .get()
             .map_or(&no_memo, std::sync::Arc::as_ref);
-        let (candidate, mut snapshot) =
-            crate::opened::apply_to_new(&self.opc, patch, self.physical_source_provenance, parent)?;
+        let (candidate, mut snapshot) = crate::opened::apply_to_new_with_semantic_limits(
+            &self.opc,
+            patch,
+            self.physical_source_provenance,
+            parent,
+            self.semantic_limits.clone(),
+        )?;
         if !patch.is_noop() {
             super::signature::refuse_signed_change(&candidate)?;
             candidate.validate_signature_edit_from(&self.opc)?;
         }
+        let changed = patch.resources().cloned().collect::<Vec<_>>();
+        snapshot.replay_index = Some(std::sync::Arc::new(
+            self.replay_index.update(&self.opc, &candidate, &changed)?,
+        ));
         snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
         Ok(crate::opened::Commit::new(
-            Self::from_opened_candidate(candidate, &snapshot),
+            Self::from_opened_candidate(candidate, &snapshot)?,
             snapshot,
             patch.clone(),
         ))
@@ -422,6 +533,7 @@ impl Package {
     fn opened_owner_state(&self) -> OpenedOwnerState {
         OpenedOwnerState {
             tolerance: self.tolerance.clone(),
+            semantic_limits: self.semantic_limits.clone(),
             #[cfg(feature = "encryption")]
             encryption: self.encryption,
             #[cfg(feature = "encryption")]
@@ -432,25 +544,73 @@ impl Package {
     /// An equal package sharing this one's graph, payloads and memo: the
     /// package an exact no-op publishes.
     pub(crate) fn duplicate(&self) -> Self {
-        let mut package = self.derive(self.opc.clone());
+        let mut package = self.derive_with_part_bytes(self.opc.clone(), self.part_bytes);
         package.part_digests = self.part_digests.clone();
+        package.content_revision = self.content_revision.clone();
         package
     }
 
-    /// A new package holding `opc` under this package's retained policy
-    /// (tolerance report, encryption provenance, physical-source flag). The
-    /// payload-digest memo starts empty, because `opc` is another graph.
-    pub(crate) fn derive(&self, opc: impl Into<std::sync::Arc<OpcPackage>>) -> Self {
+    /// Derive a package when the caller has already accounted for the
+    /// candidate's ordinary-part payload bytes in the same pass that built it.
+    pub(crate) fn derive_with_part_bytes(
+        &self,
+        opc: impl Into<std::sync::Arc<OpcPackage>>,
+        part_bytes: u64,
+    ) -> Self {
+        self.derive_with_part_bytes_and_replay_index(
+            opc,
+            part_bytes,
+            std::sync::Arc::clone(&self.replay_index),
+        )
+    }
+
+    pub(crate) fn derive_with_replay_index(
+        &self,
+        opc: impl Into<std::sync::Arc<OpcPackage>>,
+        replay_index: std::sync::Arc<crate::package::replay_index::ReplayIndex>,
+    ) -> Self {
+        let opc = opc.into();
+        let part_bytes = opc.admitted_part_bytes().unwrap_or(self.part_bytes);
+        self.derive_with_part_bytes_and_replay_index(opc, part_bytes, replay_index)
+    }
+
+    pub(crate) fn derive_with_part_bytes_and_replay_index(
+        &self,
+        opc: impl Into<std::sync::Arc<OpcPackage>>,
+        part_bytes: u64,
+        replay_index: std::sync::Arc<crate::package::replay_index::ReplayIndex>,
+    ) -> Self {
         Self {
             opc: opc.into(),
+            part_bytes,
+            content_revision: std::sync::Arc::new(std::sync::OnceLock::new()),
             physical_source_provenance: self.physical_source_provenance,
+            semantic_limits: self.semantic_limits.clone(),
             tolerance: self.tolerance.clone(),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index,
             #[cfg(feature = "encryption")]
             encryption: self.encryption,
             #[cfg(feature = "encryption")]
             encryption_limits: self.encryption_limits,
         }
+    }
+
+    /// Refresh the retained physical and content metrics after native
+    /// authoring has published its graph in place.  Authoring is the one
+    /// package construction path that mutates the initial OPC owner rather
+    /// than deriving a new facade, so both lazy identity cells must be
+    /// replaced together with the byte aggregate.  The identity remains
+    /// lazy: the publication pass already owns the graph construction, while
+    /// an exact digest is only needed if a later raw no-op asks for it.
+    pub(crate) fn refresh_authored_publication(&mut self) -> Result<()> {
+        self.part_bytes = Self::part_bytes_for(&self.opc)?;
+        self.replay_index = std::sync::Arc::new(
+            crate::package::replay_index::ReplayIndex::from_package(&self.opc)?,
+        );
+        self.content_revision = std::sync::Arc::new(std::sync::OnceLock::new());
+        self.part_digests = std::sync::Arc::new(std::sync::OnceLock::new());
+        Ok(())
     }
 
     /// Drop the retained encryption provenance: the package publishes as an
@@ -467,20 +627,35 @@ impl Package {
     pub(crate) fn from_opened_candidate(
         opc: OpcPackage,
         snapshot: &crate::opened::Snapshot,
-    ) -> Self {
+    ) -> Result<Self> {
         let state = &snapshot.owner_state;
+        let replay_index = snapshot.replay_index.clone().map_or_else(
+            || {
+                crate::package::replay_index::ReplayIndex::from_package(&opc)
+                    .map(std::sync::Arc::new)
+            },
+            Ok,
+        )?;
         let mut package = Self {
             opc: std::sync::Arc::new(opc),
+            part_bytes: snapshot.part_bytes,
+            content_revision: {
+                let slot = std::sync::OnceLock::new();
+                let _ = slot.set(snapshot.revision);
+                std::sync::Arc::new(slot)
+            },
             physical_source_provenance: snapshot.physical_source_provenance,
+            semantic_limits: state.semantic_limits.clone(),
             tolerance: state.tolerance.clone(),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
+            replay_index,
             #[cfg(feature = "encryption")]
             encryption: state.encryption,
             #[cfg(feature = "encryption")]
             encryption_limits: state.encryption_limits,
         };
         package.adopt_part_digests(snapshot);
-        package
+        Ok(package)
     }
 
     /// Capture one slide's inert `[MS-PPTX]` change-tracking identifiers.
@@ -499,7 +674,7 @@ impl Package {
         slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<crate::change_tracking::Snapshot> {
         let owner = self.resolve_slide(slide.into())?;
-        crate::change_tracking::load(&self.opc, &owner)
+        crate::change_tracking::load_with_limits(&self.opc, &owner, self.semantic_limits().shape())
     }
 
     /// Load the complete inert speaker-notes graph, when present.
@@ -513,7 +688,13 @@ impl Package {
     /// graph is malformed or exceeds its resource limits.
     pub fn notes(&self) -> Result<Option<crate::notes::Graph>> {
         let presentation = PresentationPart::from_package(&self.opc)?;
-        crate::notes::load(&self.opc, presentation.part().partname())
+        crate::notes::load_with_limits(
+            &self.opc,
+            presentation.part().partname(),
+            self.semantic_limits()
+                .notes()
+                .constrained_by_source(self.opc.read_limits()),
+        )
     }
 
     /// Capture the complete notes graph as a source-checked snapshot.
@@ -524,7 +705,13 @@ impl Package {
     /// graph is malformed or exceeds its resource limits.
     pub fn notes_snapshot(&self) -> Result<Option<crate::notes::Snapshot>> {
         let presentation = PresentationPart::from_package(&self.opc)?;
-        crate::notes::load_snapshot(&self.opc, presentation.part().partname())
+        crate::notes::load_snapshot_with_limits(
+            &self.opc,
+            presentation.part().partname(),
+            self.semantic_limits()
+                .notes()
+                .constrained_by_source(self.opc.read_limits()),
+        )
     }
 
     /// Read the presentation-owned embedded-font collection.
@@ -608,7 +795,14 @@ impl Package {
         slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<Option<crate::tag::List>> {
         let slide_name = self.resolve_slide(slide.into())?;
-        Ok(crate::tag::load(&self.opc, &slide_name)?.map(crate::tag::Source::into_list))
+        Ok(crate::tag::load_with_limits(
+            &self.opc,
+            &slide_name,
+            self.semantic_limits()
+                .tag()
+                .constrained_by_source(self.opc.read_limits()),
+        )?
+        .map(crate::tag::Source::into_list))
     }
 
     /// Read the source-bound Designer tags owned by one stable slide ID.
@@ -635,7 +829,9 @@ impl Package {
     pub fn math_properties(
         &self,
     ) -> Result<Option<crate::presentation_properties::math::Properties>> {
-        crate::presentation_properties::load_math_from_package(&self.opc)
+        let limits =
+            crate::presentation_properties::Limits::from_source_limits(self.opc.read_limits());
+        crate::presentation_properties::load_math_from_package(&self.opc, limits)
     }
 
     /// Read the inert `p1710:readonlyRecommended` presentation hint.
@@ -690,8 +886,16 @@ impl Package {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::tag::List>> {
         let slide_name = self.resolve_slide(slide.into())?;
-        Ok(crate::tag::shape::load(&self.opc, &slide_name, shape)?
-            .map(crate::tag::Source::into_list))
+        Ok(crate::tag::shape::load(
+            &self.opc,
+            &slide_name,
+            shape,
+            self.semantic_limits()
+                .tag()
+                .constrained_by_source(self.opc.read_limits()),
+            self.semantic_limits().shape(),
+        )?
+        .map(crate::tag::Source::into_list))
     }
 
     /// Read the optional classification outcome attached to one semantic
@@ -707,7 +911,12 @@ impl Package {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::shape::classification::Snapshot>> {
         let slide_name = self.resolve_slide(slide.into())?;
-        crate::shape::classification::load(&self.opc, &slide_name, shape)
+        crate::shape::classification::load_with_limits(
+            &self.opc,
+            &slide_name,
+            shape,
+            self.semantic_limits().shape(),
+        )
     }
 
     /// Read the optional `p15:designElem` value attached to one semantic
@@ -723,7 +932,12 @@ impl Package {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::shape::designer::Snapshot>> {
         let slide_name = self.resolve_slide(slide.into())?;
-        crate::shape::designer::load(&self.opc, &slide_name, shape)
+        crate::shape::designer::load_with_limits(
+            &self.opc,
+            &slide_name,
+            shape,
+            self.semantic_limits().shape(),
+        )
     }
 
     /// Read one shape's source-bound `PowerPoint` 2020 Designer properties.
@@ -737,7 +951,12 @@ impl Package {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<crate::shape::designer::properties::Snapshot> {
         let (slide_name, _) = self.resolve_slide_identity(slide.into())?;
-        crate::shape::designer::load_properties(&self.opc, &slide_name, shape)
+        crate::shape::designer::load_properties_with_shape_limits(
+            &self.opc,
+            &slide_name,
+            shape,
+            self.semantic_limits().shape(),
+        )
     }
 
     /// Read all contextual 3D-model owners on one slide in source order.
@@ -750,7 +969,8 @@ impl Package {
         slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<Vec<crate::model3d::Model>> {
         let slide_name = self.resolve_slide(slide.into())?;
-        crate::model3d::package::load_all(&self.opc, &slide_name)
+        let limits = crate::model3d::codec::Limits::from_source_limits(self.opc.read_limits());
+        crate::model3d::package::load_all(&self.opc, &slide_name, limits)
     }
 
     /// Read the model3d owner attached to one semantic shape, if present.
@@ -764,7 +984,8 @@ impl Package {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::model3d::Model>> {
         let slide_name = self.resolve_slide(slide.into())?;
-        crate::model3d::package::load(&self.opc, &slide_name, shape.into())
+        let limits = crate::model3d::codec::Limits::from_source_limits(self.opc.read_limits());
+        crate::model3d::package::load(&self.opc, &slide_name, shape.into(), limits)
     }
 
     /// Load the presentation's optional `DrawingML` table-style catalog.
@@ -796,7 +1017,13 @@ impl Package {
     pub fn load_slide_sync(
         &self,
     ) -> Result<Vec<crate::presentation_properties::metadata::slide_sync::Part>> {
-        self.with_opc(crate::presentation_properties::metadata::slide_sync::load)
+        let limits = self.semantic_limits().slide_sync();
+        self.with_opc(|opc| {
+            crate::presentation_properties::metadata::slide_sync::load(
+                opc,
+                limits.constrained_by_source(opc.read_limits()),
+            )
+        })
     }
 
     /// A new package with every signature removed explicitly (ADR 0006);
@@ -834,7 +1061,8 @@ impl Package {
         self.ensure_plain_mutation("unsign")?;
         let mut opc = (*self.opc).clone();
         opc.unsign();
-        Ok(self.derive(opc))
+        let part_bytes = Self::part_bytes_for(&opc)?;
+        Ok(self.derive_with_part_bytes(opc, part_bytes))
     }
 
     /// Adopt, as this package's memo, `snapshot`'s payload-digest memo
@@ -851,6 +1079,7 @@ impl Package {
     /// cannot allocate leaves the memo empty, which only costs a later hash.
     fn adopt_part_digests(&mut self, snapshot: &crate::opened::Snapshot) {
         self.part_digests = std::sync::Arc::new(std::sync::OnceLock::new());
+        let _ = self.content_revision.set(snapshot.revision);
         if let Some(memo) = Self::memo_for(&self.opc, snapshot) {
             let _kept = self.part_digests.set(memo);
         }
@@ -870,6 +1099,7 @@ impl Package {
     /// every mutation that publishes no snapshot empties it and every
     /// publication replaces it.
     fn offer_part_digests(&self, snapshot: &crate::opened::Snapshot) {
+        let _ = self.content_revision.set(snapshot.revision);
         if self.part_digests.get().is_none()
             && let Some(memo) = Self::memo_for(&self.opc, snapshot)
         {

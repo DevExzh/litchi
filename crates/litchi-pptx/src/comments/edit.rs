@@ -14,7 +14,6 @@
     reason = "the delegated signatures name the module's values"
 )]
 
-use super::package as raw;
 use super::*;
 use crate::part_edit::{Staged, family};
 use crate::{Package, Result};
@@ -49,14 +48,29 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_comments(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_comments")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_comments",
+            |package, target, patch| {
+                let limits = package
+                    .semantic_limits()
+                    .comments()
+                    .constrained_by_source(target.read_limits());
+                patch.validate_changed_parts(target, |_, part| validate_replay_part(part, limits))
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
 impl Edit<'_> {
+    fn limits(&self) -> Limits {
+        self.staged
+            .semantic_limits()
+            .comments()
+            .constrained_by_source(self.staged.opc().read_limits())
+    }
+
     /// Load the presentation's legacy comment graph.
     ///
     /// The read applies the `PowerPoint`-compatible comment repairs of audit
@@ -75,7 +89,11 @@ impl Edit<'_> {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn comments(&self) -> Result<Option<Comments>> {
-        load_presentation_comments(self.staged.opc())
+        load_presentation_comments_with_tolerance_and_limits(
+            self.staged.opc(),
+            &mut crate::leniency::ToleranceReport::default(),
+            self.limits(),
+        )
     }
 
     /// The staged comment author `author_id`.
@@ -84,7 +102,17 @@ impl Edit<'_> {
     ///
     /// Returns an error if the operation fails.
     pub fn author(&self, author_id: u32) -> Result<Option<Author>> {
-        find_presentation_comment_author(self.staged.opc(), author_id)
+        Ok(load_presentation_comments_with_tolerance_and_limits(
+            self.staged.opc(),
+            &mut crate::leniency::ToleranceReport::default(),
+            self.limits(),
+        )?
+        .and_then(|graph| {
+            graph
+                .authors
+                .into_iter()
+                .find(|author| author.id == author_id)
+        }))
     }
 
     /// The staged legacy comment `index` (its `p:cm/@idx`) by the author `author_id` on the selected slide.
@@ -99,12 +127,23 @@ impl Edit<'_> {
         index: u32,
     ) -> Result<Option<Comment>> {
         let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
-        find_presentation_comment(
+        Ok(load_presentation_comments_with_tolerance_and_limits(
             self.staged.opc(),
-            slide_part_name.as_str(),
-            author_id,
-            index,
-        )
+            &mut crate::leniency::ToleranceReport::default(),
+            self.limits(),
+        )?
+        .and_then(|graph| {
+            graph
+                .slides
+                .into_iter()
+                .find(|slide| slide.slide_part_name == slide_part_name.as_str())
+                .and_then(|slide| {
+                    slide
+                        .comments
+                        .into_iter()
+                        .find(|comment| comment.author_id == author_id && comment.index == index)
+                })
+        }))
     }
 
     /// Replace the complete legacy comment graph (authors and every slide's comments).
@@ -113,8 +152,10 @@ impl Edit<'_> {
     ///
     /// Returns an error if the output cannot be encoded or written.
     pub fn set(&mut self, value: &Comments, conformance: Conformance) -> Result<()> {
-        self.staged
-            .update(move |opc| store_presentation_comments(opc, value, conformance))
+        let limits = self.limits();
+        self.staged.update(move |opc| {
+            store_presentation_comments_with_limits(opc, value, conformance, limits)
+        })
     }
 
     /// Add one comment author; its ID must be new.
@@ -130,8 +171,10 @@ impl Edit<'_> {
     ///
     /// Returns an error if the operation fails.
     pub fn add_author(&mut self, author: Author, conformance: Conformance) -> Result<()> {
-        self.staged
-            .update(move |opc| add_presentation_comment_author(opc, author, conformance))
+        let limits = self.limits();
+        self.staged.update(move |opc| {
+            add_presentation_comment_author_with_limits(opc, author, conformance, limits)
+        })
     }
 
     /// Replace the comment author `author_id`.
@@ -152,8 +195,15 @@ impl Edit<'_> {
         author: Author,
         conformance: Conformance,
     ) -> Result<()> {
+        let limits = self.limits();
         self.staged.update(move |opc| {
-            raw::update_presentation_comment_author(opc, author_id, author, conformance)
+            update_presentation_comment_author_with_limits(
+                opc,
+                author_id,
+                author,
+                conformance,
+                limits,
+            )
         })
     }
 
@@ -170,8 +220,10 @@ impl Edit<'_> {
     ///
     /// Returns an error if the operation fails.
     pub fn remove_author(&mut self, author_id: u32, conformance: Conformance) -> Result<bool> {
-        self.staged
-            .update(move |opc| raw::remove_presentation_comment_author(opc, author_id, conformance))
+        let limits = self.limits();
+        self.staged.update(move |opc| {
+            remove_presentation_comment_author_with_limits(opc, author_id, conformance, limits)
+        })
     }
 
     /// Reorder the comment authors to `ordered_ids`, which must name each author once.
@@ -187,8 +239,9 @@ impl Edit<'_> {
     ///
     /// Returns an error if the operation fails.
     pub fn reorder_authors(&mut self, ordered_ids: &[u32], conformance: Conformance) -> Result<()> {
+        let limits = self.limits();
         self.staged.update(move |opc| {
-            raw::reorder_presentation_comment_authors(opc, ordered_ids, conformance)
+            reorder_presentation_comment_authors_with_limits(opc, ordered_ids, conformance, limits)
         })
     }
 
@@ -211,8 +264,15 @@ impl Edit<'_> {
         conformance: Conformance,
     ) -> Result<()> {
         let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        let limits = self.limits();
         self.staged.update(move |opc| {
-            add_presentation_comment(opc, slide_part_name.as_str(), comment, conformance)
+            add_presentation_comment_with_limits(
+                opc,
+                slide_part_name.as_str(),
+                comment,
+                conformance,
+                limits,
+            )
         })
     }
 
@@ -237,14 +297,16 @@ impl Edit<'_> {
         conformance: Conformance,
     ) -> Result<()> {
         let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        let limits = self.limits();
         self.staged.update(move |opc| {
-            update_presentation_comment(
+            update_presentation_comment_with_limits(
                 opc,
                 slide_part_name.as_str(),
                 author_id,
                 index,
                 replacement,
                 conformance,
+                limits,
             )
         })
     }
@@ -269,13 +331,15 @@ impl Edit<'_> {
         conformance: Conformance,
     ) -> Result<bool> {
         let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        let limits = self.limits();
         self.staged.update(move |opc| {
-            remove_presentation_comment(
+            remove_presentation_comment_with_limits(
                 opc,
                 slide_part_name.as_str(),
                 author_id,
                 index,
                 conformance,
+                limits,
             )
         })
     }
@@ -299,12 +363,14 @@ impl Edit<'_> {
         conformance: Conformance,
     ) -> Result<()> {
         let slide_part_name = crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        let limits = self.limits();
         self.staged.update(move |opc| {
-            raw::reorder_presentation_comments(
+            reorder_presentation_comments_with_limits(
                 opc,
                 slide_part_name.as_str(),
                 ordered_keys,
                 conformance,
+                limits,
             )
         })
     }

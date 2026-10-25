@@ -23,7 +23,11 @@ impl Data {
 
     pub(crate) fn from_shared(bytes: Arc<Vec<u8>>) -> Result<Self> {
         if bytes.len() > super::MAX_MODEL_BYTES {
-            return Err(limit("model3d payload bytes", super::MAX_MODEL_BYTES));
+            return Err(limit(
+                crate::error::CodecLimitKind::PayloadBytes,
+                bytes.len(),
+                super::MAX_MODEL_BYTES,
+            ));
         }
         Ok(Self(bytes))
     }
@@ -479,14 +483,35 @@ fn is_known_scene_child(value: &drawing::Inert) -> bool {
         )
 }
 
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 /// Convert the shared model3d error into the host error without leaking its
 /// package-neutral type through the ordinary PPTX facade.
 pub(crate) fn drawing_error(error: litchi_drawingml::Error) -> Error {
     Error::Drawing(error)
+}
+
+/// Convert the shared model3d validator's error while preserving typed limit
+/// dimensions at the PPTX boundary.
+pub(crate) fn drawing_model3d_error(error: litchi_drawingml::model3d::Error) -> Error {
+    match error {
+        litchi_drawingml::model3d::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Drawing(litchi_drawingml::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        }),
+        error => Error::Drawing(litchi_drawingml::Error::Invalid(error.to_string())),
+    }
 }
 
 /// Construct a checked shared relationship identifier for package publication.

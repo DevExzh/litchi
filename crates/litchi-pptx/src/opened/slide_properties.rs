@@ -138,14 +138,16 @@ fn stage_rooted_properties(
             .checked_sub(edit.span.end - edit.span.start)
             .and_then(|length| length.checked_add(edit.value.len()))
             .ok_or(Error::Limit {
-                resource: PROPERTY_RESOURCE,
-                limit: max_output_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: usize::MAX,
+                maximum: max_output_bytes,
             })?;
     }
     if output_len > max_output_bytes {
         return Err(Error::Limit {
-            resource: PROPERTY_RESOURCE,
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: output_len,
+            maximum: max_output_bytes,
         });
     }
     edits.sort_unstable_by_key(|edit| edit.span.start);
@@ -354,12 +356,19 @@ fn escape_attribute(value: &str, maximum: usize) -> Result<Vec<u8>> {
     let length = value.chars().try_fold(0usize, |total, character| {
         total
             .checked_add(escaped_length(character))
-            .filter(|length| *length <= maximum)
             .ok_or(Error::Limit {
-                resource: PROPERTY_RESOURCE,
-                limit: maximum,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: usize::MAX,
+                maximum,
             })
     })?;
+    if length > maximum {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: length,
+            maximum,
+        });
+    }
     let mut output = Vec::new();
     output
         .try_reserve_exact(length)

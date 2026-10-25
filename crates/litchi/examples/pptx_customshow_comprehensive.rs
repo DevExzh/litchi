@@ -5,7 +5,7 @@
 //! presentation graph.
 
 use litchi_pptx::Package;
-use litchi_pptx::presentation_properties::metadata::custom_show::Show;
+use litchi_pptx::presentation_properties::metadata::custom_show::{Limits, Show};
 use litchi_pptx::presentation_properties::metadata::sections::Section;
 use litchi_pptx::presentation_properties::metadata::structure;
 use std::error::Error as StdError;
@@ -61,7 +61,7 @@ fn publish_structure(
 ) -> Result<(), Box<dyn StdError>> {
     // The builder already finalized the canonical OPC graph.
     let slide_ids = package
-        .with_opc(structure::load)?
+        .with_opc(|opc| structure::load(opc, Limits::DEFAULT))?
         .slides
         .into_iter()
         .map(|slide| slide.slide_id)
@@ -90,7 +90,7 @@ fn publish_structure(
         package = edit.commit()?.into_package();
     }
 
-    let graph = package.with_opc(structure::load)?;
+    let graph = package.with_opc(|opc| structure::load(opc, Limits::DEFAULT))?;
     assert_eq!(graph.slides.len(), slide_count);
     assert_eq!(graph.custom_shows.shows.len(), shows.len());
     assert_eq!(graph.sections.len(), sections.len());
@@ -101,7 +101,7 @@ fn publish_structure(
 
     package.save(output)?;
     let reopened = Package::open(output)?;
-    let graph = reopened.with_opc(structure::load)?;
+    let graph = reopened.with_opc(|opc| structure::load(opc, Limits::DEFAULT))?;
     assert_eq!(graph.custom_shows.shows.len(), shows.len());
     assert_eq!(graph.sections.len(), sections.len());
     println!(

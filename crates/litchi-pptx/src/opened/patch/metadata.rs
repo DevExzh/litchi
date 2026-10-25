@@ -93,9 +93,10 @@ fn text(value: &str) -> Result<String> {
 fn source_limits(limits: Limits, maximum: usize) -> Result<SourceLimits> {
     let maximum = maximum.min(u32::MAX as usize);
     if maximum == 0 {
-        return Err(Error::Limit {
-            resource: "opened-presentation metadata bytes",
-            limit: 0,
+        return Err(Error::InvalidLimit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            value: 0,
+            maximum: 0,
         });
     }
     Ok(SourceLimits::builder()
@@ -679,8 +680,9 @@ impl Metadata {
             }
         }
         if count > limits.max_parts().saturating_mul(2).saturating_add(2) {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: count,
                 maximum: limits.max_parts(),
             });
         }
@@ -691,8 +693,9 @@ impl Metadata {
     }
     pub(super) fn check(&self, limits: Limits) -> Result<()> {
         if self.members.len() > limits.max_parts().saturating_mul(2).saturating_add(2) {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: self.members.len(),
                 maximum: limits.max_parts(),
             });
         }
@@ -727,8 +730,9 @@ impl Metadata {
             .map_err(allocation)?;
         let mut push_owner = |owner: Owner| -> Result<()> {
             if owners.len() >= limits.max_parts().saturating_mul(2).saturating_add(2) {
-                return Err(Error::EditLimit {
+                return Err(Error::Limit {
                     kind: crate::opened::LimitKind::Parts,
+                    observed: owners.len().checked_add(1).unwrap_or(usize::MAX),
                     maximum: limits.max_parts(),
                 });
             }
@@ -845,8 +849,9 @@ impl Metadata {
     pub(super) fn preflight(input: &mut Input<'_>, limits: Limits) -> Result<()> {
         let count = input.usize32()?;
         if count > limits.max_parts().saturating_mul(2).saturating_add(2) {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: count,
                 maximum: limits.max_parts(),
             });
         }
@@ -876,8 +881,9 @@ impl Metadata {
     pub(super) fn parse(input: &mut Input<'_>, limits: Limits) -> Result<Self> {
         let count = input.usize32()?;
         if count > limits.max_parts().saturating_mul(2).saturating_add(2) {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: count,
                 maximum: limits.max_parts(),
             });
         }

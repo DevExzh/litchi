@@ -25,16 +25,37 @@ fn layout_and_master_read_local_powerpoint_2010_transition_choices() {
             .unwrap(),
     )
     .unwrap();
-    assert_ripple(&read(master.part().blob()).unwrap().unwrap());
+    assert_ripple(
+        &read(
+            master.part().blob(),
+            litchi_pptx::transition::Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap(),
+    );
 
     let layouts = master.layouts(&package).unwrap();
     let layout = layouts
         .iter()
         .find(|layout| layout.part().partname().as_str() == "/ppt/slideLayouts/slideLayout1.xml")
         .unwrap();
-    assert_ripple(&read(layout.part().blob()).unwrap().unwrap());
+    assert_ripple(
+        &read(
+            layout.part().blob(),
+            litchi_pptx::transition::Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap(),
+    );
     let inherited_master = layout.master(&package).unwrap();
-    assert_ripple(&read(inherited_master.part().blob()).unwrap().unwrap());
+    assert_ripple(
+        &read(
+            inherited_master.part().blob(),
+            litchi_pptx::transition::Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap(),
+    );
 
     let reference = presentation.slide_references().unwrap().remove(0);
     let slide = SlidePart::from_part(
@@ -45,11 +66,21 @@ fn layout_and_master_read_local_powerpoint_2010_transition_choices() {
     .unwrap();
     assert_eq!(reference.relationship_id(), "rId4");
     let layout = slide.layout(&package).unwrap().unwrap();
-    assert_ripple(&read(layout.part().blob()).unwrap().unwrap());
     assert_ripple(
-        &read(layout.master(&package).unwrap().part().blob())
-            .unwrap()
-            .unwrap(),
+        &read(
+            layout.part().blob(),
+            litchi_pptx::transition::Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap(),
+    );
+    assert_ripple(
+        &read(
+            layout.master(&package).unwrap().part().blob(),
+            litchi_pptx::transition::Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap(),
     );
 }
 

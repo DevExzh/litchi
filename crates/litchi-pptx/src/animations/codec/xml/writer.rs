@@ -3,9 +3,10 @@ use super::super::super::model::{
     TimingNodeKind, Trigger,
 };
 use super::super::validation::direction_subtype;
+use super::BoundedXml;
 
 pub(super) fn write_animation_xml(
-    xml: &mut String,
+    xml: &mut BoundedXml,
     anim: &EffectInstance,
     tn_id: &mut u32,
     interactive_trigger: Option<u32>,
@@ -125,7 +126,7 @@ pub(super) fn write_animation_xml(
     xml.push_str("</p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par>");
 }
 
-pub(super) fn write_timing_child(xml: &mut String, child: &TimingChild) {
+pub(super) fn write_timing_child(xml: &mut BoundedXml, child: &TimingChild) {
     let TimingChild::Node(node) = child else {
         if let TimingChild::Opaque(raw) = child {
             xml.push_str(raw);
@@ -212,7 +213,7 @@ pub(super) fn write_timing_child(xml: &mut String, child: &TimingChild) {
     }
 }
 
-fn write_condition_list(xml: &mut String, name: &str, conditions: &[TimeCondition]) {
+fn write_condition_list(xml: &mut BoundedXml, name: &str, conditions: &[TimeCondition]) {
     if conditions.is_empty() {
         return;
     }
@@ -249,7 +250,7 @@ fn write_condition_list(xml: &mut String, name: &str, conditions: &[TimeConditio
     xml.push_str(&format!("</p:{name}>"));
 }
 
-fn escape_xml(xml: &mut String, value: &str) {
+fn escape_xml(xml: &mut BoundedXml, value: &str) {
     for character in value.chars() {
         match character {
             '&' => xml.push_str("&amp;"),

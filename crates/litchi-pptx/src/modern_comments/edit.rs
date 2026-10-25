@@ -531,7 +531,7 @@ impl Edit<'_> {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn changes(&self) -> Result<Vec<ChangeCommand>> {
-        load_modern_comment_changes(self.staged.opc())
+        load_modern_comment_changes(self.staged.opc(), self.staged.changes_limits())
     }
 
     /// Update typed modern-comment commands transactionally.
@@ -553,8 +553,9 @@ impl Edit<'_> {
     where
         F: FnOnce(&mut Vec<ChangeCommand>),
     {
+        let limits = self.staged.changes_limits();
         self.staged
-            .update(move |opc| update_modern_comment_changes(opc, update))
+            .update(move |opc| update_modern_comment_changes(opc, limits, update))
     }
 
     /// Discard every staged change.

@@ -44,21 +44,47 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_author_presence(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_author_presence")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_author_presence",
+            |package, target, patch| {
+                let limits = package
+                    .semantic_limits()
+                    .comments()
+                    .constrained_by_source(target.read_limits());
+                patch.validate_changed_parts(target, |_, part| {
+                    if part.content_type() == crate::comments::AUTHORS_CONTENT_TYPE {
+                        super::validate_presence_replay(part.blob(), limits)
+                    } else {
+                        crate::comments::validate_replay_part(part, limits)
+                    }
+                })
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
 impl Edit<'_> {
+    fn limits(&self) -> super::super::Limits {
+        self.staged
+            .semantic_limits()
+            .comments()
+            .constrained_by_source(self.staged.opc().read_limits())
+    }
+
     /// The staged presence extension of the comment author `author_id`.
     ///
     /// # Errors
     ///
     /// Returns an error for malformed comment-author markup.
     pub fn presence(&self, author_id: u32) -> Result<Option<PresenceInfo>> {
-        package::load_presence(self.staged.opc(), author_id)
+        Ok(package::load_presence_snapshot_with_limits(
+            self.staged.opc(),
+            author_id,
+            self.limits(),
+        )?
+        .and_then(|snapshot| snapshot.value().cloned()))
     }
 
     /// Create or replace the presence extension of the comment author
@@ -69,8 +95,9 @@ impl Edit<'_> {
     /// Returns an error for a missing author, malformed markup, or a changed
     /// edit of a signed package.
     pub fn set(&mut self, author_id: u32, value: PresenceInfo) -> Result<Option<PresenceInfo>> {
+        let limits = self.limits();
         self.staged
-            .update(move |opc| package::put_presence(opc, author_id, value))
+            .update(move |opc| package::put_presence_with_limits(opc, author_id, value, limits))
     }
 
     /// Remove the presence extension of the comment author `author_id`.
@@ -81,8 +108,9 @@ impl Edit<'_> {
     /// Returns an error for malformed markup or a changed edit of a signed
     /// package.
     pub fn remove(&mut self, author_id: u32) -> Result<Option<PresenceInfo>> {
+        let limits = self.limits();
         self.staged
-            .update(move |opc| package::remove_presence(opc, author_id))
+            .update(move |opc| package::remove_presence_with_limits(opc, author_id, limits))
     }
 
     /// Discard every staged change.

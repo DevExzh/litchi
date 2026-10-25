@@ -58,7 +58,8 @@ fn body_properties_and_runs_are_read_in_each_ancestor_namespace_scope() {
             BODY.to_owned()
         };
         let xml = shape(&body, &extra, &shape_extra, &tree_extra);
-        let scene = Scene::read(xml.as_bytes()).unwrap_or_else(|error| panic!("{label}: {error}"));
+        let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT)
+            .unwrap_or_else(|error| panic!("{label}: {error}"));
         let selected = scene.get("Text").unwrap().unwrap();
         let body = selected
             .text_body()
@@ -103,7 +104,7 @@ fn group_namespace_is_retained_and_bom_offsets_cover_the_processed_owner() {
     );
     let mut marked = vec![0xEF, 0xBB, 0xBF];
     marked.extend_from_slice(xml.as_bytes());
-    let scene = Scene::read(&marked).expect("BOM owner");
+    let scene = Scene::read(&marked, litchi_pptx::shape::Limits::DEFAULT).expect("BOM owner");
     let selected = scene.get("Text").unwrap().unwrap();
     assert_eq!(selected.text_body().unwrap().unwrap().text(), "grouped");
     let span = raw::text_body_span(selected).expect("raw text-body span");
@@ -123,7 +124,8 @@ fn mid_tree_namespace_rebindings_are_used_for_lazy_bodies() {
             </p:sp>
         </p:spTree></p:cSld></p:sld>"#
     );
-    let scene = Scene::read(xml.as_bytes()).expect("mid-tree owner");
+    let scene =
+        Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).expect("mid-tree owner");
     let selected = scene.get("MidTree").unwrap().unwrap();
     assert_eq!(selected.text_body().unwrap().unwrap().text(), "mid-tree");
 }
@@ -133,7 +135,7 @@ fn owned_lazy_body_keeps_the_caller_limits() {
     let xml = shape(BODY, &format!(r#"xmlns:a="{DML}" xmlns:r="{REL}""#), "", "");
     let limits = litchi_pptx::shape::Limits::new(xml.len(), xml.len(), 64, 128, 1, 64)
         .expect("finite limits");
-    let scene = litchi_pptx::shape::owned::Scene::read_with(xml.into_bytes(), limits)
+    let scene = litchi_pptx::shape::owned::Scene::read(xml.into_bytes(), limits)
         .expect("small bounded owner");
     assert_eq!(scene.limits(), limits);
     let selected = scene.shape("Text").unwrap().unwrap();
@@ -155,7 +157,8 @@ fn duplicate_direct_bodies_are_refused_but_nested_foreign_body_is_not_owned() {
         "",
         "",
     );
-    let scene = Scene::read(duplicate.as_bytes()).expect("duplicate owner remains indexed");
+    let scene = Scene::read(duplicate.as_bytes(), litchi_pptx::shape::Limits::DEFAULT)
+        .expect("duplicate owner remains indexed");
     let selected = scene.get("Text").unwrap().unwrap();
     assert!(selected.text_body().is_err());
     assert!(raw::text_body_span(selected).is_some());
@@ -166,7 +169,8 @@ fn duplicate_direct_bodies_are_refused_but_nested_foreign_body_is_not_owned() {
         "",
         "",
     );
-    let nested_scene = Scene::read(nested.as_bytes()).expect("nested owner");
+    let nested_scene =
+        Scene::read(nested.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).expect("nested owner");
     let selected = nested_scene.get("Text").unwrap().unwrap();
     assert!(raw::text_body_span(selected).is_none());
     assert_eq!(selected.text_body().unwrap(), None);
@@ -182,7 +186,8 @@ fn markup_compatibility_selection_and_strict_property_errors_are_preserved() {
             <mc:Fallback><p:sp><p:nvSpPr><p:cNvPr id="3" name="Fallback"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/></p:sp></mc:Fallback></mc:AlternateContent>
         </p:spTree></p:cSld></p:sld>"#
     );
-    let scene = Scene::read(xml.as_bytes()).expect("MCE owner");
+    let scene =
+        Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).expect("MCE owner");
     assert!(scene.is_rewritten());
     let selected = scene.get("Choice").unwrap().unwrap();
     assert!(scene.get("Fallback").unwrap().is_none());

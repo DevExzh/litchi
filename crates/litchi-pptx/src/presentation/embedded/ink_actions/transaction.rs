@@ -68,8 +68,9 @@ impl Draft {
         let index = self.source.find(selector)?;
         if profile.source().len() > self.source.limits().target_bytes {
             return Err(Error::Limit {
-                resource: "ink-action target bytes",
-                limit: self.source.limits().target_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                observed: profile.source().len(),
+                maximum: self.source.limits().target_bytes,
             });
         }
         if self.source.anchors()[index].profile() == &profile {
@@ -94,8 +95,9 @@ impl Draft {
     ) -> Result<bool> {
         if bytes.as_ref().len() > self.source.limits().target_bytes {
             return Err(Error::Limit {
-                resource: "ink-action target bytes",
-                limit: self.source.limits().target_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                observed: bytes.as_ref().len(),
+                maximum: self.source.limits().target_bytes,
             });
         }
         let profile = actions::read_profile(bytes.as_ref(), actions::Limits::DEFAULT)?;
@@ -230,8 +232,11 @@ impl Draft {
             let size = profile.source().len();
             if size > limits.target_bytes {
                 return Err(Error::Limit {
-                    resource: "ink-action target bytes",
-                    limit: limits.target_bytes,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::PayloadBytes,
+                    ),
+                    observed: size,
+                    maximum: limits.target_bytes,
                 });
             }
             if let Some(existing_index) =
@@ -253,13 +258,17 @@ impl Draft {
         let mut aggregate = 0usize;
         for size in final_sizes.values() {
             aggregate = aggregate.checked_add(*size).ok_or(Error::Limit {
-                resource: "ink-action aggregate target bytes",
-                limit: limits.total_target_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                observed: usize::MAX,
+                maximum: limits.total_target_bytes,
             })?;
             if aggregate > limits.total_target_bytes {
                 return Err(Error::Limit {
-                    resource: "ink-action aggregate target bytes",
-                    limit: limits.total_target_bytes,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::PayloadBytes,
+                    ),
+                    observed: aggregate,
+                    maximum: limits.total_target_bytes,
                 });
             }
         }

@@ -11,7 +11,12 @@ impl Edit {
     fn comment_conformance(&self, slide: &litchi_opc::PackURI) -> Result<Conformance> {
         let owner = self.working.get_part(slide)?;
         Ok(
-            match crate::media_parts::document_conformance(owner.blob())? {
+            match crate::media_parts::document_conformance_with_limits(
+                owner.blob(),
+                self.semantic_limits()
+                    .media_parts()
+                    .constrained_by_source(self.working.read_limits()),
+            )? {
                 crate::media_parts::Conformance::Transitional => Conformance::Transitional,
                 crate::media_parts::Conformance::Strict => Conformance::Strict,
             },
@@ -42,7 +47,10 @@ impl Edit {
     ) -> Result<Position> {
         let selected = self.resolve_slide(slide.into())?;
         let conformance = self.comment_conformance(&selected.part_name)?;
-        let graph = crate::comments::load_presentation_comments_strict(&self.working)?;
+        let graph = crate::comments::load_presentation_comments_strict_with_limits(
+            &self.working,
+            self.comments_limits(),
+        )?;
         let (authors, existing) = graph.as_ref().map_or((&[][..], 0), |graph| {
             let existing = graph
                 .slides
@@ -60,6 +68,7 @@ impl Edit {
                 "several comment authors share the requested name",
             ));
         }
+        let limits = self.comments_limits();
         let before = self.working.clone();
         let result = (|| {
             let author = match found {
@@ -74,10 +83,11 @@ impl Edit {
                             Error::Invalid("comment author identifiers are exhausted".into())
                         })?;
                     let created = Author::new(id, author, initials);
-                    crate::comments::add_presentation_comment_author(
+                    crate::comments::add_presentation_comment_author_with_limits(
                         &mut self.working,
                         created.clone(),
                         conformance,
+                        limits,
                     )?;
                     created
                 },
@@ -91,11 +101,12 @@ impl Edit {
             if let Some(date_time) = date_time {
                 comment = comment.with_date_time(date_time);
             }
-            crate::comments::add_presentation_comment(
+            crate::comments::add_presentation_comment_with_limits(
                 &mut self.working,
                 selected.part_name.as_str(),
                 comment,
                 conformance,
+                limits,
             )
         })();
         if let Err(error) = result {
@@ -121,7 +132,10 @@ impl Edit {
     ) -> Result<bool> {
         let selected = self.resolve_slide(slide.into())?;
         let conformance = self.comment_conformance(&selected.part_name)?;
-        let graph = crate::comments::load_presentation_comments_strict(&self.working)?;
+        let graph = crate::comments::load_presentation_comments_strict_with_limits(
+            &self.working,
+            self.comments_limits(),
+        )?;
         let comments = graph
             .as_ref()
             .and_then(|graph| {
@@ -149,13 +163,15 @@ impl Edit {
             return Ok(false);
         }
         let before = self.working.clone();
-        if let Err(error) = crate::comments::update_presentation_comment(
+        let limits = self.comments_limits();
+        if let Err(error) = crate::comments::update_presentation_comment_with_limits(
             &mut self.working,
             selected.part_name.as_str(),
             current.author_id,
             current.index,
             replacement,
             conformance,
+            limits,
         ) {
             self.working = before;
             return Err(error);
@@ -185,13 +201,15 @@ impl Edit {
         let mut replacement = current.clone();
         replacement.date_time = Some(date_time.to_owned());
         let before = self.working.clone();
-        if let Err(error) = crate::comments::update_presentation_comment(
+        let limits = self.comments_limits();
+        if let Err(error) = crate::comments::update_presentation_comment_with_limits(
             &mut self.working,
             selected.part_name.as_str(),
             current.author_id,
             current.index,
             replacement,
             conformance,
+            limits,
         ) {
             self.working = before;
             return Err(error);
@@ -223,7 +241,8 @@ impl Edit {
         let conformance = self.comment_conformance(&selected.part_name)?;
         let current = self.legacy_comment(&selected.part_name, position)?;
         let before = self.working.clone();
-        match crate::comments::reattribute_presentation_comment(
+        let limits = self.comments_limits();
+        match crate::comments::reattribute_presentation_comment_with_limits(
             &mut self.working,
             selected.part_name.as_str(),
             current.author_id,
@@ -231,6 +250,7 @@ impl Edit {
             name,
             initials,
             conformance,
+            limits,
         ) {
             Ok(changed) => Ok(changed),
             Err(error) => {
@@ -242,7 +262,10 @@ impl Edit {
 
     /// The legacy comment at `position` of a slide part.
     fn legacy_comment(&self, slide: &litchi_opc::PackURI, position: Position) -> Result<Comment> {
-        let graph = crate::comments::load_presentation_comments_strict(&self.working)?;
+        let graph = crate::comments::load_presentation_comments_strict_with_limits(
+            &self.working,
+            self.comments_limits(),
+        )?;
         let comments = graph
             .as_ref()
             .and_then(|graph| {
@@ -280,7 +303,10 @@ impl Edit {
     ) -> Result<bool> {
         let selected = self.resolve_slide(slide.into())?;
         let conformance = self.comment_conformance(&selected.part_name)?;
-        let graph = crate::comments::load_presentation_comments_strict(&self.working)?;
+        let graph = crate::comments::load_presentation_comments_strict_with_limits(
+            &self.working,
+            self.comments_limits(),
+        )?;
         let comments = graph
             .as_ref()
             .and_then(|graph| {
@@ -297,12 +323,14 @@ impl Edit {
                 len: comments.len(),
             })?;
         let before = self.working.clone();
-        match crate::comments::remove_presentation_comment(
+        let limits = self.comments_limits();
+        match crate::comments::remove_presentation_comment_with_limits(
             &mut self.working,
             selected.part_name.as_str(),
             current.author_id,
             current.index,
             conformance,
+            limits,
         ) {
             Ok(changed) => Ok(changed),
             Err(error) => {

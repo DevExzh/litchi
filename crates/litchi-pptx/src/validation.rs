@@ -1294,9 +1294,10 @@ impl Facts {
 
     fn issue_capacity_check(&self, observed: usize) -> Result<(), Error> {
         if observed >= self.issue_capacity {
+            let next_issue = observed.checked_add(1).unwrap_or(usize::MAX);
             return Err(Error::Report(ValidationReportError::Limit {
                 kind: ValidationLimitKind::Issues,
-                observed: observed.saturating_add(1),
+                observed: next_issue,
                 limit: self.issue_capacity,
             }));
         }

@@ -4,9 +4,27 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use super::Limits;
 use super::codec::*;
 use super::model::*;
+use crate::{Error, Result};
 use std::collections::HashSet;
+
+fn parse_timing_tree(xml: &str) -> Result<TimingTree> {
+    TimingTree::parse(xml, Limits::DEFAULT)
+}
+
+fn parse_slide_xml(xml: &[u8]) -> Result<Sequence> {
+    Sequence::parse_slide_xml(xml, Limits::DEFAULT)
+}
+
+fn parse_slide_xml_strict(xml: &[u8]) -> Result<Sequence> {
+    Sequence::parse_slide_xml_strict(xml, Limits::DEFAULT)
+}
+
+fn parse_template_time_node(xml: &str) -> Result<TemplateTimeNode> {
+    TemplateTimeNode::parse(xml, Limits::DEFAULT)
+}
 #[cfg(test)]
 mod recursive_timing_tests {
     use super::*;
@@ -18,8 +36,8 @@ mod recursive_timing_tests {
         let xml = format!(
             r#"<p:timing xmlns:p="{NS}"><p:tnLst><p:seq concurrent="1" nextAc="seek"><p:cTn id="1" nodeType="interactiveSeq" presetID="10" presetClass="entr"><p:stCondLst><p:cond evt="onClick" delay="0"><p:tgtEl><p:spTgt spid="7"/></p:tgtEl></p:cond><p:cond evt="onEnd" delay="25"><p:tn val="9"/></p:cond></p:stCondLst><p:childTnLst><p:par><p:cTn id="2" presetID="11" presetClass="emph"/></p:par></p:childTnLst></p:cTn><p:extLst><p:ext uri="opaque"><x:data xmlns:x="urn:test"/></p:ext></p:extLst></p:seq></p:tnLst></p:timing>"#
         );
-        let tree = TimingTree::parse(&xml).expect("nested timing parses");
-        assert_eq!(tree.to_xml(), xml);
+        let tree = parse_timing_tree(&xml).expect("nested timing parses");
+        assert_eq!(tree.to_xml(Limits::DEFAULT).unwrap(), xml);
         let TimingChild::Node(root) = &tree.roots[0] else {
             panic!("typed root")
         };
@@ -55,7 +73,10 @@ mod recursive_timing_tests {
         let xml = format!(
             r#"<p:timing xmlns:p="{NS}"><p:tnLst><p:par><p:cTn id="not-a-number"/></p:par></p:tnLst></p:timing>"#
         );
-        assert!(TimingTree::parse(&xml).is_err());
+        assert!(matches!(
+            parse_timing_tree(&xml),
+            Err(Error::Invalid(reason)) if reason == "invalid common time-node ID"
+        ));
     }
 
     #[test]
@@ -63,7 +84,7 @@ mod recursive_timing_tests {
         let xml = format!(
             r#"<p:timing xmlns:p="{NS}" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"><p:tnLst><p:par><p:cTn><p:stCondLst><p:cond delay="0"><p:tgtEl><p14:bmkTgt spid="7" bmkName="cue"/></p:tgtEl></p:cond></p:stCondLst></p:cTn></p:par></p:tnLst></p:timing>"#
         );
-        let tree = TimingTree::parse(&xml).expect("media bookmark target parses");
+        let tree = parse_timing_tree(&xml).expect("media bookmark target parses");
         let TimingChild::Node(root) = &tree.roots[0] else {
             panic!("typed root")
         };
@@ -74,7 +95,7 @@ mod recursive_timing_tests {
 
         let mut rewritten = tree.clone();
         rewritten.roots.push(TimingChild::Opaque("".into()));
-        let emitted = rewritten.to_xml();
+        let emitted = rewritten.to_xml(Limits::DEFAULT).unwrap();
         assert!(emitted.contains(r#"<p14:bmkTgt xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" spid="7" bmkName="cue"/>"#));
     }
 
@@ -83,7 +104,7 @@ mod recursive_timing_tests {
         let xml = format!(
             r#"<p:timing xmlns:p="{NS}" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"><p:tnLst><p:par><p:cTn p14:presetBounceEnd="50000"/></p:par></p:tnLst></p:timing>"#
         );
-        let tree = TimingTree::parse(&xml).expect("preset bounce parses");
+        let tree = parse_timing_tree(&xml).expect("preset bounce parses");
         let TimingChild::Node(root) = &tree.roots[0] else {
             panic!("typed root")
         };
@@ -98,7 +119,8 @@ mod recursive_timing_tests {
         rewritten.roots.push(TimingChild::Opaque("".into()));
         assert!(
             rewritten
-                .to_xml()
+                .to_xml(Limits::DEFAULT)
+                .unwrap()
                 .contains(r#"p14:presetBounceEnd="50000""#)
         );
     }
@@ -113,7 +135,14 @@ mod recursive_timing_tests {
             xml.push_str("</p:childTnLst></p:cTn></p:par>");
         }
         xml.push_str("</p:tnLst></p:timing>");
-        assert!(TimingTree::parse(&xml).is_err());
+        assert!(matches!(
+            parse_timing_tree(&xml),
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlDepth),
+                observed,
+                maximum,
+            }) if observed > maximum && maximum == MAX_TIMING_DEPTH
+        ));
     }
 
     #[test]
@@ -123,7 +152,14 @@ mod recursive_timing_tests {
             xml.push_str(&format!("<p:par><p:cTn id=\"{id}\"/></p:par>"));
         }
         xml.push_str("</p:tnLst></p:timing>");
-        assert!(TimingTree::parse(&xml).is_err());
+        assert!(matches!(
+            parse_timing_tree(&xml),
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlNodes),
+                observed,
+                maximum,
+            }) if observed > maximum && maximum == MAX_TIMING_NODES
+        ));
     }
 }
 
@@ -252,7 +288,33 @@ mod integration_tests {
         seq.add(EffectInstance::new(2, Effect::FlyIn).with_trigger(Trigger::AfterPrevious));
 
         assert_eq!(seq.len(), 2);
-        assert!(!seq.to_xml().is_empty());
+        assert!(!seq.to_xml(Limits::DEFAULT).unwrap().is_empty());
+    }
+
+    #[test]
+    fn raw_output_policy_admits_exact_wire_and_refuses_one_byte_under() {
+        let mut sequence = Sequence::new();
+        sequence.add(EffectInstance::new(1, Effect::Fade));
+        let wire = sequence.to_xml(Limits::DEFAULT).unwrap();
+        let exact = Limits {
+            max_output_bytes: wire.len(),
+            ..Limits::DEFAULT
+        };
+        assert_eq!(sequence.to_xml(exact).unwrap(), wire);
+        let output_limit = sequence
+            .to_xml(Limits {
+                max_output_bytes: wire.len().saturating_sub(1),
+                ..exact
+            })
+            .unwrap_err();
+        assert!(matches!(
+            output_limit,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlBytes),
+                observed,
+                maximum,
+            } if observed > maximum && maximum == wire.len().saturating_sub(1)
+        ));
     }
 
     #[test]
@@ -263,7 +325,7 @@ mod integration_tests {
             effect("4", 42, "entr", "withEffect", "0", 20, 600),
             effect("5", 8, "emph", "afterEffect", "0", 40, 900),
         );
-        let sequence = Sequence::parse_slide_xml(slide(&timing).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide(&timing).as_bytes()).unwrap();
         assert_eq!(sequence.len(), 3);
         assert_eq!(sequence.animations[0].shape_id, 3);
         assert_eq!(sequence.animations[0].effect, Effect::Fade);
@@ -287,7 +349,7 @@ mod integration_tests {
         ];
         for effect in cases {
             let timing = format!("<p:timing><p:tnLst>{effect}</p:tnLst></p:timing>");
-            assert!(Sequence::parse_slide_xml(slide(&timing).as_bytes()).is_err());
+            assert!(parse_slide_xml(slide(&timing).as_bytes()).is_err());
         }
 
         let duplicate = effect("3", 10, "entr", "clickEffect", "indefinite", 0, 500).replace(
@@ -295,14 +357,14 @@ mod integration_tests {
             "<p:spTgt spid=\"3\"/><p:spTgt spid=\"4\"/>",
         );
         let timing = format!("<p:timing><p:tnLst>{duplicate}</p:tnLst></p:timing>");
-        assert!(Sequence::parse_slide_xml(slide(&timing).as_bytes()).is_err());
+        assert!(parse_slide_xml(slide(&timing).as_bytes()).is_err());
 
         let spoofed = effect("3", 10, "entr", "clickEffect", "indefinite", 0, 500).replace(
             "<p:spTgt spid=\"3\"/>",
             "<x:spTgt xmlns:x=\"urn:foreign\" spid=\"3\"/>",
         );
         let timing = format!("<p:timing><p:tnLst>{spoofed}</p:tnLst></p:timing>");
-        assert!(Sequence::parse_slide_xml(slide(&timing).as_bytes()).is_err());
+        assert!(parse_slide_xml(slide(&timing).as_bytes()).is_err());
     }
 
     /// Stale cross-references that used to fail the whole timing tree are
@@ -402,7 +464,7 @@ mod integration_tests {
             ),
         ];
         for (xml, skipped) in cases {
-            let sequence = Sequence::parse_slide_xml(xml.as_bytes())
+            let sequence = parse_slide_xml(xml.as_bytes())
                 .unwrap_or_else(|error| panic!("stale target must repair: {error}\n{xml}"));
             let recorded: Vec<_> = sequence
                 .tolerance_report()
@@ -413,7 +475,7 @@ mod integration_tests {
             let expected: Vec<_> = skipped.iter().map(|id| (orphan, *id, None)).collect();
             assert_eq!(recorded, expected, "{xml}");
             assert!(sequence.preserved_timing_xml().is_none());
-            assert!(Sequence::parse_slide_xml_strict(xml.as_bytes()).is_err());
+            assert!(parse_slide_xml_strict(xml.as_bytes()).is_err());
         }
     }
 
@@ -426,7 +488,7 @@ mod integration_tests {
             effect("3", 10, "entr", "clickEffect", "indefinite", 0, 500)
         );
         let xml = slide(&timing).replace(r#"<p:cNvPr id="4" "#, r#"<p:cNvPr id="3" "#);
-        let sequence = Sequence::parse_slide_xml(xml.as_bytes()).unwrap();
+        let sequence = parse_slide_xml(xml.as_bytes()).unwrap();
         assert_eq!(sequence.animations.len(), 1);
         assert_eq!(sequence.animations[0].shape_id, 3);
         // Nothing was skipped, so the verbatim subtree still round-trips.
@@ -449,7 +511,7 @@ mod integration_tests {
             r#"<p:cNvPr id="3" name="A"/>"#,
             r#"<p:cNvPr id="5" name="A"/>"#,
         );
-        let sequence = Sequence::parse_slide_xml(xml.as_bytes()).unwrap();
+        let sequence = parse_slide_xml(xml.as_bytes()).unwrap();
         assert!(sequence.graphic_builds.is_empty());
         let recorded: Vec<_> = sequence
             .tolerance_report()
@@ -472,10 +534,10 @@ mod integration_tests {
             "<p:timing><p:tnLst>{}</p:tnLst></p:timing>",
             effect("3", 10, "entr", "clickEffect", "indefinite", 0, 500)
         );
-        let sequence = Sequence::parse_slide_xml(slide(&timing).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide(&timing).as_bytes()).unwrap();
         assert!(sequence.tolerance_report().is_clean());
         assert!(sequence.preserved_timing_xml().is_some());
-        assert!(Sequence::parse_slide_xml_strict(slide(&timing).as_bytes()).is_ok());
+        assert!(parse_slide_xml_strict(slide(&timing).as_bytes()).is_ok());
     }
 
     #[test]
@@ -485,7 +547,7 @@ mod integration_tests {
             "<p:par>".repeat(MAX_TIMING_DEPTH + 1),
             "</p:par>".repeat(MAX_TIMING_DEPTH + 1)
         );
-        assert!(Sequence::parse_slide_xml(slide(&nested).as_bytes()).is_err());
+        assert!(parse_slide_xml(slide(&nested).as_bytes()).is_err());
     }
 
     #[test]
@@ -495,7 +557,7 @@ mod integration_tests {
             effect("3", 10, "entr", "clickEffect", "indefinite", 0, 500)
                 .replace("dur=\"500\"", "dur=\"indefinite\"")
         );
-        let sequence = Sequence::parse_slide_xml(slide(&timing).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide(&timing).as_bytes()).unwrap();
         assert_eq!(sequence.animations[0].duration, Duration::Indefinite);
     }
 
@@ -505,12 +567,12 @@ mod integration_tests {
             "<p:timing><p:tnLst>{}</p:tnLst><p:extLst><p:ext uri=\"urn:test\"><x:opaque xmlns:x=\"urn:opaque\" value=\"kept\"><![CDATA[raw]]></x:opaque></p:ext></p:extLst></p:timing>",
             effect("3", 10, "entr", "clickEffect", "indefinite", 0, 500)
         );
-        let mut sequence = Sequence::parse_slide_xml(slide(&timing).as_bytes()).unwrap();
+        let mut sequence = parse_slide_xml(slide(&timing).as_bytes()).unwrap();
         assert_eq!(sequence.preserved_timing_xml(), Some(timing.as_str()));
-        assert_eq!(sequence.to_xml(), timing);
+        assert_eq!(sequence.to_xml(Limits::DEFAULT).unwrap(), timing);
 
         sequence.animations[0].duration = Duration::Finite(750);
-        let canonical = sequence.to_xml();
+        let canonical = sequence.to_xml(Limits::DEFAULT).unwrap();
         assert!(canonical.contains("dur=\"750\""));
         assert!(!canonical.contains("x:opaque"));
     }
@@ -528,7 +590,7 @@ mod integration_tests {
             effect("3", 23, "entr", "withEffect", "0", 0, 500)
                 .replace("presetSubtype=\"0\"", "presetSubtype=\"288\"")
         );
-        let sequence = Sequence::parse_slide_xml(slide(&timing).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide(&timing).as_bytes()).unwrap();
         assert_eq!(sequence.animations[0].direction, Some(Direction::UpRight));
         assert_eq!(sequence.animations[1].direction, Some(Direction::DownLeft));
         assert_eq!(
@@ -549,7 +611,7 @@ mod integration_tests {
                 " fill=\"freeze\" restart=\"whenNotActive\" autoRev=\"1\" repeatCount=\"3500\" nodeType=\"clickEffect\"",
             );
         let timing = format!("<p:timing><p:tnLst>{configured}</p:tnLst></p:timing>");
-        let sequence = Sequence::parse_slide_xml(slide(&timing).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide(&timing).as_bytes()).unwrap();
         let animation = &sequence.animations[0];
         assert_eq!(animation.fill, Some(Fill::Freeze));
         assert_eq!(animation.restart, Some(Restart::WhenNotActive));
@@ -570,7 +632,7 @@ mod integration_tests {
                 &format!(" {attribute} nodeType=\"clickEffect\""),
             );
             let timing = format!("<p:timing><p:tnLst>{configured}</p:tnLst></p:timing>");
-            assert!(Sequence::parse_slide_xml(slide(&timing).as_bytes()).is_err());
+            assert!(parse_slide_xml(slide(&timing).as_bytes()).is_err());
         }
     }
 
@@ -582,7 +644,7 @@ mod integration_tests {
                 " spd=\"-50000\" accel=\"25000\" decel=\"10000\" display=\"0\" nodeType=\"clickEffect\"",
             );
         let timing = format!("<p:timing><p:tnLst>{configured}</p:tnLst></p:timing>");
-        let sequence = Sequence::parse_slide_xml(slide(&timing).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide(&timing).as_bytes()).unwrap();
         let animation = &sequence.animations[0];
         assert_eq!(
             animation.speed.map(Speed::thousandths_percent),
@@ -618,7 +680,7 @@ mod integration_tests {
                 &format!(" {attribute} nodeType=\"clickEffect\""),
             );
             let timing = format!("<p:timing><p:tnLst>{configured}</p:tnLst></p:timing>");
-            assert!(Sequence::parse_slide_xml(slide(&timing).as_bytes()).is_err());
+            assert!(parse_slide_xml(slide(&timing).as_bytes()).is_err());
         }
     }
 
@@ -630,7 +692,7 @@ mod integration_tests {
                 " repeatDur=\"indefinite\" syncBehavior=\"locked\" afterEffect=\"1\" nodeType=\"clickEffect\"",
             );
         let timing = format!("<p:timing><p:tnLst>{configured}</p:tnLst></p:timing>");
-        let sequence = Sequence::parse_slide_xml(slide(&timing).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide(&timing).as_bytes()).unwrap();
         let animation = &sequence.animations[0];
         assert_eq!(animation.repeat_duration, Some(Duration::Indefinite));
         assert_eq!(animation.sync_behavior, Some(SyncBehavior::Locked));
@@ -650,7 +712,7 @@ mod integration_tests {
                 &format!(" {attribute} nodeType=\"clickEffect\""),
             );
             let timing = format!("<p:timing><p:tnLst>{configured}</p:tnLst></p:timing>");
-            assert!(Sequence::parse_slide_xml(slide(&timing).as_bytes()).is_err());
+            assert!(parse_slide_xml(slide(&timing).as_bytes()).is_err());
         }
     }
 
@@ -661,7 +723,7 @@ mod integration_tests {
             " tmFilter=\"0.0,0.0; 0.25,0.07; 0.50,0.2; 1.0,1.0\" nodeType=\"clickEffect\"",
         );
         let timing = format!("<p:timing><p:tnLst>{configured}</p:tnLst></p:timing>");
-        let sequence = Sequence::parse_slide_xml(slide(&timing).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide(&timing).as_bytes()).unwrap();
         let points = sequence.animations[0]
             .time_filter
             .as_ref()
@@ -701,7 +763,7 @@ mod integration_tests {
                 &format!(" tmFilter=\"{filter}\" nodeType=\"clickEffect\""),
             );
             let timing = format!("<p:timing><p:tnLst>{configured}</p:tnLst></p:timing>");
-            assert!(Sequence::parse_slide_xml(slide(&timing).as_bytes()).is_err());
+            assert!(parse_slide_xml(slide(&timing).as_bytes()).is_err());
         }
     }
 
@@ -709,7 +771,7 @@ mod integration_tests {
     fn parses_and_canonicalizes_contextual_cancel_bubble_filter() {
         let interactive = interactive_effect("4", "cancelBubble");
         let timing = format!("<p:timing><p:tnLst>{interactive}</p:tnLst></p:timing>");
-        let mut sequence = Sequence::parse_slide_xml(slide(&timing).as_bytes()).unwrap();
+        let mut sequence = parse_slide_xml(slide(&timing).as_bytes()).unwrap();
         assert_eq!(
             sequence.animations[0].sequence_context,
             SequenceContext::Interactive {
@@ -718,15 +780,15 @@ mod integration_tests {
             }
         );
         assert_eq!(sequence.preserved_timing_xml(), Some(timing.as_str()));
-        assert_eq!(sequence.to_xml(), timing);
+        assert_eq!(sequence.to_xml(Limits::DEFAULT).unwrap(), timing);
 
         sequence.animations[0].duration = Duration::Finite(750);
-        let canonical = sequence.to_xml();
+        let canonical = sequence.to_xml(Limits::DEFAULT).unwrap();
         assert!(canonical.contains(r#"nodeType="interactiveSeq" evtFilter="cancelBubble""#));
         assert!(
             canonical.contains(r#"<p:cond evt="onClick" delay="0"><p:tgtEl><p:spTgt spid="4"/>"#)
         );
-        let reparsed = Sequence::parse_slide_xml(slide(&canonical).as_bytes()).unwrap();
+        let reparsed = parse_slide_xml(slide(&canonical).as_bytes()).unwrap();
         assert_eq!(reparsed, sequence);
     }
 
@@ -768,7 +830,7 @@ mod integration_tests {
             ),
         ];
         for timing in cases {
-            assert!(Sequence::parse_slide_xml(slide(&timing).as_bytes()).is_err());
+            assert!(parse_slide_xml(slide(&timing).as_bytes()).is_err());
         }
     }
 
@@ -781,34 +843,40 @@ mod integration_tests {
                 .with_trigger(Trigger::OnClick),
         );
         let targets = HashSet::from([3, 4]);
-        let xml = sequence.to_xml_for_slide(&targets).unwrap();
+        let xml = sequence
+            .to_xml_for_slide(&targets, Limits::DEFAULT)
+            .unwrap();
         assert!(xml.contains(r#"nodeType="interactiveSeq" evtFilter="cancelBubble""#));
-        let parsed = Sequence::parse_slide_xml(slide(&xml).as_bytes()).unwrap();
+        let parsed = parse_slide_xml(slide(&xml).as_bytes()).unwrap();
         assert_eq!(parsed, sequence);
 
         sequence.animations[0].sequence_context = SequenceContext::Interactive {
             trigger_shape_id: 99,
             event_filter: Some(EventFilter::CancelBubble),
         };
-        assert!(sequence.to_xml_for_slide(&targets).is_err());
+        assert!(
+            sequence
+                .to_xml_for_slide(&targets, Limits::DEFAULT)
+                .is_err()
+        );
     }
 
     #[test]
     fn parses_preserves_and_writes_paragraph_build_group_references() {
         let timing = grouped_timing("3", "42");
-        let mut sequence = Sequence::parse_slide_xml(slide(&timing).as_bytes()).unwrap();
+        let mut sequence = parse_slide_xml(slide(&timing).as_bytes()).unwrap();
         assert_eq!(sequence.animations[0].group_id, Some(GroupId::new(42)));
         assert_eq!(
             sequence.paragraph_builds,
             vec![ParagraphBuild::new(3, GroupId::new(42))]
         );
-        assert_eq!(sequence.to_xml(), timing);
+        assert_eq!(sequence.to_xml(Limits::DEFAULT).unwrap(), timing);
 
         sequence.animations[0].duration = Duration::Finite(750);
-        let canonical = sequence.to_xml();
+        let canonical = sequence.to_xml(Limits::DEFAULT).unwrap();
         assert!(canonical.contains(r#"grpId="42" nodeType="clickEffect""#));
         assert!(canonical.contains(r#"<p:bldLst><p:bldP spid="3" grpId="42"/></p:bldLst>"#));
-        let reparsed = Sequence::parse_slide_xml(slide(&canonical).as_bytes()).unwrap();
+        let reparsed = parse_slide_xml(slide(&canonical).as_bytes()).unwrap();
         assert_eq!(reparsed, sequence);
     }
 
@@ -838,7 +906,7 @@ mod integration_tests {
             ),
         ];
         for timing in cases {
-            assert!(Sequence::parse_slide_xml(slide(&timing).as_bytes()).is_err());
+            assert!(parse_slide_xml(slide(&timing).as_bytes()).is_err());
         }
     }
 
@@ -847,19 +915,26 @@ mod integration_tests {
         let targets = HashSet::from([3]);
         let mut sequence = Sequence::new();
         sequence.add(EffectInstance::new(3, Effect::Fade).with_group_id(7));
-        assert!(sequence.to_xml_for_slide(&targets).is_err());
+        assert!(
+            sequence
+                .to_xml_for_slide(&targets, Limits::DEFAULT)
+                .is_err()
+        );
 
         sequence.add_paragraph_build(ParagraphBuild::new(3, GroupId::new(7)));
-        assert!(sequence.to_xml_for_slide(&targets).is_ok());
+        assert!(sequence.to_xml_for_slide(&targets, Limits::DEFAULT).is_ok());
 
         sequence.paragraph_builds[0].shape_id = 99;
-        assert!(sequence.to_xml_for_slide(&targets).is_err());
+        assert!(
+            sequence
+                .to_xml_for_slide(&targets, Limits::DEFAULT)
+                .is_err()
+        );
     }
 
     #[test]
     fn parses_bldp_schema_defaults_and_powerpoint_auto_advance_semantics() {
-        let sequence =
-            Sequence::parse_slide_xml(slide(&grouped_timing("3", "42")).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide(&grouped_timing("3", "42")).as_bytes()).unwrap();
         let build = &sequence.paragraph_builds[0];
         assert!(!build.ui_expand);
         assert_eq!(build.build_type, ParagraphBuildType::Whole);
@@ -877,7 +952,7 @@ mod integration_tests {
             r#"<p:bldP spid="3" grpId="42"/>"#,
             r#"<p:bldP spid="3" grpId="42" uiExpand="true" build="p" bldLvl="3" animBg="1" autoUpdateAnimBg="false" rev="true" advAuto="4294967295"/>"#,
         );
-        let mut sequence = Sequence::parse_slide_xml(slide(&configured).as_bytes()).unwrap();
+        let mut sequence = parse_slide_xml(slide(&configured).as_bytes()).unwrap();
         let build = &sequence.paragraph_builds[0];
         assert!(build.ui_expand);
         assert_eq!(build.build_type, ParagraphBuildType::Paragraph);
@@ -888,11 +963,11 @@ mod integration_tests {
         assert_eq!(build.auto_advance, Duration::Finite(u32::MAX));
 
         sequence.animations[0].duration = Duration::Finite(750);
-        let canonical = sequence.to_xml();
+        let canonical = sequence.to_xml(Limits::DEFAULT).unwrap();
         assert!(canonical.contains(
             r#"<p:bldP spid="3" grpId="42" uiExpand="1" build="p" bldLvl="3" animBg="1" autoUpdateAnimBg="0" rev="1" advAuto="4294967295"/>"#
         ));
-        let reparsed = Sequence::parse_slide_xml(slide(&canonical).as_bytes()).unwrap();
+        let reparsed = parse_slide_xml(slide(&canonical).as_bytes()).unwrap();
         assert_eq!(reparsed, sequence);
     }
 
@@ -916,7 +991,7 @@ mod integration_tests {
                 r#"<p:bldP spid="3" grpId="42"/>"#,
                 &format!(r#"<p:bldP spid="3" grpId="42" {attributes}/>"#),
             );
-            assert!(Sequence::parse_slide_xml(slide(&timing).as_bytes()).is_err());
+            assert!(parse_slide_xml(slide(&timing).as_bytes()).is_err());
         }
     }
 
@@ -926,14 +1001,18 @@ mod integration_tests {
         let mut sequence = Sequence::new();
         sequence.add(EffectInstance::new(3, Effect::Fade).with_group_id(7));
         sequence.add_paragraph_build(ParagraphBuild::new(3, GroupId::new(7)).with_build_level(2));
-        assert!(sequence.to_xml_for_slide(&targets).is_err());
+        assert!(
+            sequence
+                .to_xml_for_slide(&targets, Limits::DEFAULT)
+                .is_err()
+        );
 
         sequence.paragraph_builds[0] = sequence.paragraph_builds[0]
             .clone()
             .with_build_type(ParagraphBuildType::Paragraph)
             .with_reverse(true)
             .with_auto_advance(250u32);
-        assert!(sequence.to_xml_for_slide(&targets).is_ok());
+        assert!(sequence.to_xml_for_slide(&targets, Limits::DEFAULT).is_ok());
     }
 
     #[test]
@@ -944,19 +1023,19 @@ mod integration_tests {
             r#"<p:bldP spid="3" grpId="42"/>"#,
             &format!(r#"<p:bldP spid="3" grpId="42" build="p"><p:tmplLst><p:tmpl><p:tnLst>{first}</p:tnLst></p:tmpl><p:tmpl lvl="2"><p:tnLst>{second}</p:tnLst></p:tmpl></p:tmplLst></p:bldP>"#),
         );
-        let mut sequence = Sequence::parse_slide_xml(slide(&configured).as_bytes()).unwrap();
+        let mut sequence = parse_slide_xml(slide(&configured).as_bytes()).unwrap();
         let templates = &sequence.paragraph_builds[0].templates;
         assert_eq!(templates.len(), 2);
         assert_eq!(templates[0].level, 0);
         assert_eq!(templates[0].time_node.as_xml(), first);
         assert_eq!(templates[1].level, 2);
         assert_eq!(templates[1].time_node.as_xml(), second);
-        assert_eq!(sequence.to_xml(), configured);
+        assert_eq!(sequence.to_xml(Limits::DEFAULT).unwrap(), configured);
 
         sequence.animations[0].duration = Duration::Finite(750);
-        let canonical = sequence.to_xml();
+        let canonical = sequence.to_xml(Limits::DEFAULT).unwrap();
         assert!(canonical.contains(&format!(r#"<p:tmplLst><p:tmpl><p:tnLst>{first}</p:tnLst></p:tmpl><p:tmpl lvl="2"><p:tnLst>{second}</p:tnLst></p:tmpl></p:tmplLst>"#)));
-        let reparsed = Sequence::parse_slide_xml(slide(&canonical).as_bytes()).unwrap();
+        let reparsed = parse_slide_xml(slide(&canonical).as_bytes()).unwrap();
         assert_eq!(reparsed, sequence);
     }
 
@@ -986,7 +1065,7 @@ mod integration_tests {
                 r#"<p:bldP spid="3" grpId="42"/>"#,
                 &format!(r#"<p:bldP spid="3" grpId="42" build="p"><p:tmplLst>{list}</p:tmplLst></p:bldP>"#),
             );
-            assert!(Sequence::parse_slide_xml(slide(&timing).as_bytes()).is_err());
+            assert!(parse_slide_xml(slide(&timing).as_bytes()).is_err());
         }
     }
 
@@ -1000,10 +1079,10 @@ mod integration_tests {
             r#"<x:par xmlns:x="urn:foreign"><x:cTn/></x:par>"#,
             r"<!DOCTYPE x><p:par><p:cTn/></p:par>",
         ] {
-            assert!(TemplateTimeNode::parse(xml).is_err());
+            assert!(parse_template_time_node(xml).is_err());
         }
 
-        let node = TemplateTimeNode::parse(r#"<p:par><p:cTn id="90"/></p:par>"#).unwrap();
+        let node = parse_template_time_node(r#"<p:par><p:cTn id="90"/></p:par>"#).unwrap();
         assert!(ParagraphTemplate::new(10, node.clone()).is_err());
         let mut sequence = Sequence::new();
         sequence.add(EffectInstance::new(3, Effect::Fade).with_group_id(7));
@@ -1014,13 +1093,17 @@ mod integration_tests {
                 .with_template(duplicate.clone())
                 .with_template(duplicate),
         );
-        assert!(sequence.to_xml_for_slide(&HashSet::from([3])).is_err());
+        assert!(
+            sequence
+                .to_xml_for_slide(&HashSet::from([3]), Limits::DEFAULT)
+                .is_err()
+        );
     }
 
     #[test]
     fn parses_preserves_and_writes_complete_diagram_build_grammar() {
         let timing = diagram_timing("5", "77", r#" uiExpand="true" bld="ccwOut""#);
-        let mut sequence = Sequence::parse_slide_xml(slide_with_ole(&timing).as_bytes()).unwrap();
+        let mut sequence = parse_slide_xml(slide_with_ole(&timing).as_bytes()).unwrap();
         assert_eq!(
             sequence.diagram_builds,
             vec![DiagramBuild {
@@ -1030,12 +1113,12 @@ mod integration_tests {
                 build_type: DiagramBuildType::CounterClockwiseOut,
             }]
         );
-        assert_eq!(sequence.to_xml(), timing);
+        assert_eq!(sequence.to_xml(Limits::DEFAULT).unwrap(), timing);
 
         sequence.animations[0].duration = Duration::Finite(750);
-        let canonical = sequence.to_xml();
+        let canonical = sequence.to_xml(Limits::DEFAULT).unwrap();
         assert!(canonical.contains(r#"<p:bldDgm spid="5" grpId="77" uiExpand="1" bld="ccwOut"/>"#));
-        let reparsed = Sequence::parse_slide_xml(slide_with_ole(&canonical).as_bytes()).unwrap();
+        let reparsed = parse_slide_xml(slide_with_ole(&canonical).as_bytes()).unwrap();
         assert_eq!(reparsed, sequence);
     }
 
@@ -1061,10 +1144,10 @@ mod integration_tests {
             "cust",
         ] {
             let timing = diagram_timing("5", "77", &format!(r#" bld="{token}""#));
-            assert!(Sequence::parse_slide_xml(slide_with_ole(&timing).as_bytes()).is_ok());
+            assert!(parse_slide_xml(slide_with_ole(&timing).as_bytes()).is_ok());
         }
         let timing = diagram_timing("5", "77", "");
-        let sequence = Sequence::parse_slide_xml(slide_with_ole(&timing).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide_with_ole(&timing).as_bytes()).unwrap();
         assert_eq!(
             sequence.diagram_builds[0].build_type,
             DiagramBuildType::Whole
@@ -1099,7 +1182,7 @@ mod integration_tests {
             )),
         ];
         for xml in cases {
-            assert!(Sequence::parse_slide_xml(xml.as_bytes()).is_err());
+            assert!(parse_slide_xml(xml.as_bytes()).is_err());
         }
     }
 
@@ -1113,12 +1196,20 @@ mod integration_tests {
                 .with_ui_expand(true)
                 .with_build_type(DiagramBuildType::BreadthByLevel),
         );
-        assert!(sequence.to_xml_for_slide(&targets).is_ok());
+        assert!(sequence.to_xml_for_slide(&targets, Limits::DEFAULT).is_ok());
         sequence.diagram_builds.push(sequence.diagram_builds[0]);
-        assert!(sequence.to_xml_for_slide(&targets).is_err());
+        assert!(
+            sequence
+                .to_xml_for_slide(&targets, Limits::DEFAULT)
+                .is_err()
+        );
         sequence.diagram_builds.pop();
         sequence.diagram_builds[0].shape_id = 99;
-        assert!(sequence.to_xml_for_slide(&targets).is_err());
+        assert!(
+            sequence
+                .to_xml_for_slide(&targets, Limits::DEFAULT)
+                .is_err()
+        );
     }
 
     #[test]
@@ -1129,8 +1220,7 @@ mod integration_tests {
             r#" uiExpand="true""#,
             r#"<p:bldSub><a:bldChart bld="seriesEl" animBg="false"/></p:bldSub>"#,
         );
-        let mut sequence =
-            Sequence::parse_slide_xml(slide_with_graphic_hosts(&timing).as_bytes()).unwrap();
+        let mut sequence = parse_slide_xml(slide_with_graphic_hosts(&timing).as_bytes()).unwrap();
         assert_eq!(
             sequence.graphic_builds,
             vec![GraphicBuild {
@@ -1143,23 +1233,21 @@ mod integration_tests {
                 },
             }]
         );
-        assert_eq!(sequence.to_xml(), timing);
+        assert_eq!(sequence.to_xml(Limits::DEFAULT).unwrap(), timing);
 
         sequence.animations[0].duration = Duration::Finite(750);
-        let canonical = sequence.to_xml();
+        let canonical = sequence.to_xml(Limits::DEFAULT).unwrap();
         assert!(canonical.contains(
             r#"<p:bldGraphic spid="5" grpId="88" uiExpand="1"><p:bldSub><a:bldChart bld="seriesEl" animBg="0"/></p:bldSub></p:bldGraphic>"#
         ));
-        let reparsed =
-            Sequence::parse_slide_xml(slide_with_graphic_hosts(&canonical).as_bytes()).unwrap();
+        let reparsed = parse_slide_xml(slide_with_graphic_hosts(&canonical).as_bytes()).unwrap();
         assert_eq!(reparsed, sequence);
     }
 
     #[test]
     fn accepts_all_graphic_build_modes_tokens_and_schema_defaults() {
         let as_one = graphic_timing("5", "88", "", "<p:bldAsOne/>");
-        let sequence =
-            Sequence::parse_slide_xml(slide_with_graphic_hosts(&as_one).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide_with_graphic_hosts(&as_one).as_bytes()).unwrap();
         assert_eq!(sequence.graphic_builds[0].mode, GraphicBuildMode::AsOne);
 
         for token in ["allAtOnce", "one", "lvlOne", "lvlAtOnce"] {
@@ -1169,9 +1257,7 @@ mod integration_tests {
                 "",
                 &format!(r#"<p:bldSub><a:bldDgm bld="{token}"/></p:bldSub>"#),
             );
-            assert!(
-                Sequence::parse_slide_xml(slide_with_graphic_hosts(&timing).as_bytes()).is_ok()
-            );
+            assert!(parse_slide_xml(slide_with_graphic_hosts(&timing).as_bytes()).is_ok());
         }
         for token in ["allAtOnce", "series", "category", "seriesEl", "categoryEl"] {
             let timing = graphic_timing(
@@ -1180,14 +1266,11 @@ mod integration_tests {
                 "",
                 &format!(r#"<p:bldSub><a:bldChart bld="{token}"/></p:bldSub>"#),
             );
-            assert!(
-                Sequence::parse_slide_xml(slide_with_graphic_hosts(&timing).as_bytes()).is_ok()
-            );
+            assert!(parse_slide_xml(slide_with_graphic_hosts(&timing).as_bytes()).is_ok());
         }
 
         let diagram = graphic_timing("6", "88", "", "<p:bldSub><a:bldDgm/></p:bldSub>");
-        let sequence =
-            Sequence::parse_slide_xml(slide_with_graphic_hosts(&diagram).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide_with_graphic_hosts(&diagram).as_bytes()).unwrap();
         assert_eq!(
             sequence.graphic_builds[0].mode,
             GraphicBuildMode::Diagram {
@@ -1196,8 +1279,7 @@ mod integration_tests {
             }
         );
         let chart = graphic_timing("5", "88", "", "<p:bldSub><a:bldChart/></p:bldSub>");
-        let sequence =
-            Sequence::parse_slide_xml(slide_with_graphic_hosts(&chart).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide_with_graphic_hosts(&chart).as_bytes()).unwrap();
         assert_eq!(
             sequence.graphic_builds[0].mode,
             GraphicBuildMode::Chart {
@@ -1262,30 +1344,26 @@ mod integration_tests {
             valid_chart.replace(r#" spid="5" grpId="88""#, r#" grpId="88""#),
         ];
         for timing in cases {
-            assert!(
-                Sequence::parse_slide_xml(slide_with_graphic_hosts(&timing).as_bytes()).is_err()
-            );
+            assert!(parse_slide_xml(slide_with_graphic_hosts(&timing).as_bytes()).is_err());
         }
 
         let chart_marker =
             r#"<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#;
         let duplicate_marker = slide_with_graphic_hosts(&valid_chart)
             .replace(chart_marker, &format!(r"{chart_marker}{chart_marker}"));
-        assert!(Sequence::parse_slide_xml(duplicate_marker.as_bytes()).is_err());
+        assert!(parse_slide_xml(duplicate_marker.as_bytes()).is_err());
 
         let ambiguous_marker = slide_with_graphic_hosts(&valid_chart).replace(
             chart_marker,
             &format!(r#"{chart_marker}<dgm:relIds xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram"/>"#),
         );
-        assert!(Sequence::parse_slide_xml(ambiguous_marker.as_bytes()).is_err());
+        assert!(parse_slide_xml(ambiguous_marker.as_bytes()).is_err());
 
         let duplicate = valid_chart.replace(
             "</p:bldLst>",
             r#"<p:bldGraphic spid="5" grpId="88"><p:bldAsOne/></p:bldGraphic></p:bldLst>"#,
         );
-        assert!(
-            Sequence::parse_slide_xml(slide_with_graphic_hosts(&duplicate).as_bytes()).is_err()
-        );
+        assert!(parse_slide_xml(slide_with_graphic_hosts(&duplicate).as_bytes()).is_err());
     }
 
     #[test]
@@ -1294,17 +1372,34 @@ mod integration_tests {
         let mut sequence = Sequence::new();
         sequence.add(EffectInstance::new(5, Effect::Fade).with_group_id(88));
         sequence.add_graphic_build(GraphicBuild::chart(5, GroupId::new(88)));
-        assert!(sequence.to_xml_for_slide(&targets).is_ok());
+        assert!(sequence.to_xml_for_slide(&targets, Limits::DEFAULT).is_ok());
         sequence.graphic_builds.push(sequence.graphic_builds[0]);
-        assert!(sequence.to_xml_for_slide(&targets).is_err());
+        assert!(
+            sequence
+                .to_xml_for_slide(&targets, Limits::DEFAULT)
+                .is_err()
+        );
         sequence.graphic_builds.pop();
         sequence.graphic_builds[0].shape_id = 99;
-        assert!(sequence.to_xml_for_slide(&targets).is_err());
+        assert!(
+            sequence
+                .to_xml_for_slide(&targets, Limits::DEFAULT)
+                .is_err()
+        );
 
         let mut oversized = Sequence::new();
         oversized.graphic_builds =
             vec![GraphicBuild::as_one(5, GroupId::new(88)); MAX_ANIMATION_BUILDS + 1];
-        assert!(oversized.to_xml_for_slide(&targets).is_err());
+        assert!(matches!(
+            oversized.to_xml_for_slide(&targets, Limits::DEFAULT),
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::Codec(
+                    crate::error::CodecLimitKind::AnimationBuilds
+                ),
+                observed,
+                maximum,
+            }) if observed > maximum && maximum == MAX_ANIMATION_BUILDS
+        ));
     }
 
     #[test]
@@ -1314,8 +1409,7 @@ mod integration_tests {
             "91",
             r#" uiExpand="true" bld="categoryEl" animBg="false""#,
         );
-        let mut sequence =
-            Sequence::parse_slide_xml(slide_with_ole_chart(&timing).as_bytes()).unwrap();
+        let mut sequence = parse_slide_xml(slide_with_ole_chart(&timing).as_bytes()).unwrap();
         assert_eq!(
             sequence.ole_chart_builds,
             vec![OleChartBuild {
@@ -1326,15 +1420,14 @@ mod integration_tests {
                 animate_background: false,
             }]
         );
-        assert_eq!(sequence.to_xml(), timing);
+        assert_eq!(sequence.to_xml(Limits::DEFAULT).unwrap(), timing);
 
         sequence.animations[0].duration = Duration::Finite(750);
-        let canonical = sequence.to_xml();
+        let canonical = sequence.to_xml(Limits::DEFAULT).unwrap();
         assert!(canonical.contains(
             r#"<p:bldOleChart spid="5" grpId="91" uiExpand="1" bld="categoryEl" animBg="0"/>"#
         ));
-        let reparsed =
-            Sequence::parse_slide_xml(slide_with_ole_chart(&canonical).as_bytes()).unwrap();
+        let reparsed = parse_slide_xml(slide_with_ole_chart(&canonical).as_bytes()).unwrap();
         assert_eq!(reparsed, sequence);
     }
 
@@ -1342,10 +1435,10 @@ mod integration_tests {
     fn accepts_every_ole_chart_build_token_and_schema_defaults() {
         for token in ["allAtOnce", "series", "category", "seriesEl", "categoryEl"] {
             let timing = ole_chart_timing("5", "91", &format!(r#" bld="{token}""#));
-            assert!(Sequence::parse_slide_xml(slide_with_ole_chart(&timing).as_bytes()).is_ok());
+            assert!(parse_slide_xml(slide_with_ole_chart(&timing).as_bytes()).is_ok());
         }
         let timing = ole_chart_timing("5", "91", "");
-        let sequence = Sequence::parse_slide_xml(slide_with_ole(&timing).as_bytes()).unwrap();
+        let sequence = parse_slide_xml(slide_with_ole(&timing).as_bytes()).unwrap();
         assert_eq!(
             sequence.ole_chart_builds[0].build_type,
             OleChartBuildType::AllAtOnce
@@ -1383,14 +1476,14 @@ mod integration_tests {
             ),
         ];
         for xml in cases {
-            assert!(Sequence::parse_slide_xml(xml.as_bytes()).is_err());
+            assert!(parse_slide_xml(xml.as_bytes()).is_err());
         }
 
         let duplicate = slide_with_ole_chart(&valid).replace(
             "</p:bldLst>",
             r#"<p:bldOleChart spid="5" grpId="91"/></p:bldLst>"#,
         );
-        assert!(Sequence::parse_slide_xml(duplicate.as_bytes()).is_err());
+        assert!(parse_slide_xml(duplicate.as_bytes()).is_err());
     }
 
     #[test]
@@ -1404,17 +1497,34 @@ mod integration_tests {
                 .with_build_type(OleChartBuildType::Series)
                 .with_animate_background(false),
         );
-        assert!(sequence.to_xml_for_slide(&targets).is_ok());
+        assert!(sequence.to_xml_for_slide(&targets, Limits::DEFAULT).is_ok());
         sequence.ole_chart_builds.push(sequence.ole_chart_builds[0]);
-        assert!(sequence.to_xml_for_slide(&targets).is_err());
+        assert!(
+            sequence
+                .to_xml_for_slide(&targets, Limits::DEFAULT)
+                .is_err()
+        );
         sequence.ole_chart_builds.pop();
         sequence.ole_chart_builds[0].shape_id = 99;
-        assert!(sequence.to_xml_for_slide(&targets).is_err());
+        assert!(
+            sequence
+                .to_xml_for_slide(&targets, Limits::DEFAULT)
+                .is_err()
+        );
 
         let mut oversized = Sequence::new();
         oversized.ole_chart_builds =
             vec![OleChartBuild::new(5, GroupId::new(91)); MAX_ANIMATION_BUILDS + 1];
-        assert!(oversized.to_xml_for_slide(&targets).is_err());
+        assert!(matches!(
+            oversized.to_xml_for_slide(&targets, Limits::DEFAULT),
+            Err(Error::Limit {
+                kind: crate::error::LimitKind::Codec(
+                    crate::error::CodecLimitKind::AnimationBuilds
+                ),
+                observed,
+                maximum,
+            }) if observed > maximum && maximum == MAX_ANIMATION_BUILDS
+        ));
     }
 }
 

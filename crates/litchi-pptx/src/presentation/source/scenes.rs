@@ -447,11 +447,16 @@ impl super::SourceSlide {
                     maximum: self.owner.limits.max_part_bytes(),
                 }));
             }
-            let semantic_maximum = crate::shape::Limits::DEFAULT.input_bytes();
+            let shape_limits =
+                crate::open_options::selected(self.owner.semantic_limits.as_ref()).shape();
+            let semantic_maximum = shape_limits.input_bytes();
             if declared > semantic_maximum as u64 {
                 return Err(crate::Error::Limit {
-                    resource: "shape owner input bytes",
-                    limit: semantic_maximum,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::InputBytes,
+                    ),
+                    observed: usize::try_from(declared).unwrap_or(usize::MAX),
+                    maximum: semantic_maximum,
                 });
             }
             let part = self.load_part(&view)?;
@@ -460,7 +465,10 @@ impl super::SourceSlide {
                 self.owner.limits,
             )?;
             let slide = crate::parts::SlidePart::from_part(&part)?;
-            let scene = Scene::from_source(slide.shapes()?, part.source_data().clone())?;
+            let scene = Scene::from_source(
+                slide.shapes_with_limits(shape_limits)?,
+                part.source_data().clone(),
+            )?;
             fence()?;
             Ok(scene)
         })();
@@ -494,7 +502,7 @@ mod tests {
         let xml = format!(
             r#"<p:spTree xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:nvGrpSpPr/><p:grpSpPr/>{body}</p:spTree>"#
         );
-        Scene::read(xml.into_bytes()).unwrap()
+        Scene::read(xml.into_bytes(), crate::shape::Limits::DEFAULT).unwrap()
     }
 
     fn weight(scene: &Scene, part: &PackURI) -> usize {

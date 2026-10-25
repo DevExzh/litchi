@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use super::codec::{MAX_OWNER_BYTES, MAX_OWNER_NODES, anchor_id, scan_layout, selected_raw_span};
+use super::codec::{anchor_id, scan_layout, selected_raw_span_with_limits};
 use crate::tag::pml;
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
@@ -37,9 +37,14 @@ pub(super) fn validate_staged_anchor(
     xml: &[u8],
     key: crate::shape::Key<'_>,
     expected_id: Option<&str>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<()> {
     validate_owner_content_type(owner.content_type())?;
-    let staged = scan_layout(xml, selected_raw_span(xml, key)?)?;
+    let staged = scan_layout(
+        xml,
+        selected_raw_span_with_limits(xml, key, shape_limits)?,
+        shape_limits,
+    )?;
     if staged.anchor.as_ref().map(|anchor| anchor.id.as_str()) != expected_id {
         return Err(crate::tag::invalid(
             "staged shape tag anchor did not round-trip",
@@ -48,27 +53,53 @@ pub(super) fn validate_staged_anchor(
     Ok(())
 }
 
-pub(super) fn active_pml_offsets(xml: &[u8], span: &Range<usize>) -> Result<Vec<u32>> {
+pub(super) fn active_pml_offsets(
+    xml: &[u8],
+    span: &Range<usize>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Vec<u32>> {
+    if xml.len() > shape_limits.input_bytes() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: shape_limits.input_bytes(),
+        });
+    }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     let mut offsets = Vec::new();
     let mut nodes = 0usize;
+    let mut depth = 0usize;
     loop {
         let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let profile = pml(&namespace);
         drop(namespace);
         match event {
-            Event::Start(_) | Event::Empty(_)
-                if start >= span.start && start < span.end && profile.is_some() =>
-            {
-                bump_nodes(&mut nodes)?;
-                try_push(
-                    &mut offsets,
-                    offset_u32(start)?,
-                    "shape MCE candidate offsets",
-                )?;
+            Event::Start(_) => {
+                enter_depth(&mut depth, shape_limits)?;
+                if start >= span.start && start < span.end && profile.is_some() {
+                    bump_nodes(&mut nodes, shape_limits)?;
+                    try_push(
+                        &mut offsets,
+                        offset_u32(start)?,
+                        "shape MCE candidate offsets",
+                    )?;
+                }
             },
+            Event::Empty(_) => {
+                enter_depth(&mut depth, shape_limits)?;
+                leave_depth(&mut depth)?;
+                if start >= span.start && start < span.end && profile.is_some() {
+                    bump_nodes(&mut nodes, shape_limits)?;
+                    try_push(
+                        &mut offsets,
+                        offset_u32(start)?,
+                        "shape MCE candidate offsets",
+                    )?;
+                }
+            },
+            Event::End(_) => leave_depth(&mut depth)?,
             Event::Eof => break,
             _ => {},
         }
@@ -80,32 +111,46 @@ pub(super) fn active_pml_offsets(xml: &[u8], span: &Range<usize>) -> Result<Vec<
         xml,
         &offsets,
         &shape_mce_capabilities(),
-        &OffsetLimits::default(),
+        &shape_offset_limits(shape_limits),
     )
     .map_err(Into::into)
 }
 
-pub(super) fn preserved_anchor_uses(xml: &[u8], relationship_id: &str) -> Result<usize> {
-    if xml.len() > MAX_OWNER_BYTES {
+pub(super) fn preserved_anchor_uses(
+    xml: &[u8],
+    relationship_id: &str,
+    shape_limits: crate::shape::Limits,
+) -> Result<usize> {
+    if xml.len() > shape_limits.input_bytes() {
         return Err(Error::Limit {
-            resource: "shape-tag owner XML bytes",
-            limit: MAX_OWNER_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: shape_limits.input_bytes(),
         });
     }
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     let mut nodes = 0usize;
+    let mut depth = 0usize;
     let mut uses = 0usize;
     loop {
         let start = xml_position(&reader, origin)?;
         let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
         let profile = pml(&namespace);
         drop(namespace);
+        let is_start = matches!(&event, Event::Start(_));
         match event {
-            Event::Start(element) | Event::Empty(element)
-                if profile.is_some() && element.local_name().as_ref() == b"tags" =>
-            {
-                bump_nodes(&mut nodes)?;
+            Event::Start(element) | Event::Empty(element) => {
+                if is_start {
+                    enter_depth(&mut depth, shape_limits)?;
+                } else {
+                    enter_depth(&mut depth, shape_limits)?;
+                    leave_depth(&mut depth)?;
+                }
+                bump_nodes(&mut nodes, shape_limits)?;
+                if profile.is_none() || element.local_name().as_ref() != b"tags" {
+                    continue;
+                }
                 let profile = profile
                     .ok_or_else(|| crate::tag::invalid("preserved p:tags profile is missing"))?;
                 let (id, _) = anchor_id(
@@ -117,12 +162,15 @@ pub(super) fn preserved_anchor_uses(xml: &[u8], relationship_id: &str) -> Result
                 )?;
                 if id == relationship_id {
                     uses = uses.checked_add(1).ok_or(Error::Limit {
-                        resource: "preserved shape tag-anchor references",
-                        limit: MAX_OWNER_NODES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: usize::MAX,
+                        maximum: shape_limits.nodes(),
                     })?;
                 }
             },
-            Event::Start(_) | Event::Empty(_) => bump_nodes(&mut nodes)?,
+            Event::End(_) => leave_depth(&mut depth)?,
             Event::Eof => break,
             _ => {},
         }
@@ -135,6 +183,24 @@ pub(super) fn shape_mce_capabilities() -> Capabilities {
     capabilities.understand_namespace(P14);
     capabilities.understand_namespace(P15);
     capabilities
+}
+
+pub(super) fn shape_mce_limits(limits: crate::shape::Limits) -> litchi_ooxml_common::mce::Limits {
+    litchi_ooxml_common::mce::Limits {
+        max_input_bytes: limits.input_bytes(),
+        max_output_bytes: limits.output_bytes(),
+        max_depth: limits.depth(),
+        ..litchi_ooxml_common::mce::Limits::default()
+    }
+}
+
+pub(super) fn shape_offset_limits(limits: crate::shape::Limits) -> OffsetLimits {
+    OffsetLimits {
+        max_source_bytes: limits.input_bytes(),
+        max_offsets: limits.nodes(),
+        max_marked_bytes: limits.input_bytes(),
+        processing: shape_mce_limits(limits),
+    }
 }
 
 pub(super) fn has_non_namespace_attrs(element: &BytesStart<'_>) -> Result<bool> {
@@ -175,19 +241,44 @@ pub(super) fn try_push<T>(values: &mut Vec<T>, value: T, resource: &'static str)
     Ok(())
 }
 
-pub(super) fn bump_nodes(nodes: &mut usize) -> Result<()> {
+pub(super) fn bump_nodes(nodes: &mut usize, limits: crate::shape::Limits) -> Result<()> {
     *nodes = nodes.checked_add(1).ok_or(Error::Limit {
-        resource: "shape-tag owner XML nodes",
-        limit: MAX_OWNER_NODES,
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+        observed: usize::MAX,
+        maximum: limits.nodes(),
     })?;
-    if *nodes > MAX_OWNER_NODES {
+    if *nodes > limits.nodes() {
         Err(Error::Limit {
-            resource: "shape-tag owner XML nodes",
-            limit: MAX_OWNER_NODES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: *nodes,
+            maximum: limits.nodes(),
         })
     } else {
         Ok(())
     }
+}
+
+pub(super) fn enter_depth(depth: &mut usize, limits: crate::shape::Limits) -> Result<()> {
+    *depth = depth.checked_add(1).ok_or(Error::Limit {
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+        observed: usize::MAX,
+        maximum: limits.depth(),
+    })?;
+    if *depth > limits.depth() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+            observed: *depth,
+            maximum: limits.depth(),
+        });
+    }
+    Ok(())
+}
+
+pub(super) fn leave_depth(depth: &mut usize) -> Result<()> {
+    *depth = depth
+        .checked_sub(1)
+        .ok_or_else(|| crate::tag::invalid("shape-tag owner XML depth underflow"))?;
+    Ok(())
 }
 
 pub(super) fn offset_u32(offset: usize) -> Result<u32> {

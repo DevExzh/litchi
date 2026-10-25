@@ -13,6 +13,7 @@ use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
+use super::codec::Limits;
 use super::model::MediaKey;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -25,9 +26,10 @@ pub(crate) const P173: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/
 pub const TRACKS_INFO_URI: &str = "{3AFAAA56-56D3-431D-BCD4-E75A35582382}";
 pub const NARRATION_URI: &str = "{42D2F446-02D8-4167-A562-619A0277C38B}";
 
-const MAX_SLIDE_BYTES: usize = 64 * 1024 * 1024;
-const MAX_TRACKS: usize = 4_096;
-const MAX_STRING_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_SLIDE_BYTES: usize = 64 * 1024 * 1024;
+pub(crate) const MAX_XML_NODES: usize = 1_000_000;
+pub(crate) const MAX_TRACKS: usize = 4_096;
+pub(crate) const MAX_STRING_BYTES: usize = 1024 * 1024;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Attr {
@@ -104,15 +106,16 @@ struct Shape {
     narration: Option<Narration>,
 }
 
-pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
+pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Option<Found>> {
     if xml.is_empty() {
         return Err(invalid("slide XML is empty"));
     }
-    if xml.len() > MAX_SLIDE_BYTES {
-        return Err(Error::Limit {
-            resource: "slide XML bytes for media tracks",
-            limit: MAX_SLIDE_BYTES,
-        });
+    if xml.len() > limits.max_slide_xml_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::InputBytes,
+            xml.len(),
+            limits.max_slide_xml_bytes(),
+        ));
     }
 
     let mut reader = NsReader::from_reader(xml);
@@ -135,14 +138,19 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
 
         match event {
             Event::Start(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| invalid("slide XML node count overflow"))?;
-                if nodes > 1_000_000 {
-                    return Err(Error::Limit {
-                        resource: "slide XML nodes for media tracks",
-                        limit: 1_000_000,
-                    });
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_xml_nodes(),
+                    )
+                })?;
+                if nodes > limits.max_xml_nodes() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_xml_nodes(),
+                    ));
                 }
                 let kind = classify(
                     namespace,
@@ -176,8 +184,8 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                             ));
                         }
                         current.media = Some(Media {
-                            embed: attr(&element, b"embed", Some(b"r"), decoder, start)?,
-                            link: attr(&element, b"link", Some(b"r"), decoder, start)?,
+                            embed: attr(&element, b"embed", Some(b"r"), decoder, start, limits)?,
+                            link: attr(&element, b"link", Some(b"r"), decoder, start, limits)?,
                             tracks_info: None,
                         });
                     },
@@ -197,6 +205,7 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                                 decoder,
                                 start,
                                 "tracksInfo displayLoc",
+                                limits,
                             )?,
                             tracks: Vec::new(),
                         });
@@ -207,14 +216,17 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                             .and_then(|value| value.media.as_mut())
                             .and_then(|value| value.tracks_info.as_mut())
                             .ok_or_else(|| invalid("track is outside tracksInfo"))?;
-                        if current.tracks.len() >= MAX_TRACKS {
-                            return Err(Error::Limit {
-                                resource: "media caption track count",
-                                limit: MAX_TRACKS,
-                            });
+                        if current.tracks.len() >= limits.max_tracks() {
+                            return Err(limit(
+                                crate::error::CodecLimitKind::CaptionTracks,
+                                current.tracks.len().checked_add(1).unwrap_or(usize::MAX),
+                                limits.max_tracks(),
+                            ));
                         }
                         let track = Track {
-                            id: required_attr(&element, b"id", None, decoder, start, "track id")?,
+                            id: required_attr(
+                                &element, b"id", None, decoder, start, "track id", limits,
+                            )?,
                             label: required_attr(
                                 &element,
                                 b"label",
@@ -222,10 +234,11 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                                 decoder,
                                 start,
                                 "track label",
+                                limits,
                             )?,
-                            language: attr(&element, b"lang", None, decoder, start)?,
-                            embed: attr(&element, b"embed", Some(b"r"), decoder, start)?,
-                            link: attr(&element, b"link", Some(b"r"), decoder, start)?,
+                            language: attr(&element, b"lang", None, decoder, start, limits)?,
+                            embed: attr(&element, b"embed", Some(b"r"), decoder, start, limits)?,
+                            link: attr(&element, b"link", Some(b"r"), decoder, start, limits)?,
                             opening_insert: opening_insert(&element, start)?,
                         };
                         if track.embed.is_none() && track.link.is_none() {
@@ -246,7 +259,7 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                             return Err(invalid("shape contains duplicate isNarration elements"));
                         }
                         current.narration = Some(Narration {
-                            value: attr(&element, b"val", None, decoder, start)?,
+                            value: attr(&element, b"val", None, decoder, start, limits)?,
                             opening_insert: opening_insert(&element, start)?,
                         });
                     },
@@ -256,7 +269,7 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                     && element.local_name().as_ref() == b"cNvPr"
                     && shape.as_ref().is_some_and(|value| value.id.is_none())
                 {
-                    let id = parse_shape_id(&element, decoder, start)?;
+                    let id = parse_shape_id(&element, decoder, start, limits)?;
                     if let Some(current) = shape.as_mut() {
                         current.id = id;
                     }
@@ -264,14 +277,19 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                 stack.push(Open { kind, track: None });
             },
             Event::Empty(element) => {
-                nodes = nodes
-                    .checked_add(1)
-                    .ok_or_else(|| invalid("slide XML node count overflow"))?;
-                if nodes > 1_000_000 {
-                    return Err(Error::Limit {
-                        resource: "slide XML nodes for media tracks",
-                        limit: 1_000_000,
-                    });
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_xml_nodes(),
+                    )
+                })?;
+                if nodes > limits.max_xml_nodes() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_xml_nodes(),
+                    ));
                 }
                 let kind = classify(
                     namespace,
@@ -283,7 +301,7 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                 match kind {
                     Kind::Shape => {
                         let candidate = Shape {
-                            id: parse_shape_id(&element, decoder, start)?,
+                            id: parse_shape_id(&element, decoder, start, limits)?,
                             media: None,
                             narration: None,
                         };
@@ -301,8 +319,8 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                             ));
                         }
                         current.media = Some(Media {
-                            embed: attr(&element, b"embed", Some(b"r"), decoder, start)?,
-                            link: attr(&element, b"link", Some(b"r"), decoder, start)?,
+                            embed: attr(&element, b"embed", Some(b"r"), decoder, start, limits)?,
+                            link: attr(&element, b"link", Some(b"r"), decoder, start, limits)?,
                             tracks_info: None,
                         });
                     },
@@ -322,6 +340,7 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                                 decoder,
                                 start,
                                 "tracksInfo displayLoc",
+                                limits,
                             )?,
                             tracks: Vec::new(),
                         });
@@ -332,13 +351,14 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                             .and_then(|value| value.media.as_mut())
                             .and_then(|value| value.tracks_info.as_mut())
                             .ok_or_else(|| invalid("track is outside tracksInfo"))?;
-                        if current.tracks.len() >= MAX_TRACKS {
-                            return Err(Error::Limit {
-                                resource: "media caption track count",
-                                limit: MAX_TRACKS,
-                            });
+                        if current.tracks.len() >= limits.max_tracks() {
+                            return Err(limit(
+                                crate::error::CodecLimitKind::CaptionTracks,
+                                current.tracks.len().checked_add(1).unwrap_or(usize::MAX),
+                                limits.max_tracks(),
+                            ));
                         }
-                        let track = parse_track(&element, decoder, start)?;
+                        let track = parse_track(&element, decoder, start, limits)?;
                         current.tracks.push(track);
                     },
                     Kind::Narration => {
@@ -349,7 +369,7 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                             return Err(invalid("shape contains duplicate isNarration elements"));
                         }
                         current.narration = Some(Narration {
-                            value: attr(&element, b"val", None, decoder, start)?,
+                            value: attr(&element, b"val", None, decoder, start, limits)?,
                             opening_insert: opening_insert(&element, start)?,
                         });
                     },
@@ -359,7 +379,7 @@ pub(crate) fn discover(xml: &[u8], key: &MediaKey) -> Result<Option<Found>> {
                     && element.local_name().as_ref() == b"cNvPr"
                     && shape.as_ref().is_some_and(|value| value.id.is_none())
                 {
-                    let id = parse_shape_id(&element, decoder, start)?;
+                    let id = parse_shape_id(&element, decoder, start, limits)?;
                     if let Some(current) = shape.as_mut() {
                         current.id = id;
                     }
@@ -477,13 +497,26 @@ fn classify(namespace: NamespaceKind, local: &[u8], stack: &[Open], shape: Optio
     Kind::Other
 }
 
-fn parse_track(element: &BytesStart<'_>, decoder: Decoder, start: usize) -> Result<Track> {
+fn parse_track(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    start: usize,
+    limits: Limits,
+) -> Result<Track> {
     let track = Track {
-        id: required_attr(element, b"id", None, decoder, start, "track id")?,
-        label: required_attr(element, b"label", None, decoder, start, "track label")?,
-        language: attr(element, b"lang", None, decoder, start)?,
-        embed: attr(element, b"embed", Some(b"r"), decoder, start)?,
-        link: attr(element, b"link", Some(b"r"), decoder, start)?,
+        id: required_attr(element, b"id", None, decoder, start, "track id", limits)?,
+        label: required_attr(
+            element,
+            b"label",
+            None,
+            decoder,
+            start,
+            "track label",
+            limits,
+        )?,
+        language: attr(element, b"lang", None, decoder, start, limits)?,
+        embed: attr(element, b"embed", Some(b"r"), decoder, start, limits)?,
+        link: attr(element, b"link", Some(b"r"), decoder, start, limits)?,
         opening_insert: opening_insert(element, start)?,
     };
     if track.embed.is_none() && track.link.is_none() {
@@ -492,8 +525,13 @@ fn parse_track(element: &BytesStart<'_>, decoder: Decoder, start: usize) -> Resu
     Ok(track)
 }
 
-fn parse_shape_id(element: &BytesStart<'_>, decoder: Decoder, start: usize) -> Result<Option<u32>> {
-    attr(element, b"id", None, decoder, start)?
+fn parse_shape_id(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    start: usize,
+    limits: Limits,
+) -> Result<Option<u32>> {
+    attr(element, b"id", None, decoder, start, limits)?
         .map(|value| {
             value
                 .value
@@ -510,8 +548,9 @@ fn required_attr(
     decoder: Decoder,
     start: usize,
     label: &str,
+    limits: Limits,
 ) -> Result<Attr> {
-    attr(element, local, prefix, decoder, start)?
+    attr(element, local, prefix, decoder, start, limits)?
         .ok_or_else(|| invalid(format!("{label} is missing")))
 }
 
@@ -521,6 +560,7 @@ fn attr(
     prefix: Option<&[u8]>,
     decoder: Decoder,
     start: usize,
+    limits: Limits,
 ) -> Result<Option<Attr>> {
     let mut result = None;
     for attribute in element.checked_attributes() {
@@ -542,11 +582,12 @@ fn attr(
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
             .map_err(xml_error)?
             .into_owned();
-        if value.len() > MAX_STRING_BYTES {
-            return Err(Error::Limit {
-                resource: "media track attribute",
-                limit: MAX_STRING_BYTES,
-            });
+        if value.len() > limits.max_string_bytes() {
+            return Err(limit(
+                crate::error::CodecLimitKind::StringBytes,
+                value.len(),
+                limits.max_string_bytes(),
+            ));
         }
         let local_span = attribute_span(element.as_ref(), attribute.key.as_ref())?;
         let value_start = start
@@ -687,4 +728,12 @@ fn xml_error(error: quick_xml::Error) -> Error {
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
+}
+
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }

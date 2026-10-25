@@ -33,7 +33,6 @@ const STRICT_SLIDE_LAYOUT_REL: &str =
 const MAX_REFERENCES: usize = 4_096;
 const MAX_BULK_SOURCE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_PRESENTATION_PART_BYTES: usize = crate::notes::MAX_PRESENTATION_XML;
-const MAX_MASTER_PART_BYTES: usize = crate::shape::Limits::DEFAULT.input_bytes();
 
 /// A detached source-backed slide master.
 ///
@@ -133,12 +132,12 @@ impl BulkBudget {
     }
 
     fn remaining(&self) -> Result<usize> {
-        MAX_BULK_SOURCE_BYTES
-            .checked_sub(self.used)
-            .ok_or(Error::Limit {
-                resource: "source presentation bulk snapshot bytes",
-                limit: MAX_BULK_SOURCE_BYTES,
-            })
+        MAX_BULK_SOURCE_BYTES.checked_sub(self.used).ok_or_else(|| {
+            Error::internal(
+                "bulk_source_budget_remaining",
+                "used source bytes exceed the bulk source budget",
+            )
+        })
     }
 
     fn charge(
@@ -154,17 +153,20 @@ impl BulkBudget {
             .and_then(|value| value.checked_add(scene.retained_bytes()))
             .and_then(|value| value.checked_add(name.map_or(0, str::len)))
             .ok_or(Error::Limit {
-                resource: "source presentation bulk snapshot bytes",
-                limit: MAX_BULK_SOURCE_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Snapshots),
+                observed: usize::MAX,
+                maximum: MAX_BULK_SOURCE_BYTES,
             })?;
         let next = self.used.checked_add(charge).ok_or(Error::Limit {
-            resource: "source presentation bulk snapshot bytes",
-            limit: MAX_BULK_SOURCE_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Snapshots),
+            observed: usize::MAX,
+            maximum: MAX_BULK_SOURCE_BYTES,
         })?;
         if next > MAX_BULK_SOURCE_BYTES {
             return Err(Error::Limit {
-                resource: "source presentation bulk snapshot bytes",
-                limit: MAX_BULK_SOURCE_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Snapshots),
+                observed: next,
+                maximum: MAX_BULK_SOURCE_BYTES,
             });
         }
         self.used = next;
@@ -294,8 +296,9 @@ fn master_targets(owner: &SourceInner, presentation: &SourcePart) -> Result<Vec<
     let relationship_ids = presentation_part.slide_master_references()?;
     if relationship_ids.len() > MAX_REFERENCES {
         return Err(Error::Limit {
-            resource: "source presentation master references",
-            limit: MAX_REFERENCES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::References),
+            observed: relationship_ids.len(),
+            maximum: MAX_REFERENCES,
         });
     }
     let (expected_type, conformance) = relationship_type_for(presentation, "presentation")?;
@@ -325,8 +328,9 @@ fn layout_targets(owner: &SourceInner, master: &SourcePart) -> Result<Vec<Target
     let relationship_ids = master_part.layout_references()?;
     if relationship_ids.len() > MAX_REFERENCES {
         return Err(Error::Limit {
-            resource: "source master layout references",
-            limit: MAX_REFERENCES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::References),
+            observed: relationship_ids.len(),
+            maximum: MAX_REFERENCES,
         });
     }
     let (expected_type, conformance) = relationship_type_for(master, "sldMaster")?;
@@ -359,13 +363,15 @@ fn preflight_bulk_targets(owner: &SourceInner, targets: &[Target]) -> Result<()>
         total = total
             .checked_add(view.declared_uncompressed_size()?)
             .ok_or(Error::Limit {
-                resource: "source presentation bulk snapshot bytes",
-                limit: MAX_BULK_SOURCE_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Snapshots),
+                observed: usize::MAX,
+                maximum: MAX_BULK_SOURCE_BYTES,
             })?;
         if total > MAX_BULK_SOURCE_BYTES as u64 {
             return Err(Error::Limit {
-                resource: "source presentation bulk snapshot bytes",
-                limit: MAX_BULK_SOURCE_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Snapshots),
+                observed: usize::try_from(total).unwrap_or(usize::MAX),
+                maximum: MAX_BULK_SOURCE_BYTES,
             });
         }
     }
@@ -379,14 +385,25 @@ fn load_bulk_part(
     budget: &BulkBudget,
 ) -> Result<SourcePart> {
     let remaining = budget.remaining()?;
-    let semantic_maximum = remaining.min(crate::shape::Limits::DEFAULT.input_bytes());
+    let semantic_maximum = remaining.min(
+        crate::open_options::selected(owner.semantic_limits.as_ref())
+            .shape()
+            .input_bytes(),
+    );
     if semantic_maximum == 0 {
         return Err(Error::Limit {
-            resource: "source presentation bulk snapshot bytes",
-            limit: MAX_BULK_SOURCE_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Snapshots),
+            observed: 0,
+            maximum: MAX_BULK_SOURCE_BYTES,
         });
     }
     super::load_part(owner, &target.part_uri, content_type, semantic_maximum)
+}
+
+fn shape_input_limit(owner: &SourceInner) -> usize {
+    crate::open_options::selected(owner.semantic_limits.as_ref())
+        .shape()
+        .input_bytes()
 }
 
 fn prepare_master(
@@ -402,7 +419,12 @@ fn prepare_master(
     let preserved = master.is_preserved()?;
     let candidate = super::acquire_scene(owner, &part, |source| {
         let master = SlideMasterPart::from_part(source)?;
-        let scene = OwnedScene::from_source(master.shapes()?, source.source_data().clone())?;
+        let scene = OwnedScene::from_source(
+            master.shapes_with_limits(
+                crate::open_options::selected(owner.semantic_limits.as_ref()).shape(),
+            )?,
+            source.source_data().clone(),
+        )?;
         super::strict_scene(&scene, "master")?;
         Ok(scene)
     })?;
@@ -577,7 +599,7 @@ impl SourceBackedPresentation {
                             &self.inner,
                             &master.part_uri,
                             ct::PML_SLIDE_MASTER,
-                            MAX_MASTER_PART_BYTES,
+                            shape_input_limit(&self.inner),
                         )?;
                         crate::shape::theme::package::theme_target(&part)?
                     },
@@ -587,8 +609,12 @@ impl SourceBackedPresentation {
             let Some(target) = target else {
                 return Ok(None);
             };
-            let part =
-                super::load_part(&self.inner, &target, ct::OFC_THEME, MAX_MASTER_PART_BYTES)?;
+            let part = super::load_part(
+                &self.inner,
+                &target,
+                ct::OFC_THEME,
+                shape_input_limit(&self.inner),
+            )?;
             Ok(Some(litchi_drawingml::theme::codec::read(
                 part.blob(),
                 litchi_drawingml::theme::codec::Limits::DEFAULT,
@@ -611,7 +637,7 @@ impl SourceBackedPresentation {
                 &self.inner,
                 &target.part_uri,
                 ct::PML_SLIDE_MASTER,
-                MAX_MASTER_PART_BYTES,
+                shape_input_limit(&self.inner),
             )?;
             prepare_master(
                 &self.inner,
@@ -643,7 +669,7 @@ impl SourceBackedPresentation {
                 &self.inner,
                 &master_target.part_uri,
                 ct::PML_SLIDE_MASTER,
-                MAX_MASTER_PART_BYTES,
+                shape_input_limit(&self.inner),
             )?;
             require_conformance(&master, "sldMaster", master_target.conformance)?;
             let targets = layout_targets(&self.inner, &master)?;
@@ -684,7 +710,7 @@ impl SourceBackedPresentation {
                 &self.inner,
                 &master_target.part_uri,
                 ct::PML_SLIDE_MASTER,
-                MAX_MASTER_PART_BYTES,
+                shape_input_limit(&self.inner),
             )?;
             require_conformance(&master, "sldMaster", master_target.conformance)?;
             let targets = layout_targets(&self.inner, &master)?;
@@ -695,7 +721,7 @@ impl SourceBackedPresentation {
                 &self.inner,
                 &target.part_uri,
                 ct::PML_SLIDE_LAYOUT,
-                MAX_MASTER_PART_BYTES,
+                shape_input_limit(&self.inner),
             )?;
             require_conformance(&part, "sldLayout", target.conformance)?;
             super::prepare_layout(&self.inner, part, &target.relationship_id).map(Some)

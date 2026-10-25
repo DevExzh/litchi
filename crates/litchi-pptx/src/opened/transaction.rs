@@ -27,7 +27,7 @@ use quick_xml::reader::NsReader;
 
 pub use litchi_core::edit::Diagnostics;
 
-use super::model::{Slide, SlideNameIndex, Snapshot, capture, invalid};
+use super::model::{Slide, SlideNameIndex, Snapshot, invalid};
 use super::patch::Patch;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
@@ -83,6 +83,7 @@ pub struct Edit {
 #[derive(Clone)]
 struct LazySource {
     package: Arc<OpcPackage>,
+    replay_index: Arc<crate::package::replay_index::ReplayIndex>,
     limits: super::Limits,
     physical_source_provenance: bool,
     owner_state: Arc<crate::package::OpenedOwnerState>,
@@ -156,6 +157,18 @@ impl std::fmt::Debug for Edit {
 }
 
 impl Edit {
+    fn semantic_limits_ref(&self) -> Option<crate::open_options::SemanticLimitsRef> {
+        self.source
+            .as_ref()
+            .map(|source| source.owner_state.semantic_limits.clone())
+            .or_else(|| {
+                self.lazy
+                    .as_ref()
+                    .map(|lazy| lazy.owner_state.semantic_limits.clone())
+            })
+            .flatten()
+    }
+
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             working: Working::new(Arc::clone(&source.package)),
@@ -173,6 +186,7 @@ impl Edit {
     /// operation that needs semantic state calls [`Self::ensure_ready`].
     pub(crate) fn new_lazy(
         package: Arc<OpcPackage>,
+        replay_index: Arc<crate::package::replay_index::ReplayIndex>,
         limits: super::Limits,
         physical_source_provenance: bool,
         owner_state: Arc<crate::package::OpenedOwnerState>,
@@ -189,6 +203,7 @@ impl Edit {
             source: None,
             lazy: Some(LazySource {
                 package,
+                replay_index,
                 limits,
                 physical_source_provenance,
                 owner_state,
@@ -218,16 +233,18 @@ impl Edit {
             ));
         };
         let captured = match lazy.parent_digests.as_deref() {
-            Some(parent) => super::model::capture_with_parent_digests(
+            Some(parent) => super::model::capture_with_parent_digests_and_semantic_limits(
                 &lazy.package,
                 lazy.limits,
                 lazy.physical_source_provenance,
                 parent,
+                lazy.owner_state.semantic_limits.clone(),
             ),
-            None => super::model::capture_with_provenance(
+            None => super::model::capture_with_provenance_and_semantic_limits(
                 &lazy.package,
                 lazy.limits,
                 lazy.physical_source_provenance,
+                lazy.owner_state.semantic_limits.clone(),
             ),
         };
         let mut snapshot = match captured {
@@ -237,6 +254,7 @@ impl Edit {
                 return Err(error);
             },
         };
+        snapshot.replay_index = Some(Arc::clone(&lazy.replay_index));
         snapshot.owner_state = Arc::clone(&lazy.owner_state);
         if lazy.release_retained_mce {
             snapshot.release_retained_mce();
@@ -263,6 +281,30 @@ impl Edit {
         self.source
             .as_ref()
             .ok_or_else(|| invalid("opened-presentation edit source state is unavailable"))
+    }
+
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        self.source
+            .as_ref()
+            .and_then(|source| source.owner_state.semantic_limits.as_deref().copied())
+            .or_else(|| {
+                self.lazy
+                    .as_ref()
+                    .and_then(|source| source.owner_state.semantic_limits.as_deref().copied())
+            })
+            .unwrap_or_default()
+    }
+
+    fn notes_limits(&self) -> crate::notes::Limits {
+        self.semantic_limits()
+            .notes()
+            .constrained_by_source(self.working.read_limits())
+    }
+
+    fn comments_limits(&self) -> crate::comments::Limits {
+        self.semantic_limits()
+            .comments()
+            .constrained_by_source(self.working.read_limits())
     }
 
     /// Record that the payload now staged for `part_name` was read back as a
@@ -346,13 +388,21 @@ impl Edit {
             let source = self.source_ref()?;
             (source.limits, source.physical_source_provenance)
         };
-        let current = capture(&self.working, limits, physical_source_provenance)?;
+        let owner_state = Arc::clone(&self.source_ref()?.owner_state);
+        let mut current = super::model::capture_with_provenance_and_semantic_limits(
+            &self.working,
+            limits,
+            physical_source_provenance,
+            owner_state.semantic_limits.clone(),
+        )?;
+        current.owner_state = Arc::clone(&owner_state);
         let patch = super::insert::plan(&current, position.get(), layout_name)?;
-        let (working, published) = super::patch::apply_to_new(
+        let (working, published) = super::patch::apply_to_new_with_semantic_limits(
             &self.working,
             &patch,
             physical_source_provenance,
             &current.part_digests,
+            owner_state.semantic_limits.clone(),
         )?;
         let selected = published
             .slides
@@ -523,17 +573,27 @@ impl Edit {
         slide: impl Into<crate::slide::Selector<'s>>,
     ) -> Result<Slide> {
         self.ensure_ready()?;
-        let (limits, physical_source_provenance) = {
+        let (limits, physical_source_provenance, semantic_limits) = {
             let source = self.source_ref()?;
-            (source.limits, source.physical_source_provenance)
+            (
+                source.limits,
+                source.physical_source_provenance,
+                source.owner_state.semantic_limits.clone(),
+            )
         };
-        let snapshot = capture(&self.working, limits, physical_source_provenance)?;
+        let snapshot = super::model::capture_with_provenance_and_semantic_limits(
+            &self.working,
+            limits,
+            physical_source_provenance,
+            semantic_limits.clone(),
+        )?;
         let plan = snapshot.plan_slide_removal(slide)?;
         let selected = plan.source().clone();
-        let published = super::remove_plan::apply_patch(
+        let published = super::remove_plan::apply_patch_with_semantic_limits(
             &mut self.working,
             plan.patch(),
             physical_source_provenance,
+            semantic_limits,
         )?;
         self.slides = published.slides.as_ref().clone();
         self.slide_name_index = Some(published.slide_name_index.as_ref().clone());
@@ -580,8 +640,12 @@ impl Edit {
         if super::package_fingerprint(&self.working)? != plan.source_revision() {
             return Err(Error::PatchConflict);
         }
-        let mut snapshot =
-            super::apply(&mut self.working, plan.patch(), physical_source_provenance)?;
+        let mut snapshot = super::apply_with_semantic_limits(
+            &mut self.working,
+            plan.patch(),
+            physical_source_provenance,
+            owner_state.semantic_limits.clone(),
+        )?;
         snapshot.owner_state = owner_state;
         self.record_plan(plan.source_revision(), snapshot, plan.patch());
         Ok(())
@@ -610,10 +674,11 @@ impl Edit {
             )
         };
         owner_state.ensure_plain_mutation("stage_slide_removal")?;
-        let mut snapshot = super::remove_plan::apply_patch(
+        let mut snapshot = super::remove_plan::apply_patch_with_semantic_limits(
             &mut self.working,
             plan.patch(),
             physical_source_provenance,
+            owner_state.semantic_limits.clone(),
         )?;
         snapshot.owner_state = owner_state;
         let source_revision = plan.patch().source_revision();
@@ -679,6 +744,8 @@ impl Edit {
                 source: source.part_digest_memo(),
                 destination: Some(destination_digests.as_ref()),
             },
+            source.semantic_limits.clone(),
+            owner_state.semantic_limits.clone(),
         )?;
         snapshot.owner_state = owner_state;
         let source_revision = plan.destination_revision();
@@ -707,7 +774,8 @@ impl Edit {
         let text = text.as_ref();
         let owner = self.working.get_part(&selected_slide.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let shape_limits = self.semantic_limits().shape();
+        let scene = crate::shape::Scene::read(owner.blob(), shape_limits)?;
         let selected_shape = scene.shape(key)?;
         if selected_shape.common().text() == Some(text) {
             return Ok(false);
@@ -719,13 +787,14 @@ impl Edit {
         }
         let span =
             crate::tag::shape::selected_raw_span_for_shape(owner.blob(), &scene, selected_shape)?;
-        let xml = super::xml::rewrite_shape_text(
+        let xml = super::xml::rewrite_shape_text_with_limits(
             owner.blob(),
             span,
             text,
             self.source_ref()?.limits.max_text_bytes(),
+            shape_limits,
         )?;
-        let staged = crate::shape::Scene::read(&xml)?;
+        let staged = crate::shape::Scene::read(&xml, shape_limits)?;
         let staged_shape = staged.shape(key)?;
         if staged_shape.common().text() != Some(text) || staged.len() != scene.len() {
             return Err(invalid(
@@ -813,7 +882,7 @@ impl Edit {
             owner.blob(),
             name,
             hidden,
-            crate::shape::Limits::DEFAULT.output_bytes(),
+            self.semantic_limits().shape().output_bytes(),
         )?
         else {
             return Ok(false);
@@ -883,16 +952,21 @@ impl Edit {
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
         let presentation_name = self.source_ref()?.presentation_name.clone();
         let main = self.working.get_part(&presentation_name)?;
-        let (xml, changed) = crate::presentation::transition::stage(
+        let semantic = self.semantic_limits();
+        let (xml, changed) = crate::presentation::transition::stage_with_limits(
             owner.blob(),
             main.blob(),
             value,
-            crate::shape::Limits::DEFAULT.output_bytes(),
+            semantic.shape().output_bytes(),
+            semantic.transition(),
             if value.is_some() {
                 "set_slide_transition"
             } else {
                 "clear_slide_transition"
             },
+            crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                self.working.read_limits(),
+            ),
         )?;
         if let Some(xml) = xml {
             self.working
@@ -920,11 +994,12 @@ impl Edit {
         let selected_slide = self.resolve_slide(slide.into())?;
         let owner = self.working.get_part(&selected_slide.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
-        let (xml, changed) = super::xml::stage_shape_texts(
+        let (xml, changed) = super::xml::stage_shape_texts_with_limits(
             owner.blob(),
             replacements,
             self.source_ref()?.limits.max_text_bytes(),
-            crate::shape::Limits::DEFAULT.output_bytes(),
+            self.semantic_limits().shape().output_bytes(),
+            self.semantic_limits().shape(),
         )?;
         if let Some(xml) = xml {
             self.working
@@ -955,11 +1030,12 @@ impl Edit {
         let selected_slide = self.resolve_slide(slide.into())?;
         let owner = self.working.get_part(&selected_slide.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
-        let (xml, changed) = super::stage_shape_text_chunks(
+        let (xml, changed) = super::stage_shape_text_chunks_with_limits(
             owner.blob(),
             chunks,
             self.source_ref()?.limits.max_text_bytes(),
-            crate::shape::Limits::DEFAULT.output_bytes(),
+            self.semantic_limits().shape().output_bytes(),
+            self.semantic_limits().shape(),
         )?;
         if let Some(xml) = xml {
             self.working
@@ -986,11 +1062,12 @@ impl Edit {
         let selected_slide = self.resolve_slide(slide.into())?;
         let owner = self.working.get_part(&selected_slide.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
-        let (xml, changed) = super::properties::stage_shape_properties(
+        let (xml, changed) = super::properties::stage_shape_properties_with_limits(
             owner.blob(),
             replacements,
             self.source_ref()?.limits.max_text_bytes(),
-            crate::shape::Limits::DEFAULT.output_bytes(),
+            self.semantic_limits().shape().output_bytes(),
+            self.semantic_limits().shape(),
         )?;
         if let Some(xml) = xml {
             self.working
@@ -1026,11 +1103,12 @@ impl Edit {
         let selected_slide = self.resolve_slide(slide.into())?;
         let owner = self.working.get_part(&selected_slide.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
-        let (xml, changed) = super::stage_text_properties(
+        let (xml, changed) = super::stage_text_properties_with_limits(
             owner.blob(),
             edits,
             self.source_ref()?.limits.max_text_bytes(),
-            crate::shape::Limits::DEFAULT.output_bytes(),
+            self.semantic_limits().shape().output_bytes(),
+            self.semantic_limits().shape(),
         )?;
         if let Some(xml) = xml {
             self.working
@@ -1087,12 +1165,13 @@ impl Edit {
         let selected_slide = self.resolve_slide(slide)?;
         let owner = self.working.get_part(&selected_slide.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
-        let (xml, changed) = super::stage_text_property_chunks(
+        let (xml, changed) = super::stage_text_property_chunks_with_limits(
             owner.blob(),
             chunks,
             self.source_ref()?.limits.max_text_bytes(),
-            crate::shape::Limits::DEFAULT.output_bytes(),
+            self.semantic_limits().shape().output_bytes(),
             changes,
+            self.semantic_limits().shape(),
         )?;
         if let Some(xml) = xml {
             self.working
@@ -1116,11 +1195,12 @@ impl Edit {
         let selected_slide = self.resolve_slide(slide.into())?;
         let owner = self.working.get_part(&selected_slide.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
-        let (xml, changed) = super::stage_shape_property_chunks(
+        let (xml, changed) = super::stage_shape_property_chunks_with_limits(
             owner.blob(),
             chunks,
             self.source_ref()?.limits.max_text_bytes(),
-            crate::shape::Limits::DEFAULT.output_bytes(),
+            self.semantic_limits().shape().output_bytes(),
+            self.semantic_limits().shape(),
         )?;
         if let Some(xml) = xml {
             self.working
@@ -1145,9 +1225,15 @@ impl Edit {
     ) -> Result<u32> {
         let selected = self.resolve_slide(slide.into())?;
         let owner = self.working.get_part(&selected.part_name)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let shape_limits = self.semantic_limits().shape();
+        let scene = crate::shape::Scene::read(owner.blob(), shape_limits)?;
         let shape_id = next_shape_id(&scene, "text box")?;
-        let conformance = crate::media_parts::document_conformance(owner.blob())?;
+        let conformance = crate::media_parts::document_conformance_with_limits(
+            owner.blob(),
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(self.working.read_limits()),
+        )?;
         let fragment = text_box_fragment(
             text.as_ref(),
             bounds,
@@ -1214,8 +1300,9 @@ impl Edit {
             ));
         }
         if resource.data.len() > self.source_ref()?.limits.max_patch_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed: resource.data.len(),
                 maximum: self.source_ref()?.limits.max_patch_bytes(),
             });
         }
@@ -1232,9 +1319,15 @@ impl Edit {
             ));
         }
         let owner = self.working.get_part(&selected.part_name)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let shape_limits = self.semantic_limits().shape();
+        let scene = crate::shape::Scene::read(owner.blob(), shape_limits)?;
         let shape_id = next_shape_id(&scene, "picture")?;
-        let conformance = crate::media_parts::document_conformance(owner.blob())?;
+        let conformance = crate::media_parts::document_conformance_with_limits(
+            owner.blob(),
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(self.working.read_limits()),
+        )?;
         let reserved: HashSet<_> = self
             .working
             .iter_parts()
@@ -1258,11 +1351,12 @@ impl Edit {
             &relationship_id,
             conformance,
         );
-        let xml = super::xml::append_shape(
+        let xml = super::xml::append_shape_with_limit(
             candidate.get_part(&selected.part_name)?.blob(),
             fragment.as_bytes(),
+            shape_limits.output_bytes(),
         )?;
-        ensure_shape_id(&xml, shape_id, "picture")?;
+        ensure_shape_id(&xml, shape_id, "picture", shape_limits)?;
         candidate.get_part_mut(&selected.part_name)?.set_blob(xml);
         self.working = candidate;
         Ok(shape_id)
@@ -1286,7 +1380,8 @@ impl Edit {
         let key = shape.into();
         let owner = self.working.get_part(&selected.part_name)?;
         let blob = owner.blob();
-        let span = super::xml::shape_removal_span(blob, key)?;
+        let shape_limits = self.semantic_limits().shape();
+        let span = super::xml::shape_removal_span_with_limits(blob, key, shape_limits)?;
         let mut removed_relationships =
             shape_relationship_ids(super::xml::span_bytes(blob, span.clone())?, owner.rels())?;
         // A SmartArt's cached drawing is related by the slide but named only
@@ -1296,10 +1391,11 @@ impl Edit {
             .filter_map(|id| smartart::drawing_relationship(&self.working, &selected.part_name, id))
             .collect();
         removed_relationships.extend(drawings);
-        let (xml, _) = super::xml::stage_shape_removal(
+        let (xml, _) = super::xml::stage_shape_removal_with_limits(
             blob,
             key,
-            crate::shape::Limits::DEFAULT.output_bytes(),
+            self.semantic_limits().shape().output_bytes(),
+            shape_limits,
         )?;
         let xml =
             xml.ok_or_else(|| invalid("opened-presentation shape removal produced no candidate"))?;
@@ -1350,7 +1446,14 @@ impl Edit {
         let source_slide = resolve_snapshot_slide(source, source_slide.into())?;
         let destination = self.resolve_slide(destination_slide.into())?;
         let source_owner = source.package.get_part(&source_slide.part_name)?;
-        let source_scene = crate::shape::Scene::read(source_owner.blob())?;
+        let source_shape_limits = source
+            .owner_state
+            .semantic_limits
+            .as_deref()
+            .copied()
+            .unwrap_or_default()
+            .shape();
+        let source_scene = crate::shape::Scene::read(source_owner.blob(), source_shape_limits)?;
         let key = source_shape.into();
         let shape = source_scene.shape(key)?;
         let source_roots: Vec<_> = source_scene.roots().collect();
@@ -1385,8 +1488,9 @@ impl Edit {
                 continue;
             }
             if included_roots.len() > self.source_ref()?.limits.max_parts() {
-                return Err(Error::EditLimit {
+                return Err(Error::Limit {
                     kind: crate::opened::LimitKind::Parts,
+                    observed: included_roots.len(),
                     maximum: self.source_ref()?.limits.max_parts(),
                 });
             }
@@ -1395,9 +1499,10 @@ impl Edit {
                 .copied()
                 .ok_or_else(|| invalid("opened-presentation transferred shape root disappeared"))?;
             collect_transfer_shape_ids(root, &mut source_shape_ids)?;
-            let span = crate::tag::shape::selected_raw_span(
+            let span = crate::tag::shape::selected_raw_span_with_limits(
                 source_owner.blob(),
                 crate::shape::Key::Index(root.common().index()),
+                source_shape_limits,
             )?;
             let fragment = super::xml::span_bytes(source_owner.blob(), span.clone())?;
             relationship_ids.extend(shape_relationship_ids(fragment, source_owner.rels())?);
@@ -1447,8 +1552,10 @@ impl Edit {
         )?;
         let mut candidate = self.working.clone();
         publish_transfer(source.package.as_ref(), &mut candidate, &mapping)?;
-        let destination_scene =
-            crate::shape::Scene::read(candidate.get_part(&destination.part_name)?.blob())?;
+        let destination_scene = crate::shape::Scene::read(
+            candidate.get_part(&destination.part_name)?.blob(),
+            self.semantic_limits().shape(),
+        )?;
         let shape_id_mapping = plan_shape_identity_transfer(&destination_scene, &source_shape_ids)?;
         let shape_id = *shape_id_mapping.get(&source_shape_id).ok_or_else(|| {
             invalid("opened-presentation transferred root identity mapping disappeared")
@@ -1488,9 +1595,18 @@ impl Edit {
                 &shape_id_mapping,
                 &relationship_mapping,
             )?;
-            xml = super::xml::append_shape(&xml, &fragment)?;
+            xml = super::xml::append_shape_with_limit(
+                &xml,
+                &fragment,
+                self.semantic_limits().shape().output_bytes(),
+            )?;
         }
-        ensure_shape_id(&xml, shape_id, "transferred shape")?;
+        ensure_shape_id(
+            &xml,
+            shape_id,
+            "transferred shape",
+            self.semantic_limits().shape(),
+        )?;
         candidate
             .get_part_mut(&destination.part_name)?
             .set_blob(xml);
@@ -1516,7 +1632,11 @@ impl Edit {
     ) -> Result<usize> {
         let selected_slide = self.resolve_slide(slide.into())?;
         let presentation_name = self.source_ref()?.presentation_name.clone();
-        let source = crate::notes::load_snapshot(&self.working, &presentation_name)?;
+        let source = crate::notes::load_snapshot_with_limits(
+            &self.working,
+            &presentation_name,
+            self.notes_limits(),
+        )?;
         let Some(note) = source.as_ref().and_then(|source| {
             source
                 .slides()
@@ -1531,11 +1651,12 @@ impl Edit {
         };
         let part_name = PackURI::new(note.part())
             .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
-        let (xml, changed) = super::stage_text_properties(
+        let (xml, changed) = super::stage_text_properties_with_limits(
             note.xml(),
             edits,
             self.source_ref()?.limits.max_text_bytes(),
-            crate::shape::Limits::DEFAULT.output_bytes(),
+            self.semantic_limits().shape().output_bytes(),
+            self.semantic_limits().shape(),
         )?;
         if let Some(xml) = xml {
             self.working.get_part_mut(&part_name)?.set_blob(xml);
@@ -1588,7 +1709,11 @@ impl Edit {
     ) -> Result<usize> {
         let selected_slide = self.resolve_slide(slide)?;
         let presentation_name = self.source_ref()?.presentation_name.clone();
-        let source = crate::notes::load_snapshot(&self.working, &presentation_name)?;
+        let source = crate::notes::load_snapshot_with_limits(
+            &self.working,
+            &presentation_name,
+            self.notes_limits(),
+        )?;
         let Some(note) = source.as_ref().and_then(|source| {
             source
                 .slides()
@@ -1603,12 +1728,13 @@ impl Edit {
         };
         let part_name = PackURI::new(note.part())
             .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
-        let (xml, changed) = super::stage_text_property_chunks(
+        let (xml, changed) = super::stage_text_property_chunks_with_limits(
             note.xml(),
             chunks,
             self.source_ref()?.limits.max_text_bytes(),
-            crate::shape::Limits::DEFAULT.output_bytes(),
+            self.semantic_limits().shape().output_bytes(),
             changes,
+            self.semantic_limits().shape(),
         )?;
         if let Some(xml) = xml {
             self.working.get_part_mut(&part_name)?.set_blob(xml);
@@ -1635,13 +1761,18 @@ impl Edit {
         let selected_slide = self.resolve_slide(slide.into())?;
         let text = text.as_ref();
         if text.len() > self.source_ref()?.limits.max_text_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::TextBytes,
+                observed: text.len(),
                 maximum: self.source_ref()?.limits.max_text_bytes(),
             });
         }
         let presentation_name = self.source_ref()?.presentation_name.clone();
-        let source = crate::notes::load_snapshot(&self.working, &presentation_name)?;
+        let source = crate::notes::load_snapshot_with_limits(
+            &self.working,
+            &presentation_name,
+            self.notes_limits(),
+        )?;
         let note = source.as_ref().and_then(|source| {
             source
                 .slides()
@@ -1650,12 +1781,13 @@ impl Edit {
         });
         match note {
             Some(note) => {
-                if note.text()?.as_deref() == (!text.is_empty()).then_some(text) {
+                let limits = self.notes_limits();
+                if note.text(limits)?.as_deref() == (!text.is_empty()).then_some(text) {
                     return Ok(false);
                 }
                 let part_name = PackURI::new(note.part())
                     .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
-                let xml = crate::notes::rewrite_text(note.xml(), text)?;
+                let xml = crate::notes::rewrite_text(note.xml(), text, limits)?;
                 self.working.get_part_mut(&part_name)?.set_blob(xml);
             },
             // A slide without notes and empty text is already as requested.
@@ -1680,14 +1812,18 @@ impl Edit {
     /// Read the staged notes of `slide` back and require `text`.
     fn verify_notes_text(&self, slide: &PackURI, text: &str) -> Result<()> {
         let presentation_name = self.source_ref()?.presentation_name.clone();
-        let staged = crate::notes::load_snapshot(&self.working, &presentation_name)?
-            .ok_or_else(|| invalid("opened-presentation staged notes graph disappeared"))?;
+        let staged = crate::notes::load_snapshot_with_limits(
+            &self.working,
+            &presentation_name,
+            self.notes_limits(),
+        )?
+        .ok_or_else(|| invalid("opened-presentation staged notes graph disappeared"))?;
         let staged_note = staged
             .slides()
             .iter()
             .find(|note| note.owner() == slide.as_str())
             .ok_or_else(|| invalid("opened-presentation staged notes owner disappeared"))?;
-        let actual = staged_note.text()?;
+        let actual = staged_note.text(self.notes_limits())?;
         if actual.as_deref() != (!text.is_empty()).then_some(text) {
             return Err(invalid(
                 "opened-presentation notes text did not round-trip semantically",
@@ -1745,9 +1881,15 @@ impl Edit {
     ) -> Result<u32> {
         let selected = self.resolve_slide(slide.into())?;
         let owner = self.working.get_part(&selected.part_name)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let shape_limits = self.semantic_limits().shape();
+        let scene = crate::shape::Scene::read(owner.blob(), shape_limits)?;
         let shape_id = next_shape_id(&scene, "table")?;
-        let conformance = crate::media_parts::document_conformance(owner.blob())?;
+        let conformance = crate::media_parts::document_conformance_with_limits(
+            owner.blob(),
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(self.working.read_limits()),
+        )?;
         let fragment = table_fragment(
             cells,
             bounds,
@@ -1756,8 +1898,12 @@ impl Edit {
             self.source_ref()?.limits,
         )?;
         let _table = crate::table::Table::from_graphic_frame(fragment.as_bytes())?;
-        let xml = super::xml::append_shape(owner.blob(), fragment.as_bytes())?;
-        let staged = crate::shape::Scene::read(&xml)?;
+        let xml = super::xml::append_shape_with_limit(
+            owner.blob(),
+            fragment.as_bytes(),
+            shape_limits.output_bytes(),
+        )?;
+        let staged = crate::shape::Scene::read(&xml, shape_limits)?;
         if !staged.iter().any(|shape| shape.id() == Some(shape_id)) {
             return Err(invalid(
                 "opened-presentation table did not round-trip semantically",
@@ -1816,7 +1962,11 @@ impl Edit {
             crate::presentation::embedded::excel::Workbook::from_spec(&spec)?.into_bytes();
         let mut candidate = self.working.clone();
         crate::package::signature::refuse_signed_change(&candidate)?;
-        let scene = crate::shape::Scene::read(candidate.get_part(&selected.part_name)?.blob())?;
+        let shape_limits = self.semantic_limits().shape();
+        let scene = crate::shape::Scene::read(
+            candidate.get_part(&selected.part_name)?.blob(),
+            shape_limits,
+        )?;
         let shape_id = next_shape_id(&scene, "chart")?;
         let (chart_stem, content_type, relationship_type) = if extended {
             (
@@ -1878,8 +2028,12 @@ impl Edit {
             .relate_to(&chart_ref, relationship_type);
         let fragment = chart_frame(shape_id, &relationship_id, name, bounds, extended);
         let owner = candidate.get_part(&selected.part_name)?;
-        let xml = super::xml::append_shape(owner.blob(), fragment.as_bytes())?;
-        let scene = crate::shape::Scene::read(&xml)?;
+        let xml = super::xml::append_shape_with_limit(
+            owner.blob(),
+            fragment.as_bytes(),
+            shape_limits.output_bytes(),
+        )?;
+        let scene = crate::shape::Scene::read(&xml, shape_limits)?;
         if !scene.iter().any(|shape| shape.id() == Some(shape_id)) {
             return Err(invalid(
                 "opened-presentation chart frame did not round-trip semantically",
@@ -1905,8 +2059,12 @@ impl Edit {
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<(Vec<u8>, Option<Vec<u8>>)> {
         let selected = self.resolve_slide(slide.into())?;
-        let (chart_name, workbook_name) =
-            chart_targets(&self.working, &selected.part_name, shape.into())?;
+        let (chart_name, workbook_name) = chart_targets(
+            &self.working,
+            &selected.part_name,
+            shape.into(),
+            self.semantic_limits().shape(),
+        )?;
         let xml = self.working.get_part(&chart_name)?.blob().to_vec();
         let workbook = match workbook_name {
             Some(name) => Some(self.working.get_part(&name)?.blob().to_vec()),
@@ -1940,8 +2098,12 @@ impl Edit {
         workbook: Option<Vec<u8>>,
     ) -> Result<bool> {
         let selected = self.resolve_slide(slide.into())?;
-        let (chart_name, workbook_name) =
-            chart_targets(&self.working, &selected.part_name, shape.into())?;
+        let (chart_name, workbook_name) = chart_targets(
+            &self.working,
+            &selected.part_name,
+            shape.into(),
+            self.semantic_limits().shape(),
+        )?;
         let current = self.working.get_part(&chart_name)?.content_type();
         if current == litchi_drawingml::chart::chartex::CONTENT_TYPE {
             litchi_drawingml::chart::chartex::read(&xml, &litchi_drawingml::chart::Limits::DEFAULT)
@@ -1992,11 +2154,17 @@ impl Edit {
         conformance: crate::media_parts::Conformance,
     ) -> Result<()> {
         let selected = self.resolve_slide(slide.into())?;
-        crate::media_parts::package::store(
+        let limits = self
+            .semantic_limits()
+            .media_parts()
+            .constrained_by_source(self.working.read_limits());
+        crate::media_parts::package::store_with_limits(
             &mut self.working,
             &selected.part_name,
             media,
             conformance,
+            false,
+            limits,
         )
     }
 
@@ -2074,7 +2242,13 @@ impl Edit {
         conformance: crate::comments::Conformance,
     ) -> Result<()> {
         self.ensure_ready()?;
-        crate::comments::add_presentation_comment_author(&mut self.working, author, conformance)
+        let limits = self.comments_limits();
+        crate::comments::add_presentation_comment_author_with_limits(
+            &mut self.working,
+            author,
+            conformance,
+            limits,
+        )
     }
 
     /// Add a legacy comment owned by one selected slide.
@@ -2095,11 +2269,13 @@ impl Edit {
         conformance: crate::comments::Conformance,
     ) -> Result<()> {
         let selected = self.resolve_slide(slide.into())?;
-        crate::comments::add_presentation_comment(
+        let limits = self.comments_limits();
+        crate::comments::add_presentation_comment_with_limits(
             &mut self.working,
             selected.part_name.as_str(),
             comment,
             conformance,
+            limits,
         )
     }
 
@@ -2122,12 +2298,14 @@ impl Edit {
         conformance: crate::comments::Conformance,
     ) -> Result<bool> {
         let selected = self.resolve_slide(slide.into())?;
-        crate::comments::remove_presentation_comment(
+        let limits = self.comments_limits();
+        crate::comments::remove_presentation_comment_with_limits(
             &mut self.working,
             selected.part_name.as_str(),
             author_id,
             index,
             conformance,
+            limits,
         )
     }
 
@@ -2593,16 +2771,32 @@ impl Edit {
         {
             // The staged graph is exactly the candidate a plan published as
             // this edit's first change: its validated snapshot and patch stand.
-            let package =
-                crate::Package::from_opened_candidate(self.working.into_owned(), &snapshot);
+            let working = self.working.into_owned();
+            let changed = patch.resources().cloned().collect::<Vec<_>>();
+            let base = source.replay_index.clone().map_or_else(
+                || {
+                    crate::package::replay_index::ReplayIndex::from_package(source.package.as_ref())
+                        .map(Arc::new)
+                },
+                Ok,
+            )?;
+            let mut snapshot = snapshot;
+            snapshot.replay_index = Some(Arc::new(base.update(
+                source.package.as_ref(),
+                &working,
+                &changed,
+            )?));
+            let package = crate::Package::from_opened_candidate(working, &snapshot)?;
             return Ok(Commit::new(package, snapshot, patch));
         }
+        let shape_limits = self.semantic_limits().shape();
         let mut working = self.working;
-        compact_changed_slides(
+        compact_changed_slides_with_limits(
             &mut working,
             source.package.as_ref(),
             &self.slides,
             &self.scene_read,
+            shape_limits,
         )?;
         // The staged package shares every untouched payload allocation with
         // the source snapshot, so the source memo answers every part the
@@ -2620,7 +2814,7 @@ impl Edit {
         )?;
         if patch.is_noop() {
             let package =
-                crate::Package::from_opened_candidate(source.package.as_ref().clone(), &source);
+                crate::Package::from_opened_candidate(source.package.as_ref().clone(), &source)?;
             return Ok(Commit {
                 package: Arc::new(package),
                 snapshot: source,
@@ -2631,17 +2825,32 @@ impl Edit {
         // transaction did not rewrite, so the source snapshot's proved
         // notes-root classifications answer for those slides and only the
         // rewritten ones are rescanned; every other validation still runs.
-        let mut snapshot = super::model::capture_with_revision_and_digests_and_mce(
-            &working,
-            source.limits,
-            source.physical_source_provenance,
-            revision,
-            digests,
-            source.retained_mce.as_deref(),
-            Some(source.slide_roots.as_ref()),
+        let mut snapshot =
+            super::model::capture_with_revision_and_digests_and_mce_and_semantic_limits(
+                &working,
+                source.limits,
+                source.physical_source_provenance,
+                revision,
+                digests,
+                source.retained_mce.as_deref(),
+                Some(source.slide_roots.as_ref()),
+                source.owner_state.semantic_limits.clone(),
+            )?;
+        let changed = patch.resources().cloned().collect::<Vec<_>>();
+        let base = source.replay_index.clone().map_or_else(
+            || {
+                crate::package::replay_index::ReplayIndex::from_package(source.package.as_ref())
+                    .map(Arc::new)
+            },
+            Ok,
         )?;
+        snapshot.replay_index = Some(Arc::new(base.update(
+            source.package.as_ref(),
+            &working,
+            &changed,
+        )?));
         snapshot.owner_state = Arc::clone(&source.owner_state);
-        let package = crate::Package::from_opened_candidate(working.into_owned(), &snapshot);
+        let package = crate::Package::from_opened_candidate(working.into_owned(), &snapshot)?;
         Ok(Commit {
             package: Arc::new(package),
             snapshot,
@@ -2659,9 +2868,14 @@ impl Edit {
     ) -> Result<u32> {
         let selected = self.resolve_slide(slide)?;
         let owner = self.working.get_part(&selected.part_name)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let scene = crate::shape::Scene::read(owner.blob(), self.semantic_limits().shape())?;
         let shape_id = next_shape_id(&scene, label)?;
-        let conformance = crate::media_parts::document_conformance(owner.blob())?;
+        let conformance = crate::media_parts::document_conformance_with_limits(
+            owner.blob(),
+            self.semantic_limits()
+                .media_parts()
+                .constrained_by_source(self.working.read_limits()),
+        )?;
         let fragment =
             preset_shape_fragment(preset, label, bounds, fill_color, shape_id, conformance)?;
         self.append_checked_shape(&selected, shape_id, fragment.as_bytes())?;
@@ -2674,9 +2888,13 @@ impl Edit {
         shape_id: u32,
         fragment: &[u8],
     ) -> Result<()> {
-        let xml =
-            super::xml::append_shape(self.working.get_part(&slide.part_name)?.blob(), fragment)?;
-        ensure_shape_id(&xml, shape_id, "shape")?;
+        let shape_limits = self.semantic_limits().shape();
+        let xml = super::xml::append_shape_with_limit(
+            self.working.get_part(&slide.part_name)?.blob(),
+            fragment,
+            shape_limits.output_bytes(),
+        )?;
+        ensure_shape_id(&xml, shape_id, "shape", shape_limits)?;
         self.working.get_part_mut(&slide.part_name)?.set_blob(xml);
         Ok(())
     }
@@ -2739,11 +2957,28 @@ fn refuse_signed_change(source: &OpcPackage, working: &OpcPackage) -> Result<()>
     Ok(())
 }
 
+#[cfg(test)]
 fn compact_changed_slides(
     working: &mut OpcPackage,
     source: &OpcPackage,
     slides: &[Slide],
     scene_read: &HashMap<PackURI, Weak<Vec<u8>>>,
+) -> Result<()> {
+    compact_changed_slides_with_limits(
+        working,
+        source,
+        slides,
+        scene_read,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+fn compact_changed_slides_with_limits(
+    working: &mut OpcPackage,
+    source: &OpcPackage,
+    slides: &[Slide],
+    scene_read: &HashMap<PackURI, Weak<Vec<u8>>>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<()> {
     for slide in slides {
         let Ok(before) = source.get_part(&slide.part_name) else {
@@ -2765,12 +3000,12 @@ fn compact_changed_slides(
             .is_some_and(|read| std::ptr::eq(read.as_slice(), after_blob));
         let expected = if staged_scene_read {
             debug_assert!(
-                shape_semantics(after.blob()).is_ok(),
+                shape_semantics_with_limits(after.blob(), shape_limits).is_ok(),
                 "a staged slide recorded as read back fails the scene read"
             );
             None
         } else {
-            Some(compaction_scene(after.blob())?)
+            Some(compaction_scene_with_limits(after.blob(), shape_limits)?)
         };
         let compacted = super::xml::compact_changed_slide_xml(after.blob())?;
         // Compaction that reproduces the staged bytes exactly needs no read
@@ -2786,7 +3021,7 @@ fn compact_changed_slides(
                 #[cfg(debug_assertions)]
                 if let Some(expected) = expected.as_ref() {
                     debug_assert!(
-                        shape_semantics(&compacted.xml)
+                        shape_semantics_with_limits(&compacted.xml, shape_limits)
                             .as_ref()
                             .is_ok_and(|actual| actual == expected),
                         "root-byte proof changed staged shape semantics",
@@ -2794,7 +3029,10 @@ fn compact_changed_slides(
                 } else {
                     debug_assert!(
                         matches!(
-                            (shape_semantics(&compacted.xml), shape_semantics(after.blob())),
+                            (
+                                shape_semantics_with_limits(&compacted.xml, shape_limits),
+                                shape_semantics_with_limits(after.blob(), shape_limits),
+                            ),
                             (Ok(compacted), Ok(staged)) if compacted == staged
                         ),
                         "root-byte proof changed read-back shape semantics",
@@ -2803,9 +3041,9 @@ fn compact_changed_slides(
             } else {
                 let expected = match expected {
                     Some(expected) => expected,
-                    None => compaction_scene(after.blob())?,
+                    None => compaction_scene_with_limits(after.blob(), shape_limits)?,
                 };
-                if compaction_scene(&compacted.xml)? != expected {
+                if compaction_scene_with_limits(&compacted.xml, shape_limits)? != expected {
                     return Err(invalid(
                         "opened-presentation slide compaction changed shape semantics",
                     ));
@@ -2828,16 +3066,25 @@ thread_local! {
 
 type ShapeSemantics = Vec<(Option<u32>, Option<String>, Option<String>)>;
 
-/// The scene read compaction performs, counted in tests. Debug re-derivations
-/// call [`shape_semantics`] directly and are not counted.
-fn compaction_scene(xml: &[u8]) -> Result<ShapeSemantics> {
+fn compaction_scene_with_limits(
+    xml: &[u8],
+    shape_limits: crate::shape::Limits,
+) -> Result<ShapeSemantics> {
     #[cfg(test)]
     COMPACTION_SCENE_READS.with(|reads| reads.set(reads.get() + 1));
-    shape_semantics(xml)
+    shape_semantics_with_limits(xml, shape_limits)
 }
 
+#[cfg(test)]
 fn shape_semantics(xml: &[u8]) -> Result<ShapeSemantics> {
-    let scene = crate::shape::Scene::read(xml)?;
+    shape_semantics_with_limits(xml, crate::shape::Limits::DEFAULT)
+}
+
+fn shape_semantics_with_limits(
+    xml: &[u8],
+    shape_limits: crate::shape::Limits,
+) -> Result<ShapeSemantics> {
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     Ok(scene
         .iter()
         .map(|shape| {
@@ -2915,11 +3162,12 @@ fn chart_targets(
     package: &OpcPackage,
     slide: &PackURI,
     shape: crate::shape::Key<'_>,
+    shape_limits: crate::shape::Limits,
 ) -> Result<(PackURI, Option<PackURI>)> {
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
     let owner = package.get_part(slide)?;
-    let scene = crate::shape::Scene::read(owner.blob())?;
+    let scene = crate::shape::Scene::read(owner.blob(), shape_limits)?;
     let shape = scene
         .get(shape)
         .map_err(|error| invalid(format!("chart frame lookup: {error}")))?
@@ -3120,16 +3368,23 @@ pub(crate) fn text_box_output_bound(
         .checked_mul(ESCAPED_TEXT_MULTIPLIER)
         .and_then(|bytes| bytes.checked_add(FRAGMENT_OVERHEAD))
         .ok_or(Error::Limit {
-            resource: "opened-presentation appended shape XML",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: usize::MAX,
+            maximum: max_output_bytes,
         })?;
-    input_bytes
-        .checked_add(fragment)
-        .filter(|bytes| *bytes <= max_output_bytes)
-        .ok_or(Error::Limit {
-            resource: "opened-presentation appended shape XML",
-            limit: max_output_bytes,
-        })
+    let output = input_bytes.checked_add(fragment).ok_or(Error::Limit {
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+        observed: usize::MAX,
+        maximum: max_output_bytes,
+    })?;
+    if output > max_output_bytes {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: output,
+            maximum: max_output_bytes,
+        });
+    }
+    Ok(output)
 }
 
 /// Stage one plain text-box fragment against an already selected slide.
@@ -3143,6 +3398,7 @@ pub(crate) fn stage_text_box(
     text: &str,
     bounds: (i64, i64, i64, i64),
     max_output_bytes: usize,
+    shape_limits: crate::shape::Limits,
 ) -> Result<(Vec<u8>, u32)> {
     // Reject cheap caller errors before scene indexing or any fragment
     // allocation. The fragment builder repeats these checks at its own
@@ -3152,7 +3408,7 @@ pub(crate) fn stage_text_box(
     // allocating the exact fragment. The exact post-escape length is checked
     // again below before the lexical append.
     let _output_bound = text_box_output_bound(xml.len(), text.len(), max_output_bytes)?;
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     let shape_id = next_shape_id(&scene, "text box")?;
     let conformance = crate::media_parts::document_conformance(xml)?;
     let fragment = text_box_fragment(
@@ -3162,22 +3418,25 @@ pub(crate) fn stage_text_box(
         conformance,
         super::Limits::default(),
     )?;
-    let output_len = xml
-        .len()
-        .checked_add(fragment.len())
-        .filter(|length| *length <= max_output_bytes)
-        .ok_or(Error::Limit {
-            resource: "opened-presentation appended shape XML",
-            limit: max_output_bytes,
-        })?;
-    let output = super::xml::append_shape(xml, fragment.as_bytes())?;
-    if output.len() != output_len {
+    let output_len = xml.len().checked_add(fragment.len()).ok_or(Error::Limit {
+        kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+        observed: usize::MAX,
+        maximum: max_output_bytes,
+    })?;
+    if output_len > max_output_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation appended shape XML",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: output_len,
+            maximum: max_output_bytes,
         });
     }
-    ensure_shape_id(&output, shape_id, "text box")?;
+    let output = super::xml::append_shape_with_limit(xml, fragment.as_bytes(), max_output_bytes)?;
+    if output.len() != output_len {
+        return Err(Error::Invalid(
+            "native text-box append changed the preflighted output size".into(),
+        ));
+    }
+    ensure_shape_id(&output, shape_id, "text box", shape_limits)?;
     Ok((output, shape_id))
 }
 
@@ -3285,8 +3544,13 @@ fn resolve_snapshot_slide(source: &Snapshot, key: crate::slide::Selector<'_>) ->
     source.resolve_slide(key)
 }
 
-fn ensure_shape_id(xml: &[u8], shape_id: u32, label: &str) -> Result<()> {
-    let scene = crate::shape::Scene::read(xml)?;
+fn ensure_shape_id(
+    xml: &[u8],
+    shape_id: u32,
+    label: &str,
+    shape_limits: crate::shape::Limits,
+) -> Result<()> {
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     if scene.iter().any(|shape| shape.id() == Some(shape_id)) {
         Ok(())
     } else {
@@ -3316,8 +3580,9 @@ pub(crate) fn validate_text_box_input(text: &str, bounds: (i64, i64, i64, i64)) 
 
 fn validate_shape_text(text: &str, limits: super::Limits, label: &str) -> Result<()> {
     if text.len() > limits.max_text_bytes() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::TextBytes,
+            observed: text.len(),
             maximum: limits.max_text_bytes(),
         });
     }
@@ -3501,8 +3766,9 @@ fn table_fragment(
         .try_fold(0usize, |total, cell| total.checked_add(cell.len()))
         .ok_or_else(|| invalid("opened-presentation table text size overflow"))?;
     if text_bytes > limits.max_text_bytes() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::TextBytes,
+            observed: text_bytes,
             maximum: limits.max_text_bytes(),
         });
     }
@@ -3582,8 +3848,9 @@ fn plan_transfer_roots(
         }
         if seen.len() > limit {
             return Err(Error::Limit {
-                resource: "opened-presentation transfer dependency parts",
-                limit,
+                kind: crate::opened::LimitKind::Parts,
+                observed: seen.len(),
+                maximum: limit,
             });
         }
         let part = source.get_part(&name)?;
@@ -3773,7 +4040,8 @@ impl Commit {
     #[must_use]
     pub fn into_parts(self) -> (crate::Package, Patch) {
         let package = Arc::try_unwrap(self.package).unwrap_or_else(|package| {
-            crate::Package::from_opened_candidate((*package.opc).clone(), &self.snapshot)
+            package
+                .derive_with_replay_index((*package.opc).clone(), Arc::clone(&package.replay_index))
         });
         (package, self.patch)
     }
@@ -3956,6 +4224,7 @@ mod compaction_tests {
                 .package
                 .get_part(&snapshot.slides[1].part_name)?
                 .blob(),
+            crate::shape::Limits::DEFAULT,
         )?
         .at(0)
         .map_err(|error| crate::Error::Invalid(error.to_string()))?

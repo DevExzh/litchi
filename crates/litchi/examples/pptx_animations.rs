@@ -1,6 +1,6 @@
 //! Animations example - demonstrates typed effects, triggers, and timing XML.
 
-use litchi_pptx::animations::{Effect, EffectInstance, Sequence, Trigger};
+use litchi_pptx::animations::{Effect, EffectInstance, Limits, Sequence, Trigger};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Animations Example ===\n");
@@ -40,8 +40,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Total animations: {}", sequence.len());
     println!("  Is empty: {}", sequence.is_empty());
 
-    let xml = sequence.to_xml();
-    let parsed = Sequence::parse_timing_xml(&xml)?;
+    let xml = sequence.to_xml(Limits::DEFAULT)?;
+    let parsed = Sequence::parse_timing_xml(&xml, Limits::DEFAULT)?;
     println!("\nGenerated timing XML length: {} bytes", xml.len());
     assert!(xml.contains("<p:timing>"));
     assert!(xml.contains("spid=\"1\""));

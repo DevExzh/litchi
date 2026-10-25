@@ -32,10 +32,15 @@ pub(crate) fn invalid(message: impl Into<String>) -> crate::Error {
     crate::Error::Invalid(message.into())
 }
 
-pub(crate) fn limit(resource: &'static str, maximum: usize) -> crate::Error {
+pub(crate) fn limit(
+    kind: crate::error::CodecLimitKind,
+    observed: usize,
+    maximum: usize,
+) -> crate::Error {
     crate::Error::Limit {
-        resource,
-        limit: maximum,
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
     }
 }
 
@@ -67,19 +72,27 @@ pub(crate) fn relationship_value(
     )?)
 }
 
-pub(crate) fn bounded(value: &str, resource: &'static str) -> crate::Result<()> {
+pub(crate) fn bounded(value: &str, kind: crate::error::CodecLimitKind) -> crate::Result<()> {
     if value.len() > MAX_ATTRIBUTE_BYTES {
-        return Err(limit(resource, MAX_ATTRIBUTE_BYTES));
+        return Err(limit(kind, value.len(), MAX_ATTRIBUTE_BYTES));
     }
     Ok(())
 }
 
 pub(crate) fn increment_nodes(nodes: &mut usize) -> crate::Result<()> {
-    *nodes = nodes
-        .checked_add(1)
-        .ok_or_else(|| limit("embedded XML nodes", MAX_XML_NODES))?;
+    *nodes = nodes.checked_add(1).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            usize::MAX,
+            MAX_XML_NODES,
+        )
+    })?;
     if *nodes > MAX_XML_NODES {
-        return Err(limit("embedded XML nodes", MAX_XML_NODES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlNodes,
+            *nodes,
+            MAX_XML_NODES,
+        ));
     }
     Ok(())
 }

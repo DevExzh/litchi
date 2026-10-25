@@ -11,6 +11,8 @@ pub use presentation::{PresentationPart, SlideReference};
 pub use slide::{SlideLayoutPart, SlideMasterPart, SlidePart};
 #[cfg(test)]
 pub(crate) use slide::{take_proved_root_hits, take_root_scans};
+#[cfg(test)]
+use std::cell::Cell;
 
 use std::borrow::Cow;
 use std::mem::size_of;
@@ -20,7 +22,9 @@ use litchi_ooxml_common::mce::{
     Error as MceError, LimitKind as MceLimitKind, Limits as MceLimits, process_part,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcPackage, PackURI, Part, Relationship};
+use litchi_opc::{
+    OpcError, OpcPackage, PackURI, Part, Relationship, SourceLimitKind, SourceLimits,
+};
 use quick_xml::events::BytesStart;
 use quick_xml::reader::NsReader;
 
@@ -28,6 +32,40 @@ use crate::{Error, Result};
 
 pub(crate) const MAX_PART_XML_BYTES: usize = 64 * 1024 * 1024;
 pub(crate) const MAX_SLIDES: usize = 100_000;
+
+#[cfg(test)]
+thread_local! {
+    /// Physical XML admissions performed by opened slide capture and notes
+    /// graph validation. Memo-hit tests use this to distinguish a skipped
+    /// source scan from a merely equivalent semantic result.
+    static SOURCE_XML_SCANS: Cell<usize> = const { Cell::new(0) };
+}
+
+#[cfg(test)]
+pub(crate) fn take_source_xml_scans() -> usize {
+    SOURCE_XML_SCANS.with(|scans| scans.replace(0))
+}
+
+/// Admit one owned PresentationML source part under the package's physical
+/// policy before a format-specific parser or MCE projection touches it.
+///
+/// `MAX_PART_XML_BYTES` remains the hard eager-reader ceiling; a caller's
+/// source profile may be tighter. The XML event/depth/attribute scan is kept
+/// here so the opened capture and source-backed readers share the same
+/// physical admission without widening the notes semantic limits.
+pub(crate) fn validate_source_part_xml(xml: &[u8], limits: SourceLimits) -> Result<()> {
+    #[cfg(test)]
+    SOURCE_XML_SCANS.with(|scans| scans.set(scans.get().saturating_add(1)));
+    let observed = u64::try_from(xml.len()).unwrap_or(u64::MAX);
+    if observed > limits.max_part_bytes() {
+        return Err(Error::Opc(OpcError::Limit {
+            kind: SourceLimitKind::PartBytes,
+            observed,
+            maximum: limits.max_part_bytes(),
+        }));
+    }
+    crate::source_limits::validate_xml_limits(xml, limits)
+}
 
 pub(crate) type MceKey = (usize, usize);
 
@@ -353,11 +391,12 @@ pub(crate) struct ProcessedXml<'a> {
     pub(crate) processed: ProcessedBytes<'a>,
 }
 
-fn raw_xml(part: &dyn Part) -> Result<&[u8]> {
+pub(crate) fn raw_xml(part: &dyn Part) -> Result<&[u8]> {
     if part.blob().len() > MAX_PART_XML_BYTES {
         return Err(Error::Limit {
-            resource: "PresentationML part XML",
-            limit: MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: part.blob().len(),
+            maximum: MAX_PART_XML_BYTES,
         });
     }
     Ok(part.blob())
@@ -407,20 +446,12 @@ pub(crate) fn processed_xml_with_source(part: &dyn Part) -> Result<ProcessedXml<
     Ok(ProcessedXml { source, processed })
 }
 
-pub(crate) fn processed_xml_with_capture<'a, 'parent>(
-    part: &'a dyn Part,
-    capture: &mut MceCapture<'a, 'parent>,
-) -> Result<ProcessedXml<'a>> {
-    let source = raw_xml(part)?;
-    let processed = capture.process(source)?;
-    Ok(ProcessedXml { source, processed })
-}
-
 pub(crate) fn processed_xml(part: &dyn Part) -> Result<Cow<'_, [u8]>> {
     if part.blob().len() > MAX_PART_XML_BYTES {
         return Err(Error::Limit {
-            resource: "PresentationML part XML",
-            limit: MAX_PART_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: part.blob().len(),
+            maximum: MAX_PART_XML_BYTES,
         });
     }
     Ok(process_part(part)?)

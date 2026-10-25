@@ -18,7 +18,12 @@ use crate::{Result, shape};
 use super::{Notes, RelatedPart, notes_text};
 
 /// Read the selected slide's optional notes slide as a detached snapshot.
-pub(crate) fn load<'a>(package: &'a OpcPackage, slide: &SlidePart<'a>) -> Result<Option<Notes>> {
+pub(crate) fn load<'a>(
+    package: &'a OpcPackage,
+    slide: &SlidePart<'a>,
+    shape_limits: shape::Limits,
+    notes_limits: crate::notes::Limits,
+) -> Result<Option<Notes>> {
     let Some((relationship, part)) = related_by_type(
         package,
         slide.part(),
@@ -30,9 +35,10 @@ pub(crate) fn load<'a>(package: &'a OpcPackage, slide: &SlidePart<'a>) -> Result
         return Ok(None);
     };
 
-    super::notes::validate_eager(package, slide.part(), part)?;
-    let processed = super::notes::processed_eager_notes(part, package.read_limits())?;
-    let parsed = shape::Scene::read(processed.as_slice())?;
+    super::notes::validate_eager_with_limits(package, slide.part(), part, notes_limits)?;
+    let processed =
+        super::notes::processed_eager_notes_with_limits(part, package.read_limits(), notes_limits)?;
+    let parsed = shape::Scene::read(processed.as_slice(), shape_limits)?;
     let scene = OwnedScene::from_parsed(parsed, Arc::clone(&processed))?;
     super::strict_scene(&scene, "notes")?;
     let text = notes_text(&scene)?;

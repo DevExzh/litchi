@@ -1,5 +1,6 @@
 //! Bounded protection XML codec.
 
+use super::super::{BoundedString, Limits, process_str};
 use super::model::{Algorithm, Settings, Verifier};
 use crate::{Error, Result};
 use base64::Engine;
@@ -41,11 +42,12 @@ fn password_hash(password: &str, salt: &[u8], spin_count: u32) -> Zeroizing<Sha5
     hash
 }
 
-pub(crate) fn generate_verifier(password: &str) -> Result<Verifier> {
-    if password.len() > 1 << 20 {
+pub(crate) fn generate_verifier(password: &str, limits: Limits) -> Result<Verifier> {
+    if password.len() > limits.max_string_bytes() {
         return Err(Error::Limit {
-            resource: "protection password",
-            limit: 1 << 20,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PasswordBytes),
+            observed: password.len(),
+            maximum: limits.max_string_bytes(),
         });
     }
 
@@ -69,24 +71,107 @@ impl Settings {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_xml(xml: &str) -> Result<Self> {
-        let processed = litchi_ooxml_common::mce::process_str(xml)?;
+    pub fn parse_xml(xml: &str, limits: Limits) -> Result<Self> {
+        if xml.len() > limits.max_input_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                observed: xml.len(),
+                maximum: limits.max_input_bytes(),
+            });
+        }
+        let processed = process_str(xml, limits)?;
+        if processed.len() > limits.max_output_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                observed: processed.len(),
+                maximum: limits.max_output_bytes(),
+            });
+        }
         let mut reader = Reader::from_str(processed.as_ref());
         reader.config_mut().trim_text(true);
         let mut settings = Self::new();
         let mut seen = false;
+        let mut nodes = 0usize;
+        let mut depth = 0usize;
         loop {
             match reader.read_event()? {
-                Event::Empty(element) | Event::Start(element)
-                    if element.local_name().as_ref() == b"modifyVerifier" =>
-                {
-                    if seen {
-                        return Err(Error::Invalid(
-                            "duplicate presentation modifyVerifier".into(),
-                        ));
+                Event::Start(element) => {
+                    depth = depth.checked_add(1).ok_or_else(|| Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: usize::MAX,
+                        maximum: limits.max_depth(),
+                    })?;
+                    if depth > limits.max_depth() {
+                        return Err(Error::Limit {
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::XmlDepth,
+                            ),
+                            observed: depth,
+                            maximum: limits.max_depth(),
+                        });
                     }
-                    seen = true;
-                    settings.modify = Some(parse_verifier(&element, reader.decoder())?);
+                    nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: usize::MAX,
+                        maximum: limits.max_nodes(),
+                    })?;
+                    if nodes > limits.max_nodes() {
+                        return Err(Error::Limit {
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::XmlNodes,
+                            ),
+                            observed: nodes,
+                            maximum: limits.max_nodes(),
+                        });
+                    }
+                    check_attributes(&element, reader.decoder(), limits)?;
+                    if element.local_name().as_ref() == b"modifyVerifier" {
+                        if seen {
+                            return Err(Error::Invalid(
+                                "duplicate presentation modifyVerifier".into(),
+                            ));
+                        }
+                        seen = true;
+                        settings.modify = Some(parse_verifier(&element, reader.decoder(), limits)?);
+                    }
+                },
+                Event::Empty(element) => {
+                    check_empty_depth(depth, limits)?;
+                    nodes = nodes.checked_add(1).ok_or_else(|| Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlNodes,
+                        ),
+                        observed: usize::MAX,
+                        maximum: limits.max_nodes(),
+                    })?;
+                    if nodes > limits.max_nodes() {
+                        return Err(Error::Limit {
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::XmlNodes,
+                            ),
+                            observed: nodes,
+                            maximum: limits.max_nodes(),
+                        });
+                    }
+                    check_attributes(&element, reader.decoder(), limits)?;
+                    if element.local_name().as_ref() == b"modifyVerifier" {
+                        if seen {
+                            return Err(Error::Invalid(
+                                "duplicate presentation modifyVerifier".into(),
+                            ));
+                        }
+                        seen = true;
+                        settings.modify = Some(parse_verifier(&element, reader.decoder(), limits)?);
+                    }
+                },
+                Event::End(_) => {
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        Error::Invalid("protection XML has an unmatched end tag".into())
+                    })?;
                 },
                 Event::Eof => break,
                 Event::DocType(_) | Event::PI(_) => {
@@ -97,51 +182,97 @@ impl Settings {
                 _ => {},
             }
         }
+        if depth != 0 {
+            return Err(Error::Invalid(
+                "protection XML has an unterminated element".into(),
+            ));
+        }
         Ok(settings)
     }
 
-    #[must_use]
-    pub fn to_xml(&self) -> String {
+    pub fn to_xml(&self, limits: Limits) -> Result<String> {
         let Some(verifier) = &self.modify else {
-            return String::new();
+            return Ok(String::new());
         };
-        format!(
+        let mut value = BoundedString::new(limits, "serialized protection XML");
+        value.write_fmt(format_args!(
             r#"<p:modifyVerifier cryptProviderType="rsaAES" cryptAlgorithmClass="hash" cryptAlgorithmType="typeAny" cryptAlgorithmSid="{}" spinCount="{}" saltData="{}" hashData="{}"/>"#,
             verifier.algorithm.sid(),
             verifier.spin_count,
             verifier.salt,
             verifier.hash,
-        )
+        ))?;
+        Ok(value.finish())
     }
 
-    #[must_use]
-    pub fn to_pres_props_xml(&self) -> String {
-        if self.read_only_recommended {
-            format!(
-                r#"<p:extLst><p:ext uri="{}"><p1710:readonlyRecommended xmlns:p1710="{}" val="1"/></p:ext></p:extLst>"#,
-                crate::presentation_properties::READONLY_RECOMMENDED_URI,
-                crate::presentation_properties::P1710_NS,
-            )
-        } else {
-            String::new()
+    pub fn to_pres_props_xml(&self, limits: Limits) -> Result<String> {
+        if !self.read_only_recommended {
+            return Ok(String::new());
         }
+        let mut value =
+            BoundedString::new(limits, "serialized protection presentation-properties XML");
+        value.write_fmt(format_args!(
+            r#"<p:extLst><p:ext uri="{}"><p1710:readonlyRecommended xmlns:p1710="{}" val="1"/></p:ext></p:extLst>"#,
+            crate::presentation_properties::READONLY_RECOMMENDED_URI,
+            crate::presentation_properties::P1710_NS,
+        ))?;
+        Ok(value.finish())
     }
 }
 
 fn parse_verifier(
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
+    limits: Limits,
 ) -> Result<Verifier> {
     let mut hash = None;
     let mut salt = None;
     let mut spins = None;
     let mut algorithm = None;
+    let mut attributes = 0usize;
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        attributes = attributes.checked_add(1).ok_or_else(|| Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+            observed: usize::MAX,
+            maximum: limits.max_attributes(),
+        })?;
+        if attributes > limits.max_attributes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+                observed: attributes,
+                maximum: limits.max_attributes(),
+            });
+        }
+        if attribute.key.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: attribute.key.as_ref().len(),
+                maximum: limits.max_string_bytes(),
+            });
+        }
+        if attribute.value.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: attribute.value.as_ref().len(),
+                maximum: limits.max_string_bytes(),
+            });
+        }
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
-            .map_err(|error| Error::Xml(error.to_string()))?
-            .into_owned();
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        if value.len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+                observed: value.len(),
+                maximum: limits.max_string_bytes(),
+            });
+        }
+        let value = value.into_owned();
         match attribute.key.as_ref() {
             b"hashValue" | b"hashData" => set_once(&mut hash, value, "hash")?,
             b"saltValue" | b"saltData" => set_once(&mut salt, value, "salt")?,
@@ -204,6 +335,70 @@ fn parse_verifier(
         hash,
         salt,
     })
+}
+
+fn check_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    limits: Limits,
+) -> Result<()> {
+    let mut attributes = 0usize;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        attributes = attributes.checked_add(1).ok_or_else(|| Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+            observed: usize::MAX,
+            maximum: limits.max_attributes(),
+        })?;
+        if attributes > limits.max_attributes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlAttributes),
+                observed: attributes,
+                maximum: limits.max_attributes(),
+            });
+        }
+        if attribute.key.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: attribute.key.as_ref().len(),
+                maximum: limits.max_string_bytes(),
+            });
+        }
+        if attribute.value.as_ref().len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: attribute.value.as_ref().len(),
+                maximum: limits.max_string_bytes(),
+            });
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        if value.len() > limits.max_string_bytes() {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+                observed: value.len(),
+                maximum: limits.max_string_bytes(),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn check_empty_depth(depth: usize, limits: Limits) -> Result<()> {
+    let observed = depth.checked_add(1).unwrap_or(usize::MAX);
+    if observed > limits.max_depth() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+            observed,
+            maximum: limits.max_depth(),
+        });
+    }
+    Ok(())
 }
 
 fn set_once<T>(slot: &mut Option<T>, value: T, field: &str) -> Result<()> {
@@ -273,18 +468,25 @@ mod tests {
     #[test]
     fn parses_and_republishes_a_legacy_verifier() {
         let xml = r#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:modifyVerifier cryptAlgorithmSid="14" spinCount="1000" saltData="AA==" hashData="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="/></p:presentation>"#;
-        let settings = Settings::parse_xml(xml).expect("verifier");
+        let settings = Settings::parse_xml(xml, Limits::DEFAULT).expect("verifier");
         assert_eq!(
             settings.modify().expect("modifier").algorithm(),
             Algorithm::Sha512
         );
-        assert!(settings.to_xml().contains("cryptAlgorithmSid=\"14\""));
+        assert!(
+            settings
+                .to_xml(Limits::DEFAULT)
+                .expect("serialize verifier")
+                .contains("cryptAlgorithmSid=\"14\"")
+        );
     }
 
     #[test]
     fn password_generation_is_explicitly_dependency_bound() {
         let mut settings = Settings::new();
-        settings.set_modify_password("secret").unwrap();
+        settings
+            .set_modify_password("secret", Limits::DEFAULT)
+            .unwrap();
         let verifier = settings.modify().unwrap();
         assert_eq!(verifier.algorithm(), Algorithm::Sha512);
         assert_eq!(verifier.spins(), SPIN_COUNT);
@@ -300,5 +502,42 @@ mod tests {
             BASE64_ENGINE.encode(hash.0.as_slice()),
             "3ACFcYR0/M+PsEwOXR4/mcgYsTN1VMXMunIrbpt1lY+1Kal3nCkZOJjIEw+LWRlQzI3rL5HZnVIoL87I6R8tNw=="
         );
+    }
+
+    #[test]
+    fn empty_protection_depth_is_checked_before_attributes() {
+        let limits = Limits::DEFAULT.with_depth(1).expect("depth limit");
+        let exact = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
+        Settings::parse_xml(std::str::from_utf8(exact).expect("UTF-8"), limits)
+            .expect("depth-one empty root");
+
+        let one_over = br#"<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:holder/></p:presentation>"#;
+        assert_xml_depth_limit(
+            Settings::parse_xml(std::str::from_utf8(one_over).expect("UTF-8"), limits)
+                .expect_err("depth-two empty element"),
+            2,
+            1,
+        );
+        assert!(matches!(
+            Settings::parse_xml(
+                "<p:presentation xmlns:p=\"http://schemas.openxmlformats.org/presentationml/2006/main\">",
+                Limits::DEFAULT,
+            ),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    fn assert_xml_depth_limit(error: Error, observed: usize, maximum: usize) {
+        match error {
+            Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: actual,
+                maximum: configured,
+            } => {
+                assert_eq!(actual, observed);
+                assert_eq!(configured, maximum);
+            },
+            other => panic!("expected XML depth limit, got {other:?}"),
+        }
     }
 }

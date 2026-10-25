@@ -31,7 +31,11 @@ pub fn load_slide_action_settings(
         ));
     }
     if slide.blob().len() > MAX_SLIDE_XML_BYTES {
-        return Err(limit("slide XML bytes", MAX_SLIDE_XML_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            slide.blob().len(),
+            MAX_SLIDE_XML_BYTES,
+        ));
     }
     limits.add_slide_xml(slide.blob().len())?;
 
@@ -79,7 +83,7 @@ fn resolve_target(
                 "slide {slide_index} action relationship '{relationship_id}' has an empty external target"
             )));
         }
-        bounded(&target, "external action target")?;
+        bounded(&target)?;
         return Ok(Target::External {
             target,
             relationship_type,
@@ -103,9 +107,13 @@ fn resolve_target(
     })
 }
 
-fn bounded(value: &str, what: &'static str) -> Result<()> {
+fn bounded(value: &str) -> Result<()> {
     if value.len() > MAX_ATTRIBUTE_BYTES {
-        return Err(limit(what, MAX_ATTRIBUTE_BYTES));
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlAttributeBytes,
+            value.len(),
+            MAX_ATTRIBUTE_BYTES,
+        ));
     }
     Ok(())
 }

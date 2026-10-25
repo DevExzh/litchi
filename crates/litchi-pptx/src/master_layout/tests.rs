@@ -1428,7 +1428,7 @@ fn p232_source_store_replaces_all_drawingml_text_runs() {
         )
         .unwrap();
     let part = package.opc().unwrap().get_part(&layout.part_name).unwrap();
-    let scene = crate::shape::Scene::read(part.blob()).unwrap();
+    let scene = crate::shape::Scene::read(part.blob(), crate::shape::Limits::DEFAULT).unwrap();
     let shape = scene.get("Runs").unwrap().unwrap();
     assert_eq!(shape.text(), Some("updated & escaped"));
     assert!(

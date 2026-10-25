@@ -92,8 +92,9 @@ pub(super) fn read(xml: &[u8]) -> Result<Source> {
     }
     if xml.len() > MAX_SHAPE_BYTES {
         return Err(Error::Limit {
-            resource: "classification shape XML bytes",
-            limit: MAX_SHAPE_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_SHAPE_BYTES,
         });
     }
 
@@ -153,8 +154,11 @@ pub(super) fn read(xml: &[u8]) -> Result<Source> {
                 )?;
                 if frames.len() >= MAX_SHAPE_DEPTH {
                     return Err(Error::Limit {
-                        resource: "classification shape XML depth",
-                        limit: MAX_SHAPE_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: frames.len().checked_add(1).unwrap_or(usize::MAX),
+                        maximum: MAX_SHAPE_DEPTH,
                     });
                 }
                 frames.push(Frame {
@@ -514,8 +518,9 @@ fn finish_frame(
                 empty,
             };
             *extension_children = extension_children.checked_add(1).ok_or(Error::Limit {
-                resource: "classification extension count",
-                limit: super::validation::MAX_EXTENSION_COUNT,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Extensions),
+                observed: usize::MAX,
+                maximum: super::validation::MAX_EXTENSION_COUNT,
             })?;
             if is_known {
                 if known.is_some() {
@@ -678,8 +683,9 @@ pub(super) fn write_extension(conformance: Conformance, outcome: Outcome) -> Res
     .into_bytes();
     if xml.len() > MAX_EXTENSION_BYTES {
         return Err(Error::Limit {
-            resource: "classification extension bytes",
-            limit: MAX_EXTENSION_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::ExtensionBytes),
+            observed: xml.len(),
+            maximum: MAX_EXTENSION_BYTES,
         });
     }
     Ok(xml)
@@ -708,6 +714,11 @@ pub(super) fn write_classification(outcome: Outcome) -> Vec<u8> {
     .into_bytes()
 }
 
-pub(super) fn replace(xml: &[u8], range: Range<usize>, value: &[u8]) -> Result<Vec<u8>> {
-    replace_xml(xml, range, value)
+pub(super) fn replace(
+    xml: &[u8],
+    range: Range<usize>,
+    value: &[u8],
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
+    replace_xml(xml, range, value, max_bytes)
 }

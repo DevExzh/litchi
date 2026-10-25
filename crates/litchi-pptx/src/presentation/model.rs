@@ -16,6 +16,7 @@ use super::package;
 pub struct Presentation<'a> {
     pub(super) package: &'a OpcPackage,
     pub(super) part: PresentationPart<'a>,
+    pub(super) semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     /// Memo of [`PresentationPart::slide_references`]: the ordered catalog as
     /// parsed from the main part, before any package-graph validation.
     ///
@@ -34,12 +35,29 @@ impl<'a> Presentation<'a> {
     /// Construct a view from a validated main part and its package.
     #[must_use]
     pub fn new(part: PresentationPart<'a>, package: &'a OpcPackage) -> Self {
+        Self::new_with_semantic_limits(part, package, None)
+    }
+
+    pub(crate) fn new_with_semantic_limits(
+        part: PresentationPart<'a>,
+        package: &'a OpcPackage,
+        semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
+    ) -> Self {
         Self {
             package,
             part,
+            semantic_limits,
             catalog: OnceLock::new(),
             catalog_validated: OnceLock::new(),
         }
+    }
+
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        crate::open_options::selected(self.semantic_limits.as_ref())
+    }
+
+    pub(crate) fn shape_limits(&self) -> crate::shape::Limits {
+        self.semantic_limits().shape()
     }
 
     /// The ordered slide catalog parsed from the immutable main part.
@@ -134,7 +152,13 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn notes(&self) -> Result<Option<crate::notes::Graph>> {
-        package::notes(self.package, &self.part)
+        package::notes(
+            self.package,
+            &self.part,
+            self.semantic_limits()
+                .notes()
+                .constrained_by_source(self.package.read_limits()),
+        )
     }
 
     /// Discover the optional opaque VBA project relationship owned by this
@@ -231,8 +255,9 @@ impl<'a> Presentation<'a> {
         &self,
         capture: &mut crate::parts::MceCapture<'a, 'parent>,
         proved_roots: Option<&crate::notes::SlideRootMemo>,
+        source_limits: litchi_opc::SourceLimits,
     ) -> Result<package::CaptureSlides<'a>> {
-        package::capture_slides_with_mce(self, capture, proved_roots)
+        package::capture_slides_with_mce(self, capture, proved_roots, source_limits)
     }
 
     /// Resolve the slide masters declared by `p:sldMasterIdLst` in XML order.
@@ -241,7 +266,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn slide_masters(&self) -> Result<Vec<SlideMaster<'a>>> {
-        package::slide_masters(self.package, &self.part)
+        package::slide_masters(self.package, &self.part, self.shape_limits())
     }
 
     /// Resolve all layouts reachable from all presentation masters.
@@ -250,7 +275,7 @@ impl<'a> Presentation<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn slide_layouts(&self) -> Result<Vec<SlideLayout<'a>>> {
-        package::slide_layouts(self.package, &self.part)
+        package::slide_layouts(self.package, &self.part, self.shape_limits())
     }
 
     /// Flatten all slide text in presentation order.
@@ -292,6 +317,9 @@ impl<'a> Presentation<'a> {
     pub fn slide_sync(
         &self,
     ) -> Result<Vec<crate::presentation_properties::metadata::slide_sync::Part>> {
-        package::slide_sync(self.package)
+        package::slide_sync(
+            self.package,
+            crate::open_options::selected(self.semantic_limits.as_ref()).slide_sync(),
+        )
     }
 }

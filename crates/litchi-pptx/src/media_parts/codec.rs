@@ -1,13 +1,14 @@
+#[cfg(test)]
+use super::MAX_STRING_BYTES;
 use super::{
     Arc, BTreeMap, BTreeSet, Bookmark, BytesStart, Conformance, Coordinate, Error, Event,
-    Extension, ExtensionList, Extent, Fade, Kind, List, MAX_BOOKMARKS, MAX_DEPTH, MAX_MEDIA,
-    MAX_MEDIA_EXTENSION_XML_BYTES, MAX_NODES, MAX_STRING_BYTES, MAX_XML_BYTES, MEDIA_EXTENSION_URI,
-    Namespace, NsReader, P14, PML, Picture, Poster, PrefixDeclaration, REL, ResolveResult, Result,
-    STRICT_PML, Transform, Trim, XmlVersion, coordinate_error, invalid, limit, output_limit,
-    parse_time, validate_value,
+    Extension, ExtensionList, Extent, Fade, Kind, Limits, List, MAX_MEDIA_EXTENSION_XML_BYTES,
+    MEDIA_EXTENSION_URI, Namespace, NsReader, P14, PML, Picture, Poster, PrefixDeclaration, REL,
+    ResolveResult, Result, STRICT_PML, Transform, Trim, XmlVersion, coordinate_error, invalid,
+    limit, output_limit, parse_time, validate_value_with_limits,
 };
 use litchi_ooxml_common::mce::{
-    Capabilities, Limits, NAMESPACE, Name, process_markup_compatibility,
+    Capabilities, Limits as MceLimits, NAMESPACE, Name, process_markup_compatibility,
 };
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::attributes::SeenNames;
@@ -46,12 +47,19 @@ impl ExtensionList {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(xml: &[u8]) -> Result<Self> {
-        if xml.len() > MAX_MEDIA_EXTENSION_XML_BYTES {
-            return Err(limit("media extension-list XML bytes"));
+    pub fn parse(xml: &[u8], limits: Limits) -> Result<Self> {
+        let extension_limit = limits
+            .max_extension_bytes
+            .min(MAX_MEDIA_EXTENSION_XML_BYTES);
+        if xml.len() > extension_limit {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlBytes,
+                xml.len(),
+                extension_limit,
+            ));
         }
-        let root = parse_document(xml)?;
-        Self::from_node(&root)
+        let root = parse_document(xml, limits)?;
+        Self::from_node(&root, limits)
     }
 
     /// Borrow the self-contained canonical XML fragment.
@@ -60,9 +68,9 @@ impl ExtensionList {
         &self.xml
     }
 
-    fn from_node(node: &Node) -> Result<Self> {
+    fn from_node(node: &Node, limits: Limits) -> Result<Self> {
         require_node(node, PML, "extLst")?;
-        let xml = canonical_fragment(node)?;
+        let xml = canonical_fragment(node, limits)?;
         let xml = String::from_utf8(xml)
             .map_err(|_err| invalid("canonical media extension-list XML is not UTF-8"))?;
         Ok(Self {
@@ -76,37 +84,42 @@ impl ExtensionList {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn parse(xml: &[u8]) -> Result<List> {
-    let root = parse_document(xml)?;
+pub fn parse(xml: &[u8], limits: Limits) -> Result<List> {
+    let root = parse_document(xml, limits)?;
     let conformance = conformance(&root)?;
     let mut pictures = Vec::new();
-    collect_pictures(&root, conformance, &mut pictures)?;
+    collect_pictures(&root, conformance, limits, &mut pictures)?;
     let value = List { pictures };
-    validate_value(&value, false)?;
+    validate_value_with_limits(&value, false, limits)?;
     Ok(value)
 }
 
 fn collect_pictures(
     node: &Node,
     conformance: Conformance,
+    limits: Limits,
     output: &mut Vec<Picture>,
 ) -> Result<()> {
     if node.namespace == conformance.pml()
         && node.name == "pic"
-        && let Some(picture) = parse_picture(node, conformance)?
+        && let Some(picture) = parse_picture(node, conformance, limits)?
     {
-        if output.len() == MAX_MEDIA {
-            return Err(limit("media count"));
+        if output.len() == limits.max_media {
+            return Err(limit(
+                crate::error::CodecLimitKind::MediaPictures,
+                output.len().checked_add(1).unwrap_or(usize::MAX),
+                limits.max_media,
+            ));
         }
         output.push(picture);
     }
     for child in &node.children {
-        collect_pictures(child, conformance, output)?;
+        collect_pictures(child, conformance, limits, output)?;
     }
     Ok(())
 }
 
-fn parse_picture(node: &Node, conformance: Conformance) -> Result<Option<Picture>> {
+fn parse_picture(node: &Node, conformance: Conformance, limits: Limits) -> Result<Option<Picture>> {
     let Some(nv_pic) = one_child(node, conformance.pml(), "nvPicPr")? else {
         return Ok(None);
     };
@@ -136,7 +149,7 @@ fn parse_picture(node: &Node, conformance: Conformance) -> Result<Option<Picture
     let poster = parse_poster(node, conformance)?;
     let transform = parse_transform(node, conformance)?;
     let office_extension = find_office_media(nv_pr, conformance)?
-        .map(parse_office_media)
+        .map(|node| parse_office_media(node, limits))
         .transpose()?;
     Ok(Some(Picture {
         shape_id,
@@ -209,7 +222,7 @@ fn find_office_media(node: &Node, conformance: Conformance) -> Result<Option<&No
     Ok(found)
 }
 
-fn parse_office_media(node: &Node) -> Result<Extension> {
+fn parse_office_media(node: &Node, limits: Limits) -> Result<Extension> {
     whitespace(node)?;
     // The Office 2010 p14 schema imports the transitional relationships
     // namespace even when the containing presentation uses Strict namespaces.
@@ -248,7 +261,7 @@ fn parse_office_media(node: &Node) -> Result<Extension> {
             // the containing slide uses the Strict namespace dialect.
             (PML, "extLst") => {
                 if extensions
-                    .replace(ExtensionList::from_node(child)?)
+                    .replace(ExtensionList::from_node(child, limits)?)
                     .is_some()
                 {
                     return Err(invalid("p14:media has multiple extLst children"));
@@ -275,8 +288,12 @@ fn parse_office_media(node: &Node) -> Result<Extension> {
     if let Some(list) = bookmarks_node {
         whitespace(list)?;
         no_attributes(list, &[])?;
-        if list.children.len() > MAX_BOOKMARKS {
-            return Err(limit("bookmark count"));
+        if list.children.len() > limits.max_bookmarks {
+            return Err(limit(
+                crate::error::CodecLimitKind::Bookmarks,
+                list.children.len(),
+                limits.max_bookmarks,
+            ));
         }
         for child in &list.children {
             require_node(child, P14, "bmk")?;
@@ -321,9 +338,9 @@ fn parse_fade(node: &Node) -> Result<Fade> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn write_pictures(value: &List, conformance: Conformance) -> Result<Vec<u8>> {
-    validate_value(value, false)?;
-    let mut output = BoundedXml::new();
+pub fn write_pictures(value: &List, conformance: Conformance, limits: Limits) -> Result<Vec<u8>> {
+    validate_value_with_limits(value, false, limits)?;
+    let mut output = BoundedXml::new(limits.max_output_bytes, limits.max_string_bytes);
     for picture in &value.pictures {
         write_picture(&mut output, picture, conformance)?;
     }
@@ -441,9 +458,13 @@ fn write_office_extension(output: &mut BoundedXml, value: &Extension) -> Result<
 }
 
 /// Loads media pictures and validates their complete internal OPC resource graph.
-fn parse_document(xml: &[u8]) -> Result<Node> {
-    if xml.len() > MAX_XML_BYTES {
-        return Err(limit("input XML bytes"));
+fn parse_document(xml: &[u8], limits: Limits) -> Result<Node> {
+    if xml.len() > limits.max_input_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.max_input_bytes,
+        ));
     }
     let mut caps = Capabilities::ooxml_baseline();
     caps.understand_namespace(P14);
@@ -453,16 +474,16 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
             local_name: "ext".to_owned(),
         });
     }
-    let limits = Limits {
-        max_input_bytes: MAX_XML_BYTES,
-        max_output_bytes: MAX_XML_BYTES,
-        max_depth: MAX_DEPTH,
+    let mce_limits = MceLimits {
+        max_input_bytes: limits.max_input_bytes,
+        max_output_bytes: limits.max_input_bytes,
+        max_depth: limits.max_depth,
         max_namespace_bindings: 4096,
         max_directive_tokens: 4096,
         max_choices_per_alternate: 1024,
         max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     };
-    let processed = process_markup_compatibility(xml, &caps, &limits)?.xml;
+    let processed = process_markup_compatibility(xml, &caps, &mce_limits)?.xml;
     let mut reader = NsReader::from_reader(processed.as_ref());
     reader.config_mut().trim_text(false);
     let mut buffer = Vec::new();
@@ -475,9 +496,26 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
         let event = reader.read_event_into(&mut buffer).map_err(xml_error)?;
         match event {
             Event::Start(ref element) | Event::Empty(ref element) => {
-                nodes += 1;
-                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
-                    return Err(limit("XML structure"));
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes,
+                    )
+                })?;
+                if nodes > limits.max_nodes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes,
+                    ));
+                }
+                if stack.len() >= limits.max_depth {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        limits.max_depth,
+                    ));
                 }
                 let empty = matches!(&event, Event::Empty(_));
                 let parent_namespace_context = stack
@@ -488,6 +526,7 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
                     element,
                     reader.decoder(),
                     &mut strings,
+                    limits.max_string_bytes,
                     parent_namespace_context,
                 )?;
                 if empty {
@@ -505,7 +544,7 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
             Event::Text(text) => {
                 let decoded = text.decode().map_err(xml_error)?;
                 let decoded = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
-                add_strings(&mut strings, decoded.len())?;
+                add_strings(&mut strings, decoded.len(), limits.max_string_bytes)?;
                 if let Some(node) = stack.last_mut() {
                     node.text.push_str(&decoded);
                 } else if !decoded.trim().is_empty() {
@@ -527,6 +566,7 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
                         _ => None,
                     })
                     .ok_or_else(|| invalid("custom XML entity is rejected"))?;
+                add_strings(&mut strings, value.len(), limits.max_string_bytes)?;
                 if let Some(node) = stack.last_mut() {
                     node.text.push_str(&value);
                 } else {
@@ -535,7 +575,7 @@ fn parse_document(xml: &[u8]) -> Result<Node> {
             },
             Event::CData(text) => {
                 let decoded = text.decode().map_err(xml_error)?;
-                add_strings(&mut strings, decoded.len())?;
+                add_strings(&mut strings, decoded.len(), limits.max_string_bytes)?;
                 if let Some(node) = stack.last_mut() {
                     node.text.push_str(&decoded);
                 } else if !decoded.trim().is_empty() {
@@ -561,6 +601,7 @@ fn make_node(
     element: &BytesStart<'_>,
     decoder: quick_xml::encoding::Decoder,
     strings: &mut usize,
+    max_string_bytes: usize,
     parent_namespace_context: &Arc<NamespaceContext>,
 ) -> Result<Node> {
     let namespace = resolved(reader.resolver().resolve_element(element.name()).0)?;
@@ -574,7 +615,11 @@ fn make_node(
     let name = std::str::from_utf8(element.local_name().as_ref())
         .map_err(xml_error)?
         .to_owned();
-    add_strings(strings, namespace.len() + prefix.len() + name.len())?;
+    add_strings(
+        strings,
+        namespace.len() + prefix.len() + name.len(),
+        max_string_bytes,
+    )?;
     let mut attributes = Vec::new();
     let mut namespace_declarations = Vec::new();
     // The expanded names in `attributes`, so that checking each attribute for
@@ -593,7 +638,7 @@ fn make_node(
                     std::str::from_utf8(prefix).map_err(xml_error)?.to_owned()
                 },
             };
-            add_strings(strings, prefix.len() + value.len())?;
+            add_strings(strings, prefix.len() + value.len(), max_string_bytes)?;
             namespace_declarations.push((prefix, value));
             continue;
         }
@@ -618,6 +663,7 @@ fn make_node(
         add_strings(
             strings,
             namespace.len() + prefix.len() + name.len() + value.len(),
+            max_string_bytes,
         )?;
         if !expanded_names.insert((namespace_key, local.into_inner())) {
             return Err(invalid("duplicate expanded XML attribute"));
@@ -661,7 +707,11 @@ fn attach(node: Node, stack: &mut [Node], root: &mut Option<Node>) -> Result<()>
     Ok(())
 }
 pub(crate) fn document_conformance(xml: &[u8]) -> Result<Conformance> {
-    let root = parse_document(xml)?;
+    document_conformance_with_limits(xml, Limits::DEFAULT)
+}
+
+pub(crate) fn document_conformance_with_limits(xml: &[u8], limits: Limits) -> Result<Conformance> {
+    let root = parse_document(xml, limits)?;
     conformance(&root)
 }
 
@@ -763,19 +813,20 @@ pub(crate) fn validate_id(value: &str) -> Result<()> {
         Ok(())
     }
 }
-pub(crate) fn bounded(value: &str) -> Result<()> {
-    if value.len() <= MAX_STRING_BYTES {
-        Ok(())
-    } else {
-        Err(limit("string bytes"))
-    }
-}
-fn add_strings(total: &mut usize, size: usize) -> Result<()> {
-    *total = total
-        .checked_add(size)
-        .ok_or_else(|| limit("XML string bytes"))?;
-    if *total > MAX_STRING_BYTES {
-        Err(limit("XML string bytes"))
+fn add_strings(total: &mut usize, size: usize, maximum: usize) -> Result<()> {
+    *total = total.checked_add(size).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::StringBytes,
+            usize::MAX,
+            maximum,
+        )
+    })?;
+    if *total > maximum {
+        Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            *total,
+            maximum,
+        ))
     } else {
         Ok(())
     }
@@ -793,11 +844,16 @@ fn resolved(value: ResolveResult<'_>) -> Result<String> {
     }
 }
 
-fn canonical_fragment(node: &Node) -> Result<Vec<u8>> {
+fn canonical_fragment(node: &Node, limits: Limits) -> Result<Vec<u8>> {
     let mut used_prefixes = BTreeSet::new();
     collect_used_prefixes(node, &mut used_prefixes);
-    let mut output = BoundedXml::with_limit(MAX_MEDIA_EXTENSION_XML_BYTES);
-    write_canonical_node(&mut output, node, &used_prefixes, true)?;
+    let mut output = BoundedXml::new(
+        limits
+            .max_extension_bytes
+            .min(MAX_MEDIA_EXTENSION_XML_BYTES),
+        limits.max_string_bytes,
+    );
+    write_canonical_node(&mut output, node, &used_prefixes, true, limits.max_depth)?;
     Ok(output.finish())
 }
 
@@ -846,6 +902,7 @@ fn write_canonical_node(
     node: &Node,
     used_prefixes: &BTreeSet<String>,
     root: bool,
+    max_depth: usize,
 ) -> Result<()> {
     if node.text_ends.len() != node.children.len() {
         return Err(invalid("invalid XML text-segment state"));
@@ -854,7 +911,7 @@ fn write_canonical_node(
     output.push(b'<')?;
     write_original_name(output, &node.prefix, &node.name)?;
     if root {
-        let mut bindings = effective_namespace_bindings(&node.namespace_context)?;
+        let mut bindings = effective_namespace_bindings(&node.namespace_context, max_depth)?;
         bindings.retain(|prefix, _| used_prefixes.contains(prefix));
         bindings.entry(String::new()).or_default();
         for (prefix, namespace) in &bindings {
@@ -904,7 +961,7 @@ fn write_canonical_node(
             .get(text_start..text_end)
             .ok_or_else(|| invalid("invalid XML text-segment state"))?;
         output.escape(text)?;
-        write_canonical_node(output, child, used_prefixes, false)?;
+        write_canonical_node(output, child, used_prefixes, false, max_depth)?;
         text_start = text_end;
     }
     let text = node
@@ -920,12 +977,17 @@ fn write_canonical_node(
 
 fn effective_namespace_bindings(
     context: &Arc<NamespaceContext>,
+    max_depth: usize,
 ) -> Result<BTreeMap<String, String>> {
     let mut contexts = Vec::new();
     let mut current = Some(context.as_ref());
     while let Some(context) = current {
-        if contexts.len() == MAX_DEPTH {
-            return Err(limit("media extension namespace depth"));
+        if contexts.len() == max_depth {
+            return Err(limit(
+                crate::error::CodecLimitKind::NamespaceBindings,
+                contexts.len().checked_add(1).unwrap_or(usize::MAX),
+                max_depth,
+            ));
         }
         contexts.push(context);
         current = context.parent.as_deref();
@@ -971,18 +1033,21 @@ fn write_original_name(output: &mut BoundedXml, prefix: &str, name: &str) -> Res
 pub(crate) struct BoundedXml {
     pub(super) bytes: Vec<u8>,
     limit: usize,
+    max_string_bytes: usize,
 }
 
 impl BoundedXml {
-    pub(super) fn new() -> Self {
-        Self::with_limit(MAX_XML_BYTES)
-    }
-
-    pub(super) fn with_limit(limit: usize) -> Self {
+    pub(super) fn new(limit: usize, max_string_bytes: usize) -> Self {
         Self {
             bytes: Vec::new(),
             limit,
+            max_string_bytes,
         }
+    }
+
+    #[cfg(test)]
+    pub(super) fn with_limit(limit: usize) -> Self {
+        Self::new(limit, MAX_STRING_BYTES)
     }
 
     fn finish(self) -> Vec<u8> {
@@ -1002,20 +1067,34 @@ impl BoundedXml {
     }
 
     fn escape(&mut self, value: &str) -> Result<()> {
-        let escaped = escaped_len(value).ok_or_else(|| output_limit(self.limit))?;
+        if value.len() > self.max_string_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::StringBytes,
+                value.len(),
+                self.max_string_bytes,
+            ));
+        }
+        let escaped = escaped_len(value).ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         self.reserve(escaped)?;
         write_escaped(&mut self.bytes, value);
         Ok(())
     }
 
     fn attr(&mut self, name: &str, value: &str) -> Result<()> {
-        let escaped = escaped_len(value).ok_or_else(|| output_limit(self.limit))?;
+        if value.len() > self.max_string_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::StringBytes,
+                value.len(),
+                self.max_string_bytes,
+            ));
+        }
+        let escaped = escaped_len(value).ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         let fixed = 4usize
             .checked_add(name.len())
-            .ok_or_else(|| output_limit(self.limit))?;
+            .ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         let required = fixed
             .checked_add(escaped)
-            .ok_or_else(|| output_limit(self.limit))?;
+            .ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         self.reserve(required)?;
         self.bytes.push(b' ');
         self.bytes.extend_from_slice(name.as_bytes());
@@ -1030,9 +1109,9 @@ impl BoundedXml {
             .bytes
             .len()
             .checked_add(additional)
-            .ok_or_else(|| output_limit(self.limit))?;
+            .ok_or_else(|| output_limit(self.limit, usize::MAX))?;
         if next > self.limit {
-            return Err(output_limit(self.limit));
+            return Err(output_limit(self.limit, next));
         }
         let spare = self.bytes.capacity().saturating_sub(self.bytes.len());
         if additional > spare {

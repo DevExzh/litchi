@@ -218,25 +218,17 @@ impl std::fmt::Debug for LookupError {
 }
 
 impl<'a> Scene<'a> {
-    /// Index a scene with conservative finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(xml: &'a [u8]) -> Result<Self> {
-        Self::read_with(xml, Limits::DEFAULT)
-    }
-
     /// Index a scene with caller-selected finite limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn read_with(xml: &'a [u8], limits: Limits) -> Result<Self> {
+    pub fn read(xml: &'a [u8], limits: Limits) -> Result<Self> {
         if xml.len() > limits.input_bytes {
             return Err(Error::Limit {
-                resource: "shape owner input bytes",
-                limit: limits.input_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InputBytes),
+                observed: xml.len(),
+                maximum: limits.input_bytes,
             });
         }
         if limits.output_bytes > u32::MAX as usize {
@@ -258,8 +250,9 @@ impl<'a> Scene<'a> {
         let output = process_markup_compatibility(xml, &capabilities, &mce_limits)?.xml;
         if output.len() > limits.output_bytes || output.len() > u32::MAX as usize {
             return Err(Error::Limit {
-                resource: "processed shape owner bytes",
-                limit: limits.output_bytes.min(u32::MAX as usize),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: output.len(),
+                maximum: limits.output_bytes.min(u32::MAX as usize),
             });
         }
 
@@ -1472,8 +1465,9 @@ impl<'a> Scanner<'a> {
     ) -> Result<u32> {
         if self.records.len() >= self.limits.shapes {
             return Err(Error::Limit {
-                resource: "shapes",
-                limit: self.limits.shapes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Shapes),
+                observed: self.records.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum: self.limits.shapes,
             });
         }
         self.records
@@ -1942,13 +1936,15 @@ impl<'a> Scanner<'a> {
     fn retain(&mut self, value: &str) -> Result<TextSpan> {
         let start = self.strings.len();
         let end = start.checked_add(value.len()).ok_or(Error::Limit {
-            resource: "shape retained strings",
-            limit: self.limits.retained_text_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::RetainedBytes),
+            observed: usize::MAX,
+            maximum: self.limits.retained_text_bytes,
         })?;
         if end > self.limits.retained_text_bytes || end > u32::MAX as usize {
             return Err(Error::Limit {
-                resource: "shape retained strings",
-                limit: self.limits.retained_text_bytes.min(u32::MAX as usize),
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::RetainedBytes),
+                observed: end,
+                maximum: self.limits.retained_text_bytes.min(u32::MAX as usize),
             });
         }
         self.strings
@@ -1971,13 +1967,15 @@ impl<'a> Scanner<'a> {
             .retained_text
             .checked_add(value.len())
             .ok_or(Error::Limit {
-                resource: "shape decoded text",
-                limit: self.limits.retained_text_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: usize::MAX,
+                maximum: self.limits.retained_text_bytes,
             })?;
         if next > self.limits.retained_text_bytes {
             return Err(Error::Limit {
-                resource: "shape decoded text",
-                limit: self.limits.retained_text_bytes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: next,
+                maximum: self.limits.retained_text_bytes,
             });
         }
         let active = self
@@ -1997,13 +1995,15 @@ impl<'a> Scanner<'a> {
 
     fn count_node(&mut self) -> Result<()> {
         self.nodes = self.nodes.checked_add(1).ok_or(Error::Limit {
-            resource: "shape XML elements",
-            limit: self.limits.nodes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: usize::MAX,
+            maximum: self.limits.nodes,
         })?;
         if self.nodes > self.limits.nodes {
             Err(Error::Limit {
-                resource: "shape XML elements",
-                limit: self.limits.nodes,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+                observed: self.nodes,
+                maximum: self.limits.nodes,
             })
         } else {
             Ok(())
@@ -2012,13 +2012,15 @@ impl<'a> Scanner<'a> {
 
     fn enter_depth(&self) -> Result<usize> {
         let depth = self.depth.checked_add(1).ok_or(Error::Limit {
-            resource: "shape XML nesting depth",
-            limit: self.limits.depth,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+            observed: usize::MAX,
+            maximum: self.limits.depth,
         })?;
         if depth > self.limits.depth {
             Err(Error::Limit {
-                resource: "shape XML nesting depth",
-                limit: self.limits.depth,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: depth,
+                maximum: self.limits.depth,
             })
         } else {
             Ok(depth)

@@ -216,6 +216,7 @@ fn author_index(authors: Option<&[ParsedAuthor]>) -> Result<Option<AuthorIndex>>
 pub(crate) fn load_eager<'a>(
     package: &'a OpcPackage,
     slide: &SlidePart<'a>,
+    limits: comments::Limits,
 ) -> Result<Option<Comments>> {
     let Some((relationship, part)) = related_by_type(
         package,
@@ -227,15 +228,18 @@ pub(crate) fn load_eager<'a>(
     else {
         return Ok(None);
     };
-    let processed =
-        super::process_eager_part(part, comments::MAX_PART_BYTES, package.read_limits())?;
+    let processed = super::process_eager_part(
+        part,
+        comments::MAX_PART_BYTES.min(limits.max_input_bytes),
+        package.read_limits(),
+    )?;
     if !part.rels().is_empty() {
         return Err(Error::Relationship(
             "comments part must not have relationships".into(),
         ));
     }
-    let parsed = comments::parse_slide_comments_strict(processed.blob())?;
-    let authors = selected_eager_authors(package, &parsed)?;
+    let parsed = comments::parse_slide_comments_strict(processed.blob(), limits)?;
+    let authors = selected_eager_authors(package, &parsed, limits)?;
     let (author_related, author_values) = match authors {
         Some((part, authors)) => (Some(part), Some(authors)),
         None => (None, None),
@@ -252,6 +256,7 @@ pub(crate) fn load_eager<'a>(
 fn selected_eager_authors(
     package: &OpcPackage,
     parsed_comments: &[ParsedComment],
+    limits: comments::Limits,
 ) -> Result<Option<(RelatedPart, Vec<ParsedAuthor>)>> {
     // A comments part with no entries does not need the presentation author
     // graph. A non-empty part requires the selected author closure.
@@ -292,14 +297,17 @@ fn selected_eager_authors(
         .get_part(&target)
         .map_err(|_| Error::Relationship("comment-author target part is missing".into()))?;
     crate::parts::validate_content_type(part, comments::AUTHORS_CONTENT_TYPE)?;
-    let processed =
-        super::process_eager_part(part, comments::MAX_PART_BYTES, package.read_limits())?;
+    let processed = super::process_eager_part(
+        part,
+        comments::MAX_PART_BYTES.min(limits.max_input_bytes),
+        package.read_limits(),
+    )?;
     if !part.rels().is_empty() {
         return Err(Error::Relationship(
             "comment-author part must not have relationships".into(),
         ));
     }
-    let authors = comments::parse_comment_authors(processed.blob())?;
+    let authors = comments::parse_comment_authors(processed.blob(), limits)?;
     Ok(Some((
         RelatedPart::from_eager(part, relationship.r_id()),
         authors,

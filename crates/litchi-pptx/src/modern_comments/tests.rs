@@ -89,16 +89,57 @@ mod comment_tests {
         assert!(matches!(
             List::from_processed(&oversized),
             Err(Error::Limit {
-                limit: MAX_BYTES,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed,
+                maximum: MAX_BYTES,
                 ..
-            })
+            }) if observed == oversized.len()
         ));
         assert!(matches!(
             Authors::from_processed(&oversized),
             Err(Error::Limit {
-                limit: MAX_BYTES,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed,
+                maximum: MAX_BYTES,
                 ..
-            })
+            }) if observed == oversized.len()
+        ));
+    }
+
+    #[test]
+    fn comment_relationship_string_limit_preserves_observation() {
+        let expected = MAX_STRING_BYTES + 1;
+        let mut package = package();
+        let mut value = value();
+        value.relationship_id = "r".repeat(expected);
+        assert!(matches!(
+            store_modern_comment(&mut package, &value),
+            Err(Error::Limit {
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+                observed,
+                maximum: MAX_STRING_BYTES,
+                ..
+            }) if observed == expected
+        ));
+    }
+
+    #[test]
+    fn author_relationship_string_limit_preserves_observation() {
+        let expected = MAX_STRING_BYTES + 1;
+        let mut package = package();
+        let value = AuthorPart {
+            relationship_id: "r".repeat(expected),
+            part_name: "/ppt/authors/modernAuthor1.xml".into(),
+            authors: Authors::default(),
+        };
+        assert!(matches!(
+            store_modern_comment_authors(&mut package, &value),
+            Err(Error::Limit {
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::StringBytes),
+                observed,
+                maximum: MAX_STRING_BYTES,
+                ..
+            }) if observed == expected
         ));
     }
 

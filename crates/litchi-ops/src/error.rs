@@ -1424,7 +1424,7 @@ impl Classify for litchi_pptx::Error {
             // operation and reason remain content-free diagnostics only.
             Self::Refused(refusal) => refusal.classify(),
             Self::UnsupportedOpenPolicy { .. } => Class::of(Code::InvalidArgument),
-            Self::EditLimit { .. } => Class::of(Code::LimitExceeded),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             // The core-properties reader reports its OPC failures, among them
             // a source change or cancellation during the read, through the
             // shared OOXML error.

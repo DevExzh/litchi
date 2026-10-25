@@ -46,10 +46,14 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_change_tracking(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_change_tracking")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_change_tracking",
+            |package, target, patch| {
+                patch.validate_changed_shape_parts(target, package.semantic_limits().shape())
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
@@ -61,14 +65,15 @@ impl Edit<'_> {
     ) -> Result<()> {
         let opc = self.staged.opc();
         let owner = crate::package::resolve_slide(opc, slide)?;
-        let mut draft = super::load(opc, &owner)?.edit();
+        let shape_limits = self.staged.shape_limits();
+        let mut draft = super::load_with_limits(opc, &owner, shape_limits)?.edit();
         change(&mut draft)?;
         let prepared = draft.commit()?;
         if prepared.patch().is_noop() {
             return Ok(());
         }
         self.staged
-            .update(|opc| super::apply_commit(opc, prepared).map(drop))
+            .update(|opc| super::apply_commit_with_limits(opc, prepared, shape_limits).map(drop))
     }
 
     /// The staged change-tracking identifiers of the selected slide.
@@ -80,7 +85,7 @@ impl Edit<'_> {
     pub fn change_tracking<'s>(&self, slide: impl Into<Selector<'s>>) -> Result<super::Snapshot> {
         let opc = self.staged.opc();
         let owner = crate::package::resolve_slide(opc, slide.into())?;
-        super::load(opc, &owner)
+        super::load_with_limits(opc, &owner, self.staged.shape_limits())
     }
 
     /// Set or replace the creation identifier of the selected slide.

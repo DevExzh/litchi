@@ -8,7 +8,12 @@ use super::model::{Anchor, Container, Element, Layout};
 use crate::Result;
 use crate::tag::{allocation, invalid, replace_xml};
 
-pub(super) fn add_anchor(xml: &[u8], layout: &Layout, relationship_id: &str) -> Result<Vec<u8>> {
+pub(super) fn add_anchor(
+    xml: &[u8],
+    layout: &Layout,
+    relationship_id: &str,
+    max_bytes: usize,
+) -> Result<Vec<u8>> {
     if layout.anchor.is_some() {
         return Err(invalid("selected shape already has a p:tags anchor"));
     }
@@ -25,9 +30,10 @@ pub(super) fn add_anchor(xml: &[u8], layout: &Layout, relationship_id: &str) -> 
                 xml,
                 container.element.close_start..container.element.close_start,
                 anchor.as_bytes(),
+                max_bytes,
             );
         }
-        return expand_empty(xml, &container.element, anchor.as_bytes());
+        return expand_empty(xml, &container.element, anchor.as_bytes(), max_bytes);
     }
 
     let container = format!(
@@ -35,12 +41,13 @@ pub(super) fn add_anchor(xml: &[u8], layout: &Layout, relationship_id: &str) -> 
         layout.conformance.namespace()
     );
     if layout.nv_pr.empty {
-        expand_empty(xml, &layout.nv_pr, container.as_bytes())
+        expand_empty(xml, &layout.nv_pr, container.as_bytes(), max_bytes)
     } else {
         replace_xml(
             xml,
             layout.insertion..layout.insertion,
             container.as_bytes(),
+            max_bytes,
         )
     }
 }
@@ -49,15 +56,21 @@ pub(super) fn replace_anchor_id(
     xml: &[u8],
     layout: &Layout,
     relationship_id: &str,
+    max_bytes: usize,
 ) -> Result<Vec<u8>> {
     let anchor = layout
         .anchor
         .as_ref()
         .ok_or_else(|| invalid("selected shape has no p:tags anchor"))?;
-    replace_xml(xml, anchor.id_value.clone(), relationship_id.as_bytes())
+    replace_xml(
+        xml,
+        anchor.id_value.clone(),
+        relationship_id.as_bytes(),
+        max_bytes,
+    )
 }
 
-pub(super) fn remove_anchor(xml: &[u8], layout: &Layout) -> Result<Vec<u8>> {
+pub(super) fn remove_anchor(xml: &[u8], layout: &Layout, max_bytes: usize) -> Result<Vec<u8>> {
     let anchor = layout
         .anchor
         .as_ref()
@@ -70,13 +83,13 @@ pub(super) fn remove_anchor(xml: &[u8], layout: &Layout) -> Result<Vec<u8>> {
         && !container.preserve_when_empty
         && container_contains_only_anchor(xml, container, anchor)?
     {
-        replace_xml(xml, container.element.span.clone(), &[])
+        replace_xml(xml, container.element.span.clone(), &[], max_bytes)
     } else {
-        replace_xml(xml, anchor.span.clone(), &[])
+        replace_xml(xml, anchor.span.clone(), &[], max_bytes)
     }
 }
 
-fn expand_empty(xml: &[u8], element: &Element, child: &[u8]) -> Result<Vec<u8>> {
+fn expand_empty(xml: &[u8], element: &Element, child: &[u8], max_bytes: usize) -> Result<Vec<u8>> {
     let raw = xml
         .get(element.span.clone())
         .ok_or_else(|| invalid("empty shape element span is outside owner XML"))?;
@@ -102,7 +115,7 @@ fn expand_empty(xml: &[u8], element: &Element, child: &[u8]) -> Result<Vec<u8>> 
     replacement.extend_from_slice(b"</");
     replacement.extend_from_slice(qualified_name);
     replacement.push(b'>');
-    replace_xml(xml, element.span.clone(), &replacement)
+    replace_xml(xml, element.span.clone(), &replacement, max_bytes)
 }
 
 fn element_qname(element: &[u8]) -> Result<&[u8]> {

@@ -138,7 +138,7 @@ fn resolve_ranges(
         if targets.len() >= limits.max_expanded_targets() {
             return Err(crate::transaction::Error::Limit {
                 kind: crate::transaction::LimitKind::ExpandedTargets,
-                observed: targets.len().saturating_add(1),
+                observed: targets.len().checked_add(1).unwrap_or(usize::MAX),
                 maximum: limits.max_expanded_targets(),
             }
             .into());

@@ -77,8 +77,9 @@ impl Limits {
     fn check_source(self, bytes: usize) -> Result<()> {
         if bytes > self.owner_bytes {
             return Err(Error::Limit {
-                resource: "p232 placeholder owner XML bytes",
-                limit: self.owner_bytes,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: bytes,
+                maximum: self.owner_bytes,
             });
         }
         Ok(())
@@ -90,8 +91,9 @@ impl Limits {
         let growth = target.saturating_sub(source);
         if growth > self.growth_bytes {
             return Err(Error::Limit {
-                resource: "p232 placeholder patch growth bytes",
-                limit: self.growth_bytes,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                observed: growth,
+                maximum: self.growth_bytes,
             });
         }
         Ok(())
@@ -240,6 +242,7 @@ pub struct Snapshot {
     value: Option<PlaceholderTypeExtension>,
     location: SlotLocation,
     limits: Limits,
+    shape_limits: crate::shape::Limits,
 }
 
 impl Snapshot {
@@ -302,6 +305,7 @@ impl Snapshot {
             && self.shape_name == other.shape_name
             && self.placeholder_index == other.placeholder_index
             && self.value == other.value
+            && self.shape_limits == other.shape_limits
     }
 }
 
@@ -368,6 +372,7 @@ impl SlotDraft {
             Arc::new(staged),
             self.snapshot.shape_index,
             self.snapshot.limits,
+            self.snapshot.shape_limits,
         )?;
         if after.value != target {
             return Err(Error::Invalid(
@@ -430,24 +435,49 @@ impl SlotChange {
 }
 
 /// Load an optional p232 extension from a slide, master, or layout placeholder.
+#[cfg(test)]
 pub(crate) fn load_slot_snapshot<'a>(
     package: &OpcPackage,
     owner: &PackURI,
     key: impl Into<Key<'a>>,
 ) -> Result<Snapshot> {
-    load_slot_snapshot_with_limits(package, owner, key, Limits::DEFAULT)
+    load_slot_snapshot_with_shape_limits(
+        package,
+        owner,
+        key,
+        Limits::DEFAULT,
+        crate::shape::Limits::DEFAULT,
+    )
 }
 
 /// Load an optional p232 extension under finite source and growth limits.
+#[cfg(test)]
 pub(crate) fn load_slot_snapshot_with_limits<'a>(
     package: &OpcPackage,
     owner: &PackURI,
     key: impl Into<Key<'a>>,
     limits: Limits,
 ) -> Result<Snapshot> {
+    load_slot_snapshot_with_shape_limits(package, owner, key, limits, crate::shape::Limits::DEFAULT)
+}
+
+/// Load an optional p232 extension with separate source and shape policies.
+pub(crate) fn load_slot_snapshot_with_shape_limits<'a>(
+    package: &OpcPackage,
+    owner: &PackURI,
+    key: impl Into<Key<'a>>,
+    limits: Limits,
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
     let part = package.get_part(owner)?;
     validate_owner(part)?;
-    slot_snapshot_from_source_for_key(part.partname().clone(), part.blob_arc(), key.into(), limits)
+    slot_snapshot_from_source_for_key(
+        part.partname().clone(),
+        part.blob_arc(),
+        key.into(),
+        limits,
+        shape_limits,
+    )
 }
 
 /// Apply an add/remove/update patch after exact source, semantic, bound and
@@ -477,11 +507,12 @@ pub(crate) fn apply_slot_patch(package: &mut OpcPackage, patch: &SlotChange) -> 
     candidate
         .get_part_mut(&patch.after.owner)?
         .set_blob_shared(Arc::clone(&patch.after.source));
-    let published = load_slot_snapshot_with_limits(
+    let published = load_slot_snapshot_with_shape_limits(
         &candidate,
         &patch.after.owner,
         Key::Index(patch.after.shape_index),
         patch.after.limits,
+        patch.after.shape_limits,
     )?;
     if !published.same_source(&patch.after) {
         return Err(Error::Invalid(
@@ -508,10 +539,11 @@ pub(crate) fn apply_slot_patch(package: &mut OpcPackage, patch: &SlotChange) -> 
 /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
 /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
 /// no-op keeps the signature.
-pub(crate) fn store_placeholder_shape_source(
+pub(crate) fn store_placeholder_shape_source_with_shape_limits(
     package: &mut OpcPackage,
     part_name: &PackURI,
     spec: &PlaceholderSpec,
+    shape_limits: crate::shape::Limits,
 ) -> Result<()> {
     validate_placeholder_spec(spec)?;
     let part = package.get_part(part_name)?;
@@ -527,7 +559,7 @@ pub(crate) fn store_placeholder_shape_source(
             source,
         })?;
     source.extend_from_slice(blob);
-    let mut patched = prepare_placeholder_shape_source(&source, spec, limits)?;
+    let mut patched = prepare_placeholder_shape_source(&source, spec, limits, shape_limits)?;
 
     if patched == source {
         return Ok(());
@@ -552,10 +584,11 @@ fn prepare_placeholder_shape_source(
     source: &[u8],
     spec: &PlaceholderSpec,
     limits: Limits,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Vec<u8>> {
     validate_placeholder_spec(spec)?;
     limits.check_source(source.len())?;
-    let scene = Scene::read(source)?;
+    let scene = Scene::read(source, shape_limits)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -585,7 +618,7 @@ fn prepare_placeholder_shape_source(
                 limits,
             )?)
         };
-        patch_existing_shape_fields(typed.as_ref(), shape_index, spec, limits)?
+        patch_existing_shape_fields(typed.as_ref(), shape_index, spec, limits, shape_limits)?
     } else {
         let tree = scan_element_span(source, "spTree", SPTREE_DEPTH)?
             .ok_or_else(|| invalid("owner has no shape tree"))?;
@@ -598,7 +631,7 @@ fn prepare_placeholder_shape_source(
     };
 
     limits.check_source(patched.len())?;
-    let final_scene = Scene::read(&patched)?;
+    let final_scene = Scene::read(&patched, shape_limits)?;
     if final_scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -631,15 +664,17 @@ fn prepare_placeholder_shape_source(
 
 /// Validate the bounded inputs that the package facade must check before its
 /// generic transaction snapshots the whole OPC graph.
-pub(crate) fn preflight_store_placeholder_shape(
+pub(crate) fn preflight_store_placeholder_shape_with_shape_limits(
     package: &OpcPackage,
     part_name: &PackURI,
     spec: &PlaceholderSpec,
+    shape_limits: crate::shape::Limits,
 ) -> Result<bool> {
     validate_placeholder_spec(spec)?;
     let part = package.get_part(part_name)?;
     validate_owner(part)?;
-    let staged = prepare_placeholder_shape_source(part.blob(), spec, Limits::DEFAULT)?;
+    let staged =
+        prepare_placeholder_shape_source(part.blob(), spec, Limits::DEFAULT, shape_limits)?;
     Ok(staged.as_slice() == part.blob())
 }
 
@@ -659,8 +694,9 @@ fn validate_placeholder_spec(spec: &PlaceholderSpec) -> Result<()> {
     {
         if escaped_xml_len(value)? > MAX_OWNER_BYTES {
             return Err(Error::Limit {
-                resource: "p232 placeholder escaped XML bytes",
-                limit: MAX_OWNER_BYTES,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: escaped_xml_len(value)?,
+                maximum: MAX_OWNER_BYTES,
             });
         }
     }
@@ -695,8 +731,9 @@ fn patch_existing_shape_fields(
     shape_index: usize,
     spec: &PlaceholderSpec,
     limits: Limits,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Vec<u8>> {
-    let scene = Scene::read(source)?;
+    let scene = Scene::read(source, shape_limits)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -808,8 +845,9 @@ fn apply_replacements(
             .checked_sub(replacement.range.end - replacement.range.start)
             .and_then(|value| value.checked_add(replacement.bytes.len()))
             .ok_or(Error::Limit {
-                resource: "p232 placeholder shape output bytes",
-                limit: limits.owner_bytes,
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                observed: usize::MAX,
+                maximum: limits.owner_bytes,
             })?;
         previous_end = replacement.range.end;
     }
@@ -840,8 +878,9 @@ fn escaped_xml_len(value: &str) -> Result<usize> {
             _ => character.len_utf8(),
         };
         length.checked_add(extra).ok_or(Error::Limit {
-            resource: "p232 placeholder escaped XML bytes",
-            limit: MAX_OWNER_BYTES,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: usize::MAX,
+            maximum: MAX_OWNER_BYTES,
         })
     })
 }
@@ -850,8 +889,9 @@ fn escape_xml_bounded(value: &str, limits: Limits) -> Result<Vec<u8>> {
     let length = escaped_xml_len(value)?;
     if length > limits.owner_bytes {
         return Err(Error::Limit {
-            resource: "p232 placeholder escaped XML bytes",
-            limit: limits.owner_bytes,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: length,
+            maximum: limits.owner_bytes,
         });
     }
     let mut escaped = Vec::new();
@@ -1118,9 +1158,10 @@ fn slot_snapshot_from_source_for_key<'a>(
     source: Arc<Vec<u8>>,
     key: Key<'a>,
     limits: Limits,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Snapshot> {
     limits.check_source(source.len())?;
-    let scene = Scene::read(source.as_slice())?;
+    let scene = Scene::read(source.as_slice(), shape_limits)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -1151,6 +1192,7 @@ fn slot_snapshot_from_source_for_key<'a>(
         value: source_value,
         location,
         limits,
+        shape_limits,
     })
 }
 
@@ -1159,8 +1201,9 @@ fn slot_snapshot_from_source(
     source: Arc<Vec<u8>>,
     shape_index: usize,
     limits: Limits,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Snapshot> {
-    let scene = Scene::read(source.as_slice())?;
+    let scene = Scene::read(source.as_slice(), shape_limits)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -1190,6 +1233,7 @@ fn slot_snapshot_from_source(
         value: source_value,
         location,
         limits,
+        shape_limits,
     })
 }
 
@@ -1590,16 +1634,18 @@ fn rewrite_slot(
                             length.checked_add(close_element_len(&prefix, b"extLst"))
                         })
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     let target_len = source
                         .len()
                         .checked_sub(list_len)
                         .and_then(|length| length.checked_add(replacement_len))
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     limits.check_growth(source.len(), target_len)?;
                     let extension = extension_bytes(&prefix, value)?;
@@ -1618,8 +1664,9 @@ fn rewrite_slot(
                             .len()
                             .checked_add(extension_len)
                             .ok_or(Error::Limit {
-                                resource: "p232 placeholder patch output bytes",
-                                limit: limits.owner_bytes,
+                                kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                                observed: usize::MAX,
+                                maximum: limits.owner_bytes,
                             })?,
                     )?;
                     let extension = extension_bytes(&prefix, value)?;
@@ -1641,16 +1688,18 @@ fn rewrite_slot(
                                 })
                         })
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     let target_len = source
                         .len()
                         .checked_sub(placeholder_len)
                         .and_then(|length| length.checked_add(replacement_len))
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     limits.check_growth(source.len(), target_len)?;
                     let extension = extension_bytes(&prefix, value)?;
@@ -1674,8 +1723,9 @@ fn rewrite_slot(
                             length.checked_add(close_element_len(&prefix, b"extLst"))
                         })
                         .ok_or(Error::Limit {
-                            resource: "p232 placeholder patch output bytes",
-                            limit: limits.owner_bytes,
+                            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                            observed: usize::MAX,
+                            maximum: limits.owner_bytes,
                         })?;
                     limits.check_growth(
                         source.len(),
@@ -1683,8 +1733,9 @@ fn rewrite_slot(
                             .len()
                             .checked_add(insertion_len)
                             .ok_or(Error::Limit {
-                                resource: "p232 placeholder patch output bytes",
-                                limit: limits.owner_bytes,
+                                kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+                                observed: usize::MAX,
+                                maximum: limits.owner_bytes,
                             })?,
                     )?;
                     let extension = extension_bytes(&prefix, value)?;
@@ -1718,8 +1769,9 @@ fn replace_range(
         .checked_sub(old_len)
         .and_then(|value| value.checked_add(replacement.len()))
         .ok_or(Error::Limit {
-            resource: "p232 placeholder patch output bytes",
-            limit: limits.owner_bytes,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+            observed: usize::MAX,
+            maximum: limits.owner_bytes,
         })?;
     limits.check_growth(source.len(), target_len)?;
     let mut output = bytes_with_capacity(target_len, "p232 placeholder patch output bytes")?;
@@ -1739,8 +1791,9 @@ fn insert_range(source: &[u8], offset: usize, insertion: &[u8], limits: Limits) 
         .len()
         .checked_add(insertion.len())
         .ok_or(Error::Limit {
-            resource: "p232 placeholder patch output bytes",
-            limit: limits.owner_bytes,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::PatchBytes),
+            observed: usize::MAX,
+            maximum: limits.owner_bytes,
         })?;
     limits.check_growth(source.len(), target_len)?;
     let mut output = bytes_with_capacity(target_len, "p232 placeholder patch output bytes")?;
@@ -1778,8 +1831,9 @@ fn extension_bytes_len(prefix: &[u8], value: PlaceholderTypeExtension) -> Result
     ];
     parts.into_iter().try_fold(0usize, |length, part| {
         length.checked_add(part).ok_or(Error::Limit {
-            resource: "p232 placeholder extension bytes",
-            limit: MAX_OWNER_BYTES,
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::ExtensionBytes),
+            observed: usize::MAX,
+            maximum: MAX_OWNER_BYTES,
         })
     })
 }
@@ -1863,7 +1917,13 @@ impl crate::Package {
     ) -> Result<Snapshot> {
         let opc = self.opc()?;
         let owner = super::package::resolve_owner(opc, owner.into())?;
-        load_slot_snapshot(opc, &owner, key)
+        load_slot_snapshot_with_shape_limits(
+            opc,
+            &owner,
+            key,
+            Limits::DEFAULT,
+            self.semantic_limits().shape(),
+        )
     }
 
     /// Start a placeholder type-extension edit.
@@ -1887,10 +1947,14 @@ impl crate::Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_placeholder_type_extension(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_placeholder_type_extension")?,
-            patch.0.clone(),
-        )))
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_placeholder_type_extension",
+            |package, target, patch| {
+                patch.validate_changed_shape_parts(target, package.semantic_limits().shape())
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
@@ -1933,7 +1997,14 @@ impl Edit<'_> {
         value: Option<PlaceholderTypeExtension>,
     ) -> Result<bool> {
         let owner = super::package::resolve_owner(self.staged.opc(), owner)?;
-        let mut draft = load_slot_snapshot(self.staged.opc(), &owner, key)?.edit();
+        let mut draft = load_slot_snapshot_with_shape_limits(
+            self.staged.opc(),
+            &owner,
+            key,
+            Limits::DEFAULT,
+            self.staged.shape_limits(),
+        )?
+        .edit();
         draft.set_optional(value);
         let staged = draft.commit()?;
         if staged.is_noop() {

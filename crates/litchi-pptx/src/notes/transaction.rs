@@ -6,10 +6,10 @@ use std::sync::Arc;
 use litchi_opc::OpcPackage;
 use litchi_opc::{PackURI, Part, TargetMode};
 
-use super::codec::{self, validate_resource_xml};
+use super::codec::{self, validate_resource_xml_with_limits};
 use super::model::{Graph, Link};
 use super::validation;
-use super::{MAX_MASTER_XML, MAX_NOTES_XML, MAX_THEME_XML, invalid};
+use super::{Limits, MAX_MASTER_XML, MAX_NOTES_XML, MAX_THEME_XML, invalid};
 use crate::Result;
 
 /// Stable fingerprint of all captured notes graph part bytes and edges.
@@ -56,6 +56,7 @@ pub struct Snapshot {
     pub(crate) parts: Vec<PartState>,
     pub(crate) graph: Graph,
     pub(crate) revision: Revision,
+    pub(crate) limits: Limits,
 }
 
 impl Snapshot {
@@ -70,9 +71,10 @@ impl Snapshot {
         presentation: PartState,
         mut parts: Vec<PartState>,
         graph: Graph,
+        limits: Limits,
     ) -> Result<Self> {
         parts.sort_unstable_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
-        validation::validate_parts(&parts)?;
+        validation::validate_parts_with_limits(&parts, limits)?;
         if presentation.name != presentation_part_name {
             return Err(invalid(
                 "notes presentation source identity is inconsistent",
@@ -85,6 +87,7 @@ impl Snapshot {
             parts,
             graph,
             revision,
+            limits,
         })
     }
 
@@ -138,6 +141,7 @@ impl Snapshot {
             && self.parts == other.parts
             && self.graph == other.graph
             && self.revision == other.revision
+            && self.limits == other.limits
     }
 }
 
@@ -160,7 +164,7 @@ impl Draft {
     /// Returns an error when the replacement is malformed or retargets any
     /// presentation, master, theme, slide, or notes relationship identity.
     pub(crate) fn replace(&mut self, graph: Graph) -> Result<bool> {
-        super::package::validate_graph(&graph)?;
+        super::package::validate_graph_with_limits(&graph, self.source.limits)?;
         if !same_ownership(&self.source.graph, &graph) {
             return Err(invalid(
                 "notes transaction cannot retarget or orphan physical owners",
@@ -185,11 +189,11 @@ impl Draft {
             .slides()
             .get(index)
             .ok_or_else(|| invalid("notes slide index is out of bounds"))?;
-        let current = slide.text()?;
+        let current = slide.text(self.source.limits)?;
         if current.as_deref() == (!text.is_empty()).then_some(text) {
             return Ok(false);
         }
-        let xml = codec::rewrite_text(slide.xml(), text)?;
+        let xml = codec::rewrite_text(slide.xml(), text, self.source.limits)?;
         self.working.slides_mut()[index].replace_xml(xml);
         Ok(true)
     }
@@ -201,7 +205,14 @@ impl Draft {
     /// Returns an error if the operation fails.
     pub(crate) fn replace_slide_xml(&mut self, index: usize, xml: Vec<u8>) -> Result<bool> {
         let conformance = self.working.conformance();
-        validate_resource_xml(&xml, MAX_NOTES_XML, conformance, "notes", "notes slide")?;
+        validate_resource_xml_with_limits(
+            &xml,
+            MAX_NOTES_XML,
+            conformance,
+            "notes",
+            "notes slide",
+            self.source.limits,
+        )?;
         let slide = self
             .working
             .slides()
@@ -221,12 +232,13 @@ impl Draft {
     /// Returns an error if the operation fails.
     pub(crate) fn replace_master_xml(&mut self, xml: Vec<u8>) -> Result<bool> {
         let conformance = self.working.conformance();
-        validate_resource_xml(
+        validate_resource_xml_with_limits(
             &xml,
             MAX_MASTER_XML,
             conformance,
             "notesMaster",
             "notes master",
+            self.source.limits,
         )?;
         if self.working.master().xml() == xml {
             return Ok(false);
@@ -242,7 +254,14 @@ impl Draft {
     /// Returns an error if the operation fails.
     pub(crate) fn replace_theme_xml(&mut self, xml: Vec<u8>) -> Result<bool> {
         let conformance = self.working.conformance();
-        validate_resource_xml(&xml, MAX_THEME_XML, conformance, "theme", "notes theme")?;
+        validate_resource_xml_with_limits(
+            &xml,
+            MAX_THEME_XML,
+            conformance,
+            "theme",
+            "notes theme",
+            self.source.limits,
+        )?;
         if self.working.master().theme().xml() == xml {
             return Ok(false);
         }
@@ -256,7 +275,7 @@ impl Draft {
     ///
     /// Returns an error if the operation fails.
     pub(crate) fn commit(self) -> Result<Prepared> {
-        super::package::validate_graph(&self.working)?;
+        super::package::validate_graph_with_limits(&self.working, self.source.limits)?;
         let changed = self.is_changed();
         if !changed {
             let patch = Change {
@@ -274,6 +293,7 @@ impl Draft {
             self.source.presentation.clone(),
             parts,
             self.working,
+            self.source.limits,
         )?;
         let patch = Change {
             before: self.source,

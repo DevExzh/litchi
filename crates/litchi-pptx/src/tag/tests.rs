@@ -7,8 +7,16 @@
 use litchi_opc::{OpcPackage, PackURI, XmlPart};
 
 use super::model::escaped_len;
-use super::package::process_owner_ooxml;
+use super::package::{process_owner_ooxml, put, remove};
 use super::*;
+
+fn parse(xml: &[u8]) -> Result<List> {
+    super::parse(xml, Limits::DEFAULT)
+}
+
+fn write(value: &List, conformance: Conformance) -> Result<Vec<u8>> {
+    super::write(value, conformance, Limits::DEFAULT)
+}
 
 const TRANSITIONAL: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 
@@ -23,9 +31,35 @@ fn strict_round_trip_preserves_inert_values_and_extensions() {
     assert_eq!(value.namespaces()[0].qualified_name(), "xmlns:x");
     assert_eq!(value.attrs()[0].qualified_name(), "x:origin");
 
-    let strict = value.xml(Conformance::Strict).unwrap();
+    let strict = value.xml(Conformance::Strict, Limits::DEFAULT).unwrap();
     assert!(std::str::from_utf8(&strict).unwrap().contains(STRICT_TEXT));
     assert_eq!(parse(&strict).unwrap(), value);
+}
+
+#[test]
+fn raw_policy_admits_exact_tag_wire_and_refuses_one_byte_under() {
+    let mut list = List::new();
+    list.add(Tag::new("owner", "Alice & Bob").unwrap()).unwrap();
+    let wire = super::write(&list, Conformance::Transitional, Limits::DEFAULT).unwrap();
+    let exact = Limits {
+        max_input_bytes: wire.len(),
+        max_output_bytes: wire.len(),
+    };
+    assert_eq!(super::parse(&wire, exact).unwrap(), list);
+    assert_eq!(
+        super::write(&list, Conformance::Transitional, exact).unwrap(),
+        wire
+    );
+    assert!(
+        super::parse(
+            &wire,
+            Limits {
+                max_input_bytes: wire.len().saturating_sub(1),
+                ..exact
+            },
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -156,7 +190,7 @@ fn parsing_rejects_canonical_escape_expansion_past_the_wire_budget() {
     assert!(matches!(
         parse(xml.as_bytes()),
         Err(Error::Limit {
-            resource: "encoded tag-list bytes",
+            kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
             ..
         })
     ));
@@ -254,7 +288,7 @@ fn escaped_size_budget_is_cached_and_failed_edits_are_atomic() {
         assert!(matches!(
             list.replace("small", replacement),
             Err(Error::Limit {
-                resource: "encoded tag-list bytes",
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
                 ..
             })
         ));
@@ -265,7 +299,7 @@ fn escaped_size_budget_is_cached_and_failed_edits_are_atomic() {
         assert!(matches!(
             list.set("small", quotes.clone()),
             Err(Error::Limit {
-                resource: "encoded tag-list bytes",
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
                 ..
             })
         ));
@@ -277,7 +311,7 @@ fn escaped_size_budget_is_cached_and_failed_edits_are_atomic() {
         assert!(matches!(
             list.add(Tag::new("large", quotes.clone()).unwrap()),
             Err(Error::Limit {
-                resource: "encoded tag-list bytes",
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
                 ..
             })
         ));
@@ -288,7 +322,7 @@ fn escaped_size_budget_is_cached_and_failed_edits_are_atomic() {
         assert!(matches!(
             list.insert(0, Tag::new("large", quotes.clone()).unwrap()),
             Err(Error::Limit {
-                resource: "encoded tag-list bytes",
+                kind: LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
                 ..
             })
         ));

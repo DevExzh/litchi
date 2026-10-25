@@ -293,12 +293,32 @@ fn add_slide_layout_inner(
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
+#[cfg(test)]
 pub(crate) fn store_placeholder_shape(
     package: &mut OpcPackage,
     part_name: &PackURI,
     spec: &PlaceholderSpec,
 ) -> Result<()> {
-    super::placeholder::store_placeholder_shape_source(package, part_name, spec)
+    store_placeholder_shape_with_shape_limits(
+        package,
+        part_name,
+        spec,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+pub(crate) fn store_placeholder_shape_with_shape_limits(
+    package: &mut OpcPackage,
+    part_name: &PackURI,
+    spec: &PlaceholderSpec,
+    shape_limits: crate::shape::Limits,
+) -> Result<()> {
+    super::placeholder::store_placeholder_shape_source_with_shape_limits(
+        package,
+        part_name,
+        spec,
+        shape_limits,
+    )
 }
 
 /// Delete a slide layout that is not referenced by any slide.

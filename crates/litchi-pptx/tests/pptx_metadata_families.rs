@@ -12,9 +12,9 @@ use litchi_pptx::Package;
 use litchi_pptx::presentation_properties::metadata::color_map::{Role, Slot};
 use litchi_pptx::presentation_properties::metadata::custom_show::List as CustomShows;
 use litchi_pptx::presentation_properties::metadata::events::Draft as Event;
-use litchi_pptx::presentation_properties::metadata::guides::{Guides, ListKind};
+use litchi_pptx::presentation_properties::metadata::guides::{Guides, Limits, ListKind};
 use litchi_pptx::presentation_properties::metadata::sections::Section;
-use litchi_pptx::presentation_properties::metadata::structure;
+use litchi_pptx::presentation_properties::metadata::structure::{self, Limits as StructureLimits};
 use litchi_pptx::time::Offset;
 
 const GUIDES_XML: &[u8] =
@@ -28,14 +28,14 @@ fn deck() -> Package {
 
 fn slide_id(package: &Package) -> u32 {
     package
-        .with_opc(|opc| Ok(structure::load(opc)?.slides[0].slide_id))
+        .with_opc(|opc| Ok(structure::load(opc, StructureLimits::DEFAULT)?.slides[0].slide_id))
         .unwrap()
 }
 
 #[test]
 fn guide_edits_publish_a_new_package_and_invert() {
     let package = deck();
-    let guides = Guides::from_xml(GUIDES_XML).unwrap();
+    let guides = Guides::from_xml(GUIDES_XML, Limits::DEFAULT).unwrap();
     let mut edit = package.edit_guides().unwrap();
     edit.set(&guides).unwrap();
     assert_eq!(edit.guides().unwrap(), guides);

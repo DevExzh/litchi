@@ -21,6 +21,57 @@ fn text(package: &Package, slide: usize) -> String {
 }
 
 #[test]
+fn source_owner_retains_custom_shape_profile() {
+    let defaults = crate::shape::Limits::DEFAULT;
+    let shape_limits = crate::shape::Limits::new(
+        defaults.input_bytes(),
+        defaults.output_bytes(),
+        defaults.depth(),
+        defaults.shapes(),
+        1,
+        defaults.retained_text_bytes(),
+    )
+    .unwrap();
+    let package = Package::from_read_at_with_options(
+        Arc::new(CountingSource::new(fixture())),
+        crate::OpenOptions::default().shape_limits(shape_limits),
+    )
+    .unwrap();
+    let mut edit = package.edit().unwrap();
+    assert!(matches!(
+        edit.add_text_box(0, "bounded", (0, 0, 914_400, 914_400)),
+        Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Shapes),
+            observed: 2,
+            maximum: 1,
+        })
+    ));
+}
+
+#[test]
+fn source_owner_retains_custom_transition_profile() {
+    let output_limit = crate::transition::Limits::DEFAULT
+        .with_output_bytes(1)
+        .unwrap();
+    let package = Package::from_read_at_with_options(
+        Arc::new(CountingSource::new(fixture())),
+        crate::OpenOptions::default().transition_limits(output_limit),
+    )
+    .unwrap();
+    let mut edit = package.edit().unwrap();
+    let transition =
+        crate::transition::Transition::new(crate::transition::Kind::Fade { black: None });
+    assert!(matches!(
+        edit.set_slide_transition(0, Some(&transition)),
+        Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed,
+                maximum: 1,
+        }) if observed > 1
+    ));
+}
+
+#[test]
 fn immutable_commits_compose_replay_inverse_and_keep_original_exact() {
     let bytes = fixture();
     let source = package(bytes.clone());
@@ -128,6 +179,91 @@ fn order_staging_keeps_slide_payloads_deferred_until_a_logical_read() {
     assert_eq!(source.second_payload_reads.load(Ordering::SeqCst), before);
     assert_eq!(text(commit.package(), 0), "Second slide");
     assert!(source.second_payload_reads.load(Ordering::SeqCst) > before);
+}
+
+#[test]
+fn removal_dependent_then_insertion_respects_exact_selected_part_limit() {
+    let mut builder = crate::builder::Builder::new().unwrap();
+    builder
+        .presentation()
+        .unwrap()
+        .add_slide()
+        .unwrap()
+        .set_notes("owned by the removed slide");
+    builder.presentation().unwrap().add_slide().unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let source_catalog =
+        litchi_opc::OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    let source_parts = source_catalog.iter_parts().count();
+    assert!(source_parts > 1);
+    let ingress_limits = SourceLimits::builder()
+        .max_parts(source_parts)
+        .unwrap()
+        .build()
+        .unwrap();
+    let source = Package::from_read_at_with_options(
+        Arc::new(litchi_core::OwnedSource::new(bytes)),
+        crate::OpenOptions::default().source_limits(ingress_limits),
+    )
+    .unwrap();
+    let layout_name = source
+        .presentation()
+        .unwrap()
+        .slide(1)
+        .unwrap()
+        .layout()
+        .unwrap()
+        .unwrap()
+        .name()
+        .unwrap()
+        .to_owned();
+
+    // The removed slide contributes one exclusive notes Part.  Two inserted
+    // dependency-free slides exactly replace the removed slide and dependent,
+    // so the final catalog remains at the selected original source_parts.
+    let mut edit = source.edit().unwrap();
+    assert!(edit.remove_slide(Position::new(0)).unwrap());
+    edit.insert_slide(Position::new(0), &layout_name).unwrap();
+    edit.insert_slide(Position::new(1), &layout_name).unwrap();
+    let candidate = edit.commit().unwrap().into_package();
+    let output = candidate.to_bytes().unwrap();
+    let output_catalog =
+        litchi_opc::OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
+    assert_eq!(output_catalog.iter_parts().count(), source_parts);
+
+    let final_limits = SourceLimits::builder()
+        .max_parts(source_parts)
+        .unwrap()
+        .build()
+        .unwrap();
+    let reopened = Package::from_read_at_with_options(
+        Arc::new(litchi_core::OwnedSource::new(output.clone())),
+        crate::OpenOptions::default().source_limits(final_limits),
+    )
+    .unwrap();
+    assert_eq!(reopened.presentation().unwrap().slide_count().unwrap(), 3);
+    let layout_name = reopened
+        .presentation()
+        .unwrap()
+        .slide(0)
+        .unwrap()
+        .layout()
+        .unwrap()
+        .unwrap()
+        .name()
+        .unwrap()
+        .to_owned();
+    let mut rejected = reopened.edit().unwrap();
+    assert!(matches!(
+        rejected.insert_slide(Position::new(2), &layout_name),
+        Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Parts),
+            observed,
+            maximum,
+        }) if observed == source_parts + 1 && maximum == source_parts
+    ));
+    assert!(rejected.commit().unwrap().patch().is_noop());
+    assert_eq!(reopened.to_bytes().unwrap(), output);
 }
 
 #[test]
@@ -311,7 +447,7 @@ fn rejected_managed_reservation_is_atomic_and_budget_recovers() {
     assert!(matches!(
         edit.set_shape_text(0, 0_usize, "rejected"),
         Err(Error::Opc(litchi_opc::OpcError::Execution(
-            litchi_core::ExecutionError::ResourceLimit(_)
+            ExecutionError::ResourceLimit(_)
         )))
     ));
     drop(pressure);
@@ -374,7 +510,7 @@ fn changed_slide_limit_refuses_atomically_across_successive_commits() {
     assert!(matches!(
         edit.set_shape_text(MAX_SOURCE_BACKED_SLIDE_BATCH, 0_usize, "refused"),
         Err(Error::Limit {
-            resource: "source-backed primary changed slides",
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
             ..
         })
     ));

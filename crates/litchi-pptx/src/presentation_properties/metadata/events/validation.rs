@@ -1,5 +1,6 @@
 //! Semantic and safety validation for inert slide-show event metadata.
 
+use super::codec::Limits;
 use super::model::{Draft, Kind};
 use crate::{Error, Result};
 
@@ -11,30 +12,42 @@ pub(crate) const MAX_XML_DEPTH: usize = 128;
 pub(crate) const MAX_EVENT_STRING_BYTES: usize = 64;
 
 /// Validate one typed event without resolving its target or executing it.
-pub(crate) fn validate_draft(value: &Draft) -> Result<()> {
-    if value.time().as_str().len() > MAX_EVENT_STRING_BYTES {
-        return Err(limit("slide-show event time offset"));
+pub(crate) fn validate_draft(value: &Draft, limits: Limits) -> Result<()> {
+    if value.time().as_str().len() > limits.max_event_string_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.time().as_str().len(),
+            limits.max_event_string_bytes(),
+        ));
     }
     if let Kind::Seek { at } = value.kind()
-        && at.as_str().len() > MAX_EVENT_STRING_BYTES
+        && at.as_str().len() > limits.max_event_string_bytes()
     {
-        return Err(limit("slide-show seek offset"));
+        return Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            at.as_str().len(),
+            limits.max_event_string_bytes(),
+        ));
     }
     Ok(())
 }
 
 /// Validate the bounded, ordered event collection.
-pub(crate) fn validate_events(values: &[Draft]) -> Result<()> {
+pub(crate) fn validate_events(values: &[Draft], limits: Limits) -> Result<()> {
     if values.is_empty() {
         return Err(invalid(
             "slide-show event storage requires at least one event",
         ));
     }
-    if values.len() > MAX_EVENTS {
-        return Err(limit("slide-show event count"));
+    if values.len() > limits.max_events() {
+        return Err(limit(
+            crate::error::CodecLimitKind::Events,
+            values.len(),
+            limits.max_events(),
+        ));
     }
     for value in values {
-        validate_draft(value)?;
+        validate_draft(value, limits)?;
     }
     Ok(())
 }
@@ -53,6 +66,10 @@ fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn limit(what: &str) -> Error {
-    Error::Invalid(format!("{what} exceeds the supported safety limit"))
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }

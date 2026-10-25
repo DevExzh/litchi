@@ -920,7 +920,7 @@ fn package_limits_accept_exact_and_one_under_caps_and_reject_one_over_atomically
     assert!(matches!(
         error,
         crate::Error::Limit {
-            resource: "ink-action target bytes",
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
             ..
         }
     ));
@@ -937,9 +937,9 @@ fn package_limits_accept_exact_and_one_under_caps_and_reject_one_over_atomically
     assert!(matches!(
         error,
         crate::Error::Limit {
-            resource: "ink-action aggregate target bytes",
-            limit: payload_limit
-        } if payload_limit == payload_len - 1
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::RetainedBytes),
+            observed: payload_len,
+                maximum: payload_limit} if payload_limit == payload_len - 1
     ));
     assert_eq!(
         package.get_part(&action_name).unwrap().blob(),
@@ -965,8 +965,9 @@ fn package_limits_accept_exact_and_one_under_caps_and_reject_one_over_atomically
     assert!(matches!(
         error,
         crate::Error::Limit {
-            resource: "ink-action anchor count",
-            limit: 1
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::InkAnchors),
+            observed: 2,
+            maximum: 1
         }
     ));
     assert_eq!(
@@ -982,8 +983,9 @@ fn package_limits_accept_exact_and_one_under_caps_and_reject_one_over_atomically
     assert!(matches!(
         error,
         crate::Error::Limit {
-            resource: "ink-action relationship edges",
-            limit: 1
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+            observed: 2,
+            maximum: 1
         }
     ));
     assert_eq!(
@@ -1661,9 +1663,13 @@ fn public_presentation_inventory_charges_shared_targets_once_and_distinct_target
         matches!(
             error,
             crate::Error::Limit {
-                resource: "ink-action aggregate target bytes",
-                limit
-            } if limit == payload_len
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::RetainedBytes,
+                ),
+                observed,
+                maximum,
+            } if observed == payload_len.checked_add(payload_len).unwrap()
+                && maximum == payload_len
         ),
         "unexpected multi-slide aggregate error: {error:?}"
     );
@@ -2143,9 +2149,10 @@ fn changed_profile_over_caller_target_cap_refuses_before_publication() {
         matches!(
             error,
             crate::Error::Limit {
-                resource: "ink-action target bytes",
-                limit
-            } if limit == target_cap
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                maximum,
+                ..
+            } if maximum == target_cap
         ),
         "unexpected target-cap error: {error:?}"
     );
@@ -2169,9 +2176,10 @@ fn oversized_profile_bytes_hit_the_target_cap_before_profile_parse_or_staging() 
         matches!(
             error,
             crate::Error::Limit {
-                resource: "ink-action target bytes",
-                limit
-            } if limit == target_cap
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PayloadBytes),
+                maximum,
+                ..
+            } if maximum == target_cap
         ),
         "unexpected early target-cap error: {error:?}"
     );

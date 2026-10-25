@@ -15,9 +15,32 @@
 
 use std::sync::Arc;
 
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships, TargetMode};
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships, SourceLimitKind, TargetMode};
 
 use crate::{Error, Package, Result};
+
+fn source_limit(kind: SourceLimitKind, observed: u64, maximum: u64) -> Error {
+    Error::Opc(litchi_opc::OpcError::Limit {
+        kind,
+        observed,
+        maximum,
+    })
+}
+
+fn check_source_limit(kind: SourceLimitKind, observed: usize, maximum: u64) -> Result<()> {
+    let observed = u64::try_from(observed).unwrap_or(u64::MAX);
+    if observed > maximum {
+        return Err(source_limit(kind, observed, maximum));
+    }
+    Ok(())
+}
+
+fn check_source_limit_u64(kind: SourceLimitKind, observed: u64, maximum: u64) -> Result<()> {
+    if observed > maximum {
+        return Err(source_limit(kind, observed, maximum));
+    }
+    Ok(())
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Relationship {
@@ -235,13 +258,53 @@ struct Delta {
 }
 
 /// The exact, reversible part-level change of one staged edit.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct PartPatch {
     deltas: Vec<Delta>,
     root: Option<(RelationshipImage, RelationshipImage)>,
     content_types: Option<(ContentTypesImage, ContentTypesImage)>,
     exact_content_types: bool,
+    /// Lazily cached complete-content identity of the recorded no-op base.
+    /// It is empty for a cold no-op commit and is filled by the first
+    /// independent replay, so repeated cross-owner replays do not fingerprint
+    /// the patch owner again. Non-noop patches never consult the cell.
+    base_revision: Arc<std::sync::OnceLock<[u8; 32]>>,
+    /// The immutable graph that supplied an exact no-op's base. Keeping this
+    /// owner preserves a pointer-identity fast path without forcing a cold
+    /// first commit to fingerprint the whole package; independent recipients
+    /// are still checked by content when they do not share this graph.
+    base_owner: Option<Arc<OpcPackage>>,
+    /// Aggregate admitted payload bytes captured while the before/after
+    /// graphs are already being walked. Replay uses these metrics instead of
+    /// rescanning unchanged recipient parts.
+    part_bytes_before: u64,
+    part_bytes_after: u64,
+    /// Payload bytes in the changed-part write set only. These are the
+    /// replay delta; the full before/after totals above are ingress metrics.
+    changed_part_bytes_before: u64,
+    changed_part_bytes_after: u64,
 }
+
+impl PartialEq for PartPatch {
+    fn eq(&self, other: &Self) -> bool {
+        self.deltas == other.deltas
+            && self.root == other.root
+            && self.content_types == other.content_types
+            && self.exact_content_types == other.exact_content_types
+            && self.base_revision.get() == other.base_revision.get()
+            && match (&self.base_owner, &other.base_owner) {
+                (None, None) => true,
+                (Some(left), Some(right)) => Arc::ptr_eq(left, right),
+                _ => false,
+            }
+            && self.part_bytes_before == other.part_bytes_before
+            && self.part_bytes_after == other.part_bytes_after
+            && self.changed_part_bytes_before == other.changed_part_bytes_before
+            && self.changed_part_bytes_after == other.changed_part_bytes_after
+    }
+}
+
+impl Eq for PartPatch {}
 
 impl PartPatch {
     pub(crate) fn is_noop(&self) -> bool {
@@ -268,7 +331,49 @@ impl PartPatch {
                 .content_types
                 .as_ref()
                 .map(|(before, after)| (after.clone(), before.clone())),
+            part_bytes_before: self.part_bytes_after,
+            part_bytes_after: self.part_bytes_before,
+            changed_part_bytes_before: self.changed_part_bytes_after,
+            changed_part_bytes_after: self.changed_part_bytes_before,
+            base_revision: Arc::clone(&self.base_revision),
+            base_owner: self.base_owner.clone(),
         }
+    }
+
+    fn base_matches_noop(&self, package: &Package) -> Result<bool> {
+        let Some(owner) = self.base_owner.as_ref() else {
+            return Ok(false);
+        };
+        if Arc::ptr_eq(owner, &package.opc) {
+            return Ok(true);
+        }
+        let base_revision = match self.base_revision.get().copied() {
+            Some(revision) => revision,
+            None => {
+                let revision = crate::opened::package_fingerprint_with_memo(owner, None)?.0;
+                let _ = self.base_revision.set(revision);
+                revision
+            },
+        };
+        Ok(package.content_revision()? == base_revision)
+    }
+
+    /// Bind an exact no-op to the visible content it was captured from.
+    ///
+    /// This is deliberately done only once the patch is known to be a no-op;
+    /// ordinary changed patches retain their O(affected) replay path.
+    pub(crate) fn bind_noop_identity(&mut self, package: &Package) -> Result<()> {
+        debug_assert!(self.is_noop());
+        self.base_revision = Arc::new(std::sync::OnceLock::new());
+        if let Some(revision) = package.cached_content_revision() {
+            let _ = self.base_revision.set(revision);
+        }
+        self.base_owner = Some(Arc::clone(&package.opc));
+        self.part_bytes_before = package.part_bytes;
+        self.part_bytes_after = package.part_bytes;
+        self.changed_part_bytes_before = 0;
+        self.changed_part_bytes_after = 0;
+        Ok(())
     }
 
     /// Capture every part that differs between `before` and `after`.
@@ -281,13 +386,16 @@ impl PartPatch {
         // limits admit.
         let maximum = before.read_limits().max_parts();
         let mut deltas = Vec::new();
+        let mut part_bytes_before = 0_u64;
+        let mut part_bytes_after = 0_u64;
         let mut push = |delta: Delta| -> Result<()> {
             if delta.before == delta.after {
                 return Ok(());
             }
             if deltas.len() >= maximum {
-                return Err(Error::EditLimit {
+                return Err(Error::Limit {
                     kind: crate::opened::LimitKind::Parts,
+                    observed: deltas.len().checked_add(1).unwrap_or(usize::MAX),
                     maximum,
                 });
             }
@@ -296,6 +404,20 @@ impl PartPatch {
         };
         for part in before.try_iter_parts() {
             let part = part?;
+            check_source_limit(
+                SourceLimitKind::PartBytes,
+                part.blob().len(),
+                before.read_limits().max_part_bytes(),
+            )?;
+            part_bytes_before = part_bytes_before
+                .checked_add(u64::try_from(part.blob().len()).unwrap_or(u64::MAX))
+                .ok_or_else(|| {
+                    source_limit(
+                        SourceLimitKind::TotalPartBytes,
+                        u64::MAX,
+                        before.read_limits().max_total_part_bytes(),
+                    )
+                })?;
             let name = part.partname();
             match optional_part(after, name)? {
                 Some(other)
@@ -310,6 +432,20 @@ impl PartPatch {
         }
         for part in after.try_iter_parts() {
             let part = part?;
+            check_source_limit(
+                SourceLimitKind::PartBytes,
+                part.blob().len(),
+                after.read_limits().max_part_bytes(),
+            )?;
+            part_bytes_after = part_bytes_after
+                .checked_add(u64::try_from(part.blob().len()).unwrap_or(u64::MAX))
+                .ok_or_else(|| {
+                    source_limit(
+                        SourceLimitKind::TotalPartBytes,
+                        u64::MAX,
+                        after.read_limits().max_total_part_bytes(),
+                    )
+                })?;
             if optional_part(before, part.partname())?.is_none() {
                 push(Delta {
                     name: part.partname().clone(),
@@ -318,7 +454,51 @@ impl PartPatch {
                 })?;
             }
         }
+        check_source_limit(
+            SourceLimitKind::Parts,
+            before.part_count(),
+            before.read_limits().max_parts() as u64,
+        )?;
+        check_source_limit(
+            SourceLimitKind::Parts,
+            after.part_count(),
+            after.read_limits().max_parts() as u64,
+        )?;
+        check_source_limit_u64(
+            SourceLimitKind::TotalPartBytes,
+            part_bytes_before,
+            before.read_limits().max_total_part_bytes(),
+        )?;
+        check_source_limit_u64(
+            SourceLimitKind::TotalPartBytes,
+            part_bytes_after,
+            after.read_limits().max_total_part_bytes(),
+        )?;
         deltas.sort_unstable_by(|left, right| left.name.as_str().cmp(right.name.as_str()));
+        let mut changed_part_bytes_before = 0_u64;
+        let mut changed_part_bytes_after = 0_u64;
+        for delta in &deltas {
+            if let Some(before) = &delta.before {
+                changed_part_bytes_before = changed_part_bytes_before
+                    .checked_add(u64::try_from(before.blob.len()).unwrap_or(u64::MAX))
+                    .ok_or_else(|| {
+                        Error::internal(
+                            "PartPatch::capture",
+                            "changed before-part payload aggregate overflows u64",
+                        )
+                    })?;
+            }
+            if let Some(after) = &delta.after {
+                changed_part_bytes_after = changed_part_bytes_after
+                    .checked_add(u64::try_from(after.blob.len()).unwrap_or(u64::MAX))
+                    .ok_or_else(|| {
+                        Error::internal(
+                            "PartPatch::capture",
+                            "changed after-part payload aggregate overflows u64",
+                        )
+                    })?;
+            }
+        }
         let owner = PackURI::new("/").map_err(Error::Uri)?;
         let root = if crate::opened::relationships_equal(before.rels(), after.rels())
             && before.same_retained_relationships(after, &owner)?
@@ -360,13 +540,46 @@ impl PartPatch {
             root,
             content_types,
             exact_content_types,
+            base_revision: Arc::new(std::sync::OnceLock::new()),
+            base_owner: None,
+            part_bytes_before,
+            part_bytes_after,
+            changed_part_bytes_before,
+            changed_part_bytes_after,
         })
     }
 
     /// Replay onto `package`, refusing a package that is not the patch's
     /// before state.
     pub(crate) fn apply(&self, package: &Package, operation: &'static str) -> Result<Package> {
+        self.apply_inner(package, operation, None)
+    }
+
+    /// Replay with a family-owned semantic validator for changed payloads.
+    ///
+    /// The generic replay engine still owns before-state matching, exact
+    /// patch scope, and atomic target construction. A family can additionally
+    /// validate only the payloads whose bytes changed, using the recipient's
+    /// retained semantic policy, before the target is published.
+    pub(crate) fn apply_with_replay_validation(
+        &self,
+        package: &Package,
+        operation: &'static str,
+        mut validate: impl FnMut(&Package, &OpcPackage, &Self) -> Result<()>,
+    ) -> Result<Package> {
+        self.apply_inner(package, operation, Some(&mut validate))
+    }
+
+    fn apply_inner(
+        &self,
+        package: &Package,
+        operation: &'static str,
+        validate: Option<&mut dyn FnMut(&Package, &OpcPackage, &Self) -> Result<()>>,
+    ) -> Result<Package> {
         if self.is_noop() {
+            if !self.base_matches_noop(package)? {
+                return Err(Error::PatchConflict);
+            }
             return Ok(package.duplicate());
         }
         package.ensure_plain_mutation(operation)?;
@@ -389,6 +602,7 @@ impl PartPatch {
             }
         }
         crate::package::signature::refuse_signed_change(source)?;
+        let part_bytes = self.validate_destination_source_limits(package)?;
         let mut target = (**source).clone();
         for delta in &self.deltas {
             if let (Some(before), Some(after)) = (&delta.before, &delta.after)
@@ -448,8 +662,174 @@ impl PartPatch {
                 }
             }
         }
+        if let Some(validate) = validate {
+            validate(package, &target, self)?;
+        }
+        let replay_index = self.replay_index_after(package, &target)?;
         crate::package::signature::settle_unsigned_change(&mut target)?;
-        Ok(package.derive(target))
+        Ok(package.derive_with_part_bytes_and_replay_index(target, part_bytes, replay_index))
+    }
+
+    /// Admit the replay candidate against the recipient's physical part
+    /// policy before cloning or mutating the target graph. Existing source
+    /// parts were admitted at ingress, and the candidate aggregate was
+    /// captured with the patch's already-required before/after walks, so
+    /// replay stays proportional to the write set rather than rescanning the
+    /// recipient.
+    fn validate_destination_source_limits(&self, package: &Package) -> Result<u64> {
+        let source = &package.opc;
+        let limits = source.read_limits();
+        let mut part_count = source.part_count();
+        for delta in &self.deltas {
+            match (&delta.before, &delta.after) {
+                (None, Some(after)) => {
+                    part_count = part_count.checked_add(1).ok_or_else(|| {
+                        source_limit(SourceLimitKind::Parts, u64::MAX, limits.max_parts() as u64)
+                    })?;
+                    check_source_limit(
+                        SourceLimitKind::PartBytes,
+                        after.blob.len(),
+                        limits.max_part_bytes(),
+                    )?;
+                },
+                (Some(_), Some(after)) => {
+                    check_source_limit(
+                        SourceLimitKind::PartBytes,
+                        after.blob.len(),
+                        limits.max_part_bytes(),
+                    )?;
+                },
+                (Some(_), None) => {
+                    part_count = part_count.checked_sub(1).ok_or_else(|| {
+                        source_limit(SourceLimitKind::Parts, 0, limits.max_parts() as u64)
+                    })?;
+                },
+                (None, None) => {},
+            }
+        }
+        check_source_limit(
+            SourceLimitKind::Parts,
+            part_count,
+            limits.max_parts() as u64,
+        )?;
+        let part_bytes = package
+            .part_bytes
+            .checked_sub(self.changed_part_bytes_before)
+            .ok_or_else(|| {
+                source_limit(
+                    SourceLimitKind::TotalPartBytes,
+                    0,
+                    limits.max_total_part_bytes(),
+                )
+            })?
+            .checked_add(self.changed_part_bytes_after)
+            .ok_or_else(|| {
+                source_limit(
+                    SourceLimitKind::TotalPartBytes,
+                    u64::MAX,
+                    limits.max_total_part_bytes(),
+                )
+            })?;
+        check_source_limit_u64(
+            SourceLimitKind::TotalPartBytes,
+            part_bytes,
+            limits.max_total_part_bytes(),
+        )?;
+        Ok(part_bytes)
+    }
+
+    /// Visit only added or byte-replaced parts in the assembled replay target.
+    /// Relationship-only deltas are deliberately skipped so semantic replay
+    /// checks do not turn a small patch into a package-wide scan.
+    pub(crate) fn validate_changed_parts(
+        &self,
+        target: &OpcPackage,
+        mut validate: impl FnMut(&PackURI, &dyn Part) -> Result<()>,
+    ) -> Result<()> {
+        for delta in &self.deltas {
+            let Some(after) = &delta.after else {
+                continue;
+            };
+            let payload_changed = match &delta.before {
+                Some(before) => {
+                    before.content_type != after.content_type || before.blob != after.blob
+                },
+                None => true,
+            };
+            if !payload_changed {
+                continue;
+            }
+            validate(&delta.name, target.get_part(&delta.name)?)?;
+        }
+        Ok(())
+    }
+
+    /// Admit changed PresentationML shape-owner parts under the recipient's
+    /// selected shape profile. The write set is deliberately the only scan:
+    /// unrelated opaque parts remain untouched and are not re-parsed during
+    /// replay.
+    pub(crate) fn validate_changed_shape_parts(
+        &self,
+        target: &OpcPackage,
+        shape_limits: crate::shape::Limits,
+    ) -> Result<()> {
+        self.validate_changed_parts(target, |_, part| {
+            if matches!(
+                part.content_type(),
+                litchi_opc::constants::content_type::PML_SLIDE
+                    | litchi_opc::constants::content_type::PML_SLIDE_LAYOUT
+                    | litchi_opc::constants::content_type::PML_SLIDE_MASTER
+            ) {
+                crate::shape::Scene::read(part.blob(), shape_limits).map(|_| ())
+            } else {
+                Ok(())
+            }
+        })
+    }
+
+    pub(crate) fn replay_index_after(
+        &self,
+        package: &Package,
+        target: &OpcPackage,
+    ) -> Result<Arc<crate::package::replay_index::ReplayIndex>> {
+        let mut changed = Vec::new();
+        changed
+            .try_reserve(self.deltas.len())
+            .map_err(|source| Error::Allocation {
+                resource: "PPTX replay changed part index",
+                source,
+            })?;
+        changed.extend(self.deltas.iter().map(|delta| delta.name.clone()));
+        Ok(Arc::new(package.replay_index.update(
+            &package.opc,
+            target,
+            &changed,
+        )?))
+    }
+
+    pub(crate) fn touches_notes(&self, source: &OpcPackage, target: &OpcPackage) -> Result<bool> {
+        for delta in &self.deltas {
+            let old = optional_part(source, &delta.name)?;
+            let new = optional_part(target, &delta.name)?;
+            if old.as_ref().is_some_and(|part| {
+                matches!(
+                    part.content_type(),
+                    litchi_opc::constants::content_type::PML_NOTES_SLIDE
+                        | litchi_opc::constants::content_type::PML_NOTES_MASTER
+                        | litchi_opc::constants::content_type::OFC_THEME
+                )
+            }) || new.as_ref().is_some_and(|part| {
+                matches!(
+                    part.content_type(),
+                    litchi_opc::constants::content_type::PML_NOTES_SLIDE
+                        | litchi_opc::constants::content_type::PML_NOTES_MASTER
+                        | litchi_opc::constants::content_type::OFC_THEME
+                )
+            }) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 }
 
@@ -494,6 +874,47 @@ impl<'a> Staged<'a> {
         }
     }
 
+    /// The semantic laser policy retained by the owning package.
+    pub(crate) fn laser_limits(&self) -> crate::laser::Limits {
+        self.package.semantic_limits().laser()
+    }
+
+    /// The semantic shape policy retained by the owning package.
+    pub(crate) fn shape_limits(&self) -> crate::shape::Limits {
+        self.package.semantic_limits().shape()
+    }
+
+    /// The owner-retained semantic codec policies for this staged family.
+    pub(crate) fn semantic_limits(&self) -> crate::open_options::SemanticLimits {
+        self.package.semantic_limits()
+    }
+
+    pub(crate) fn changes_limits(
+        &self,
+    ) -> crate::presentation_properties::metadata::changes::Limits {
+        self.package.semantic_limits().changes()
+    }
+
+    pub(crate) fn revision_limits(
+        &self,
+    ) -> crate::presentation_properties::metadata::revision::Limits {
+        self.package.semantic_limits().revision()
+    }
+
+    pub(crate) fn slide_sync_limits(
+        &self,
+    ) -> crate::presentation_properties::metadata::slide_sync::Limits {
+        self.package.semantic_limits().slide_sync()
+    }
+
+    pub(crate) fn tracks_limits(&self) -> crate::presentation_properties::metadata::tracks::Limits {
+        self.package.semantic_limits().tracks()
+    }
+
+    pub(crate) fn events_limits(&self) -> crate::presentation_properties::metadata::events::Limits {
+        self.package.semantic_limits().events()
+    }
+
     /// Run one typed graph operation on the staged graph. An error leaves
     /// the staged graph as it was before the operation.
     pub(crate) fn update<T>(
@@ -517,17 +938,30 @@ impl<'a> Staged<'a> {
     /// staging publishes the source package.
     pub(crate) fn commit(self) -> Result<(Package, PartPatch)> {
         if !self.changed {
-            return Ok((self.package.duplicate(), PartPatch::default()));
-        }
-        let Some(staged) = self.staged else {
-            return Ok((self.package.duplicate(), PartPatch::default()));
-        };
-        let staged = Arc::new(staged);
-        let patch = PartPatch::capture(&self.package.opc, &staged)?;
-        if patch.is_noop() {
+            let mut patch = PartPatch::default();
+            patch.bind_noop_identity(self.package)?;
             return Ok((self.package.duplicate(), patch));
         }
-        Ok((self.package.derive(staged), patch))
+        let Some(staged) = self.staged else {
+            let mut patch = PartPatch::default();
+            patch.bind_noop_identity(self.package)?;
+            return Ok((self.package.duplicate(), patch));
+        };
+        let staged = Arc::new(staged);
+        let mut patch = PartPatch::capture(&self.package.opc, &staged)?;
+        if patch.is_noop() {
+            patch.bind_noop_identity(self.package)?;
+            return Ok((self.package.duplicate(), patch));
+        }
+        let replay_index = patch.replay_index_after(self.package, &staged)?;
+        Ok((
+            self.package.derive_with_part_bytes_and_replay_index(
+                staged,
+                patch.part_bytes_after,
+                replay_index,
+            ),
+            patch,
+        ))
     }
 }
 
@@ -536,9 +970,11 @@ impl<'a> Staged<'a> {
 macro_rules! family {
     ($what:literal) => {
         pub use crate::Error;
-        /// The bounded dimension of this family: the number of parts one
-        /// commit may change, at most the package's source-limit part count.
-        pub use crate::opened::LimitKind;
+        /// The canonical typed dimension used by this family error. Part
+        /// edits currently emit the root `Parts` variant; the shared type is
+        /// re-exported from the crate boundary so this family does not expose
+        /// an unrelated `opened`-module alias.
+        pub use crate::LimitKind;
         pub use litchi_core::edit::Diagnostics;
 
         #[doc = concat!("The result of a ", $what, " edit's `commit`: the new package, the patch and the diagnostics.")]
@@ -573,3 +1009,71 @@ macro_rules! family {
 }
 
 pub(crate) use family;
+
+#[cfg(test)]
+mod tests {
+    use litchi_opc::{BlobPart, PackURI};
+
+    #[test]
+    fn replay_updates_the_retained_physical_aggregate_by_the_write_set_delta() {
+        let base = crate::Package::new().expect("fresh package");
+        let name = PackURI::new("/custom/aggregate.bin").expect("part URI");
+        let payload = vec![0xA5; 37];
+        let mut edit = base.edit_opc().expect("raw edit");
+        edit.update(|opc| {
+            opc.add_part(Box::new(BlobPart::new(
+                name.clone(),
+                "application/octet-stream".to_owned(),
+                payload.clone(),
+            )));
+            Ok(())
+        })
+        .expect("stage part");
+        let (published, patch) = edit.commit().expect("commit").into_parts();
+
+        let replayed = base.apply_opc(&patch).expect("replay").into_package();
+        assert_eq!(replayed.part_bytes, published.part_bytes);
+        assert_eq!(replayed.part_bytes, base.part_bytes + payload.len() as u64);
+    }
+
+    #[test]
+    fn noop_replay_requires_the_recorded_content_base() {
+        let base = crate::Package::new().expect("fresh package");
+        let (_published, patch) = base
+            .edit_opc()
+            .expect("raw edit")
+            .commit()
+            .expect("noop commit")
+            .into_parts();
+
+        // A cold no-op commit keeps only the owner handle.  It must not
+        // fingerprint the whole package merely to record an exact no-op.
+        assert!(base.cached_content_revision().is_none());
+        assert!(patch.0.base_revision.get().is_none());
+
+        let bytes = base.to_bytes().expect("serialize base");
+        let equal = crate::Package::from_bytes(&bytes).expect("independent equal package");
+        let _ = crate::opened::fingerprint_log::take();
+        assert!(equal.apply_opc(&patch).is_ok());
+        assert!(patch.0.base_revision.get().is_some());
+        assert!(!crate::opened::fingerprint_log::take().is_empty());
+        assert!(equal.apply_opc(&patch).is_ok());
+        assert!(crate::opened::fingerprint_log::take().is_empty());
+
+        let mut edit = base.edit_opc().expect("raw edit");
+        edit.update(|opc| {
+            opc.add_part(Box::new(BlobPart::new(
+                PackURI::new("/custom/noop-conflict.bin").expect("part URI"),
+                "application/octet-stream".to_owned(),
+                vec![0x5A],
+            )));
+            Ok(())
+        })
+        .expect("stage different package");
+        let (different, _) = edit.commit().expect("different commit").into_parts();
+        assert!(matches!(
+            different.apply_opc(&patch),
+            Err(crate::Error::PatchConflict)
+        ));
+    }
+}

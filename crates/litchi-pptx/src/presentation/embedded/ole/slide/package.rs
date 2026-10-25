@@ -253,7 +253,8 @@ fn relationship_states<'a>(
         .is_some_and(|value| value > MAX_RELATIONSHIPS)
     {
         return Err(crate::presentation::embedded::limit(
-            "OLE relationship count",
+            crate::error::CodecLimitKind::Relationships,
+            relationships.size_hint().1.unwrap_or(usize::MAX),
             MAX_RELATIONSHIPS,
         ));
     }

@@ -3,7 +3,7 @@
 //!
 //! Run with:
 //! ```bash
-//! cargo run --example pptx_features_demo
+//! cargo run -p litchi --example pptx_features_demo --features pptx
 //! ```
 
 use litchi_opc::{OpcPackage, PackURI};
@@ -16,7 +16,9 @@ use litchi_pptx::media_parts::{
     Transform,
 };
 use litchi_pptx::presentation::media::{Format as MediaFormat, Kind as AuthoringMediaKind};
-use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
+use litchi_pptx::presentation_properties::metadata::sections::{
+    Limits, List as SectionList, Section,
+};
 use litchi_pptx::{Error, Package, Result};
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
@@ -52,14 +54,14 @@ fn main() -> std::result::Result<(), Box<dyn StdError>> {
     println!(
         "Creating {} typed sections ({} XML bytes)...",
         sections.len(),
-        sections.to_xml()?.len()
+        sections.to_xml(Limits::DEFAULT)?.len()
     );
 
     let mut package = builder.build()?;
     {
         package = store_comments(&package)?;
         let mut opc_edit = package.edit_opc()?;
-        opc_edit.update(move |opc| store_sections(opc, &sections.to_xml()?))?;
+        opc_edit.update(move |opc| store_sections(opc, &sections.to_xml(Limits::DEFAULT)?))?;
         package = opc_edit.commit()?.into_package();
         package = store_media(&package, media)?;
     }

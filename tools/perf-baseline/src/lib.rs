@@ -39,16 +39,17 @@ mod opc_part_add;
 mod operation_metrics;
 mod ordinary_save;
 mod parallel_metrics;
+pub mod ppt_lazy_native;
 pub mod pptx_cache_retention;
 pub mod pptx_metadata_spool;
 pub mod pptx_native_image;
+pub mod pptx_notes_memo;
 mod pptx_owned_benchmark;
 mod pptx_owned_control;
 pub mod pptx_pair_lifecycle;
 pub mod pptx_provider_lifecycle;
 pub mod pptx_range_source;
 pub mod pptx_retention;
-pub mod ppt_lazy_native;
 mod pptx_slide_boundaries;
 mod pptx_streaming_create;
 mod process_metrics;
@@ -34810,10 +34811,12 @@ fn run_rtf_validation_report(
         corpus,
         warmup_iterations,
         samples,
-        |bytes| Ok(litchi_rtf::ValidationReport::from_bytes(
-            bytes,
-            litchi_rtf::OpenOptions::default(),
-        )?),
+        |bytes| {
+            Ok(litchi_rtf::ValidationReport::from_bytes(
+                bytes,
+                litchi_rtf::OpenOptions::default(),
+            )?)
+        },
         rtf_validation_summary,
     )
 }

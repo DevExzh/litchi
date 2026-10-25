@@ -140,10 +140,15 @@ impl Edit {
                 source.presentation_name.clone(),
             )
         };
-        let max_output_bytes = crate::shape::Limits::DEFAULT.output_bytes();
+        let shape_limits = self.semantic_limits().shape();
+        let max_output_bytes = shape_limits.output_bytes();
         let (part_name, candidate) = match body {
             TextBody::Notes { .. } => {
-                let source = crate::notes::load_snapshot(&self.working, &presentation_name)?;
+                let source = crate::notes::load_snapshot_with_limits(
+                    &self.working,
+                    &presentation_name,
+                    self.notes_limits(),
+                )?;
                 let Some(note) = source.as_ref().and_then(|source| {
                     source
                         .slides()
@@ -158,12 +163,13 @@ impl Edit {
                 };
                 let part_name = PackURI::new(note.part())
                     .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
-                let candidate = crate::opened::stage_text_structure(
+                let candidate = crate::opened::stage_text_structure_with_limits(
                     note.xml(),
                     body,
                     change,
                     max_text_bytes,
                     max_output_bytes,
+                    shape_limits,
                 )?;
                 (part_name, candidate)
             },
@@ -173,12 +179,13 @@ impl Edit {
                     owner,
                     litchi_opc::constants::content_type::PML_SLIDE,
                 )?;
-                let candidate = crate::opened::stage_text_structure(
+                let candidate = crate::opened::stage_text_structure_with_limits(
                     owner.blob(),
                     body,
                     change,
                     max_text_bytes,
                     max_output_bytes,
+                    shape_limits,
                 )?;
                 (selected_slide.part_name.clone(), candidate)
             },

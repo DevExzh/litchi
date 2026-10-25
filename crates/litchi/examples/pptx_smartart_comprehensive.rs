@@ -573,7 +573,7 @@ fn validate_graphic_frame() -> Result<(), Box<dyn std::error::Error>> {
     let xml = format!(
         r#"<p:spTree xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">{frame}</p:spTree>"#
     );
-    let scene = shape::read(xml.as_bytes())?;
+    let scene = shape::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT)?;
     assert!(matches!(scene.at(0)?, shape::Shape::Diagram(_)));
     Ok(())
 }

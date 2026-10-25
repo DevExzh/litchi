@@ -200,6 +200,7 @@ impl Package {
             package_relationships: seed.package_relationships,
             presentation_binding: seed.presentation_binding,
             limits: inner.limits,
+            semantic_limits: inner.semantic_limits.clone(),
         };
         let order = source_order(&owner)?;
         let physical = source_physical_index(&owner)?;
@@ -682,7 +683,8 @@ impl Package {
         }
         if snapshot.xml.as_bytes().len() > snapshot.max_output_bytes {
             return Err(limit(
-                "source-backed primary slide output bytes",
+                crate::error::CodecLimitKind::OutputBytes,
+                snapshot.xml.as_bytes().len(),
                 snapshot.max_output_bytes,
             ));
         }
@@ -709,7 +711,8 @@ impl Package {
             + usize::from(changed);
         if count > MAX_SOURCE_BACKED_SLIDE_BATCH {
             return Err(limit(
-                "source-backed primary changed slides",
+                crate::error::CodecLimitKind::Slides,
+                count,
                 MAX_SOURCE_BACKED_SLIDE_BATCH,
             ));
         }
@@ -772,7 +775,8 @@ impl Package {
         )?;
         if root.as_bytes().len() > self.owner.limits.max_part_bytes() as usize {
             return Err(limit(
-                "source-backed primary presentation output bytes",
+                crate::error::CodecLimitKind::OutputBytes,
+                root.as_bytes().len(),
                 self.owner.limits.max_part_bytes() as usize,
             ));
         }
@@ -969,7 +973,8 @@ impl Package {
         )?;
         if encoded > max_patch_bytes {
             return Err(limit(
-                "source-backed primary retained patch bytes",
+                crate::error::CodecLimitKind::PatchBytes,
+                encoded,
                 max_patch_bytes,
             ));
         }
@@ -1525,7 +1530,10 @@ impl Slide {
         }
         let scene_reservation =
             reserve_scene(&self.package, self.snapshot.xml.as_bytes().len(), maximum)?;
-        let parsed = crate::shape::Scene::read(self.snapshot.xml.as_bytes())?;
+        let parsed = crate::shape::Scene::read(
+            self.snapshot.xml.as_bytes(),
+            crate::open_options::selected(self.snapshot.semantic_limits.as_ref()).shape(),
+        )?;
         let scene = match &self.snapshot.xml {
             SourcePayload::Original(data) => {
                 crate::shape::owned::Scene::from_source(parsed, data.clone())?
@@ -1542,11 +1550,18 @@ impl Slide {
             },
         };
         let scene = if let Some(reservation) = scene_reservation {
-            let retained = u64::try_from(scene.retained_bytes())
-                .map_err(|_| limit("source-backed primary scene bytes", usize::MAX))?;
+            let retained_bytes = scene.retained_bytes();
+            let retained = u64::try_from(retained_bytes).map_err(|_| {
+                limit(
+                    crate::error::CodecLimitKind::SourceBytes,
+                    usize::MAX,
+                    usize::MAX,
+                )
+            })?;
             if retained > reservation.amount() {
                 return Err(limit(
-                    "source-backed primary scene bytes",
+                    crate::error::CodecLimitKind::SourceBytes,
+                    retained_bytes,
                     usize::try_from(reservation.amount()).unwrap_or(usize::MAX),
                 ));
             }
@@ -1649,7 +1664,8 @@ impl Edit {
         let after = edit.commit_checked()?.snapshot;
         if after.xml.as_bytes().len() > output_limit {
             return Err(limit(
-                "source-backed primary slide output bytes",
+                crate::error::CodecLimitKind::OutputBytes,
+                after.xml.as_bytes().len(),
                 output_limit,
             ));
         }
@@ -1688,7 +1704,8 @@ impl Edit {
         }
         if changes.len() > MAX_SOURCE_BACKED_SLIDE_BATCH {
             return Err(limit(
-                "source-backed primary patch slides",
+                crate::error::CodecLimitKind::Slides,
+                changes.len(),
                 MAX_SOURCE_BACKED_SLIDE_BATCH,
             ));
         }
@@ -2301,7 +2318,8 @@ impl Edit {
         // observed; a rejected candidate must never escape that preflight.
         if after.xml.as_bytes().len() > output_limit {
             return Err(limit(
-                "source-backed primary slide output bytes",
+                crate::error::CodecLimitKind::OutputBytes,
+                after.xml.as_bytes().len(),
                 output_limit,
             ));
         }
@@ -2348,7 +2366,8 @@ impl Edit {
         }
         if changes.len() > MAX_SOURCE_BACKED_SLIDE_BATCH {
             return Err(limit(
-                "source-backed primary patch slides",
+                crate::error::CodecLimitKind::Slides,
+                changes.len(),
                 MAX_SOURCE_BACKED_SLIDE_BATCH,
             ));
         }
@@ -2377,9 +2396,14 @@ impl Edit {
         shape_removals: bool,
     ) -> Result<usize> {
         let length = self.local_patch_wire_len(key, before, 0, shape_removals)?;
-        self.max_patch_bytes
-            .checked_sub(length)
-            .ok_or_else(|| limit("source-backed durable patch bytes", self.max_patch_bytes))
+        if length > self.max_patch_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::PatchBytes,
+                length,
+                self.max_patch_bytes,
+            ));
+        }
+        Ok(self.max_patch_bytes - length)
     }
 
     fn check_local_patch_budget(
@@ -2392,7 +2416,8 @@ impl Edit {
         let length = self.local_patch_wire_len(key, before, after, shape_removals)?;
         if length > self.max_patch_bytes {
             return Err(limit(
-                "source-backed durable patch bytes",
+                crate::error::CodecLimitKind::PatchBytes,
+                length,
                 self.max_patch_bytes,
             ));
         }
@@ -2484,7 +2509,8 @@ impl Edit {
             let encoded = patch.encoded_len()?;
             if encoded > max_patch_bytes {
                 return Err(limit(
-                    "source-backed primary retained patch bytes",
+                    crate::error::CodecLimitKind::PatchBytes,
+                    encoded,
                     max_patch_bytes,
                 ));
             }
@@ -2519,7 +2545,8 @@ impl Edit {
         )?;
         if encoded > max_patch_bytes {
             return Err(limit(
-                "source-backed primary retained patch bytes",
+                crate::error::CodecLimitKind::PatchBytes,
+                encoded,
                 max_patch_bytes,
             ));
         }
@@ -2637,7 +2664,13 @@ impl Patch {
                 } else {
                     0
                 })
-                .ok_or_else(|| limit("source-backed durable patch bytes", usize::MAX))?,
+                .ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::PatchBytes,
+                        usize::MAX,
+                        usize::MAX,
+                    )
+                })?,
             PatchData::Topology(data) => data
                 .encoded_len()?
                 .checked_add(if self.shape_removals {
@@ -2645,7 +2678,13 @@ impl Patch {
                 } else {
                     0
                 })
-                .ok_or_else(|| limit("source-backed durable patch bytes", usize::MAX))?,
+                .ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::PatchBytes,
+                        usize::MAX,
+                        usize::MAX,
+                    )
+                })?,
         };
         let _ = self.encoded_len_cache.set(length);
         Ok(length)
@@ -2766,12 +2805,28 @@ fn check_payload_budget_with_limit<'a>(
 ) -> Result<()> {
     let root_bytes = root.map_or(0, <[u8]>::len);
     if root_bytes > maximum {
-        return Err(limit("source-backed primary retained root bytes", maximum));
+        return Err(limit(
+            crate::error::CodecLimitKind::RetainedBytes,
+            root_bytes,
+            maximum,
+        ));
     }
     slides.try_fold(root_bytes, |sum, slide| {
-        sum.checked_add(slide.xml.as_bytes().len())
-            .filter(|total| *total <= maximum)
-            .ok_or_else(|| limit("source-backed primary retained slide bytes", maximum))
+        let total = sum.checked_add(slide.xml.as_bytes().len()).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::RetainedBytes,
+                usize::MAX,
+                maximum,
+            )
+        })?;
+        if total > maximum {
+            return Err(limit(
+                crate::error::CodecLimitKind::RetainedBytes,
+                total,
+                maximum,
+            ));
+        }
+        Ok(total)
     })?;
     Ok(())
 }
@@ -2782,8 +2837,12 @@ fn allocation(source: std::collections::TryReserveError) -> Error {
         source,
     }
 }
-fn limit(resource: &'static str, limit: usize) -> Error {
-    Error::Limit { resource, limit }
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
 }
 
 macro_rules! redacted_debug {
@@ -2794,6 +2853,122 @@ macro_rules! redacted_debug {
     })+ };
 }
 redacted_debug!(Package, Presentation, Slide, Edit, Patch);
+
+#[cfg(test)]
+mod deferred_policy_tests {
+    use std::sync::Arc;
+
+    use litchi_opc::SourceCacheLimits;
+
+    use super::Package;
+
+    fn fixture() -> Vec<u8> {
+        super::super::tests::svg_picture_pptx()
+    }
+
+    #[test]
+    fn deferred_svg_materialization_retains_mixed_profiles_and_cache_policy() {
+        let shape_defaults = crate::shape::Limits::DEFAULT;
+        let shape_limits = crate::shape::Limits::new(
+            shape_defaults.input_bytes(),
+            shape_defaults.output_bytes(),
+            shape_defaults.depth(),
+            shape_defaults.nodes(),
+            1,
+            shape_defaults.retained_text_bytes(),
+        )
+        .unwrap();
+        let notes_defaults = crate::notes::Limits::DEFAULT;
+        let notes_limits = crate::notes::Limits {
+            max_nodes: notes_defaults.max_nodes - 1,
+            ..notes_defaults
+        };
+        let events_defaults = crate::presentation_properties::metadata::events::Limits::DEFAULT;
+        let events_limits = crate::presentation_properties::metadata::events::Limits::new(
+            events_defaults.max_slide_xml_bytes(),
+            events_defaults.max_total_slide_xml_bytes(),
+            events_defaults.max_events() - 1,
+            events_defaults.max_xml_nodes(),
+            events_defaults.max_xml_depth(),
+            events_defaults.max_event_string_bytes(),
+            events_defaults.max_output_bytes(),
+        )
+        .unwrap();
+        let cache_limits = SourceCacheLimits::new(64 * 1024, 1).unwrap();
+        let options = crate::OpenOptions::default()
+            .cache_limits(cache_limits)
+            .shape_limits(shape_limits)
+            .notes_limits(notes_limits)
+            .events_limits(events_limits);
+        let selected = options
+            .semantic_limits
+            .clone()
+            .expect("selected semantic policy");
+        let source = Package::from_read_at_with_options(
+            Arc::new(litchi_core::OwnedSource::new(fixture())),
+            options,
+        )
+        .unwrap();
+
+        let mut edit = source.edit_svg_images().unwrap();
+        assert!(
+            edit.replace(
+                0,
+                0,
+                crate::source::svg::Replacement::new(
+                    br#"<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>"#.to_vec(),
+                    b"\x89PNGchanged".to_vec(),
+                ),
+            )
+            .unwrap()
+        );
+        let updated = edit.commit().unwrap().into_package();
+
+        // The public write takes the deferred stream route. The effective
+        // owner check then forces the same artifact through materialization.
+        assert!(!updated.to_bytes().unwrap().is_empty());
+        let effective = updated.effective().unwrap();
+        assert!(Arc::ptr_eq(
+            &selected,
+            effective.owner.semantic_limits.as_ref().unwrap(),
+        ));
+        assert_eq!(effective.owner.package.cache_limits(), cache_limits);
+
+        // Make the package non-pristine, then exercise the SVG physical
+        // reopen path rather than only reading the already-materialized owner.
+        let mut shape_edit = updated.edit().unwrap();
+        assert!(shape_edit.set_slide_name(0, "physical reopen").unwrap());
+        let nonpristine = shape_edit.commit().unwrap().into_package();
+        let reopened = super::svg::physical(&nonpristine).unwrap();
+        assert!(Arc::ptr_eq(
+            &selected,
+            reopened.owner.semantic_limits.as_ref().unwrap(),
+        ));
+        assert_eq!(reopened.owner.package.cache_limits(), cache_limits);
+        let image = nonpristine.edit_svg_images().unwrap().image(0, 0).unwrap();
+        assert_eq!(image.raster_bytes(), b"\x89PNGchanged");
+
+        // The selected shape ceiling rejects a second shape; the default
+        // profile admits the same public edit.
+        let mut selected_edit = nonpristine.edit().unwrap();
+        assert!(matches!(
+            selected_edit.add_text_box(0, "selected policy", (0, 0, 914_400, 914_400)),
+            Err(crate::Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Shapes),
+                observed: 2,
+                maximum: 1,
+            })
+        ));
+        let default =
+            Package::from_read_at(Arc::new(litchi_core::OwnedSource::new(fixture()))).unwrap();
+        let mut default_edit = default.edit().unwrap();
+        assert!(
+            default_edit
+                .add_text_box(0, "default policy", (0, 0, 914_400, 914_400))
+                .is_ok()
+        );
+    }
+}
 
 // Charge conservative input/output and escaping headroom before lowering. The
 // token follows the candidate bytes through patches and detached shape handles.
@@ -2809,26 +2984,64 @@ fn reserve_edit(
         return Ok(None);
     };
     let maximum = snapshot.max_output_bytes;
-    let bytes = replacements.iter().try_fold(
-        snapshot
-            .xml
-            .as_bytes()
+    let initial = snapshot
+        .xml
+        .as_bytes()
+        .len()
+        .checked_mul(2)
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::SourceBytes,
+                usize::MAX,
+                maximum,
+            )
+        })?;
+    if initial > maximum {
+        return Err(limit(
+            crate::error::CodecLimitKind::SourceBytes,
+            initial,
+            maximum,
+        ));
+    }
+    let bytes = replacements.iter().try_fold(initial, |sum, replacement| {
+        replacement
+            .text()
             .len()
-            .checked_mul(2)
-            .ok_or_else(|| limit("source-backed primary edit bytes", maximum))?,
-        |sum, replacement| {
-            replacement
-                .text()
-                .len()
-                .checked_mul(6)
-                .and_then(|size| size.checked_add(256))
-                .and_then(|size| sum.checked_add(size))
-                .filter(|total| *total <= maximum)
-                .ok_or_else(|| limit("source-backed primary edit bytes", maximum))
-        },
-    )?;
-    let bytes =
-        u64::try_from(bytes).map_err(|_| limit("source-backed primary edit bytes", maximum))?;
+            .checked_mul(6)
+            .and_then(|size| size.checked_add(256))
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::SourceBytes,
+                    usize::MAX,
+                    maximum,
+                )
+            })
+            .and_then(|size| {
+                let total = sum.checked_add(size).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::SourceBytes,
+                        usize::MAX,
+                        maximum,
+                    )
+                })?;
+                if total > maximum {
+                    Err(limit(
+                        crate::error::CodecLimitKind::SourceBytes,
+                        total,
+                        maximum,
+                    ))
+                } else {
+                    Ok(total)
+                }
+            })
+    })?;
+    let bytes = u64::try_from(bytes).map_err(|_| {
+        limit(
+            crate::error::CodecLimitKind::SourceBytes,
+            usize::MAX,
+            maximum,
+        )
+    })?;
     context
         .reserve(litchi_core::Resource::Memory, bytes)
         .map(Some)
@@ -2853,10 +3066,29 @@ fn reserve_scene(
     let bytes = input_bytes
         .checked_mul(64)
         .and_then(|bytes| bytes.checked_add(1024))
-        .filter(|bytes| *bytes <= maximum)
-        .ok_or_else(|| limit("source-backed primary scene bytes", maximum))?;
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::SourceBytes,
+                usize::MAX,
+                maximum,
+            )
+        })?;
+    if bytes > maximum {
+        return Err(limit(
+            crate::error::CodecLimitKind::SourceBytes,
+            bytes,
+            maximum,
+        ));
+    }
+    let amount = u64::try_from(bytes).map_err(|_| {
+        limit(
+            crate::error::CodecLimitKind::SourceBytes,
+            usize::MAX,
+            maximum,
+        )
+    })?;
     context
-        .reserve(litchi_core::Resource::Memory, bytes as u64)
+        .reserve(litchi_core::Resource::Memory, amount)
         .map(Some)
         .map_err(|error| {
             Error::Opc(match error {

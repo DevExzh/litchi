@@ -15,6 +15,7 @@ pub mod read_only_recommended;
 /// final top-level paths.
 pub mod metadata;
 
+pub use codec::Limits;
 pub use model::*;
 pub use package::{load_from_package, load_from_package_with_tolerance, load_math_from_package};
 
@@ -42,9 +43,6 @@ pub(crate) const STRICT_REL: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships/presProps";
 pub(crate) const CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.presentationml.presProps+xml";
-pub(crate) const MAX_BYTES: usize = 8 * 1024 * 1024;
-pub(crate) const MAX_DEPTH: usize = 128;
-pub(crate) const MAX_NODES: usize = 100_000;
 pub(crate) const MAX_STRING: usize = 1024 * 1024;
 pub(crate) const MAX_EXTENSIONS: usize = 1024;
-pub(crate) use package::{put_math_to_package, remove_math_from_package};
+pub(crate) use package::{put_math_to_package, remove_math_from_package, validate_replay_part};

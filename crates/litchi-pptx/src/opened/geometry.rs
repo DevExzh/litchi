@@ -100,10 +100,26 @@ pub(super) fn rewrite_shape_bounds(
 /// output allocation.  Callers use this for homogeneous property batches so
 /// the work remains proportional to the owner XML plus the number of spans,
 /// rather than reparsing the owner once per item.
+#[cfg(test)]
 pub(super) fn rewrite_shape_bounds_many(
     xml: &[u8],
     replacements: &[(Position, (i64, i64, i64, i64))],
     max_output_bytes: usize,
+) -> Result<Option<Vec<u8>>> {
+    rewrite_shape_bounds_many_with_limits(
+        xml,
+        replacements,
+        max_output_bytes,
+        crate::shape::Limits::DEFAULT,
+    )
+}
+
+/// Rewrite a checked batch under the caller's retained shape policy.
+pub(super) fn rewrite_shape_bounds_many_with_limits(
+    xml: &[u8],
+    replacements: &[(Position, (i64, i64, i64, i64))],
+    max_output_bytes: usize,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Option<Vec<u8>>> {
     if replacements.is_empty() {
         return Ok(None);
@@ -112,7 +128,7 @@ pub(super) fn rewrite_shape_bounds_many(
         validate_requested_bounds(bounds)?;
     }
 
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     refuse_rewritten_scene(&scene)?;
     let scanned = scan_geometry(xml)?;
 
@@ -175,7 +191,7 @@ pub(super) fn rewrite_shape_bounds_many(
     }
     edits.sort_unstable_by_key(|edit| (edit.span.start, edit.span.end));
     let output = emit_replacements(xml, &edits, max_output_bytes)?;
-    let published = crate::shape::Scene::read(&output)?;
+    let published = crate::shape::Scene::read(&output, shape_limits)?;
     refuse_rewritten_scene(&published)?;
     if !same_shape_identity(&scene, &published) {
         return Err(Error::Invalid(
@@ -201,8 +217,17 @@ pub(super) fn rewrite_shape_bounds_many(
 /// Build a proof surface that masks only validated direct transform values of
 /// ordinary shapes.  The result intentionally retains all tags, attributes,
 /// namespaces, comments, and unknown extension bytes exactly.
+#[cfg(test)]
 pub(crate) fn geometry_skeleton(xml: &[u8]) -> Result<Vec<u8>> {
-    let scene = crate::shape::Scene::read(xml)?;
+    geometry_skeleton_with_limits(xml, crate::shape::Limits::DEFAULT)
+}
+
+/// Build a geometry proof surface under the caller's retained shape policy.
+pub(crate) fn geometry_skeleton_with_limits(
+    xml: &[u8],
+    shape_limits: crate::shape::Limits,
+) -> Result<Vec<u8>> {
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     refuse_rewritten_scene(&scene)?;
     let scanned = scan_geometry(xml)?;
     let mut edits = Vec::new();
@@ -432,8 +457,9 @@ fn emit_replacements(
         .ok_or_else(|| Error::Invalid("opened-presentation geometry size overflow".into()))?;
     if output_len > max_output_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation geometry output bytes",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: output_len,
+            maximum: max_output_bytes,
         });
     }
     let mut output = Vec::new();
@@ -965,7 +991,7 @@ mod tests {
             assert!(String::from_utf8_lossy(&output).contains(r#"rot="900000"#));
             assert!(String::from_utf8_lossy(&output).contains(r#"<d:foo data="keep"/>"#));
             assert_eq!(
-                crate::shape::Scene::read(&output)
+                crate::shape::Scene::read(&output, crate::shape::Limits::DEFAULT)
                     .expect("scene")
                     .at(0)
                     .expect("shape")

@@ -27,7 +27,13 @@ fn reads_and_replaces_typed_classification_without_normalizing_the_shape() {
         Some(Outcome::Header)
     );
 
-    let updated = transaction::set(&original, &source, Outcome::Watermark).unwrap();
+    let updated = transaction::set(
+        &original,
+        &source,
+        Outcome::Watermark,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .unwrap();
     let parsed = codec::read(&updated).unwrap();
     assert_eq!(
         parsed
@@ -55,7 +61,13 @@ fn unknown_extensions_survive_first_class_authoring() {
     let source = codec::read(&xml).unwrap();
     assert!(source.snapshot.is_none());
 
-    let updated = transaction::set(&xml, &source, Outcome::Footer).unwrap();
+    let updated = transaction::set(
+        &xml,
+        &source,
+        Outcome::Footer,
+        crate::shape::Limits::DEFAULT.output_bytes(),
+    )
+    .unwrap();
     assert!(
         updated
             .windows(b"<f:payload answer=\"42\">".len())

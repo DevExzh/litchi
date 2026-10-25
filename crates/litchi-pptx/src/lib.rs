@@ -100,7 +100,7 @@ pub mod metadata;
 pub(crate) mod namespace;
 pub mod notes;
 pub mod opc;
-mod open_options;
+pub(crate) mod open_options;
 pub mod opened;
 pub mod package;
 pub(crate) mod part_edit;
@@ -146,8 +146,8 @@ pub use comments::{
     parse_slide_comments_with_tolerance, write_comment_authors, write_slide_comments,
 };
 pub use error::{
-    DurablePatchFormat, Error, Result, ShapeTransferRefusal, SlideCopyRefusal, SlideOrderRefusal,
-    SlideRemovalRefusal,
+    CodecLimitKind, DurablePatchFormat, Error, LimitKind, Result, ShapeTransferRefusal,
+    SlideCopyRefusal, SlideOrderRefusal, SlideRemovalRefusal,
 };
 pub use format::{ImageFormat, TextFormat};
 pub use hyperlinks::Hyperlink;
@@ -174,7 +174,6 @@ pub use master_layout::{
 };
 pub use media_parts::{
     Bookmark, Data, ExtensionList, Fade, Picture, Poster, Resource, Transform, Trim,
-    load_slide_media, parse_slide_media, write_slide_media_pictures,
 };
 pub use modern_comments::*;
 pub use open_options::{OpenOptions, OpenPolicy};

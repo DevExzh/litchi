@@ -17,6 +17,7 @@
 use crate::slide::Selector;
 
 use super::ListDraft;
+use super::codec::Limits;
 #[allow(
     unused_imports,
     reason = "the delegated signatures name the module's values"
@@ -27,10 +28,30 @@ use crate::{Package, Result};
 
 family!("slide-show event");
 
+/// Per-edit bounds for inert slide-show event operations.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[must_use]
+pub struct EditOptions {
+    limits: Option<Limits>,
+}
+
+impl EditOptions {
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    #[must_use]
+    pub const fn limits_value(&self) -> Option<Limits> {
+        self.limits
+    }
+}
+
 /// A staged slide-show event edit of one [`Package`]. Dropping it discards it.
 #[derive(Debug)]
 pub struct Edit<'a> {
     staged: Staged<'a>,
+    limits: Limits,
 }
 
 impl Package {
@@ -41,9 +62,17 @@ impl Package {
     /// Returns the encryption-policy error for a package whose typed
     /// mutations are refused.
     pub fn edit_show_events(&self) -> Result<Edit<'_>> {
-        Ok(Edit {
-            staged: Staged::new(self, "edit_show_events")?,
-        })
+        self.edit_show_events_with_options(EditOptions::default())
+    }
+
+    /// Start a slide-show event edit under explicit operation options.
+    pub fn edit_show_events_with_options(&self, options: EditOptions) -> Result<Edit<'_>> {
+        let staged = Staged::new(self, "edit_show_events")?;
+        let limits = options
+            .limits_value()
+            .unwrap_or_else(|| staged.events_limits())
+            .constrained_by_source(self.opc.read_limits());
+        Ok(Edit { staged, limits })
     }
 
     /// Apply a slide-show event patch to a new package; this one is unchanged. An
@@ -55,10 +84,23 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_show_events(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_show_events")?,
-            patch.0.clone(),
-        )))
+        let semantic_limits = self.semantic_limits();
+        let package = patch.0.apply_with_replay_validation(
+            self,
+            "apply_show_events",
+            |_, target, patch| {
+                patch.validate_changed_parts(target, |name, part| {
+                    crate::presentation_properties::metadata::validate_replay_part_policy(
+                        target,
+                        crate::presentation_properties::metadata::ReplayFamily::Events,
+                        name,
+                        part,
+                        semantic_limits,
+                    )
+                })
+            },
+        )?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
@@ -77,8 +119,9 @@ impl Edit<'_> {
         operation: impl FnOnce(&mut ListDraft) -> Result<T>,
     ) -> Result<T> {
         let slide_part_name = &crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        let limits = self.limits;
         self.staged.update(move |opc| {
-            let mut draft = load_snapshot(opc, slide_part_name)?
+            let mut draft = load_snapshot(opc, slide_part_name, limits)?
                 .ok_or_else(|| {
                     Error::refused(
                         litchi_core::edit::RefusalKind::NotFound,
@@ -100,7 +143,7 @@ impl Edit<'_> {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn show_events<'s>(&self, slide: impl Into<Selector<'s>>) -> Result<Option<Vec<Event>>> {
         let slide_part_name = &crate::package::resolve_slide(self.staged.opc(), slide.into())?;
-        load(self.staged.opc(), slide_part_name)
+        load(self.staged.opc(), slide_part_name, self.limits)
     }
 
     /// Add a new slide-show event extension atomically.
@@ -116,8 +159,9 @@ impl Edit<'_> {
     /// Returns an error if the output cannot be encoded or written.
     pub fn set<'s>(&mut self, slide: impl Into<Selector<'s>>, events: &[Draft]) -> Result<()> {
         let slide_part_name = &crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        let limits = self.limits;
         self.staged
-            .update(move |opc| package::store(opc, slide_part_name, events))
+            .update(move |opc| package::store(opc, slide_part_name, events, limits))
     }
 
     /// Remove only the MS-PPTX show-event extension, retaining neighboring opaque
@@ -134,8 +178,9 @@ impl Edit<'_> {
     /// Returns an error if the operation fails.
     pub fn remove<'s>(&mut self, slide: impl Into<Selector<'s>>) -> Result<Option<Snapshot>> {
         let slide_part_name = &crate::package::resolve_slide(self.staged.opc(), slide.into())?;
+        let limits = self.limits;
         self.staged
-            .update(move |opc| package::remove(opc, slide_part_name))
+            .update(move |opc| package::remove(opc, slide_part_name, limits))
     }
 
     /// Discard every staged change.

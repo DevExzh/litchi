@@ -29,13 +29,16 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, Relationships, TargetMode};
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part, Relationships, SourceLimitKind,
+    SourceLimits, TargetMode,
+};
 
 use super::{Limits, Snapshot};
 use crate::notes::{
     Conformance, SlideRootMemo, SlideRootProof, with_refused_slide_root_reservation,
 };
-use crate::parts::{take_proved_root_hits, take_root_scans};
+use crate::parts::{take_proved_root_hits, take_root_scans, take_source_xml_scans};
 use crate::{Error, Package, Result};
 
 /// Resource named by a refused memo reservation (ADR 0032 section 4).
@@ -135,6 +138,78 @@ fn slide_arc(snapshot: &Snapshot, index: usize) -> Arc<Vec<u8>> {
         .get_part(&snapshot.slides[index].part_name)
         .expect("captured slide part")
         .blob_arc()
+}
+
+fn physical_slide_error(xml: &[u8], limits: SourceLimits) -> (SourceLimitKind, u64, u64) {
+    let part = BlobPart::new(
+        PackURI::new("/ppt/slides/physical.xml").expect("valid part name"),
+        crate::notes::SLIDE_CT.to_owned(),
+        xml.to_vec(),
+    );
+    let mut capture = crate::parts::MceCapture::new(None, usize::MAX);
+    match crate::parts::SlidePart::from_part_with_name_with_capture(
+        &part,
+        false,
+        &mut capture,
+        None,
+        limits,
+    ) {
+        Err(Error::Opc(OpcError::Limit {
+            kind,
+            observed,
+            maximum,
+        })) => (kind, observed, maximum),
+        Ok(_) => panic!("expected a physical slide limit refusal"),
+        Err(other) => panic!("expected a physical slide limit refusal, got {other:?}"),
+    }
+}
+
+#[test]
+fn selected_source_limits_refuse_slides_before_mce_with_exact_dimensions() -> Result<()> {
+    const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+    let events = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:x/></p:sld>"#;
+    let depth = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:x><p:y/></p:x></p:sld>"#;
+    let attributes =
+        br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#;
+
+    take_source_xml_scans();
+    assert_eq!(
+        physical_slide_error(events, SourceLimits::builder().max_events(2)?.build()?,),
+        (SourceLimitKind::Events, 3, 2)
+    );
+    assert_eq!(
+        physical_slide_error(depth, SourceLimits::builder().max_depth(1)?.build()?,),
+        (SourceLimitKind::Depth, 2, 1)
+    );
+    assert_eq!(
+        physical_slide_error(
+            attributes,
+            SourceLimits::builder()
+                .max_xml_attribute_bytes(PML.len() - 1)?
+                .max_relationship_target_bytes(PML.len() - 1)?
+                .build()?,
+        ),
+        (
+            SourceLimitKind::XmlAttributeBytes,
+            PML.len() as u64,
+            (PML.len() - 1) as u64,
+        )
+    );
+    assert_eq!(
+        physical_slide_error(
+            events,
+            SourceLimits::builder()
+                .max_part_bytes((events.len() - 1) as u64)?
+                .build()?,
+        ),
+        (
+            SourceLimitKind::PartBytes,
+            events.len() as u64,
+            (events.len() - 1) as u64,
+        )
+    );
+    assert_eq!(take_source_xml_scans(), 4);
+    Ok(())
 }
 
 fn reallocate_slide(package: &mut OpcPackage, part_name: &PackURI) -> Result<()> {
@@ -524,20 +599,33 @@ fn a_memo_hit_adds_no_payload_observation_over_a_plain_recapture() -> Result<()>
     let candidate = source.package.as_ref().clone();
 
     observations.store(0, Ordering::SeqCst);
+    take_source_xml_scans();
     take_proved_root_hits();
     let assisted = recapture(&source, &candidate, true)?;
     let assisted_observations = observations.load(Ordering::SeqCst);
+    let assisted_source_scans = take_source_xml_scans();
     assert_eq!(take_proved_root_hits(), 2);
 
     observations.store(0, Ordering::SeqCst);
+    take_source_xml_scans();
     let plain = recapture(&source, &candidate, false)?;
     let plain_observations = observations.load(Ordering::SeqCst);
+    let plain_source_scans = take_source_xml_scans();
     assert_eq!(take_proved_root_hits(), 0);
 
     assert_same_snapshot("counted part", &assisted, &plain);
     assert_eq!(
         assisted_observations, plain_observations,
         "a memo lookup must not add raw payload observations"
+    );
+    assert_eq!(
+        assisted_source_scans, 0,
+        "a memo hit skips physical XML scans"
+    );
+    assert_eq!(
+        plain_source_scans,
+        source.slides.len(),
+        "a cold recapture admits every slide under the physical source policy"
     );
     Ok(())
 }
@@ -680,6 +768,55 @@ fn the_notes_owning_deck_reuses_proofs_and_keeps_its_notes_graph() -> Result<()>
     )?
     .expect("notes graph");
     assert_eq!(notes.slides().len(), 3);
+    Ok(())
+}
+
+#[test]
+fn a_source_profile_change_drops_the_memo_before_recapture() -> Result<()> {
+    let package = text_box_package(3, 1)?;
+    let source = package.opened_presentation()?;
+    let same_profile = source.rebound_to(source.package.as_ref());
+    assert_eq!(
+        same_profile.slide_roots.len(),
+        source.slide_roots.len(),
+        "an unchanged source profile projects the shared memo"
+    );
+    let changed_limits = SourceLimits::builder()
+        .max_events(SourceLimits::default().max_events().saturating_sub(1))?
+        .build()?;
+    let rebound_package = OpcPackage::from_vec_reusing_payloads(
+        PackageWriter::to_bytes(source.package.as_ref())?,
+        changed_limits,
+        source.package.as_ref(),
+    )?;
+    let source_slide_blob = source
+        .package
+        .get_part(&source.slides[0].part_name)?
+        .blob_arc();
+    let rebound_slide_blob = rebound_package
+        .get_part(&source.slides[0].part_name)?
+        .blob_arc();
+    assert!(
+        Arc::ptr_eq(&source_slide_blob, &rebound_slide_blob),
+        "the changed-profile package must retain shared slide allocations"
+    );
+    let rebound = source.rebound_to(&rebound_package);
+    assert_eq!(rebound.slide_roots.len(), 0);
+    assert_eq!(SlideRootMemo::ENTRY_BYTES, 32);
+
+    take_source_xml_scans();
+    take_proved_root_hits();
+    let mut edit = rebound.edit();
+    assert!(edit.set_shape_text(0, 0, "profile change")?);
+    let commit = edit.commit()?;
+    assert_eq!(take_proved_root_hits(), 0, "the dropped memo cannot answer");
+    assert_eq!(
+        take_source_xml_scans(),
+        source.slides.len(),
+        "the changed source profile forces one physical admission per slide"
+    );
+    let cold = cold_capture(commit.snapshot())?;
+    assert_same_snapshot("profile-change commit", commit.snapshot(), &cold);
     Ok(())
 }
 
@@ -1163,14 +1300,15 @@ fn the_memo_costs_one_32_byte_entry_per_captured_slide() -> Result<()> {
         7 * SlideRootMemo::ENTRY_BYTES,
         "the table is reserved exactly, one entry per captured slide"
     );
-    // The slide count is bounded by the capture's limit, and so is the memo.
+    // Capture charges the slide references against the primary parts limit.
     let limits = Limits::new(6, 1 << 20, 1 << 20, 4, 1 << 20, 1 << 20).expect("limits");
     match package.opened_presentation_with_limits(limits) {
-        Err(Error::Limit { resource, limit }) => {
-            assert_eq!(resource, "opened-presentation slides");
-            assert_eq!(limit, 6);
-        },
-        other => panic!("seven slides exceed a six-part limit: {other:?}"),
+        Err(Error::Limit {
+            kind: crate::opened::LimitKind::Parts,
+            observed: 7,
+            maximum: 6,
+        }) => {},
+        other => panic!("seven slide references exceed a six-part limit: {other:?}"),
     }
     Ok(())
 }

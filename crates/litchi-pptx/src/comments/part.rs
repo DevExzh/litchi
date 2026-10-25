@@ -2,7 +2,7 @@
 
 use litchi_opc::part::Part as OpcPart;
 
-use super::{AUTHORS_CONTENT_TYPE, Author, COMMENTS_CONTENT_TYPE, Comment, Conformance};
+use super::{AUTHORS_CONTENT_TYPE, Author, COMMENTS_CONTENT_TYPE, Comment, Conformance, Limits};
 use crate::Result;
 use crate::parts::validate_content_type;
 
@@ -26,8 +26,8 @@ impl<'a> ListPart<'a> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn comments(&self) -> Result<Vec<Comment>> {
-        super::parse_slide_comments(self.part.blob())
+    pub fn comments(&self, limits: Limits) -> Result<Vec<Comment>> {
+        super::parse_slide_comments(self.part.blob(), limits)
     }
 
     /// Re-serialize the part. A list whose read would need a repair is
@@ -36,10 +36,11 @@ impl<'a> ListPart<'a> {
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn to_xml(&self, conformance: Conformance) -> Result<Vec<u8>> {
+    pub fn to_xml(&self, conformance: Conformance, limits: Limits) -> Result<Vec<u8>> {
         super::write_slide_comments(
-            &super::parse_slide_comments_strict(self.part.blob())?,
+            &super::parse_slide_comments_strict(self.part.blob(), limits)?,
             conformance,
+            limits,
         )
     }
 
@@ -67,15 +68,15 @@ impl<'a> AuthorListPart<'a> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn authors(&self) -> Result<Vec<Author>> {
-        super::parse_comment_authors(self.part.blob())
+    pub fn authors(&self, limits: Limits) -> Result<Vec<Author>> {
+        super::parse_comment_authors(self.part.blob(), limits)
     }
 
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn to_xml(&self, conformance: Conformance) -> Result<Vec<u8>> {
-        super::write_comment_authors(&self.authors()?, conformance)
+    pub fn to_xml(&self, conformance: Conformance, limits: Limits) -> Result<Vec<u8>> {
+        super::write_comment_authors(&self.authors(limits)?, conformance, limits)
     }
 
     #[inline]

@@ -261,7 +261,8 @@ impl Edit {
         let owner = self.working.get_part(&selected.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
         let xml = owner.blob();
-        let scene = crate::shape::Scene::read(xml)?;
+        let shape_limits = self.semantic_limits().shape();
+        let scene = crate::shape::Scene::read(xml, shape_limits)?;
         if scene.is_rewritten() {
             return Err(crate::Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -334,7 +335,7 @@ impl Edit {
         next.extend_from_slice(&xml[..start]);
         next.extend_from_slice(&replacement);
         next.extend_from_slice(&xml[end..]);
-        let staged = crate::shape::Scene::read(&next)?;
+        let staged = crate::shape::Scene::read(&next, shape_limits)?;
         let after = staged.shape(key)?;
         let read = frame_table(&next, after.common().span()?.range(next.len())?)?.properties()?;
         if staged.len() != scene.len() || read.as_ref() != Some(&target) {
@@ -357,7 +358,8 @@ impl Edit {
         let owner = self.working.get_part(&selected.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
         let xml = owner.blob();
-        let scene = crate::shape::Scene::read(xml)?;
+        let shape_limits = self.semantic_limits().shape();
+        let scene = crate::shape::Scene::read(xml, shape_limits)?;
         if scene.is_rewritten() {
             return Err(crate::Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -376,7 +378,7 @@ impl Edit {
         let Some(next) = crate::table::columns::change(xml, span, change)? else {
             return Ok(false);
         };
-        let staged = crate::shape::Scene::read(&next)?;
+        let staged = crate::shape::Scene::read(&next, shape_limits)?;
         let column_delta = |count: usize| match change {
             Change::Insert { .. } => count.checked_add(1),
             Change::Remove { .. } => count.checked_sub(1),

@@ -210,6 +210,9 @@ impl Snapshot {
             .map_err(|error| Error::Xml(format!("presentation XML is not UTF-8: {error}")))?;
         if crate::presentation_properties::metadata::protection::Settings::parse_xml(
             presentation_text,
+            crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                self.package.read_limits(),
+            ),
         )?
         .is_protected()
         {
@@ -221,8 +224,9 @@ impl Snapshot {
         validate_slide_ids(&self.slides)?;
         if self.slides.len() == crate::parts::MAX_SLIDES {
             return Err(Error::Limit {
-                resource: "slide-copy presentation slides",
-                limit: crate::parts::MAX_SLIDES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
+                observed: self.slides.len().checked_add(1).unwrap_or(usize::MAX),
+                maximum: crate::parts::MAX_SLIDES,
             });
         }
         // This validates that the reused layout is registered through exactly
@@ -239,8 +243,9 @@ impl Snapshot {
         reject_cycles(&owned, &edges)?;
         validate_registered_layout(self.package.as_ref(), presentation, &reused_layout)?;
         if self.package.part_count() > self.limits.max_parts() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: self.package.part_count(),
                 maximum: self.limits.max_parts(),
             });
         }
@@ -319,8 +324,9 @@ fn preflight_copy_candidate(
         .checked_add(parts.len())
         .ok_or_else(|| invalid("slide-copy resulting part count overflow"))?;
     if resulting_parts > snapshot.limits.max_parts() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
+            observed: resulting_parts,
             maximum: snapshot.limits.max_parts(),
         });
     }
@@ -348,8 +354,9 @@ fn preflight_copy_candidate(
         .and_then(|value| value.checked_add(128))
         .ok_or_else(|| invalid("slide-copy candidate byte count overflow"))?;
     if conservative_patch_bytes > snapshot.limits.max_patch_bytes() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::PatchBytes,
+            observed: conservative_patch_bytes,
             maximum: snapshot.limits.max_patch_bytes(),
         });
     }
@@ -465,10 +472,11 @@ fn build_copy_candidate(
         )?;
         staged.set_blob(xml);
     }
-    let captured = super::model::capture(
+    let captured = super::model::capture_with_provenance_and_semantic_limits(
         &candidate,
         snapshot.limits,
         snapshot.physical_source_provenance,
+        snapshot.owner_state.semantic_limits.clone(),
     )?;
     let published = captured
         .slides
@@ -531,16 +539,18 @@ pub(super) fn collect_owned_closure(
             continue;
         }
         if owned.len() > limits.max_parts() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: owned.len(),
                 maximum: limits.max_parts(),
             });
         }
         let part = package.get_part(&name)?;
         planned_bytes = checked_plan_bytes(planned_bytes, part)?;
         if planned_bytes > limits.max_patch_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed: planned_bytes,
                 maximum: limits.max_patch_bytes(),
             });
         }
@@ -557,8 +567,11 @@ pub(super) fn collect_owned_closure(
                 .ok_or_else(|| invalid("slide-copy relationship count overflow"))?;
             if traversed_relationships > relationship_limit {
                 return Err(Error::Limit {
-                    resource: "slide-copy dependency relationships",
-                    limit: relationship_limit,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::Relationships,
+                    ),
+                    observed: traversed_relationships,
+                    maximum: relationship_limit,
                 });
             }
             if relationship.target_ref().is_empty() {

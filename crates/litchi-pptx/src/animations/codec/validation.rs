@@ -1,10 +1,11 @@
 //! Bounded scalar and structural validation for `PresentationML` timing values.
 
-use super::super::invalid;
 use super::super::model::{
     Direction, Duration, Effect, GroupId, MotionFraction, ParagraphBuildType, Repeat, Sequence,
     SequenceContext,
 };
+use super::super::{invalid, limit};
+use crate::animations::Limits;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::encoding::Decoder;
@@ -74,9 +75,13 @@ pub(super) fn parse_build_auto_advance(value: &str) -> Result<Duration> {
         .map_err(|_err| invalid("invalid paragraph build auto-advance time"))
 }
 
-pub(super) fn validate_template_time_node(xml: &str) -> Result<()> {
-    if xml.len() > MAX_TEMPLATE_TIME_NODE_BYTES {
-        return Err(invalid("paragraph template time node exceeds safety limit"));
+pub(super) fn validate_template_time_node(xml: &str, limits: Limits) -> Result<()> {
+    if xml.len() > limits.max_template_bytes {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            xml.len(),
+            limits.max_template_bytes,
+        ));
     }
     let wrapped = format!(
         r#"<root xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">{xml}</root>"#
@@ -93,12 +98,35 @@ pub(super) fn validate_template_time_node(xml: &str) -> Result<()> {
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(element) => {
-                depth += 1;
-                nodes += 1;
-                if depth > MAX_TIMING_DEPTH || nodes > MAX_TIMING_NODES {
-                    return Err(invalid("paragraph template time node exceeds safety limit"));
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth,
+                    )
+                })?;
+                if depth > limits.max_depth {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth,
+                    ));
                 }
-                check_attribute_count(&element)?;
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes,
+                    )
+                })?;
+                if nodes > limits.max_nodes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes,
+                    ));
+                }
+                check_attribute_count(&element, limits)?;
                 if depth == 2 {
                     if saw_par || !is_presentationml_name(&namespace, element.name(), b"par") {
                         return Err(invalid(
@@ -116,12 +144,35 @@ pub(super) fn validate_template_time_node(xml: &str) -> Result<()> {
                 }
             },
             Event::Empty(element) => {
-                nodes += 1;
-                if nodes > MAX_TIMING_NODES {
-                    return Err(invalid("paragraph template time node exceeds safety limit"));
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes,
+                    )
+                })?;
+                if nodes > limits.max_nodes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes,
+                    ));
                 }
-                check_attribute_count(&element)?;
-                let element_depth = depth + 1;
+                check_attribute_count(&element, limits)?;
+                let element_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth,
+                    )
+                })?;
+                if element_depth > limits.max_depth {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        element_depth,
+                        limits.max_depth,
+                    ));
+                }
                 if element_depth == 2 {
                     return Err(invalid("paragraph template par node cannot be empty"));
                 }
@@ -140,22 +191,38 @@ pub(super) fn validate_template_time_node(xml: &str) -> Result<()> {
                     .ok_or_else(|| invalid("unbalanced paragraph template XML"))?;
             },
             Event::Text(text) => {
-                text_bytes = text_bytes
-                    .checked_add(text.len())
-                    .ok_or_else(|| invalid("paragraph template text size overflows"))?;
-                if text_bytes > MAX_TIMING_TEXT_BYTES {
-                    return Err(invalid("paragraph template text exceeds safety limit"));
+                text_bytes = text_bytes.checked_add(text.len()).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::TextBytes,
+                        usize::MAX,
+                        limits.max_text_bytes,
+                    )
+                })?;
+                if text_bytes > limits.max_text_bytes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::TextBytes,
+                        text_bytes,
+                        limits.max_text_bytes,
+                    ));
                 }
                 if depth <= 1 && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("paragraph template has text outside its par root"));
                 }
             },
             Event::CData(text) => {
-                text_bytes = text_bytes
-                    .checked_add(text.len())
-                    .ok_or_else(|| invalid("paragraph template text size overflows"))?;
-                if text_bytes > MAX_TIMING_TEXT_BYTES {
-                    return Err(invalid("paragraph template text exceeds safety limit"));
+                text_bytes = text_bytes.checked_add(text.len()).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::TextBytes,
+                        usize::MAX,
+                        limits.max_text_bytes,
+                    )
+                })?;
+                if text_bytes > limits.max_text_bytes {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::TextBytes,
+                        text_bytes,
+                        limits.max_text_bytes,
+                    ));
                 }
                 if depth <= 1 && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
                     return Err(invalid("paragraph template has text outside its par root"));
@@ -292,23 +359,53 @@ pub(super) fn attribute(
     )?)
 }
 
-pub(super) fn check_attribute_count(element: &BytesStart<'_>) -> Result<()> {
+pub(super) fn check_attribute_count(element: &BytesStart<'_>, limits: Limits) -> Result<()> {
     let mut count = 0usize;
+    let mut bytes = 0usize;
     for attribute in element.checked_attributes() {
-        attribute.map_err(|error| Error::Xml(error.to_string()))?;
-        count += 1;
-        if count > MAX_TIMING_ATTRIBUTES {
-            return Err(invalid(
-                "animation XML attribute count exceeds safety limit",
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        count = count.checked_add(1).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::XmlAttributes,
+                usize::MAX,
+                limits.max_attributes,
+            )
+        })?;
+        if count > limits.max_attributes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributes,
+                count,
+                limits.max_attributes,
+            ));
+        }
+        bytes = bytes
+            .checked_add(attribute.key.as_ref().len())
+            .and_then(|value| value.checked_add(attribute.value.len()))
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::XmlAttributeBytes,
+                    usize::MAX,
+                    limits.max_text_bytes,
+                )
+            })?;
+        if bytes > limits.max_text_bytes {
+            return Err(limit(
+                crate::error::CodecLimitKind::XmlAttributeBytes,
+                bytes,
+                limits.max_text_bytes,
             ));
         }
     }
     Ok(())
 }
 
-pub(super) fn check_xml_size(size: usize) -> Result<()> {
-    if size > MAX_TIMING_XML_BYTES {
-        Err(invalid("animation XML exceeds safety limit"))
+pub(super) fn check_xml_size(size: usize, limits: Limits) -> Result<()> {
+    if size > limits.max_input_bytes {
+        Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            size,
+            limits.max_input_bytes,
+        ))
     } else {
         Ok(())
     }
@@ -353,17 +450,33 @@ impl Sequence {
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn to_xml_for_slide(&self, valid_targets: &HashSet<u32>) -> Result<String> {
+    pub fn to_xml_for_slide(&self, valid_targets: &HashSet<u32>, limits: Limits) -> Result<String> {
         if self.len() > MAX_ANIMATIONS {
-            return Err(invalid("slide animation count exceeds safety limit"));
+            return Err(limit(
+                crate::error::CodecLimitKind::Animations,
+                self.len(),
+                MAX_ANIMATIONS,
+            ));
         }
-        if self.paragraph_builds.len()
-            + self.diagram_builds.len()
-            + self.graphic_builds.len()
-            + self.ole_chart_builds.len()
-            > MAX_ANIMATION_BUILDS
-        {
-            return Err(invalid("slide animation build count exceeds safety limit"));
+        let build_count = self
+            .paragraph_builds
+            .len()
+            .checked_add(self.diagram_builds.len())
+            .and_then(|count| count.checked_add(self.graphic_builds.len()))
+            .and_then(|count| count.checked_add(self.ole_chart_builds.len()))
+            .ok_or_else(|| {
+                limit(
+                    crate::error::CodecLimitKind::AnimationBuilds,
+                    usize::MAX,
+                    MAX_ANIMATION_BUILDS,
+                )
+            })?;
+        if build_count > MAX_ANIMATION_BUILDS {
+            return Err(limit(
+                crate::error::CodecLimitKind::AnimationBuilds,
+                build_count,
+                MAX_ANIMATION_BUILDS,
+            ));
         }
         let animation_groups: HashSet<_> = self
             .animations
@@ -391,7 +504,11 @@ impl Sequence {
                 return Err(invalid("reverse paragraph order requires build type p"));
             }
             if build.templates.len() > MAX_PARAGRAPH_TEMPLATES {
-                return Err(invalid("paragraph template count exceeds PowerPoint limit"));
+                return Err(limit(
+                    crate::error::CodecLimitKind::ParagraphTemplates,
+                    build.templates.len(),
+                    MAX_PARAGRAPH_TEMPLATES,
+                ));
             }
             let mut levels = HashSet::new();
             for template in &build.templates {
@@ -503,9 +620,13 @@ impl Sequence {
             if let Some(time_filter) = &animation.time_filter
                 && time_filter.write_value().len() > MAX_TIME_FILTER_BYTES
             {
-                return Err(invalid("animation time filter exceeds safety limit"));
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlBytes,
+                    time_filter.write_value().len(),
+                    MAX_TIME_FILTER_BYTES,
+                ));
             }
         }
-        Ok(self.to_xml())
+        self.to_xml(limits)
     }
 }

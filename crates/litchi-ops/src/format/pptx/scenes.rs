@@ -72,10 +72,13 @@ mod tests {
     use super::{CAPACITY, Scenes};
 
     fn scene() -> Scene {
-        Scene::read(Arc::new(
-            br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree/></p:cSld></p:sld>"#
-                .to_vec(),
-        ))
+        Scene::read(
+            Arc::new(
+                br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree/></p:cSld></p:sld>"#
+                    .to_vec(),
+            ),
+            litchi_pptx::shape::Limits::DEFAULT,
+        )
         .expect("an empty slide reads")
     }
 

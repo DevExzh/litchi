@@ -10,7 +10,7 @@
 //! let xml = br#"<p:spTree xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
 //!   <p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/></p:nvSpPr></p:sp>
 //! </p:spTree>"#;
-//! let scene = Scene::read(xml.to_vec())?;
+//! let scene = Scene::read(xml.to_vec(), litchi_pptx::shape::Limits::DEFAULT)?;
 //! let title = scene.shape("Title")?.expect("title");
 //! drop(scene);
 //! assert_eq!(title.view().name(), Some("Title"));
@@ -103,20 +103,13 @@ impl Xml {
     }
 }
 impl Scene {
-    /// Index owned XML with the leaf reader's finite default limits.
+    /// Index owned XML with caller-selected finite limits.
     ///
     /// # Errors
     /// Returns the same parse and limit failures as [`super::Scene::read`].
-    pub fn read(xml: impl Into<Arc<Vec<u8>>>) -> crate::Result<Self> {
-        Self::read_with(xml, Limits::DEFAULT)
-    }
-    /// Index owned XML with explicit finite limits.
-    ///
-    /// # Errors
-    /// Returns the same parse and limit failures as [`super::Scene::read_with`].
-    pub fn read_with(xml: impl Into<Arc<Vec<u8>>>, limits: Limits) -> crate::Result<Self> {
+    pub fn read(xml: impl Into<Arc<Vec<u8>>>, limits: Limits) -> crate::Result<Self> {
         let input = xml.into();
-        let parsed = super::Scene::read_with(input.as_slice(), limits)?;
+        let parsed = super::Scene::read(input.as_slice(), limits)?;
         Self::from_parsed(parsed, Arc::clone(&input))
     }
     pub(crate) fn from_parsed(
@@ -287,7 +280,7 @@ impl Scene {
     /// use litchi_pptx::shape::owned::Scene;
     ///
     /// let xml = br#"<p:spTree xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/></p:sp></p:spTree>"#;
-    /// let scene = Scene::read(xml.to_vec())?;
+    /// let scene = Scene::read(xml.to_vec(), litchi_pptx::shape::Limits::DEFAULT)?;
     /// assert_eq!(scene.views().count(), scene.iter().count());
     /// # Ok::<(), litchi_pptx::Error>(())
     /// ```

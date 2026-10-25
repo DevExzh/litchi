@@ -107,9 +107,12 @@ struct Frame {
     other_content: bool,
 }
 
-pub(super) fn read_state(xml: &[u8]) -> Result<State> {
+pub(super) fn read_state_with_limits(
+    xml: &[u8],
+    shape_limits: crate::shape::Limits,
+) -> Result<State> {
     let creation_id = read(xml, Owner::Slide)?.id;
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     let mut shapes = Vec::new();
     shapes
         .try_reserve_exact(scene.len())
@@ -120,8 +123,11 @@ pub(super) fn read_state(xml: &[u8]) -> Result<State> {
     for (position, shape) in scene.iter().enumerate() {
         let trackable = !matches!(shape, crate::shape::Shape::Unknown(_));
         let modification_id = if trackable {
-            let span =
-                crate::tag::shape::selected_raw_span(xml, crate::shape::Key::Index(position))?;
+            let span = crate::tag::shape::selected_raw_span_with_limits(
+                xml,
+                crate::shape::Key::Index(position),
+                shape_limits,
+            )?;
             read_at(xml, Owner::Shape, Some(&span))?.id
         } else {
             None
@@ -159,8 +165,17 @@ pub(super) fn set(xml: &[u8], owner: Owner, id: Id) -> Result<Vec<u8>> {
     set_source(xml, owner, id, &source)
 }
 
-pub(super) fn set_shape(xml: &[u8], position: usize, id: Id) -> Result<Vec<u8>> {
-    let span = crate::tag::shape::selected_raw_span(xml, crate::shape::Key::Index(position))?;
+pub(super) fn set_shape_with_limits(
+    xml: &[u8],
+    position: usize,
+    id: Id,
+    shape_limits: crate::shape::Limits,
+) -> Result<Vec<u8>> {
+    let span = crate::tag::shape::selected_raw_span_with_limits(
+        xml,
+        crate::shape::Key::Index(position),
+        shape_limits,
+    )?;
     let source = read_at(xml, Owner::Shape, Some(&span))?;
     set_source(xml, Owner::Shape, id, &source)
 }
@@ -218,8 +233,16 @@ pub(super) fn remove(xml: &[u8], owner: Owner) -> Result<Vec<u8>> {
     remove_source(xml, &source)
 }
 
-pub(super) fn remove_shape(xml: &[u8], position: usize) -> Result<Vec<u8>> {
-    let span = crate::tag::shape::selected_raw_span(xml, crate::shape::Key::Index(position))?;
+pub(super) fn remove_shape_with_limits(
+    xml: &[u8],
+    position: usize,
+    shape_limits: crate::shape::Limits,
+) -> Result<Vec<u8>> {
+    let span = crate::tag::shape::selected_raw_span_with_limits(
+        xml,
+        crate::shape::Key::Index(position),
+        shape_limits,
+    )?;
     let source = read_at(xml, Owner::Shape, Some(&span))?;
     remove_source(xml, &source)
 }
@@ -260,8 +283,9 @@ fn read_at(xml: &[u8], owner: Owner, root_range: Option<&Range<usize>>) -> Resul
     }
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::Limit {
-            resource: "change-tracking XML bytes",
-            limit: MAX_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_XML_BYTES,
         });
     }
     let mut reader = NsReader::from_reader(xml);
@@ -314,8 +338,11 @@ fn read_at(xml: &[u8], owner: Owner, root_range: Option<&Range<usize>>) -> Resul
                 )?;
                 if frames.len() >= MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "change-tracking XML depth",
-                        limit: MAX_XML_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: frames.len().checked_add(1).unwrap_or(usize::MAX),
+                        maximum: MAX_XML_DEPTH,
                     });
                 }
                 frames.push(Frame {
@@ -693,8 +720,9 @@ fn replace(xml: &[u8], range: Range<usize>, replacement: &[u8]) -> Result<Vec<u8
         .ok_or_else(|| invalid("change-tracking replacement length overflow"))?;
     if length > MAX_XML_BYTES {
         return Err(Error::Limit {
-            resource: "change-tracking XML bytes",
-            limit: MAX_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: length,
+            maximum: MAX_XML_BYTES,
         });
     }
     let mut value = Vec::new();
@@ -722,8 +750,9 @@ fn bump_node(nodes: &mut usize) -> Result<()> {
         .ok_or_else(|| invalid("change-tracking XML node count overflow"))?;
     if *nodes > MAX_XML_NODES {
         return Err(Error::Limit {
-            resource: "change-tracking XML nodes",
-            limit: MAX_XML_NODES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: *nodes,
+            maximum: MAX_XML_NODES,
         });
     }
     Ok(())

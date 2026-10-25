@@ -100,9 +100,10 @@ impl Edit {
     }
 
     fn master_part(&self, master: Position) -> Result<PackURI> {
-        let presentation = crate::presentation::Presentation::new(
+        let presentation = crate::presentation::Presentation::new_with_semantic_limits(
             crate::parts::PresentationPart::from_package(self.working_ref()?)?,
             self.working_ref()?,
+            self.semantic_limits_ref(),
         );
         let masters = presentation.slide_masters()?;
         let selected = masters
@@ -112,9 +113,10 @@ impl Edit {
     }
 
     fn layout_part(&self, master: Position, layout: Position) -> Result<PackURI> {
-        let presentation = crate::presentation::Presentation::new(
+        let presentation = crate::presentation::Presentation::new_with_semantic_limits(
             crate::parts::PresentationPart::from_package(self.working_ref()?)?,
             self.working_ref()?,
+            self.semantic_limits_ref(),
         );
         let masters = presentation.slide_masters()?;
         let selected = masters
@@ -140,7 +142,7 @@ impl Edit {
             owner.blob(),
             root,
             name,
-            crate::shape::Limits::DEFAULT.output_bytes(),
+            self.semantic_limits().shape().output_bytes(),
         )?
         else {
             return Ok(false);
@@ -158,7 +160,8 @@ impl Edit {
     ) -> Result<bool> {
         let owner = self.working.get_part(part)?;
         crate::parts::validate_content_type(owner, content_type)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let shape_limits = self.semantic_limits().shape();
+        let scene = crate::shape::Scene::read(owner.blob(), shape_limits)?;
         let selected = scene.shape(key)?;
         if selected.common().text() == Some(text) {
             return Ok(false);
@@ -167,13 +170,14 @@ impl Edit {
             return Err(invalid("the selected shape has no text body"));
         }
         let span = crate::tag::shape::selected_raw_span_for_shape(owner.blob(), &scene, selected)?;
-        let xml = super::super::xml::rewrite_shape_text(
+        let xml = super::super::xml::rewrite_shape_text_with_limits(
             owner.blob(),
             span,
             text,
             self.source_ref()?.limits.max_text_bytes(),
+            shape_limits,
         )?;
-        let staged = crate::shape::Scene::read(&xml)?;
+        let staged = crate::shape::Scene::read(&xml, shape_limits)?;
         if staged.shape(key)?.common().text() != Some(text) || staged.len() != scene.len() {
             return Err(invalid("the shape text did not round-trip semantically"));
         }

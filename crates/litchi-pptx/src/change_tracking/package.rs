@@ -8,29 +8,42 @@ use super::transaction::{Change, Prepared};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
-pub(crate) fn load(package: &OpcPackage, owner: &PackURI) -> Result<Snapshot> {
+pub(crate) fn load_with_limits(
+    package: &OpcPackage,
+    owner: &PackURI,
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
     let part = package.get_part(owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
-    Snapshot::from_source(part.partname().clone(), part.blob().to_vec())
+    Snapshot::from_source_with_limits(part.partname().clone(), part.blob().to_vec(), shape_limits)
 }
 
-pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
+pub(crate) fn apply_commit_with_limits(
+    package: &mut OpcPackage,
+    commit: Prepared,
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
     let (snapshot, patch) = commit.into_parts();
     if patch.after() != snapshot.state() {
         return Err(Error::Invalid(
             "change-tracking commit differs from its candidate snapshot".into(),
         ));
     }
-    apply_patch(package, &patch)
+    apply_patch_with_limits(package, &patch, shape_limits)
 }
 
-pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
+pub(crate) fn apply_patch_with_limits(
+    package: &mut OpcPackage,
+    patch: &Change,
+    shape_limits: crate::shape::Limits,
+) -> Result<Snapshot> {
     let part = package.get_part(&patch.owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     if part.blob() != patch.source {
         return Err(Error::PatchConflict);
     }
-    let snapshot = Snapshot::from_source(patch.owner.clone(), patch.target.clone())?;
+    let snapshot =
+        Snapshot::from_source_with_limits(patch.owner.clone(), patch.target.clone(), shape_limits)?;
     if snapshot.state() != patch.after() {
         return Err(Error::Invalid(
             "change-tracking patch target differs from its semantic result".into(),

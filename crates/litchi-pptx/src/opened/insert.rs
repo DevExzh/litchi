@@ -56,24 +56,31 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
     if position > source.slides.len() {
         return Err(Error::SlideIndexOutOfBounds {
             index: position,
-            len: source.slides.len().saturating_add(1),
+            len: source.slides.len().checked_add(1).unwrap_or(usize::MAX),
         });
     }
     if source.slides.len() >= crate::parts::MAX_SLIDES {
         return Err(Error::Limit {
-            resource: "presentation slides",
-            limit: crate::parts::MAX_SLIDES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
+            observed: source.slides.len().checked_add(1).unwrap_or(usize::MAX),
+            maximum: crate::parts::MAX_SLIDES,
         });
     }
     if source.package.part_count() >= source.limits.max_parts() {
-        return Err(Error::EditLimit {
+        return Err(Error::Limit {
             kind: crate::opened::LimitKind::Parts,
+            observed: source
+                .package
+                .part_count()
+                .checked_add(1)
+                .unwrap_or(usize::MAX),
             maximum: source.limits.max_parts(),
         });
     }
     if layout_name.len() > source.limits.max_text_bytes() {
-        return Err(Error::EditLimit {
-            kind: crate::opened::LimitKind::TextBytes,
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::NameBytes),
+            observed: layout_name.len(),
             maximum: source.limits.max_text_bytes(),
         });
     }
@@ -85,17 +92,32 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
     let main = source.package.get_part(&source.presentation_name)?;
     // Both old and new presentation payloads must fit the durable patch. This
     // lower-bound admission precedes XML scans and lexical output allocation.
-    if main.blob().len() > source.limits.max_patch_bytes() / 2 {
-        return Err(Error::EditLimit {
+    let main_patch_charge = main
+        .blob()
+        .len()
+        .checked_mul(2)
+        .ok_or_else(|| Error::Limit {
             kind: crate::opened::LimitKind::PatchBytes,
+            observed: usize::MAX,
+            maximum: source.limits.max_patch_bytes(),
+        })?;
+    if main_patch_charge > source.limits.max_patch_bytes() {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::PatchBytes,
+            observed: main_patch_charge,
             maximum: source.limits.max_patch_bytes(),
         });
     }
     super::copy_plan::reject_mce(main.blob(), "presentation owner").map_err(source_refusal)?;
     let main_text =
         std::str::from_utf8(main.blob()).map_err(|_| invalid("presentation XML is not UTF-8"))?;
-    if crate::presentation_properties::metadata::protection::Settings::parse_xml(main_text)?
-        .is_protected()
+    if crate::presentation_properties::metadata::protection::Settings::parse_xml(
+        main_text,
+        crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+            source.package.read_limits(),
+        ),
+    )?
+    .is_protected()
     {
         return Err(refuse(
             "the presentation has an active modify-password verifier",
@@ -111,9 +133,10 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
         ));
     }
     crate::master_layout::validate_master_layout_graph(&source.package)?;
-    let presentation = crate::Presentation::new(
+    let presentation = crate::Presentation::new_with_semantic_limits(
         crate::parts::PresentationPart::from_part(main)?,
         &source.package,
+        source.owner_state.semantic_limits.clone(),
     );
     let mut layout = None;
     let mut matches = 0;
@@ -179,8 +202,16 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
         &[],
         policy,
     )?;
-    let placeholders = super::new_slide::plan(source.package.get_part(&layout)?.blob())?;
-    let mut slide_xml = super::new_slide::slide_xml(id, &placeholders)?;
+    let shape_limits = source
+        .owner_state
+        .semantic_limits
+        .as_deref()
+        .copied()
+        .unwrap_or_default()
+        .shape();
+    let placeholders =
+        super::new_slide::plan(source.package.get_part(&layout)?.blob(), shape_limits)?;
+    let mut slide_xml = super::new_slide::slide_xml_with_limits(id, &placeholders, shape_limits)?;
     if strict {
         for (old, new) in [
             (
@@ -215,7 +246,7 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
     let mut order: Vec<u32> = source.slides.iter().map(|slide| slide.id).collect();
     order.insert(position, id);
     let xml = super::sections::place(&xml, &order, position)?.unwrap_or(xml);
-    super::new_slide::read_back(slide.blob(), &placeholders)?;
+    super::new_slide::read_back_with_limits(slide.blob(), &placeholders, shape_limits)?;
     let sizes = [
         main.blob().len(),
         xml.len(),
@@ -232,8 +263,9 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
         .ok_or_else(|| invalid("slide insertion byte accounting overflow"))?;
     if retained > maximum {
         return Err(Error::Limit {
-            resource: "slide insertion retained bytes",
-            limit: maximum,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::RetainedBytes),
+            observed: retained,
+            maximum,
         });
     }
     let next_types = types_plan.materialize(policy)?;
@@ -249,8 +281,12 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
     candidate
         .get_part_mut(&source.presentation_name)?
         .set_blob(xml);
-    let captured =
-        super::model::capture(&candidate, source.limits, source.physical_source_provenance)?;
+    let captured = super::model::capture_with_provenance_and_semantic_limits(
+        &candidate,
+        source.limits,
+        source.physical_source_provenance,
+        source.owner_state.semantic_limits.clone(),
+    )?;
     if captured
         .slides
         .get(position)
@@ -291,8 +327,9 @@ fn available_name(source: &Snapshot) -> Result<PackURI> {
             return Ok(());
         }
         if used.len() >= source.limits.max_parts() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: used.len().checked_add(1).unwrap_or(usize::MAX),
                 maximum: source.limits.max_parts(),
             });
         }

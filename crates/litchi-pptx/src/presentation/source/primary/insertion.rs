@@ -6,7 +6,7 @@
 //! This module performs the eager-compatible authoring and admission work
 //! without constructing an eager package or reopening a ZIP.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::mem::size_of;
 use std::sync::Arc;
 
@@ -26,6 +26,13 @@ use crate::{Error, Result};
 const MIN_SLIDE_ID: u32 = 256;
 const MAX_SLIDE_ID: u32 = 2_147_483_647;
 const INSERTION_WORKSPACE_BYTES: usize = 32 * 1024;
+
+#[derive(Clone)]
+struct EffectivePartDelta {
+    uri: PackURI,
+    before: bool,
+    after: bool,
+}
 
 /// Build the source-native insertion recipe for one logical position.
 pub(super) fn plan(
@@ -49,15 +56,17 @@ pub(super) fn plan(
     }
     if package.order.len() >= crate::parts::MAX_SLIDES {
         return Err(Error::Limit {
-            resource: "source-backed primary presentation slides",
-            limit: crate::parts::MAX_SLIDES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Slides),
+            observed: package.order.len().checked_add(1).unwrap_or(usize::MAX),
+            maximum: crate::parts::MAX_SLIDES,
         });
     }
     let selector_limit = crate::opened::Limits::default().max_text_bytes();
     if layout_name.len() > selector_limit {
         return Err(Error::Limit {
-            resource: "slide layout selector",
-            limit: selector_limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::NameBytes),
+            observed: layout_name.len(),
+            maximum: selector_limit,
         });
     }
 
@@ -81,26 +90,19 @@ pub(super) fn plan(
 
     let strict = strict_presentation(physical_root)?;
 
-    let source_parts = source.iter_parts().count();
-    let mut effective_parts = source_parts;
-    if let Some(revision) = &package.topology {
-        for change in revision.data.changes.iter() {
-            match (change.before.is_some(), change.after.is_some()) {
-                (false, true) => {
-                    effective_parts = effective_parts.checked_add(1).ok_or_else(|| {
-                        limit("source-backed primary insertion parts", usize::MAX)
-                    })?;
-                },
-                (true, false) => {
-                    effective_parts = effective_parts.checked_sub(1).ok_or(Error::PatchConflict)?;
-                },
-                _ => {},
-            }
-        }
-    }
+    // A structural revision can remove a slide and the exclusive dependent
+    // Parts it owns.  Count the final catalog with a bounded index over only
+    // those changed/dependent URIs; the physical source pass remains the
+    // existing metadata-only count and never copies every source name.
+    let effective_parts = effective_part_count(
+        source,
+        package.topology.as_deref(),
+        package.owner.limits.max_parts(),
+    )?;
     if effective_parts >= package.owner.limits.max_parts() {
-        return Err(Error::EditLimit {
-            kind: crate::opened::LimitKind::Parts,
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Parts),
+            observed: effective_parts.checked_add(1).unwrap_or(usize::MAX),
             maximum: package.owner.limits.max_parts(),
         });
     }
@@ -117,10 +119,12 @@ pub(super) fn plan(
 
     let part_uri = next_slide_part_name(package)?;
 
+    let shape_limits =
+        crate::open_options::selected(package.owner.semantic_limits.as_ref()).shape();
     let placeholders = {
         let layout_part = source.part(&layout)?;
         let data = layout_part.data()?;
-        crate::opened::plan_new_slide_placeholders(data.as_bytes())?
+        crate::opened::plan_new_slide_placeholders(data.as_bytes(), shape_limits)?
     };
     let (slide_xml, relationships_xml) = authored_slide(
         package.owner.limits,
@@ -129,8 +133,9 @@ pub(super) fn plan(
         slide_id,
         strict,
         &placeholders,
+        shape_limits,
     )?;
-    crate::opened::read_back_new_slide(&slide_xml, &placeholders)?;
+    crate::opened::read_back_new_slide(&slide_xml, &placeholders, shape_limits)?;
     crate::source_limits::validate_xml_limits(&slide_xml, package.owner.limits)?;
     crate::opened::validate_removal_slide_surface(&slide_xml).map_err(map_error)?;
     crate::source_limits::validate_xml_limits(&relationships_xml, package.owner.limits)?;
@@ -156,7 +161,8 @@ pub(super) fn plan(
     };
     if root.len() > package.owner.limits.max_part_bytes() as usize {
         return Err(limit(
-            "source-backed primary presentation output bytes",
+            crate::error::CodecLimitKind::OutputBytes,
+            root.len(),
             package.owner.limits.max_part_bytes() as usize,
         ));
     }
@@ -222,9 +228,102 @@ pub(super) fn plan(
             presentation_uri,
         )?)
         .and_then(|size| size.checked_add(identity_bytes))
-        .ok_or_else(|| limit("source-backed primary insertion reservation", usize::MAX))?;
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::MemoryBytes,
+                usize::MAX,
+                usize::MAX,
+            )
+        })?;
     let managed_reservation = super::topology::reserve_payload(package, envelope)?.map(Arc::new);
     Ok((Arc::new(root), order.into(), change, managed_reservation))
+}
+
+fn effective_part_count(
+    source: &litchi_opc::SourceBackedPackage,
+    revision: Option<&super::topology::Revision>,
+    maximum: usize,
+) -> Result<usize> {
+    let source_parts = source.iter_parts().count();
+    let Some(revision) = revision else {
+        return Ok(source_parts);
+    };
+    let entry_count = revision
+        .data
+        .changes
+        .len()
+        .checked_add(revision.data.dependents.len())
+        .ok_or_else(|| limit(crate::error::CodecLimitKind::Parts, usize::MAX, maximum))?;
+    let mut deltas: HashMap<String, EffectivePartDelta> = HashMap::new();
+    deltas.try_reserve(entry_count).map_err(allocation)?;
+
+    let mut add_delta = |uri: &PackURI, before: bool, after: bool| -> Result<()> {
+        if !before && !after {
+            return Ok(());
+        }
+        let key = uri.as_str().to_ascii_lowercase();
+        if let Some(delta) = deltas.get_mut(&key) {
+            // A duplicate URI across the two topology namespaces describes
+            // one final catalog Part.  Presence wins when one overlapping
+            // entry restores it; later topology validation still checks the
+            // corresponding images and owners.
+            delta.before |= before;
+            delta.after |= after;
+        } else {
+            deltas.insert(
+                key,
+                EffectivePartDelta {
+                    uri: uri.clone(),
+                    before,
+                    after,
+                },
+            );
+        }
+        Ok(())
+    };
+    for change in revision.data.changes.iter() {
+        add_delta(
+            &change.key.part_uri,
+            change.before.is_some(),
+            change.after.is_some(),
+        )?;
+    }
+    for dependent in revision.data.dependents.iter() {
+        add_delta(
+            &dependent.part_uri,
+            dependent.before.is_some(),
+            dependent.after.is_some(),
+        )?;
+    }
+
+    let mut additions = 0usize;
+    let mut removals = 0usize;
+    for delta in deltas.values() {
+        let physical = match source.part(&delta.uri) {
+            Ok(_) => true,
+            Err(litchi_opc::OpcError::PartNotFound(_)) => false,
+            Err(error) => return Err(Error::Opc(error)),
+        };
+        if delta.before && !physical {
+            // Keep the old checked-subtraction refusal observable instead of
+            // silently treating a stale dependent as an absent Part.
+            return Err(Error::PatchConflict);
+        }
+        if delta.after && !physical {
+            additions = additions
+                .checked_add(1)
+                .ok_or_else(|| limit(crate::error::CodecLimitKind::Parts, usize::MAX, maximum))?;
+        } else if !delta.after && physical {
+            removals = removals
+                .checked_add(1)
+                .ok_or_else(|| limit(crate::error::CodecLimitKind::Parts, usize::MAX, maximum))?;
+        }
+    }
+    source_parts
+        .checked_sub(removals)
+        .ok_or(Error::PatchConflict)?
+        .checked_add(additions)
+        .ok_or_else(|| limit(crate::error::CodecLimitKind::Parts, usize::MAX, maximum))
 }
 
 /// Map the shared source topology refusal vocabulary to the eager editor's
@@ -277,7 +376,13 @@ fn metadata_bytes(
         .as_bytes()
         .len()
         .checked_add(content_types.as_bytes().len())
-        .ok_or_else(|| limit("source-backed primary insertion reservation", usize::MAX))
+        .ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::MemoryBytes,
+                usize::MAX,
+                usize::MAX,
+            )
+        })
 }
 
 fn insertion_workspace_bound(
@@ -318,17 +423,25 @@ fn insertion_workspace_bound(
     // Hash tables reserve spare buckets and the XML scanners retain one event
     // at a time. Doubling the measured strings/entries covers those capacities
     // while the fixed workspace covers the crate::builder::Slide and root splice.
-    bytes = bytes
-        .checked_mul(2)
-        .ok_or_else(|| limit("source-backed primary insertion reservation", usize::MAX))?;
+    bytes = bytes.checked_mul(2).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::MemoryBytes,
+            usize::MAX,
+            usize::MAX,
+        )
+    })?;
     add_workspace_amount(&mut bytes, INSERTION_WORKSPACE_BYTES)?;
     Ok(bytes)
 }
 
 fn add_workspace_amount(total: &mut usize, amount: usize) -> Result<()> {
-    *total = total
-        .checked_add(amount)
-        .ok_or_else(|| limit("source-backed primary insertion reservation", usize::MAX))?;
+    *total = total.checked_add(amount).ok_or_else(|| {
+        limit(
+            crate::error::CodecLimitKind::MemoryBytes,
+            usize::MAX,
+            usize::MAX,
+        )
+    })?;
     Ok(())
 }
 
@@ -382,8 +495,9 @@ fn authored_slide(
     slide_id: u32,
     strict: bool,
     placeholders: &[crate::opened::NewSlidePlaceholder],
+    shape_limits: crate::shape::Limits,
 ) -> Result<(Vec<u8>, Vec<u8>)> {
-    let mut slide_xml = crate::opened::new_slide_xml(slide_id, placeholders)?;
+    let mut slide_xml = crate::opened::new_slide_xml(slide_id, placeholders, shape_limits)?;
     if strict {
         for (old, new) in [
             (

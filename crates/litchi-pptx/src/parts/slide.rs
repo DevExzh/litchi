@@ -6,14 +6,14 @@ use std::collections::HashSet;
 use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
 use litchi_ooxml_common::xml::{DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
-use litchi_opc::{OpcPackage, Part};
+use litchi_opc::{OpcPackage, Part, SourceLimits};
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::{NsReader, Reader};
 
 use super::{
-    MceCapture, invalid, processed_xml, processed_xml_with_capture, processed_xml_with_source,
-    related_part_by_type, validate_content_type,
+    MceCapture, invalid, processed_xml, processed_xml_with_source, raw_xml, related_part_by_type,
+    validate_content_type, validate_source_part_xml,
 };
 use crate::leniency::{MarkupDefect, ToleranceReport};
 use crate::notes::SlideRootProof;
@@ -490,8 +490,9 @@ fn append_layout_relationship_id(
 ) -> Result<()> {
     if relationship_ids.len() >= MAX_LAYOUT_REFERENCES {
         return Err(Error::Limit {
-            resource: "slide-master layout references",
-            limit: MAX_LAYOUT_REFERENCES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::References),
+            observed: relationship_ids.len().checked_add(1).unwrap_or(usize::MAX),
+            maximum: MAX_LAYOUT_REFERENCES,
         });
     }
     let native_id = parse_layout_native_id(element, reader.decoder())?;
@@ -595,14 +596,16 @@ impl SemanticTextXmlBudget {
         })?;
         if self.events > MAX_SEMANTIC_TEXT_EVENTS {
             return Err(Error::Limit {
-                resource: "semantic slide XML events",
-                limit: MAX_SEMANTIC_TEXT_EVENTS,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlEvents),
+                observed: self.events,
+                maximum: MAX_SEMANTIC_TEXT_EVENTS,
             });
         }
         if event_bytes > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide XML event bytes",
-                limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: event_bytes,
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
         }
         Ok(())
@@ -614,8 +617,9 @@ impl SemanticTextXmlBudget {
         })?;
         if self.depth > MAX_SEMANTIC_TEXT_DEPTH {
             return Err(Error::Limit {
-                resource: "semantic slide XML depth",
-                limit: MAX_SEMANTIC_TEXT_DEPTH,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: self.depth,
+                maximum: MAX_SEMANTIC_TEXT_DEPTH,
             });
         }
         Ok(())
@@ -663,8 +667,11 @@ fn validate_semantic_attributes(element: &quick_xml::events::BytesStart<'_>) -> 
             .ok_or_else(|| Error::Invalid("semantic slide XML attribute length overflow".into()))?;
         if total > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide XML attribute bytes",
-                limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: total,
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
         }
         let value = attribute
@@ -833,8 +840,11 @@ impl RawTextScan {
                 validate_xml_characters(&decoded)?;
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide decoded text event bytes",
-                        limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                     });
                 }
                 if self.budget.depth == 0 && !decoded.as_bytes().iter().all(u8::is_ascii_whitespace)
@@ -852,8 +862,11 @@ impl RawTextScan {
                 validate_xml_characters(&decoded)?;
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide decoded text event bytes",
-                        limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                     });
                 }
             },
@@ -869,8 +882,11 @@ impl RawTextScan {
                 }
                 if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide XML reference bytes",
-                        limit: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::ReferenceBytes,
+                        ),
+                        observed: reference.as_ref().len(),
+                        maximum: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
                     });
                 }
             },
@@ -891,8 +907,9 @@ impl RawTextScan {
 fn check_semantic_text_raw_len(xml: &[u8]) -> Result<()> {
     if xml.len() > MAX_SEMANTIC_TEXT_RAW_XML_BYTES {
         return Err(Error::Limit {
-            resource: "semantic slide raw XML bytes",
-            limit: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
         });
     }
     Ok(())
@@ -1027,12 +1044,22 @@ impl<'a> SemanticTextParser<'a> {
 }
 
 impl<'a> SemanticTextParser<'a> {
-    fn increment(value: &mut usize, limit: usize, resource: &'static str) -> Result<()> {
-        *value = value
-            .checked_add(1)
-            .ok_or_else(|| Error::Invalid(format!("{resource} counter overflow")))?;
+    fn increment(
+        value: &mut usize,
+        limit: usize,
+        kind: crate::error::CodecLimitKind,
+    ) -> Result<()> {
+        *value = value.checked_add(1).ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(kind),
+            observed: usize::MAX,
+            maximum: limit,
+        })?;
         if *value > limit {
-            return Err(Error::Limit { resource, limit });
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(kind),
+                observed: *value,
+                maximum: limit,
+            });
         }
         Ok(())
     }
@@ -1043,8 +1070,9 @@ impl<'a> SemanticTextParser<'a> {
         })?;
         if observed > MAX_SEMANTIC_TEXT_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide decoded text bytes",
-                limit: MAX_SEMANTIC_TEXT_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed,
+                maximum: MAX_SEMANTIC_TEXT_BYTES,
             });
         }
         self.output
@@ -1100,7 +1128,7 @@ impl<'a> SemanticTextParser<'a> {
             Self::increment(
                 &mut self.objects,
                 MAX_SEMANTIC_TEXT_OBJECTS,
-                "semantic slide text objects",
+                crate::error::CodecLimitKind::TextObjects,
             )?;
             self.active_text_depth = Some(self.budget.depth);
             self.text_has_payload = false;
@@ -1108,7 +1136,7 @@ impl<'a> SemanticTextParser<'a> {
             Self::increment(
                 &mut self.runs,
                 MAX_SEMANTIC_TEXT_RUNS,
-                "semantic slide text runs",
+                crate::error::CodecLimitKind::TextRuns,
             )?;
         }
         Ok(())
@@ -1134,7 +1162,7 @@ impl<'a> SemanticTextParser<'a> {
             Self::increment(
                 &mut self.objects,
                 MAX_SEMANTIC_TEXT_OBJECTS,
-                "semantic slide text objects",
+                crate::error::CodecLimitKind::TextObjects,
             )?;
             if !self.output.is_empty() {
                 self.append_output(self.paragraph_separator)?;
@@ -1143,7 +1171,7 @@ impl<'a> SemanticTextParser<'a> {
             Self::increment(
                 &mut self.runs,
                 MAX_SEMANTIC_TEXT_RUNS,
-                "semantic slide text runs",
+                crate::error::CodecLimitKind::TextRuns,
             )?;
         }
         Ok(())
@@ -1195,8 +1223,9 @@ impl<'a> SemanticTextParser<'a> {
         validate_xml_characters(&decoded)?;
         if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide decoded text event bytes",
-                limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: decoded.len(),
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
         }
         self.append_text_fragment(&decoded)
@@ -1209,8 +1238,9 @@ impl<'a> SemanticTextParser<'a> {
         validate_xml_characters(&decoded)?;
         if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide decoded text event bytes",
-                limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: decoded.len(),
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
         }
         self.append_text_fragment(&decoded)
@@ -1219,8 +1249,11 @@ impl<'a> SemanticTextParser<'a> {
     fn reference_event(&mut self, reference: &quick_xml::events::BytesRef<'_>) -> Result<()> {
         if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide XML reference bytes",
-                limit: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ReferenceBytes,
+                ),
+                observed: reference.as_ref().len(),
+                maximum: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
             });
         }
         let decoded = litchi_ooxml_common::xml::decode_xml_reference(reference)
@@ -1228,8 +1261,11 @@ impl<'a> SemanticTextParser<'a> {
         validate_xml_characters(&decoded)?;
         if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide decoded reference bytes",
-                limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ReferenceBytes,
+                ),
+                observed: decoded.len(),
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
             });
         }
         self.append_text_fragment(&decoded)
@@ -1314,8 +1350,11 @@ impl<'a> SemanticTextParser<'a> {
                 validate_xml_characters(&decoded)?;
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide decoded text event bytes",
-                        limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                     });
                 }
                 if !decoded.as_bytes().iter().all(u8::is_ascii_whitespace) {
@@ -1329,8 +1368,11 @@ impl<'a> SemanticTextParser<'a> {
                 validate_xml_characters(&decoded)?;
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide decoded text event bytes",
-                        limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                     });
                 }
             },
@@ -1351,16 +1393,22 @@ impl<'a> SemanticTextParser<'a> {
                 validate_xml_characters(&decoded)?;
                 if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide decoded text event bytes",
-                        limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                     });
                 }
             },
             Event::GeneralRef(reference) => {
                 if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
                     return Err(Error::Limit {
-                        resource: "semantic slide XML reference bytes",
-                        limit: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::ReferenceBytes,
+                        ),
+                        observed: reference.as_ref().len(),
+                        maximum: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
                     });
                 }
                 let decoded = litchi_ooxml_common::xml::decode_xml_reference(&reference)
@@ -1447,8 +1495,9 @@ fn semantic_text_and_repairs(
     let processed = processed?;
     if processed.xml.len() > MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES {
         return Err(Error::Limit {
-            resource: "semantic slide processed XML bytes",
-            limit: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: processed.xml.len(),
+            maximum: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
         });
     }
     parse_semantic_text(processed.xml.as_ref(), paragraph_separator)
@@ -1593,24 +1642,36 @@ impl<'a> SlidePart<'a> {
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         validate_content_type(part, ct::PML_SLIDE)?;
         let xml = processed_xml_with_source(part)?;
-        Self::finish_from_processed(part, collect_notes_proof, xml, None)
+        Self::finish_from_processed(part, collect_notes_proof, xml, None, false)
     }
 
     /// Capture variant that may reuse a default-profile transformed slide
     /// projection already retained by the opened snapshot, and a notes-root
     /// classification an earlier capture proved for the same payload
-    /// allocation. Every source, root, name, and MCE limit check still runs
-    /// for this call; only the complete notes-root scan of a payload whose
-    /// classification is already proved is not repeated.
+    /// allocation. Source, name, and MCE checks still run for this call; an
+    /// exact notes-root proof may answer the root classification without
+    /// repeating its complete bounded scan.
     pub(crate) fn from_part_with_name_with_capture<'parent>(
         part: &'a dyn Part,
         collect_notes_proof: bool,
         capture: &mut MceCapture<'a, 'parent>,
         proved_roots: Option<&crate::notes::SlideRootMemo>,
+        source_limits: SourceLimits,
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         validate_content_type(part, ct::PML_SLIDE)?;
-        let xml = processed_xml_with_capture(part, capture)?;
-        Self::finish_from_processed(part, collect_notes_proof, xml, proved_roots)
+        let source = raw_xml(part)?;
+        // A memo hit was admitted from this package's source profile during
+        // the preceding capture. Reusing it avoids a second physical XML
+        // scan; misses and the first capture must still honor the selected
+        // source event, depth, attribute, and part-byte limits before MCE.
+        let memo_hit = proved_roots.and_then(|memo| memo.lookup(source)).is_some();
+        if !memo_hit {
+            validate_source_part_xml(source, source_limits)?;
+        }
+        let source_checked = true;
+        let processed = capture.process(source)?;
+        let xml = super::ProcessedXml { source, processed };
+        Self::finish_from_processed(part, collect_notes_proof, xml, proved_roots, source_checked)
     }
 
     fn finish_from_processed(
@@ -1618,6 +1679,7 @@ impl<'a> SlidePart<'a> {
         collect_notes_proof: bool,
         xml: super::ProcessedXml<'a>,
         proved_roots: Option<&crate::notes::SlideRootMemo>,
+        source_checked: bool,
     ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
         if root_name_from_xml(xml.processed.as_ref())? != "sld" {
             return Err(invalid("slide part does not have a p:sld root"));
@@ -1656,7 +1718,11 @@ impl<'a> SlidePart<'a> {
                     },
                     None => scan()?,
                 };
-                Ok(SlideRootProof::new(xml.source, conformance))
+                Ok(SlideRootProof::with_source_checked(
+                    xml.source,
+                    conformance,
+                    source_checked,
+                ))
             })
             .transpose()?;
         drop(xml);
@@ -1741,7 +1807,12 @@ impl<'a> SlidePart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
+        self.shapes_with_limits(crate::shape::Limits::DEFAULT)
+    }
+
+    /// Build the borrowed scene under an explicit semantic shape policy.
+    pub(crate) fn shapes_with_limits(&self, limits: crate::shape::Limits) -> Result<Scene<'a>> {
+        Ok(Scene::read(self.part.blob(), limits)?.locate_in_part(self.part.partname().as_str()))
     }
 
     /// Resolve ordinary `DrawingML` chart parts related to this slide.
@@ -1882,7 +1953,12 @@ impl<'a> SlideLayoutPart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
+        self.shapes_with_limits(crate::shape::Limits::DEFAULT)
+    }
+
+    /// Build the borrowed scene under an explicit semantic shape policy.
+    pub(crate) fn shapes_with_limits(&self, limits: crate::shape::Limits) -> Result<Scene<'a>> {
+        Ok(Scene::read(self.part.blob(), limits)?.locate_in_part(self.part.partname().as_str()))
     }
 
     /// Read the optional theme override attached to this layout.
@@ -1976,7 +2052,12 @@ impl<'a> SlideMasterPart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
+        self.shapes_with_limits(crate::shape::Limits::DEFAULT)
+    }
+
+    /// Build the borrowed scene under an explicit semantic shape policy.
+    pub(crate) fn shapes_with_limits(&self, limits: crate::shape::Limits) -> Result<Scene<'a>> {
+        Ok(Scene::read(self.part.blob(), limits)?.locate_in_part(self.part.partname().as_str()))
     }
 
     /// Read the theme reached from this slide master.
@@ -2062,8 +2143,9 @@ mod tests {
     fn oracle_scan_raw_semantic_text_xml(xml: &[u8]) -> Result<()> {
         if xml.len() > MAX_SEMANTIC_TEXT_RAW_XML_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide raw XML bytes",
-                limit: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: xml.len(),
+                maximum: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
             });
         }
 
@@ -2136,8 +2218,11 @@ mod tests {
                     validate_xml_characters(&decoded)?;
                     if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                         return Err(Error::Limit {
-                            resource: "semantic slide decoded text event bytes",
-                            limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::TextBytes,
+                            ),
+                            observed: decoded.len(),
+                            maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                         });
                     }
                     if budget.depth == 0 && !decoded.as_bytes().iter().all(u8::is_ascii_whitespace)
@@ -2155,8 +2240,11 @@ mod tests {
                     validate_xml_characters(&decoded)?;
                     if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
                         return Err(Error::Limit {
-                            resource: "semantic slide decoded text event bytes",
-                            limit: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::TextBytes,
+                            ),
+                            observed: decoded.len(),
+                            maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
                         });
                     }
                 },
@@ -2172,8 +2260,11 @@ mod tests {
                     }
                     if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
                         return Err(Error::Limit {
-                            resource: "semantic slide XML reference bytes",
-                            limit: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::ReferenceBytes,
+                            ),
+                            observed: reference.as_ref().len(),
+                            maximum: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
                         });
                     }
                 },
@@ -2203,8 +2294,9 @@ mod tests {
         )?;
         if processed.xml.len() > MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES {
             return Err(Error::Limit {
-                resource: "semantic slide processed XML bytes",
-                limit: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: processed.xml.len(),
+                maximum: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
             });
         }
 
@@ -2359,7 +2451,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::Limit {
-                resource: "semantic slide decoded text bytes",
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
                 ..
             }
         ));

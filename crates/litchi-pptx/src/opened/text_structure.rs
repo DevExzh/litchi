@@ -111,8 +111,9 @@ fn validate(change: &Change<'_>, max_text_bytes: usize) -> Result<()> {
     let text = properties.text.unwrap_or("");
     if text.len() > max_text_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation text structure bytes",
-            limit: max_text_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+            observed: text.len(),
+            maximum: max_text_bytes,
         });
     }
     if run && text.contains(['\n', '\r']) {
@@ -324,18 +325,17 @@ fn insert_run(
     splices.apply(paragraph)
 }
 
-/// Apply `change` to the text body `body` of the part `xml` (a slide or a
-/// notes page), returning the candidate part.
-pub(crate) fn stage_text_structure(
+pub(crate) fn stage_text_structure_with_limits(
     xml: &[u8],
     body: TextBody,
     change: &Change<'_>,
     max_text_bytes: usize,
     max_output_bytes: usize,
+    shape_limits: crate::shape::Limits,
 ) -> Result<Vec<u8>> {
     let operation = operation(change);
     validate(change, max_text_bytes)?;
-    let original = crate::shape::Scene::read(xml)?;
+    let original = crate::shape::Scene::read(xml, shape_limits)?;
     if original.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -397,8 +397,9 @@ pub(crate) fn stage_text_structure(
     let length = xml.len() - span.len() + replacement.len();
     if length > max_output_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation text structure output bytes",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+            observed: length,
+            maximum: max_output_bytes,
         });
     }
     let mut candidate = Vec::new();
@@ -411,7 +412,7 @@ pub(crate) fn stage_text_structure(
     candidate.extend_from_slice(&xml[..span.start]);
     candidate.extend_from_slice(&replacement);
     candidate.extend_from_slice(&xml[span.end..]);
-    let published = crate::shape::Scene::read(&candidate)?;
+    let published = crate::shape::Scene::read(&candidate, shape_limits)?;
     if published.is_rewritten() || published.len() != original.len() {
         return Err(Error::Invalid(
             "opened-presentation text structure edit changed the semantic shape graph".into(),

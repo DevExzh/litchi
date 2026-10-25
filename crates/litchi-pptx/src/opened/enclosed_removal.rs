@@ -28,9 +28,9 @@ use quick_xml::reader::NsReader;
 
 use super::xml::{
     MAX_XML_DEPTH, is_presentation_namespace, position, shape_removal_plan_in, span_bytes,
-    stage_shape_removal, validate_shape_removal_dependencies,
+    stage_shape_removal_with_limits, validate_shape_removal_dependencies,
 };
-use crate::presentation::transition::{SlideMce, admit_source, enclosed_edit_refusal};
+use crate::presentation::transition::{SlideMce, admit_source_with_limits, enclosed_edit_refusal};
 use crate::{Error, Result};
 
 /// The source spans of the shape children of `p:sld/p:cSld/p:spTree`, in
@@ -58,8 +58,11 @@ fn shape_tree_children(xml: &[u8]) -> Result<Vec<Range<usize>>> {
                 depth += 1;
                 if depth > MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "slide shape-tree XML depth",
-                        limit: MAX_XML_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: depth,
+                        maximum: MAX_XML_DEPTH,
                     });
                 }
                 let local = element.local_name();
@@ -133,17 +136,15 @@ fn refusal(reason: &'static str) -> Error {
     )
 }
 
-/// Remove one top-level shape from a slide whose markup compatibility is
-/// enclosed in shape-tree children, splicing the source bytes. A slide that
-/// processing leaves unchanged takes the ordinary path.
-pub(crate) fn stage_enclosed_shape_removal(
+pub(crate) fn stage_enclosed_shape_removal_with_limits(
     xml: &[u8],
     key: crate::shape::Key<'_>,
     max_output_bytes: usize,
+    shape_limits: crate::shape::Limits,
 ) -> Result<(Option<Vec<u8>>, usize)> {
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, shape_limits)?;
     if !scene.is_rewritten() {
-        return stage_shape_removal(xml, key, max_output_bytes);
+        return stage_shape_removal_with_limits(xml, key, max_output_bytes, shape_limits);
     }
     let processed = scene.owner_xml();
     let (processed_span, removed, shape_count) = shape_removal_plan_in(&scene, processed, key)?;
@@ -170,15 +171,16 @@ pub(crate) fn stage_enclosed_shape_removal(
     let span = children[index].clone();
     if xml.len() - span.len() > max_output_bytes {
         return Err(Error::Limit {
-            resource: "opened-presentation removed shape XML",
-            limit: max_output_bytes,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len() - span.len(),
+            maximum: max_output_bytes,
         });
     }
     let candidate = without(xml, std::slice::from_ref(&span))?;
     validate_shape_removal_dependencies(&candidate, &removed)?;
     // The deleted source child must carry exactly the removed shapes: the
     // candidate's shapes are the source's shapes without them, in order.
-    let published = crate::shape::Scene::read(&candidate)?;
+    let published = crate::shape::Scene::read(&candidate, shape_limits)?;
     let mut retained = scene
         .iter()
         .filter(|shape| shape.id().is_none_or(|id| !removed.contains(&id)));
@@ -220,16 +222,15 @@ fn identities(scene: &crate::shape::Scene<'_>) -> Result<BTreeSet<u32>> {
 ///
 /// # Errors
 ///
-/// Refuses a pair that holds markup compatibility outside shape-tree
-/// children, or one that differs in any other way, with the guard's typed
-/// refusal.
-pub(crate) fn validate_enclosed_removal_pair(
+pub(crate) fn validate_enclosed_removal_pair_with_limits(
     before: &[u8],
     after: &[u8],
     operation: &'static str,
+    shape_limits: crate::shape::Limits,
+    transition_limits: crate::transition::Limits,
 ) -> Result<bool> {
-    let before_mce = admit_source(before, operation)?;
-    let after_mce = admit_source(after, operation)?;
+    let before_mce = admit_source_with_limits(before, operation, shape_limits, transition_limits)?;
+    let after_mce = admit_source_with_limits(after, operation, shape_limits, transition_limits)?;
     if before_mce == SlideMce::Plain && after_mce == SlideMce::Plain {
         return Ok(false);
     }
@@ -256,8 +257,8 @@ pub(crate) fn validate_enclosed_removal_pair(
     if retained.next().is_some() || removed.is_empty() || without(larger, &removed)? != smaller {
         return Err(enclosed_edit_refusal(operation));
     }
-    let larger_ids = identities(&crate::shape::Scene::read(larger)?)?;
-    let smaller_ids = identities(&crate::shape::Scene::read(smaller)?)?;
+    let larger_ids = identities(&crate::shape::Scene::read(larger, shape_limits)?)?;
+    let smaller_ids = identities(&crate::shape::Scene::read(smaller, shape_limits)?)?;
     let gone: BTreeSet<u32> = larger_ids.difference(&smaller_ids).copied().collect();
     if gone.is_empty() || !smaller_ids.is_subset(&larger_ids) {
         return Err(enclosed_edit_refusal(operation));

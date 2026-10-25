@@ -312,8 +312,11 @@ impl Builder {
             }
             if self.pending.len() >= self.max_edges {
                 return Err(Error::Limit {
-                    resource: "slide-removal owned-part relationships",
-                    limit: self.max_edges,
+                    kind: crate::opened::LimitKind::Codec(
+                        crate::opened::CodecLimitKind::Relationships,
+                    ),
+                    observed: self.pending.len().checked_add(1).unwrap_or(usize::MAX),
+                    maximum: self.max_edges,
                 });
             }
             let target = relationship.target_partname()?;

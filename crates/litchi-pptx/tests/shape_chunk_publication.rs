@@ -666,9 +666,14 @@ fn one_oversized_chunk_keeps_the_historical_256_cap() {
     assert!(matches!(
         edit.set_shape_text_chunks(0_usize, &[&replacements]),
         Err(Error::Limit {
-            limit: MAX_SHAPE_TEXT_REPLACEMENTS,
+            kind: litchi_pptx::opened::LimitKind::Codec(
+                litchi_pptx::opened::CodecLimitKind::TextReplacements,
+            ),
+            observed,
+            maximum,
             ..
-        })
+        }) if observed == MAX_SHAPE_TEXT_REPLACEMENTS + 1
+            && maximum == MAX_SHAPE_TEXT_REPLACEMENTS
     ));
     assert_eq!(
         edit.commit().unwrap().into_package().to_bytes().unwrap(),
@@ -680,9 +685,14 @@ fn one_oversized_chunk_keeps_the_historical_256_cap() {
     assert!(matches!(
         edit.set_shape_property_chunks(0_usize, &[&properties]),
         Err(Error::Limit {
-            limit: MAX_SHAPE_PROPERTIES_REPLACEMENTS,
+            kind: litchi_pptx::opened::LimitKind::Codec(
+                litchi_pptx::opened::CodecLimitKind::ShapeProperties,
+            ),
+            observed,
+            maximum,
             ..
-        })
+        }) if observed == MAX_SHAPE_PROPERTIES_REPLACEMENTS + 1
+            && maximum == MAX_SHAPE_PROPERTIES_REPLACEMENTS
     ));
     assert_eq!(
         edit.commit().unwrap().into_package().to_bytes().unwrap(),

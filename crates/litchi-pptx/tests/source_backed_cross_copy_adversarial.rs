@@ -307,9 +307,12 @@ fn cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publicati
     assert!(matches!(
         error,
         Error::Limit {
-            resource: "cross-slide serialized archive bytes",
-            limit,
-        } if limit == one_short
+            kind: litchi_pptx::opened::LimitKind::Codec(
+                litchi_pptx::opened::CodecLimitKind::ArchiveBytes,
+            ),
+            maximum,
+            ..
+        } if maximum == one_short
     ));
     assert_eq!(
         serialized(&mut short_destination)?,

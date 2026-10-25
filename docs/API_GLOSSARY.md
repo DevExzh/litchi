@@ -291,8 +291,8 @@ audit deferral.
 | Raw CFB signature editor | `litchi_sign::cfb::Editor::open(bytes, format, Limits)` | `Editor::with_limits`; default `Editor::open(bytes, format)` | ✅ one raw constructor with caller-selected limits; no limit-less twin (0362za1) |
 | Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ keynote (0298) `SourceLimits::builder()`/`SemanticLimits::builder()`; ✅ OPC, DOC (0192), XLS (0196) and PPT (0210) · ✅ pages `SourceLimits::builder()`/`SemanticLimits::builder()` (0299) · ✅ Numbers `SourceLimits::builder()`, `SemanticLimits::builder()` (0297) |
 | Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ keynote (0298) `Error::InvalidLimit { kind: LimitKind, value, maximum }`; ✅ OPC `InvalidLimit` with contextual maximum (0036); DOC (0192), XLS (0196), PPT (0210); pages `PackageError::InvalidLimit` (0299); ✅ Numbers `limits::Error::InvalidLimit { kind: LimitKind, .. }` (`SemanticLimitsError`, `DocumentSourceLimitsError`, `DocumentLimitsError` deleted, 0297); other owners pending |
-| Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036), DOC (0192), XLS (0196), PPT (0210) kind/observed/maximum; ✅ XLSB cell-values transaction bounds (`PackageError::Limit`, 0261); broader taxonomy pending |
-| Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ keynote (0298) `SourceLimitKind`/`SemanticLimitKind` with `as_str()` nouns and `LimitKind::{Source, Semantic}`; ✅ OPC/OOXML (0036), DOC (0192), XLS (0196), PPT (0210) `SourceLimitKind`; ✅ XLSB `cell_values::LimitKind` (0261); other semantic kinds pending |
+| Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036), DOC (0192), XLS (0196), PPT (0210) kind/observed/maximum; ✅ PPTX root/codec dimensions (0362ul84); ✅ XLSB cell-values transaction bounds (`PackageError::Limit`, 0261); broader taxonomy pending |
+| Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ keynote (0298) `SourceLimitKind`/`SemanticLimitKind` with `as_str()` nouns and `LimitKind::{Source, Semantic}`; ✅ OPC/OOXML (0036), DOC (0192), XLS (0196), PPT (0210) `SourceLimitKind`; ✅ PPTX root/codec dimensions (0362ul84); ✅ XLSB `cell_values::LimitKind` (0261); other semantic kinds pending |
 | Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | ✅ OPC common nouns (0037); shared defaults remain 512 MiB input and XML depth 256; other families pending |
 | Coverage policy | caller-selected limits on **every** public ingress path | — | ✅ PPT package/record ingress (0210), XLS eager ingress (0196); ✅ ODT/ODS/ODP `Package`, source-backed and catalog ingress via `OpenOptions` with typed `Error::{Limit, InvalidLimit}` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Package` ingress, `from_prepared_package` included (0282); ✅ ODF flat owners `flat::{Document, Workbook, Presentation, Drawing, Chart, Image}` and `generic::flat::Document` take `OpenOptions`; the ODC chart `Limits` fold into `SemanticLimits` (0358) |
 
@@ -1996,9 +1996,10 @@ See [record 0252](unified-ops/0252-pptx-w2-residue-and-p0-writes.md).
 `litchi_pptx::opened` now exports the complete family
 `{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` and is registered in
 both PPTX glossary profiles. `opened::Error` is the crate `Error` re-exported
-(a focused split of the PPTX god-enum is deferred); the family's own resource
-refusals use the typed `Error::EditLimit { kind: opened::LimitKind, maximum }`
-instead of a resource string, and `Limits::maximum(LimitKind)` reads one bound.
+(a focused split of the PPTX god-enum is deferred). The crate-wide typed
+boundary uses `Error::Limit { kind, observed, maximum }` and
+`Error::InvalidLimit { kind, value, maximum }`; `opened::LimitKind` and
+`opened::CodecLimitKind` re-export the canonical dimensions (0362ul84).
 
 Rich formatting of existing text bodies uses one verb on every primary edit:
 `opened::Edit::set_text_properties(slide, &[TextEdit])`,
@@ -3381,3 +3382,83 @@ projection owners retain their immutable API. All examples, tests, facade
 consumers and performance harness imports were migrated in the same change.
 
 See [0362zab](unified-ops/0362zab-spreadsheet-chart-builder.md).
+
+## PPTX raw property and model3d limits (record 0362ul63)
+
+PPTX view-properties and presentation-properties codecs expose one explicit
+limits policy for every raw parse, tolerant/strict parse and XML write. Package
+and source-backed owners derive that policy from their retained `SourceLimits`;
+detached callers select the module-local `Limits` directly. Unknown XML and MCE
+tolerance remain preserved, while input, output, depth, node, string, semantic
+item and opaque-fragment budgets are checked before retention. Model3d reads,
+writes, validation and edits retain the same owner-derived policy for XML,
+relationships, links and embedded model/preview payloads.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::view_properties::ViewProperties::{parse, parse_with_tolerance, parse_strict, to_xml}`; `view_properties::{load_from_package, load_from_package_with_tolerance}` | adopted (0362ul63); every raw codec and package loader takes the required `view_properties::Limits` |
+| `litchi_pptx::presentation_properties::Properties::{parse, parse_with_tolerance, parse_strict, to_xml}`; `presentation_properties::{load_from_package, load_from_package_with_tolerance}` | adopted (0362ul63); strict/tolerant paths share the selected `presentation_properties::Limits` |
+| `litchi_pptx::presentation_properties::read_only_recommended::Snapshot::{from_xml, from_xml_owned}` | adopted (0362ul63); detached source snapshots require the presentation-properties limits policy |
+| `litchi_pptx::model3d::codec::{read, write}`; `model3d::validation::validate` | adopted (0362ul63); model3d package, selected-shape and edit consumers propagate the retained owner policy, including payload and relationship ceilings |
+
+See [0362ul63](unified-ops/0362ul63-pptx-raw-properties.md).
+
+## PPTX structural metadata policies (record 0362ul81)
+
+The eight PresentationML structural metadata families share one required
+`presentation_properties::metadata::Limits` policy.  Package owners derive
+that policy from their retained `SourceLimits`; detached and raw operations
+receive it explicitly.  Changed replay validates the candidate payload under
+the recipient's policy, while an equal-content no-op keeps the recipient
+profile and exact bytes without a second semantic rewrite.
+
+| API | Status / contract |
+|---|---|
+| `litchi_pptx::presentation_properties::metadata::Limits` and its re-exports from `custom_show`, `guides`, `sections`, `structure`, `color_map`, `handout`, `template` and `protection` | adopted (0362ul81); one checked policy carries input/output bytes, tree/nodes, strings, extensions, family counts, references, attributes and relationships |
+| `custom_show::List::{parse_xml, to_xml, to_xml_with_rel_map}` | adopted (0362ul81); required metadata limits, bounded MCE selection, relationship-aware output and no fixed codec ceilings |
+| `guides::Guides::{from_xml, to_xml}`, `sections::{List, Section}::{from_xml, to_xml}` | adopted (0362ul81); required limits through DOM, extension, reference and writer paths, with opaque extension bytes retained |
+| `structure::{load, load_snapshot}` and `structure::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0362ul81); package-aware graph edits use the shared triad, derive owner policy, and replay against equal content rather than patch lineage |
+| `color_map::{parse_master, parse_override}` and `color_map::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0362ul81); master/layout/slide sources retain their exact owner bytes and apply changed payloads under recipient limits |
+| `handout::Master::{parse_xml, to_xml}`, `protection::Settings::{parse_xml, to_xml, to_pres_props_xml}`, `template::pres_props_xml_with_handout` | adopted (0362ul81); required limits cover input, output, attributes, strings, nodes and password verifier fields; detached handout/protection writers retain canonical typed-model semantics, while static template constants remain format-invariant |
+| `custom_show`, `guides`, `structure` and `color_map` replay | adopted (0362ul81); no-op patches preserve exact recipient content and policy, changed patches perform bounded recipient validation, and no public `_with_limits`/default twins remain; `Snapshot::read`, projection aliases and draft `snapshot` wrappers (including `color_map::Draft::snapshot`) are banned in these scopes |
+
+See [0362ul81](unified-ops/0362ul81-pptx-metadata-structural.md).
+
+## PPTX metadata history limits (record 0362ul82)
+
+The Changes Information, Revision Information, slide-synchronization,
+caption-track and slide-show-event codecs now take their module-local typed
+`Limits` at every raw parse, read, write and package-load boundary. Owners
+retain the selected profiles from `OpenOptions`; edits accept them through
+`EditOptions`, snapshots and patches retain them, projections use the same
+profile, and replay admits changed payloads under the recipient profile.
+Format constraints such as the slide-synchronization date lexical rules and
+the inert treatment of extension/MCE payloads remain unchanged. No default
+only twin, alias or `_with_limits` entry point was added.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::presentation_properties::metadata::{changes,revision}::{Info::{parse,to_xml},load}` | adopted (0362ul82); explicit typed limits at raw XML and package boundaries |
+| `litchi_pptx::presentation_properties::metadata::slide_sync::{Properties::{parse,to_xml},load}` | adopted (0362ul82); selected profile retains the existing date/year constraints |
+| `litchi_pptx::presentation_properties::metadata::tracks::{File::{parse,to_bytes},load,load_media}` | adopted (0362ul82); WebVTT and slide metadata bounds share the retained profile |
+| `litchi_pptx::presentation_properties::metadata::events::{load,load_snapshot}` | adopted (0362ul82); slide XML event admission remains inert and opaque outside the typed island |
+| `OpenOptions::{changes_limits,revision_limits,slide_sync_limits,tracks_limits,events_limits}` and each family's `EditOptions::limits` | adopted (0362ul82); profiles survive owners, projections, edits, snapshots, patches and replay |
+
+See [0362ul82](unified-ops/0362ul82-pptx-metadata-history.md).
+
+## PPTX metadata history bounded admission (record 0362ul82a)
+
+The 82a correction applies the selected semantic profile before MCE
+expansion, keeps modern-comment Changes operations on the retained owner
+profile, and performs checked, fallible event-fragment and slide-splice
+allocation. Escaped slide-synchronization identifiers are counted before
+output admission. These are corrections to the 82 contracts, not aliases or
+additional default entry points.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::modern_comments::{load_modern_comment_changes, Edit::{changes, update_changes}}` | adopted (0362ul82a); selected Changes limits are intersected with physical source limits and used for reads and writes |
+| `litchi_pptx::presentation_properties::metadata::{changes,revision,slide_sync}::Limits` | adopted (0362ul82a); bounded MCE admission uses the selected profile before expansion |
+| `litchi_pptx::presentation_properties::metadata::events::store` and slide extension splice | adopted (0362ul82a); checked exact sizing and fallible reservation use the selected output ceiling |
+
+See [0362ul82a](unified-ops/0362ul82a-pptx-metadata-history-admission.md).

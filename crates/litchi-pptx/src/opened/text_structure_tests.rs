@@ -42,7 +42,7 @@ const SHAPE: TextBody = TextBody::Shape {
 };
 
 fn text(xml: &[u8], shape: usize) -> Result<String> {
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     Ok(scene.at(shape)?.text().unwrap_or_default().to_owned())
 }
 
@@ -62,7 +62,7 @@ fn only_inserted(before: &[u8], after: &[u8], inserted: &str) -> bool {
 
 /// The paragraph texts of a table cell's body.
 fn cell_paragraphs(xml: &[u8], row: usize, column: usize) -> Result<Vec<String>> {
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     let frame = scene.at(1)?.xml()?.to_vec();
     let table = crate::table::Table::from_graphic_frame(&frame)?;
     let body = table

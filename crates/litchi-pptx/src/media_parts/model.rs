@@ -1,5 +1,5 @@
 use super::{
-    Arc, Coordinate, DML, Error, Extent, Offset, PML, REL, Result, STRICT_AUDIO_REL, STRICT_DML,
+    Arc, Coordinate, DML, Extent, Offset, PML, REL, Result, STRICT_AUDIO_REL, STRICT_DML,
     STRICT_PML, STRICT_REL, STRICT_VIDEO_REL, coordinate_error, rt,
 };
 
@@ -278,14 +278,6 @@ pub struct ExtensionList {
 impl AsRef<str> for ExtensionList {
     fn as_ref(&self) -> &str {
         self.as_str()
-    }
-}
-
-impl TryFrom<&str> for ExtensionList {
-    type Error = Error;
-
-    fn try_from(value: &str) -> Result<Self> {
-        Self::parse(value.as_bytes())
     }
 }
 

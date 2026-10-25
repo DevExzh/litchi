@@ -989,7 +989,7 @@ fn append_run(
     if targets.len() >= maximum {
         return Err(TransactionError::Limit {
             kind: LimitKind::ExpandedTargets,
-            observed: targets.len().saturating_add(1),
+            observed: targets.len().checked_add(1).unwrap_or(usize::MAX),
             maximum,
         }
         .into());
@@ -1712,7 +1712,7 @@ fn append_paragraph(positions: &mut Vec<Position>, node: Node<'_>, maximum: usiz
     if positions.len() >= maximum {
         return Err(TransactionError::Limit {
             kind: LimitKind::ExpandedTargets,
-            observed: positions.len().saturating_add(1),
+            observed: positions.len().checked_add(1).unwrap_or(usize::MAX),
             maximum,
         }
         .into());

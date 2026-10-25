@@ -625,6 +625,9 @@ enum MetadataOwner {
 
 fn validate_positional_metadata(package: &litchi_opc::SourceBackedPackage) -> Result<()> {
     let context = package.execution_context();
+    let view_limits = crate::view_properties::Limits::from_source_limits(package.read_limits());
+    let presentation_limits =
+        crate::presentation_properties::Limits::from_source_limits(package.read_limits());
     let presentation = package.main_document_part()?;
     for relationship in presentation.rels().iter() {
         check_execution_context(context.as_ref())?;
@@ -654,6 +657,7 @@ fn validate_positional_metadata(package: &litchi_opc::SourceBackedPackage) -> Re
             MetadataOwner::ViewProperties => {
                 let properties = crate::view_properties::ViewProperties::parse_strict(
                     data.as_bytes(),
+                    view_limits,
                 )
                 .map_err(|error| {
                     metadata_refusal(owner, format!("view properties parse failed: {error}"))
@@ -670,14 +674,16 @@ fn validate_positional_metadata(package: &litchi_opc::SourceBackedPackage) -> Re
                 }
             },
             MetadataOwner::PresentationProperties => {
-                let properties =
-                    crate::presentation_properties::Properties::parse_strict(data.as_bytes())
-                        .map_err(|error| {
-                            metadata_refusal(
-                                owner,
-                                format!("presentation properties parse failed: {error}"),
-                            )
-                        })?;
+                let properties = crate::presentation_properties::Properties::parse_strict(
+                    data.as_bytes(),
+                    presentation_limits,
+                )
+                .map_err(|error| {
+                    metadata_refusal(
+                        owner,
+                        format!("presentation properties parse failed: {error}"),
+                    )
+                })?;
                 validate_modeled_presentation_properties(&properties)?;
                 let html_has_range = properties.html_publish.as_ref().is_some_and(|html| {
                     matches!(
@@ -802,8 +808,11 @@ fn inspect_presentation_properties_xml(
                 }
                 if stack.len() >= MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "source-backed presentation-properties XML depth",
-                        limit: MAX_XML_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: stack.len().checked_add(1).unwrap_or(usize::MAX),
+                        maximum: MAX_XML_DEPTH,
                     });
                 }
                 reject_mce_element(&namespace, &element, resolver).map_err(|error| {
@@ -1237,8 +1246,11 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
                 }
                 if depth >= MAX_XML_DEPTH {
                     return Err(Error::Limit {
-                        resource: "source-backed presentation XML depth",
-                        limit: MAX_XML_DEPTH,
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::XmlDepth,
+                        ),
+                        observed: depth.checked_add(1).unwrap_or(usize::MAX),
+                        maximum: MAX_XML_DEPTH,
                     });
                 }
                 reject_mce_element(&namespace, &element, resolver)?;
@@ -1635,8 +1647,9 @@ fn bump_xml(nodes: &mut usize) -> Result<()> {
         .ok_or_else(|| Error::Invalid("source-backed presentation XML node overflow".into()))?;
     if *nodes > MAX_XML_NODES {
         return Err(Error::Limit {
-            resource: "source-backed presentation XML nodes",
-            limit: MAX_XML_NODES,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlNodes),
+            observed: *nodes,
+            maximum: MAX_XML_NODES,
         });
     }
     Ok(())
@@ -1729,8 +1742,11 @@ mod tests {
             show_uri = crate::presentation_properties::SHOW_MEDIA_CONTROLS_URI,
         );
         assert!(inspect_presentation_properties_xml(root.as_bytes(), None).is_ok());
-        let properties =
-            crate::presentation_properties::Properties::parse_strict(root.as_bytes()).unwrap();
+        let properties = crate::presentation_properties::Properties::parse_strict(
+            root.as_bytes(),
+            crate::presentation_properties::Limits::default(),
+        )
+        .unwrap();
         assert!(validate_modeled_presentation_properties(&properties).is_ok());
     }
 
@@ -1791,8 +1807,11 @@ mod tests {
             r#"<p:presentationPr xmlns:p="{presentation}" xmlns:x="urn:unknown"><p:extLst><p:ext uri="urn:unknown"><x:payload/></p:ext></p:extLst></p:presentationPr>"#
         );
         inspect_presentation_properties_xml(unknown.as_bytes(), None).unwrap();
-        let properties =
-            crate::presentation_properties::Properties::parse_strict(unknown.as_bytes()).unwrap();
+        let properties = crate::presentation_properties::Properties::parse_strict(
+            unknown.as_bytes(),
+            crate::presentation_properties::Limits::default(),
+        )
+        .unwrap();
         assert_refused_kind!(
             validate_modeled_presentation_properties(&properties),
             SlideOrderRefusal::PresentationProperties.kind()

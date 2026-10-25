@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::OpcPackage;
 
-use super::codec::{self, LoadLimits, Located};
+use super::codec::{self, Limits, LoadLimits, Located};
 use super::model::{Draft, Event, Kind};
 use super::validation::{validate_draft, validate_events};
 use crate::time::Offset;
@@ -20,6 +20,7 @@ pub struct Snapshot {
     pub(crate) source_xml: Arc<Vec<u8>>,
     pub(crate) events: Vec<Event>,
     pub(crate) layout: Located,
+    pub(crate) limits: Limits,
     pub(crate) revision: Revision,
 }
 
@@ -32,35 +33,26 @@ impl Snapshot {
     pub fn load(
         package: &OpcPackage,
         slide_part_name: &litchi_opc::PackURI,
+        limits: Limits,
     ) -> Result<Option<Self>> {
-        super::package::load_snapshot(package, slide_part_name)
-    }
-
-    /// Alias for [`Self::load`] emphasizing the source-bound result.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(
-        package: &OpcPackage,
-        slide_part_name: &litchi_opc::PackURI,
-    ) -> Result<Option<Self>> {
-        Self::load(package, slide_part_name)
+        super::package::load_snapshot(package, slide_part_name, limits)
     }
 
     pub(crate) fn from_located(
         slide_part_name: String,
         source_xml: Arc<Vec<u8>>,
         layout: Located,
+        limits: Limits,
     ) -> Result<Self> {
         let drafts: Vec<_> = layout.events.iter().map(Draft::from_event).collect();
-        validate_events(&drafts)?;
+        validate_events(&drafts, limits)?;
         Ok(Self {
             slide_part_name,
             revision: fingerprint(source_xml.as_slice()),
             source_xml,
             events: layout.events.clone(),
             layout,
+            limits,
         })
     }
 
@@ -127,13 +119,6 @@ impl ListDraft {
         &self.working
     }
 
-    /// Alias for [`Self::events`].
-    #[inline]
-    #[must_use]
-    pub fn snapshot(&self) -> &[Draft] {
-        self.events()
-    }
-
     fn is_changed(&self) -> bool {
         self.working
             != self
@@ -156,7 +141,7 @@ impl ListDraft {
     ///
     /// Returns an error if the operation fails.
     pub fn replace(&mut self, events: Vec<Draft>) -> Result<bool> {
-        validate_events(&events)?;
+        validate_events(&events, self.original.limits)?;
         if self.working == events {
             return Ok(false);
         }
@@ -180,10 +165,10 @@ impl ListDraft {
             .cloned()
             .ok_or_else(|| index_error(index, self.working.len()))?;
         edit(&mut candidate)?;
-        validate_draft(&candidate)?;
+        validate_draft(&candidate, self.original.limits)?;
         let mut working = self.working.clone();
         working[index] = candidate;
-        validate_events(&working)?;
+        validate_events(&working, self.original.limits)?;
         self.working = working;
         Ok(())
     }
@@ -232,7 +217,7 @@ impl ListDraft {
     pub fn push(&mut self, event: Draft) -> Result<()> {
         let mut candidate = self.working.clone();
         candidate.push(event);
-        validate_events(&candidate)?;
+        validate_events(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(())
     }
@@ -248,7 +233,7 @@ impl ListDraft {
         }
         let mut candidate = self.working.clone();
         candidate.insert(index, event);
-        validate_events(&candidate)?;
+        validate_events(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(())
     }
@@ -269,7 +254,7 @@ impl ListDraft {
         }
         let mut candidate = self.working.clone();
         let removed = candidate.remove(index);
-        validate_events(&candidate)?;
+        validate_events(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(removed)
     }
@@ -289,7 +274,7 @@ impl ListDraft {
         let mut candidate = self.working.clone();
         let event = candidate.remove(from);
         candidate.insert(to, event);
-        validate_events(&candidate)?;
+        validate_events(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(true)
     }
@@ -308,16 +293,22 @@ impl ListDraft {
                 changed: false,
             });
         }
-        validate_events(&self.working)?;
+        validate_events(&self.working, self.original.limits)?;
         let updated = codec::rewrite(
             self.original.source_xml.as_slice(),
             &self.original.layout,
             &self.working,
+            self.original.limits,
         )?;
         let updated = Arc::new(updated);
         let slide_index = self.original.events.first().map_or(0, Event::slide_index);
-        let located = codec::locate(slide_index, updated.as_slice(), &mut LoadLimits::default())?
-            .ok_or_else(|| invalid("edited slide-show event list disappeared"))?;
+        let located = codec::locate(
+            slide_index,
+            updated.as_slice(),
+            self.original.limits,
+            &mut LoadLimits::default(),
+        )?
+        .ok_or_else(|| invalid("edited slide-show event list disappeared"))?;
         let parsed: Vec<_> = located.events.iter().map(Draft::from_event).collect();
         if parsed != self.working {
             return Err(invalid(
@@ -328,6 +319,7 @@ impl ListDraft {
             self.original.slide_part_name.clone(),
             Arc::clone(&updated),
             located,
+            self.original.limits,
         )?;
         let patch = Change::new(self.original, snapshot.clone());
         Ok(Prepared {

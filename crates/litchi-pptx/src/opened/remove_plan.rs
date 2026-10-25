@@ -106,8 +106,9 @@ impl Patch {
             .ok_or_else(|| invalid("slide-removal durable patch limit overflow"))?;
         if length > limit {
             return Err(Error::Limit {
-                resource: "slide-removal durable patch bytes",
-                limit,
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: length,
+                maximum: limit,
             });
         }
         let payload_len = u64::try_from(payload.len())
@@ -148,8 +149,9 @@ impl Patch {
             .ok_or_else(|| invalid("slide-removal durable patch limit overflow"))?;
         if bytes.len() > limit {
             return Err(Error::Limit {
-                resource: "slide-removal durable patch bytes",
-                limit,
+                kind: crate::opened::LimitKind::PatchBytes,
+                observed: bytes.len(),
+                maximum: limit,
             });
         }
         // A patch serialized under the superseded magic carries revisions from
@@ -288,8 +290,9 @@ impl Snapshot {
             );
         }
         if self.package.part_count() > self.limits.max_parts() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Parts,
+                observed: self.package.part_count(),
                 maximum: self.limits.max_parts(),
             });
         }
@@ -317,6 +320,9 @@ impl Snapshot {
             .map_err(|error| Error::Xml(format!("presentation XML is not UTF-8: {error}")))?;
         if crate::presentation_properties::metadata::protection::Settings::parse_xml(
             presentation_text,
+            crate::presentation_properties::metadata::protection::Limits::from_source_limits(
+                self.package.read_limits(),
+            ),
         )?
         .is_protected()
         {
@@ -374,8 +380,9 @@ impl Snapshot {
                 .ok_or_else(|| invalid("slide-removal planned byte count overflow"))?;
         }
         if planned_bytes > self.limits.max_patch_bytes() {
-            return Err(Error::EditLimit {
+            return Err(Error::Limit {
                 kind: crate::opened::LimitKind::PatchBytes,
+                observed: planned_bytes,
                 maximum: self.limits.max_patch_bytes(),
             });
         }
@@ -422,10 +429,11 @@ impl Snapshot {
     }
 }
 
-pub(crate) fn apply_patch(
+pub(crate) fn apply_patch_with_semantic_limits(
     package: &mut OpcPackage,
     patch: &Patch,
     physical_source_provenance: bool,
+    semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
 ) -> Result<Snapshot> {
     if super::model::package_fingerprint(package)? != patch.source_revision {
         return Err(Error::PatchConflict);
@@ -437,26 +445,32 @@ pub(crate) fn apply_patch(
     let slide_name = slide_name.clone();
     match direction {
         SinglePartChange::Remove => {
-            let source =
-                super::model::capture(package, patch.patch.limits(), physical_source_provenance)?;
+            let source = super::model::capture_with_provenance_and_semantic_limits(
+                package,
+                patch.patch.limits(),
+                physical_source_provenance,
+                semantic_limits.clone(),
+            )?;
             let proof = replan_exact_removal(&source, &slide_name)?;
             if !patch.has_same_semantics(proof.patch()) {
                 return Err(Error::PatchConflict);
             }
-            super::patch::apply_exact_revision(
+            super::patch::apply_exact_revision_with_semantic_limits(
                 package,
                 &patch.patch,
                 patch.target_revision,
                 physical_source_provenance,
+                semantic_limits.clone(),
             )
         },
         SinglePartChange::Add => {
             let mut candidate = package.clone();
-            let restored = super::patch::apply_exact_revision(
+            let restored = super::patch::apply_exact_revision_with_semantic_limits(
                 &mut candidate,
                 &patch.patch,
                 patch.target_revision,
                 physical_source_provenance,
+                semantic_limits.clone(),
             )?;
             let proof = replan_exact_removal(&restored, &slide_name)?;
             if !patch.inverse().has_same_semantics(proof.patch()) {
@@ -530,10 +544,11 @@ fn build_candidate(
             return Err(invalid("slide-removal dependent part disappeared"));
         }
     }
-    let captured = super::model::capture(
+    let captured = super::model::capture_with_provenance_and_semantic_limits(
         &candidate,
         snapshot.limits,
         snapshot.physical_source_provenance,
+        snapshot.owner_state.semantic_limits.clone(),
     )?;
     if captured.slides.len() + 1 != snapshot.slides.len()
         || captured
@@ -698,8 +713,9 @@ fn checked_relationship_count(current: usize, limit: usize) -> Result<usize> {
         .ok_or_else(|| invalid("slide-removal relationship count overflow"))?;
     if next > limit {
         return Err(Error::Limit {
-            resource: "slide-removal relationship scan",
-            limit,
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::Relationships),
+            observed: next,
+            maximum: limit,
         });
     }
     Ok(next)

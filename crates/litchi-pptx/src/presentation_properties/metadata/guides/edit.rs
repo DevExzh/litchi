@@ -53,10 +53,20 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_guides(&self, patch: &Patch) -> Result<Commit> {
-        Ok(commit_of((
-            patch.0.apply(self, "apply_guides")?,
-            patch.0.clone(),
-        )))
+        let package =
+            patch
+                .0
+                .apply_with_replay_validation(self, "apply_guides", |_, target, patch| {
+                    patch.validate_changed_parts(target, |name, part| {
+                        crate::presentation_properties::metadata::validate_replay_part(
+                            target,
+                            crate::presentation_properties::metadata::ReplayFamily::Guides,
+                            name,
+                            part,
+                        )
+                    })
+                })?;
+        Ok(commit_of((package, patch.0.clone())))
     }
 }
 
@@ -71,7 +81,8 @@ impl Edit<'_> {
     /// the draft, or a changed edit of a signed package.
     pub fn update<T>(&mut self, operation: impl FnOnce(&mut Draft) -> Result<T>) -> Result<T> {
         self.staged.update(move |opc| {
-            let mut draft = load_snapshot(opc)?.edit();
+            let limits = Limits::from_source_limits(opc.read_limits());
+            let mut draft = load_snapshot(opc, limits)?.edit();
             let value = operation(&mut draft)?;
             package::apply_commit(opc, draft.commit()?)?;
             Ok(value)
@@ -84,7 +95,10 @@ impl Edit<'_> {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn guides(&self) -> Result<Guides> {
-        load(self.staged.opc())
+        load(
+            self.staged.opc(),
+            Limits::from_source_limits(self.staged.opc().read_limits()),
+        )
     }
 
     /// Replace the typed guide value while preserving unrelated presentation XML.

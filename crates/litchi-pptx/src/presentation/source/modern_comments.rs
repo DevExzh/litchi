@@ -145,8 +145,11 @@ fn validate_unique_ids(
         count = count
             .checked_add(comment.replies.len())
             .ok_or(Error::Limit {
-                resource,
-                limit: codec::MAX_COMMENTS.saturating_add(codec::MAX_REPLIES),
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::CommentEntries,
+                ),
+                observed: usize::MAX,
+                maximum: codec::MAX_COMMENTS.saturating_add(codec::MAX_REPLIES),
             })?;
     }
 

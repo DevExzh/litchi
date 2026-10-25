@@ -212,7 +212,8 @@ fn pptx(slides: usize, matches: usize) -> Outcome<serde_json::Value> {
             .collect();
         for (slide, part) in parts.iter().enumerate() {
             let part = opc.get_part(part)?;
-            let scene = litchi_pptx::shape::Scene::read(part.blob())?;
+            let scene =
+                litchi_pptx::shape::Scene::read(part.blob(), litchi_pptx::shape::Limits::DEFAULT)?;
             let mut texts = Vec::new();
             for index in 0..scene.len() {
                 if let Some(text) = scene.at(index)?.text()

@@ -785,7 +785,11 @@ impl Fonts {
     pub fn add(&mut self, font: Font) -> Result<()> {
         self.ensure_unique(&font, None)?;
         if self.fonts.len() == MAX_FONTS {
-            return Err(limit("embedded fonts"));
+            return Err(limit(
+                crate::error::CodecLimitKind::Fonts,
+                self.fonts.len().checked_add(1).unwrap_or(usize::MAX),
+                MAX_FONTS,
+            ));
         }
         let next_index = build_name_index(
             self.fonts.len() + 1,
@@ -1014,7 +1018,11 @@ pub(super) fn name_key(value: &str) -> String {
 /// Validate the detached semantic collection before package publication.
 pub(super) fn validate_fonts(value: &Fonts, require_unique_names: bool) -> Result<()> {
     if value.fonts.len() > MAX_FONTS {
-        return Err(limit("embedded fonts"));
+        return Err(limit(
+            crate::error::CodecLimitKind::Fonts,
+            value.fonts.len(),
+            MAX_FONTS,
+        ));
     }
     let mut names = HashSet::new();
     let mut resources = HashSet::new();
@@ -1041,11 +1049,19 @@ pub(super) fn validate_fonts(value: &Fonts, require_unique_names: bool) -> Resul
             codec::validate_font_bytes(&face.data.bytes)?;
             let identity = (Arc::as_ptr(&face.data.bytes) as usize, face.data.format);
             if resources.insert(identity) {
-                total = total
-                    .checked_add(face.data.bytes.len())
-                    .ok_or_else(|| limit("total font bytes"))?;
+                total = total.checked_add(face.data.bytes.len()).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::TotalFontBytes,
+                        usize::MAX,
+                        MAX_TOTAL_FONT_BYTES,
+                    )
+                })?;
                 if total > MAX_TOTAL_FONT_BYTES {
-                    return Err(limit("total font bytes"));
+                    return Err(limit(
+                        crate::error::CodecLimitKind::TotalFontBytes,
+                        total,
+                        MAX_TOTAL_FONT_BYTES,
+                    ));
                 }
             }
         }

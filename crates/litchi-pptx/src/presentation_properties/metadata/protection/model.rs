@@ -174,8 +174,12 @@ impl Settings {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_modify_password(&mut self, password: &str) -> crate::Result<()> {
-        self.modify = Some(super::codec::generate_verifier(password)?);
+    pub fn set_modify_password(
+        &mut self,
+        password: &str,
+        limits: super::Limits,
+    ) -> crate::Result<()> {
+        self.modify = Some(super::codec::generate_verifier(password, limits)?);
         Ok(())
     }
 

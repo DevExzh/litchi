@@ -69,7 +69,7 @@ fn root_namespace(fragment: &[u8]) -> Option<Vec<u8>> {
 #[test]
 fn borrowed_spans_stay_exact_slices_of_the_processed_owner() {
     let xml = slide("p", "a", "r");
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
     assert!(scene.is_rewritten(), "the MCE input must be rewritten");
 
     for index in 0..scene.len() {
@@ -90,7 +90,7 @@ fn borrowed_spans_stay_exact_slices_of_the_processed_owner() {
 #[test]
 fn self_contained_spans_add_only_the_inherited_declarations() {
     let xml = slide("p", "a", "r");
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
 
     let title = scene.at(0).unwrap();
     let borrowed = title.xml().unwrap();
@@ -128,7 +128,7 @@ fn self_contained_spans_add_only_the_inherited_declarations() {
 #[test]
 fn conventional_prefixes_read_the_same_from_either_accessor() {
     let xml = slide("p", "a", "r");
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
 
     let title = scene.at(0).unwrap();
     let borrowed = title.xml().unwrap();
@@ -171,7 +171,7 @@ fn conventional_prefixes_read_the_same_from_either_accessor() {
 #[test]
 fn unconventional_prefixes_need_the_self_contained_accessor() {
     let xml = slide("q", "d", "rel");
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
 
     // The `a` and `p` fallbacks in the fragment scanners only cover the
     // conventional aliases, so a borrowed span from this deck reads empty.

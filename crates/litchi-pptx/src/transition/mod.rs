@@ -31,7 +31,7 @@ pub use model::{
     MAX_PRESET_NAME_BYTES, Morph, Ms, Origin, Preset, Prism, Raw, Reveal, Ripple, Shape, Shred,
     ShredPattern, Side, Speed, Spokes, TimeError, Transition,
 };
-pub use reader::{Limits, read, read_with};
+pub use reader::{Limits, read};
 pub use writer::{write, write_to};
 
 #[cfg(test)]
@@ -86,7 +86,7 @@ mod tests {
             .with_click(false)
             .with_after(Ms::new(1250).unwrap());
 
-        let xml = write(&value).unwrap();
+        let xml = write(&value, Limits::DEFAULT).unwrap();
         assert!(xml.contains(r#"<mc:Choice Requires="p14">"#));
         assert!(xml.contains(r#"p14:dur="750""#));
         assert!(!xml.contains(r#"<p:transition spd="fast" dur="#));
@@ -105,7 +105,7 @@ mod tests {
             .with_click(false)
             .with_after(Ms::new(4250).unwrap());
 
-        let xml = write(&value).unwrap();
+        let xml = write(&value, Limits::DEFAULT).unwrap();
         assert!(xml.contains(r#"<p14:ripple dir="ld"/>"#));
         assert!(xml.contains("<p:fade/>"));
         assert!(parse_fragment(&xml).same_semantics(&value));
@@ -119,7 +119,7 @@ mod tests {
             .with_click(false)
             .with_after(Ms::new(1250).unwrap());
 
-        let xml = write(&value).unwrap();
+        let xml = write(&value, Limits::DEFAULT).unwrap();
         assert!(xml.contains(r#"Requires="p14 p159""#));
         assert!(xml.contains(r#"<p159:morph option="byWord"/>"#));
         assert!(xml.contains("<p:fade/>"));
@@ -131,7 +131,7 @@ mod tests {
         let preset = Preset::with_options("wind", true, false).unwrap();
         let value = Transition::new(Kind::Preset(preset.clone())).with_speed(Speed::Slow);
 
-        let xml = write(&value).unwrap();
+        let xml = write(&value, Limits::DEFAULT).unwrap();
         assert!(xml.contains(r#"Requires="p15""#));
         assert!(xml.contains(r#"<p15:prstTrans prst="wind" invX="1"/>"#));
         assert!(parse_fragment(&xml).same_semantics(&value));
@@ -144,7 +144,7 @@ mod tests {
     fn preset_escapes_xml_name_and_round_trips() {
         let preset = Preset::new("wind&<\"\t\n\r").unwrap();
         let value = Transition::new(Kind::Preset(preset));
-        let xml = write(&value).unwrap();
+        let xml = write(&value, Limits::DEFAULT).unwrap();
         assert!(xml.contains(r#"prst="wind&amp;&lt;&quot;&#x9;&#xA;&#xD;""#));
         assert!(parse_fragment(&xml).same_semantics(&value));
     }
@@ -154,15 +154,15 @@ mod tests {
         let xml = transition_xml(
             r#"<p159:morph xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main" option="byChar" future="keep"/>"#,
         );
-        let value = read(xml.as_bytes()).unwrap().unwrap();
+        let value = read(xml.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
         assert_eq!(value.kind(), &Kind::Morph(Morph::ByChar));
-        let preserved = write(&value).unwrap();
+        let preserved = write(&value, Limits::DEFAULT).unwrap();
         assert!(preserved.contains(r#"future="keep""#));
         assert!(parse_fragment(&preserved).same_semantics(&value));
 
         let mut changed = value.clone();
         changed.set_kind(Kind::Morph(Morph::ByObject));
-        let changed = write(&changed).unwrap();
+        let changed = write(&changed, Limits::DEFAULT).unwrap();
         assert!(!changed.contains(r#"future="keep""#));
         assert!(changed.contains(r#"option="byObject""#));
     }
@@ -172,9 +172,9 @@ mod tests {
         let xml = transition_xml(
             r#"<p15:prstTrans xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main" invX="false"/>"#,
         );
-        let value = read(xml.as_bytes()).unwrap().unwrap();
+        let value = read(xml.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
         assert_eq!(value.kind(), &Kind::Preset(Preset::without_name()));
-        let output = write(&value).unwrap();
+        let output = write(&value, Limits::DEFAULT).unwrap();
         assert!(output.contains(r#"invX="false""#));
         assert!(!output.contains(r#"invY=""#));
     }
@@ -186,6 +186,7 @@ mod tests {
                 r#"<p15:prstTrans xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main"/>"#,
             )
             .as_bytes(),
+            Limits::DEFAULT,
         )
         .unwrap()
         .unwrap();
@@ -194,14 +195,15 @@ mod tests {
                 r#"<p15:prstTrans xmlns:p15="http://schemas.microsoft.com/office/powerpoint/2012/main" invX="false"/>"#,
             )
             .as_bytes(),
+            Limits::DEFAULT,
         )
         .unwrap()
         .unwrap();
 
         assert!(absent.same_semantics(&explicit_false));
         assert_ne!(absent, explicit_false);
-        let absent_xml = write(&absent).unwrap();
-        let explicit_xml = write(&explicit_false).unwrap();
+        let absent_xml = write(&absent, Limits::DEFAULT).unwrap();
+        let explicit_xml = write(&explicit_false, Limits::DEFAULT).unwrap();
         assert!(!absent_xml.contains(" invX="));
         assert!(explicit_xml.contains(r#"invX="false""#));
     }
@@ -212,7 +214,9 @@ mod tests {
             r#"<p159:morph xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main" option="byShape"/>"#,
             r#"<p159:morph xmlns:p159="http://schemas.microsoft.com/office/powerpoint/2015/09/main"/>"#,
         ] {
-            let value = read(transition_xml(morph).as_bytes()).unwrap().unwrap();
+            let value = read(transition_xml(morph).as_bytes(), Limits::DEFAULT)
+                .unwrap()
+                .unwrap();
             assert!(matches!(value.kind(), Kind::Raw(raw) if raw.xml() == morph));
             assert_eq!(repairs(&value), [(TransitionDefect::EffectToken, 0)]);
         }
@@ -220,20 +224,25 @@ mod tests {
         let oversized = "x".repeat(MAX_PRESET_NAME_BYTES + 1);
         assert!(matches!(
             Preset::new(oversized),
-            Err(Error::Limit { resource, limit })
-                if resource == "preset transition name bytes" && limit == MAX_PRESET_NAME_BYTES
+            Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::NameBytes),
+                maximum,
+                ..
+            }) if maximum == MAX_PRESET_NAME_BYTES
         ));
     }
 
     #[test]
     fn reads_local_standard_fixtures() {
-        let cover = read(STANDARD_COVER).unwrap().unwrap();
+        let cover = read(STANDARD_COVER, Limits::DEFAULT).unwrap().unwrap();
         assert_eq!(cover.speed(), Speed::Fast);
         assert!(!cover.click());
         assert_eq!(cover.after().map(Ms::get), Some(750));
         assert_eq!(cover.kind(), &Kind::Cover(Origin::RightDown));
 
-        let fade = read(STANDARD_EFFECT_OPTIONS).unwrap().unwrap();
+        let fade = read(STANDARD_EFFECT_OPTIONS, Limits::DEFAULT)
+            .unwrap()
+            .unwrap();
         assert_eq!(fade.kind(), &Kind::Fade { black: Some(true) });
     }
 
@@ -264,7 +273,7 @@ mod tests {
 
         for (kind, expected) in cases {
             let value = Transition::new(kind);
-            let xml = write(&value).unwrap();
+            let xml = write(&value, Limits::DEFAULT).unwrap();
             assert!(xml.contains(expected), "expected {expected:?} in {xml:?}");
             assert!(parse_fragment(&xml).same_semantics(&value));
         }
@@ -319,7 +328,7 @@ mod tests {
 
         for (kind, expected) in cases {
             let value = Transition::new(kind);
-            let xml = write(&value).unwrap();
+            let xml = write(&value, Limits::DEFAULT).unwrap();
             assert!(xml.contains(r#"<mc:Choice Requires="p14">"#));
             assert!(xml.contains(expected), "expected {expected:?} in {xml:?}");
             assert!(xml.contains("<p:fade/>"));
@@ -365,7 +374,7 @@ mod tests {
         ];
 
         for (effect, expected) in cases {
-            let value = read(transition_xml_with_p14(effect).as_bytes())
+            let value = read(transition_xml_with_p14(effect).as_bytes(), Limits::DEFAULT)
                 .unwrap()
                 .unwrap();
             assert_eq!(value.kind(), &expected);
@@ -383,7 +392,7 @@ mod tests {
             r#"<p14:reveal dir="u"/>"#,
             r#"<p14:shred pattern="circle"/>"#,
         ] {
-            let value = read(transition_xml_with_p14(effect).as_bytes())
+            let value = read(transition_xml_with_p14(effect).as_bytes(), Limits::DEFAULT)
                 .unwrap()
                 .unwrap();
             assert!(
@@ -401,15 +410,16 @@ mod tests {
                 r#"<p14:prism xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" dir="r" isContent="true" future="keep"/>"#,
             )
             .as_bytes(),
+            Limits::DEFAULT,
         )
         .unwrap()
         .unwrap();
-        let unchanged = write(&value).unwrap();
+        let unchanged = write(&value, Limits::DEFAULT).unwrap();
         assert!(unchanged.contains(r#"future="keep""#));
 
         let mut changed = value.clone();
         changed.set_kind(Kind::Prism(Prism::new(Side::Up, true, false)));
-        let changed = write(&changed).unwrap();
+        let changed = write(&changed, Limits::DEFAULT).unwrap();
         assert!(!changed.contains(r#"future="keep""#));
         assert!(changed.contains(r#"<p14:prism dir="u" isContent="1"/>"#));
         assert!(changed.contains("<p:fade/>"));
@@ -425,13 +435,13 @@ mod tests {
             (wheel.as_str(), r#"<p:wheel spokes="6"/>"#, 6),
             (reverse.as_str(), "spokes=\"12\"", 12),
         ] {
-            let value = read(xml.as_bytes()).unwrap().unwrap();
+            let value = read(xml.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
             let Kind::Raw(raw) = value.kind() else {
                 panic!("expected a raw effect, got {:?}", value.kind());
             };
             assert!(raw.xml().contains(effect), "{}", raw.xml());
             // The verbatim element round-trips.
-            assert!(write(&value).unwrap().contains(effect));
+            assert!(write(&value, Limits::DEFAULT).unwrap().contains(effect));
             let repaired: Vec<_> = value
                 .tolerance_report()
                 .defects()
@@ -448,24 +458,36 @@ mod tests {
             );
         }
         // Supported counts stay typed and repair nothing.
-        let typed = read(transition_xml(r#"<p:wheel spokes="8"/>"#).as_bytes())
-            .unwrap()
-            .unwrap();
+        let typed = read(
+            transition_xml(r#"<p:wheel spokes="8"/>"#).as_bytes(),
+            Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(typed.kind(), &Kind::Wheel(Spokes::Eight));
         assert!(typed.tolerance_report().is_clean());
         // A spoke count that is not an unsignedInt is an effect-token repair.
-        let negative = read(transition_xml(r#"<p:wheel spokes="-1"/>"#).as_bytes())
-            .unwrap()
-            .unwrap();
+        let negative = read(
+            transition_xml(r#"<p:wheel spokes="-1"/>"#).as_bytes(),
+            Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap();
         assert_eq!(repairs(&negative), [(TransitionDefect::EffectToken, 0)]);
         // Ill-formed XML stays fatal.
-        assert!(read(transition_xml(r#"<p:wheel spokes="6">"#).as_bytes()).is_err());
+        assert!(
+            read(
+                transition_xml(r#"<p:wheel spokes="6">"#).as_bytes(),
+                Limits::DEFAULT
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn invalid_directions_degrade_and_out_of_range_times_clamp() {
         let xml = transition_xml(r#"<p:push dir="horz"/>"#);
-        let value = read(xml.as_bytes()).unwrap().unwrap();
+        let value = read(xml.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
         assert!(matches!(value.kind(), Kind::Raw(_)));
         assert_eq!(repairs(&value), [(TransitionDefect::EffectToken, 0)]);
 
@@ -481,7 +503,7 @@ mod tests {
                 &format!(r#"<p:transition advTm="{lexical}" dur="{lexical}">"#),
                 1,
             );
-            let value = read(xml.as_bytes()).unwrap().unwrap();
+            let value = read(xml.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
             assert_eq!(value.after().map(Ms::get), Some(MAX_MS));
             assert_eq!(value.duration().map(Ms::get), Some(MAX_MS));
             assert_eq!(value.kind(), &Kind::Fade { black: None });
@@ -492,7 +514,11 @@ mod tests {
                     (TransitionDefect::TimeClamped, context)
                 ]
             );
-            assert!(write(&value).unwrap().contains(r#"advTm="2147483647""#));
+            assert!(
+                write(&value, Limits::DEFAULT)
+                    .unwrap()
+                    .contains(r#"advTm="2147483647""#)
+            );
         }
     }
 
@@ -503,7 +529,7 @@ mod tests {
             r#"<p:transition spd="warp" advClick="maybe" advTm="soon" dur="-5">"#,
             1,
         );
-        let value = read(xml.as_bytes()).unwrap().unwrap();
+        let value = read(xml.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
         assert_eq!(value.speed(), Speed::Medium);
         assert!(value.click());
         assert_eq!(value.after(), None);
@@ -518,7 +544,7 @@ mod tests {
             1,
         );
         assert!(
-            read(xml.as_bytes())
+            read(xml.as_bytes(), Limits::DEFAULT)
                 .unwrap()
                 .unwrap()
                 .tolerance_report()
@@ -530,7 +556,7 @@ mod tests {
             r#"<p:transition spd="warp" spd="x">"#,
             1,
         );
-        assert!(read(xml.as_bytes()).is_err());
+        assert!(read(xml.as_bytes(), Limits::DEFAULT).is_err());
     }
 
     /// The repairs a read recorded, as `(class, context)` pairs.
@@ -553,7 +579,7 @@ mod tests {
             r#"<p:transition advTm="750ms">"#,
             1,
         );
-        let value = read(xml.as_bytes()).unwrap().unwrap();
+        let value = read(xml.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
         assert_eq!(value.after(), None);
         assert_eq!(repairs(&value), [(TransitionDefect::AttributeToken, 0)]);
 
@@ -563,7 +589,7 @@ mod tests {
             1,
         );
         assert_eq!(
-            read(xml.as_bytes())
+            read(xml.as_bytes(), Limits::DEFAULT)
                 .unwrap()
                 .unwrap()
                 .after()
@@ -587,10 +613,10 @@ mod tests {
                 &format!(r#"<p:transition p14:dur="{lexical}">"#),
                 1,
             );
-            let value = read(xml.as_bytes()).unwrap().unwrap();
+            let value = read(xml.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
             assert_eq!(value.duration_offset().unwrap().as_str(), canonical);
             assert_eq!(value.duration().map(Ms::get), legacy);
-            let output = write(&value).unwrap();
+            let output = write(&value, Limits::DEFAULT).unwrap();
             assert!(output.contains(&format!(r#"p14:dur="{canonical}""#)));
             assert!(parse_fragment(&output).same_semantics(&value));
         }
@@ -600,7 +626,7 @@ mod tests {
             r#"<p:transition p14:dur="1quarter">"#,
             1,
         );
-        let value = read(invalid.as_bytes()).unwrap().unwrap();
+        let value = read(invalid.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
         assert_eq!(value.duration_offset(), None);
         assert_eq!(repairs(&value), [(TransitionDefect::AttributeToken, 0)]);
 
@@ -609,7 +635,7 @@ mod tests {
             r#"<p:transition p14:dur=" 1s ">"#,
             1,
         );
-        let value = read(invalid.as_bytes()).unwrap().unwrap();
+        let value = read(invalid.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
         assert_eq!(value.duration_offset(), None);
         assert_eq!(repairs(&value), [(TransitionDefect::AttributeToken, 0)]);
     }
@@ -619,7 +645,7 @@ mod tests {
         let xml = transition_xml_with_p14(
             r#"<p14:flythrough xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" dir="  out &#x9;" hasBounce=" &#xA; true &#xD; "/>"#,
         );
-        let value = read(xml.as_bytes()).unwrap().unwrap();
+        let value = read(xml.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
         assert_eq!(
             value.kind(),
             &Kind::FlyThrough(FlyThrough::new(InOut::Out, true))
@@ -633,7 +659,7 @@ mod tests {
             r#"<p14:honeycomb xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main">unexpected</p14:honeycomb>"#,
         ] {
             assert!(matches!(
-                read(transition_xml(effect).as_bytes()),
+                read(transition_xml(effect).as_bytes(), Limits::DEFAULT),
                 Err(Error::Invalid(message)) if message.contains("typed transition effects")
             ));
         }
@@ -643,19 +669,22 @@ mod tests {
     fn rejects_duplicate_effects() {
         let xml = transition_xml("<p:fade/><p:cut/>");
         assert!(matches!(
-            read(xml.as_bytes()),
+            read(xml.as_bytes(), Limits::DEFAULT),
             Err(Error::Invalid(message)) if message.contains("more than one")
         ));
     }
 
     #[test]
     fn exact_equality_includes_retained_wire_state() {
-        let plain = read(transition_xml("<p:fade/>").as_bytes())
+        let plain = read(transition_xml("<p:fade/>").as_bytes(), Limits::DEFAULT)
             .unwrap()
             .unwrap();
-        let extended = read(transition_xml(r#"<p:fade future="1"/>"#).as_bytes())
-            .unwrap()
-            .unwrap();
+        let extended = read(
+            transition_xml(r#"<p:fade future="1"/>"#).as_bytes(),
+            Limits::DEFAULT,
+        )
+        .unwrap()
+        .unwrap();
         assert!(plain.same_semantics(&extended));
         assert_ne!(plain, extended);
 
@@ -675,7 +704,7 @@ mod tests {
     fn rejects_doctype_without_expanding_entities() {
         let xml = r#"<!DOCTYPE p:sld [<!ENTITY xxe SYSTEM "file:///etc/passwd">]><p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:transition><p:fade/></p:transition></p:sld>"#;
         assert!(matches!(
-            read(xml.as_bytes()),
+            read(xml.as_bytes(), Limits::DEFAULT),
             Err(Error::Invalid(message)) if message.contains("DOCTYPE")
         ));
     }
@@ -685,14 +714,14 @@ mod tests {
         let xml = transition_xml(
             r#"<p15:glitter xmlns:p15="urn:example:p15" amount="7"><p15:data/></p15:glitter><p:extLst><p:ext uri="urn:test"/></p:extLst>"#,
         );
-        let value = read(xml.as_bytes()).unwrap().unwrap();
+        let value = read(xml.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
         let Kind::Raw(raw) = value.kind() else {
             panic!("unknown effect should remain raw")
         };
         assert!(raw.xml().contains("p15:glitter"));
         assert_eq!(value.preserved().count(), 1);
 
-        let output = write(&value).unwrap();
+        let output = write(&value, Limits::DEFAULT).unwrap();
         assert!(output.contains("p15:glitter"));
         assert!(output.contains("<p:extLst>"));
     }
@@ -700,7 +729,7 @@ mod tests {
     #[test]
     fn inspects_but_does_not_emit_raw_children_with_ancestor_only_prefixes() {
         let xml = r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:p15="urn:example:p15"><p:transition><p15:glitter/></p:transition></p:sld>"#;
-        let value = read(xml.as_bytes()).unwrap().unwrap();
+        let value = read(xml.as_bytes(), Limits::DEFAULT).unwrap().unwrap();
         let Kind::Raw(raw) = value.kind() else {
             panic!("unknown effect should remain raw")
         };
@@ -708,7 +737,7 @@ mod tests {
         assert!(raw.xml().contains("p15:glitter"));
         let mut output = "unchanged".to_string();
         assert!(matches!(
-            write_to(&value, &mut output),
+            write_to(&value, &mut output, Limits::DEFAULT),
             Err(Error::Invalid(message)) if message.contains("namespace prefix")
         ));
         assert_eq!(output, "unchanged");
@@ -719,23 +748,47 @@ mod tests {
         let tiny = Limits::new(4096, 2, 10, 16).unwrap();
         let deep = transition_xml("<p:extLst><p:ext/></p:extLst>");
         assert!(matches!(
-            read_with(deep.as_bytes(), tiny),
+            read(deep.as_bytes(), tiny),
             Err(Error::Limit { .. })
         ));
 
         let tiny = Limits::new(4096, 16, 2, 4096).unwrap();
         let nodes = transition_xml("<p:fade/>");
         assert!(matches!(
-            read_with(nodes.as_bytes(), tiny),
+            read(nodes.as_bytes(), tiny),
             Err(Error::Limit { .. })
         ));
 
         let tiny = Limits::new(4096, 16, 20, 8).unwrap();
         let raw = transition_xml(r#"<x:future xmlns:x="urn:x"/>"#);
         assert!(matches!(
-            read_with(raw.as_bytes(), tiny),
+            read(raw.as_bytes(), tiny),
             Err(Error::Limit { .. })
         ));
+    }
+
+    #[test]
+    fn writer_admits_exact_output_and_refuses_one_byte_under_atomically() {
+        let value =
+            Transition::new(Kind::Fade { black: Some(true) }).with_duration(Ms::new(750).unwrap());
+        let expected = write(&value, Limits::DEFAULT).unwrap();
+        let exact = Limits::DEFAULT
+            .with_output_bytes(expected.len())
+            .expect("bounded output policy");
+        assert_eq!(write(&value, exact).unwrap(), expected);
+
+        let narrow = Limits::DEFAULT
+            .with_output_bytes(expected.len() - 1)
+            .expect("one-byte narrower output policy");
+        let mut output = "prefix".to_owned();
+        assert!(matches!(
+            write_to(&value, &mut output, narrow),
+            Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::OutputBytes),
+                ..
+            })
+        ));
+        assert_eq!(output, "prefix");
     }
 
     fn transition_xml(effect: &str) -> String {
@@ -748,7 +801,7 @@ mod tests {
         let xml = format!(
             r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">{xml}</p:sld>"#
         );
-        read(xml.as_bytes()).unwrap().unwrap()
+        read(xml.as_bytes(), Limits::DEFAULT).unwrap().unwrap()
     }
 
     fn transition_xml_with_p14(effect: &str) -> String {

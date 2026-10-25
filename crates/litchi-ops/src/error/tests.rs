@@ -611,8 +611,9 @@ fn row_resource_limits_are_limit_exceeded() {
     #[cfg(feature = "pptx")]
     check(
         litchi_pptx::Error::Limit {
-            resource: "slides",
-            limit: 10,
+            kind: litchi_pptx::LimitKind::Codec(litchi_pptx::CodecLimitKind::Slides),
+            observed: 11,
+            maximum: 10,
         }
         .into(),
     );

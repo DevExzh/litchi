@@ -23,6 +23,6 @@ pub use package::validate_master_layout_graph;
 
 pub(crate) use package::{
     add_slide_layout, add_slide_master, preflight_add_slide_layout, remove_slide_layout,
-    resolve_master, resolve_owner, store_placeholder_shape,
+    resolve_master, resolve_owner, store_placeholder_shape_with_shape_limits,
 };
-pub(crate) use placeholder::preflight_store_placeholder_shape;
+pub(crate) use placeholder::preflight_store_placeholder_shape_with_shape_limits;
