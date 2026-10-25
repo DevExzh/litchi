@@ -33,6 +33,7 @@ PREPARATION_SCHEMA = "litchi.current-native-preparation.v2"
 QUALIFICATION_SCHEMA = "litchi.current-native-qualification.v2"
 PROTOCOL_SCHEMA = "litchi.native-evidence-protocol.v2"
 POLICY_VERSION = 2
+EXECUTION_RECEIPT_RELATIVE = "execution-receipt.json"
 
 BASELINE_COMMIT = "f2bbbc8d07ab5da26c180f1ff74813d39f632d54"
 BASELINE_GIT_TREE = "2e0d0cdf7f6a345961ceca361d53202200d00970"

@@ -17,6 +17,7 @@ import sys
 from typing import Any
 
 from native_qualification.current_native_policy_v2 import (
+    EXECUTION_RECEIPT_RELATIVE,
     POLICY_SCHEMA,
     PREPARATION_SCHEMA,
     PolicyError,
@@ -197,7 +198,7 @@ def prepare(
         "manifest": {"path": str(Path(manifest).absolute()), "sha256": manifest_sha256, "bytes": manifest_bytes},
         "output_root": str(Path(output_root).absolute().resolve()) if output_root is not None else None,
         "output_root_initial": output_root_identity,
-        "execution_receipt_relative": "execution-receipt.json" if output_root_identity is not None else None,
+        "execution_receipt_relative": EXECUTION_RECEIPT_RELATIVE if output_root_identity is not None else None,
         "preparer": tooling["preparer"],
         "tooling": tooling,
         "protocol": TRUSTED_POLICY.json()["protocol"],

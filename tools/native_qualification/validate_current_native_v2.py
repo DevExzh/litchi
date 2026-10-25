@@ -17,6 +17,7 @@ from typing import Any, Mapping, Sequence
 
 from native_qualification.current_native_policy_v2 import (
     ABBA_ORDER,
+    EXECUTION_RECEIPT_RELATIVE,
     POLICY_SCHEMA,
     PREPARATION_SCHEMA,
     QUALIFICATION_SCHEMA,
@@ -154,6 +155,8 @@ def _validate_output_root(receipt: Mapping[str, Any], *, required: bool) -> Path
         raise ValidationError("preparation output root lacks a fresh-creation proof")
     if initial.get("sha256") != hashlib.sha256(_canonical([])).hexdigest():
         raise ValidationError("preparation output root creation proof is invalid")
+    if receipt.get("execution_receipt_relative") != EXECUTION_RECEIPT_RELATIVE:
+        raise ValidationError("preparation execution receipt path is not the fixed relative name")
     root_resolved = root.resolve()
     identities = receipt.get("identities")
     if isinstance(identities, Mapping):
@@ -203,15 +206,15 @@ def _validate_execution_receipt(value: Mapping[str, Any], prepared: Mapping[str,
     artifact = value.get("execution_receipt")
     if not isinstance(artifact, Mapping):
         raise ValidationError("qualification is missing the actual runner execution receipt")
-    expected_path = output_root / str(prepared["receipt"].get("execution_receipt_relative", "execution-receipt.json"))
-    if artifact.get("relative_path") != "execution-receipt.json" or artifact.get("path") != str(expected_path):
+    expected_path = output_root / EXECUTION_RECEIPT_RELATIVE
+    if artifact.get("relative_path") != EXECUTION_RECEIPT_RELATIVE or artifact.get("path") != str(expected_path):
         raise ValidationError("execution receipt path is not the prepared output-root receipt")
     execution, digest = _load(expected_path, "runner execution receipt")
     actual_identity = {
         "path": str(expected_path),
         "sha256": digest,
         "bytes": expected_path.stat().st_size,
-        "relative_path": "execution-receipt.json",
+        "relative_path": EXECUTION_RECEIPT_RELATIVE,
     }
     if dict(artifact) != actual_identity:
         raise ValidationError("runner execution receipt identity changed")

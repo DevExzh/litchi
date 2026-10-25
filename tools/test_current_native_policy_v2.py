@@ -212,6 +212,28 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                     output_root=output_root,
                 )
 
+    def test_execution_receipt_path_tampering_is_rejected(self) -> None:
+        manifest = ROOT / "tools/native_qualification/manifests/ppt-current-v2.json"
+        for forged_path in ("/tmp/escape.json", "../escape.json"):
+            with tempfile.TemporaryDirectory() as directory:
+                parent = Path(directory)
+                before = self._fake_source(parent / "before", "receipt-before")
+                after = self._fake_source(parent / "after", "receipt-after")
+                receipt_path = parent / "preparation.json"
+                preparer.prepare(
+                    lane="ppt-auxiliary",
+                    manifest=manifest,
+                    before=before,
+                    after=after,
+                    output=receipt_path,
+                    output_root=parent / "outputs",
+                )
+                receipt = json.loads(receipt_path.read_text())
+                receipt["execution_receipt_relative"] = forged_path
+                receipt_path.write_bytes((json.dumps(receipt, sort_keys=True, separators=(",", ":")) + "\n").encode())
+                with self.assertRaises(validator.ValidationError):
+                    validator.validate_preparation(receipt_path)
+
     def test_final_qualification_rejects_all_refused_rows(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
