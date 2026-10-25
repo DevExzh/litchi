@@ -4846,3 +4846,45 @@ See [0063](0063-source-pptx-modern-comments.md).
   `106e48ea98` pass independent source review; their actual guarded runs
   continue. ODF's latest retained-profile and opaque-vendor XML changes are
   under review. Nothing is pushed.
+
+- Coordinator font and encryption integration (2026-10-25):
+  Crypto atomic `7d765ad6e0` merges into the integration branch at
+  `f1816486ec`. Independent review confirms all selected encryption profiles
+  survive unlock and later output for DOCX, PPTX and XLSX. Root verifies the
+  actual unlock regression, affected all-target check and Clippy receipts,
+  including logs, traces, source/lock identities and empty owned-process lists.
+  The merge retains the selected DOC/OLE custom-XML profile and required
+  writer arguments. Record 0362ul52 preserves the earlier failed attempts.
+
+  Font atomic `07680db969` merges at `b8897649d6`, preserving the complete
+  reviewed first-party and vendor changes on their true common ancestor.
+  Root verifies all eleven actual guarded rows on `e69d108830`: vendor budget
+  checks, font tests/Clippy, affected format checks/tests and both glossary
+  profiles. The largest sampled target is 5,610,859,304 bytes; all final
+  ownership samples are empty. The atomic tree differs from tested source
+  only by the final receipt added to record 0362ul50. The old root lock is
+  preserved externally; integration now uses reviewed root `efff87af6c`,
+  performance-tool `de1f8ae53b` and native-tool `989da70f10` locks. Records
+  0362ul59 and 0362ul59a document the three registry-to-path transitions.
+  Both merges pass the 75 selected glossary/matrix/adapter tooling tests.
+  A fresh composed check is assigned slot 4, including standalone consumers.
+
+  The current-source census finds additional required policy migrations:
+  RTF validation/compression (0362ul65), Numbers wire codecs (0362ul66), VBA
+  (0362ul67), XLDM (0362ul68), formula codecs (0362ul69), and Markdown owner
+  options (0362ul70). These remain engineering work, not exceptions. RTF's
+  production changes pass source review and receive slot 3; its historical
+  benchmark adapter must migrate atomically. Markdown is returned to preserve
+  recipient policy through cross-copy replay/history, and VBA is returned
+  for legacy PPT and complete signature coverage. PPTX returns 0362ul61–63
+  and ODF validation remain active; ODF also needs the remaining tracked-change
+  and formula serializer policies. Source-only census tooling 0362ul71 is
+  returned for fail-closed anchor/input validation. New DrawingML protocol
+  0362ul72 will bind separate historical/current source and lock identities;
+  historical evidence is not relabeled.
+
+  Cleanup wave 59 is authorized for four merged leaves with branches and
+  ignored payloads retained; completion and measured savings are pending.
+  Final integrated capture, complete gates, actual native/performance
+  qualification and the signed-batch contract choice remain open. Nothing
+  is pushed.
