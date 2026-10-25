@@ -149,6 +149,11 @@ def _validate_output_root(receipt: Mapping[str, Any], *, required: bool) -> Path
             raise ValidationError(f"preparation output root contains a symlink component: {cursor}")
     if root.is_symlink() or not root.is_dir():
         raise ValidationError("preparation output root is not a regular directory")
+    initial = receipt.get("output_root_initial")
+    if not isinstance(initial, Mapping) or initial.get("path") != str(root.resolve()) or initial.get("entries") != []:
+        raise ValidationError("preparation output root lacks a fresh-creation proof")
+    if initial.get("sha256") != hashlib.sha256(_canonical([])).hexdigest():
+        raise ValidationError("preparation output root creation proof is invalid")
     root_resolved = root.resolve()
     identities = receipt.get("identities")
     if isinstance(identities, Mapping):
@@ -189,6 +194,41 @@ def _validate_output_artifact(evidence: Mapping[str, Any], expected: Any, output
         raise ValidationError(str(error)) from error
     if dict(artifact) != {**actual_output, "relative_path": relative}:
         raise ValidationError(f"{label} output artifact changed")
+
+
+def _validate_execution_receipt(value: Mapping[str, Any], prepared: Mapping[str, Any]) -> None:
+    output_root = prepared.get("output_root")
+    if not isinstance(output_root, Path):
+        raise ValidationError("qualification has no prepared output root for execution receipt")
+    artifact = value.get("execution_receipt")
+    if not isinstance(artifact, Mapping):
+        raise ValidationError("qualification is missing the actual runner execution receipt")
+    expected_path = output_root / str(prepared["receipt"].get("execution_receipt_relative", "execution-receipt.json"))
+    if artifact.get("relative_path") != "execution-receipt.json" or artifact.get("path") != str(expected_path):
+        raise ValidationError("execution receipt path is not the prepared output-root receipt")
+    execution, digest = _load(expected_path, "runner execution receipt")
+    actual_identity = {
+        "path": str(expected_path),
+        "sha256": digest,
+        "bytes": expected_path.stat().st_size,
+        "relative_path": "execution-receipt.json",
+    }
+    if dict(artifact) != actual_identity:
+        raise ValidationError("runner execution receipt identity changed")
+    if execution.get("schema") != "litchi.current-native-execution.v2" or execution.get("status") != "completed":
+        raise ValidationError("runner execution receipt is not a completed v2 execution")
+    for field in ("policy_sha256", "preparation_receipt_sha256", "lane", "output_root", "routes", "source_artifacts", "tooling"):
+        expected = value.get("policy_sha256") if field == "policy_sha256" else (
+            prepared.get("receipt_sha256") if field == "preparation_receipt_sha256" else value.get(field)
+        )
+        if execution.get(field) != expected:
+            raise ValidationError(f"runner execution receipt {field} is not bound to qualification")
+    runner = execution.get("runner")
+    expected_runner = _file_identity(Path(__file__).resolve().parents[1] / "native_qualification_runner.py", "runner")
+    if not isinstance(runner, Mapping) or dict(runner) != expected_runner:
+        raise ValidationError("runner execution receipt is not bound to the reviewed generic runner")
+    if execution.get("route_receipts") != value.get("results"):
+        raise ValidationError("runner execution receipt route evidence differs from qualification")
 
 
 def validate_preparation(path: Path) -> dict[str, Any]:
@@ -271,11 +311,9 @@ def validate_qualification(path: Path, preparation_path: Path) -> dict[str, Any]
         if not isinstance(row, Mapping):
             raise ValidationError(f"qualification result {index} is not an object")
         expected = TRUSTED_POLICY.routes_for(lane)[index]
-        for field in ("route", "kind", "program", "output", "role"):
+        for field in ("route", "kind", "program", "output", "role", "status"):
             if row.get(field) != getattr(expected, field):
                 raise ValidationError(f"qualification result {index} {field} differs from the policy")
-        if row.get("status") not in {"ok", "refused"}:
-            raise ValidationError(f"qualification result {index} has an invalid status")
         evidence = row.get("evidence")
         if not isinstance(evidence, Mapping):
             raise ValidationError(f"qualification result {index} is missing source evidence")
@@ -286,6 +324,7 @@ def validate_qualification(path: Path, preparation_path: Path) -> dict[str, Any]
         if evidence.get("source_bindings") != expected_bindings:
             raise ValidationError(f"qualification result {index} source bindings differ from preparation")
         _validate_output_artifact(evidence, expected, prepared["output_root"], f"qualification result {index}")
+    _validate_execution_receipt(value, prepared)
     return {"schema": QUALIFICATION_SCHEMA, "lane": lane, "policy_sha256": TRUSTED_POLICY.digest(), "sha256": value_sha256}
 
 

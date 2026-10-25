@@ -88,6 +88,28 @@ def _disjoint(paths: list[tuple[str, Path]]) -> None:
                 raise PreparationError(f"paths must be pairwise disjoint: {left_label}={left}, {right_label}={right}")
 
 
+def _create_fresh_output_root(path: Path | None) -> dict[str, Any] | None:
+    if path is None:
+        return None
+    lexical = path.absolute()
+    cursor = Path(lexical.anchor)
+    for component in lexical.parts[1:]:
+        cursor /= component
+        if cursor.is_symlink():
+            raise PreparationError(f"qualification output root contains a symlink component: {cursor}")
+    if lexical.exists() or lexical.is_symlink():
+        raise PreparationError(f"qualification output root must be fresh and absent: {path}")
+    parent = lexical.parent
+    if parent.is_symlink() or not parent.is_dir():
+        raise PreparationError(f"qualification output root parent is not a regular directory: {parent}")
+    lexical.mkdir()
+    return {
+        "path": str(lexical.resolve()),
+        "entries": [],
+        "sha256": hashlib.sha256(_canonical([])).hexdigest(),
+    }
+
+
 def prepare(
     *,
     lane: str,
@@ -156,6 +178,8 @@ def prepare(
         status = "blocked"
         reason = "exact candidate source/tree/lock/probe/fixture pins are not frozen"
 
+    output_root_identity = _create_fresh_output_root(Path(output_root) if output_root is not None else None)
+
     preparer = Path(__file__).resolve()
     tooling = {
         "policy": _tooling_identity(preparer.with_name("current_native_policy_v2.py"), "policy module"),
@@ -172,6 +196,8 @@ def prepare(
         "blocked_reason": reason,
         "manifest": {"path": str(Path(manifest).absolute()), "sha256": manifest_sha256, "bytes": manifest_bytes},
         "output_root": str(Path(output_root).absolute().resolve()) if output_root is not None else None,
+        "output_root_initial": output_root_identity,
+        "execution_receipt_relative": "execution-receipt.json" if output_root_identity is not None else None,
         "preparer": tooling["preparer"],
         "tooling": tooling,
         "protocol": TRUSTED_POLICY.json()["protocol"],

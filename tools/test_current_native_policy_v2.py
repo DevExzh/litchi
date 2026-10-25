@@ -11,6 +11,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest import mock
 
 from native_qualification import current_native_policy_v2 as policy
 from native_qualification import prepare_current_native_inputs_v2 as preparer
@@ -183,6 +184,118 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
             forged["path"] = str(unrelated)
             with self.assertRaises(validator.ValidationError):
                 validator._validate_output_artifact({"output_artifact": forged}, expected, root.resolve(), "output")
+
+    def test_preparation_requires_a_fresh_output_root(self) -> None:
+        manifest = ROOT / "tools/native_qualification/manifests/ppt-current-v2.json"
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            before = self._fake_source(parent / "before", "fresh-before")
+            after = self._fake_source(parent / "after", "fresh-after")
+            output_root = parent / "outputs"
+            receipt = preparer.prepare(
+                lane="ppt-auxiliary",
+                manifest=manifest,
+                before=before,
+                after=after,
+                output=parent / "receipt.json",
+                output_root=output_root,
+            )
+            self.assertEqual(receipt["output_root_initial"]["entries"], [])
+            self.assertEqual(list(output_root.iterdir()), [])
+            with self.assertRaises(preparer.PreparationError):
+                preparer.prepare(
+                    lane="ppt-auxiliary",
+                    manifest=manifest,
+                    before=before,
+                    after=after,
+                    output=parent / "second-receipt.json",
+                    output_root=output_root,
+                )
+
+    def test_final_qualification_rejects_all_refused_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            output_root = parent / "outputs"
+            output_root.mkdir()
+            identities = {"before": {}, "after": {}}
+            tooling = {"test": "tooling"}
+            prepared = {
+                "receipt": {
+                    "identities": identities,
+                    "tooling": tooling,
+                    "execution_receipt_relative": "execution-receipt.json",
+                },
+                "receipt_sha256": "preparation",
+                "lane": "ppt-auxiliary",
+                "output_root": output_root.resolve(),
+            }
+            routes = [route.json() for route in policy.PPT_ROUTES]
+            bindings = {
+                side: hashlib.sha256(validator._canonical(identities[side])).hexdigest()
+                for side in ("before", "after")
+            }
+            for route in policy.PPT_ROUTES:
+                output = output_root / route.output
+                output.parent.mkdir(parents=True, exist_ok=True)
+                output.write_bytes(route.route.encode())
+            rows = []
+            for route in policy.PPT_ROUTES:
+                output = output_root / route.output
+                artifact = {
+                    "path": str(output.resolve()),
+                    "sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+                    "bytes": output.stat().st_size,
+                    "relative_path": route.output,
+                }
+                rows.append({
+                    **route.json(),
+                    "status": route.status,
+                    "evidence": {"source_bindings": bindings, "output_artifact": artifact},
+                })
+            execution = {
+                "schema": "litchi.current-native-execution.v2",
+                "status": "completed",
+                "policy_sha256": policy.TRUSTED_POLICY.digest(),
+                "preparation_receipt_sha256": "preparation",
+                "lane": "ppt-auxiliary",
+                "output_root": str(output_root.resolve()),
+                "routes": routes,
+                "source_artifacts": identities,
+                "tooling": tooling,
+                "runner": validator._file_identity(ROOT / "tools/native_qualification_runner.py", "runner"),
+                "route_receipts": rows,
+            }
+            execution_path = output_root / "execution-receipt.json"
+            execution_path.write_bytes((json.dumps(execution, sort_keys=True, separators=(",", ":")) + "\n").encode())
+            qualification = {
+                "schema": policy.QUALIFICATION_SCHEMA,
+                "policy_schema": policy.POLICY_SCHEMA,
+                "policy_sha256": policy.TRUSTED_POLICY.digest(),
+                "preparation_receipt_sha256": "preparation",
+                "lane": "ppt-auxiliary",
+                "abba_order": list(policy.ABBA_ORDER),
+                "output_root": str(output_root.resolve()),
+                "source_artifacts": identities,
+                "tooling": tooling,
+                "routes": routes,
+                "results": rows,
+                "execution_receipt": {
+                    "path": str(execution_path.resolve()),
+                    "sha256": hashlib.sha256(execution_path.read_bytes()).hexdigest(),
+                    "bytes": execution_path.stat().st_size,
+                    "relative_path": "execution-receipt.json",
+                },
+            }
+            qualification_path = parent / "qualification.json"
+            qualification_path.write_bytes((json.dumps(qualification, sort_keys=True, separators=(",", ":")) + "\n").encode())
+            with mock.patch.object(validator, "validate_preparation", return_value=prepared):
+                validator.validate_qualification(qualification_path, parent / "preparation.json")
+                forged = copy.deepcopy(qualification)
+                for row in forged["results"]:
+                    row["status"] = "refused"
+                qualification_path.write_bytes((json.dumps(forged, sort_keys=True, separators=(",", ":")) + "\n").encode())
+                with self.assertRaises(validator.ValidationError):
+                    validator.validate_qualification(qualification_path, parent / "preparation.json")
 
     def test_manifest_mutation_is_checked_before_pending_admission(self) -> None:
         source_manifest = ROOT / "tools/native_qualification/manifests/ppt-current-v2.json"
