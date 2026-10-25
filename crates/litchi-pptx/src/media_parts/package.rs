@@ -6,7 +6,6 @@ use super::{
 };
 use crate::package::replay_index::ReplayIndex;
 use litchi_core::xml::ReaderOrigin;
-use std::collections::HashSet;
 
 /// # Errors
 ///

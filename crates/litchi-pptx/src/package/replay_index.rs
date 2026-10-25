@@ -72,24 +72,23 @@ impl<V: Clone> PersistentMap<V> {
         }
     }
 
-    fn first_matching<F>(&self, predicate: &F) -> Option<(&PackURI, &V)>
-    where
-        F: Fn(&V) -> bool,
-    {
-        fn visit<'a, V, F>(
-            node: Option<&'a Arc<PersistentNode<V>>>,
-            predicate: &F,
-        ) -> Option<(&'a PackURI, &'a V)>
-        where
-            F: Fn(&V) -> bool,
-        {
-            let node = node?;
-            visit(node.left.as_ref(), predicate)
-                .or_else(|| predicate(&node.value).then_some((&node.key, &node.value)))
-                .or_else(|| visit(node.right.as_ref(), predicate))
+    fn remove(&self, key: &PackURI) -> Self {
+        if self.get(key).is_none() {
+            return self.clone();
         }
+        Self {
+            root: remove_persistent(self.root.as_ref(), key),
+        }
+    }
 
-        visit(self.root.as_ref(), predicate)
+    fn first_key(&self) -> Option<&PackURI> {
+        let mut current = self.root.as_ref();
+        let mut first = None;
+        while let Some(node) = current {
+            first = Some(&node.key);
+            current = node.left.as_ref();
+        }
+        first
     }
 }
 
@@ -239,6 +238,57 @@ fn insert_persistent<V: Clone>(
     }
 }
 
+fn take_min<V: Clone>(
+    node: &Arc<PersistentNode<V>>,
+) -> (PackURI, V, Option<Arc<PersistentNode<V>>>) {
+    let Some(left) = node.left.as_ref() else {
+        return (node.key.clone(), node.value.clone(), node.right.clone());
+    };
+    let (key, value, new_left) = take_min(left);
+    let rebuilt = rebalance(make_node(
+        node.key.clone(),
+        node.value.clone(),
+        new_left,
+        node.right.clone(),
+    ));
+    (key, value, Some(rebuilt))
+}
+
+fn remove_persistent<V: Clone>(
+    node: Option<&Arc<PersistentNode<V>>>,
+    key: &PackURI,
+) -> Option<Arc<PersistentNode<V>>> {
+    let node = node?;
+    match key.as_str().cmp(node.key.as_str()) {
+        Ordering::Less => Some(rebalance(make_node(
+            node.key.clone(),
+            node.value.clone(),
+            remove_persistent(node.left.as_ref(), key),
+            node.right.clone(),
+        ))),
+        Ordering::Greater => Some(rebalance(make_node(
+            node.key.clone(),
+            node.value.clone(),
+            node.left.clone(),
+            remove_persistent(node.right.as_ref(), key),
+        ))),
+        Ordering::Equal => match (node.left.as_ref(), node.right.as_ref()) {
+            (None, None) => None,
+            (Some(left), None) => Some(left.clone()),
+            (None, Some(right)) => Some(right.clone()),
+            (Some(left), Some(right)) => {
+                let (successor_key, successor_value, successor_right) = take_min(right);
+                Some(rebalance(make_node(
+                    successor_key,
+                    successor_value,
+                    Some(left.clone()),
+                    successor_right,
+                )))
+            },
+        },
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum NotesEntry {
     Slide { bytes: u64 },
@@ -254,9 +304,9 @@ enum NotesEntry {
 /// a delta and never recomputed from the package.
 #[derive(Debug, Clone)]
 pub(crate) struct ReplayIndex {
-    notes_entries: PersistentMap<Option<NotesEntry>>,
-    notes_theme_users: PersistentMap<Option<Arc<[PackURI]>>>,
-    missing_themes: PersistentMap<Option<()>>,
+    notes_entries: PersistentMap<NotesEntry>,
+    notes_theme_users: PersistentMap<Arc<[PackURI]>>,
+    missing_themes: PersistentMap<()>,
     missing_theme_hint: Option<PackURI>,
     media_slides: PersistentMap<Arc<[PackURI]>>,
     notes_total_bytes: u64,
@@ -269,7 +319,7 @@ impl ReplayIndex {
         // Keep ingress reservations proportional to the expected relevant
         // edges. The maps grow fallibly as the graph reveals more owners.
         let part_count = package.part_count().min(256);
-        let mut notes_entries = HashMap::new();
+        let mut notes_entries: HashMap<PackURI, NotesEntry> = HashMap::new();
         notes_entries
             .try_reserve(part_count)
             .map_err(|source| Error::Allocation {
@@ -300,11 +350,7 @@ impl ReplayIndex {
                     notes_total_bytes = notes_total_bytes.checked_add(bytes).ok_or_else(|| {
                         Error::Invalid("PPTX replay notes index byte count overflow".into())
                     })?;
-                    insert_notes_entry(
-                        &mut notes_entries,
-                        name,
-                        Some(NotesEntry::Slide { bytes }),
-                    )?;
+                    insert_notes_entry(&mut notes_entries, name, NotesEntry::Slide { bytes })?;
                 },
                 ct::PML_NOTES_MASTER => {
                     let themes = notes_theme_targets(part.rels())?;
@@ -321,10 +367,10 @@ impl ReplayIndex {
                     insert_notes_entry(
                         &mut notes_entries,
                         name.clone(),
-                        Some(NotesEntry::Master {
+                        NotesEntry::Master {
                             bytes,
                             themes: Arc::from(themes.clone()),
-                        }),
+                        },
                     )?;
                     for theme in themes {
                         push_theme_user(&mut notes_theme_users, theme, name)?;
@@ -339,17 +385,16 @@ impl ReplayIndex {
             }
         }
 
-        let missing_themes = missing_theme_map(package, &notes_theme_users)?;
-        let missing_theme_hint = missing_themes
-            .iter()
-            .find_map(|(name, value)| value.is_some().then(|| name.clone()));
+        let missing_themes =
+            persistent_from_hash_map(missing_theme_map(package, &notes_theme_users)?);
+        let missing_theme_hint = missing_themes.first_key().cloned();
         let notes_entries = persistent_from_hash_map(notes_entries);
         let notes_theme_users = notes_theme_users
             .into_iter()
+            .filter(|(_, users)| !users.is_empty())
             .fold(PersistentMap::default(), |map, (name, users)| {
-                map.insert(name, Some(Arc::from(users)))
+                map.insert(name, Arc::from(users))
             });
-        let missing_themes = persistent_from_hash_map(missing_themes);
         let media_slides = media_slides
             .into_iter()
             .fold(PersistentMap::default(), |map, (name, slides)| {
@@ -376,14 +421,13 @@ impl ReplayIndex {
     }
 
     fn notes_entry(&self, name: &PackURI) -> Option<NotesEntry> {
-        self.notes_entries.get(name).cloned().flatten()
+        self.notes_entries.get(name).cloned()
     }
 
     fn theme_users(&self, name: &PackURI) -> Arc<[PackURI]> {
         self.notes_theme_users
             .get(name)
             .cloned()
-            .flatten()
             .unwrap_or_else(|| Arc::from([]))
     }
 
@@ -406,7 +450,7 @@ impl ReplayIndex {
             return Ok(self.clone());
         }
         let mut notes_entries = self.notes_entries.clone();
-        let mut notes_theme_users: HashMap<PackURI, Option<Vec<PackURI>>> = HashMap::new();
+        let mut notes_theme_users: HashMap<PackURI, Vec<PackURI>> = HashMap::new();
         let mut changed_masters = HashSet::new();
         let mut changed_themes = HashSet::new();
         let mut affected_themes = HashSet::new();
@@ -474,7 +518,10 @@ impl ReplayIndex {
                 let old_value = notes_contribution_if_present(old_entry.as_ref(), source)?;
                 let new_value = notes_contribution(new_entry.as_ref(), target)?;
                 notes_total_bytes = adjust_total(notes_total_bytes, old_value, new_value)?;
-                notes_entries = notes_entries.insert(name.clone(), new_entry.clone());
+                notes_entries = match new_entry.as_ref() {
+                    Some(entry) => notes_entries.insert(name.clone(), entry.clone()),
+                    None => notes_entries.remove(name),
+                };
             } else if old
                 .as_ref()
                 .is_some_and(|part| part.content_type() == ct::PML_NOTES_SLIDE)
@@ -482,7 +529,10 @@ impl ReplayIndex {
                     .as_ref()
                     .is_some_and(|part| part.content_type() == ct::PML_NOTES_SLIDE)
             {
-                notes_entries = notes_entries.insert(name.clone(), new_entry.clone());
+                notes_entries = match new_entry.as_ref() {
+                    Some(entry) => notes_entries.insert(name.clone(), entry.clone()),
+                    None => notes_entries.remove(name),
+                };
             }
             if changed_masters.contains(name) {
                 let old_themes = master_themes(old_entry.as_ref());
@@ -506,28 +556,17 @@ impl ReplayIndex {
         for theme in &affected_themes {
             let users = notes_theme_users
                 .get(theme)
-                .and_then(|users| users.as_ref())
                 .cloned()
                 .unwrap_or_else(|| self.theme_users(theme).to_vec());
             let new_missing = !users.is_empty() && optional_part(target, theme)?.is_none();
-            missing_themes = missing_themes.insert(theme.clone(), new_missing.then_some(()));
+            if new_missing {
+                missing_themes = missing_themes.insert(theme.clone(), ());
+            } else {
+                missing_themes = missing_themes.remove(theme);
+            }
         }
 
-        let missing_theme_hint = match self.missing_theme_hint.as_ref() {
-            Some(name) if affected_themes.contains(name) => {
-                if missing_themes.get(name).and_then(|value| *value).is_some() {
-                    Some(name.clone())
-                } else {
-                    missing_themes
-                        .first_matching(&|value| value.is_some())
-                        .map(|(name, _)| name.clone())
-                }
-            },
-            Some(name) => Some(name.clone()),
-            None => missing_themes
-                .first_matching(&|value| value.is_some())
-                .map(|(name, _)| name.clone()),
-        };
+        let missing_theme_hint = missing_themes.first_key().cloned();
 
         // A changed theme contributes to each unchanged notes master that
         // references it. Masters changed in this same patch were already
@@ -535,7 +574,6 @@ impl ReplayIndex {
         for theme in &changed_themes {
             let users = notes_theme_users
                 .get(theme)
-                .and_then(|users| users.as_ref())
                 .cloned()
                 .unwrap_or_else(|| self.theme_users(theme).to_vec());
             if users.is_empty() {
@@ -615,17 +653,26 @@ impl ReplayIndex {
 
         let mut media_slides = self.media_slides.clone();
         for (name, slides) in media_updates {
-            media_slides = media_slides.insert(name, Arc::from(slides));
+            media_slides = if slides.is_empty() {
+                media_slides.remove(&name)
+            } else {
+                media_slides.insert(name, Arc::from(slides))
+            };
         }
 
         Ok(Self {
             notes_total_bytes,
             notes_entries,
-            notes_theme_users: notes_theme_users
-                .into_iter()
-                .fold(self.notes_theme_users.clone(), |map, (name, users)| {
-                    map.insert(name, users.map(Arc::from))
-                }),
+            notes_theme_users: notes_theme_users.into_iter().fold(
+                self.notes_theme_users.clone(),
+                |map, (name, users)| {
+                    if users.is_empty() {
+                        map.remove(&name)
+                    } else {
+                        map.insert(name, Arc::from(users))
+                    }
+                },
+            ),
             missing_themes,
             missing_theme_hint,
             media_slides,
@@ -737,7 +784,7 @@ fn notes_theme_targets(rels: &Relationships) -> Result<Vec<PackURI>> {
 fn missing_theme_map(
     package: &OpcPackage,
     users: &HashMap<PackURI, Vec<PackURI>>,
-) -> Result<HashMap<PackURI, Option<()>>> {
+) -> Result<HashMap<PackURI, ()>> {
     let mut missing = HashMap::new();
     missing
         .try_reserve(users.len())
@@ -751,7 +798,7 @@ fn missing_theme_map(
                 resource: "PPTX replay missing notes themes",
                 source,
             })?;
-            missing.insert(theme.clone(), Some(()));
+            missing.insert(theme.clone(), ());
         }
     }
     Ok(missing)
@@ -802,9 +849,9 @@ fn push_media_slide(
 }
 
 fn insert_notes_entry(
-    entries: &mut HashMap<PackURI, Option<NotesEntry>>,
+    entries: &mut HashMap<PackURI, NotesEntry>,
     name: PackURI,
-    value: Option<NotesEntry>,
+    value: NotesEntry,
 ) -> Result<()> {
     entries.try_reserve(1).map_err(|source| Error::Allocation {
         resource: "PPTX replay notes entry",
@@ -840,7 +887,7 @@ fn adjust_total(total: u64, old: u64, new: u64) -> Result<u64> {
 }
 
 fn add_theme_user(
-    updates: &mut HashMap<PackURI, Option<Vec<PackURI>>>,
+    updates: &mut HashMap<PackURI, Vec<PackURI>>,
     index: &ReplayIndex,
     theme: PackURI,
     master: &PackURI,
@@ -851,9 +898,7 @@ fn add_theme_user(
     })?;
     let users = updates
         .entry(theme.clone())
-        .or_insert_with(|| Some(index.theme_users(&theme).to_vec()))
-        .as_mut()
-        .ok_or_else(|| Error::Invalid("PPTX replay notes theme users missing".into()))?;
+        .or_insert_with(|| index.theme_users(&theme).to_vec());
     users.try_reserve(1).map_err(|source| Error::Allocation {
         resource: "PPTX replay notes theme users",
         source,
@@ -863,7 +908,7 @@ fn add_theme_user(
 }
 
 fn remove_theme_user(
-    updates: &mut HashMap<PackURI, Option<Vec<PackURI>>>,
+    updates: &mut HashMap<PackURI, Vec<PackURI>>,
     index: &ReplayIndex,
     theme: PackURI,
     master: &PackURI,
@@ -874,11 +919,141 @@ fn remove_theme_user(
     })?;
     let users = updates
         .entry(theme.clone())
-        .or_insert_with(|| Some(index.theme_users(&theme).to_vec()))
-        .as_mut()
-        .ok_or_else(|| Error::Invalid("PPTX replay notes theme users missing".into()))?;
+        .or_insert_with(|| index.theme_users(&theme).to_vec());
     if let Some(position) = users.iter().position(|user| user == master) {
         users.remove(position);
     }
     Ok(())
+}
+
+#[cfg(test)]
+#[allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "persistent-map assertions use panic-on-failure test helpers"
+)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap as StdHashMap;
+
+    fn name(value: &str) -> PackURI {
+        PackURI::new(format!("/{value}")).expect("valid test URI")
+    }
+
+    fn check_tree<V>(node: Option<&Arc<PersistentNode<V>>>) -> usize {
+        let Some(node) = node else {
+            return 0;
+        };
+        let left = check_tree(node.left.as_ref());
+        let right = check_tree(node.right.as_ref());
+        assert!(left.abs_diff(right) <= 1, "AVL balance invariant failed");
+        assert_eq!(node.height, 1 + left.max(right));
+        1 + left.max(right)
+    }
+
+    fn collect_keys<V>(node: Option<&Arc<PersistentNode<V>>>, keys: &mut Vec<String>) {
+        let Some(node) = node else {
+            return;
+        };
+        collect_keys(node.left.as_ref(), keys);
+        keys.push(node.key.as_str().to_owned());
+        collect_keys(node.right.as_ref(), keys);
+    }
+
+    fn assert_valid<V>(map: &PersistentMap<V>) {
+        check_tree(map.root.as_ref());
+        let mut keys = Vec::new();
+        collect_keys(map.root.as_ref(), &mut keys);
+        assert!(keys.windows(2).all(|window| window[0] < window[1]));
+    }
+
+    fn exercise_insertions(names: &[&str]) {
+        let mut map = PersistentMap::default();
+        let mut expected = StdHashMap::new();
+        for (index, value) in names.iter().enumerate() {
+            let key = name(value);
+            map = map.insert(key.clone(), index);
+            expected.insert(key.clone(), index);
+            assert_eq!(map.get(&key), expected.get(&key));
+            assert_valid(&map);
+        }
+    }
+
+    #[test]
+    fn persistent_map_keeps_avl_balance_for_ordered_and_zig_zag_inserts() {
+        exercise_insertions(&["a", "b", "c", "d", "e", "f", "g", "h"]);
+        exercise_insertions(&["h", "g", "f", "e", "d", "c", "b", "a"]);
+        exercise_insertions(&["m", "a", "z", "b", "y", "c", "x", "d", "w"]);
+    }
+
+    #[test]
+    fn persistent_map_replacement_deletion_and_old_root_persistence() {
+        let mut base = PersistentMap::default();
+        for (index, value) in ["d", "b", "f", "a", "c", "e", "g", "h"]
+            .into_iter()
+            .enumerate()
+        {
+            base = base.insert(name(value), index);
+        }
+        assert_valid(&base);
+
+        let replaced_key = name("d");
+        let replaced = base.insert(replaced_key.clone(), 99);
+        let mut expected = StdHashMap::new();
+        for (index, value) in ["d", "b", "f", "a", "c", "e", "g", "h"]
+            .into_iter()
+            .enumerate()
+        {
+            expected.insert(name(value), index);
+        }
+        expected.insert(replaced_key.clone(), 99);
+        assert_eq!(base.get(&replaced_key), Some(&0));
+        assert_eq!(replaced.get(&replaced_key), expected.get(&replaced_key));
+        assert_valid(&replaced);
+
+        let all_keys = ["d", "b", "f", "a", "c", "e", "g", "h"];
+        for value in ["a", "g", "b", "d"] {
+            let key = name(value);
+            let before = replaced.clone();
+            let after = replaced.remove(&key);
+            let mut after_expected = expected.clone();
+            after_expected.remove(&key);
+            assert!(before.get(&key).is_some());
+            assert!(after.get(&key).is_none());
+            for candidate in all_keys {
+                let candidate = name(candidate);
+                assert_eq!(after.get(&candidate), after_expected.get(&candidate));
+            }
+            assert_eq!(before.get(&replaced_key), expected.get(&replaced_key));
+            assert_valid(&before);
+            assert_valid(&after);
+        }
+
+        let absent = name("absent");
+        let unchanged = replaced.remove(&absent);
+        assert!(
+            matches!((&replaced.root, &unchanged.root), (Some(left), Some(right)) if Arc::ptr_eq(left, right))
+        );
+        assert_valid(&unchanged);
+
+        let deleted = replaced.remove(&replaced_key);
+        assert!(deleted.get(&replaced_key).is_none());
+        assert_eq!(replaced.get(&replaced_key), Some(&99));
+        assert_valid(&deleted);
+    }
+
+    #[test]
+    fn persistent_map_distinguishes_absent_from_present_option_value() {
+        let present = name("present-none");
+        let absent = name("absent");
+        let map = PersistentMap::default().insert(present.clone(), None::<usize>);
+        assert!(map.get(&present).is_some_and(|value| value.is_none()));
+        assert!(map.get(&absent).is_none());
+        assert_valid(&map);
+
+        let removed = map.remove(&present);
+        assert!(removed.get(&present).is_none());
+        assert!(map.get(&present).is_some());
+        assert_valid(&removed);
+    }
 }

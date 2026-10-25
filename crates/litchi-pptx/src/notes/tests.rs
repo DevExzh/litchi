@@ -194,6 +194,35 @@ fn replay_notes_index_counts_all_theme_edges_and_refuses_missing_targets() {
         Err(Error::Opc(litchi_opc::OpcError::PartNotFound(_)))
     ));
     assert!(!missing.contains_part(&missing_theme));
+
+    let mut cleared = missing.clone();
+    cleared
+        .get_part_mut(&master_name)
+        .unwrap()
+        .rels_mut()
+        .remove("rIdMissingTheme");
+    let cleared_index = missing_index
+        .update(&missing, &cleared, std::slice::from_ref(&master_name))
+        .unwrap();
+    assert!(cleared_index.missing_theme_name().unwrap().is_none());
+    assert!(super::package::validate_replay_total(&cleared_index, Limits::DEFAULT).is_ok());
+
+    let master_bytes = package.get_part(&master_name).unwrap().blob().len() as u64;
+    let canonical_theme = PackURI::new("/ppt/theme/theme2.xml").unwrap();
+    let canonical_theme_bytes = package.get_part(&canonical_theme).unwrap().blob().len() as u64;
+    let mut without_master = package.clone();
+    without_master.remove_part(&master_name);
+    let removed_master_index = base
+        .update(
+            &package,
+            &without_master,
+            std::slice::from_ref(&master_name),
+        )
+        .unwrap();
+    assert_eq!(
+        removed_master_index.notes_total_bytes(),
+        base.notes_total_bytes() - master_bytes - canonical_theme_bytes
+    );
 }
 
 #[test]
