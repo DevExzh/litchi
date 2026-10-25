@@ -5191,3 +5191,35 @@ See [0063](0063-source-pptx-modern-comments.md).
   remain active engineering work, with no exception accepted. The workspace
   cleanup holds are released; the protected constructor probe is unchanged.
   Final gate, census and native/performance qualification remain open.
+
+- Coordinator composed compiler and source-review checkpoint (2026-10-25):
+  All nine composed compiler rows pass on detached `f14235da95`. The four
+  spreadsheet/ops/facade checks pass first; the following row stops on an
+  invalid DOCX feature flag in the command. The corrected five-row
+  continuation passes Formula/DOC/DOCX, the scoped facade/ops consumers, and
+  both standalone tools. Root verifies the actual receipts and preserves the
+  failed attempt. Record 0362ul85 binds all commands, logs, traces and source
+  identities. Final target usage is 3,687,603,132 bytes; the slot is released.
+  These are compiler checks, with no native execution or timing claim.
+
+  Numbers `6417a19464` reaches focused tests and exposes an output-preflight
+  budget error in two mixed scalar batches. Source correction `67613f5dd0`
+  passes independent review: it uses the selected tile output ceiling while
+  retaining independent work/input/tail accounting. Its actual guarded rerun
+  remains in progress; no final validation result is claimed yet.
+
+  PPTX history return 82a at `fac5957f84` passes scoped source review, pending
+  the shared typed-error migration. Record 0362ul84 owns that migration and
+  every consumer of the root limit errors. The 61 physical accounting and
+  no-op identity repair is under review. The 62 authoring-index repair passes
+  review, while theme-edge accounting, missing-target behavior, history-chain
+  cost and eager payload decoding remain required returns. Structural 81a
+  continues alias and preallocation repairs. All PPTX work still requires
+  combined review and actual validation before integration.
+
+  Census reconciliation now derives 68 glossary profiles plus 16 package-only
+  profiles, separately from the 68-package all-feature inventory. Its initial
+  claims of unresolved ODF/CFB/ZIP limit twins were stale; root checked current
+  signatures and returned the record for correction. No duplicate engineering
+  scope or generic exemption is accepted from those historical claims. Only
+  redaction audit 22 remains deferred. Nothing is pushed.
