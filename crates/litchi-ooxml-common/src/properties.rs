@@ -47,6 +47,7 @@ pub use transaction::{
     Change, Commit, Diagnostics, Edit, EditOptions, Error, Family, FamilyAdmission, LimitKind,
     OwnerAdmission, Patch, Plan, Snapshot,
 };
+#[cfg(test)]
 pub(crate) use write::write_core;
 
 use crate::Result;
@@ -390,41 +391,6 @@ pub fn read_prepared_with_report(
     Ok(read_core_prepared_with_report(package, report)?.map(|core| core.metadata()))
 }
 
-/// Store the core fields of `metadata` in a package's core-properties part.
-///
-/// The existing part's dialect, target path and relationship ID are
-/// retained, and every unchanged field keeps its lexical form. A missing
-/// part is created as `/docProps/core.xml` (or the first free numbered
-/// name). Returns whether the package changed. An equal value publishes
-/// nothing, so a signed package keeps its signature; a change to a signed
-/// package is refused before it mutates anything (ADR 0006).
-///
-/// # Errors
-///
-/// Returns [`crate::Error::Invalid`] when `metadata` sets a field core
-/// properties cannot store (application, custom and format-only fields are
-/// written through the package's metadata transaction), [`crate::Error::Opc`]
-/// with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a change to a signed package, and an error when a value violates
-/// OOXML constraints or a bound.
-#[cfg_attr(not(test), allow(dead_code))]
-pub(crate) fn write(package: &mut OpcPackage, metadata: &Metadata) -> Result<bool> {
-    ensure_core_only(metadata)?;
-    let base = match graph::inspect(package)?.part {
-        Some(part) => {
-            let current = package.get_part(&part)?;
-            let xml = std::str::from_utf8(current.blob()).map_err(|error| {
-                crate::Error::Xml(format!("invalid UTF-8 in core properties: {error}"))
-            })?;
-            Some(read::decode(xml)?.0)
-        },
-        None => None,
-    };
-    let core = Core::merged(base.as_ref(), metadata)?;
-    write_core(package, core)
-}
-
 /// A host package's authoritative, mutation-tracked core-properties slot.
 ///
 /// This is public so host crates can share the implementation, but ordinary
@@ -619,15 +585,22 @@ mod tests {
     }
 
     #[test]
-    fn core_writes_refuse_fields_the_part_cannot_store() {
-        let mut package = OpcPackage::new();
+    fn complete_edit_refuses_fields_no_family_can_store() {
+        let package = OpcPackage::new();
         let metadata = Metadata {
             title: Some("T".to_owned()),
-            company: Some("C".to_owned()),
+            content_type: Some("application/example".to_owned()),
             ..Metadata::default()
         };
-        let error = write(&mut package, &metadata).unwrap_err();
-        assert!(error.to_string().contains("`company`"), "{error}");
+        let mut edit = Edit::new(&package, crate::custom::Host::Word).unwrap();
+        edit.set_metadata(metadata);
+        let error = edit.commit().unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Unsupported {
+                field: Field::ContentType
+            }
+        ));
         assert!(
             read_with_report(&package, &mut ToleranceReport::default())
                 .unwrap()
