@@ -634,7 +634,20 @@ class QuietAbbaWrapperTests(unittest.TestCase):
             [sys.executable, "-c", "import sys; sys.exit(7)"],
             start_new_session=True,
         )
-        time.sleep(0.1)
+        deadline = time.monotonic() + 5.0
+        while True:
+            observed = os.waitid(
+                os.P_PID,
+                process.pid,
+                os.WEXITED | os.WNOHANG | os.WNOWAIT,
+            )
+            if observed is not None and observed.si_pid == process.pid:
+                break
+            if time.monotonic() >= deadline:
+                process.kill()
+                process.wait()
+                self.fail("top-level Popen child did not exit within the observation deadline")
+            time.sleep(0.01)
         identity = wrapper.proc_identity(process.pid)
         self.assertIsNotNone(identity)
         state = {
