@@ -8,7 +8,7 @@ use crate::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::{BlobPart, Part};
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, TargetMode};
 use litchi_vba::{Limits, project::Project};
 use std::sync::Arc;
 
@@ -34,6 +34,97 @@ struct ExistingGraph {
     relationship_id: String,
     project_part: PackURI,
     supplemental: Option<(PackURI, String)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RelationshipState {
+    id: String,
+    relationship_type: String,
+    target: String,
+    target_mode: TargetMode,
+}
+
+impl RelationshipState {
+    fn capture(value: &litchi_opc::Relationship) -> Self {
+        Self {
+            id: value.r_id().to_owned(),
+            relationship_type: value.reltype().to_owned(),
+            target: value.target_ref().to_owned(),
+            target_mode: value.target_mode(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct PartState {
+    name: PackURI,
+    content_type: String,
+    data: Arc<Vec<u8>>,
+    relationships: Vec<RelationshipState>,
+}
+
+impl PartState {
+    fn capture(part: &dyn Part) -> Self {
+        let mut relationships = part
+            .rels()
+            .iter()
+            .map(RelationshipState::capture)
+            .collect::<Vec<_>>();
+        relationships.sort_unstable_by(|left, right| left.id.cmp(&right.id));
+        Self {
+            name: part.partname().clone(),
+            content_type: part.content_type().to_owned(),
+            data: part.blob_arc(),
+            relationships,
+        }
+    }
+
+    fn to_part(&self) -> Result<BlobPart> {
+        let mut part = BlobPart::new_shared(
+            self.name.clone(),
+            self.content_type.clone(),
+            Arc::clone(&self.data),
+        );
+        for relationship in &self.relationships {
+            part.rels_mut().try_add_relationship(
+                relationship.relationship_type.clone(),
+                relationship.target.clone(),
+                relationship.id.clone(),
+                relationship.target_mode,
+            )?;
+        }
+        Ok(part)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct GraphSnapshot {
+    host: Host,
+    source: PartState,
+    project: Option<PartState>,
+    supplemental: Option<PartState>,
+}
+
+impl GraphSnapshot {
+    fn capture(package: &OpcPackage, source_part: &PackURI, host: Host) -> Result<Self> {
+        let source = package.get_part(source_part)?;
+        let existing = inspect_existing_graph(package, source_part, host)?;
+        let project = existing
+            .as_ref()
+            .map(|graph| package.get_part(&graph.project_part))
+            .transpose()?;
+        let supplemental = existing
+            .as_ref()
+            .and_then(|graph| graph.supplemental.as_ref().map(|(part, _)| part))
+            .map(|part| package.get_part(part))
+            .transpose()?;
+        Ok(Self {
+            host,
+            source: PartState::capture(source),
+            project: project.map(PartState::capture),
+            supplemental: supplemental.map(PartState::capture),
+        })
+    }
 }
 
 impl Host {
@@ -114,37 +205,6 @@ pub fn read_project_part(
     Project::read(part.blob(), limits).map_err(Error::from)
 }
 
-/// Replace or attach the one VBA graph allowed for an OOXML main part.
-///
-/// Storing always republishes the graph, so a signed package is refused
-/// before it is changed (ADR 0006): remove the signature explicitly first,
-/// with [`OpcPackage::unsign`] or the format facade's `unsign`.
-/// # Errors
-///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a signed package, and an error when input violates OOXML constraints,
-/// exceeds a configured bound, or an underlying XML or package operation
-/// fails.
-pub fn store_project_graph(
-    package: &mut OpcPackage,
-    source_part: &PackURI,
-    host: Host,
-    project_payload: Arc<Vec<u8>>,
-    word_supplemental_xml: Option<Vec<u8>>,
-) -> Result<()> {
-    let mut staged = package.clone();
-    store_project_graph_in_place(
-        &mut staged,
-        source_part,
-        host,
-        project_payload,
-        word_supplemental_xml,
-    )?;
-    *package = staged;
-    Ok(())
-}
-
 fn store_project_graph_in_place(
     package: &mut OpcPackage,
     source_part: &PackURI,
@@ -221,20 +281,7 @@ fn store_project_graph_in_place(
     Ok(())
 }
 
-/// Remove the complete VBA graph and restore the corresponding non-macro main type.
-///
-/// An absent graph returns `Ok(false)` and keeps a signed package's
-/// signature; removing a present graph from a signed package is refused
-/// before it is changed (ADR 0006): remove the signature explicitly first,
-/// with [`OpcPackage::unsign`] or the format facade's `unsign`.
-/// # Errors
-///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a change to a signed package, and an error when input violates OOXML
-/// constraints, exceeds a configured bound, or an underlying XML or package
-/// operation fails.
-pub fn remove_project_graph(
+fn remove_project_graph_on_candidate(
     package: &mut OpcPackage,
     source_part: &PackURI,
     host: Host,
@@ -263,9 +310,7 @@ pub fn remove_project_graph(
     }
 
     refuse_signed_change(package)?;
-    let mut staged = package.clone();
-    remove_project_graph_in_place(&mut staged, source_part, graph, non_macro_content_type)?;
-    *package = staged;
+    remove_project_graph_in_place(package, source_part, graph, non_macro_content_type)?;
     Ok(true)
 }
 
@@ -282,6 +327,268 @@ fn remove_project_graph_in_place(
     if let Some((supplemental, _)) = graph.supplemental {
         package.remove_part(&supplemental);
     }
+    settle_unsigned_change(package)?;
+    Ok(())
+}
+
+/// A staged VBA-project graph edit over one immutable OPC package.
+///
+/// The edit captures only the selected host graph and shares every package
+/// payload through the OPC package clone. Dropping it discards the candidate.
+#[derive(Clone)]
+pub struct Edit {
+    source: OpcPackage,
+    candidate: OpcPackage,
+    before: GraphSnapshot,
+    source_part: PackURI,
+    host: Host,
+}
+
+impl std::fmt::Debug for Edit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("host", &self.host)
+            .field("source_part", &self.source_part)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Edit {
+    /// Capture the selected host's main-part graph and start an isolated edit.
+    ///
+    /// The package is cloned only as a structural candidate; unchanged part
+    /// payloads remain shared. The source package is never mutated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the host main part or its existing VBA graph is
+    /// malformed.
+    pub fn new(package: &OpcPackage, host: Host) -> Result<Self> {
+        let source_part = package.main_document_part()?.partname().clone();
+        let before = GraphSnapshot::capture(package, &source_part, host)?;
+        Ok(Self {
+            source: package.clone(),
+            candidate: package.clone(),
+            before,
+            source_part,
+            host,
+        })
+    }
+
+    /// Attach or replace the opaque VBA project graph.
+    ///
+    /// Word requires supplemental XML; Excel and PowerPoint reject it. The
+    /// payload is retained byte-for-byte and is never interpreted here.
+    ///
+    /// # Errors
+    ///
+    /// Returns graph validation errors and the signed-package refusal.
+    pub fn store(
+        &mut self,
+        project_payload: Arc<Vec<u8>>,
+        word_supplemental_xml: Option<Vec<u8>>,
+    ) -> Result<()> {
+        let mut candidate = self.candidate.clone();
+        store_project_graph_in_place(
+            &mut candidate,
+            &self.source_part,
+            self.host,
+            project_payload,
+            word_supplemental_xml,
+        )?;
+        self.candidate = candidate;
+        Ok(())
+    }
+
+    /// Remove the selected host's complete VBA graph.
+    ///
+    /// Returns `false` for an absent graph; that exact no-op keeps the source
+    /// package and its signature unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns graph validation errors and the signed-package refusal.
+    pub fn remove(&mut self) -> Result<bool> {
+        let mut candidate = self.candidate.clone();
+        let changed =
+            remove_project_graph_on_candidate(&mut candidate, &self.source_part, self.host)?;
+        self.candidate = candidate;
+        Ok(changed)
+    }
+
+    /// Discard every staged graph change.
+    pub fn reset(&mut self) {
+        self.candidate = self.source.clone();
+    }
+
+    /// Publish the staged graph as a new package, exact patch, and diagnostics.
+    ///
+    /// An unchanged edit publishes the source package itself, preserving
+    /// signatures and byte identity. A changed edit of a signed package is
+    /// refused before publication.
+    ///
+    /// # Errors
+    ///
+    /// Returns graph validation errors and the signed-package refusal.
+    pub fn commit(self) -> Result<Commit> {
+        let after = GraphSnapshot::capture(&self.candidate, &self.source_part, self.host)?;
+        let patch = Patch {
+            before: self.before,
+            after,
+        };
+        if patch.is_noop() {
+            return Ok(Commit::new(self.source, patch, Diagnostics::UNCHANGED));
+        }
+        refuse_signed_change(&self.source)?;
+        Ok(Commit::new(self.candidate, patch, Diagnostics::CHANGED))
+    }
+}
+
+/// A complete, reversible VBA-project graph patch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Patch {
+    before: GraphSnapshot,
+    after: GraphSnapshot,
+}
+
+impl Patch {
+    /// Whether this patch is an exact graph no-op.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before == self.after
+    }
+
+    /// Return the exact inverse patch without reinterpreting VBA bytes.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: self.after.clone(),
+            after: self.before.clone(),
+        }
+    }
+
+    /// Replay this patch onto a package with the recorded graph base.
+    ///
+    /// The recipient may contain unrelated package changes; the selected VBA
+    /// graph must match exactly. A changed patch is published on a cloned
+    /// package and the recipient remains unchanged on every error.
+    ///
+    /// # Errors
+    ///
+    /// Returns a relationship error when the selected graph base differs and
+    /// the signed-package refusal for a changed recipient.
+    pub fn apply(&self, package: &OpcPackage) -> Result<Commit> {
+        let current = GraphSnapshot::capture(package, &self.before.source.name, self.before.host)?;
+        if current != self.before {
+            return Err(Error::Relationship(
+                "VBA patch source graph changed".to_string(),
+            ));
+        }
+        if self.is_noop() {
+            return Ok(Commit::new(
+                package.clone(),
+                self.clone(),
+                Diagnostics::UNCHANGED,
+            ));
+        }
+        refuse_signed_change(package)?;
+        let mut candidate = package.clone();
+        restore_graph_in_place(&mut candidate, &self.after)?;
+        let resulting =
+            GraphSnapshot::capture(&candidate, &self.after.source.name, self.after.host)?;
+        if resulting != self.after {
+            return Err(Error::Relationship(
+                "VBA patch publication changed the staged graph".to_string(),
+            ));
+        }
+        Ok(Commit::new(candidate, self.clone(), Diagnostics::CHANGED))
+    }
+}
+
+/// The published VBA graph commit triad.
+pub type Commit = litchi_core::edit::Commit<OpcPackage, Patch>;
+
+/// Minimal content-free commit diagnostics.
+pub use litchi_core::edit::Diagnostics;
+
+fn restore_graph_in_place(package: &mut OpcPackage, target: &GraphSnapshot) -> Result<()> {
+    let source_part = &target.source.name;
+    let existing = inspect_existing_graph(package, source_part, target.host)?;
+    if let Some(graph) = &existing {
+        ensure_exclusive_inbound_reference(
+            package,
+            &graph.project_part,
+            source_part,
+            &graph.relationship_id,
+        )?;
+        if let Some((supplemental, relationship_id)) = &graph.supplemental {
+            ensure_exclusive_inbound_reference(
+                package,
+                supplemental,
+                &graph.project_part,
+                relationship_id,
+            )?;
+        }
+    }
+    refuse_signed_change(package)?;
+    if let Some(graph) = existing {
+        package
+            .get_part_mut(source_part)?
+            .rels_mut()
+            .remove(&graph.relationship_id);
+        package.remove_part(&graph.project_part);
+        if let Some((supplemental, _)) = graph.supplemental {
+            package.remove_part(&supplemental);
+        }
+    }
+
+    if let Some(supplemental) = &target.supplemental {
+        ensure_no_inbound_reference(package, &supplemental.name)?;
+        package.try_add_part(Box::new(supplemental.to_part()?))?;
+    }
+    if let Some(project) = &target.project {
+        ensure_no_inbound_reference(package, &project.name)?;
+        package.try_add_part(Box::new(project.to_part()?))?;
+    }
+
+    let source = package.get_part_mut(source_part)?;
+    if source.blob() != target.source.data.as_slice() {
+        return Err(Error::Relationship(
+            "VBA patch source part bytes changed".to_string(),
+        ));
+    }
+    let current_relationships = source
+        .rels()
+        .iter()
+        .map(RelationshipState::capture)
+        .collect::<Vec<_>>();
+    for current in current_relationships {
+        let retained = target
+            .source
+            .relationships
+            .iter()
+            .any(|candidate| candidate == &current);
+        if !retained {
+            source.rels_mut().remove(&current.id);
+        }
+    }
+    for relationship in &target.source.relationships {
+        let present = source
+            .rels()
+            .get(&relationship.id)
+            .map(RelationshipState::capture);
+        if present.as_ref() != Some(relationship) {
+            source.rels_mut().remove(&relationship.id);
+            source.rels_mut().try_add_relationship(
+                relationship.relationship_type.clone(),
+                relationship.target.clone(),
+                relationship.id.clone(),
+                relationship.target_mode,
+            )?;
+        }
+    }
+    source.set_content_type(target.source.content_type.clone())?;
     settle_unsigned_change(package)?;
     Ok(())
 }
@@ -623,14 +930,14 @@ mod tests {
             );
 
             assert!(
-                store_project_graph(
-                    &mut package,
-                    &source_name,
-                    Host::Word,
-                    Arc::new(b"validated payload".to_vec()),
-                    Some(b"<wne:vbaSuppData/>".to_vec()),
-                )
-                .is_err()
+                Edit::new(&package, Host::Word)
+                    .and_then(|mut edit| {
+                        edit.store(
+                            Arc::new(b"validated payload".to_vec()),
+                            Some(b"<wne:vbaSuppData/>".to_vec()),
+                        )
+                    })
+                    .is_err()
             );
 
             assert_eq!(package.part_count(), before_parts);
@@ -665,23 +972,22 @@ mod tests {
                 b"workbook".to_vec(),
             )))
             .unwrap();
+        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
         package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
         let parts = package.part_count();
 
         // Removing an absent graph publishes nothing and keeps the signature.
-        assert!(!remove_project_graph(&mut package, &source_name, Host::Excel).unwrap());
+        let mut edit = Edit::new(&package, Host::Excel).unwrap();
+        assert!(!edit.remove().unwrap());
+        let _ = edit.commit().unwrap();
         assert!(package.is_signed());
         // Storing changes the signed package, so it is refused (ADR 0006).
-        let store = |package: &mut OpcPackage| {
-            store_project_graph(
-                package,
-                &source_name,
-                Host::Excel,
-                Arc::new(b"project".to_vec()),
-                None,
-            )
+        let store = |package: &OpcPackage| {
+            let mut edit = Edit::new(package, Host::Excel)?;
+            edit.store(Arc::new(b"project".to_vec()), None)?;
+            edit.commit()
         };
-        assert!(refused(store(&mut package)));
+        assert!(refused(store(&package)));
         assert!(package.is_signed());
         assert_eq!(package.part_count(), parts);
         assert_eq!(
@@ -690,15 +996,69 @@ mod tests {
         );
 
         package.unsign();
-        store(&mut package).unwrap();
+        package = store(&package).unwrap().into_package();
         package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-        assert!(refused(
-            remove_project_graph(&mut package, &source_name, Host::Excel).map(|_| ())
-        ));
+        assert!(refused(Edit::new(&package, Host::Excel).and_then(
+            |mut edit| {
+                edit.remove()?;
+                edit.commit().map(|_| ())
+            }
+        )));
         assert!(package.get_part(&project_name).is_ok());
         package.unsign();
-        assert!(remove_project_graph(&mut package, &source_name, Host::Excel).unwrap());
+        let mut edit = Edit::new(&package, Host::Excel).unwrap();
+        let changed = edit.remove().unwrap();
+        let next = edit.commit().unwrap().into_package();
+        assert!(changed);
+        package = next;
         assert!(package.get_part(&project_name).is_err());
+    }
+
+    #[test]
+    fn semantic_helpers_publish_candidates_without_mutating_source() {
+        let source_name = PackURI::new("/xl/workbook.xml").unwrap();
+        let mut package = OpcPackage::new();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                source_name.clone(),
+                ct::SML_SHEET_MAIN.to_string(),
+                b"workbook".to_vec(),
+            )))
+            .unwrap();
+
+        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
+        let mut edit = Edit::new(&package, Host::Excel).unwrap();
+        edit.store(Arc::new(b"project".to_vec()), None).unwrap();
+        let stored = edit.commit().unwrap().into_package();
+        assert!(
+            package
+                .get_part(&PackURI::new(EXCEL_PROJECT_PART).unwrap())
+                .is_err()
+        );
+        assert_eq!(package.part_count(), 1);
+        assert_eq!(
+            stored.get_part(&source_name).unwrap().content_type(),
+            ct::SML_SHEET_MACRO_MAIN
+        );
+
+        let mut edit = Edit::new(&stored, Host::Excel).unwrap();
+        let changed = edit.remove().unwrap();
+        let removed = edit.commit().unwrap().into_package();
+        assert!(changed);
+        assert!(
+            stored
+                .get_part(&PackURI::new(EXCEL_PROJECT_PART).unwrap())
+                .is_ok()
+        );
+        assert!(
+            removed
+                .get_part(&PackURI::new(EXCEL_PROJECT_PART).unwrap())
+                .is_err()
+        );
+        assert_eq!(
+            removed.get_part(&source_name).unwrap().content_type(),
+            ct::SML_SHEET_MAIN
+        );
     }
 
     #[test]
@@ -723,9 +1083,11 @@ mod tests {
                 b"project".to_vec(),
             )))
             .unwrap();
+        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
         let before_parts = package.part_count();
 
-        assert!(remove_project_graph(&mut package, &source_name, Host::Excel).is_err());
+        let mut edit = Edit::new(&package, Host::Excel).unwrap();
+        assert!(edit.remove().is_err());
 
         assert_eq!(package.part_count(), before_parts);
         assert!(package.get_part(&project_name).is_ok());
