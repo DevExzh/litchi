@@ -1055,7 +1055,7 @@ fn escaped_attribute_length(value: &str) -> Option<usize> {
             '<' | '>' => 4,
             '"' => 6,
             '\t' => 5,
-            '\n' | '\r' => 6,
+            '\n' | '\r' => 5,
             _ => character.len_utf8(),
         };
         length.checked_add(encoded)

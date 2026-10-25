@@ -1520,6 +1520,39 @@ mod tests {
     }
 
     #[test]
+    fn writer_counts_numeric_whitespace_escapes_exactly() {
+        let mut value = author();
+        value.name = "\n\r".repeat(6);
+        let physical = value.name.len() * b"&#xA;".len();
+        assert!(physical > Conformance::Strict.namespace().len());
+        let exact = Limits {
+            max_attribute_bytes: physical,
+            ..Limits::DEFAULT
+        };
+        let xml = write_comment_authors(&[value.clone()], Conformance::Strict, exact).unwrap();
+        assert_eq!(parse_comment_authors(&xml, exact).unwrap(), vec![value.clone()]);
+        let error = write_comment_authors(
+            &[value],
+            Conformance::Strict,
+            Limits {
+                max_attribute_bytes: physical - 1,
+                ..Limits::DEFAULT
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(
+                    crate::error::CodecLimitKind::XmlAttributeBytes
+                ),
+                observed,
+                maximum,
+            } if observed == physical && maximum == physical - 1
+        ));
+    }
+
+    #[test]
     fn raw_policy_admits_exact_wire_and_refuses_one_byte_under() {
         let authors = vec![author()];
         let comments = vec![comment()];
