@@ -4,6 +4,7 @@ use super::model::{
     FileMoniker, Hyperlink, HyperlinkMoniker, HyperlinkRange, ItemMoniker, TOOLTIP_RECORD_TYPE,
     UrlMoniker,
 };
+use crate::SourceLimits;
 use crate::error::{Error, Result};
 
 pub(super) const URL_MONIKER_CLSID: [u8; 16] = [
@@ -19,10 +20,24 @@ pub(super) const URL_SERIAL_GUID: [u8; 16] = [
     0x79, 0x58, 0x81, 0xF4, 0x3B, 0x1D, 0x7F, 0x48, 0xAF, 0x2C, 0x82, 0x5D, 0xC4, 0x85, 0x27, 0x63,
 ];
 
+/// Parse one complete `HLink` payload under the caller's source profile.
+///
+/// The display name, target frame, location, and moniker strings are all
+/// variable-size fields and can be copied into the returned model. The
+/// profile is required at this raw record boundary so a detached caller can
+/// narrow the retained payload before decoding any of those fields.
+///
 /// # Errors
 ///
 /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-pub fn parse_hlink_record(data: &[u8]) -> Result<Hyperlink> {
+pub fn parse_hlink_record(data: &[u8], limits: &SourceLimits) -> Result<Hyperlink> {
+    if data.len() > limits.max_entry_bytes() {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::EntryBytes,
+            observed: u64::try_from(data.len()).unwrap_or(u64::MAX),
+            maximum: u64::try_from(limits.max_entry_bytes()).unwrap_or(u64::MAX),
+        });
+    }
     let mut cursor = Cursor::new(data);
     let range = cursor.range()?;
     let class_id = cursor.guid()?;
@@ -90,7 +105,17 @@ pub fn parse_hlink_record(data: &[u8]) -> Result<Hyperlink> {
     })
 }
 
-pub(super) fn parse_tooltip(data: &[u8]) -> Result<(HyperlinkRange, String)> {
+pub(super) fn parse_tooltip(
+    data: &[u8],
+    limits: &SourceLimits,
+) -> Result<(HyperlinkRange, String)> {
+    if data.len() > limits.max_entry_bytes() {
+        return Err(Error::Limit {
+            kind: crate::LimitKind::EntryBytes,
+            observed: u64::try_from(data.len()).unwrap_or(u64::MAX),
+            maximum: u64::try_from(limits.max_entry_bytes()).unwrap_or(u64::MAX),
+        });
+    }
     if data.len() < 14 {
         return invalid(format!("HLinkTooltip payload is too short: {}", data.len()));
     }

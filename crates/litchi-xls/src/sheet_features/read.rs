@@ -6,7 +6,7 @@ use super::stream::{
     Sheet, VERTICAL_PAGE_BREAKS, u16_at, u32_at,
 };
 use super::{Area, FeatureSet, PageBreak};
-use crate::Result;
+use crate::{Result, SourceLimits};
 use crate::formula::FormulaContext;
 
 /// The features of one worksheet a [`FeatureSet`] selected.
@@ -353,11 +353,16 @@ fn rgb_of(palette: &crate::Palette, icv: u32) -> Option<u32> {
 }
 
 /// Every feature `select` names on the worksheet at catalog position `sheet`.
-pub(super) fn features(stream_bytes: &[u8], sheet: usize, select: FeatureSet) -> Result<Features> {
+pub(super) fn features(
+    stream_bytes: &[u8],
+    sheet: usize,
+    select: FeatureSet,
+    limits: &SourceLimits,
+) -> Result<Features> {
     let globals = Globals::parse(stream_bytes)?;
     let start = globals.worksheet(sheet)?;
     let layout = Sheet::parse(stream_bytes, start)?;
-    read(stream_bytes, &globals, &layout, sheet, select)
+    read(stream_bytes, &globals, &layout, sheet, select, limits)
 }
 
 pub(super) fn read(
@@ -366,6 +371,7 @@ pub(super) fn read(
     layout: &Sheet,
     sheet: usize,
     select: FeatureSet,
+    limits: &SourceLimits,
 ) -> Result<Features> {
     let mut out = Features::default();
     let needs_context =
@@ -392,7 +398,7 @@ pub(super) fn read(
             .collect();
     }
     if select.contains(FeatureSet::HYPERLINKS) {
-        let mut collector = crate::hyperlinks::HyperlinkCollector::new();
+        let mut collector = crate::hyperlinks::HyperlinkCollector::new(*limits);
         for (_, record) in layout.tail() {
             if record.kind != stream::BOF {
                 collector.feed_record(record.kind, record.payload(stream_bytes))?;

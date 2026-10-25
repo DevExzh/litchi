@@ -3250,6 +3250,10 @@
   {
    "record": "0362ul48",
    "reason": "IWork result-name migration Clippy receipts are compile/consumer-gate output, including a preserved fixture-setup failure and later pass; they contain no leaf-versus-unified timing or allocation pair."
+  },
+  {
+   "record": "0362ul46",
+   "reason": "XLS raw-profile source and consumer migration with scoped correctness, compiler and Clippy receipts, including the corrected complete library corpus. These command durations and target sizes are validation provenance, not a leaf-versus-unified benchmark pair."
   }
  ]
 }

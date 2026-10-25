@@ -40,13 +40,13 @@ ADAPTER_PATHS = (
     "tools/native_qualification/fixtures/drawingml_raw_fixtures.json",
 )
 
-# The DrawingML probe is shared with the historical RTF benchmark parent.  The
-# current RTF leaf renamed these two constructors in 1d273acbf2, but the
-# historical baseline still exposes the old spelling.  The baseline adapter
-# below changes exactly these two consumer references while leaving every
-# DrawingML route byte-identical.  Candidate sources are never transformed.
-RTF_STREAMING_ADAPTER_PATH = "tools/perf-baseline/src/lib.rs"
-RTF_STREAMING_REPLACEMENTS = (
+# The DrawingML probe is shared with historical RTF and XLS benchmark
+# parents. Their canonical leaves renamed three consumer spellings, while the
+# historical baseline still exposes the old APIs. The baseline adapter below
+# changes exactly these three consumer references while leaving every
+# DrawingML route byte-identical. Candidate sources are never transformed.
+CONSUMER_API_ADAPTER_PATH = "tools/perf-baseline/src/lib.rs"
+CONSUMER_API_REPLACEMENTS = (
     (
         b"litchi_rtf::streaming::Limits::new",
         b"litchi_rtf::write::StreamingRtfLimits::new",
@@ -55,13 +55,19 @@ RTF_STREAMING_REPLACEMENTS = (
         b"litchi_rtf::streaming::Writer::new",
         b"litchi_rtf::write::StreamingRtfWriter::new",
     ),
+    (
+        b"litchi_xls::validation::Limits::default()",
+        b"litchi_xls::validation::XlsValidationLimits::default()",
+    ),
 )
-RTF_STREAMING_TRANSFORM_COUNT = len(RTF_STREAMING_REPLACEMENTS)
-RTF_STREAMING_CURRENT_SHA256 = "ff0ca3a924852cfc5d8497f812fbf412c4eb71b5f289f1c3b3136dea92c7ed9f"
-RTF_STREAMING_HISTORICAL_SHA256 = "280d61ae1f714af78be6cecf21a4432a9ea2a27478e89c237b5d358bc02db02a"
-RTF_STREAMING_TRANSFORM_BYTES = sum(
+CONSUMER_API_TRANSFORM_COUNT = len(CONSUMER_API_REPLACEMENTS)
+# This hash is the checked-in composed candidate identity. The historical
+# baseline adapter below reverses these spellings only in the baseline copy.
+CONSUMER_API_CURRENT_SHA256 = "c28d436cdbd6c1746fc0be31b7b1ca28d46526143d6186ceb2c7bf5dbcdecf02"
+CONSUMER_API_HISTORICAL_SHA256 = "280d61ae1f714af78be6cecf21a4432a9ea2a27478e89c237b5d358bc02db02a"
+CONSUMER_API_TRANSFORM_BYTES = sum(
     len(historical) - len(current)
-    for current, historical in RTF_STREAMING_REPLACEMENTS
+    for current, historical in CONSUMER_API_REPLACEMENTS
 )
 
 # Filled from the reviewed adapter in this leaf.  Keeping this table in the
@@ -69,7 +75,7 @@ RTF_STREAMING_TRANSFORM_BYTES = sum(
 # baseline evidence merely because it is copied into a worktree.
 STATIC_REVIEWED_ADAPTER_SHA256 = {
     "tools/perf-baseline/Cargo.toml": "61e103809753ffc528b2cd2c2e00a1525d40fc4e6360668ad982bec22a60bb73",
-    "tools/perf-baseline/src/lib.rs": RTF_STREAMING_CURRENT_SHA256,
+    "tools/perf-baseline/src/lib.rs": CONSUMER_API_CURRENT_SHA256,
     "tools/perf-baseline/src/drawingml_raw_probe.rs": "539e4641b1eecda7ef97f1bfca2e526348f0a0d4941cdec781cadb3c99a18477",
     "tools/perf-baseline/src/bin/drawingml_raw_native.rs": "c64e5cb9436622d383a55f6720c940344c7575cc56404ab6459133afbc63116e",
     "tools/perf-baseline/src/bin/drawingml_raw_allocator.rs": "6dd60e14b760bf7562017ddc99b9356699a13155eb88a46cdb62a81aa3b0d3b9",
@@ -95,7 +101,7 @@ def _reviewed_adapter_hashes(
         "tools/perf-baseline/Cargo.lock": perf_lock_sha256,
     }
     if role == "baseline":
-        result[RTF_STREAMING_ADAPTER_PATH] = RTF_STREAMING_HISTORICAL_SHA256
+        result[CONSUMER_API_ADAPTER_PATH] = CONSUMER_API_HISTORICAL_SHA256
     return result
 
 
@@ -112,37 +118,37 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def _rtf_streaming_adapter_receipt() -> dict[str, Any]:
+def _consumer_api_adapter_receipt() -> dict[str, Any]:
     return {
-        "path": RTF_STREAMING_ADAPTER_PATH,
-        "candidate_sha256": RTF_STREAMING_CURRENT_SHA256,
-        "baseline_sha256": RTF_STREAMING_HISTORICAL_SHA256,
-        "replacement_count": RTF_STREAMING_TRANSFORM_COUNT,
-        "changed_bytes": RTF_STREAMING_TRANSFORM_BYTES,
+        "path": CONSUMER_API_ADAPTER_PATH,
+        "candidate_sha256": CONSUMER_API_CURRENT_SHA256,
+        "baseline_sha256": CONSUMER_API_HISTORICAL_SHA256,
+        "replacement_count": CONSUMER_API_TRANSFORM_COUNT,
+        "changed_bytes": CONSUMER_API_TRANSFORM_BYTES,
         "replacements": [
             {
                 "candidate": current.decode("ascii"),
                 "baseline": historical.decode("ascii"),
                 "count": 1,
             }
-            for current, historical in RTF_STREAMING_REPLACEMENTS
+            for current, historical in CONSUMER_API_REPLACEMENTS
         ],
     }
 
 
-def _adapt_baseline_adapter(relative: str, source: bytes) -> bytes:
-    """Apply only the historical RTF consumer spelling to a baseline copy."""
+def _adapt_baseline_consumer_adapter(relative: str, source: bytes) -> bytes:
+    """Apply only the historical RTF/XLS consumer spellings to a baseline."""
 
-    if relative != RTF_STREAMING_ADAPTER_PATH:
+    if relative != CONSUMER_API_ADAPTER_PATH:
         return source
     _expect(
-        _sha256_bytes(source) == RTF_STREAMING_CURRENT_SHA256,
-        "candidate RTF consumer adapter is not the reviewed current source",
+        _sha256_bytes(source) == CONSUMER_API_CURRENT_SHA256,
+        "candidate consumer adapter is not the reviewed composed source",
     )
     adapted = source
     replacement_count = 0
     changed_bytes = 0
-    for current, historical in RTF_STREAMING_REPLACEMENTS:
+    for current, historical in CONSUMER_API_REPLACEMENTS:
         current_count = adapted.count(current)
         historical_count = adapted.count(historical)
         _expect(
@@ -153,16 +159,16 @@ def _adapt_baseline_adapter(relative: str, source: bytes) -> bytes:
         replacement_count += current_count
         changed_bytes += len(historical) - len(current)
     _expect(
-        replacement_count == RTF_STREAMING_TRANSFORM_COUNT,
-        "RTF consumer adapter replacement count changed",
+        replacement_count == CONSUMER_API_TRANSFORM_COUNT,
+        "consumer adapter replacement count changed",
     )
     _expect(
-        changed_bytes == RTF_STREAMING_TRANSFORM_BYTES,
-        "RTF consumer adapter byte delta changed",
+        changed_bytes == CONSUMER_API_TRANSFORM_BYTES,
+        "consumer adapter byte delta changed",
     )
     _expect(
-        _sha256_bytes(adapted) == RTF_STREAMING_HISTORICAL_SHA256,
-        "historical RTF consumer adapter hash changed",
+        _sha256_bytes(adapted) == CONSUMER_API_HISTORICAL_SHA256,
+        "historical consumer adapter hash changed",
     )
     return adapted
 
@@ -292,8 +298,8 @@ def _validate_receipt_data(
     )
     _expect(receipt.get("perf_lock_sha256") == perf_lock_sha256, "receipt perf-baseline lock differs")
     _expect(
-        receipt.get("role_adapter") == _rtf_streaming_adapter_receipt(),
-        "role-aware RTF consumer adapter receipt changed",
+        receipt.get("role_consumer_adapter") == _consumer_api_adapter_receipt(),
+        "role-aware consumer adapter receipt changed",
     )
     _expect(
         receipt.get("reviewed_adapter_sha256") == {
@@ -337,12 +343,12 @@ def _validate_receipt_data(
         {
             path: baseline["adapter_hashes"][path]
             for path in ADAPTER_PATHS
-            if path not in LOCK_PATHS and path != RTF_STREAMING_ADAPTER_PATH
+            if path not in LOCK_PATHS and path != CONSUMER_API_ADAPTER_PATH
         }
         == {
             path: candidate["adapter_hashes"][path]
             for path in ADAPTER_PATHS
-            if path not in LOCK_PATHS and path != RTF_STREAMING_ADAPTER_PATH
+            if path not in LOCK_PATHS and path != CONSUMER_API_ADAPTER_PATH
         },
         "non-lock adapter bytes differ",
     )
@@ -440,8 +446,8 @@ def prepare(
         _expect(not source.is_symlink() and source.is_file(), f"candidate adapter path is missing: {source}")
         _expect(not target.is_symlink(), f"baseline adapter target is a symlink: {target}")
         target.parent.mkdir(parents=True, exist_ok=True)
-        if relative == RTF_STREAMING_ADAPTER_PATH:
-            target.write_bytes(_adapt_baseline_adapter(relative, source.read_bytes()))
+        if relative == CONSUMER_API_ADAPTER_PATH:
+            target.write_bytes(_adapt_baseline_consumer_adapter(relative, source.read_bytes()))
         else:
             shutil.copyfile(source, target)
     baseline = _identity(baseline_root)
@@ -460,12 +466,12 @@ def prepare(
         {
             path: baseline["adapter_hashes"][path]
             for path in ADAPTER_PATHS
-            if path not in LOCK_PATHS and path != RTF_STREAMING_ADAPTER_PATH
+            if path not in LOCK_PATHS and path != CONSUMER_API_ADAPTER_PATH
         }
         == {
             path: candidate["adapter_hashes"][path]
             for path in ADAPTER_PATHS
-            if path not in LOCK_PATHS and path != RTF_STREAMING_ADAPTER_PATH
+            if path not in LOCK_PATHS and path != CONSUMER_API_ADAPTER_PATH
         },
         "non-lock adapter bytes differ",
     )
@@ -481,7 +487,7 @@ def prepare(
         "candidate_workspace_lock_bytes": candidate["workspace_lock_bytes"],
         "perf_lock_sha256": perf_lock_sha256,
         "perf_lock_bytes": candidate["perf_lock_bytes"],
-        "role_adapter": _rtf_streaming_adapter_receipt(),
+        "role_consumer_adapter": _consumer_api_adapter_receipt(),
         "reviewed_adapter_sha256": {
             "baseline": _reviewed_adapter_hashes(
                 perf_lock_sha256, HISTORICAL_WORKSPACE_LOCK_SHA256, "baseline"

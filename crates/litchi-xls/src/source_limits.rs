@@ -44,7 +44,11 @@ impl SourceLimits {
     /// Shared default aggregate input limit.
     pub const DEFAULT_MAX_AGGREGATE_BYTES: usize = 2 * 1024 * 1024 * 1024;
     /// Hard safety ceiling for the complete source.
-    pub const MAX_INPUT_BYTES: usize = 1024 * 1024 * 1024;
+    ///
+    /// This matches the shared CFB reader's hard input ceiling.  In
+    /// particular, adapting a source-backed owner must not silently narrow a
+    /// profile that was admitted for a larger CFB source.
+    pub const MAX_INPUT_BYTES: usize = litchi_cfb::SharedOleFileLimits::MAX_INPUT_BYTES as usize;
     /// Hard safety ceiling for one declared stream entry.
     pub const MAX_ENTRY_BYTES: usize = 512 * 1024 * 1024;
     /// Hard safety ceiling for aggregate declared stream payloads.
@@ -100,6 +104,58 @@ impl SourceLimits {
             entry_bytes: min_usize(self.entry_bytes, other.entry_bytes),
             aggregate_bytes: min_usize(self.aggregate_bytes, other.aggregate_bytes),
         }
+    }
+
+    /// Adapt an already-selected physical owner profile to a raw
+    /// variable-payload boundary.
+    ///
+    /// Worksheet traversal and raw-record budgets are logical policies owned
+    /// by [`crate::SourceBackedLimits`]. They must not be placed in
+    /// `entry_bytes`, which governs the physical size of one CFB stream. The
+    /// source-backed adapter therefore carries only the retained physical
+    /// input ceiling and leaves the entry and aggregate ceilings at their
+    /// checked hard bounds.
+    pub(crate) fn from_physical_profile(input_bytes: u64) -> Result<Self> {
+        Self::try_from_profile(
+            input_bytes,
+            Self::MAX_ENTRY_BYTES as u64,
+            Self::MAX_AGGREGATE_BYTES as u64,
+        )
+    }
+
+    /// Adapt three retained physical ceilings without narrowing or widening
+    /// them implicitly. Values outside the checked `SourceLimits` contract
+    /// are rejected as invalid limits instead of being clamped.
+    pub(crate) fn try_from_profile(
+        input_bytes: u64,
+        entry_bytes: u64,
+        aggregate_bytes: u64,
+    ) -> Result<Self> {
+        fn exact(kind: LimitKind, value: u64, maximum: usize) -> Result<usize> {
+            let maximum_u64 = maximum as u64;
+            if value == 0 || value > maximum_u64 {
+                return Err(Error::InvalidLimit {
+                    kind,
+                    value,
+                    maximum: maximum_u64,
+                });
+            }
+            usize::try_from(value).map_err(|_| Error::InvalidLimit {
+                kind,
+                value,
+                maximum: maximum_u64,
+            })
+        }
+
+        Ok(Self {
+            input_bytes: exact(LimitKind::InputBytes, input_bytes, Self::MAX_INPUT_BYTES)?,
+            entry_bytes: exact(LimitKind::EntryBytes, entry_bytes, Self::MAX_ENTRY_BYTES)?,
+            aggregate_bytes: exact(
+                LimitKind::AggregateBytes,
+                aggregate_bytes,
+                Self::MAX_AGGREGATE_BYTES,
+            )?,
+        })
     }
 }
 
@@ -246,5 +302,28 @@ mod tests {
         let effective = retained.constrained_by(requested);
         assert_eq!(effective, retained);
         assert_eq!(requested.constrained_by(retained), retained);
+    }
+
+    #[test]
+    fn profile_adapter_preserves_or_rejects_without_clamping() {
+        let retained = SourceLimits::from_physical_profile(
+            u64::try_from(SourceLimits::MAX_INPUT_BYTES).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(retained.max_input_bytes(), SourceLimits::MAX_INPUT_BYTES);
+
+        assert!(matches!(
+            SourceLimits::try_from_profile(
+                64,
+                u64::try_from(SourceLimits::MAX_ENTRY_BYTES).unwrap() + 1,
+                u64::try_from(SourceLimits::MAX_AGGREGATE_BYTES).unwrap(),
+            ),
+            Err(Error::InvalidLimit {
+                kind: LimitKind::EntryBytes,
+                value,
+                maximum,
+            }) if value == u64::try_from(SourceLimits::MAX_ENTRY_BYTES).unwrap() + 1
+                && maximum == u64::try_from(SourceLimits::MAX_ENTRY_BYTES).unwrap()
+        ));
     }
 }

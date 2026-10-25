@@ -18,7 +18,7 @@ use crate::workbook::model::Reader;
 use crate::worksheet::Worksheet;
 use crate::{
     autofilter, comments, compatibility::CompatibilityProfile, conditional_format, hyperlinks,
-    layout, merged_cells, page_setup, pivot_table, protection, utils, view,
+    layout, merged_cells, page_setup, pivot_table, protection, utils, view, SourceLimits,
 };
 use litchi_biff::Records;
 use std::collections::{HashMap, HashSet};
@@ -302,6 +302,7 @@ impl<R: Read + Seek> Reader<R> {
             shared_string_properties,
             Some(&self.formula_context),
             self.formatting.clone(),
+            self.source_limits,
             compatibility_profile,
             store,
             tolerance,
@@ -336,6 +337,7 @@ impl<R: Read + Seek> Reader<R> {
             shared_string_properties,
             formula_context,
             formatting,
+            SourceLimits::default(),
             CompatibilityProfile::Strict,
             &mut super::cells::DecodeEveryCell,
             &mut tolerance,
@@ -351,6 +353,7 @@ impl<R: Read + Seek> Reader<R> {
         shared_string_properties: Arc<Vec<Option<Box<SharedStringProperties>>>>,
         formula_context: Option<&FormulaContext>,
         formatting: Arc<Formatting>,
+        source_limits: SourceLimits,
         compatibility_profile: CompatibilityProfile,
         store: &mut S,
         tolerance: &mut ToleranceReport,
@@ -369,7 +372,7 @@ impl<R: Read + Seek> Reader<R> {
         let mut pivot_table_collector = pivot_table::PivotTableCollector::new();
 
         let mut comment_collector = comments::CommentCollector::new();
-        let mut hyperlink_collector = hyperlinks::HyperlinkCollector::new();
+        let mut hyperlink_collector = hyperlinks::HyperlinkCollector::new(source_limits);
         let mut layout_collector = layout::Collector::new();
         let mut sheet_layout_collector = crate::worksheet::layout::Collector::new();
         let mut view_collector = view::ViewCollector::new();

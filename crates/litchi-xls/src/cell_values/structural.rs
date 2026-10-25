@@ -3,6 +3,7 @@ use super::{
     StructuralChange, StyleIndex, Value,
 };
 use crate::writer::row_blocks::{RowBlockLayoutPlan, RowBlockLayoutRow};
+use crate::SourceLimits;
 use litchi_biff::Records;
 use litchi_core::binary;
 use litchi_core::edit::RefusalKind;
@@ -1014,7 +1015,8 @@ pub(super) fn certify_shift(
         .try_reserve_exact(workbook.len())
         .map_err(|_error| Error::Allocation("certifying workbook dependencies"))?;
     candidate.extend_from_slice(workbook);
-    patch_workbook_dependencies(&mut candidate, workbook_index, shift)?;
+    let limits = source.raw_record_limits()?;
+    patch_workbook_dependencies(&mut candidate, workbook_index, &limits, shift)?;
     let bounds = bound_sheets(workbook)?;
     let bound = bounds
         .get(workbook_index)
@@ -2023,9 +2025,10 @@ fn rewrite_worksheet(
             reason: "worksheet operation index is stale",
         })?
         .workbook_index;
+    let limits = source.raw_record_limits()?;
     for operation in operations {
         if let Some(shift) = axis_shift(operation) {
-            patch_workbook_dependencies(workbook, workbook_index, shift)?;
+            patch_workbook_dependencies(workbook, workbook_index, &limits, shift)?;
         }
     }
     let bounds = bound_sheets(workbook)?;
@@ -2222,7 +2225,12 @@ fn patch_3d_references(
 /// their coordinate fields are rewritten at fixed width, so no record moves.
 /// External names belong to another workbook's `SupBook` and are untouched.
 /// Records whose coordinates this owner does not model stay refusals.
-fn patch_workbook_dependencies(workbook: &mut [u8], tab: usize, shift: AxisShift) -> Result<()> {
+fn patch_workbook_dependencies(
+    workbook: &mut [u8],
+    tab: usize,
+    limits: &SourceLimits,
+    shift: AxisShift,
+) -> Result<()> {
     // AutoFilter keeps column positions relative to a filter range this
     // owner does not shift; it stays refused in the shifted worksheet and
     // wherever a 3-D reference can reach it.
@@ -2349,7 +2357,12 @@ fn patch_workbook_dependencies(workbook: &mut [u8], tab: usize, shift: AxisShift
             },
             HLINK => {
                 let payload = record_payload(workbook, record, "HLINK")?;
-                certify_hyperlink_target(payload, target.contains(&record.start), &target_name)?;
+                certify_hyperlink_target(
+                    payload,
+                    limits,
+                    target.contains(&record.start),
+                    &target_name,
+                )?;
             },
             // Shared, array, conditional-format and validation formulas of
             // any worksheet keep their 3-D references into the shifted one;
@@ -5124,8 +5137,13 @@ fn certify_coordinate_shift(
 /// worksheet (record 0308): a location on another sheet of this workbook,
 /// a defined name (which moves with its own record) and a location inside
 /// another document do not.
-fn certify_hyperlink_target(payload: &[u8], in_target: bool, target_name: &str) -> Result<()> {
-    let hyperlink = crate::hyperlinks::parse_hlink_record(payload)?;
+fn certify_hyperlink_target(
+    payload: &[u8],
+    limits: &SourceLimits,
+    in_target: bool,
+    target_name: &str,
+) -> Result<()> {
+    let hyperlink = crate::hyperlinks::parse_hlink_record(payload, limits)?;
     let Some(location) = hyperlink.location() else {
         return Ok(());
     };
@@ -6325,7 +6343,8 @@ mod tests {
     fn defined_names_and_3d_formulas_follow_their_sheet_and_inverse_exactly() {
         let original = three_d_workbook();
         let mut workbook = original.clone();
-        patch_workbook_dependencies(&mut workbook, 0, INSERT_ROWS).unwrap();
+        let limits = SourceLimits::default();
+        patch_workbook_dependencies(&mut workbook, 0, &limits, INSERT_ROWS).unwrap();
         let name_start = original.len() - 4 - 29 - 4 - 4 - 27;
         // $A$4:$C$9 on sheet 0 became $A$6:$C$11; the formula on sheet 1 kept $B$7.
         assert_eq!(
@@ -6336,13 +6355,13 @@ mod tests {
             workbook[workbook.len() - 6..],
             original[original.len() - 6..]
         );
-        patch_workbook_dependencies(&mut workbook, 0, DELETE_ROWS).unwrap();
+        patch_workbook_dependencies(&mut workbook, 0, &limits, DELETE_ROWS).unwrap();
         assert_eq!(workbook, original);
 
         // The same shift on sheet 1 moves only the formula's reference.
-        patch_workbook_dependencies(&mut workbook, 1, INSERT_ROWS).unwrap();
+        patch_workbook_dependencies(&mut workbook, 1, &limits, INSERT_ROWS).unwrap();
         assert_eq!(&workbook[workbook.len() - 4..workbook.len() - 2], &[8, 0]);
-        patch_workbook_dependencies(&mut workbook, 1, DELETE_ROWS).unwrap();
+        patch_workbook_dependencies(&mut workbook, 1, &limits, DELETE_ROWS).unwrap();
         assert_eq!(workbook, original);
 
         // Deleting a row the name names is refused.
@@ -6351,6 +6370,7 @@ mod tests {
             patch_workbook_dependencies(
                 &mut erasing,
                 0,
+                &limits,
                 AxisShift::Rows {
                     start: 8,
                     count: 1,

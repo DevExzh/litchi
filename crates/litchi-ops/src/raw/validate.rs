@@ -65,7 +65,7 @@ pub enum Error {
     Pptx(litchi_pptx::PptxValidationError),
     /// The XLS validator.
     #[cfg(feature = "xls")]
-    Xls(litchi_xls::validation::XlsValidationError),
+    Xls(litchi_xls::validation::Error),
     /// The PPT validator.
     #[cfg(feature = "ppt")]
     Ppt(litchi_ppt::PptValidationError),
@@ -174,7 +174,7 @@ pub(super) fn validate(file: &File) -> Result<Validation> {
             let bytes = file.to_bytes()?;
             litchi_xls::validation::validate_source(
                 Arc::new(litchi_core::OwnedSource::new(bytes)),
-                litchi_xls::validation::XlsValidationLimits::default(),
+                litchi_xls::validation::Limits::default(),
             )
             .map_err(Error::Xls)?
         },
