@@ -24,10 +24,33 @@ use crate::{Package, Result};
 
 family!("Revision Information");
 
+/// Per-edit bounds for Revision Information operations.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[must_use]
+pub struct EditOptions {
+    limits: Option<Limits>,
+}
+
+impl EditOptions {
+    /// Select an optional tighter Revision Information profile.
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    /// Return the explicitly selected profile, if any.
+    #[must_use]
+    pub const fn limits_value(&self) -> Option<Limits> {
+        self.limits
+    }
+}
+
 /// A staged Revision Information edit of one [`Package`]. Dropping it discards it.
 #[derive(Debug)]
 pub struct Edit<'a> {
     staged: Staged<'a>,
+    limits: Limits,
 }
 
 impl Package {
@@ -38,9 +61,17 @@ impl Package {
     /// Returns the encryption-policy error for a package whose typed
     /// mutations are refused.
     pub fn edit_revision_info(&self) -> Result<Edit<'_>> {
-        Ok(Edit {
-            staged: Staged::new(self, "edit_revision_info")?,
-        })
+        self.edit_revision_info_with_options(EditOptions::default())
+    }
+
+    /// Start a Revision Information edit under explicit operation options.
+    pub fn edit_revision_info_with_options(&self, options: EditOptions) -> Result<Edit<'_>> {
+        let staged = Staged::new(self, "edit_revision_info")?;
+        let limits = options
+            .limits_value()
+            .unwrap_or_else(|| staged.revision_limits())
+            .constrained_by_source(self.opc.read_limits());
+        Ok(Edit { staged, limits })
     }
 
     /// Apply a Revision Information patch to a new package; this one is unchanged. An
@@ -52,16 +83,18 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_revision_info(&self, patch: &Patch) -> Result<Commit> {
+        let semantic_limits = self.semantic_limits();
         let package = patch.0.apply_with_replay_validation(
             self,
             "apply_revision_info",
             |_, target, patch| {
                 patch.validate_changed_parts(target, |name, part| {
-                    crate::presentation_properties::metadata::validate_replay_part(
+                    crate::presentation_properties::metadata::validate_replay_part_policy(
                         target,
                         crate::presentation_properties::metadata::ReplayFamily::Revision,
                         name,
                         part,
+                        semantic_limits,
                     )
                 })
             },
@@ -77,7 +110,7 @@ impl Edit<'_> {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn revision_info(&self) -> Result<Option<Part>> {
-        load(self.staged.opc())
+        load(self.staged.opc(), self.limits)
     }
 
     /// Add a new Revision Information part after validating the complete graph.
@@ -87,7 +120,9 @@ impl Edit<'_> {
     ///
     /// Returns an error if the output cannot be encoded or written.
     pub fn set(&mut self, value: &Part) -> Result<()> {
-        self.staged.update(move |opc| raw::store(opc, value))
+        let limits = self.limits;
+        self.staged
+            .update(move |opc| raw::store(opc, value, limits))
     }
 
     /// Discard every staged change.

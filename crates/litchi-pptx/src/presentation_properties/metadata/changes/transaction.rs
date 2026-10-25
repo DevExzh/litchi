@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use litchi_opc::OpcPackage;
 
+use super::codec::Limits;
 use super::model::{Data, Info, Kind, List};
 use super::package;
 use crate::{Error, Result};
@@ -27,6 +28,7 @@ pub struct Snapshot {
     pub(crate) source_xml: Arc<Vec<u8>>,
     pub(crate) info: Info,
     pub(crate) revision: Revision,
+    pub(crate) limits: Limits,
 }
 
 impl Snapshot {
@@ -35,17 +37,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn load(package: &OpcPackage) -> Result<Option<Self>> {
-        package::load_snapshot(package)
-    }
-
-    /// Alias for `Self::load` emphasizing the source-bound result.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn read(package: &OpcPackage) -> Result<Option<Self>> {
-        Self::load(package)
+    pub fn load(package: &OpcPackage, limits: Limits) -> Result<Option<Self>> {
+        package::load_snapshot(package, limits)
     }
 
     pub(crate) fn from_wire(
@@ -56,8 +49,9 @@ impl Snapshot {
         part_name: String,
         source_xml: Arc<Vec<u8>>,
         info: Info,
+        limits: Limits,
     ) -> Result<Self> {
-        if source_xml.len() > MAX_BYTES {
+        if source_xml.len() > limits.max_input_bytes() {
             return Err(limit("Changes Information source bytes"));
         }
         Ok(Self {
@@ -69,6 +63,7 @@ impl Snapshot {
             revision: fingerprint(source_xml.as_slice()),
             source_xml,
             info,
+            limits,
         })
     }
 
@@ -77,13 +72,6 @@ impl Snapshot {
     #[must_use]
     pub fn info(&self) -> &Info {
         &self.info
-    }
-
-    /// Alias for [`Self::info`] for callers treating this as a semantic view.
-    #[inline]
-    #[must_use]
-    pub fn changes_information(&self) -> &Info {
-        self.info()
     }
 
     /// Return the exact OPC part name owned by this snapshot.
@@ -191,7 +179,7 @@ impl Draft {
     ///
     /// Returns an error if the operation fails.
     pub fn replace(&mut self, value: Info) -> Result<bool> {
-        validate_candidate(&value)?;
+        validate_candidate(&value, self.original.limits)?;
         if self.working == value {
             return Ok(false);
         }
@@ -207,7 +195,7 @@ impl Draft {
     pub fn edit(&mut self, edit: impl FnOnce(&mut Info) -> Result<()>) -> Result<()> {
         let mut candidate = self.working.clone();
         edit(&mut candidate)?;
-        validate_candidate(&candidate)?;
+        validate_candidate(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(())
     }
@@ -228,7 +216,7 @@ impl Draft {
             return Ok(false);
         }
         list.author = value;
-        validate_candidate(&candidate)?;
+        validate_candidate(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(true)
     }
@@ -254,7 +242,7 @@ impl Draft {
             .as_mut()
             .ok_or_else(|| invalid("Changes Information list has no reviewer metadata"))?;
         edit(author)?;
-        validate_candidate(&candidate)?;
+        validate_candidate(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(())
     }
@@ -384,7 +372,7 @@ impl Draft {
             return Ok(false);
         }
         descriptor.change_kinds = kinds;
-        validate_candidate(&candidate)?;
+        validate_candidate(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(true)
     }
@@ -397,7 +385,7 @@ impl Draft {
     pub fn push_list(&mut self, value: List) -> Result<()> {
         let mut candidate = self.working.clone();
         candidate.change_lists.push(value);
-        validate_candidate(&candidate)?;
+        validate_candidate(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(())
     }
@@ -413,7 +401,7 @@ impl Draft {
             return Err(list_index_error(index, candidate.change_lists.len()));
         }
         let removed = candidate.change_lists.remove(index);
-        validate_candidate(&candidate)?;
+        validate_candidate(&candidate, self.original.limits)?;
         self.working = candidate;
         Ok(removed)
     }
@@ -442,9 +430,9 @@ impl Draft {
             });
         }
 
-        let encoded = encode_info(&self.working)?;
-        let source_xml = Arc::new(encoded.to_xml()?);
-        let info = Info::parse(source_xml.as_slice())?;
+        let encoded = encode_info(&self.working, self.original.limits)?;
+        let source_xml = Arc::new(encoded.to_xml(self.original.limits)?);
+        let info = Info::parse(source_xml.as_slice(), self.original.limits)?;
         if info != encoded {
             return Err(invalid(
                 "Changes Information serialization changed the typed document",
@@ -458,6 +446,7 @@ impl Draft {
             self.original.part_name.clone(),
             source_xml,
             info,
+            self.original.limits,
         )?;
         let patch = Change::new(self.original, snapshot.clone());
         Ok(Prepared {
@@ -520,8 +509,6 @@ pub(crate) struct Change {
     after: Snapshot,
 }
 
-const MAX_BYTES: usize = 16 * 1024 * 1024;
-
 impl Change {
     fn new(before: Snapshot, after: Snapshot) -> Self {
         Self { before, after }
@@ -557,7 +544,7 @@ impl Change {
     ///
     /// Returns an error if the operation fails.
     pub(crate) fn apply(&self, target: &mut OpcPackage) -> Result<Snapshot> {
-        let current = package::load_snapshot(target)?
+        let current = package::load_snapshot(target, self.before.limits)?
             .ok_or_else(|| invalid("Changes Information source is absent"))?;
         if !current.same_source(&self.before) {
             return Err(invalid("Changes Information source is stale"));
@@ -566,27 +553,28 @@ impl Change {
             return Ok(current);
         }
         let mut candidate = target.clone();
-        let snapshot = package::replace_snapshot(&mut candidate, &self.after)?;
+        let snapshot = package::replace_snapshot(&mut candidate, &self.after, self.after.limits)?;
         *target = candidate;
         Ok(snapshot)
     }
 }
 
-fn validate_candidate(value: &Info) -> Result<()> {
-    let _ = encode_info(value)?;
+fn validate_candidate(value: &Info, limits: Limits) -> Result<()> {
+    let _ = encode_info(value, limits)?;
     Ok(())
 }
 
-fn encode_info(value: &Info) -> Result<Info> {
+fn encode_info(value: &Info, limits: Limits) -> Result<Info> {
     let mut normalized = value.clone();
     for list in &mut normalized.change_lists {
         for descriptor in &mut list.changes {
             validate_kinds(&descriptor.change_kinds)?;
-            descriptor.xml = replace_change_kinds(&descriptor.xml, &descriptor.change_kinds)?;
+            descriptor.xml =
+                replace_change_kinds(&descriptor.xml, &descriptor.change_kinds, limits)?;
         }
     }
-    let bytes = normalized.to_xml()?;
-    let parsed = Info::parse(&bytes)?;
+    let bytes = normalized.to_xml(limits)?;
+    let parsed = Info::parse(&bytes, limits)?;
     if parsed != normalized {
         return Err(invalid(
             "Changes Information typed values do not round-trip through XML",
@@ -607,8 +595,8 @@ fn validate_kinds(kinds: &[Kind]) -> Result<()> {
     Ok(())
 }
 
-fn replace_change_kinds(source: &[u8], kinds: &[Kind]) -> Result<Vec<u8>> {
-    if source.len() > MAX_BYTES {
+fn replace_change_kinds(source: &[u8], kinds: &[Kind], limits: Limits) -> Result<Vec<u8>> {
+    if source.len() > limits.max_input_bytes() {
         return Err(limit("document change descriptor bytes"));
     }
     let value = kinds

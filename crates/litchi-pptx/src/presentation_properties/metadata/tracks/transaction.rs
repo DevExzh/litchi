@@ -3,6 +3,7 @@
 use std::ops::Range;
 use std::sync::Arc;
 
+use super::codec::Limits;
 use super::model::{Caption, DisplayLocation, MediaMetadata};
 use super::tracks_info::{self, Attr, Found};
 use super::validation::{validate_caption, validate_metadata};
@@ -18,6 +19,7 @@ pub struct Snapshot {
     pub(crate) source_xml: Arc<Vec<u8>>,
     pub(crate) layout: Found,
     pub(crate) metadata: MediaMetadata,
+    pub(crate) limits: Limits,
     pub(crate) revision: Revision,
 }
 
@@ -27,8 +29,9 @@ impl Snapshot {
         source_xml: Vec<u8>,
         layout: Found,
         metadata: MediaMetadata,
+        limits: Limits,
     ) -> Result<Self> {
-        validate_metadata(&metadata)?;
+        validate_metadata(&metadata, limits)?;
         let source_xml = Arc::new(source_xml);
         let revision = fingerprint(&source_xml);
         Ok(Self {
@@ -36,6 +39,7 @@ impl Snapshot {
             source_xml,
             layout,
             metadata,
+            limits,
             revision,
         })
     }
@@ -135,7 +139,7 @@ impl Draft {
         let mut candidate = caption.clone();
         candidate.id = id.into();
         candidate.label = label.into();
-        validate_caption(&candidate)?;
+        validate_caption(&candidate, self.original.limits)?;
         *caption = candidate;
         Ok(())
     }
@@ -149,7 +153,7 @@ impl Draft {
         let caption = self.caption_mut(index)?;
         let mut candidate = caption.clone();
         candidate.language = language;
-        validate_caption(&candidate)?;
+        validate_caption(&candidate, self.original.limits)?;
         *caption = candidate;
         Ok(())
     }
@@ -176,21 +180,23 @@ impl Draft {
     ///
     /// Returns an error if the operation fails.
     pub(crate) fn commit(self) -> Result<Prepared> {
-        validate_metadata(&self.working)?;
+        validate_metadata(&self.working, self.original.limits)?;
         let updated = encode_edit(&self.original, &self.working)?;
         let updated = Arc::new(updated);
         let layout = if updated.as_slice() == self.original.source_xml.as_slice() {
             self.original.layout.clone()
         } else {
-            tracks_info::discover(updated.as_slice(), &self.working.key)?.ok_or_else(|| {
-                invalid("edited media tracks no longer contain the selected shape")
-            })?
+            tracks_info::discover(updated.as_slice(), &self.working.key, self.original.limits)?
+                .ok_or_else(|| {
+                    invalid("edited media tracks no longer contain the selected shape")
+                })?
         };
         let snapshot = Snapshot {
             source_part_name: self.original.source_part_name.clone(),
             source_xml: Arc::clone(&updated),
             layout,
             metadata: self.working,
+            limits: self.original.limits,
             revision: fingerprint(&updated),
         };
         let patch = Change {
@@ -199,6 +205,7 @@ impl Draft {
             expected_revision: self.original.revision,
             expected_xml: Arc::clone(&self.original.source_xml),
             updated_xml: Arc::clone(&updated),
+            limits: self.original.limits,
         };
         Ok(Prepared { snapshot, patch })
     }
@@ -260,6 +267,7 @@ pub(crate) struct Change {
     pub(crate) expected_revision: Revision,
     pub(crate) expected_xml: Arc<Vec<u8>>,
     pub(crate) updated_xml: Arc<Vec<u8>>,
+    pub(crate) limits: Limits,
 }
 
 impl Change {

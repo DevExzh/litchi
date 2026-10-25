@@ -122,7 +122,12 @@ fn capture_slides_inner<'a, 'parent>(
             (SlidePart::from_part(part)?, None)
         };
         slides.push(CaptureSlide {
-            slide: Slide::new_with_shape_limits(package, slide_part, presentation.shape_limits()),
+            slide: Slide::new_with_shape_and_semantic_limits(
+                package,
+                slide_part,
+                presentation.shape_limits(),
+                presentation.semantic_limits.clone(),
+            ),
             name,
         });
     }
@@ -274,10 +279,11 @@ pub(super) fn slide<'a>(
         return Ok(None);
     };
     let part = slide_part(package, presentation.part(), reference)?;
-    Ok(Some(Slide::new_with_shape_limits(
+    Ok(Some(Slide::new_with_shape_and_semantic_limits(
         package,
         part,
         presentation.shape_limits(),
+        presentation.semantic_limits.clone(),
     )))
 }
 
@@ -312,10 +318,14 @@ pub(super) fn slides<'a>(presentation: &Presentation<'a>) -> Result<Vec<Slide<'a
     let references = presentation.catalog()?;
     let mut slides = Vec::with_capacity(references.len());
     for reference in references {
-        slides.push(Slide::new_with_shape_limits(
+        slides.push(Slide::new_with_shape_and_semantic_limits(
             package,
             slide_part(package, presentation.part(), reference)?,
             presentation.shape_limits(),
+            // The semantic profile is retained by every slide projection.
+            // Keep this call in the same constructor family as `slide` so a
+            // projection never silently falls back to the default policy.
+            presentation.semantic_limits.clone(),
         ));
     }
     Ok(slides)
@@ -397,8 +407,12 @@ pub(super) fn text(presentation: &Presentation<'_>) -> Result<String> {
 
 pub(super) fn slide_sync(
     package: &OpcPackage,
+    limits: crate::presentation_properties::metadata::slide_sync::Limits,
 ) -> Result<Vec<crate::presentation_properties::metadata::slide_sync::Part>> {
-    crate::presentation_properties::metadata::slide_sync::load(package)
+    crate::presentation_properties::metadata::slide_sync::load(
+        package,
+        limits.constrained_by_source(package.read_limits()),
+    )
 }
 
 fn slide_part<'a>(

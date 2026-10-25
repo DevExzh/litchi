@@ -168,11 +168,15 @@ pub(crate) fn slide_zooms<'a>(
 pub(crate) fn slide_sync<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,
+    limits: crate::presentation_properties::metadata::slide_sync::Limits,
 ) -> Result<Option<crate::presentation_properties::metadata::slide_sync::Properties>> {
     let part_name = part.part().partname();
-    let mut matches = crate::presentation_properties::metadata::slide_sync::load(package)?
-        .into_iter()
-        .filter(|entry| entry.slide_part_name == *part_name);
+    let mut matches = crate::presentation_properties::metadata::slide_sync::load(
+        package,
+        limits.constrained_by_source(package.read_limits()),
+    )?
+    .into_iter()
+    .filter(|entry| entry.slide_part_name == *part_name);
     Ok(matches.next().map(|entry| entry.properties))
 }
 

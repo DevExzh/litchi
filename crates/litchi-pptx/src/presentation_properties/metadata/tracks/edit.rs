@@ -15,6 +15,7 @@
 )]
 
 use super::Draft;
+use super::codec::Limits;
 #[allow(
     unused_imports,
     reason = "the delegated signatures name the module's values"
@@ -26,10 +27,31 @@ use crate::{Package, Result};
 
 family!("media caption-track");
 
+/// Per-edit bounds for media caption-track operations.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[must_use]
+pub struct EditOptions {
+    limits: Option<Limits>,
+}
+
+impl EditOptions {
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = Some(limits);
+        self
+    }
+
+    #[must_use]
+    pub const fn limits_value(&self) -> Option<Limits> {
+        self.limits
+    }
+}
+
 /// A staged media caption-track edit of one [`Package`]. Dropping it discards it.
 #[derive(Debug)]
 pub struct Edit<'a> {
     staged: Staged<'a>,
+    limits: Limits,
 }
 
 impl Package {
@@ -40,9 +62,17 @@ impl Package {
     /// Returns the encryption-policy error for a package whose typed
     /// mutations are refused.
     pub fn edit_caption_tracks(&self) -> Result<Edit<'_>> {
-        Ok(Edit {
-            staged: Staged::new(self, "edit_caption_tracks")?,
-        })
+        self.edit_caption_tracks_with_options(EditOptions::default())
+    }
+
+    /// Start a media caption-track edit under explicit operation options.
+    pub fn edit_caption_tracks_with_options(&self, options: EditOptions) -> Result<Edit<'_>> {
+        let staged = Staged::new(self, "edit_caption_tracks")?;
+        let limits = options
+            .limits_value()
+            .unwrap_or_else(|| staged.tracks_limits())
+            .constrained_by_source(self.opc.read_limits());
+        Ok(Edit { staged, limits })
     }
 
     /// Apply a media caption-track patch to a new package; this one is unchanged. An
@@ -54,16 +84,18 @@ impl Package {
     /// before state, and the signature refusal for a changed patch of a
     /// signed package.
     pub fn apply_caption_tracks(&self, patch: &Patch) -> Result<Commit> {
+        let semantic_limits = self.semantic_limits();
         let package = patch.0.apply_with_replay_validation(
             self,
             "apply_caption_tracks",
             |_, target, patch| {
                 patch.validate_changed_parts(target, |name, part| {
-                    crate::presentation_properties::metadata::validate_replay_part(
+                    crate::presentation_properties::metadata::validate_replay_part_policy(
                         target,
                         crate::presentation_properties::metadata::ReplayFamily::Tracks,
                         name,
                         part,
+                        semantic_limits,
                     )
                 })
             },
@@ -88,8 +120,9 @@ impl Edit<'_> {
         operation: impl FnOnce(&mut Draft) -> Result<T>,
     ) -> Result<T> {
         let key = media_key(self.staged.opc(), slide.into(), shape_id)?;
+        let limits = self.limits;
         self.staged.update(move |opc| {
-            let mut draft = load_media(opc, &key)?
+            let mut draft = load_media(opc, &key, limits)?
                 .ok_or_else(|| {
                     Error::refused(
                         litchi_core::edit::RefusalKind::NotFound,
@@ -116,7 +149,7 @@ impl Edit<'_> {
         shape_id: u32,
     ) -> Result<Option<Snapshot>> {
         let key = media_key(self.staged.opc(), slide.into(), shape_id)?;
-        load_media(self.staged.opc(), &key)
+        load_media(self.staged.opc(), &key, self.limits)
     }
 
     /// The staged caption tracks of the package.
@@ -125,7 +158,7 @@ impl Edit<'_> {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn caption_tracks(&self) -> Result<Vec<Track>> {
-        load(self.staged.opc())
+        load(self.staged.opc(), self.limits)
     }
 
     /// Create or replace one caption track.
@@ -134,7 +167,9 @@ impl Edit<'_> {
     ///
     /// Returns an error if the output cannot be encoded or written.
     pub fn set(&mut self, value: &Track) -> Result<()> {
-        self.staged.update(move |opc| package::store(opc, value))
+        let limits = self.limits;
+        self.staged
+            .update(move |opc| package::store(opc, value, limits))
     }
 
     /// Discard every staged change.

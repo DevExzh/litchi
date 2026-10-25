@@ -3323,3 +3323,25 @@ relationships, links and embedded model/preview payloads.
 | `litchi_pptx::model3d::codec::{read, write}`; `model3d::validation::validate` | adopted (0362ul63); model3d package, selected-shape and edit consumers propagate the retained owner policy, including payload and relationship ceilings |
 
 See [0362ul63](unified-ops/0362ul63-pptx-raw-properties.md).
+
+## PPTX metadata history limits (record 0362ul82)
+
+The Changes Information, Revision Information, slide-synchronization,
+caption-track and slide-show-event codecs now take their module-local typed
+`Limits` at every raw parse, read, write and package-load boundary. Owners
+retain the selected profiles from `OpenOptions`; edits accept them through
+`EditOptions`, snapshots and patches retain them, projections use the same
+profile, and replay admits changed payloads under the recipient profile.
+Format constraints such as the slide-synchronization date lexical rules and
+the inert treatment of extension/MCE payloads remain unchanged. No default
+only twin, alias or `_with_limits` entry point was added.
+
+| Name | Status |
+|---|---|
+| `litchi_pptx::presentation_properties::metadata::{changes,revision}::{Info::{parse,to_xml},load}` | adopted (0362ul82); explicit typed limits at raw XML and package boundaries |
+| `litchi_pptx::presentation_properties::metadata::slide_sync::{Properties::{parse,to_xml},load}` | adopted (0362ul82); selected profile retains the existing date/year constraints |
+| `litchi_pptx::presentation_properties::metadata::tracks::{File::{parse,to_bytes},load,load_media}` | adopted (0362ul82); WebVTT and slide metadata bounds share the retained profile |
+| `litchi_pptx::presentation_properties::metadata::events::{load,load_snapshot}` | adopted (0362ul82); slide XML event admission remains inert and opaque outside the typed island |
+| `OpenOptions::{changes_limits,revision_limits,slide_sync_limits,tracks_limits,events_limits}` and each family's `EditOptions::limits` | adopted (0362ul82); profiles survive owners, projections, edits, snapshots, patches and replay |
+
+See [0362ul82](unified-ops/0362ul82-pptx-metadata-history.md).

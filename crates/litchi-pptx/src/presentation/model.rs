@@ -306,6 +306,9 @@ impl<'a> Presentation<'a> {
     pub fn slide_sync(
         &self,
     ) -> Result<Vec<crate::presentation_properties::metadata::slide_sync::Part>> {
-        package::slide_sync(self.package)
+        package::slide_sync(
+            self.package,
+            crate::open_options::selected(self.semantic_limits.as_ref()).slide_sync(),
+        )
     }
 }

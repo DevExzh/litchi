@@ -30,7 +30,12 @@ pub struct ChangeCommand {
 ///
 /// Returns an error if the input cannot be read or is malformed.
 pub fn load_modern_comment_changes(package: &OpcPackage) -> Result<Vec<ChangeCommand>> {
-    let Some(part) = super::super::presentation_properties::metadata::changes::load(package)?
+    let limits =
+        super::super::presentation_properties::metadata::changes::Limits::from_source_limits(
+            package.read_limits(),
+        );
+    let Some(part) =
+        super::super::presentation_properties::metadata::changes::load(package, limits)?
     else {
         return Ok(Vec::new());
     };
@@ -70,7 +75,12 @@ pub(crate) fn update_modern_comment_changes<F>(package: &mut OpcPackage, update:
 where
     F: FnOnce(&mut Vec<ChangeCommand>),
 {
-    let Some(mut part) = super::super::presentation_properties::metadata::changes::load(package)?
+    let limits =
+        super::super::presentation_properties::metadata::changes::Limits::from_source_limits(
+            package.read_limits(),
+        );
+    let Some(mut part) =
+        super::super::presentation_properties::metadata::changes::load(package, limits)?
     else {
         return Ok(false);
     };

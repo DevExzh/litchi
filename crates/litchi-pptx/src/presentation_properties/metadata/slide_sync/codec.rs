@@ -11,11 +11,153 @@ use crate::presentation_properties::metadata::escape_xml;
 use crate::presentation_properties::metadata::is_presentationml_name;
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_opc::SourceLimits;
 
 const MAX_PART_XML_BYTES: usize = 1024 * 1024;
+const MAX_TOTAL_XML_BYTES: usize = 64 * 1024 * 1024;
+const MAX_PARTS: usize = 4096;
 const MAX_XML_NODES: usize = 4096;
 const MAX_XML_DEPTH: usize = 32;
 const MAX_SERVER_SLIDE_ID_BYTES: usize = 4096;
+
+/// Caller-selected bounds for Slide Synchronization Data XML operations.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Limits {
+    max_input_bytes: usize,
+    max_output_bytes: usize,
+    max_total_input_bytes: usize,
+    max_parts: usize,
+    max_nodes: usize,
+    max_depth: usize,
+    max_server_slide_id_bytes: usize,
+}
+
+impl Limits {
+    /// The historical Slide Synchronization safety profile.
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: MAX_PART_XML_BYTES,
+        max_output_bytes: MAX_PART_XML_BYTES,
+        max_total_input_bytes: MAX_TOTAL_XML_BYTES,
+        max_parts: MAX_PARTS,
+        max_nodes: MAX_XML_NODES,
+        max_depth: MAX_XML_DEPTH,
+        max_server_slide_id_bytes: MAX_SERVER_SLIDE_ID_BYTES,
+    };
+
+    /// Construct a finite policy no wider than the format safety ceilings.
+    #[must_use]
+    pub const fn new(
+        max_input_bytes: usize,
+        max_output_bytes: usize,
+        max_total_input_bytes: usize,
+        max_parts: usize,
+        max_nodes: usize,
+        max_depth: usize,
+        max_server_slide_id_bytes: usize,
+    ) -> Option<Self> {
+        let default = Self::DEFAULT;
+        if max_input_bytes == 0
+            || max_input_bytes > default.max_input_bytes
+            || max_output_bytes == 0
+            || max_output_bytes > default.max_output_bytes
+            || max_total_input_bytes == 0
+            || max_total_input_bytes > default.max_total_input_bytes
+            || max_parts == 0
+            || max_parts > default.max_parts
+            || max_nodes == 0
+            || max_nodes > default.max_nodes
+            || max_depth == 0
+            || max_depth > default.max_depth
+            || max_server_slide_id_bytes == 0
+            || max_server_slide_id_bytes > default.max_server_slide_id_bytes
+        {
+            return None;
+        }
+        Some(Self {
+            max_input_bytes,
+            max_output_bytes,
+            max_total_input_bytes,
+            max_parts,
+            max_nodes,
+            max_depth,
+            max_server_slide_id_bytes,
+        })
+    }
+
+    #[must_use]
+    pub const fn max_input_bytes(self) -> usize {
+        self.max_input_bytes
+    }
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+    #[must_use]
+    pub const fn max_total_input_bytes(self) -> usize {
+        self.max_total_input_bytes
+    }
+    #[must_use]
+    pub const fn max_parts(self) -> usize {
+        self.max_parts
+    }
+    #[must_use]
+    pub const fn max_nodes(self) -> usize {
+        self.max_nodes
+    }
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+    #[must_use]
+    pub const fn max_server_slide_id_bytes(self) -> usize {
+        self.max_server_slide_id_bytes
+    }
+
+    /// Derive a profile from the retained physical source policy.
+    #[must_use]
+    pub fn from_source_limits(source: SourceLimits) -> Self {
+        let default = Self::DEFAULT;
+        let part = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);
+        let total = usize::try_from(source.max_total_part_bytes()).unwrap_or(usize::MAX);
+        let events = source.max_events();
+        let depth = source.max_depth();
+        let strings = usize::try_from(source.max_xml_attribute_bytes()).unwrap_or(usize::MAX);
+        Self {
+            max_input_bytes: default.max_input_bytes.min(part),
+            max_output_bytes: default.max_output_bytes.min(part),
+            max_total_input_bytes: default.max_total_input_bytes.min(total),
+            max_parts: default.max_parts.min(source.max_parts()),
+            max_nodes: default.max_nodes.min(events),
+            max_depth: default.max_depth.min(depth),
+            max_server_slide_id_bytes: default.max_server_slide_id_bytes.min(strings),
+        }
+    }
+
+    /// Intersect this semantic profile with physical source bounds.
+    pub(crate) fn constrained_by_source(self, source: SourceLimits) -> Self {
+        let physical = Self::from_source_limits(source);
+        Self {
+            max_input_bytes: self.max_input_bytes.min(physical.max_input_bytes),
+            max_output_bytes: self.max_output_bytes.min(physical.max_output_bytes),
+            max_total_input_bytes: self
+                .max_total_input_bytes
+                .min(physical.max_total_input_bytes),
+            max_parts: self.max_parts.min(physical.max_parts),
+            max_nodes: self.max_nodes.min(physical.max_nodes),
+            max_depth: self.max_depth.min(physical.max_depth),
+            max_server_slide_id_bytes: self
+                .max_server_slide_id_bytes
+                .min(physical.max_server_slide_id_bytes),
+        }
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
@@ -31,11 +173,14 @@ impl Properties {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse(xml: &[u8]) -> Result<Self> {
-        if xml.len() > MAX_PART_XML_BYTES {
+    pub fn parse(xml: &[u8], limits: Limits) -> Result<Self> {
+        if xml.len() > limits.max_input_bytes() {
             return Err(limit("slide synchronization XML bytes"));
         }
         let xml = process_ooxml(xml)?;
+        if xml.len() > limits.max_input_bytes() {
+            return Err(limit("MCE-processed slide synchronization XML bytes"));
+        }
         let mut reader = NsReader::from_reader(xml.as_ref());
         let mut properties = None;
         let mut depth = 0usize;
@@ -50,8 +195,10 @@ impl Properties {
             let is_empty_element = matches!(event, Event::Empty(_));
             match event {
                 Event::Start(element) | Event::Empty(element) => {
-                    nodes = increment(nodes, MAX_XML_NODES, "slide synchronization XML nodes")?;
-                    depth = increment(depth, MAX_XML_DEPTH, "slide synchronization XML depth")?;
+                    nodes =
+                        increment(nodes, limits.max_nodes(), "slide synchronization XML nodes")?;
+                    depth =
+                        increment(depth, limits.max_depth(), "slide synchronization XML depth")?;
                     let is_root = is_presentationml_name(&namespace, element.name(), b"sldSyncPr");
                     let is_extension_list =
                         is_presentationml_name(&namespace, element.name(), b"extLst");
@@ -67,7 +214,7 @@ impl Properties {
                                     "slide synchronization part must have a sldSyncPr root",
                                 ));
                             }
-                            properties = Some(from_root(&element, decoder)?);
+                            properties = Some(from_root(&element, decoder, limits)?);
                         },
                         2 if is_extension_list => {
                             let entry = properties.as_mut().ok_or_else(|| {
@@ -131,33 +278,62 @@ impl Properties {
     /// # Errors
     ///
     /// Returns an error if the output cannot be encoded or written.
-    pub fn to_xml(&self) -> Result<Vec<u8>> {
-        if self.server_slide_id.len() > MAX_SERVER_SLIDE_ID_BYTES {
+    pub fn to_xml(&self, limits: Limits) -> Result<Vec<u8>> {
+        if self.server_slide_id.len() > limits.max_server_slide_id_bytes() {
             return Err(limit("slide synchronization server slide ID bytes"));
         }
-        let mut out = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#.to_vec();
-        out.extend_from_slice(
-            br#"<p:sldSyncPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" serverSldId="#,
-        );
-        out.extend_from_slice(escape_xml(&self.server_slide_id).as_bytes());
-        out.extend_from_slice(br#"" serverSldModifiedTime="#);
-        out.extend_from_slice(self.server_modified_time.to_lexical().as_bytes());
-        out.extend_from_slice(br#"" clientInsertedTime="#);
-        out.extend_from_slice(self.client_inserted_time.to_lexical().as_bytes());
-        if self.has_extension_list {
-            out.extend_from_slice(br#""><p:extLst/></p:sldSyncPr>"#);
+        let server_slide_id = escape_xml(&self.server_slide_id);
+        let server_modified_time = self.server_modified_time.to_lexical();
+        let client_inserted_time = self.client_inserted_time.to_lexical();
+        let prefix = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#;
+        let root = br#"<p:sldSyncPr xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" serverSldId="#;
+        let server_time = br#"" serverSldModifiedTime="#;
+        let client_time = br#"" clientInsertedTime="#;
+        let suffix = if self.has_extension_list {
+            br#""><p:extLst/></p:sldSyncPr>"#.as_slice()
         } else {
-            out.extend_from_slice(br#""/>"#);
-        }
-        if out.len() > MAX_PART_XML_BYTES {
+            br#""/>"#.as_slice()
+        };
+        let output_len = prefix
+            .len()
+            .checked_add(root.len())
+            .and_then(|length| length.checked_add(server_slide_id.len()))
+            .and_then(|length| length.checked_add(server_time.len()))
+            .and_then(|length| length.checked_add(server_modified_time.len()))
+            .and_then(|length| length.checked_add(client_time.len()))
+            .and_then(|length| length.checked_add(client_inserted_time.len()))
+            .and_then(|length| length.checked_add(suffix.len()))
+            .ok_or_else(|| limit("serialized slide synchronization XML bytes"))?;
+        if output_len > limits.max_output_bytes() {
             return Err(limit("serialized slide synchronization XML bytes"));
         }
-        Self::parse(&out)?;
+        let mut out = Vec::new();
+        out.try_reserve_exact(output_len)
+            .map_err(|source| Error::Allocation {
+                resource: "slide synchronization XML",
+                source,
+            })?;
+        out.extend_from_slice(prefix);
+        out.extend_from_slice(root);
+        out.extend_from_slice(server_slide_id.as_bytes());
+        out.extend_from_slice(server_time);
+        out.extend_from_slice(server_modified_time.as_bytes());
+        out.extend_from_slice(client_time);
+        out.extend_from_slice(client_inserted_time.as_bytes());
+        out.extend_from_slice(suffix);
+        if out.len() != output_len {
+            return Err(invalid(
+                "slide synchronization output length changed during emission",
+            ));
+        }
+        let mut parse_limits = limits;
+        parse_limits.max_input_bytes = parse_limits.max_input_bytes.max(out.len());
+        Self::parse(&out, parse_limits)?;
         Ok(out)
     }
 }
 
-fn from_root(element: &BytesStart<'_>, decoder: Decoder) -> Result<Properties> {
+fn from_root(element: &BytesStart<'_>, decoder: Decoder, limits: Limits) -> Result<Properties> {
     for attribute in element.checked_attributes() {
         let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
         if attribute.key.prefix().is_some() {
@@ -175,7 +351,7 @@ fn from_root(element: &BytesStart<'_>, decoder: Decoder) -> Result<Properties> {
     }
     let server_slide_id = unqualified_attribute_value(element, b"serverSldId", decoder)?
         .ok_or_else(|| invalid("missing slide synchronization serverSldId attribute"))?;
-    if server_slide_id.len() > MAX_SERVER_SLIDE_ID_BYTES {
+    if server_slide_id.len() > limits.max_server_slide_id_bytes() {
         return Err(limit("slide synchronization server slide ID bytes"));
     }
     let server_modified_time = DateTime::parse(

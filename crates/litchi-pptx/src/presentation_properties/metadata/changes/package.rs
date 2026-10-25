@@ -5,6 +5,7 @@ use std::sync::Arc;
 use litchi_opc::{OpcPackage, PackURI};
 
 use super::codec;
+use super::codec::Limits;
 use super::model::Part as ChangesPart;
 use super::transaction::{Change, Prepared, Snapshot};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
@@ -15,8 +16,8 @@ use crate::{Error, Result};
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load(package: &OpcPackage) -> Result<Option<ChangesPart>> {
-    codec::load(package)
+pub fn load(package: &OpcPackage, limits: Limits) -> Result<Option<ChangesPart>> {
+    codec::load(package, limits)
 }
 
 /// Add a new Changes Information owner atomically.
@@ -31,11 +32,11 @@ pub fn load(package: &OpcPackage) -> Result<Option<ChangesPart>> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub(crate) fn store(package: &mut OpcPackage, value: &ChangesPart) -> Result<()> {
+pub(crate) fn store(package: &mut OpcPackage, value: &ChangesPart, limits: Limits) -> Result<()> {
     refuse_signed_change(package)?;
     let mut candidate = package.clone();
-    codec::store(&mut candidate, value)?;
-    if codec::load(&candidate)?.is_none() {
+    codec::store(&mut candidate, value, limits)?;
+    if codec::load(&candidate, limits)?.is_none() {
         return Err(invalid("stored Changes Information part cannot be read"));
     }
     settle_unsigned_change(&mut candidate)?;
@@ -48,8 +49,8 @@ pub(crate) fn store(package: &mut OpcPackage, value: &ChangesPart) -> Result<()>
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
-    let Some(value) = codec::load(package)? else {
+pub fn load_snapshot(package: &OpcPackage, limits: Limits) -> Result<Option<Snapshot>> {
+    let Some(value) = codec::load(package, limits)? else {
         return Ok(None);
     };
     let presentation = package.main_document_part()?;
@@ -68,6 +69,7 @@ pub fn load_snapshot(package: &OpcPackage) -> Result<Option<Snapshot>> {
         value.part_name,
         part.blob_arc(),
         value.changes_information,
+        limits,
     )
     .map(Some)
 }
@@ -120,9 +122,9 @@ pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result
 /// # Errors
 ///
 /// Returns an error if the operation fails.
-pub(crate) fn remove(package: &mut OpcPackage) -> Result<Option<ChangesPart>> {
+pub(crate) fn remove(package: &mut OpcPackage, limits: Limits) -> Result<Option<ChangesPart>> {
     let mut candidate = package.clone();
-    let Some(value) = codec::load(&candidate)? else {
+    let Some(value) = codec::load(&candidate, limits)? else {
         return Ok(None);
     };
     refuse_signed_change(package)?;
@@ -152,7 +154,7 @@ pub(crate) fn remove(package: &mut OpcPackage) -> Result<Option<ChangesPart>> {
             "Changes Information part disappeared during removal",
         ));
     }
-    if codec::load(&candidate)?.is_some() {
+    if codec::load(&candidate, limits)?.is_some() {
         return Err(invalid("Changes Information removal left an owner behind"));
     }
     settle_unsigned_change(&mut candidate)?;
@@ -161,8 +163,12 @@ pub(crate) fn remove(package: &mut OpcPackage) -> Result<Option<ChangesPart>> {
 }
 
 /// Replace only the already-owned Changes Information blob.
-pub(crate) fn replace_snapshot(package: &mut OpcPackage, after: &Snapshot) -> Result<Snapshot> {
-    let current = load_snapshot(package)?
+pub(crate) fn replace_snapshot(
+    package: &mut OpcPackage,
+    after: &Snapshot,
+    limits: Limits,
+) -> Result<Snapshot> {
+    let current = load_snapshot(package, limits)?
         .ok_or_else(|| invalid("cannot publish Changes Information into an absent owner"))?;
     if current.part_name() != after.part_name()
         || current.relationship_id() != after.relationship_id()
@@ -178,7 +184,7 @@ pub(crate) fn replace_snapshot(package: &mut OpcPackage, after: &Snapshot) -> Re
     candidate
         .get_part_mut(&target)?
         .set_blob_shared(Arc::clone(after.source_arc()));
-    let resulting = load_snapshot(&candidate)?
+    let resulting = load_snapshot(&candidate, limits)?
         .ok_or_else(|| invalid("published Changes Information part cannot be read"))?;
     if !resulting.same_source(after) {
         return Err(invalid(

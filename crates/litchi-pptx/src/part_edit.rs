@@ -696,6 +696,32 @@ impl<'a> Staged<'a> {
         self.package.semantic_limits().shape()
     }
 
+    pub(crate) fn changes_limits(
+        &self,
+    ) -> crate::presentation_properties::metadata::changes::Limits {
+        self.package.semantic_limits().changes()
+    }
+
+    pub(crate) fn revision_limits(
+        &self,
+    ) -> crate::presentation_properties::metadata::revision::Limits {
+        self.package.semantic_limits().revision()
+    }
+
+    pub(crate) fn slide_sync_limits(
+        &self,
+    ) -> crate::presentation_properties::metadata::slide_sync::Limits {
+        self.package.semantic_limits().slide_sync()
+    }
+
+    pub(crate) fn tracks_limits(&self) -> crate::presentation_properties::metadata::tracks::Limits {
+        self.package.semantic_limits().tracks()
+    }
+
+    pub(crate) fn events_limits(&self) -> crate::presentation_properties::metadata::events::Limits {
+        self.package.semantic_limits().events()
+    }
+
     /// Run one typed graph operation on the staged graph. An error leaves
     /// the staged graph as it was before the operation.
     pub(crate) fn update<T>(

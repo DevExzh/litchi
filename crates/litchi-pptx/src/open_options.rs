@@ -7,12 +7,17 @@ use std::sync::Arc;
 /// The semantic codec policies selected for an owning or source-backed
 /// presentation.  The value is retained only when a caller overrides one of
 /// the codec defaults; ordinary owners therefore keep a single empty option
-/// rather than carrying three policy copies.
+/// rather than carrying a policy copy for every family.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct SemanticLimits {
     shape: crate::shape::Limits,
     transition: crate::transition::Limits,
     laser: crate::laser::Limits,
+    changes: crate::presentation_properties::metadata::changes::Limits,
+    revision: crate::presentation_properties::metadata::revision::Limits,
+    slide_sync: crate::presentation_properties::metadata::slide_sync::Limits,
+    tracks: crate::presentation_properties::metadata::tracks::Limits,
+    events: crate::presentation_properties::metadata::events::Limits,
 }
 
 pub(crate) type SemanticLimitsRef = Arc<SemanticLimits>;
@@ -34,6 +39,11 @@ impl SemanticLimits {
             shape: crate::shape::Limits::DEFAULT,
             transition: crate::transition::Limits::DEFAULT,
             laser: crate::laser::Limits::DEFAULT,
+            changes: crate::presentation_properties::metadata::changes::Limits::DEFAULT,
+            revision: crate::presentation_properties::metadata::revision::Limits::DEFAULT,
+            slide_sync: crate::presentation_properties::metadata::slide_sync::Limits::DEFAULT,
+            tracks: crate::presentation_properties::metadata::tracks::Limits::DEFAULT,
+            events: crate::presentation_properties::metadata::events::Limits::DEFAULT,
         }
     }
 
@@ -49,6 +59,30 @@ impl SemanticLimits {
         self.laser
     }
 
+    pub(crate) const fn changes(self) -> crate::presentation_properties::metadata::changes::Limits {
+        self.changes
+    }
+
+    pub(crate) const fn revision(
+        self,
+    ) -> crate::presentation_properties::metadata::revision::Limits {
+        self.revision
+    }
+
+    pub(crate) const fn slide_sync(
+        self,
+    ) -> crate::presentation_properties::metadata::slide_sync::Limits {
+        self.slide_sync
+    }
+
+    pub(crate) const fn tracks(self) -> crate::presentation_properties::metadata::tracks::Limits {
+        self.tracks
+    }
+
+    pub(crate) const fn events(self) -> crate::presentation_properties::metadata::events::Limits {
+        self.events
+    }
+
     const fn with_shape(mut self, limits: crate::shape::Limits) -> Self {
         self.shape = limits;
         self
@@ -61,6 +95,46 @@ impl SemanticLimits {
 
     const fn with_laser(mut self, limits: crate::laser::Limits) -> Self {
         self.laser = limits;
+        self
+    }
+
+    const fn with_changes(
+        mut self,
+        limits: crate::presentation_properties::metadata::changes::Limits,
+    ) -> Self {
+        self.changes = limits;
+        self
+    }
+
+    const fn with_revision(
+        mut self,
+        limits: crate::presentation_properties::metadata::revision::Limits,
+    ) -> Self {
+        self.revision = limits;
+        self
+    }
+
+    const fn with_slide_sync(
+        mut self,
+        limits: crate::presentation_properties::metadata::slide_sync::Limits,
+    ) -> Self {
+        self.slide_sync = limits;
+        self
+    }
+
+    const fn with_tracks(
+        mut self,
+        limits: crate::presentation_properties::metadata::tracks::Limits,
+    ) -> Self {
+        self.tracks = limits;
+        self
+    }
+
+    const fn with_events(
+        mut self,
+        limits: crate::presentation_properties::metadata::events::Limits,
+    ) -> Self {
+        self.events = limits;
         self
     }
 
@@ -154,6 +228,86 @@ impl OpenOptions {
             .copied()
             .unwrap_or_default()
             .with_laser(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded Changes Information policy retained by the opened owner.
+    #[must_use]
+    pub fn changes_limits(
+        mut self,
+        limits: crate::presentation_properties::metadata::changes::Limits,
+    ) -> Self {
+        let profiles = self
+            .semantic_limits
+            .as_deref()
+            .copied()
+            .unwrap_or_default()
+            .with_changes(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded revision policy retained by the opened owner.
+    #[must_use]
+    pub fn revision_limits(
+        mut self,
+        limits: crate::presentation_properties::metadata::revision::Limits,
+    ) -> Self {
+        let profiles = self
+            .semantic_limits
+            .as_deref()
+            .copied()
+            .unwrap_or_default()
+            .with_revision(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded slide-sync policy retained by the opened owner.
+    #[must_use]
+    pub fn slide_sync_limits(
+        mut self,
+        limits: crate::presentation_properties::metadata::slide_sync::Limits,
+    ) -> Self {
+        let profiles = self
+            .semantic_limits
+            .as_deref()
+            .copied()
+            .unwrap_or_default()
+            .with_slide_sync(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded media-track policy retained by the opened owner.
+    #[must_use]
+    pub fn tracks_limits(
+        mut self,
+        limits: crate::presentation_properties::metadata::tracks::Limits,
+    ) -> Self {
+        let profiles = self
+            .semantic_limits
+            .as_deref()
+            .copied()
+            .unwrap_or_default()
+            .with_tracks(limits);
+        self.semantic_limits = profiles.into_ref();
+        self
+    }
+
+    /// Select the bounded slide-show-events policy retained by the opened owner.
+    #[must_use]
+    pub fn events_limits(
+        mut self,
+        limits: crate::presentation_properties::metadata::events::Limits,
+    ) -> Self {
+        let profiles = self
+            .semantic_limits
+            .as_deref()
+            .copied()
+            .unwrap_or_default()
+            .with_events(limits);
         self.semantic_limits = profiles.into_ref();
         self
     }
