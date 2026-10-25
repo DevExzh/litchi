@@ -233,6 +233,32 @@ impl Limits {
         self.max_output_bytes = max_output_bytes;
         Some(self)
     }
+
+    /// Intersect the codec policy with the retained OPC owner policy.
+    ///
+    /// Package edits must use one such intersection for every preflight,
+    /// scan, write, insertion, and read-back step.  The codec ceilings remain
+    /// hard safety ceilings when the owner was admitted under a broader
+    /// source profile.
+    pub(super) fn from_source_limits(source: litchi_opc::SourceLimits) -> Self {
+        let default = Self::DEFAULT;
+        let part = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);
+        let entry = usize::try_from(source.max_entry_bytes()).unwrap_or(usize::MAX);
+        let total_part = usize::try_from(source.max_total_part_bytes()).unwrap_or(usize::MAX);
+        let aggregate = usize::try_from(source.max_aggregate_bytes()).unwrap_or(usize::MAX);
+        Self {
+            max_slide_xml_bytes: default.max_slide_xml_bytes.min(part).min(entry),
+            max_total_slide_xml_bytes: default
+                .max_total_slide_xml_bytes
+                .min(total_part)
+                .min(aggregate),
+            max_trace_count: default.max_trace_count,
+            max_point_count: default.max_point_count,
+            max_xml_nodes: default.max_xml_nodes.min(source.max_events()),
+            max_xml_depth: default.max_xml_depth.min(source.max_depth()),
+            max_output_bytes: default.max_output_bytes.min(part).min(entry),
+        }
+    }
 }
 
 impl Default for Limits {

@@ -17,6 +17,13 @@ stage their charges and leave the caller's ledger unchanged.  Laser fragment
 writers admit output incrementally through the selected output bound and
 restore an existing destination buffer on refusal.
 
+The package editor intersects the retained `OpcPackage::read_limits()` policy
+with the laser safety ceilings once, then threads that profile through input
+admission, dialect scanning, fragment writing, complete-slide size preflight,
+and read-back.  The insertion path computes the complete projected slide size
+before allocating its output buffer; it does not fall back to the codec
+default when an owner was opened under a tighter profile.
+
 All PPTX source, package, edit, unit-test, integration-test, and example
 consumers were migrated to the canonical signatures.  The minimal and full
 PPTX glossary profiles register the required shape, transition, laser, and
@@ -31,7 +38,8 @@ validation after composing the neighboring raw-content and raw-properties
 leaves.
 
 Focused source tests cover exact and one-byte-under output boundaries, failure
-atomicity, and aggregate laser usage across multiple slides.  The main
+atomicity, aggregate laser usage across multiple slides, and a retained-owner
+profile that refuses a complete-slide growth before allocation.  The main
 performance consideration is the bounded laser and transition writers' small
 incremental sinks; they preserve direct appends and avoid growing a destination
 beyond the selected output ceiling.
