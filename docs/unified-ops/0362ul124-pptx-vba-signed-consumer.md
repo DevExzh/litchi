@@ -41,6 +41,13 @@ The adjacent public VBA edit and raw-owner documentation now states the
 actual crate-owned signed error rather than the lower-level OPC variant.
 Production mapping and signature behavior are unchanged.
 
+## 124a compile follow-up
+
+The first source-only tip passed the classification review but passed the
+owned `Family` into the helper after the loop had moved its `Change`.  The
+helper now takes the family's copied static name instead.  This keeps the
+dispatch typed and strict without borrowing a partially moved test value.
+
 ## Source-only validation
 
 `git diff --check` passed.  The changed Rust paths were inspected for the

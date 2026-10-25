@@ -101,13 +101,13 @@ fn is_vba_refusal(error: &Error) -> bool {
     matches!(error, Error::Signed)
 }
 
-fn is_family_refusal(family: &Family, error: &Error) -> bool {
+fn is_family_refusal(family_name: &'static str, error: &Error) -> bool {
     #[cfg(feature = "vba-inspection")]
-    if family.name == "VBA project (shared owner)" {
+    if family_name == "VBA project (shared owner)" {
         return is_vba_refusal(error);
     }
     #[cfg(not(feature = "vba-inspection"))]
-    let _ = family;
+    let _ = family_name;
     is_refusal(error)
 }
 
@@ -921,7 +921,7 @@ fn every_family_refuses_a_signed_package_until_it_is_unsigned() {
             let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
             let error = (change.edit)(&mut package)
                 .expect_err(&format!("{label}: a signed package must refuse"));
-            assert!(is_family_refusal(family, &error), "{label}: {error:?}");
+            assert!(is_family_refusal(family.name, &error), "{label}: {error:?}");
             assert!(package.opc().unwrap().is_signed(), "{label}");
             assert_eq!(package.to_bytes().unwrap(), source, "{label}: refusal");
 
