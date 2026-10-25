@@ -5601,3 +5601,46 @@ See [0063](0063-source-pptx-modern-comments.md).
   compiler packet continues unchanged; separate df57 packets remain inert.
   Subsequent validation will bind the combined source. Runtime, fidelity,
   performance and final acceptance remain open; nothing is pushed.
+
+
+  Joint merge `e2a833d72e` passes independent source review: the metadata
+  resolution and all fourteen overlap paths preserve both migration chains;
+  the tree is clean. The next compiler packet is being bound to this exact
+  source. This remains private integration pending full qualification.
+
+
+  The standalone afede PPTX packet completes all eight compiler/consumer
+  checks successfully, including strict leaf/ops/facade Clippy, combined
+  DOCX/PPTX examples and standalone perf/native harnesses. Root verifies the
+  complete terminal capture; target ends at 957,738,123 bytes. This result is
+  scoped to afede. Joint e2a qualification is being prepared, with no runtime
+  or performance acceptance inferred. Baseline `c5d2b30740` carries the same
+  eight harness blobs as e2a after its test-only consumer migration.
+
+
+  The joint e2a packet passes formatting and minimal PPTX compilation, then
+  direct primary-package Clippy finds one unnecessary closure in common
+  application properties. Root verifies the failed capture and independently
+  reviews/fast-forwards 101b at `6964022294`; the fixed error and bounds are
+  unchanged. Fresh compiler bindings are required. Joint runtime coverage is
+  consolidated to 33 rows and glossary coverage to 13 unique profiles/26 steps.
+  The existing signed-batch contract choice is explicitly surfaced to the owner;
+  no answer is inferred, and independent qualification continues.
+
+
+- Coordinator signed-batch decision and local consolidation (2026-10-25):
+  The owner selects immediate signed-batch refusal. Reviewed 102 partitions
+  signed corpus checks from unsigned equivalence and proves zero item reads;
+  it is merged privately at `b4f83c95b9`. Native policy binds that explicit
+  selection. The preceding joint compiler capture on 6964 passes formatting
+  and minimal PPTX compilation, then finds one redundant ribbon test qualifier.
+  Root verifies the failure and fast-forwards reviewed 101c at `a3aec01d5a`.
+  Fresh combined compiler/runtime/glossary qualification is required.
+
+  The owner also requests merging or deleting every local unified-derived
+  branch/worktree, excluding main and office-format-completeness. Root is
+  already on feat/unified-ops-api. The initial inventory finds 482 refs and
+  300 worktrees; lineage review distinguishes independent office siblings
+  from unified work. Already-integrated refs are being checked for guarded
+  deletion; unique work and active measurement baselines remain under review.
+  Record 0362ul103 tracks this consolidation. No push or final acceptance.
