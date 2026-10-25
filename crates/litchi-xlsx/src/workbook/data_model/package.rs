@@ -9,13 +9,20 @@ use quick_xml::{Reader, events::Event};
 
 use crate::error::Result;
 use crate::package::xldm::{
-    OlapProofLimits, StorageProfile, Xldm140TimeGroupingContentType, generated,
-    inspect as inspect_xldm, metadata, native, olap, olapproof, prove_xldm140_closure,
+    Limits as XldmLimits, OlapProofLimits, StorageProfile, Xldm140TimeGroupingContentType,
+    generated, inspect as inspect_xldm, metadata, native, olap, olapproof, prove_xldm140_closure,
 };
 
 const NATIVE_MODEL_RELATIONSHIP_TYPE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/powerPivotData";
 const MODEL_CONNECTION_EXTENSION_URI: &str = "{DE250136-89BD-433C-8126-D09CA5730AF9}";
+
+fn xldm_limits(source: SourceLimits) -> XldmLimits {
+    let maximum = usize::try_from(source.max_part_bytes())
+        .unwrap_or(usize::MAX)
+        .min(MAX_PAYLOAD_BYTES);
+    XldmLimits::new(maximum, maximum)
+}
 
 use super::codec::{
     parse_document_with_base, rewrite_data_model_extension, rewrite_load_version,
@@ -88,7 +95,7 @@ fn load_shared_model(
     if blob.len() > maximum {
         return Err(Error::limit(LimitKind::PayloadBytes, blob.len(), maximum));
     }
-    let profile = inspect_xldm(blob)?.profile();
+    let profile = inspect_xldm(blob, &xldm_limits(*limits))?.profile();
     if !part.rels().is_empty() {
         return Err(invalid(
             "Data Model part has forbidden outbound relationships",
@@ -128,6 +135,7 @@ pub(crate) fn store_data_model(
     validate_model_time_grouping_identity(
         &value.payload.data,
         value.definition.model_time_groupings()?.as_ref(),
+        &package.read_limits(),
     )?;
     validate_model_contents(
         package,
@@ -364,6 +372,44 @@ fn model_time_grouping_identity_unsupported() -> Error {
     }
 }
 
+fn map_xldm_metadata_identity_error(error: metadata::MetadataError) -> Error {
+    match error {
+        metadata::MetadataError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(crate::package::map_xldm_limit_kind(kind), observed, maximum),
+        metadata::MetadataError::InvalidLimit {
+            kind,
+            value,
+            maximum,
+        } => Error::InvalidLimit {
+            kind: crate::package::map_xldm_limit_kind(kind),
+            value: u64::try_from(value).unwrap_or(u64::MAX),
+            maximum: u64::try_from(maximum).unwrap_or(u64::MAX),
+        },
+        metadata::MetadataError::Invalid(_) | metadata::MetadataError::Allocation { .. } => {
+            model_time_grouping_identity_unsupported()
+        },
+    }
+}
+
+fn map_xldm_olap_identity_error(error: litchi_xldm::OlapProofError) -> Error {
+    match error {
+        litchi_xldm::OlapProofError::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::limit(crate::package::map_xldm_limit_kind(kind), observed, maximum),
+        litchi_xldm::OlapProofError::UnsupportedProfile
+        | litchi_xldm::OlapProofError::Invalid { .. }
+        | litchi_xldm::OlapProofError::Unproven { .. }
+        | litchi_xldm::OlapProofError::Allocation { .. } => {
+            model_time_grouping_identity_unsupported()
+        },
+    }
+}
+
 /// Prove every workbook time grouping against the complete neutral XLDM 140
 /// closure. The proof is source-bound: it resolves the table XML name, the
 /// table-local source column, every calculated column, the Date DBType of the
@@ -374,16 +420,18 @@ fn model_time_grouping_identity_unsupported() -> Error {
 fn validate_model_time_grouping_identity(
     data: &[u8],
     groupings: Option<&ModelTimeGroupings>,
+    source_limits: &SourceLimits,
 ) -> Result<()> {
     let Some(groupings) = groupings else {
         return Ok(());
     };
-    let storage = inspect_xldm(data)?;
+    let limits = xldm_limits(*source_limits);
+    let storage = inspect_xldm(data, &limits)?;
     if storage.profile() != StorageProfile::Xldm140 {
         return Err(model_time_grouping_identity_unsupported());
     }
     let metadata =
-        metadata::inspect(&storage).map_err(|_| model_time_grouping_identity_unsupported())?;
+        metadata::inspect(&storage, &limits).map_err(map_xldm_metadata_identity_error)?;
     let native = native::inspect(&storage, &metadata.native_parse_options())
         .map_err(|_| model_time_grouping_identity_unsupported())?;
     let generated = generated::inspect_system_generated(&storage)
@@ -398,7 +446,7 @@ fn validate_model_time_grouping_identity(
     // descriptor IDs.
     let olap_proof =
         olapproof::prove_xldm140_olap(&storage, &metadata, &olap, OlapProofLimits::default())
-            .map_err(|_| model_time_grouping_identity_unsupported())?;
+            .map_err(map_xldm_olap_identity_error)?;
     if !olap_proof.is_complete() {
         return Err(model_time_grouping_identity_unsupported());
     }
@@ -492,7 +540,7 @@ fn validate_model_contents(
             MAX_PAYLOAD_BYTES,
         ));
     }
-    let profile = inspect_xldm(data)?.profile();
+    let profile = inspect_xldm(data, &xldm_limits(package.read_limits()))?.profile();
     validate_inbound_relationships(
         package,
         &PackURI::new(part_name).map_err(invalid)?,
@@ -1022,6 +1070,7 @@ impl Edit {
         validate_model_time_grouping_identity(
             model.payload(),
             model.definition.model_time_groupings()?.as_ref(),
+            &self.target.read_limits(),
         )?;
         let workbook_name = self
             .loaded
@@ -1096,6 +1145,7 @@ impl Edit {
         validate_model_time_grouping_identity(
             candidate.payload(),
             candidate.definition.model_time_groupings()?.as_ref(),
+            &self.target.read_limits(),
         )?;
         let workbook_name = self
             .loaded
@@ -1739,7 +1789,7 @@ mod tests {
             .expect("test XLDM directory timestamp");
         let value_offset = offset + "<LastWriteTime>".encode_utf16().count() * 2;
         payload[value_offset] = b'1';
-        assert!(litchi_xldm::inspect(&payload).is_ok());
+        assert!(litchi_xldm::inspect(&payload, &litchi_xldm::Limits::DEFAULT).is_ok());
         payload
     }
 
@@ -2921,5 +2971,44 @@ mod tests {
             let xml = format!(r#"<d:dataModel xmlns:d="{X15}" minVersionLoad="{lexical}"/>"#);
             assert!(parse_model(xml.as_bytes()).is_err());
         }
+    }
+
+    #[test]
+    fn nested_xldm_limits_keep_typed_dimensions_at_the_xlsx_boundary() {
+        let metadata = map_xldm_metadata_identity_error(metadata::MetadataError::InvalidLimit {
+            kind: litchi_xldm::LimitKind::MetadataTextBytes,
+            value: 65,
+            maximum: 64,
+        });
+        assert!(matches!(
+            metadata,
+            Error::InvalidLimit {
+                kind: crate::LimitKind::DataModel(LimitKind::XldmMetadataTextBytes),
+                value: 65,
+                maximum: 64,
+            }
+        ));
+
+        let proof = map_xldm_olap_identity_error(litchi_xldm::OlapProofError::Limit {
+            kind: litchi_xldm::LimitKind::Work,
+            observed: 33,
+            maximum: 32,
+        });
+        assert!(matches!(
+            proof,
+            Error::Limit {
+                kind: crate::LimitKind::DataModel(LimitKind::XldmProofWork),
+                observed: 33,
+                maximum: 32,
+            }
+        ));
+
+        assert!(matches!(
+            map_xldm_olap_identity_error(litchi_xldm::OlapProofError::Invalid {
+                path: "source".into(),
+                detail: "contradiction".into(),
+            }),
+            Error::Unsupported { .. }
+        ));
     }
 }

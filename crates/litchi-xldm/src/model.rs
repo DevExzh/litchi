@@ -225,12 +225,19 @@ pub struct Storage<'a> {
     pub files: Vec<FileEntry>,
     pub(super) bytes: &'a [u8],
     pub(super) profile: StorageProfile,
+    pub(super) limits: crate::Limits,
 }
 
 impl Storage<'_> {
     #[must_use]
     pub fn profile(&self) -> StorageProfile {
         self.profile
+    }
+
+    /// Return the policy retained when this borrowed storage was inspected.
+    #[must_use = "use the retained resource policy"]
+    pub fn limits_value(&self) -> crate::Limits {
+        self.limits
     }
 
     #[must_use]
@@ -316,6 +323,7 @@ pub(crate) fn test_xldm140_storage<'a>(bytes: &'a [u8], paths: &[&str]) -> Stora
             .collect(),
         bytes,
         profile: StorageProfile::Xldm140,
+        limits: crate::Limits::DEFAULT,
     }
 }
 

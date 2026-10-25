@@ -203,6 +203,18 @@ impl Xldm140RenameError {
             crate::error::Error::Invalid(message) | crate::error::Error::Xml(message) => {
                 Self::invalid(message)
             },
+            crate::error::Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => {
+                Self::limit_with_resource(error.to_string(), Some((observed, maximum)), Some(kind))
+            },
+            crate::error::Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => Self::limit_with_resource(error.to_string(), Some((value, maximum)), Some(kind)),
             crate::error::Error::Unsupported { feature } => Self {
                 kind: Xldm140RenameErrorKind::Unsupported,
                 message: format!("unsupported XLDM rename operation: {feature}"),
@@ -987,7 +999,8 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
 
         let candidate_bytes = super::codec::rewrite_same_size_payloads(self.storage, replacements)
             .map_err(|error| OlapError::new(format!("XLDM outer rewrite failed: {error}")))?;
-        let candidate = super::codec::inspect(&candidate_bytes).map_err(|error| {
+        let limits = self.storage.limits_value();
+        let candidate = super::codec::inspect(&candidate_bytes, &limits).map_err(|error| {
             OlapError::new(format!("XLDM rewritten source is invalid: {error}"))
         })?;
         if candidate.profile() != StorageProfile::Xldm140
@@ -1007,7 +1020,7 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
             ));
         }
 
-        let metadata = super::metadata::inspect(&candidate).map_err(|error| {
+        let metadata = super::metadata::inspect(&candidate, &limits).map_err(|error| {
             OlapError::new(format!("rewritten section 2.5 is invalid: {error}"))
         })?;
         let native = super::native::inspect(&candidate, &metadata.native_parse_options()).map_err(
@@ -1095,6 +1108,20 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
                     table.metadata_path
                 ))
             })?;
+        let output_len = table_name_replacement_output_len(file.bytes, &table.xml_name, new_name)?;
+        if output_len != file.bytes.len() {
+            return Err(OlapError::new(
+                "XLDM table XML rename changes its fixed allocation size",
+            ));
+        }
+        let limits = self.storage.limits_value();
+        if self.storage.bytes().len() > limits.max_output_bytes {
+            return Err(OlapError::new(format!(
+                "XLDM table rename output bytes {} exceed retained output bytes limit {}",
+                self.storage.bytes().len(),
+                limits.max_output_bytes,
+            )));
+        }
         let replacement = replace_table_name_attribute(file.bytes, &table.xml_name, new_name)?;
         let candidate_bytes = super::codec::rewrite_same_size_payloads(
             self.storage,
@@ -1106,12 +1133,12 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
         .map_err(|error| {
             OlapError::new(format!("XLDM table rename outer rewrite failed: {error}"))
         })?;
-        let candidate = super::codec::inspect(&candidate_bytes).map_err(|error| {
+        let candidate = super::codec::inspect(&candidate_bytes, &limits).map_err(|error| {
             OlapError::new(format!(
                 "XLDM table rename produced invalid storage: {error}"
             ))
         })?;
-        let metadata_after = super::metadata::inspect(&candidate).map_err(|error| {
+        let metadata_after = super::metadata::inspect(&candidate, &limits).map_err(|error| {
             OlapError::new(format!("renamed table metadata is invalid: {error}"))
         })?;
         let native_after =
@@ -1362,7 +1389,12 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
                 let payload = payload.ok_or_else(|| {
                     Xldm140RenameError::invalid("table rename planner lost a rewritten payload")
                 })?;
-                super::metadata::parse_file(file.storage_path, &payload).map_err(|error| {
+                super::metadata::parse_file(
+                    file.storage_path,
+                    &payload,
+                    &self.storage.limits_value(),
+                )
+                .map_err(|error| {
                     Xldm140RenameError::invalid(format!(
                         "rewritten relationship metadata {} is invalid: {error}",
                         file.storage_path
@@ -1393,12 +1425,13 @@ impl<'storage, 'source> Xldm140Closure<'storage, 'source> {
             max_output_bytes,
         )
         .map_err(Xldm140RenameError::from_codec)?;
-        let candidate = super::codec::inspect(&candidate_bytes).map_err(|error| {
+        let limits = self.storage.limits_value();
+        let candidate = super::codec::inspect(&candidate_bytes, &limits).map_err(|error| {
             Xldm140RenameError::invalid(format!(
                 "XLDM structural table rename produced invalid storage: {error}"
             ))
         })?;
-        let metadata_after = super::metadata::inspect(&candidate).map_err(|error| {
+        let metadata_after = super::metadata::inspect(&candidate, &limits).map_err(|error| {
             Xldm140RenameError::invalid(format!("renamed table metadata is invalid: {error}"))
         })?;
         let native_after = super::native::inspect(
@@ -3945,6 +3978,7 @@ fn qualify_storage_name(metadata_path: &str, name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Limits;
     use crate::generated::{SystemGeneratedData, SystemGeneratedFile, SystemGeneratedModel};
     use crate::metadata::{ColumnPolicy, MetadataClass, MetadataCollection, MetadataDataObject};
     use crate::model::{BOM, CRC_SIZE, test_xldm140_storage};
@@ -4036,6 +4070,7 @@ mod tests {
             bytes: &[],
             kind: MetadataFileKind::Table,
             table,
+            limits: Limits::DEFAULT,
         }
     }
 
@@ -4070,6 +4105,7 @@ mod tests {
             bytes: &[],
             kind: MetadataFileKind::TableRelationship,
             table,
+            limits: Limits::DEFAULT,
         }
     }
 
@@ -4393,8 +4429,10 @@ mod tests {
     fn reparses_complete_distinct_id_fixture_for_changed_table_name_and_inverse() {
         let entries = complete_distinct_id_storage_entries();
         let source = build_identity_storage(&entries);
-        let storage = crate::inspect(&source).expect("canonical XLDM fixture should inspect");
-        let metadata = crate::metadata::inspect(&storage).expect("table metadata should inspect");
+        let storage = crate::inspect(&source, &Limits::DEFAULT)
+            .expect("canonical XLDM fixture should inspect");
+        let metadata = crate::metadata::inspect(&storage, &Limits::DEFAULT)
+            .expect("table metadata should inspect");
         let native = crate::native::inspect(&storage, &metadata.native_parse_options())
             .expect("empty native closure should inspect");
         let generated = crate::generated::inspect_system_generated(&storage)
@@ -4421,10 +4459,10 @@ mod tests {
         let changed = patch
             .apply(&source)
             .expect("source-bound patch should apply");
-        let changed_storage =
-            crate::inspect(changed.as_ref()).expect("changed source should reparse");
-        let changed_metadata =
-            crate::metadata::inspect(&changed_storage).expect("changed metadata should reparse");
+        let changed_storage = crate::inspect(changed.as_ref(), &Limits::DEFAULT)
+            .expect("changed source should reparse");
+        let changed_metadata = crate::metadata::inspect(&changed_storage, &Limits::DEFAULT)
+            .expect("changed metadata should reparse");
         assert_eq!(
             changed_metadata.files[0].table.name.as_deref(),
             Some("NewName")
@@ -4438,8 +4476,10 @@ mod tests {
     #[test]
     fn relationship_rename_with_limit_accepts_exact_output_and_refuses_one_under() {
         let source = build_identity_storage(&complete_distinct_id_storage_entries());
-        let storage = crate::inspect(&source).expect("canonical XLDM fixture should inspect");
-        let metadata = crate::metadata::inspect(&storage).expect("table metadata should inspect");
+        let storage = crate::inspect(&source, &Limits::DEFAULT)
+            .expect("canonical XLDM fixture should inspect");
+        let metadata = crate::metadata::inspect(&storage, &Limits::DEFAULT)
+            .expect("table metadata should inspect");
         let native = crate::native::inspect(&storage, &metadata.native_parse_options())
             .expect("native closure should inspect");
         let generated = crate::generated::inspect_system_generated(&storage)
@@ -4512,10 +4552,56 @@ mod tests {
     }
 
     #[test]
+    fn rewrites_honor_retained_output_cap_while_noops_stay_borrowed() {
+        let source = build_identity_storage(&complete_distinct_id_storage_entries());
+        let limits = Limits::new(source.len(), source.len() - 1);
+        let storage = crate::inspect(&source, &limits).expect("source should fit its input cap");
+        let metadata = crate::metadata::inspect(&storage, &limits).expect("metadata should fit");
+        let native = crate::native::inspect(&storage, &metadata.native_parse_options())
+            .expect("native closure should inspect");
+        let generated = crate::generated::inspect_system_generated(&storage)
+            .expect("generated closure should inspect");
+        let olap = crate::olap::inspect(&storage, &metadata).expect("OLAP should inspect");
+        let closure = prove_xldm140_closure(&storage, &metadata, &olap, &native, &generated)
+            .expect("fixture should form a complete closure");
+
+        let error = closure
+            .rename_table_name("T1", "NewName")
+            .expect_err("same-size rewrites must honor the retained output cap");
+        assert!(error.to_string().contains("retained output bytes limit"));
+
+        let no_op = closure
+            .rewrite_same_size(&[])
+            .expect("an exact no-op should not allocate or copy the source");
+        assert!(no_op.is_noop());
+        assert!(std::ptr::eq(no_op.after().as_ptr(), source.as_ptr()));
+
+        let rename_no_op = closure
+            .rename_table_name("T1", "OldName")
+            .expect("an exact table-name no-op should bypass the output cap");
+        assert!(rename_no_op.is_noop());
+        assert!(std::ptr::eq(rename_no_op.after().as_ptr(), source.as_ptr()));
+
+        let empty_variable =
+            crate::codec::rewrite_variable_size_payloads_with_limit(&storage, &[], source.len())
+                .expect_err("the variable writer's empty copy still emits output");
+        assert!(matches!(
+            empty_variable,
+            crate::Error::Limit {
+                kind: crate::LimitKind::XldmOutputBytes,
+                observed,
+                maximum,
+            } if observed == source.len() && maximum == source.len() - 1
+        ));
+    }
+
+    #[test]
     fn physical_complete_fixture_binds_source_and_calculated_time_grouping() {
         let source = build_identity_storage(&complete_distinct_id_storage_entries());
-        let storage = crate::inspect(&source).expect("physical XLDM fixture should inspect");
-        let metadata = crate::metadata::inspect(&storage).expect("metadata should inspect");
+        let storage = crate::inspect(&source, &Limits::DEFAULT)
+            .expect("physical XLDM fixture should inspect");
+        let metadata =
+            crate::metadata::inspect(&storage, &Limits::DEFAULT).expect("metadata should inspect");
         let native = crate::native::inspect(&storage, &metadata.native_parse_options())
             .expect("native column closure should inspect");
         assert!(native.files.iter().any(|file| {
@@ -5882,6 +5968,7 @@ mod tests {
                     collections: Vec::new(),
                     data_objects: Vec::new(),
                 },
+                limits: Limits::DEFAULT,
             }],
             columns: Vec::new(),
             relationships: Vec::new(),

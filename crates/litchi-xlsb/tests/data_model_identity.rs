@@ -123,8 +123,10 @@ fn complete_payload_named_inner(name: &str, with_relationship: bool) -> Vec<u8> 
         return build_identity_storage(&source);
     }
     let storage_bytes = build_identity_storage(&source);
-    let storage = litchi_xldm::inspect_shared(&storage_bytes).expect("XLDM storage");
-    let metadata = litchi_xldm::metadata::inspect(&storage).expect("metadata closure");
+    let storage = litchi_xldm::inspect_shared(&storage_bytes, &litchi_xldm::Limits::DEFAULT)
+        .expect("XLDM storage");
+    let metadata = litchi_xldm::metadata::inspect(&storage, &litchi_xldm::Limits::DEFAULT)
+        .expect("metadata closure");
     let native = litchi_xldm::native::inspect(&storage, &metadata.native_parse_options())
         .expect("native closure");
     let generated =
@@ -349,8 +351,9 @@ fn signed_complete_package() -> Package {
 
 fn assert_inner_table_name(package: &Package, expected: &str) {
     let part = package_part_bytes(package, MODEL_URI);
-    let storage = litchi_xldm::inspect(&part).expect("XLDM storage");
-    let metadata = litchi_xldm::metadata::inspect(&storage).expect("metadata closure");
+    let storage = litchi_xldm::inspect(&part, &litchi_xldm::Limits::DEFAULT).expect("XLDM storage");
+    let metadata = litchi_xldm::metadata::inspect(&storage, &litchi_xldm::Limits::DEFAULT)
+        .expect("metadata closure");
     let table = metadata
         .files
         .iter()
@@ -361,7 +364,7 @@ fn assert_inner_table_name(package: &Package, expected: &str) {
 
 fn inner_member_bytes(package: &Package) -> BTreeMap<String, Vec<u8>> {
     let part = package_part_bytes(package, MODEL_URI);
-    let storage = litchi_xldm::inspect(&part).expect("XLDM storage");
+    let storage = litchi_xldm::inspect(&part, &litchi_xldm::Limits::DEFAULT).expect("XLDM storage");
     storage
         .files
         .iter()

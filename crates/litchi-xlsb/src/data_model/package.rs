@@ -365,7 +365,11 @@ pub(crate) fn validate_model_payload_and_groupings(model: &Model) -> Result<()> 
     super::codec::validate_definition(&model.definition, super::SemanticLimits::DEFAULT)?;
     validate_payload(&model.part)?;
     for grouping in &model.definition.time_groupings {
-        super::proof::prove_time_grouping(model.part.bytes(), grouping)?;
+        super::proof::prove_time_grouping(
+            model.part.bytes(),
+            grouping,
+            super::codec::HARD_MAX_PART_BYTES,
+        )?;
     }
     Ok(())
 }

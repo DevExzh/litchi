@@ -12,6 +12,9 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use codec::{
+    MAX_METADATA_BYTES, MAX_METADATA_FILES, MAX_TEXT_BYTES, MAX_XML_DEPTH, MAX_XML_NODES,
+};
 pub use codec::{inspect, parse_file, write_file};
 pub use model::{
     ColumnPolicy, DictionaryPolicy, HierarchyPolicy, MetadataClass, MetadataCollection,

@@ -4,7 +4,7 @@ use super::codec::{crc32, decode_xml, utf16le};
 use super::identity::Xldm140FileReplacement;
 use super::model::{BOM, CRC_SIZE, MAX_DIRECTORY_BYTES};
 use super::{
-    FileGroupClass, FileKind, GeneratedNameKind, XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE,
+    FileGroupClass, FileKind, GeneratedNameKind, Limits, XLDM_PAGE_SIZE, XLDM_STREAM_SIGNATURE,
     classify_generated_path, inspect, inspect_shared, write,
 };
 
@@ -31,21 +31,21 @@ fn utf16_xml_budget_checks_expansion_and_exact_limit() {
         bytes.extend_from_slice(&0x0800u16.to_le_bytes());
     }
     bytes.extend_from_slice(&(b'a' as u16).to_le_bytes());
-    let (decoded, _) = decode_xml(&bytes, true).unwrap();
+    let (decoded, _) = decode_xml(&bytes, true, &Limits::DEFAULT).unwrap();
     assert_eq!(decoded.len(), MAX_DIRECTORY_BYTES);
     drop(decoded);
 
     bytes.extend_from_slice(&(b'a' as u16).to_le_bytes());
-    assert!(decode_xml(&bytes, true).is_err());
+    assert!(decode_xml(&bytes, true, &Limits::DEFAULT).is_err());
 }
 
 #[test]
 fn encoded_utf16_and_utf8_xml_budgets_reject_before_owned_copy() {
     let encoded_over_limit = vec![0u8; MAX_DIRECTORY_BYTES * 2 + 2];
-    assert!(decode_xml(&encoded_over_limit, true).is_err());
+    assert!(decode_xml(&encoded_over_limit, true, &Limits::DEFAULT).is_err());
 
     let utf8_over_limit = vec![b'x'; MAX_DIRECTORY_BYTES + 1];
-    assert!(decode_xml(&utf8_over_limit, false).is_err());
+    assert!(decode_xml(&utf8_over_limit, false, &Limits::DEFAULT).is_err());
 }
 
 #[test]
@@ -71,9 +71,11 @@ fn oversized_valid_crc_marker_is_rejected_before_xml_materialization() {
     );
     assert_eq!(marker, crc32(&partition));
     assert!(matches!(
-        inspect(&bytes),
-        Err(crate::error::Error::Invalid(message))
-            if message == "MS-XLDM XML bytes limit exceeded"
+        inspect(&bytes, &Limits::DEFAULT),
+        Err(crate::error::Error::Limit {
+            kind: crate::LimitKind::DirectoryBytes,
+            ..
+        })
     ));
 }
 
@@ -92,15 +94,44 @@ pub(crate) fn test_xldm_bytes() -> Vec<u8> {
 fn shared_inspection_retains_the_caller_source_buffer() {
     let bytes = test_xldm_bytes();
     let source = bytes.as_ptr();
-    let storage = inspect_shared(&bytes).unwrap();
+    let storage = inspect_shared(&bytes, &Limits::DEFAULT).unwrap();
     assert_eq!(storage.source_bytes().as_ptr(), source);
     assert_eq!(storage.source_bytes(), bytes.as_slice());
 }
 
 #[test]
+fn raw_limits_are_typed_and_retained_across_exact_writes() {
+    let bytes = test_xldm_bytes();
+    let mut source_limits = Limits::DEFAULT;
+    source_limits.max_source_bytes = bytes.len() - 1;
+    assert!(matches!(
+        inspect(&bytes, &source_limits),
+        Err(crate::error::Error::Limit {
+            kind: crate::LimitKind::XldmSourceBytes,
+            ..
+        })
+    ));
+
+    let mut retained_limits = Limits::DEFAULT;
+    retained_limits.max_source_bytes = bytes.len();
+    let storage = inspect(&bytes, &retained_limits).unwrap();
+    assert_eq!(storage.limits_value().max_source_bytes(), bytes.len());
+
+    let mut output_limits = Limits::DEFAULT;
+    output_limits.max_output_bytes = bytes.len() - 1;
+    assert!(matches!(
+        write(&storage, &output_limits),
+        Err(crate::error::Error::Limit {
+            kind: crate::LimitKind::XldmOutputBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
 fn same_size_payload_rewrite_updates_crc_and_has_exact_inverse() {
     let original = test_xldm_bytes();
-    let storage = inspect(&original).unwrap();
+    let storage = inspect(&original, &Limits::DEFAULT).unwrap();
     let path = storage.files[1].path.clone();
     let old_payload = storage.file_payload(1).unwrap().to_vec();
     let mut replacement = old_payload.clone();
@@ -113,7 +144,7 @@ fn same_size_payload_rewrite_updates_crc_and_has_exact_inverse() {
         }],
     )
     .unwrap();
-    let changed = inspect(&rewritten).unwrap();
+    let changed = inspect(&rewritten, &Limits::DEFAULT).unwrap();
     assert_eq!(changed.file_payload(1).unwrap(), replacement.as_slice());
     assert_ne!(rewritten, original);
 
@@ -131,7 +162,7 @@ fn same_size_payload_rewrite_updates_crc_and_has_exact_inverse() {
 #[test]
 fn same_size_payload_rewrite_rejects_growth_before_materialization() {
     let original = test_xldm_bytes();
-    let storage = inspect(&original).unwrap();
+    let storage = inspect(&original, &Limits::DEFAULT).unwrap();
     let path = storage.files[1].path.clone();
     let payload = vec![0_u8; storage.file_payload(1).unwrap().len() + 1];
     let error = super::codec::rewrite_same_size_payloads(
@@ -155,7 +186,7 @@ fn canonical_version_lexical_forms_and_profile_boundaries_are_retained() {
         ("BackupLog", log.as_bytes()),
     ]);
     assert_eq!(
-        inspect(&bytes).unwrap().profile(),
+        inspect(&bytes, &Limits::DEFAULT).unwrap().profile(),
         super::StorageProfile::Xldm140
     );
     let original = utf16le(">140<");
@@ -164,7 +195,7 @@ fn canonical_version_lexical_forms_and_profile_boundaries_are_retained() {
         .position(|part| part == original)
         .unwrap();
     bytes[position..position + original.len()].copy_from_slice(&utf16le(">150<"));
-    assert!(inspect(&bytes).is_err());
+    assert!(inspect(&bytes, &Limits::DEFAULT).is_err());
 }
 
 #[cfg(test)]
@@ -228,7 +259,7 @@ mod tests {
     #[test]
     fn inspects_typed_storage_and_writes_byte_exactly() {
         let bytes = test_xldm_bytes();
-        let storage = inspect(&bytes).unwrap();
+        let storage = inspect(&bytes, &Limits::DEFAULT).unwrap();
         assert_eq!(storage.header.backup_restore_sync_version, 140);
         assert_eq!(storage.partition_marker.partition_count, 1);
         assert_eq!(storage.files.len(), 3);
@@ -246,7 +277,7 @@ mod tests {
             storage.file_payload(1).unwrap(),
             b"compressed-looking model metadata"
         );
-        assert_eq!(write(&storage).unwrap(), bytes);
+        assert_eq!(write(&storage, &Limits::DEFAULT).unwrap(), bytes);
     }
 
     #[test]
@@ -255,36 +286,36 @@ mod tests {
         for mutation in [0usize, 4] {
             let mut bytes = base.clone();
             bytes[mutation] ^= 1;
-            assert!(inspect(&bytes).is_err());
+            assert!(inspect(&bytes, &Limits::DEFAULT).is_err());
         }
         let mut bytes = base;
         bytes[XLDM_PAGE_SIZE - 1] = 1;
-        assert!(inspect(&bytes).is_err());
+        assert!(inspect(&bytes, &Limits::DEFAULT).is_err());
     }
 
     #[test]
     fn rejects_crc_corruption_without_interpreting_payload() {
         let mut bytes = test_xldm_bytes();
-        let storage = inspect(&bytes).unwrap();
+        let storage = inspect(&bytes, &Limits::DEFAULT).unwrap();
         let offset = storage.files[1].offset.0 as usize;
         bytes[offset] ^= 1;
-        assert!(inspect(&bytes).is_err());
+        assert!(inspect(&bytes, &Limits::DEFAULT).is_err());
     }
 
     #[test]
     fn rejects_nonzero_page_padding() {
         let mut bytes = test_xldm_bytes();
-        let storage = inspect(&bytes).unwrap();
+        let storage = inspect(&bytes, &Limits::DEFAULT).unwrap();
         let padding = storage.files.last().unwrap().offset.0 as usize
             + storage.files.last().unwrap().stored_size.0 as usize;
         bytes[padding] = 1;
-        assert!(inspect(&bytes).is_err());
+        assert!(inspect(&bytes, &Limits::DEFAULT).is_err());
     }
 
     #[test]
     fn rejects_overlapping_duplicate_and_gapped_allocations_without_panicking() {
         let base = test_xldm_bytes();
-        let storage = inspect(&base).unwrap();
+        let storage = inspect(&base, &Limits::DEFAULT).unwrap();
         // Change only a directory offset, leaving all payload CRCs intact.
         // Exercise both ordinary and final (backup-log) allocations.
         for index in [1, 2] {
@@ -307,7 +338,7 @@ mod tests {
                 let mut bytes = base.clone();
                 bytes[start..start + old.len()].copy_from_slice(&new);
                 assert!(
-                    inspect(&bytes).is_err(),
+                    inspect(&bytes, &Limits::DEFAULT).is_err(),
                     "accepted offset {offset} at {index}"
                 );
             }
@@ -339,7 +370,7 @@ mod tests {
                 .iter()
                 .map(|(path, data)| (*path, data.as_slice()))
                 .collect();
-            assert!(inspect(&build_test_storage(&refs)).is_err());
+            assert!(inspect(&build_test_storage(&refs), &Limits::DEFAULT).is_err());
         }
     }
 
@@ -347,11 +378,14 @@ mod tests {
     fn rejects_directory_count_and_partition_shape_mismatches() {
         let bad_partition = b"<Partitions><Wrong/></Partitions>";
         assert!(
-            inspect(&build_test_storage(&[
-                ("Partitions", bad_partition),
-                ("Data", b"x"),
-                ("BackupLog", b"log")
-            ]))
+            inspect(
+                &build_test_storage(&[
+                    ("Partitions", bad_partition),
+                    ("Data", b"x"),
+                    ("BackupLog", b"log")
+                ]),
+                &Limits::DEFAULT
+            )
             .is_err()
         );
     }
@@ -471,7 +505,7 @@ mod tests {
                 ("Model.1.db.xml", payload),
                 ("BackupLog", log.as_bytes()),
             ]);
-            assert!(inspect(&bytes).is_err());
+            assert!(inspect(&bytes, &Limits::DEFAULT).is_err());
         }
     }
 
@@ -490,7 +524,7 @@ mod tests {
                 ("Model.1.db.xml", payload),
                 ("BackupLog", log.as_bytes()),
             ]);
-            assert!(inspect(&bytes).is_err());
+            assert!(inspect(&bytes, &Limits::DEFAULT).is_err());
         }
     }
 
@@ -503,7 +537,7 @@ mod tests {
             ("Model.1.db.xml", original_payload),
             ("BackupLog", log.as_bytes()),
         ]);
-        let before = inspect(&source).expect("source fixture is valid");
+        let before = inspect(&source, &Limits::DEFAULT).expect("source fixture is valid");
         let expanded = vec![b'x'; 5000];
         let candidate = super::super::codec::rewrite_variable_size_payloads(
             &before,
@@ -513,7 +547,7 @@ mod tests {
             }],
         )
         .expect("variable-size member rewrite should rebuild the outer stream");
-        let after = inspect(&candidate).expect("rewritten fixture remains valid");
+        let after = inspect(&candidate, &Limits::DEFAULT).expect("rewritten fixture remains valid");
         assert_eq!(after.file_payload(1), Some(expanded.as_slice()));
         assert_eq!(
             after.backup_log.file_groups[0].files[0].size,

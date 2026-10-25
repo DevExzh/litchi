@@ -138,7 +138,7 @@ impl Snapshot {
         let part = self
             .part()
             .ok_or_else(|| invalid("cannot prove a time grouping without a Data Model part"))?;
-        super::proof::prove_time_grouping(part.bytes(), grouping)
+        super::proof::prove_time_grouping(part.bytes(), grouping, self.limits.max_part_bytes)
     }
 
     /// Whether this workbook carries a complete Data Model pair.
