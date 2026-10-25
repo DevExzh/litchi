@@ -242,7 +242,10 @@ fn graph_anomalies_are_errors() {
     shared.relate_to("docProps/app.xml", "urn:test:other");
     assert!(matches!(
         publish(&mut shared, None),
-        Err(crate::properties::Error::Package(Error::Relationship(_)))
+        Err(crate::properties::Error::Refused(refusal))
+            if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+                && refusal.operation() == "remove_metadata"
+                && refusal.reason() == "removing a shared OOXML metadata part is refused"
     ));
     assert_eq!(read(&shared).unwrap(), Some(word()));
 }

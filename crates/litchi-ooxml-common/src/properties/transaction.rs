@@ -322,6 +322,7 @@ fn app_plan_error(error: crate::Error) -> Error {
         {
             Error::Internal("application-properties prepared-size invariant failed")
         },
+        crate::Error::Invalid(message) if is_xml_lexical_error(&message) => Error::Invalid(message),
         crate::Error::Invalid(message) => Error::Package(crate::Error::Invalid(message)),
         other => Error::from(other),
     }
