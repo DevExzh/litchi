@@ -9,7 +9,7 @@
 
 use std::{env, fmt::Write as _, fs};
 
-use litchi_ppt::{Package, slide_order};
+use litchi_ppt::{OpenOptions, Package, slide_order};
 use sha2::{Digest, Sha256};
 
 const MEDIA_ID: u32 = 1;
@@ -38,7 +38,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let source_bytes = fs::read(&fixture)?;
     let source = Package::from_bytes(&source_bytes)?;
-    let source_view = slide_order::Snapshot::from_bytes(source_bytes.clone())?;
+    let source_view =
+        slide_order::Snapshot::from_bytes_with_options(source_bytes.clone(), OpenOptions::new())?;
     let before_path = source_view.external_media_path(MEDIA_ID)?;
 
     let mut edit = source.edit_external_media()?;
@@ -46,7 +47,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let commit = edit.commit()?;
     let (target, patch) = commit.into_parts();
     let target_bytes = target.to_bytes()?;
-    let target_view = slide_order::Snapshot::from_bytes(target_bytes.clone())?;
+    let target_view =
+        slide_order::Snapshot::from_bytes_with_options(target_bytes.clone(), OpenOptions::new())?;
     let external_media_path = target_view.external_media_path(MEDIA_ID)?;
     if external_media_path.as_deref() != Some(EXPECTED_PATH) {
         return Err(format!(
