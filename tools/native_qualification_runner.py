@@ -62,6 +62,8 @@ DRAWINGML_V2_PROTOCOL_TOOL_PATHS = (
     "tools/native_qualification/drawingml_compile_driver_v2.py",
     "tools/native_qualification/drawingml_compile_driver.py",
     "tools/native_qualification/prepare_drawingml_raw_inputs_v2.py",
+    "tools/native_qualification/prepare_drawingml_raw_inputs.py",
+    "tools/native_qualification/prepare_xlsx_raw_inputs.py",
     "tools/native_qualification/drawingml_raw_paired_runner.py",
     "tools/native_qualification/drawingml_raw_validator.py",
 )

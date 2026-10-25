@@ -108,6 +108,25 @@ class DrawingMlRawQualificationV2Tests(unittest.TestCase):
                 master["compile_driver_module"],
                 str(ROOT / "tools/native_qualification/drawingml_compile_driver_v2.py"),
             )
+            self.assertEqual(
+                len(paired.PROTOCOL_TOOL_PATHS),
+                10,
+            )
+            self.assertEqual(
+                set(paired.PROTOCOL_TOOL_PATHS),
+                {
+                    "tools/native_qualification_runner.py",
+                    "tools/native_qualification/drawingml_raw_paired_runner_v2.py",
+                    "tools/native_qualification/drawingml_raw_validator_v2.py",
+                    "tools/native_qualification/drawingml_compile_driver_v2.py",
+                    "tools/native_qualification/drawingml_compile_driver.py",
+                    "tools/native_qualification/prepare_drawingml_raw_inputs_v2.py",
+                    "tools/native_qualification/prepare_drawingml_raw_inputs.py",
+                    "tools/native_qualification/prepare_xlsx_raw_inputs.py",
+                    "tools/native_qualification/drawingml_raw_paired_runner.py",
+                    "tools/native_qualification/drawingml_raw_validator.py",
+                },
+            )
             self.assertEqual(profile["shared"]["probe_paths"], list(policy.PROBE_COPY_PATHS))
             self.assertEqual(profile["legs"]["before"]["lock_paths"], list(policy.ROLE_LOCK_PATHS))
             with (
