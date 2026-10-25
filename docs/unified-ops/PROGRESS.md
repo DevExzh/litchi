@@ -5325,3 +5325,30 @@ See [0063](0063-source-pptx-modern-comments.md).
   Cleanup63's 15.13 GB reclamation is complete; later inventory is read-only.
   Final full formatting, gate/docs, census and native/corpus/ABBA remain open.
   Only audit22 is deferred. Nothing is pushed.
+
+- Coordinator census preparation, compiler returns and cleanup checkpoint (2026-10-25):
+  Current census preparation merges at `cd29aa8bda`, deriving 69 glossary plus
+  15 package-only profiles and keeping the separate 68-package inventory.
+  Dirty-input and stale-policy binding returns are fixed and independently
+  reviewed. All 107 selected tooling tests and the matrix check pass on
+  integration. Evidence arrays remain empty and state remains incomplete.
+  Final inventory guidance requires actual F5 outer ownership/isolation and
+  resource receipts. Record 0362ul92 binds this checkpoint.
+
+  Combined PPTX formatting passes all 384 changed Rust paths; compiler errors
+  expose three unnecessary OPC mutable bindings. Private repair `00a42a7d4c`
+  is committed with record 0362ul89f; its fresh compiler run remains queued.
+  Web/Ribbon passes every compiler row, then repairs two Clippy defaults at
+  `c877dee369`; its fresh validation is in progress. Properties repairs two
+  test result qualifications at `ac7b91e8d8`; its fresh plan is prepared.
+  VBA `b62c2e5359` passes source review with exact generated-root metadata
+  accounting and boundary regressions; corrected inert validation is prepared.
+  No runtime or performance result is inferred from these source repairs.
+
+  Cleanup64 removes the merged imgconv worktree without force, preserving its
+  branch, four ignored payloads and both external validation roots. Actual
+  restoration and root verification pass; net allocation reclaimed is
+  148,025,344 bytes. Holds are released and the constructor probe is unchanged.
+  Final full formatting, gate/docs, fresh inventories and dispositions,
+  corpus/native and quiet ABBA remain open. Only audit22 is deferred.
+  Nothing is pushed.
