@@ -5985,3 +5985,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   passes, but its capture binding is still being prepared. Current-nativev3
   is returned for common-P admission; DrawingML repair continues. Final
   qualification, trunk integration and cleanup remain open. Nothing is pushed.
+
+  Protocol137f commits at 4ab42bb967 with DrawingML's current candidate lock
+  migrated across its policy and manifest; 26 integrated tests and six
+  external mutation checks pass (150). The complete rawv11 C binding passes
+  independent/root source preflight and remains inert behind the live gate.
+  The gate's first four compiler checks pass. Native installer/driver returns
+  remain under repair, and a capped source-archive job runs outside Git.
+  Actual native measurements, final gates, census review, trunk integration
+  and cleanup remain open. Nothing is pushed.
