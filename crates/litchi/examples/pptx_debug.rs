@@ -1,6 +1,6 @@
 //! Debug PresentationML authoring through the current typed writer facade.
 //!
-//! Run with: `cargo run --example pptx_debug`
+//! Run with: `cargo run -p litchi --example pptx_debug --features pptx`
 
 use litchi_pptx::backgrounds::SlideBackground;
 use litchi_pptx::transition::{Kind, Side, Speed, Transition};

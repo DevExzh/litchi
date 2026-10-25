@@ -6,12 +6,16 @@
 //! inspectable summary deck. Feature-specific package mutation is intentionally
 //! left to the corresponding owner APIs.
 //!
-//! Run with: `cargo run --example pptx_advanced_features --features ooxml`
+//! Run with: `cargo run -p litchi --example pptx_advanced_features --features pptx`
 
 use litchi_pptx::Package;
-use litchi_pptx::animations::{Effect, EffectInstance, Limits, Sequence, Trigger};
+use litchi_pptx::animations::{
+    Effect, EffectInstance, Limits as AnimationLimits, Sequence, Trigger,
+};
 use litchi_pptx::chart::{Chart, Series, Type as ChartType, encode as encode_chart};
-use litchi_pptx::presentation_properties::metadata::custom_show::{Limits, List as ShowList, Show};
+use litchi_pptx::presentation_properties::metadata::custom_show::{
+    Limits as MetadataLimits, List as ShowList, Show,
+};
 use litchi_pptx::presentation_properties::metadata::handout::{Layout, Master};
 use litchi_pptx::presentation_properties::metadata::protection::Settings;
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
@@ -128,8 +132,8 @@ fn animation_demo() -> Result<String, Box<dyn StdError>> {
             .with_duration_ms(1_000),
     );
 
-    let xml = sequence.to_xml(Limits::DEFAULT)?;
-    let parsed = Sequence::parse_timing_xml(&xml, Limits::DEFAULT)?;
+    let xml = sequence.to_xml(AnimationLimits::DEFAULT)?;
+    let parsed = Sequence::parse_timing_xml(&xml, AnimationLimits::DEFAULT)?;
     assert_eq!(parsed.animations.len(), 3);
     Ok(xml)
 }
@@ -194,7 +198,7 @@ fn section_demo() -> Result<String, Box<dyn StdError>> {
     sections.add_section(
         Section::new("Metadata", "{00000000-0000-4000-8000-000000000002}").with_slides([258]),
     );
-    Ok(sections.to_xml(Limits::DEFAULT)?)
+    Ok(sections.to_xml(MetadataLimits::DEFAULT)?)
 }
 
 fn custom_show_demo() -> String {
@@ -202,7 +206,7 @@ fn custom_show_demo() -> String {
     shows.add(Show::new(1, "Quick overview").with_slides(vec![256, 258]));
     shows.add(Show::new(2, "Full presentation").with_slides(vec![256, 257, 258]));
     shows
-        .to_xml(Limits::DEFAULT)
+        .to_xml(MetadataLimits::DEFAULT)
         .expect("default metadata limits accept the example")
 }
 
@@ -213,7 +217,7 @@ fn handout_demo() -> String {
         .with_footer("Created with Litchi")
         .with_slide_numbers()
         .with_date_time()
-        .to_xml(Limits::DEFAULT)
+        .to_xml(MetadataLimits::DEFAULT)
         .expect("default metadata limits accept the example")
 }
 
@@ -221,7 +225,7 @@ fn protection_demo() -> Result<String, Box<dyn StdError>> {
     let settings = Settings::new()
         .with_read_only_recommended(true)
         .with_structure_protection(true);
-    let xml = settings.to_xml(Limits::DEFAULT)?;
+    let xml = settings.to_xml(MetadataLimits::DEFAULT)?;
     assert!(settings.is_protected());
     Ok(xml)
 }

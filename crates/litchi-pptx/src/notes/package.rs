@@ -401,12 +401,14 @@ pub(crate) fn load_snapshot_with_slide_root_proofs_and_limits<'a>(
     expected_catalog_len: usize,
     proofs: &[SlideRootProof<'a>],
     limits: Limits,
+    proof_limits: Limits,
 ) -> Result<Option<Snapshot>> {
     let index = load_index_with_slide_root_proofs_and_limits(
         package,
         presentation_name,
         Some((expected_catalog_len, proofs)),
         limits,
+        proof_limits,
     )?;
     snapshot_from_index(package, presentation_name, index, limits)
 }
@@ -511,7 +513,7 @@ fn load_index_with_limits(
     presentation_name: &PackURI,
     limits: Limits,
 ) -> Result<Option<GraphIndex>> {
-    load_index_with_slide_root_proofs_and_limits(package, presentation_name, None, limits)
+    load_index_with_slide_root_proofs_and_limits(package, presentation_name, None, limits, limits)
 }
 
 fn load_index_with_slide_root_proofs_and_limits<'a>(
@@ -519,6 +521,7 @@ fn load_index_with_slide_root_proofs_and_limits<'a>(
     presentation_name: &PackURI,
     slide_root_proofs: Option<(usize, &[SlideRootProof<'a>])>,
     limits: Limits,
+    proof_limits: Limits,
 ) -> Result<Option<GraphIndex>> {
     let presentation = package.get_part(presentation_name)?;
     if !is_presentation_main_content_type(presentation.content_type()) {
@@ -577,7 +580,7 @@ fn load_index_with_slide_root_proofs_and_limits<'a>(
             if !source_proof_matches_current(proof, current) {
                 crate::parts::validate_source_part_xml(current, package.read_limits())?;
             }
-            resolve_slide_root(current, proof, limits)
+            resolve_slide_root_with_profiles(current, proof, proof_limits, limits)
         } else {
             crate::parts::validate_source_part_xml(slide.blob(), package.read_limits())?;
             root_conformance_with_limits(slide.blob(), MAX_SLIDE_XML, "sld", limits)
@@ -837,17 +840,28 @@ fn default_proof_covers(limits: Limits) -> bool {
         && limits.max_attribute_bytes >= Limits::DEFAULT.max_attribute_bytes
 }
 
+#[cfg(test)]
 fn resolve_slide_root<'a>(
     current: &[u8],
     proof: Option<&SlideRootProof<'a>>,
     limits: Limits,
 ) -> Result<Conformance> {
-    match proof.filter(|proof| same_raw_source(proof.raw, current) && default_proof_covers(limits))
+    resolve_slide_root_with_profiles(current, proof, limits, limits)
+}
+
+fn resolve_slide_root_with_profiles<'a>(
+    current: &[u8],
+    proof: Option<&SlideRootProof<'a>>,
+    proof_limits: Limits,
+    scan_limits: Limits,
+) -> Result<Conformance> {
+    match proof
+        .filter(|proof| same_raw_source(proof.raw, current) && default_proof_covers(proof_limits))
     {
         Some(proof) => proof
             .conformance
             .ok_or_else(|| invalid("invalid sld root or namespace")),
-        None => root_conformance_with_limits(current, MAX_SLIDE_XML, "sld", limits),
+        None => root_conformance_with_limits(current, MAX_SLIDE_XML, "sld", scan_limits),
     }
 }
 

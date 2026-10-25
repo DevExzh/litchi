@@ -440,7 +440,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             archive
                 .by_name("ppt/notesSlides/notesSlide1.xml")?
                 .read_to_end(&mut xml)?;
-            let scene = litchi_pptx::shape::Scene::read(&xml)?;
+            let scene = litchi_pptx::shape::Scene::read(&xml, litchi_pptx::shape::Limits::DEFAULT)?;
             scene
                 .iter()
                 .position(|shape| {

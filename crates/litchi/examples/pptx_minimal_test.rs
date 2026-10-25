@@ -3,7 +3,7 @@
 //! This is useful for verifying the basic PPTX structure is correct.
 //!
 //! ```bash
-//! cargo run --example pptx_minimal_test
+//! cargo run -p litchi --example pptx_minimal_test --features pptx
 //! ```
 
 use std::error::Error;
