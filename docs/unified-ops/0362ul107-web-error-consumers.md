@@ -49,3 +49,25 @@ both changed Rust files; it reports only pre-existing formatting differences
 in untouched match-arm punctuation in `web_extensions.rs` (the changed hunks
 have no rustfmt diagnostics). `git diff --check` and the repository size
 guards pass.
+
+## Configured-format follow-up
+
+The initial source-only check above was run before the sparse leaf materialized
+the tracked root formatter inputs, so it used the host formatter and was not
+the workspace gate. The follow-up materialized `rust-toolchain.toml` and
+`rustfmt.toml` from this commit's source tree and ran the full owned files
+under the pinned `1.95.0` toolchain:
+
+```text
+rustfmt --edition 2024 \
+  crates/litchi-docx/tests/web_extensions.rs \
+  crates/litchi-docx/tests/web_extensions/durable.rs
+rustfmt --edition 2024 --check \
+  crates/litchi-docx/tests/web_extensions.rs \
+  crates/litchi-docx/tests/web_extensions/durable.rs
+```
+
+Both commands exited 0; the files were already compliant under the actual
+workspace configuration, so this follow-up has no Rust source delta. A fresh
+`git diff --check` and the repository size guards also pass. No Cargo,
+runtime, or production validation was run.
