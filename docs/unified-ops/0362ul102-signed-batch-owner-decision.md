@@ -16,12 +16,15 @@ not equivalent and must not be normalized to the same item index.
 ## Consumer migration
 
 `crates/litchi-ops/tests/pptx_batch_equivalence.rs` now preserves the error's
-actual item scope instead of converting `None` to `Some(0)`.  Its corpus and
-refused-body checks continue to require unsigned/per-item batch equivalence;
-the new signed fixture check asserts the distinct contract explicitly:
+actual item scope instead of converting `None` to `Some(0)`.  The recursive
+corpus walker includes producer-signed XMLDSIG decks, so the test branches on
+the actual owner: unsigned corpus and refused-body entries still require
+batch/closure/sequential equivalence, while signed entries assert the distinct
+admission contract explicitly:
 
 * signed batch: `DocumentProtected`, `item = None`, source bytes unchanged;
-* one sequential signed setter: `DocumentProtected`, `item = Some(0)`.
+* one sequential signed setter: `DocumentProtected`, `item = Some(0)`;
+* a one-shot iterator supplied to the signed batch is not advanced at all.
 
 The iWork equivalence consumer already preserved `None` through its
 `error.item().or(fallback)` helper and required no change.  No production

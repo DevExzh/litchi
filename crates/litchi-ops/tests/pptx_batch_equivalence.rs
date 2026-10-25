@@ -7,17 +7,19 @@
 //!
 //! Coalesced PPTX runs plan table-cell and notes items against one-pass
 //! indexes and take each item's change from the leaf; this checks that the
-//! grouping is invisible. Every PPTX fixture under `test-data/`, and decks
+//! grouping is invisible. Unsigned fixtures under `test-data/`, and decks
 //! made here whose cell and notes bodies hold values the text-body reader
 //! refuses, run seeded pseudo-random sequences of sets (cells, cell
 //! paragraphs and runs, notes paragraphs and runs, shape paragraphs;
 //! repeated and missing targets) three ways: one `File::edit` closure, one
 //! atomic `File::batch`, and a chain of single `File::set` calls. On both
 //! owners the three must publish the same bytes, or refuse with the same
-//! code at the same item.
+//! code at the same item. Signed corpus fixtures instead exercise the
+//! owner-selected admission contract and are excluded from this equality.
 
 #![cfg(feature = "pptx")]
 
+use std::cell::Cell;
 use std::io::{Read as _, Write as _};
 
 use litchi_ops::{BatchItem, BatchMode, File, NewNode, OpenOptions, PropValue, Props, SourceMode};
@@ -195,6 +197,26 @@ fn check(name: &str, bytes: &[u8], sets_for: impl Fn(&File, u64) -> Vec<Set>) ->
             if sets.is_empty() {
                 continue;
             }
+            if file.is_signed() {
+                let before = file.to_bytes().expect("publish signed source");
+                assert_eq!(
+                    batch(&file, &sets),
+                    Outcome::Refused(None, "DocumentProtected".to_owned()),
+                    "{name} seed {seed} signed batch admission: {sets:?}",
+                );
+                assert_eq!(
+                    sequential(&file, &sets),
+                    Outcome::Refused(Some(0), "DocumentProtected".to_owned()),
+                    "{name} seed {seed} signed sequential admission: {sets:?}",
+                );
+                assert_eq!(
+                    file.to_bytes().expect("republish signed source"),
+                    before,
+                    "{name} seed {seed} signed source changed",
+                );
+                checked += 1;
+                continue;
+            }
             let one = sequential(&file, &sets);
             assert_eq!(
                 batch(&file, &sets),
@@ -228,7 +250,7 @@ fn random_sets(file: &File, seed: u64) -> Vec<Set> {
 }
 
 #[test]
-fn corpus_batches_equal_their_items_one_at_a_time() {
+fn corpus_batches_keep_their_selected_contract() {
     let mut checked = 0;
     for path in fixtures() {
         let bytes = std::fs::read(&path).expect("fixture");
@@ -239,10 +261,8 @@ fn corpus_batches_equal_their_items_one_at_a_time() {
 
 #[test]
 fn signed_batch_refuses_before_item_admission() {
-    let bytes = std::fs::read(
-        "../../test-data/poi/test-data/xmldsign/hello-world-signed.pptx",
-    )
-    .expect("signed PPTX fixture");
+    let bytes = std::fs::read("../../test-data/poi/test-data/xmldsign/hello-world-signed.pptx")
+        .expect("signed PPTX fixture");
     let signed = litchi_ops::open_bytes(bytes.clone()).expect("open signed PPTX");
     assert!(signed.is_signed());
 
@@ -250,6 +270,23 @@ fn signed_batch_refuses_before_item_admission() {
         path: "/slide[1]/shape[1]".to_owned(),
         props: vec![("text", PropValue::from("changed"))],
     }];
+
+    let mut item = BatchItem::new("set");
+    item.path = Some("/slide[1]/shape[1]".into());
+    item.props = Some(Props::new().with("text", "changed"));
+    let reads = Cell::new(0usize);
+    let error = signed
+        .batch(
+            std::iter::once_with(|| {
+                reads.set(reads.get() + 1);
+                item.clone()
+            }),
+            BatchMode::Atomic,
+        )
+        .expect_err("signed batch must refuse before consuming its stream");
+    assert_eq!(error.code(), litchi_ops::Code::DocumentProtected);
+    assert_eq!(error.item(), None);
+    assert_eq!(reads.get(), 0, "signed preflight consumed a batch item");
 
     assert_eq!(
         batch(&signed, &sets),
