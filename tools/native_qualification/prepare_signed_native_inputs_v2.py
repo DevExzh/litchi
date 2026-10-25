@@ -56,6 +56,7 @@ ADAPTER_POLICY = {
     "route_count": 16,
 }
 EXECUTION_POLICY = {
+    "runner_schema": "litchi.signed-native.runner.v2",
     "capabilities_schema": "litchi.signed-native.capabilities.v2",
     "execution_schema": "litchi.signed-native.execution.v2",
     "child_schema": "litchi.signed-native.child.v2",

@@ -61,7 +61,14 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
         probes: dict[str, dict[str, object]] = {}
         for index, name in enumerate(("probe", "qualification_driver", "validator", "memory_collector", "final_collector")):
             relative = f"reviewed/{name}.input"
-            payload = ("fn main() {}\n" if name == "probe" else f"input-{index}\n").encode()
+            payload = (
+                'const SCHEMA: &str = "litchi_signed_native_probe.v1";\n'
+                'fn main() {\n'
+                '    let args: Vec<String> = std::env::args().collect();\n'
+                '}\n'
+                if name == "probe"
+                else f"input-{index}\n"
+            ).encode()
             path = source / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(payload)
@@ -207,6 +214,13 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
         build_artifact = consumer._artifact(build_path, "build receipt")
         fixture_manifest = json.loads(Path(state["fixture"]["manifest"]["path"]).read_text())
         fixture_rows = fixture_manifest["fixtures"]
+        runner_artifact = consumer._artifact(consumer.RUNNER_PATH, "signed-native v2 runner")
+        environment = {
+            "LITCHI_SIGNED_FIXTURE_ROOT": state["fixture"]["root"],
+            "LITCHI_SIGNED_FIXTURE_MANIFEST": state["fixture"]["manifest"]["path"],
+            "LITCHI_SIGNED_FIXTURE_MANIFEST_SHA256": state["fixture"]["manifest"]["sha256"],
+            "LITCHI_SIGNED_ENDPOINT": "after",
+        }
         evidence = {}
         for index, route in enumerate(policy.ROUTES):
             results = []
@@ -238,7 +252,17 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
                 elif route.endswith("/budget"):
                     result.update({"refusal_kind": "LimitExceeded", "code": "limit_exceeded", "limit_kind": "operations", "source_before_sha256": source_digest, "source_after_sha256": source_digest, "publication_attempts": 0, "output_published": False})
                 results.append(result)
-            result = {"fixtures": results}
+            result = {
+                "schema": consumer.PROBE_SCHEMA,
+                "route": route,
+                "capability": statuses[route],
+                "fixtures": results,
+            }
+            stdout_path = prepared.parent / f"child-{index}.stdout"
+            stderr_path = prepared.parent / f"child-{index}.stderr"
+            stdout_path.write_bytes(canonical(result))
+            stderr_path.write_bytes(b"")
+            command = [str(build["binary"]["path"]), "--mode", "validate", "--route", route, "--blocks", "1"]
             child = {
                 "schema": "litchi.signed-native.child.v2",
                 "probe_schema": "litchi.signed-native.probe.v2",
@@ -254,6 +278,14 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
                 "adapter": state["adapter"],
                 "binary": build["binary"],
                 "fixture": state["receipt"]["fixture"],
+                "runner": runner_artifact,
+                "argv": command,
+                "command": command,
+                "environment": environment,
+                "cwd": str(prepared / "consumer"),
+                "process": {"pid": 1000 + index, "process_group": 1000 + index, "start_new_session": True, "process_group_empty": True},
+                "stdout": consumer._artifact(stdout_path, f"child {route} stdout"),
+                "stderr": consumer._artifact(stderr_path, f"child {route} stderr"),
                 "timeout_seconds": consumer.CHILD_TIMEOUT_SECONDS,
                 "exit_code": 0,
                 "timed_out": False,
@@ -268,8 +300,25 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
         after = prepared.parent / "batch-after.bin"
         before.write_bytes(b"signed source bytes")
         after.write_bytes(b"signed source bytes")
+        batch_result = {
+            "schema": consumer.BATCH_PROOF_SCHEMA,
+            "selection": "immediate_refusal",
+            "status": "expected_refusal",
+            "error": {"kind": "DocumentProtected", "code": "document_protected", "item": None},
+            "item": None,
+            "iterator_reads": 0,
+            "publication_attempts": 0,
+            "source_before_hex": (b"signed source bytes").hex(),
+            "source_after_hex": (b"signed source bytes").hex(),
+            "source_bytes_equal": True,
+        }
+        batch_stdout = prepared.parent / "batch.stdout"
+        batch_stderr = prepared.parent / "batch.stderr"
+        batch_stdout.write_bytes(canonical(batch_result))
+        batch_stderr.write_bytes(b"")
         value = {
             "schema": consumer.CAPABILITIES_SCHEMA,
+            "protocol_schema": consumer.RUNNER_SCHEMA,
             "preparation_receipt": state["receipt_artifact"],
             "build_receipt": build_artifact,
             "source_identity": consumer._concrete_source_identity(state),
@@ -285,19 +334,32 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
             },
             "adapter": state["adapter"],
             "fixture": state["receipt"]["fixture"],
+            "runner": runner_artifact,
             "routes": statuses,
             "evidence": evidence,
             "signed_batch": {
-                "schema": "litchi.signed-native.batch-proof.v2",
+                **batch_result,
                 "selection": "immediate_refusal",
-                "status": "expected_refusal",
-                "error": {"kind": "DocumentProtected", "code": "document_protected", "item": None},
-                "item": None,
-                "iterator_reads": 0,
-                "publication_attempts": 0,
                 "source_before": consumer._artifact(before, "batch source before"),
                 "source_after": consumer._artifact(after, "batch source after"),
                 "source_bytes_equal": True,
+                "binary": build["binary"],
+                "fixture": state["receipt"]["fixture"],
+                "runner": runner_artifact,
+                "argv": [str(build["binary"]["path"]), "--mode", "batch_refusal", "--blocks", "1"],
+                "command": [str(build["binary"]["path"]), "--mode", "batch_refusal", "--blocks", "1"],
+                "environment": environment,
+                "cwd": str(prepared / "consumer"),
+                "process": {"pid": 2000, "process_group": 2000, "start_new_session": True, "process_group_empty": True},
+                "stdout": consumer._artifact(batch_stdout, "batch stdout"),
+                "stderr": consumer._artifact(batch_stderr, "batch stderr"),
+                "timeout_seconds": consumer.CHILD_TIMEOUT_SECONDS,
+                "exit_code": 0,
+                "timed_out": False,
+                "guard_error": None,
+                "after_guard_error": None,
+                "preparation_receipt": state["receipt_artifact"],
+                "build_receipt": build_artifact,
             },
         }
         path = prepared.parent / "capabilities.json"
@@ -375,6 +437,9 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
         child_path = Path(child_artifact["path"])
         child = json.loads(child_path.read_text())
         child["result"]["fixtures"][0]["source_sha256"] = "a" * 64
+        stdout_path = Path(child["stdout"]["path"])
+        stdout_path.write_bytes(canonical(child["result"]))
+        child["stdout"] = consumer._artifact(stdout_path, "tampered fixture stdout")
         child_path.write_bytes(canonical(child))
         value["evidence"][first] = consumer._artifact(child_path, "tampered fixture source")
         capabilities.write_bytes(canonical(value))
@@ -404,6 +469,11 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
 
     def test_preparation_recomputes_identity_and_generated_probe(self) -> None:
         prepared, _binding, _unused = self._prepared()
+        generated = (prepared / "consumer/src/main.rs").read_text()
+        self.assertIn('const SCHEMA: &str = "litchi.signed-native.probe.v2";', generated)
+        self.assertNotIn('const SCHEMA: &str = "litchi_signed_native_probe.v1";', generated)
+        self.assertIn("file.batch(&mut items, litchi_ops::BatchMode::Atomic)", generated)
+        self.assertIn('pair[1] == "batch_refusal"', generated)
         source_identity = json.loads((prepared / "source-identity.json").read_text())
         source = Path(source_identity["source_root"])
         changed = copy.deepcopy(source_identity)
@@ -420,6 +490,80 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
         self.assertIn("legacy_api = []", project)
         self.assertIn('features = ["docx", "pptx", "xlsx", "xlsb", "doc", "ppt", "xls"]', project)
         self.assertEqual(consumer.API_BRANCHES, ("current_api", "legacy_api"))
+
+    def test_runner_produces_process_bound_v2_receipts(self) -> None:
+        from native_qualification import signed_native_v2_runner as runner
+
+        prepared, _binding, _unused = self._prepared()
+        build_path, build = self._build_receipt(prepared)
+        fake = prepared.parent / "fake-signed-native"
+        fake.write_text(
+            """#!/usr/bin/env python3
+import hashlib
+import json
+import os
+import sys
+
+mode = sys.argv[sys.argv.index("--mode") + 1]
+if mode == "batch_refusal":
+    payload = b"signed source bytes"
+    print(json.dumps({
+        "schema": "litchi.signed-native.batch-proof.v2",
+        "selection": "immediate_refusal",
+        "status": "expected_refusal",
+        "error": {"kind": "DocumentProtected", "code": "document_protected", "item": None},
+        "item": None,
+        "iterator_reads": 0,
+        "publication_attempts": 0,
+        "source_before_hex": payload.hex(),
+        "source_after_hex": payload.hex(),
+        "source_bytes_equal": True,
+    }))
+    raise SystemExit(0)
+route = sys.argv[sys.argv.index("--route") + 1]
+refusal = any(route.endswith("/" + suffix) for suffix in ("refusal", "unsigned_negative", "source_freshness", "budget"))
+status = "expected_refusal" if refusal else "available"
+rows = []
+with open(os.environ["LITCHI_SIGNED_FIXTURE_MANIFEST"], encoding="utf-8") as manifest:
+    fixtures = json.load(manifest)["fixtures"]
+for index, fixture in enumerate(fixtures):
+    source = fixture.get("signed_sha256") or (f"{index + 1:064x}")
+    row = {
+        "name": fixture["name"], "format": fixture["format"], "origin": fixture["origin"],
+        "signature_presence": "detected", "cryptographic_verification": "not_performed",
+        "status": "expected_refusal" if refusal else "ok", "source_sha256": source,
+    }
+    if route.endswith("/noop_commit"):
+        row.update({"diagnostics_changed": False, "patch_noop": True, "signed_after": True, "output_equals_source": True, "source_after_sha256": source})
+    elif route.endswith("/noop_write"):
+        row.update({"diagnostics_changed": False, "patch_noop": True, "signed_after": True, "output_equals_source": True, "source_after_sha256": source, "stream_bounded": True, "writes": 1, "max_write_bytes": 1})
+    elif route.endswith("/noop_replay"):
+        row.update({"patch_noop": True, "replay_base_match": True, "signed_after": True, "output_equals_source": True})
+    elif route.endswith("/refusal"):
+        row.update({"refusal_kind": "ProtectedDocument", "code": "document_protected", "source_before_sha256": source, "source_after_sha256": source, "publication_attempts": 0, "output_published": False})
+    elif route.endswith("/unsign_write"):
+        row.update({"signed_after": False, "signature_parts_absent": True, "semantic_changed": True, "stream_bounded": True, "output_equals_source": False, "signed_clone_still_refuses": True, "writes": 1, "max_write_bytes": 1})
+    elif route.endswith("/unsigned_negative"):
+        row.update({"refusal_kind": "PatchConflict", "code": "invalid_input", "re_marked_signed": False, "publication_attempts": 0, "output_published": False})
+    elif route.endswith("/source_freshness"):
+        row.update({"refusal_kind": "SourceChanged", "code": "io_error", "source_before_sha256": source, "source_mutated_sha256": "b" * 64, "source_after_sha256": "b" * 64, "publication_attempts": 0, "output_published": False})
+    elif route.endswith("/budget"):
+        row.update({"refusal_kind": "LimitExceeded", "code": "limit_exceeded", "limit_kind": "operations", "source_before_sha256": source, "source_after_sha256": source, "publication_attempts": 0, "output_published": False})
+    rows.append(row)
+print(json.dumps({"schema": "litchi.signed-native.probe.v2", "route": route, "capability": status, "fixtures": rows}))
+""",
+            encoding="utf-8",
+        )
+        fake.chmod(0o755)
+        build["binary"] = consumer._artifact(fake, "fake signed-native binary", executable=True)
+        build_path.write_bytes(canonical(build))
+        capabilities = runner.run_prepared(prepared, output=prepared.parent / "runner-output")
+        result = consumer.execute(prepared, capabilities)
+        self.assertEqual(result["status"], "completed")
+        value = json.loads(capabilities.read_text())
+        self.assertEqual(value["protocol_schema"], consumer.RUNNER_SCHEMA)
+        self.assertEqual(len(value["evidence"]), len(policy.ROUTES))
+        self.assertEqual(value["signed_batch"]["iterator_reads"], 0)
 
 
 if __name__ == "__main__":

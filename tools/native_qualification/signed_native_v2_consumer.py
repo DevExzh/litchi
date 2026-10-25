@@ -38,6 +38,11 @@ TMP_CAP_BYTES = 20_000_000_000
 CHILD_TIMEOUT_SECONDS = 300.0
 CHILD_OUTPUT_LIMIT = 4 * 1024 * 1024
 API_BRANCHES = ("current_api", "legacy_api")
+RUNNER_SCHEMA = "litchi.signed-native.runner.v2"
+PROBE_SCHEMA = "litchi.signed-native.probe.v2"
+CHILD_SCHEMA = "litchi.signed-native.child.v2"
+BATCH_PROOF_SCHEMA = "litchi.signed-native.batch-proof.v2"
+RUNNER_PATH = Path(__file__).resolve().with_name("signed_native_v2_runner.py")
 
 _REQUIRED_SOURCE_KEYS = (
     "commit",
@@ -401,8 +406,67 @@ def _adapter_receipt(adapter: Path, main: Path, manifest: Path) -> dict[str, Any
     }
 
 
+_V2_BATCH_HELPER = r'''
+struct SignedBatchIterator {
+    reads: usize,
+}
+
+impl Iterator for SignedBatchIterator {
+    type Item = litchi_ops::BatchItem<'static>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.reads = self.reads.saturating_add(1);
+        None
+    }
+}
+
+fn hex_bytes(bytes: &[u8]) -> String {
+    let mut text = String::with_capacity(bytes.len().saturating_mul(2));
+    for byte in bytes {
+        let _ = write!(text, "{byte:02x}");
+    }
+    text
+}
+
+fn signed_batch_refusal() -> Value {
+    let fixtures = load_fixtures(&fixture_root());
+    let fixture = fixtures.first().expect("signed batch fixture");
+    let file = open_signed(fixture);
+    let before = file.to_bytes().expect("signed batch source before");
+    let mut items = SignedBatchIterator { reads: 0 };
+    let (error, publication_attempts) = match file.batch(&mut items, litchi_ops::BatchMode::Atomic) {
+        Err(error) => (error, 0usize),
+        Ok(_) => panic!("signed batch crossed the protected publication boundary"),
+    };
+    let after = file.to_bytes().expect("signed batch source after");
+    json!({
+        "schema": "litchi.signed-native.batch-proof.v2",
+        "selection": "immediate_refusal",
+        "status": "expected_refusal",
+        "error": {
+            "kind": "DocumentProtected",
+            "code": error.code().as_str(),
+            "item": error.item(),
+        },
+        "item": error.item(),
+        "iterator_reads": items.reads,
+        "publication_attempts": publication_attempts,
+        "source_before_hex": hex_bytes(&before),
+        "source_after_hex": hex_bytes(&after),
+        "source_bytes_equal": before == after,
+    })
+}
+'''
+
+
 def _generated_probe(source: Path) -> tuple[Path, str, bytes]:
-    """Recreate the exact generated probe from the reviewed source input."""
+    """Generate the reviewed v2 probe from the immutable historical source.
+
+    The historical source remains a pinned input, but its v1 schema is never
+    executed as a v2 receipt.  This deterministic source transformation makes
+    the compiled child the producer of the v2 probe and batch-proof schemas;
+    the runner only records process artifacts around that producer.
+    """
 
     module = _policy()
     probe_path = source / module.PROBE_INPUTS["probe"]["path"]
@@ -413,7 +477,34 @@ def _generated_probe(source: Path) -> tuple[Path, str, bytes]:
     except (OSError, UnicodeError) as error:
         raise ConsumerError(f"reviewed signed probe is unreadable: {error}") from error
     _expect("fn main()" in probe_text, "signed probe has no main function")
-    generated = "mod api_compat;\n" + probe_text.replace(
+    historical_schema = 'const SCHEMA: &str = "litchi_signed_native_probe.v1";'
+    _expect(probe_text.count(historical_schema) == 1, "signed probe schema is not the reviewed v1 input")
+    probe_text = probe_text.replace(
+        historical_schema,
+        f'const SCHEMA: &str = "{PROBE_SCHEMA}";',
+        1,
+    )
+    generated_probe = probe_text.replace(
+        "fn main() {",
+        _V2_BATCH_HELPER + "\nfn main() {",
+        1,
+    )
+    generated_probe = generated_probe.replace(
+        "    let args: Vec<String> = std::env::args().collect();",
+        "    let args: Vec<String> = std::env::args().collect();\n"
+        "    if args.windows(2).any(|pair| pair[0] == \"--mode\" && pair[1] == \"batch_refusal\") {\n"
+        "        println!(\"{}\", signed_batch_refusal());\n"
+        "        return;\n"
+        "    }",
+        1,
+    )
+    _expect(generated_probe != probe_text, "signed probe v2 producer transformation was not applied")
+    _expect("signed_batch_refusal()" in generated_probe, "signed probe v2 batch producer was not wired")
+    _expect(
+        'pair[0] == "--mode" && pair[1] == "batch_refusal"' in generated_probe,
+        "signed probe v2 batch dispatch was not wired",
+    )
+    generated = "mod api_compat;\n" + generated_probe.replace(
         "fn main() {", "fn main() {\n    api_compat::exercise_api();", 1
     )
     return probe_path, generated, generated.encode("utf-8")
@@ -607,6 +698,9 @@ def _verify_fixture_binding(prepared: Path, value: Mapping[str, Any]) -> dict[st
     binding, actual = _load_canonical(path, "fixture binding")
     _expect(actual == dict(binding_artifact), "fixture binding artifact changed")
     _expect(binding.get("schema") == FIXTURE_SCHEMA, "fixture binding schema differs")
+    source = value.get("source")
+    _expect(isinstance(source, Mapping), "fixture source identity is missing")
+    _expect(binding.get("source_manifest") == source.get("fixture"), "staged fixture manifest differs from immutable source identity")
     root = Path(str(binding.get("root", "")))
     manifest = binding.get("manifest")
     _verify_external_artifact(manifest, "staged fixture manifest")
@@ -892,6 +986,9 @@ def _validate_batch(value: Mapping[str, Any], state: Mapping[str, Any]) -> dict[
     batch = value.get("signed_batch")
     _expect(isinstance(batch, Mapping), "capability receipt lacks signed-batch evidence")
     _expect(batch.get("schema") == "litchi.signed-native.batch-proof.v2", "signed-batch proof schema differs")
+    _expect(batch.get("runner") == _artifact(RUNNER_PATH, "signed-native v2 runner"), "signed-batch runner identity differs")
+    _expect(batch.get("binary") == value.get("binary"), "signed-batch binary binding differs")
+    _expect(batch.get("fixture") == value.get("fixture"), "signed-batch fixture binding differs")
     _expect(dict(batch).get("selection") == module.SIGNED_BATCH_POLICY["selection"], "signed-batch selection differs")
     _expect(dict(batch).get("status") == "expected_refusal", "signed-batch did not refuse immediately")
     error = batch.get("error")
@@ -906,6 +1003,39 @@ def _validate_batch(value: Mapping[str, Any], state: Mapping[str, Any]) -> dict[
     _expect(before["path"] != after["path"], "signed-batch source proof must have distinct before/after artifacts")
     _expect(before["bytes"] == after["bytes"] and before["sha256"] == after["sha256"], "signed-batch refusal changed source bytes")
     _expect(batch.get("source_bytes_equal") is True, "signed-batch source equality was not proven")
+    expected_command = [str(value["binary"]["path"]), "--mode", "batch_refusal", "--blocks", "1"]
+    _expect(batch.get("command") == expected_command, "signed-batch argv is not bound to the producer")
+    environment = batch.get("environment")
+    _expect(isinstance(environment, Mapping), "signed-batch producer environment is missing")
+    _expect(environment.get("LITCHI_SIGNED_FIXTURE_ROOT") == state["fixture"]["root"], "signed-batch fixture root differs")
+    _expect(environment.get("LITCHI_SIGNED_FIXTURE_MANIFEST") == state["fixture"]["manifest"]["path"], "signed-batch fixture manifest differs")
+    _expect(environment.get("LITCHI_SIGNED_FIXTURE_MANIFEST_SHA256") == state["fixture"]["manifest"]["sha256"], "signed-batch fixture manifest hash differs")
+    _expect(environment.get("LITCHI_SIGNED_ENDPOINT") in {"before", "after"}, "signed-batch endpoint is missing")
+    _expect(batch.get("argv") == expected_command, "signed-batch argv receipt differs")
+    _expect(batch.get("cwd") == str(state["prepared"] / "consumer"), "signed-batch working directory differs")
+    process = batch.get("process")
+    _expect(isinstance(process, Mapping), "signed-batch process binding is missing")
+    _expect(isinstance(process.get("pid"), int) and process["pid"] > 0, "signed-batch process id is missing")
+    _expect(isinstance(process.get("process_group"), int) and process["process_group"] > 0, "signed-batch process group is missing")
+    _expect(process.get("start_new_session") is True and process.get("process_group_empty") is True, "signed-batch process ownership is incomplete")
+    _expect(batch.get("exit_code") == 0 and batch.get("timed_out") is False, "signed-batch process did not exit cleanly")
+    _expect(batch.get("guard_error") is None and batch.get("after_guard_error") is None, "signed-batch process guard failed")
+    stdout = _verify_external_artifact(batch.get("stdout"), "signed-batch stdout")
+    stderr = _verify_external_artifact(batch.get("stderr"), "signed-batch stderr")
+    _expect(stdout["bytes"] <= CHILD_OUTPUT_LIMIT and stderr["bytes"] <= CHILD_OUTPUT_LIMIT, "signed-batch output exceeds its bound")
+    try:
+        raw = json.loads(Path(stdout["path"]).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ConsumerError(f"signed-batch stdout is not JSON: {error}") from error
+    _expect(isinstance(raw, Mapping), "signed-batch stdout is not an object")
+    for key in ("schema", "selection", "status", "error", "item", "iterator_reads", "publication_attempts", "source_bytes_equal"):
+        _expect(raw.get(key) == batch.get(key), f"signed-batch stdout binding differs: {key}")
+    try:
+        raw_before = bytes.fromhex(str(raw["source_before_hex"]))
+        raw_after = bytes.fromhex(str(raw["source_after_hex"]))
+    except (KeyError, ValueError) as error:
+        raise ConsumerError(f"signed-batch stdout source proof is malformed: {error}") from error
+    _expect(raw_before == Path(before["path"]).read_bytes() and raw_after == Path(after["path"]).read_bytes(), "signed-batch source artifacts differ from producer stdout")
     return dict(batch)
 
 
@@ -943,11 +1073,37 @@ def _validate_child_evidence(
     _expect(child.get("adapter") == state["adapter"], f"capability evidence adapter differs for {route}")
     _expect(child.get("binary") == build_value["binary"], f"capability evidence binary differs for {route}")
     _expect(child.get("fixture") == state["receipt"]["fixture"], f"capability evidence fixture differs for {route}")
+    _expect(child.get("runner") == _artifact(RUNNER_PATH, "signed-native v2 runner"), f"capability evidence runner identity differs for {route}")
+    expected_command = [str(build_value["binary"]["path"]), "--mode", "validate", "--route", route, "--blocks", "1"]
+    _expect(child.get("command") == expected_command, f"capability evidence argv differs for {route}")
+    environment = child.get("environment")
+    _expect(isinstance(environment, Mapping), f"capability environment is missing for {route}")
+    _expect(environment.get("LITCHI_SIGNED_FIXTURE_ROOT") == state["fixture"]["root"], f"capability fixture root differs for {route}")
+    _expect(environment.get("LITCHI_SIGNED_FIXTURE_MANIFEST") == state["fixture"]["manifest"]["path"], f"capability fixture manifest differs for {route}")
+    _expect(environment.get("LITCHI_SIGNED_FIXTURE_MANIFEST_SHA256") == state["fixture"]["manifest"]["sha256"], f"capability fixture manifest hash differs for {route}")
+    _expect(environment.get("LITCHI_SIGNED_ENDPOINT") in {"before", "after"}, f"capability endpoint is missing for {route}")
+    _expect(child.get("argv") == expected_command, f"capability argv receipt differs for {route}")
+    _expect(child.get("cwd") == str(state["prepared"] / "consumer"), f"capability working directory differs for {route}")
+    process = child.get("process")
+    _expect(isinstance(process, Mapping), f"capability process binding is missing for {route}")
+    _expect(isinstance(process.get("pid"), int) and process["pid"] > 0, f"capability process id is missing for {route}")
+    _expect(isinstance(process.get("process_group"), int) and process["process_group"] > 0, f"capability process group is missing for {route}")
+    _expect(process.get("start_new_session") is True and process.get("process_group_empty") is True, f"capability process ownership is incomplete for {route}")
+    stdout = _verify_external_artifact(child.get("stdout"), f"capability stdout for {route}")
+    stderr = _verify_external_artifact(child.get("stderr"), f"capability stderr for {route}")
+    _expect(stdout["bytes"] <= CHILD_OUTPUT_LIMIT and stderr["bytes"] <= CHILD_OUTPUT_LIMIT, f"capability output exceeds its bound for {route}")
     _expect(child.get("timeout_seconds") == CHILD_TIMEOUT_SECONDS, f"capability timeout differs for {route}")
     _expect(child.get("exit_code") == 0 and child.get("timed_out") is False, f"capability route did not exit cleanly: {route}")
     _expect(child.get("guard_error") is None and child.get("after_guard_error") is None, f"capability guard failed: {route}")
     result = child.get("result")
     _expect(isinstance(result, Mapping), f"capability result is missing for {route}")
+    _expect(result.get("schema") == PROBE_SCHEMA and result.get("route") == route, f"capability producer result differs for {route}")
+    _expect(result.get("capability") == row.get("status"), f"capability producer disposition differs for {route}")
+    try:
+        stdout_value = json.loads(Path(stdout["path"]).read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ConsumerError(f"capability stdout is not JSON for {route}: {error}") from error
+    _expect(stdout_value == result, f"capability stdout binding differs for {route}")
     fixture_rows = result.get("fixtures")
     _expect(isinstance(fixture_rows, list), f"capability fixture results are missing for {route}")
     fixture_contract = _fixture_contract(state)
@@ -995,10 +1151,15 @@ def execute(
     _expect(build_value.get("routes") == state["receipt"]["routes"], "build route matrix differs")
     api_branch = build_value.get("api_branch")
     _expect(api_branch in API_BRANCHES, "build API branch is missing")
-    if capabilities is None and executor is not None:
-        produced = executor(state)
-        _expect(produced is not None, "protocol executor did not return a capabilities receipt")
-        capabilities = Path(produced)
+    if capabilities is None:
+        if executor is not None:
+            produced = executor(state)
+            _expect(produced is not None, "protocol executor did not return a capabilities receipt")
+            capabilities = Path(produced)
+        else:
+            from native_qualification import signed_native_v2_runner
+
+            capabilities = signed_native_v2_runner.run(state)
     _expect(capabilities is not None, "execute requires the protocol capabilities receipt")
     capability_value, capability_artifact = _load_canonical(Path(capabilities), "capabilities receipt")
     _expect(capability_value.get("schema") == CAPABILITIES_SCHEMA, "capabilities receipt schema differs")
@@ -1020,6 +1181,8 @@ def execute(
     )
     _expect(capability_value.get("adapter") == state["adapter"], "capabilities adapter differs")
     _expect(capability_value.get("fixture") == state["receipt"]["fixture"], "capabilities fixture binding differs")
+    _expect(capability_value.get("protocol_schema") == RUNNER_SCHEMA, "capabilities runner schema differs")
+    _expect(capability_value.get("runner") == _artifact(RUNNER_PATH, "signed-native v2 runner"), "capabilities runner identity differs")
     rows = _route_rows(capability_value)
     batch = _validate_batch(capability_value, state)
     for route, row in rows.items():
@@ -1073,7 +1236,7 @@ def main(argv: Sequence[str]) -> int:
     build_parser.add_argument("--api-branch", choices=API_BRANCHES, required=True)
     execute_parser = sub.add_parser("execute")
     execute_parser.add_argument("--prepared", type=Path, required=True)
-    execute_parser.add_argument("--capabilities", type=Path, required=True)
+    execute_parser.add_argument("--capabilities", type=Path)
     execute_parser.add_argument("--output", type=Path)
     args = parser.parse_args(list(argv))
     if args.command == "prepare":
