@@ -125,4 +125,20 @@ mod tests {
         assert!(changed.same_content(&reopened)?);
         Ok(())
     }
+
+    #[test]
+    fn authored_publication_replaces_stale_content_identity() -> Result<()> {
+        let mut builder = Builder::new()?;
+        let _ = builder.package.content_revision.set([0xA5; 32]);
+        builder
+            .presentation()?
+            .add_slide()?
+            .add_text_box("published", 0, 0, 914_400, 914_400);
+
+        let package = builder.build()?;
+
+        assert_ne!(package.cached_content_revision(), Some([0xA5; 32]));
+        assert!(package.part_bytes > 0);
+        Ok(())
+    }
 }

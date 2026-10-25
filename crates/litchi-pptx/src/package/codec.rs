@@ -171,9 +171,12 @@ impl Package {
         package.add_part(Box::new(table_styles));
         package.add_part(Box::new(core_properties));
         package.add_part(Box::new(extended_properties));
+        let part_bytes = Self::part_bytes_for(&package)?;
 
         Ok(Self {
             opc: std::sync::Arc::new(package),
+            part_bytes,
+            content_revision: std::sync::Arc::new(std::sync::OnceLock::new()),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
             physical_source_provenance: false,
             semantic_limits: None,
@@ -290,6 +293,7 @@ impl Package {
         physical_source_provenance: bool,
         semantic_limits: Option<crate::open_options::SemanticLimitsRef>,
     ) -> Result<Self> {
+        let part_bytes = Self::part_bytes_for(&opc)?;
         let main = opc.main_document_part()?;
         let presentation = PresentationPart::from_part(main)?;
         // Slide-list repairs (audit finding 6.7) are recorded at open. A slide
@@ -318,6 +322,8 @@ impl Package {
             crate::presentation_properties::load_from_package_with_tolerance(&opc, &mut tolerance);
         Ok(Self {
             opc: std::sync::Arc::new(opc),
+            part_bytes,
+            content_revision: std::sync::Arc::new(std::sync::OnceLock::new()),
             part_digests: std::sync::Arc::new(std::sync::OnceLock::new()),
             physical_source_provenance,
             semantic_limits,
@@ -411,6 +417,7 @@ impl Package {
         }
         #[cfg(feature = "automatic-fonts")]
         self.embed_fonts_for_presentation(presentation)?;
+        self.refresh_authored_publication()?;
         Ok(self)
     }
 

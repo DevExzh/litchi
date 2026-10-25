@@ -416,6 +416,9 @@ pub struct Snapshot {
     pub(crate) revision: [u8; 32],
     pub(crate) limits: Limits,
     pub(crate) physical_source_provenance: bool,
+    /// Aggregate ordinary-part payload bytes observed during the same
+    /// capture pass that produced the complete-package revision.
+    pub(crate) part_bytes: u64,
     /// Serialized-archive revision of `package`, memoized with the archive
     /// bound it was taken under.
     ///
@@ -466,6 +469,10 @@ pub struct Snapshot {
 #[derive(Default)]
 pub(crate) struct PartDigests {
     entries: HashMap<(usize, usize), (Arc<Vec<u8>>, [u8; 32])>,
+    /// Aggregate visible payload bytes observed by the same fingerprint pass.
+    /// It is carried with the memo so snapshot publication does not need a
+    /// second package walk merely to retain the physical owner metric.
+    part_bytes: u64,
 }
 
 impl PartDigests {
@@ -477,7 +484,10 @@ impl PartDigests {
                 resource: "opened-presentation part digests",
                 source,
             })?;
-        Ok(Self { entries })
+        Ok(Self {
+            entries,
+            part_bytes: 0,
+        })
     }
 
     /// Digest memoized for exactly this allocation, if any.
@@ -535,6 +545,11 @@ impl PartDigests {
         Ok(())
     }
 
+    #[must_use]
+    pub(crate) const fn part_bytes(&self) -> u64 {
+        self.part_bytes
+    }
+
     /// Number of memoized payloads.
     #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
@@ -585,9 +600,13 @@ impl PartDigests {
     /// point it keeps a snapshot's memo (change 0751).
     pub(crate) fn project(&self, package: &OpcPackage) -> Result<Self> {
         if self.entries.is_empty() {
-            return Ok(Self::default());
+            return Ok(Self {
+                entries: HashMap::new(),
+                part_bytes: self.part_bytes,
+            });
         }
         let mut projected = Self::with_capacity(package.part_count())?;
+        projected.part_bytes = self.part_bytes;
         for metadata in package.iter_parts() {
             let part = package.get_part(metadata.partname())?;
             let Some((key, blob)) = memo_key(part) else {
@@ -1023,6 +1042,7 @@ fn capture_internal(
         Revision::Cold => package_fingerprint_with_memo(owned.as_ref(), None)?,
         Revision::Parent(parent) => package_fingerprint_with_memo(owned.as_ref(), Some(parent))?,
     };
+    let part_bytes = part_digests.part_bytes();
     let retained_mce = mce_capture.finish(|key| part_digests.owner_for(key));
     // The proofs borrow the input package, so every classified allocation is
     // alive while the memo is built. Each successful classification is kept
@@ -1045,6 +1065,7 @@ fn capture_internal(
         revision,
         limits,
         physical_source_provenance,
+        part_bytes,
         physical_revision: Arc::new(OnceLock::new()),
         part_digests: Arc::new(part_digests),
         retained_mce,
@@ -1126,6 +1147,12 @@ pub(crate) fn package_fingerprint_with_memo(
     let (part_total, mut hashed) = (parts.len(), 0usize);
     for metadata in parts {
         let part = package.get_part(metadata.partname())?;
+        let payload_bytes = u64::try_from(part.blob().len())
+            .map_err(|_| invalid("opened-presentation payload length exceeds u64"))?;
+        memo.part_bytes = memo
+            .part_bytes
+            .checked_add(payload_bytes)
+            .ok_or_else(|| invalid("opened-presentation payload aggregate overflows u64"))?;
         let payload = match memo_key(part) {
             Some((key, blob)) => {
                 let payload = match parent.and_then(|parent| parent.get(key)) {

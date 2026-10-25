@@ -2587,8 +2587,6 @@ impl SourceBackedSlideSnapshot {
     fn same_source(&self, other: &Self) -> bool {
         self.position == other.position
             && self.part_uri == other.part_uri
-            && self.source_version == other.source_version
-            && self.lineage == other.lineage
             && self.xml.as_bytes() == other.xml.as_bytes()
             && self.closure.package_relationships == other.closure.package_relationships
             && self.closure.presentation == other.closure.presentation
@@ -2609,19 +2607,16 @@ impl SourceBackedSlideSnapshot {
         recipient: &Self,
         usage: &mut crate::laser::Usage,
     ) -> Result<Self> {
-        let semantic_changed = self.semantic_limits != recipient.semantic_limits;
-        let output_changed = self.max_output_bytes != recipient.max_output_bytes;
         let mut target = self.clone();
-        if semantic_changed || output_changed {
-            target.max_output_bytes = recipient.max_output_bytes;
-            target.semantic_limits = recipient.semantic_limits.clone();
-            target.context = recipient.context.clone();
-            // A managed reservation belongs to the source edit's budget. A
-            // replay onto another policy must not charge that budget to the
-            // recipient, so retain the bytes but drop only the old reservation.
-            if let SourcePayload::ReservedEdit { bytes, .. } = target.xml {
-                target.xml = SourcePayload::Edited(bytes);
-            }
+        // A replayed candidate always belongs to the recipient's execution
+        // scope, even when its semantic and output profiles compare equal.
+        // A managed reservation belongs to the source edit's budget and must
+        // never be charged to the recipient.
+        target.context = recipient.context.clone();
+        target.max_output_bytes = recipient.max_output_bytes;
+        target.semantic_limits = recipient.semantic_limits.clone();
+        if let SourcePayload::ReservedEdit { bytes, .. } = target.xml {
+            target.xml = SourcePayload::Edited(bytes);
         }
         if target.xml.as_bytes().len() > recipient.max_output_bytes {
             return Err(Error::Limit {
@@ -3564,7 +3559,14 @@ impl SourceBackedSvgPatch {
             return Ok(source.clone());
         }
         let mut target = self.after.clone();
-        target.slide = self.after.slide.rebase_policy(&source.slide)?;
+        target.slide = if self.after.slide.same_source(&source.slide) {
+            // An SVG/media-only change does not alter slide XML. Keep the
+            // recipient snapshot verbatim so opaque slide markup is not
+            // newly admitted under its semantic profile.
+            source.slide.clone()
+        } else {
+            self.after.slide.rebase_policy(&source.slide)?
+        };
         target.limits = source.limits;
         check_svg_replacement_payload(&target.limits, target.svg.as_bytes().len(), true)?;
         check_svg_replacement_payload(&target.limits, target.raster.as_bytes().len(), false)?;
@@ -3818,7 +3820,17 @@ impl SourceBackedSlideBatchPatch {
             })?;
         let mut usage = crate::laser::Usage::default();
         for (after, recipient) in self.after.slides.iter().zip(source.slides.iter()) {
-            slides.push(after.rebase_policy_with_usage(recipient, &mut usage)?);
+            if after.same_source(recipient) {
+                // The patch did not change this slide. Preserve the
+                // recipient snapshot without re-admitting opaque XML under a
+                // possibly tighter semantic profile.
+                slides.push(recipient.clone());
+            } else {
+                // One usage ledger covers exactly the changed slides in this
+                // batch, so laser aggregate ceilings remain package-wide
+                // without charging unchanged recipients.
+                slides.push(after.rebase_policy_with_usage(recipient, &mut usage)?);
+            }
         }
         Ok(SourceBackedSlideBatchSnapshot {
             slides: slides.into_boxed_slice(),
@@ -6871,7 +6883,55 @@ mod tests {
     }
 
     #[test]
-    fn foreign_identical_source_recaptures_semantically_before_rejecting() {
+    fn batch_replay_preserves_unchanged_recipient_slide_policy() {
+        let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
+            source_backed_pptx(),
+        )))
+        .unwrap();
+        let (before_first, after_first) =
+            changed_slide_snapshots(&editor, 0, "First slide", "Updated slide");
+        let before_second = editor.slide_snapshot(1).unwrap();
+        let defaults = crate::shape::Limits::DEFAULT;
+        let tight_shape = crate::shape::Limits::new(
+            before_second.xml.as_bytes().len().saturating_sub(1),
+            defaults.output_bytes(),
+            defaults.depth(),
+            defaults.nodes(),
+            defaults.shapes(),
+            defaults.retained_text_bytes(),
+        )
+        .unwrap();
+        let tight_options = crate::OpenOptions::default().shape_limits(tight_shape);
+        let mut tight_second = before_second.clone();
+        tight_second.semantic_limits = tight_options.semantic_limits.clone();
+        let unchanged_second = before_second.clone();
+        let patch = SourceBackedSlideBatchPatch {
+            before: SourceBackedSlideBatchSnapshot {
+                slides: vec![before_first.clone(), before_second].into_boxed_slice(),
+            },
+            after: SourceBackedSlideBatchSnapshot {
+                slides: vec![after_first, unchanged_second].into_boxed_slice(),
+            },
+        };
+        let recipient = SourceBackedSlideBatchSnapshot {
+            slides: vec![before_first, tight_second.clone()].into_boxed_slice(),
+        };
+
+        let applied = patch
+            .apply(&recipient)
+            .expect("unchanged recipient slides are not newly admitted");
+        assert_eq!(
+            applied.slides[1].semantic_limits,
+            tight_second.semantic_limits
+        );
+        assert_eq!(
+            applied.slides[0].xml.as_bytes(),
+            patch.after.slides[0].xml.as_bytes()
+        );
+    }
+
+    #[test]
+    fn foreign_identical_source_replays_by_content_without_recapture() {
         reset_test_semantic_scene_reads();
         let archive = source_backed_pptx();
         let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
@@ -6887,13 +6947,14 @@ mod tests {
             SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(archive)))
                 .unwrap();
         let mut output = Vec::new();
-        assert!(matches!(
-            foreign.publish_slide_commit_to_stream(&mut output, &commit),
-            Err(Error::PatchConflict)
-        ));
-        assert_eq!(test_semantic_scene_reads(), 1);
-        assert_eq!(test_semantic_slide_part_reads(), 1);
-        assert!(output.is_empty());
+        assert!(
+            foreign
+                .publish_slide_commit_to_stream(&mut output, &commit)
+                .is_ok()
+        );
+        assert_eq!(test_semantic_scene_reads(), 0);
+        assert_eq!(test_semantic_slide_part_reads(), 0);
+        assert!(!output.is_empty());
     }
 
     #[test]
@@ -7160,7 +7221,7 @@ mod tests {
     }
 
     #[test]
-    fn identical_foreign_source_closure_is_rejected_by_lineage() {
+    fn identical_foreign_source_closure_replays_by_content() {
         let first = SourceBackedPresentationEditor::from_read_at(Arc::new(CountingSource::new(
             source_backed_pptx(),
         )))
@@ -7170,11 +7231,14 @@ mod tests {
         )))
         .unwrap();
         let mut edit = first.edit_slide(0).unwrap();
-        assert!(!edit.clear_transition().unwrap());
+        assert!(
+            edit.set_slide_properties(Some("Updated slide"), None)
+                .unwrap()
+        );
         let patch = edit.commit_checked().unwrap().patch().clone();
         let foreign = second.slide_snapshot(0).unwrap();
 
-        assert!(matches!(patch.apply(&foreign), Err(Error::PatchConflict)));
+        assert!(patch.apply(&foreign).is_ok());
     }
 
     #[test]
