@@ -334,13 +334,14 @@ impl Assignments {
         self.fields.iter().any(|(field, _)| field.is_app())
     }
 
-    /// The key of an assigned field no OOXML part stores (`contentType`).
-    #[cfg(feature = "docx")]
-    pub(crate) fn unstored(&self) -> Option<&'static str> {
+    /// The canonical facade field name of an assigned field no OOXML part
+    /// stores.  The input spelling is `contentType`, but errors name the
+    /// shared [`Metadata`] field (`content_type`).
+    pub(crate) fn unsupported_property(&self) -> Option<&'static str> {
         self.fields
             .iter()
             .any(|(field, _)| *field == Field::ContentType)
-            .then_some("contentType")
+            .then_some("content_type")
     }
 
     /// `base` with the application-property assignments applied: every
@@ -396,6 +397,38 @@ impl Assignments {
         }
         Ok(props)
     }
+}
+
+/// Return the canonical shared field name that an OOXML metadata transaction
+/// cannot store, when the authored value contains one.  This is used for
+/// complete metadata creation, where the native refusal deliberately carries
+/// no property detail so its reason remains fixed and content-free.
+pub(crate) fn unsupported_field(metadata: &Metadata) -> Option<&'static str> {
+    litchi_core::metadata::Field::ALL
+        .into_iter()
+        .find_map(|field| {
+            (metadata.is_set(field)
+                && !properties::CORE_FIELDS.contains(&field)
+                && !properties::app::METADATA_FIELDS.contains(&field))
+            .then_some(field.name())
+        })
+}
+
+/// Restore caller-facing property context after mapping a typed native
+/// refusal.  The leaf refusal intentionally redacts the field from its fixed
+/// reason; only the facade boundary has the request context needed to name
+/// the shared field.  Existing property context, when any, always wins.
+pub(crate) fn with_unsupported_property(
+    mut error: Error,
+    property: Option<&'static str>,
+) -> Error {
+    if error.code() == Code::UnsupportedProperty
+        && error.property().is_none()
+        && let Some(property) = property
+    {
+        error = error.with_property(property);
+    }
+    error
 }
 
 /// Admit `/metadata` property assignments.
@@ -656,6 +689,9 @@ mod tests {
         assert_eq!(error.code(), Code::UnsupportedProperty);
         assert_eq!(error.property(), None);
 
+        let error = with_unsupported_property(error, Some("content_type"));
+        assert_eq!(error.property(), Some("content_type"));
+
         let error = native_error(
             properties::Error::SourceChanged {
                 expected: litchi_core::SourceVersion::new(8, 1),
@@ -680,6 +716,51 @@ mod tests {
             FileFormat::Xlsx,
         );
         assert_eq!(error.code(), Code::InvalidValue);
+    }
+
+    #[test]
+    fn unsupported_metadata_fields_use_shared_names_at_the_facade_boundary() {
+        let assignments = admit(
+            &Props::new().with("contentType", "application/example"),
+            FileFormat::Xlsx,
+        )
+        .expect("contentType admission");
+        assert_eq!(assignments.unsupported_property(), Some("content_type"));
+
+        for (metadata, expected) in [
+            (
+                Metadata {
+                    content_type: Some("application/example".to_owned()),
+                    ..Metadata::default()
+                },
+                "content_type",
+            ),
+            (
+                Metadata {
+                    last_backup: Some(Timestamp::parse("2024-01-01T00:00:00").unwrap()),
+                    ..Metadata::default()
+                },
+                "last_backup",
+            ),
+            (
+                Metadata {
+                    codepage: Some(1252),
+                    ..Metadata::default()
+                },
+                "codepage",
+            ),
+        ] {
+            assert_eq!(unsupported_field(&metadata), Some(expected));
+        }
+
+        assert_eq!(unsupported_field(&Metadata::default()), None);
+        assert_eq!(
+            unsupported_field(&Metadata {
+                company: Some("Litchi".to_owned()),
+                ..Metadata::default()
+            }),
+            None
+        );
     }
 
     #[test]

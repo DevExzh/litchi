@@ -77,6 +77,7 @@ impl Xlsx {
         authored_operations: usize,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
+        let unsupported_property = assignments.unsupported_property();
         let source = self.editor_for_metadata_with_snapshot_limit(limits.max_snapshot_bytes())?;
         // Metadata editing does not use the worksheet native editor. Admit
         // the source-backed endpoint before promotion. Once promoted, the
@@ -88,7 +89,8 @@ impl Xlsx {
             |value| assignments.apply(value),
             Some(assignments),
             Some(limits.max_snapshot_bytes()),
-        )?;
+        )
+        .map_err(|error| metadata::with_unsupported_property(error, unsupported_property))?;
         let after = if changed {
             self.adopt_metadata(target.clone(), metadata)
         } else {
@@ -129,8 +131,10 @@ impl Xlsx {
 
 /// Create-time metadata: commit `metadata` to a fresh workbook.
 pub(super) fn create(workbook: xlsx::Package, metadata: &Metadata) -> Result<Xlsx> {
+    let unsupported_property = metadata::unsupported_field(metadata);
     let (workbook, metadata, _, _) =
-        commit(&workbook, |value| *value = metadata.clone(), None, None)?;
+        commit(&workbook, |value| *value = metadata.clone(), None, None)
+            .map_err(|error| metadata::with_unsupported_property(error, unsupported_property))?;
     Ok(Xlsx::from_workbook(workbook, &OpenOptions::new())?.with_metadata(metadata))
 }
 

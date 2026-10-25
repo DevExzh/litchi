@@ -116,6 +116,7 @@ impl Pptx {
         authored_operations: usize,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
+        let unsupported_property = assignments.unsupported_property();
         // A signed metadata setter is staged through the unsigned private
         // owner so the publication fence can distinguish a genuine no-op
         // from a changed write.  Changed candidates are still refused by
@@ -127,7 +128,8 @@ impl Pptx {
             |value| assignments.apply(value),
             Some(assignments),
             native_snapshot_budget(limits),
-        )?;
+        )
+        .map_err(|error| metadata::with_unsupported_property(error, unsupported_property))?;
         if patch.is_noop() {
             return Ok(Commit::new(
                 self.clone(),
@@ -176,11 +178,13 @@ impl Pptx {
 
 /// Create-time metadata: commit `metadata` to a fresh presentation.
 pub(super) fn create(package: pptx::Package, metadata: &Metadata) -> Result<Pptx> {
+    let unsupported_property = metadata::unsupported_field(metadata);
     let (package, _, _) = commit(
         &package,
         |value| *value = metadata.clone(),
         None,
         litchi_pptx::opened::Limits::default().max_patch_bytes(),
-    )?;
+    )
+    .map_err(|error| metadata::with_unsupported_property(error, unsupported_property))?;
     Pptx::from_package(package, &OpenOptions::new())
 }

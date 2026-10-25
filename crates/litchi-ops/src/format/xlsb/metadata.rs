@@ -128,11 +128,16 @@ impl Xlsb {
         authored_operations: usize,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
+        let unsupported_property = assignments.unsupported_property();
         if let (XlsbOwner::Source(source), super::Signature::Unsigned) =
             (&self.0.owner, self.signature())
         {
             if self.0.retain_source {
-                return self.set_source_metadata(source, assignments, authored_operations, limits);
+                return self
+                    .set_source_metadata(source, assignments, authored_operations, limits)
+                    .map_err(|error| {
+                        metadata::with_unsupported_property(error, unsupported_property)
+                    });
             }
         }
         // Stage on the workbook itself: no copy into a package first
@@ -142,7 +147,8 @@ impl Xlsb {
             editor.edit_metadata_with_options(native_options(limits.max_snapshot_bytes())),
             |value| assignments.apply(value),
             Some(assignments),
-        )?;
+        )
+        .map_err(|error| metadata::with_unsupported_property(error, unsupported_property))?;
         if !patch.is_noop() && self.signature() == super::Signature::Signed {
             return Err(crate::Error::signed(FileFormat::Xlsb));
         }
@@ -287,11 +293,13 @@ impl Xlsb {
 
 /// Create-time metadata: commit `metadata` to a fresh package.
 pub(super) fn create(package: xlsb::Package, metadata: &Metadata) -> Result<Xlsb> {
+    let unsupported_property = metadata::unsupported_field(metadata);
     let (package, _, _) = commit(
         package.edit_metadata(),
         |value| *value = metadata.clone(),
         None,
-    )?;
+    )
+    .map_err(|error| metadata::with_unsupported_property(error, unsupported_property))?;
     Xlsb::from_package(package, &OpenOptions::new())
 }
 

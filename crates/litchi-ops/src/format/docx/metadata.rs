@@ -31,7 +31,7 @@ impl Docx {
     fn commit_metadata(&self, props: &Props<'_>) -> Result<Docx> {
         self.edit_policy()?;
         let assignments = metadata::admit(props, FileFormat::Docx)?;
-        if let Some(key) = assignments.unstored() {
+        if let Some(key) = assignments.unsupported_property() {
             return Err(Error::new(
                 Code::UnsupportedProperty,
                 "the format cannot store this metadata field",
