@@ -1,9 +1,10 @@
 # 0362ul62 — PPTX raw-content limits and source propagation
 
-Status: source-ready implementation packet, based on the coordinator replay
-integration tip `a942320908`. Native Cargo validation, the workspace gate and
-ABBA qualification remain coordinator work because this wave was run without a
-build slot.
+Status: source-ready implementation packet, based on the current source tip
+`68576a5283`. The earlier coordinator replay integration tip `a942320908` is
+historical context only, not the current source basis. Native Cargo
+validation, the workspace gate and ABBA qualification remain coordinator work
+because this wave was run without a build slot.
 
 ## Boundary
 
@@ -18,16 +19,29 @@ selected policy.
 | `tag` | `Limits`, `parse`, `write`, and `List::xml`; raw XML input/output budgets are explicit. |
 | `notes` | `Limits`, `master_xml`, `write_text`, `write_text_with`, and `Slide::text`; MCE, structure, text, and aggregate graph budgets follow the source profile. |
 | `animations` | `Limits`, semantic parse methods, and `to_xml`/`to_xml_for_slide`; MCE input and fallible bounded XML output use the selected policy. |
-| classic `comments` | `Limits`, all author/comment parse and write forms, part projections, and collaboration snapshots; package, eager, source-backed, and edit consumers derive the source policy. |
+| classic `comments` | `Limits` (including the physical `max_attribute_bytes` ceiling and selected aggregate `max_string_bytes` ceiling), all author/comment parse and write forms, part projections, and collaboration snapshots; package, eager, source-backed, and edit consumers derive the source policy. |
 
 ## Safety and fidelity
 
-MCE processing is bounded before semantic parsing. Media, animation, and
-comment serializers use checked sinks that refuse a limit before reserving the
-next chunk. Notes rewrites preflight the final byte count before the exact
-reservation and preserve opaque source markup. Existing source-splice and
-no-op paths retain their original bytes; the collaboration snapshots retain
-the selected limits and reparse with the same profile after edits and replay.
+MCE processing is bounded before semantic parsing. Classic comment ingress
+admits every raw attribute value before MCE selection, so an oversized
+attribute in an inactive branch cannot disappear before the physical
+`max_attribute_bytes` refusal. The selected parser then charges attribute
+names, decoded attribute values, text, and entity references against the
+aggregate `max_string_bytes` budget before owning them; date-time attributes
+are checked by the same selected string policy. The bounded comment writers
+use the same aggregate counter, and preflight each escaped attribute's exact
+wire length before writing it, so a writer cannot emit a part that its reader
+would refuse.
+
+Media, animation, and comment serializers use checked sinks that refuse a
+limit before reserving the next chunk. Notes rewrites preflight the final byte
+count before the exact reservation and preserve opaque source markup. Existing
+source-splice and no-op paths retain their original bytes; collaboration
+snapshots retain the selected limits. Presence and threading replay perform
+one raw admission scan, construct one `MceSource`, and reuse that selected
+source for semantic validation and offset translation rather than copying and
+reprocessing the part.
 
 Each codec has exact-wire/one-byte-under policy coverage, with media, notes,
 comments, and animation round-trip coverage kept beside their raw tests. The
