@@ -1,6 +1,6 @@
 //! Bounded namespace-aware codec and source splicer for `readonlyRecommended`.
 
-use std::collections::HashSet;
+use std::collections::{HashSet, TryReserveError};
 use std::ops::Range;
 
 use litchi_core::xml::ReaderOrigin;
@@ -214,7 +214,7 @@ pub(crate) fn rewrite(
         ));
     }
     if located.value == value {
-        return Ok(source.to_vec());
+        return clone_bounded(source, limits.max_output_bytes());
     }
     let mut replacements = Vec::new();
     match (located.value, value) {
@@ -335,7 +335,7 @@ pub(crate) fn rewrite(
             limits.max_output_bytes(),
         ));
     }
-    let updated = apply_replacements(source, replacements)?;
+    let updated = apply_replacements(source, replacements, output_len)?;
     let max_bytes = limits.max_output_bytes().min(MAX_BYTES);
     if updated.len() > max_bytes {
         return Err(limit(
@@ -698,22 +698,57 @@ struct Replacement {
     value: Vec<u8>,
 }
 
-fn apply_replacements(source: &[u8], mut replacements: Vec<Replacement>) -> Result<Vec<u8>> {
-    replacements.sort_by_key(|replacement| std::cmp::Reverse(replacement.range.start));
-    let mut output = source.to_vec();
-    let mut upper = source.len();
+fn apply_replacements(
+    source: &[u8],
+    mut replacements: Vec<Replacement>,
+    output_len: usize,
+) -> Result<Vec<u8>> {
+    replacements.sort_by_key(|replacement| replacement.range.start);
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "presentation-properties readonlyRecommended output",
+            source,
+        })?;
+    let mut cursor = 0usize;
     for replacement in replacements {
         if replacement.range.start > replacement.range.end
             || replacement.range.end > source.len()
-            || replacement.range.end > upper
+            || replacement.range.start < cursor
         {
             return Err(invalid(
                 "presentation-properties patch ranges overlap or escape source",
             ));
         }
-        output.splice(replacement.range.clone(), replacement.value);
-        upper = replacement.range.start;
+        output.extend_from_slice(&source[cursor..replacement.range.start]);
+        output.extend_from_slice(&replacement.value);
+        cursor = replacement.range.end;
     }
+    output.extend_from_slice(&source[cursor..]);
+    if output.len() != output_len {
+        return Err(invalid(
+            "presentation-properties patch length differs from its plan",
+        ));
+    }
+    Ok(output)
+}
+
+fn clone_bounded(source: &[u8], maximum: usize) -> Result<Vec<u8>> {
+    if source.len() > maximum {
+        return Err(limit(
+            "serialized presentation-properties readonlyRecommended bytes",
+            maximum,
+        ));
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|source: TryReserveError| Error::Allocation {
+            resource: "presentation-properties readonlyRecommended output",
+            source,
+        })?;
+    output.extend_from_slice(source);
     Ok(output)
 }
 

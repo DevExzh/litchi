@@ -20,10 +20,11 @@ and attributes, guides/slides, presentation extensions/colors, and model3d
 XML, tree, relationship, link and embedded model/preview payload budgets.
 Model3d package reads, selected-shape reads, edits and source relationship
 validation carry the owner policy through every load, replacement and replay
-path. Output admission is preflighted before retained opaque XML is copied;
-all source splices check the final size before allocating the changed buffer.
-Unknown XML, MCE tolerant/strict behavior, namespace mapping, relationship
-fidelity and existing semantic validation remain intact.
+path. Output admission is exact-counted before a fallible, exactly-reserved
+writer copies retained opaque XML; source splices likewise reserve only their
+checked final size. Unknown XML, MCE tolerant/strict behavior, namespace
+mapping for generated package roots, relationship fidelity and existing
+semantic validation remain intact.
 
 Public required-limit signatures covered by this record:
 

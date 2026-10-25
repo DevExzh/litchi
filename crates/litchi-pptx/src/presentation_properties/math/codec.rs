@@ -157,18 +157,12 @@ pub(crate) fn parse(xml: &[u8], limits: Limits) -> Result<Properties> {
 
 /// Write one complete a14:m payload in the requested package conformance.
 pub(crate) fn write(
-    out: &mut String,
+    out: &mut super::super::codec::XmlSink,
     value: &Properties,
     strict: bool,
     limits: Limits,
 ) -> Result<()> {
     value.validate()?;
-    if out.len().saturating_add(1024) > limits.max_output_bytes() {
-        return Err(Error::Limit {
-            resource: "serialized presentation math XML",
-            limit: limits.max_output_bytes(),
-        });
-    }
     let omml = if strict {
         "http://purl.oclc.org/ooxml/officeDocument/math"
     } else {
@@ -191,13 +185,7 @@ pub(crate) fn write(
         out.push_str("\"/>");
     }
     out.push_str("</m:mathPr></a14:m>");
-    if out.len() > limits.max_output_bytes() {
-        return Err(Error::Limit {
-            resource: "serialized presentation math XML",
-            limit: limits.max_output_bytes(),
-        });
-    }
-    Ok(())
+    out.check()
 }
 
 fn start_kind(

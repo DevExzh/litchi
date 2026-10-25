@@ -1,8 +1,10 @@
 //! PPTX relationship, content-type, and bounded-resource validation.
 
 use litchi_drawingml::model3d as drawing;
+use litchi_drawingml::{Error as DrawingError, LimitKind};
 use litchi_opc::constants::relationship_type::{IMAGE, STRICT_IMAGE};
 use litchi_opc::{OpcPackage, Part};
+use quick_xml::{Reader, events::Event};
 
 use super::codec::Limits;
 use super::model::{Asset, Data, Model, Preview, Relation};
@@ -15,7 +17,8 @@ use crate::{Error, Result};
 ///
 /// Returns an error if the input cannot be read or is malformed.
 pub fn validate(model: &Model, limits: Limits) -> Result<()> {
-    drawing::validate(&model.scene.wire).map_err(|error| invalid(error.to_string()))?;
+    validate_selected_structure(&model.scene.wire, limits)?;
+    drawing::validate(&model.scene.wire).map_err(super::model::drawing_error)?;
     validate_asset(&model.asset, limits)?;
     if let Some(preview) = &model.preview {
         validate_preview(preview, limits)?;
@@ -52,7 +55,7 @@ pub(crate) fn validate_loaded_graph(
     validate(model, limits)?;
     let resolver = Resolver { source };
     drawing::validate_relationships(&model.scene.wire, &resolver)
-        .map_err(|error| invalid(error.to_string()))?;
+        .map_err(super::model::drawing_error)?;
 
     let mut referenced = Vec::new();
     validate_reference(
@@ -112,10 +115,11 @@ pub(crate) fn validate_loaded_graph(
 pub(crate) fn validate_model_relationship_inventory(
     source: &dyn Part,
     models: &[Model],
-    _limits: Limits,
+    limits: Limits,
 ) -> Result<()> {
     let mut referenced = Vec::new();
     for model in models {
+        validate_selected_structure(&model.scene.wire, limits)?;
         collect_reference(&model.scene.wire.reference, &mut referenced);
         if let Some(raster) = model.scene.wire.raster()
             && let Some(blip) = raster.children.iter().find_map(|child| match child {
@@ -142,6 +146,125 @@ pub(crate) fn validate_model_relationship_inventory(
         }
     }
     Ok(())
+}
+
+/// Apply the PPTX adapter's selected structural policy before the shared
+/// DrawingML validator runs.  The shared semantic validator intentionally
+/// uses its crate defaults; a package owner must not lose tighter limits when
+/// it crosses this adapter boundary.
+fn validate_selected_structure(metadata: &drawing::Metadata, limits: Limits) -> Result<()> {
+    if metadata.children.len() > limits.max_children() {
+        return Err(drawing_limit(
+            LimitKind::ModelChildren,
+            metadata.children.len(),
+            limits.max_children(),
+        ));
+    }
+    if metadata.namespaces.len() > limits.max_nodes() {
+        return Err(drawing_limit(
+            LimitKind::NamespaceDeclarations,
+            metadata.namespaces.len(),
+            limits.max_nodes(),
+        ));
+    }
+    for child in &metadata.children {
+        match child {
+            drawing::Child::Raster(raster) => {
+                if raster.children.len() > limits.max_raster_children() {
+                    return Err(drawing_limit(
+                        LimitKind::RasterChildren,
+                        raster.children.len(),
+                        limits.max_raster_children(),
+                    ));
+                }
+                if let Some(blip) = raster.blip() {
+                    for inert in &blip.children {
+                        validate_fragment_limits(inert, limits)?;
+                    }
+                }
+                for child in &raster.children {
+                    if let drawing::RasterChild::Opaque(inert) = child {
+                        validate_fragment_limits(inert, limits)?;
+                    }
+                }
+            },
+            drawing::Child::Opaque(inert) => validate_fragment_limits(inert, limits)?,
+        }
+    }
+    Ok(())
+}
+
+fn validate_fragment_limits(inert: &drawing::Inert, limits: Limits) -> Result<()> {
+    let bytes = inert.as_bytes();
+    if bytes.len() > limits.max_fragment_bytes() {
+        return Err(drawing_limit(
+            LimitKind::InertFragmentBytes,
+            bytes.len(),
+            limits.max_fragment_bytes(),
+        ));
+    }
+    let mut reader = Reader::from_reader(bytes);
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    loop {
+        match reader.read_event_into(&mut buffer) {
+            Ok(Event::Start(_)) => {
+                nodes = nodes.saturating_add(1);
+                if nodes > limits.max_nodes() {
+                    return Err(drawing_limit(
+                        LimitKind::InertFragmentNodes,
+                        nodes,
+                        limits.max_nodes(),
+                    ));
+                }
+                depth = depth.saturating_add(1);
+                if depth > limits.max_depth() {
+                    return Err(drawing_limit(
+                        LimitKind::InertFragmentDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
+                }
+            },
+            Ok(Event::Empty(_)) => {
+                nodes = nodes.saturating_add(1);
+                if nodes > limits.max_nodes() {
+                    return Err(drawing_limit(
+                        LimitKind::InertFragmentNodes,
+                        nodes,
+                        limits.max_nodes(),
+                    ));
+                }
+            },
+            Ok(Event::End(_)) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::Drawing(DrawingError::Xml(
+                        "unexpected model3d fragment closing element".into(),
+                    ))
+                })?;
+            },
+            Ok(Event::Eof) => break,
+            Ok(_) => {},
+            Err(error) => return Err(Error::Drawing(DrawingError::Xml(error.to_string()))),
+        }
+        buffer.clear();
+    }
+    if depth != 0 || nodes == 0 {
+        return Err(Error::Drawing(DrawingError::Xml(
+            "incomplete model3d fragment".into(),
+        )));
+    }
+    Ok(())
+}
+
+fn drawing_limit(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Drawing(DrawingError::Limit {
+        kind,
+        observed,
+        maximum,
+    })
 }
 
 fn collect_reference(reference: &drawing::Reference, referenced: &mut Vec<String>) {

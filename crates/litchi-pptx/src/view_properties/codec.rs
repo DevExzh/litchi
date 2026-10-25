@@ -17,6 +17,7 @@ use quick_xml::{
     encoding::Decoder,
     events::{BytesStart, Event},
 };
+use std::collections::TryReserveError;
 
 const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 const PS: &str = "http://purl.oclc.org/ooxml/presentationml/main";
@@ -24,6 +25,102 @@ const A: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
 const AS: &str = "http://purl.oclc.org/ooxml/drawingml/main";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const RS: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+/// A two-pass XML sink.  The first pass counts exact bytes without allocating;
+/// the second reserves that exact capacity and appends through the same
+/// bounded path.  A failed append is retained until the writer boundary so
+/// every serializer helper remains small and cannot bypass the output limit.
+struct XmlSink {
+    value: Option<String>,
+    len: usize,
+    limit: usize,
+    failure: Option<SinkFailure>,
+}
+
+enum SinkFailure {
+    Limit,
+    Overflow,
+    Allocation(TryReserveError),
+}
+
+impl XmlSink {
+    fn count(limit: usize) -> Self {
+        Self {
+            value: None,
+            len: 0,
+            limit,
+            failure: None,
+        }
+    }
+
+    fn output(capacity: usize, limit: usize) -> Result<Self> {
+        let mut value = String::new();
+        value
+            .try_reserve_exact(capacity)
+            .map_err(|source| Error::Allocation {
+                resource: "view-properties XML output",
+                source,
+            })?;
+        Ok(Self {
+            value: Some(value),
+            len: 0,
+            limit,
+            failure: None,
+        })
+    }
+
+    fn push(&mut self, value: char) {
+        let mut encoded = [0; 4];
+        self.push_str(value.encode_utf8(&mut encoded));
+    }
+
+    fn push_str(&mut self, value: &str) {
+        if self.failure.is_some() {
+            return;
+        }
+        let Some(new_len) = self.len.checked_add(value.len()) else {
+            self.failure = Some(SinkFailure::Overflow);
+            return;
+        };
+        if new_len > self.limit {
+            self.failure = Some(SinkFailure::Limit);
+            return;
+        }
+        if let Some(out) = self.value.as_mut() {
+            if let Err(source) = out.try_reserve(value.len()) {
+                self.failure = Some(SinkFailure::Allocation(source));
+                return;
+            }
+            out.push_str(value);
+        }
+        self.len = new_len;
+    }
+
+    #[must_use]
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    fn check(&mut self) -> Result<()> {
+        match self.failure.take() {
+            None => Ok(()),
+            Some(SinkFailure::Limit) => Err(limit("serialized view properties bytes", self.limit)),
+            Some(SinkFailure::Overflow) => Err(Error::CapacityOverflow {
+                resource: "view-properties XML output",
+            }),
+            Some(SinkFailure::Allocation(source)) => Err(Error::Allocation {
+                resource: "view-properties XML output",
+                source,
+            }),
+        }
+    }
+
+    fn finish(mut self) -> Result<Vec<u8>> {
+        self.check()?;
+        let value = self.value.take().expect("output sink always owns a string");
+        Ok(value.into_bytes())
+    }
+}
 /// Caller-selected bounds for one view-properties XML operation.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[must_use]
@@ -231,11 +328,27 @@ impl ViewProperties {
                 "processing instructions are rejected",
             )?;
         }
-        let x = litchi_ooxml_common::mce::process_ooxml(&xml)?;
-        if x.len() > limits.max_input_bytes() {
+        let mce_limits = litchi_ooxml_common::mce::Limits {
+            max_input_bytes: limits.max_input_bytes(),
+            max_output_bytes: limits.max_output_bytes(),
+            max_depth: limits.max_depth(),
+            max_namespace_bindings: 4096.min(limits.max_nodes()),
+            max_directive_tokens: 4096.min(limits.max_nodes()),
+            max_choices_per_alternate: 1024.min(limits.max_nodes()),
+            max_attributes_per_element:
+                litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
+        };
+        let capabilities = litchi_ooxml_common::mce::Capabilities::ooxml_baseline();
+        let x = litchi_ooxml_common::mce::process_markup_compatibility(
+            &xml,
+            &capabilities,
+            &mce_limits,
+        )?
+        .xml;
+        if x.len() > limits.max_output_bytes() {
             return Err(limit(
                 "processed view properties bytes",
-                limits.max_input_bytes(),
+                limits.max_output_bytes(),
             ));
         }
         project(&parse_dom(x.as_ref(), limits)?, tol)
@@ -244,52 +357,65 @@ impl ViewProperties {
     ///
     /// Returns an error if the output cannot be encoded or written.
     pub fn to_xml(&self, strict: bool, limits: Limits) -> Result<Vec<u8>> {
-        preflight_output(self, limits)?;
         validate(self, limits)?;
-        let p = if strict { PS } else { P };
-        let a = if strict { AS } else { A };
-        let r = if strict { RS } else { R };
-        let mut x = format!(
-            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:viewPr xmlns:p="{p}" xmlns:a="{a}" xmlns:r="{r}""#
-        );
-        if let Some(v) = self.last_view {
-            attr(&mut x, "lastView", view_str(v));
+        let mut count = XmlSink::count(limits.max_output_bytes());
+        write_document(self, strict, limits, &mut count)?;
+        count.check()?;
+        let size = count.len();
+        let mut output = XmlSink::output(size, limits.max_output_bytes())?;
+        write_document(self, strict, limits, &mut output)?;
+        if output.len() != size {
+            return Err(Error::CapacityOverflow {
+                resource: "view-properties XML output changed between passes",
+            });
         }
-        bool_attr(&mut x, "showComments", self.show_comments);
-        x.push('>');
-        if let Some(v) = &self.normal {
-            write_normal(&mut x, v, strict, limits)?;
-        }
-        if let Some(v) = &self.slide {
-            write_slide_like(&mut x, "slideViewPr", v, strict, limits)?;
-        }
-        if let Some(v) = &self.outline {
-            write_outline(&mut x, v, strict, limits)?;
-        }
-        if let Some(v) = &self.notes_text {
-            write_simple(&mut x, "notesTextViewPr", v, strict, limits)?;
-        }
-        if let Some(v) = &self.sorter {
-            write_sorter(&mut x, v, strict, limits)?;
-        }
-        if let Some(v) = &self.notes {
-            write_slide_like(&mut x, "notesViewPr", v, strict, limits)?;
-        }
-        if let Some(v) = &self.grid_spacing {
-            x.push_str(&format!("<p:gridSpacing cx=\"{}\" cy=\"{}\"/>", v.cx, v.cy));
-        }
-        if let Some(v) = &self.extension_xml {
-            opaque(&mut x, v, strict, limits)?;
-        }
-        x.push_str("</p:viewPr>");
-        if x.len() > limits.max_output_bytes() {
-            return Err(limit(
-                "serialized view properties bytes",
-                limits.max_output_bytes(),
-            ));
-        }
-        Ok(x.into_bytes())
+        output.finish()
     }
+}
+
+fn write_document(
+    value: &ViewProperties,
+    strict: bool,
+    limits: Limits,
+    x: &mut XmlSink,
+) -> Result<()> {
+    let p = if strict { PS } else { P };
+    let a = if strict { AS } else { A };
+    let r = if strict { RS } else { R };
+    x.push_str(&format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:viewPr xmlns:p="{p}" xmlns:a="{a}" xmlns:r="{r}""#
+    ));
+    if let Some(v) = value.last_view {
+        attr(x, "lastView", view_str(v));
+    }
+    bool_attr(x, "showComments", value.show_comments);
+    x.push('>');
+    if let Some(v) = &value.normal {
+        write_normal(x, v, strict, limits)?;
+    }
+    if let Some(v) = &value.slide {
+        write_slide_like(x, "slideViewPr", v, strict, limits)?;
+    }
+    if let Some(v) = &value.outline {
+        write_outline(x, v, strict, limits)?;
+    }
+    if let Some(v) = &value.notes_text {
+        write_simple(x, "notesTextViewPr", v, strict, limits)?;
+    }
+    if let Some(v) = &value.sorter {
+        write_sorter(x, v, strict, limits)?;
+    }
+    if let Some(v) = &value.notes {
+        write_slide_like(x, "notesViewPr", v, strict, limits)?;
+    }
+    if let Some(v) = &value.grid_spacing {
+        x.push_str(&format!("<p:gridSpacing cx=\"{}\" cy=\"{}\"/>", v.cx, v.cy));
+    }
+    if let Some(v) = &value.extension_xml {
+        opaque(x, v, strict, limits)?;
+    }
+    x.push_str("</p:viewPr>");
+    x.check()
 }
 
 #[derive(Clone)]
@@ -314,6 +440,9 @@ struct Node {
     attrs: Vec<Attr>,
     bindings: Vec<(String, String)>,
     content: Vec<Content>,
+    source_start: usize,
+    capture_raw: bool,
+    raw: Option<Box<[u8]>>,
 }
 fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
     if xml.len() > limits.max_input_bytes() {
@@ -325,6 +454,8 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
     let mut root = None;
     let mut count = 0;
     loop {
+        let before = usize::try_from(rd.buffer_position())
+            .map_err(|_| invalid("view-properties source offset overflows usize"))?;
         let d = rd.decoder();
         match rd.read_event() {
             Ok(Event::Start(e)) => {
@@ -335,7 +466,9 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
                 if stack.len() >= limits.max_depth() {
                     return Err(limit("view-properties XML depth", limits.max_depth()));
                 }
-                stack.push(make(&e, d, &stack, limits)?);
+                let mut node = make(&e, d, &stack, limits)?;
+                node.source_start = before;
+                stack.push(node);
             },
             Ok(Event::Empty(e)) => {
                 count += 1;
@@ -345,13 +478,31 @@ fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
                 if stack.len() >= limits.max_depth() {
                     return Err(limit("view-properties XML depth", limits.max_depth()));
                 }
-                let n = make(&e, d, &stack, limits)?;
+                let mut n = make(&e, d, &stack, limits)?;
+                if n.capture_raw {
+                    let after = usize::try_from(rd.buffer_position())
+                        .map_err(|_| invalid("view-properties source offset overflows usize"))?;
+                    n.raw = Some(
+                        xml.get(before..after)
+                            .ok_or_else(|| invalid("view-properties source span is invalid"))?
+                            .into(),
+                    );
+                }
                 attach(&mut stack, &mut root, n)?;
             },
             Ok(Event::End(_)) => {
-                let n = stack
+                let mut n = stack
                     .pop()
                     .ok_or_else(|| invalid("unexpected closing element"))?;
+                if n.capture_raw {
+                    let after = usize::try_from(rd.buffer_position())
+                        .map_err(|_| invalid("view-properties source offset overflows usize"))?;
+                    n.raw = Some(
+                        xml.get(n.source_start..after)
+                            .ok_or_else(|| invalid("view-properties source span is invalid"))?
+                            .into(),
+                    );
+                }
                 attach(&mut stack, &mut root, n)?;
             },
             Ok(Event::Text(t)) => {
@@ -433,6 +584,12 @@ fn make(e: &BytesStart<'_>, d: Decoder, stack: &[Node], limits: Limits) -> Resul
     }
     let (pr, lo) = split(&q)?;
     let local = lo.to_string();
+    let capture_raw = matches!(
+        local.as_str(),
+        "ext" | "extLst" | "clrMru" | "penClr" | "laserClr"
+    ) || stack
+        .last()
+        .is_some_and(|parent| matches!(parent.l.as_str(), "clrMru" | "penClr" | "laserClr"));
     let ns = resolve(&bindings, pr)?;
     let mut attrs = Vec::new();
     for (q, v) in raw {
@@ -460,6 +617,9 @@ fn make(e: &BytesStart<'_>, d: Decoder, stack: &[Node], limits: Limits) -> Resul
         attrs,
         bindings,
         content: Vec::new(),
+        source_start: 0,
+        capture_raw,
+        raw: None,
     })
 }
 fn attach(stack: &mut [Node], root: &mut Option<Node>, n: Node) -> Result<()> {
@@ -780,7 +940,7 @@ fn parse_outline(n: &Node, tol: &mut Tol<'_>) -> Result<OutlineView> {
     })
 }
 
-fn write_normal(x: &mut String, v: &NormalView, s: bool, limits: Limits) -> Result<()> {
+fn write_normal(x: &mut XmlSink, v: &NormalView, s: bool, limits: Limits) -> Result<()> {
     x.push_str("<p:normalViewPr");
     for (n, b) in [
         ("showOutlineIcons", v.show_outline_icons),
@@ -804,12 +964,12 @@ fn write_normal(x: &mut String, v: &NormalView, s: bool, limits: Limits) -> Resu
     x.push_str("</p:normalViewPr>");
     Ok(())
 }
-fn pane(x: &mut String, n: &str, v: &RestoredPane) {
+fn pane(x: &mut XmlSink, n: &str, v: &RestoredPane) {
     x.push_str(&format!("<p:{n} sz=\"{}\"", v.size));
     bool_attr(x, "autoAdjust", v.auto_adjust);
     x.push_str("/>");
 }
-fn write_common(x: &mut String, v: &CommonView) {
+fn write_common(x: &mut XmlSink, v: &CommonView) {
     x.push_str("<p:cViewPr");
     bool_attr(x, "varScale", v.variable_scale);
     x.push_str("><p:scale>");
@@ -820,13 +980,13 @@ fn write_common(x: &mut String, v: &CommonView) {
         v.origin.x, v.origin.y
     ));
 }
-fn ratio_write(x: &mut String, n: &str, v: &Ratio) {
+fn ratio_write(x: &mut XmlSink, n: &str, v: &Ratio) {
     x.push_str(&format!(
         "<{n} n=\"{}\" d=\"{}\"/>",
         v.numerator, v.denominator
     ));
 }
-fn write_common_slide(x: &mut String, v: &CommonSlideView) {
+fn write_common_slide(x: &mut XmlSink, v: &CommonSlideView) {
     x.push_str("<p:cSldViewPr");
     for (n, b) in [
         ("snapToGrid", v.snap_to_grid),
@@ -862,7 +1022,7 @@ fn write_common_slide(x: &mut String, v: &CommonSlideView) {
     x.push_str("</p:cSldViewPr>");
 }
 fn write_slide_like(
-    x: &mut String,
+    x: &mut XmlSink,
     n: &str,
     v: &SlideLikeView,
     s: bool,
@@ -876,7 +1036,7 @@ fn write_slide_like(
     x.push_str(&format!("</p:{n}>"));
     Ok(())
 }
-fn write_simple(x: &mut String, n: &str, v: &SimpleView, s: bool, limits: Limits) -> Result<()> {
+fn write_simple(x: &mut XmlSink, n: &str, v: &SimpleView, s: bool, limits: Limits) -> Result<()> {
     x.push_str(&format!("<p:{n}>"));
     write_common(x, &v.view);
     if let Some(e) = &v.extension_xml {
@@ -885,7 +1045,7 @@ fn write_simple(x: &mut String, n: &str, v: &SimpleView, s: bool, limits: Limits
     x.push_str(&format!("</p:{n}>"));
     Ok(())
 }
-fn write_sorter(x: &mut String, v: &SorterView, s: bool, limits: Limits) -> Result<()> {
+fn write_sorter(x: &mut XmlSink, v: &SorterView, s: bool, limits: Limits) -> Result<()> {
     x.push_str("<p:sorterViewPr");
     bool_attr(x, "showFormatting", v.show_formatting);
     x.push('>');
@@ -896,7 +1056,7 @@ fn write_sorter(x: &mut String, v: &SorterView, s: bool, limits: Limits) -> Resu
     x.push_str("</p:sorterViewPr>");
     Ok(())
 }
-fn write_outline(x: &mut String, v: &OutlineView, s: bool, limits: Limits) -> Result<()> {
+fn write_outline(x: &mut XmlSink, v: &OutlineView, s: bool, limits: Limits) -> Result<()> {
     x.push_str("<p:outlineViewPr>");
     write_common(x, &v.view);
     if !v.slides.is_empty() {
@@ -953,92 +1113,55 @@ fn validate(v: &ViewProperties, limits: Limits) -> Result<()> {
     Ok(())
 }
 
-fn preflight_output(v: &ViewProperties, limits: Limits) -> Result<()> {
-    let mut retained = 0usize;
-    let mut strings = 0usize;
-    let mut guides = 0usize;
-    let mut slides = 0usize;
-    for extension in [
-        v.extension_xml.as_deref(),
-        v.normal.as_ref().and_then(|x| x.extension_xml.as_deref()),
-        v.slide.as_ref().and_then(|x| x.extension_xml.as_deref()),
-        v.outline.as_ref().and_then(|x| x.extension_xml.as_deref()),
-        v.notes_text
-            .as_ref()
-            .and_then(|x| x.extension_xml.as_deref()),
-        v.sorter.as_ref().and_then(|x| x.extension_xml.as_deref()),
-        v.notes.as_ref().and_then(|x| x.extension_xml.as_deref()),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        retained = retained.saturating_add(extension.len());
-    }
-    if let Some(outline) = &v.outline {
-        slides = outline.slides.len();
-        strings = outline
-            .slides
-            .iter()
-            .map(|slide| slide.relationship_id.len())
-            .sum();
-    }
-    for common in v
-        .slide
-        .iter()
-        .map(|value| &value.common)
-        .chain(v.notes.iter().map(|value| &value.common))
-    {
-        guides = guides.saturating_add(common.guides.len());
-    }
-    let bound = 2048usize
-        .saturating_add(retained.saturating_mul(2))
-        .saturating_add(strings.saturating_mul(8))
-        .saturating_add(guides.saturating_mul(96))
-        .saturating_add(slides.saturating_mul(128));
-    if bound > limits.max_output_bytes() {
-        return Err(limit(
-            "serialized view properties bytes",
-            limits.max_output_bytes(),
-        ));
-    }
+fn opaque(x: &mut XmlSink, b: &[u8], _strict: bool, limits: Limits) -> Result<()> {
+    parse_dom(b, limits)?;
+    let s = std::str::from_utf8(b).map_err(xml_error)?;
+    x.push_str(s);
+    x.check()?;
     Ok(())
+}
+fn node_xml(n: &Node, _strict: bool, limits: Limits) -> Result<Vec<u8>> {
+    if let Some(raw) = &n.raw {
+        let bindings = n
+            .bindings
+            .iter()
+            .map(|(prefix, namespace)| {
+                (
+                    prefix.as_bytes().to_vec().into_boxed_slice(),
+                    namespace.as_bytes().to_vec().into_boxed_slice(),
+                )
+            })
+            .collect();
+        let in_scope = litchi_ooxml_common::mce::InScopeNamespaces::from_declarations(bindings);
+        let fragment = in_scope.make_self_contained(raw, &fragment_mce_limits(limits))?;
+        if fragment.len() > limits.max_output_bytes() {
+            return Err(limit(
+                "serialized view-properties fragment bytes",
+                limits.max_output_bytes(),
+            ));
+        }
+        return Ok(fragment.into_owned());
+    }
+    let mut count = XmlSink::count(limits.max_output_bytes());
+    node_write(&mut count, n)?;
+    count.check()?;
+    let mut output = XmlSink::output(count.len(), limits.max_output_bytes())?;
+    node_write(&mut output, n)?;
+    output.finish()
 }
 
-fn opaque(x: &mut String, b: &[u8], strict: bool, limits: Limits) -> Result<()> {
-    if x.len().saturating_add(b.len()) > limits.max_output_bytes() {
-        return Err(limit(
-            "serialized view properties bytes",
-            limits.max_output_bytes(),
-        ));
+fn fragment_mce_limits(limits: Limits) -> litchi_ooxml_common::mce::Limits {
+    litchi_ooxml_common::mce::Limits {
+        max_input_bytes: limits.max_input_bytes(),
+        max_output_bytes: limits.max_output_bytes(),
+        max_depth: limits.max_depth(),
+        max_namespace_bindings: 4096.min(limits.max_nodes()),
+        max_directive_tokens: 4096.min(limits.max_nodes()),
+        max_choices_per_alternate: 1024.min(limits.max_nodes()),
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
     }
-    parse_dom(b, limits)?;
-    let mut s = std::str::from_utf8(b).map_err(xml_error)?.to_string();
-    if strict {
-        s = s.replace(P, PS).replace(A, AS).replace(R, RS);
-    } else {
-        s = s.replace(PS, P).replace(AS, A).replace(RS, R);
-    }
-    if x.len().saturating_add(s.len()) > limits.max_output_bytes() {
-        return Err(limit(
-            "serialized view properties bytes",
-            limits.max_output_bytes(),
-        ));
-    }
-    x.push_str(&s);
-    Ok(())
 }
-fn node_xml(n: &Node, strict: bool, limits: Limits) -> Result<Vec<u8>> {
-    let mut x = String::new();
-    node_write(&mut x, n, strict)?;
-    if x.len() > limits.max_output_bytes() {
-        return Err(limit(
-            "serialized view-properties fragment bytes",
-            limits.max_output_bytes(),
-        ));
-    }
-    Ok(x.into_bytes())
-}
-fn node_write(x: &mut String, n: &Node, s: bool) -> Result<()> {
+fn node_write(x: &mut XmlSink, n: &Node) -> Result<()> {
     x.push('<');
     x.push_str(&n.q);
     for (p, u) in &n.bindings {
@@ -1049,7 +1172,7 @@ fn node_write(x: &mut String, n: &Node, s: bool) -> Result<()> {
             x.push_str(p);
             x.push_str("=\"");
         }
-        esc(x, mapns(u, s));
+        esc(x, u);
         x.push('"');
     }
     for a in &n.attrs {
@@ -1066,7 +1189,7 @@ fn node_write(x: &mut String, n: &Node, s: bool) -> Result<()> {
     x.push('>');
     for c in &n.content {
         match c {
-            Content::Node(n) => node_write(x, n, s)?,
+            Content::Node(n) => node_write(x, n)?,
             Content::Text(v) => text(x, v),
             Content::CData(v) => {
                 x.push_str("<![CDATA[");
@@ -1085,24 +1208,6 @@ fn node_write(x: &mut String, n: &Node, s: bool) -> Result<()> {
     x.push('>');
     Ok(())
 }
-fn mapns(v: &str, s: bool) -> &str {
-    if s {
-        match v {
-            P => PS,
-            A => AS,
-            R => RS,
-            _ => v,
-        }
-    } else {
-        match v {
-            PS => P,
-            AS => A,
-            RS => R,
-            _ => v,
-        }
-    }
-}
-
 fn kids(n: &Node) -> Result<Vec<&Node>> {
     let mut v = Vec::new();
     for c in &n.content {
@@ -1226,19 +1331,19 @@ fn resolve(b: &[(String, String)], p: &str) -> Result<String> {
         .map(|x| x.1.clone())
         .ok_or_else(|| invalid(format!("unbound prefix '{p}'")))
 }
-fn attr(x: &mut String, n: &str, v: &str) {
+fn attr(x: &mut XmlSink, n: &str, v: &str) {
     x.push(' ');
     x.push_str(n);
     x.push_str("=\"");
     esc(x, v);
     x.push('"');
 }
-fn bool_attr(x: &mut String, n: &str, v: Option<bool>) {
+fn bool_attr(x: &mut XmlSink, n: &str, v: Option<bool>) {
     if let Some(v) = v {
         attr(x, n, if v { "1" } else { "0" });
     }
 }
-fn esc(x: &mut String, v: &str) {
+fn esc(x: &mut XmlSink, v: &str) {
     for c in v.chars() {
         match c {
             '&' => x.push_str("&amp;"),
@@ -1251,7 +1356,7 @@ fn esc(x: &mut String, v: &str) {
         }
     }
 }
-fn text(x: &mut String, v: &str) {
+fn text(x: &mut XmlSink, v: &str) {
     for c in v.chars() {
         match c {
             '&' => x.push_str("&amp;"),
@@ -1397,5 +1502,16 @@ mod tests {
             ViewProperties::default().to_xml(false, limits),
             Err(Error::Limit { limit: 1, .. })
         ));
+    }
+
+    #[test]
+    fn opaque_fragment_preserves_namespace_uri_text_and_attributes() {
+        let xml = format!(
+            r#"<p:viewPr xmlns:p="{P}" xmlns:u="urn:opaque"><p:extLst><u:fragment note="{A}">literal {A}</u:fragment></p:extLst></p:viewPr>"#
+        );
+        let value = ViewProperties::parse(xml.as_bytes(), Limits::default()).unwrap();
+        let output = String::from_utf8(value.to_xml(true, Limits::default()).unwrap()).unwrap();
+        assert!(output.contains(&format!(r#"note="{A}""#)));
+        assert!(output.contains(&format!("literal {A}")));
     }
 }
