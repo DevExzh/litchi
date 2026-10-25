@@ -52,14 +52,14 @@ pub fn discover(package: &OpcPackage, source: &PackURI) -> Result<Option<Project
 /// Store an opaque VBA payload through the shared transactional graph service.
 ///
 /// Storing always republishes the graph, so a signed package is refused with
-/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// [`Error::Signed`](crate::Error::Signed)
 /// (ADR 0006) before it is changed: remove the signature explicitly first,
 /// with [`Package::unsign`](crate::Package::unsign) or, on a raw package,
 /// [`OpcPackage::unsign`].
 ///
 /// # Errors
 ///
-/// Returns [`Error::Opc`] for a signed package, and an error if the output
+/// Returns [`Error::Signed`] for a signed package, and an error if the output
 /// cannot be encoded or written.
 pub(crate) fn store(
     package: &mut OpcPackage,
@@ -85,7 +85,7 @@ pub(crate) fn store(
 ///
 /// An absent graph returns `Ok(false)` and keeps a signed package's
 /// signature; removing a present graph from a signed package is refused with
-/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// [`Error::Signed`](crate::Error::Signed)
 /// (ADR 0006): remove the signature explicitly first, with
 /// [`Package::unsign`](crate::Package::unsign) or, on a raw package,
 /// [`OpcPackage::unsign`].

@@ -7,7 +7,7 @@
 //! [`Package::apply_vba`](crate::Package::apply_vba) replays a patch
 //! onto an equal package. The source package never changes, an exact no-op
 //! keeps every byte, and a changed edit of a signed package is refused with
-//! [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy).
+//! [`Error::Signed`](crate::Error::Signed).
 //!
 //! The VBA project belongs to the presentation part, so the verbs take no
 //! owner.
@@ -73,13 +73,13 @@ impl Edit<'_> {
     /// Store an opaque VBA payload through the shared transactional graph service.
     ///
     /// Storing always republishes the graph, so a signed package is refused with
-    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// [`Error::Signed`](crate::Error::Signed)
     /// (ADR 0006) before it is changed: remove the signature explicitly first,
     /// with [`Package::unsign`](crate::Package::unsign).
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Opc`] for a signed package, and an error if the output
+    /// Returns [`Error::Signed`] for a signed package, and an error if the output
     /// cannot be encoded or written.
     pub fn set(&mut self, payload: Vec<u8>) -> Result<Project> {
         let source = self.staged.opc().main_document_part()?.partname().clone();
@@ -91,13 +91,13 @@ impl Edit<'_> {
     ///
     /// An absent graph returns `Ok(false)` and keeps a signed package's
     /// signature; removing a present graph from a signed package is refused with
-    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// [`Error::Signed`](crate::Error::Signed)
     /// (ADR 0006): remove the signature explicitly first, with
     /// [`Package::unsign`](crate::Package::unsign).
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Opc`] for a change to a signed package, and an error if
+    /// Returns [`Error::Signed`] for a change to a signed package, and an error if
     /// the operation fails.
     pub fn remove(&mut self) -> Result<bool> {
         let source = self.staged.opc().main_document_part()?.partname().clone();
