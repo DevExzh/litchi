@@ -210,7 +210,6 @@ impl List {
     /// numeric slide IDs as their corresponding `rId` values (e.g. slide 5 → `rId5`).
     /// For full fidelity, prefer [`Self::to_xml_with_rel_map`] and pass the presentation's
     /// actual slide relationship map.
-    #[must_use]
     pub fn to_xml(&self, limits: Limits) -> Result<String> {
         validate(self, limits)?;
         if self.is_empty() {
@@ -246,7 +245,6 @@ impl List {
     ///
     /// # Arguments
     /// * `slide_id_to_rel_id` - Mapping from slide ID (e.g., 256) to relationship ID (e.g., "rId6")
-    #[must_use]
     pub fn to_xml_with_rel_map(
         &self,
         slide_id_to_rel_id: &HashMap<u32, String>,

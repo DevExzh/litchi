@@ -190,7 +190,6 @@ impl Settings {
         Ok(settings)
     }
 
-    #[must_use]
     pub fn to_xml(&self, limits: Limits) -> Result<String> {
         let Some(verifier) = &self.modify else {
             return Ok(String::new());
@@ -206,7 +205,6 @@ impl Settings {
         Ok(value.finish())
     }
 
-    #[must_use]
     pub fn to_pres_props_xml(&self, limits: Limits) -> Result<String> {
         if !self.read_only_recommended {
             return Ok(String::new());

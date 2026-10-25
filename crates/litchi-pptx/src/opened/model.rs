@@ -1331,9 +1331,7 @@ pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
 /// Return opaque ZIP members in their content order rather than central
 /// directory insertion order.  Their original order remains on the owner for
 /// faithful publication; only identity/equality proofs canonicalize it.
-fn sorted_non_part_members<'a>(
-    package: &'a OpcPackage,
-) -> Result<Vec<&'a litchi_opc::NonPartMember>> {
+fn sorted_non_part_members(package: &OpcPackage) -> Result<Vec<&litchi_opc::NonPartMember>> {
     let mut members = Vec::new();
     members
         .try_reserve_exact(package.non_part_members().len())

@@ -129,7 +129,6 @@ pub fn default_pres_props_xml() -> &'static str {
 
 /// Generate presProps.xml with handout print settings.
 /// The `prn_what` parameter should be a valid `ST_PrintWhat` value like "handouts1", "handouts6", etc.
-#[must_use]
 pub fn pres_props_xml_with_handout(prn_what: &str, limits: Limits) -> Result<String> {
     check_string(prn_what, limits, "template handout print mode")?;
     let mut xml = BoundedString::new(limits, "serialized presentation template");

@@ -99,9 +99,7 @@ fn build_balanced<V>(entries: &mut [Option<(PackURI, V)>]) -> Option<Arc<Persist
     let middle = entries.len() / 2;
     let left = build_balanced(&mut entries[..middle]);
     let right = build_balanced(&mut entries[middle + 1..]);
-    let Some((key, value)) = entries[middle].take() else {
-        return None;
-    };
+    let (key, value) = entries[middle].take()?;
     Some(make_node(key, value, left, right))
 }
 
@@ -504,7 +502,7 @@ impl ReplayIndex {
             let old = optional_part(source, name)?;
             let new = optional_part(target, name)?;
             let old_entry = self.notes_entry(name);
-            let new_entry = if let Some(part) = new.as_deref() {
+            let new_entry = if let Some(part) = new {
                 match part.content_type() {
                     ct::PML_NOTES_SLIDE => Some(NotesEntry::Slide {
                         bytes: part_bytes(part)?,
@@ -616,13 +614,11 @@ impl ReplayIndex {
                 continue;
             }
             let old_targets = old
-                .as_deref()
                 .filter(|part| part.content_type() == ct::PML_SLIDE)
                 .map(|part| media_targets(part.rels()))
                 .transpose()?
                 .unwrap_or_default();
             let new_targets = new
-                .as_deref()
                 .filter(|part| part.content_type() == ct::PML_SLIDE)
                 .map(|part| media_targets(part.rels()))
                 .transpose()?
@@ -840,7 +836,7 @@ fn push_media_slide(
         resource: "PPTX replay media relationship users",
         source,
     })?;
-    let values = users.entry(resource).or_insert_with(Vec::new);
+    let values = users.entry(resource).or_default();
     if values.iter().any(|current| current == &slide) {
         return Ok(());
     }
@@ -874,7 +870,7 @@ fn push_theme_user(
         resource: "PPTX replay notes theme users",
         source,
     })?;
-    let values = users.entry(theme).or_insert_with(Vec::new);
+    let values = users.entry(theme).or_default();
     values.try_reserve(1).map_err(|source| Error::Allocation {
         resource: "PPTX replay notes theme users",
         source,

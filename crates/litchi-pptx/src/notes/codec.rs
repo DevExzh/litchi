@@ -42,7 +42,6 @@ const NOTES_XML_SUFFIX: &str = concat!(
 );
 
 /// Return the deterministic Transitional notes-master producer template.
-#[must_use]
 pub fn master_xml(limits: Limits) -> Result<&'static str> {
     let xml = include_str!("resources/generated/notesMaster.xml");
     if xml.len() > limits.max_output_bytes {

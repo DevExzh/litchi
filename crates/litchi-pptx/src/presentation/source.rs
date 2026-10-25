@@ -561,7 +561,7 @@ fn reserve_source_text_box(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     let output_scene = output_bound
         .checked_mul(64)
@@ -569,7 +569,7 @@ fn reserve_source_text_box(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     let fragment_bound = output_bound.checked_sub(input_bytes).ok_or_else(|| {
         Error::internal(
@@ -583,7 +583,7 @@ fn reserve_source_text_box(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     let amount = input_scene
         .checked_add(output_scene)
@@ -591,19 +591,19 @@ fn reserve_source_text_box(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     if amount > maximum {
         return Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: amount,
-            maximum: maximum,
+            maximum,
         });
     }
     let amount = u64::try_from(amount).map_err(|_| Error::Limit {
         kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
         observed: usize::MAX,
-        maximum: maximum,
+        maximum,
     })?;
     context
         .reserve(litchi_core::Resource::Memory, amount)
@@ -633,7 +633,7 @@ fn reserve_source_shape_removal(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     let output_bound = input_bytes.min(max_output_bytes);
     let output_scene = output_bound
@@ -642,7 +642,7 @@ fn reserve_source_shape_removal(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     let amount = input_scene
         .checked_add(output_scene)
@@ -651,13 +651,13 @@ fn reserve_source_shape_removal(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     if amount > maximum {
         return Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: amount,
-            maximum: maximum,
+            maximum,
         });
     }
     context
@@ -689,13 +689,13 @@ fn reserve_source_slide_properties(
         .checked_add(name_bytes.checked_mul(6).ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?)
         .and_then(|size| size.checked_add(16))
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     // The native stage applies the exact output limit after it knows whether
     // each requested attribute is a no-op, replacement, insertion, or
@@ -711,7 +711,7 @@ fn reserve_source_slide_properties(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     let output_scene = output_bound
         .checked_mul(64)
@@ -719,7 +719,7 @@ fn reserve_source_slide_properties(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     let amount = input_scene
         .checked_add(output_scene)
@@ -729,13 +729,13 @@ fn reserve_source_slide_properties(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     if amount > maximum {
         return Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: amount,
-            maximum: maximum,
+            maximum,
         });
     }
     context
@@ -801,16 +801,16 @@ fn reserve_source_shape_properties(
         .and_then(|size| size.checked_add(output_bound.checked_mul(196)?))
         .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
         .and_then(|size| size.checked_add(4096))
-        .ok_or_else(|| Error::Limit {
+        .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     if amount > maximum {
         return Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: amount,
-            maximum: maximum,
+            maximum,
         });
     }
     context
@@ -840,13 +840,13 @@ fn reserve_source_shape_text_chunks(
         .checked_add(text_bytes.checked_mul(6).ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?)
         .and_then(|size| size.checked_add(replacements.checked_mul(256)?))
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?
         .min(max_output_bytes);
     let input_scene = input_bytes
@@ -855,7 +855,7 @@ fn reserve_source_shape_text_chunks(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     let output_scene = output_bound
         .checked_mul(64)
@@ -863,7 +863,7 @@ fn reserve_source_shape_text_chunks(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     let amount = input_scene
         .checked_add(output_scene)
@@ -874,13 +874,13 @@ fn reserve_source_shape_text_chunks(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     if amount > maximum {
         return Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: amount,
-            maximum: maximum,
+            maximum,
         });
     }
     context
@@ -910,13 +910,13 @@ fn reserve_source_shape_property_chunks(
         .checked_add(text_bytes.checked_mul(6).ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?)
         .and_then(|size| size.checked_add(replacements.checked_mul(512)?))
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?
         .min(max_output_bytes);
     let amount = input_bytes
@@ -928,13 +928,13 @@ fn reserve_source_shape_property_chunks(
         .ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: usize::MAX,
-            maximum: maximum,
+            maximum,
         })?;
     if amount > maximum {
         return Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::MemoryBytes),
             observed: amount,
-            maximum: maximum,
+            maximum,
         });
     }
     context

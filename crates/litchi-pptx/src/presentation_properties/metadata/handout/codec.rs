@@ -86,7 +86,6 @@ impl Master {
 
     /// Generate handout master XML.
     /// Structure matches Apache POI PowerPoint-created files.
-    #[must_use]
     pub fn to_xml(&self, limits: Limits) -> Result<String> {
         let mut xml = BoundedString::new(limits, "serialized handout-master XML");
 

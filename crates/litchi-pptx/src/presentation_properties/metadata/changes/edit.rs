@@ -35,7 +35,6 @@ pub struct EditOptions {
 
 impl EditOptions {
     /// Select an optional tighter Changes Information profile.
-    #[must_use]
     pub const fn limits(mut self, limits: Limits) -> Self {
         self.limits = Some(limits);
         self

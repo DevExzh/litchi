@@ -301,7 +301,6 @@ pub struct Usage {
 
 impl Usage {
     /// Start an empty aggregate ledger.
-    #[must_use]
     pub const fn new() -> Self {
         Self {
             total_slide_xml_bytes: 0,

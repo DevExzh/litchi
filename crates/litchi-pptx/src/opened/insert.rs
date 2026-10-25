@@ -265,7 +265,7 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
         return Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::RetainedBytes),
             observed: retained,
-            maximum: maximum,
+            maximum,
         });
     }
     let next_types = types_plan.materialize(policy)?;

@@ -895,9 +895,11 @@ fn attach_frame(
 }
 
 fn parse_show_layout(source: &[u8], span: Span, value: &Frame) -> Result<ShowLayout> {
-    let raw_end = (value.close_start > span.start)
-        .then_some(value.close_start)
-        .unwrap_or(span.end);
+    let raw_end = if value.close_start > span.start {
+        value.close_start
+    } else {
+        span.end
+    };
     let raw = &source[span.start..raw_end];
     let id = find_attribute(&value.attributes, "id")
         .ok_or_else(|| invalid("custom show is missing its ID"))?

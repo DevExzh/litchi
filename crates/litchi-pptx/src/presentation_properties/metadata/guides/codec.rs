@@ -44,7 +44,7 @@ impl Guides {
                 limits.max_output_bytes(),
             ));
         }
-        parse_presentation(&parse_dom(processed.as_ref(), limits)?)
+        parse_presentation(&parse_dom(processed.as_ref(), limits)?, limits)
     }
 
     /// Serialize the guide entries as a complete `p:extLst` fragment.
@@ -132,7 +132,7 @@ pub(crate) fn rewrite_source(source: &[u8], value: &Guides, limits: Limits) -> R
             }
             return Ok(source.to_vec());
         }
-        let fragment_len = guide_fragment_len(&entry_lengths, &layout.presentation_namespace)?;
+        let fragment_len = guide_fragment_len(&entry_lengths, layout.presentation_namespace)?;
         if layout.root.empty {
             let replacement_len = expanded_empty_len(source, &layout.root, fragment_len)?;
             checked_output_len(
@@ -154,7 +154,7 @@ pub(crate) fn rewrite_source(source: &[u8], value: &Guides, limits: Limits) -> R
         let entries = target_entries(value, layout.strict, layout.presentation_namespace, limits)?;
         let mut fragment = BoundedString::new(limits, "presentation-guide patch fragment");
         fragment.push_str("<p:extLst xmlns:p=\"")?;
-        fragment.push_escaped_xml(&layout.presentation_namespace)?;
+        fragment.push_escaped_xml(layout.presentation_namespace)?;
         fragment.push_str("\">")?;
         for entry in entries.iter().filter_map(Option::as_deref) {
             fragment.push_str(entry)?;
@@ -948,7 +948,6 @@ struct Node {
     attributes: Vec<Attr>,
     bindings: Vec<(String, String)>,
     content: Vec<Content>,
-    limits: Limits,
 }
 
 fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
@@ -1203,7 +1202,6 @@ fn make_node(
         attributes,
         bindings,
         content: Vec::new(),
-        limits,
     })
 }
 
@@ -1216,8 +1214,7 @@ fn attach(stack: &mut [Node], root: &mut Option<Node>, node: Node) -> Result<()>
     Ok(())
 }
 
-fn parse_presentation(root: &Node) -> Result<Guides> {
-    let limits = root.limits;
+fn parse_presentation(root: &Node, limits: Limits) -> Result<Guides> {
     expect(root, &[P, PS], "presentation")?;
     let mut root_ext = None;
     for child in children(root)? {
@@ -1281,7 +1278,7 @@ fn parse_list(node: &Node, limits: Limits) -> Result<List> {
                 return Err(invalid("duplicate guide-list extLst"));
             }
             validate_extension_list(child, limits)?;
-            extension_xml = Some(node_xml(child, false)?);
+            extension_xml = Some(node_xml(child, false, limits)?);
         } else {
             return Err(invalid("unexpected extended guide-list child"));
         }
@@ -1329,7 +1326,7 @@ fn parse_guide(node: &Node, limits: Limits) -> Result<Guide> {
     let color = parse_color(content[0], limits)?;
     let extension_xml = if content.len() == 2 {
         validate_extension_list(content[1], limits)?;
-        Some(node_xml(content[1], false)?)
+        Some(node_xml(content[1], false, limits)?)
     } else {
         None
     };
@@ -1344,7 +1341,7 @@ fn parse_guide(node: &Node, limits: Limits) -> Result<Guide> {
     })
 }
 
-fn parse_color(node: &Node, _limits: Limits) -> Result<Color> {
+fn parse_color(node: &Node, limits: Limits) -> Result<Color> {
     no_attributes(node)?;
     let colors = children(node)?;
     if colors.len() != 1 {
@@ -1362,7 +1359,7 @@ fn parse_color(node: &Node, _limits: Limits) -> Result<Color> {
     };
     Ok(Color {
         kind,
-        xml: node_xml(color, false)?,
+        xml: node_xml(color, false, limits)?,
     })
 }
 
@@ -1750,11 +1747,9 @@ fn parse_bool(value: &str, name: &str) -> Result<bool> {
     }
 }
 
-fn node_xml(node: &Node, strict: bool) -> Result<Vec<u8>> {
-    let mut xml = BoundedString::with_limit(
-        node.limits.max_string_bytes(),
-        "presentation guide node XML",
-    );
+fn node_xml(node: &Node, strict: bool, limits: Limits) -> Result<Vec<u8>> {
+    let mut xml =
+        BoundedString::with_limit(limits.max_string_bytes(), "presentation guide node XML");
     write_node(&mut xml, node, strict)?;
     Ok(xml.finish().into_bytes())
 }

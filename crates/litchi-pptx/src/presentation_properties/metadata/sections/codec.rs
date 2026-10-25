@@ -162,7 +162,6 @@ struct Node {
     attributes: Vec<Attr>,
     bindings: Vec<(String, String)>,
     content: Vec<Content>,
-    limits: Limits,
 }
 
 fn parse_dom(xml: &[u8], limits: Limits) -> Result<Node> {
@@ -417,7 +416,6 @@ fn make_node(
         attributes,
         bindings,
         content: Vec::new(),
-        limits,
     })
 }
 
@@ -511,7 +509,7 @@ fn parse_section_list(node: &Node, limits: Limits) -> Result<List> {
         let slide_ids = parse_slide_id_list(content[0], &mut total_slide_ids, limits)?;
         let extension_xml = if content.len() == 2 {
             validate_extension_list(content[1], limits)?;
-            Some(node_xml(content[1])?)
+            Some(node_xml(content[1], limits)?)
         } else {
             None
         };
@@ -734,11 +732,9 @@ fn bounded_string(value: &str, limits: Limits) -> Result<()> {
     }
 }
 
-fn node_xml(node: &Node) -> Result<Vec<u8>> {
-    let mut xml = BoundedString::with_limit(
-        node.limits.max_string_bytes(),
-        "presentation section node XML",
-    );
+fn node_xml(node: &Node, limits: Limits) -> Result<Vec<u8>> {
+    let mut xml =
+        BoundedString::with_limit(limits.max_string_bytes(), "presentation section node XML");
     write_node(&mut xml, node)?;
     Ok(xml.finish().into_bytes())
 }

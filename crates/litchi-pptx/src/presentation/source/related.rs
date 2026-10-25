@@ -324,7 +324,7 @@ pub(super) fn process_eager_part(
         return Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::PartBytes),
             observed: part.blob().len(),
-            maximum: maximum,
+            maximum,
         });
     }
     crate::source_limits::validate_xml_limits(part.blob(), source_limits)?;
@@ -900,7 +900,7 @@ impl SourceSlide {
                         crate::opened::CodecLimitKind::SourceBytes,
                     ),
                     observed: usize::try_from(declared).unwrap_or(usize::MAX),
-                    maximum: maximum,
+                    maximum,
                 });
             }
             let data = view.data()?;

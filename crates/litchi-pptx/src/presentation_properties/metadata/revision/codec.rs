@@ -131,13 +131,12 @@ impl Limits {
     }
 
     /// Derive a profile from the retained physical source policy.
-    #[must_use]
     pub fn from_source_limits(source: SourceLimits) -> Self {
         let default = Self::DEFAULT;
         let part = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);
         let events = source.max_events();
         let depth = source.max_depth();
-        let strings = usize::try_from(source.max_xml_attribute_bytes()).unwrap_or(usize::MAX);
+        let strings = source.max_xml_attribute_bytes();
         Self {
             max_input_bytes: default.max_input_bytes.min(part),
             max_output_bytes: default.max_output_bytes.min(part),

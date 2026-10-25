@@ -99,7 +99,6 @@ impl Limits {
                 self.max_total_bytes,
                 cap_u64(source.max_total_part_bytes()),
             ),
-            ..self
         }
     }
 }

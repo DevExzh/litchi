@@ -73,7 +73,6 @@ impl Limits {
             max_text_bytes: min_usize(self.max_text_bytes, part),
             max_template_bytes: min_usize(self.max_template_bytes, part),
             max_attributes: min_usize(self.max_attributes, source.max_xml_attribute_bytes()),
-            ..self
         }
     }
 }

@@ -45,7 +45,6 @@ impl TimingTree {
         check_xml_size(processed.len(), limits)?;
         parse_recursive_timing_tree(&processed, limits)
     }
-    #[must_use]
     pub fn to_xml(&self, limits: Limits) -> Result<String> {
         if let (Some(xml), Some(roots), Some(opaque)) = (
             &self.source_xml,
@@ -157,7 +156,6 @@ impl Sequence {
     }
 
     /// Generate timing XML for a slide.
-    #[must_use]
     pub fn to_xml(&self, limits: Limits) -> Result<String> {
         if let (
             Some(xml),

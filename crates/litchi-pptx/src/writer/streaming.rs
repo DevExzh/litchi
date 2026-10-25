@@ -983,7 +983,7 @@ fn validate_text(text: &str, maximum: usize) -> Result<()> {
         return Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
             observed: text.len(),
-            maximum: maximum,
+            maximum,
         });
     }
     if !text.chars().all(is_xml_char) {
@@ -1026,7 +1026,7 @@ fn checked_add_text(current: usize, additional: usize, maximum: usize) -> Result
         return Err(Error::Limit {
             kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
             observed: total,
-            maximum: maximum,
+            maximum,
         });
     }
     Ok(total)

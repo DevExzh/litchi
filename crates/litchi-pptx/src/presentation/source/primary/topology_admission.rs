@@ -136,7 +136,7 @@ fn validate_inner(
                         crate::opened::CodecLimitKind::Relationships,
                     ),
                     observed: scanned,
-                    maximum: maximum,
+                    maximum,
                 });
             }
             if relationship.is_external() {

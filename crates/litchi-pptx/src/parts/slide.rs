@@ -1049,7 +1049,7 @@ impl<'a> SemanticTextParser<'a> {
         limit: usize,
         kind: crate::error::CodecLimitKind,
     ) -> Result<()> {
-        *value = value.checked_add(1).ok_or_else(|| Error::Limit {
+        *value = value.checked_add(1).ok_or(Error::Limit {
             kind: crate::opened::LimitKind::Codec(kind),
             observed: usize::MAX,
             maximum: limit,
@@ -1071,7 +1071,7 @@ impl<'a> SemanticTextParser<'a> {
         if observed > MAX_SEMANTIC_TEXT_BYTES {
             return Err(Error::Limit {
                 kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
-                observed: observed,
+                observed,
                 maximum: MAX_SEMANTIC_TEXT_BYTES,
             });
         }

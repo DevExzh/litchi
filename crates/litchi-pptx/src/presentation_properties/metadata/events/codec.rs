@@ -124,14 +124,13 @@ impl Limits {
     }
 
     /// Derive an event profile from physical source limits.
-    #[must_use]
     pub fn from_source_limits(source: litchi_opc::SourceLimits) -> Self {
         let default = Self::DEFAULT;
         let part = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);
         let total = usize::try_from(source.max_total_part_bytes()).unwrap_or(usize::MAX);
         let events = source.max_events();
         let depth = source.max_depth();
-        let attrs = usize::try_from(source.max_xml_attribute_bytes()).unwrap_or(usize::MAX);
+        let attrs = source.max_xml_attribute_bytes();
         Self {
             max_slide_xml_bytes: default.max_slide_xml_bytes.min(part),
             max_total_slide_xml_bytes: default.max_total_slide_xml_bytes.min(total),
