@@ -5967,3 +5967,11 @@ See [0063](0063-source-pptx-modern-comments.md).
   empty owned processes. Adapter v10 must repair the actual admission seam;
   the failed packet stays preserved and C stays frozen. All final gates and
   acceptance work remain open. Nothing is pushed.
+
+  Reviewed135g commits on protocol P at 53451cc8d2; all 29 focused tests pass
+  and Cargo outputs now match the recorded external binary paths (148).
+  Full-gate v6-final passes independent review after command/path binding
+  returns. Root starts its 65-step run on immutable C=f8cd398a77; changed-Rust
+  formatting passes and the remaining rows are running or pending. Rawv10
+  stays source-only while this build slot is occupied. Native measurements,
+  census review, final trunk merge and cleanup remain open. Nothing is pushed.
