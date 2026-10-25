@@ -5548,3 +5548,20 @@ See [0063](0063-source-pptx-modern-comments.md).
   PPTX compiler/consumer packet is running on `cc2ab3f79d`; the initial inert
   packet was corrected before GO. Completed changes are committed; nothing
   is pushed. Final acceptance remains open.
+
+
+- Coordinator reviewed runtime-repair composition (2026-10-25):
+  All outstanding comments, properties and ribbon chains pass independent
+  source review and merge privately without conflicts. PPTX current tip is
+  `fc5ef75a9e` (89ay); OOXML is `b73ee18a69` (94u). The preceding PPTX packet
+  stopped at formatting before Cargo. Root corrects the harness and comments
+  layout and the premature composition formatting statements; all five PPTX
+  and thirteen OOXML changed Rust paths now pass actual formatting checks.
+
+  Baseline `84ba3b5c33` has all eight harness blobs identical to the PPTX
+  candidate while retaining original 763 production/configuration/fixtures.
+  Fresh source-bound qualification packets are being prepared; no new runtime
+  or performance acceptance is claimed. Record 0362ul100 binds this checkpoint.
+  Four retired worktrees are authorized for guarded cleanup71; results are
+  pending. The protected probe is unchanged. Completed changes are committed;
+  final acceptance remains open and nothing is pushed.
