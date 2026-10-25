@@ -3,7 +3,7 @@
 //!
 //! Run with:
 //! ```bash
-//! cargo run --example pptx_features_demo
+//! cargo run -p litchi --example pptx_features_demo --features pptx
 //! ```
 
 use litchi_opc::{OpcPackage, PackURI};

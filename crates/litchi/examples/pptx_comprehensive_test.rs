@@ -87,8 +87,13 @@ fn test_typed_models() -> Result<(), Box<dyn StdError>> {
         Transition::new(Kind::Zoom(InOut::In)),
     ];
     for transition in transitions {
-        let xml = litchi_pptx::transition::write(&transition)?;
-        let parsed = litchi_pptx::transition::read(xml.as_bytes())?.expect("transition");
+        let xml =
+            litchi_pptx::transition::write(&transition, litchi_pptx::transition::Limits::DEFAULT)?;
+        let parsed = litchi_pptx::transition::read(
+            xml.as_bytes(),
+            litchi_pptx::transition::Limits::DEFAULT,
+        )?
+        .expect("transition");
         assert!(parsed.same_semantics(&transition));
     }
     Ok(())

@@ -17,7 +17,7 @@
 //! ## Usage
 //!
 //! ```bash
-//! cargo run --example pptx_writer_showcase
+//! cargo run -p litchi --example pptx_writer_showcase --features pptx
 //! ```
 //!
 //! Then open `pptx_writer_showcase.pptx` in PowerPoint to verify!
