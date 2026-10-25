@@ -1,4 +1,4 @@
-//! Package graph discovery and mutation for custom document properties.
+//! Package graph discovery for custom document properties.
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{OpcPackage, PackURI, Relationships, SourceBackedPackage};
