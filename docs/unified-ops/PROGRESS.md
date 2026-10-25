@@ -6065,3 +6065,11 @@ See [0063](0063-source-pptx-modern-comments.md).
   The 71-profile glossary requires a matrix refresh. PPT repair 158 retains
   the build slot; Rust, native and final acceptance remain open. C1 evidence
   stays historical, and the corrected candidate is not yet frozen or pushed.
+
+  Census preparation 159 commits at ec478ed84f: all 68 packages remain covered
+  by 84 profiles, now split into 71 glossary and 13 package-only profiles.
+  All eight preparation tests pass, including checked-in determinism; capture
+  evidence remains empty. The post-repair source audit finds no further
+  mandatory API defect. Historical OfficeCLI v3 passes its source review and
+  correctly refuses the stale source identity. PPT158 review and the complete
+  corrected-source qualification remain open; no final acceptance or push.
