@@ -204,13 +204,19 @@ def _copy_regular(source: Path, destination: Path, label: str) -> dict[str, Any]
     return _artifact(destination, label)
 
 
-def _adapter_source() -> str:
-    """Return the consumer-only API bridge used by both source endpoints."""
+def _adapter_source(endpoint: str = "after") -> str:
+    """Return the one API spelling belonging to this source endpoint.
 
-    return r'''//! Consumer-only bridge for the signed-native v2 probe.
+    The adapter is intentionally generated per source tree.  Keeping both
+    spellings behind a Cargo feature would compile the wrong API against one
+    endpoint and make a claimed before/after build meaningless.
+    """
+
+    _expect(endpoint in {"before", "after"}, "unknown signed-native endpoint")
+    if endpoint == "before":
+        return r'''//! Consumer-only bridge for the signed-native v2 before endpoint.
 #![allow(dead_code)]
 
-#[cfg(feature = "legacy_api")]
 pub fn exercise_api() {
     fn commit_fields<T>(commit: &litchi_ops::transaction::Commit<T>) {
         let _ = &commit.file;
@@ -228,8 +234,11 @@ pub fn exercise_api() {
     }
     let _ = (commit_fields::<()>, edit_entry, xlsb_entry);
 }
+'''
 
-#[cfg(not(feature = "legacy_api"))]
+    return r'''//! Consumer-only bridge for the signed-native v2 after endpoint.
+#![allow(dead_code)]
+
 pub fn exercise_api() {
     fn commit_methods<T>(commit: &litchi_ops::transaction::Commit<T>) {
         let _ = commit.file();
@@ -249,7 +258,8 @@ pub fn exercise_api() {
 '''
 
 
-def _project_toml(source: Path, features: Sequence[str]) -> str:
+def _project_toml(source: Path, features: Sequence[str], endpoint: str = "after") -> str:
+    _expect(endpoint in {"before", "after"}, "unknown signed-native endpoint")
     dependencies = (
         ("litchi-ops", "crates/litchi-ops"),
         ("litchi-core", "crates/litchi-core"),
@@ -273,7 +283,6 @@ def _project_toml(source: Path, features: Sequence[str]) -> str:
         "",
         "[features]",
         'default = []',
-        'legacy_api = []',
         "",
         "[dependencies]",
     ]
@@ -354,31 +363,41 @@ def _stage_probes(source: Path, output: Path) -> dict[str, Any]:
 
 def _source_closure(source: Path, identity: Mapping[str, Any]) -> dict[str, Any]:
     module = _policy()
-    binding = module.CANDIDATE_BINDING
-    _expect(isinstance(binding, Mapping), "candidate source identity is not frozen")
-    source_binding = binding.get("source")
-    _expect(isinstance(source_binding, Mapping), "candidate source binding is missing")
+    endpoint = str(identity.get("endpoint", "after"))
+    _expect(endpoint in module.ENDPOINTS, "source endpoint is missing")
+    binding = module._endpoint_source_binding(endpoint)
+    candidate_binding = module.CANDIDATE_BINDING if endpoint == "after" else None
     closure = {
         "source_root": str(source.resolve()),
+        "endpoint": endpoint,
+        "source_role": identity.get("source_role", module.ENDPOINT_ROLE[endpoint]),
+        "source_kind": identity.get("source_kind", module.ENDPOINT_SOURCE_KINDS[endpoint]),
+        "api_branch": identity.get("api_branch", module.ENDPOINT_API_BRANCH[endpoint]),
         "commit": identity.get("commit"),
         "git_tree": identity.get("git_tree"),
         "tree_sha256": identity.get("tree_sha256"),
-        "archive": identity.get("archive", source_binding.get("archive")),
-        "features": identity.get("features", binding.get("features")),
+        "source_tree": identity.get("source_tree"),
+        "reviewed_policy": identity.get("reviewed_policy"),
+        "archive": identity.get("archive", binding.get("source_archive")),
+        "source_assembly": identity.get("source_assembly"),
+        "features": identity.get("features", candidate_binding.get("features") if isinstance(candidate_binding, Mapping) else None),
         "manifests": identity.get("manifests", binding.get("manifests")),
         "locks": identity.get("locks"),
-        "lock_graph": identity.get("lock_graph", binding.get("lock_graph")),
-        "vendor_tree": identity.get("vendor_tree", binding.get("vendor_tree")),
+        "lock_graph": identity.get("lock_graph"),
+        "role_locks": identity.get("role_locks", module.ROLE_LOCKS),
+        "vendor_tree": identity.get("vendor_tree", candidate_binding.get("vendor_tree") if isinstance(candidate_binding, Mapping) else None),
         "toolchain": identity.get("toolchain", binding.get("toolchain")),
         "toolchain_paths": list(module.TOOLCHAIN_PATHS),
         "fixture": identity.get("fixture", module.FIXTURE_INPUT),
         "probe_inputs": identity.get("probe_inputs", module.PROBE_INPUTS),
         "source_manifests": list(module.SOURCE_MANIFEST_PATHS),
         "vendor_roots": list(module.VENDOR_ROOTS),
-        "role_locks": module.ROLE_LOCKS,
     }
     for key in _REQUIRED_SOURCE_KEYS:
+        if key == "git_tree" and closure.get("source_kind") == "f2":
+            continue
         _expect(closure.get(key) is not None, f"source closure is missing {key}")
+    _expect(closure["features"].get("selected"), "source closure feature selection is missing")
     return closure
 
 
@@ -388,16 +407,25 @@ def _policy_identity() -> dict[str, Any]:
     return _artifact(policy_path, "signed-native policy")
 
 
-def _adapter_receipt(adapter: Path, main: Path, manifest: Path) -> dict[str, Any]:
+def _adapter_receipt(adapter: Path, main: Path, manifest: Path, endpoint: str = "after") -> dict[str, Any]:
     module = _policy()
+    _expect(endpoint in module.ENDPOINTS, "unknown signed-native endpoint")
+    api_branch = module.ENDPOINT_API_BRANCH[endpoint]
     return {
         "schema": ADAPTER_SCHEMA,
         "source": "consumer-only generated bridge; production crates are read-only",
-        "legacy_feature": "legacy_api",
-        "api_branches": ["legacy_commit_fields", "current_commit_accessors", "legacy_xlsb_option", "current_xlsb_resolve"],
+        "endpoint": endpoint,
+        "api_branch": api_branch,
+        "legacy_feature": None,
+        "api_branches": [
+            "legacy_commit_fields",
+            "legacy_xlsb_option",
+        ] if endpoint == "before" else [
+            "current_commit_accessors",
+            "current_xlsb_resolve",
+        ],
         "branch_builds": {
-            "current_api": {"feature": None, "compile_required": True},
-            "legacy_api": {"feature": "legacy_api", "compile_required": True},
+            api_branch: {"feature": None, "compile_required": True},
         },
         "signed_batch": dict(module.SIGNED_BATCH_POLICY),
         "module": _artifact(adapter, "consumer adapter"),
@@ -459,7 +487,7 @@ fn signed_batch_refusal() -> Value {
 '''
 
 
-def _generated_probe(source: Path) -> tuple[Path, str, bytes]:
+def _generated_probe(source: Path, endpoint: str = "after") -> tuple[Path, str, bytes]:
     """Generate the reviewed v2 probe from the immutable historical source.
 
     The historical source remains a pinned input, but its v1 schema is never
@@ -469,6 +497,7 @@ def _generated_probe(source: Path) -> tuple[Path, str, bytes]:
     """
 
     module = _policy()
+    _expect(endpoint in module.ENDPOINTS, "unknown signed-native endpoint")
     probe_path = source / module.PROBE_INPUTS["probe"]["path"]
     _reject_symlink_components(probe_path, "reviewed signed probe")
     _expect(probe_path.is_file() and not probe_path.is_symlink(), f"reviewed signed probe is missing: {probe_path}")
@@ -510,37 +539,44 @@ def _generated_probe(source: Path) -> tuple[Path, str, bytes]:
     return probe_path, generated, generated.encode("utf-8")
 
 
-def prepare(source_root: Path, output_root: Path, *, identity: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def prepare(
+    source_root: Path,
+    output_root: Path,
+    *,
+    endpoint: str = "after",
+    identity: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     """Generate a v2 consumer project after the policy source gate passes."""
 
     module = _policy()
-    source = module._root(source_root)
-    computed_identity = module.candidate_identity(source)
+    _expect(endpoint in module.ENDPOINTS, "unknown signed-native endpoint")
+    source = module._endpoint_root(source_root, endpoint)
+    computed_identity = module.endpoint_identity(source, endpoint)
     if identity is not None:
-        _expect(dict(identity) == computed_identity, "caller-supplied source identity differs from the recomputed candidate")
+        _expect(dict(identity) == computed_identity, "caller-supplied source identity differs from the recomputed endpoint")
     identity = computed_identity
     output = _safe_external(Path(output_root), "preparation output")
-    archive_path = Path(str(module.CANDIDATE_BINDING["source"]["archive"]["path"]))
-    _assert_disjoint({"candidate source": source, "candidate archive": archive_path, "preparation output": output})
+    archive_path = Path(str(module._endpoint_source_binding(endpoint)["source_archive"]["path"]))
+    _assert_disjoint({f"{endpoint} source": source, f"{endpoint} archive": archive_path, "preparation output": output})
     _expect(not output.exists() and not output.is_symlink(), f"refusing to overwrite preparation output: {output}")
     closure = _source_closure(source, identity)
     fixture_value = _fixture_value(source)
     output.mkdir(parents=True)
     project = output / "consumer"
     (project / "src").mkdir(parents=True)
-    probe_path, generated_main, generated_main_bytes = _generated_probe(source)
+    probe_path, generated_main, generated_main_bytes = _generated_probe(source, endpoint)
     adapter_path = project / "src/api_compat.rs"
     main_path = project / "src/main.rs"
     manifest_path = project / "Cargo.toml"
-    _write_bytes_new(adapter_path, _adapter_source().encode("utf-8"), "consumer adapter")
+    _write_bytes_new(adapter_path, _adapter_source(endpoint).encode("utf-8"), "consumer adapter")
     _write_bytes_new(main_path, generated_main_bytes, "generated signed probe")
     features = closure.get("features", {}).get("selected", [])
     _expect(isinstance(features, list) and all(isinstance(item, str) and item for item in features), "candidate feature selection is missing")
-    _write_bytes_new(manifest_path, _project_toml(source, features).encode("utf-8"), "consumer manifest")
+    _write_bytes_new(manifest_path, _project_toml(source, features, endpoint).encode("utf-8"), "consumer manifest")
     fixture_binding, fixture_summary = _stage_fixtures(source, output, fixture_value)
     probe_receipt = _stage_probes(source, output)
     policy_identity = _policy_identity()
-    adapter = _adapter_receipt(adapter_path, main_path, manifest_path)
+    adapter = _adapter_receipt(adapter_path, main_path, manifest_path, endpoint)
     source_identity = dict(identity)
     source_identity["source_root"] = str(source.resolve())
     source_identity["adapter"] = adapter
@@ -552,7 +588,8 @@ def prepare(source_root: Path, output_root: Path, *, identity: Mapping[str, Any]
         "schema": PREPARATION_SCHEMA,
         "status": "prepared",
         "policy": policy_identity,
-        "candidate_binding_sha256": _sha256(_canonical(module.CANDIDATE_BINDING)),
+        "endpoint": endpoint,
+        "source_binding_sha256": _sha256(_canonical(module._endpoint_source_binding(endpoint))),
         "source": closure,
         "adapter": adapter,
         "fixture": fixture_summary,
@@ -576,9 +613,8 @@ def prepare(source_root: Path, output_root: Path, *, identity: Mapping[str, Any]
             "<pinned-cargo-shim> generate-lockfile --offline",
             "<pinned-cargo-shim> metadata --offline --locked --format-version=1",
             "<pinned-cargo-shim> build --offline --locked --release --bin signed-native-consumer",
-            "<pinned-cargo-shim> build --offline --locked --release --features legacy_api --bin signed-native-consumer",
         ],
-        "api_branches": list(API_BRANCHES),
+        "api_branch": module.ENDPOINT_API_BRANCH[endpoint],
         "receipts": {
             "source_identity": source_identity_artifact,
             "fixture_binding": fixture_binding_artifact,
@@ -590,8 +626,9 @@ def prepare(source_root: Path, output_root: Path, *, identity: Mapping[str, Any]
         "schema": PREPARATION_SCHEMA,
         "status": "prepared",
         "execution_admitted": True,
+        "endpoint": endpoint,
         "policy": policy_identity,
-        "candidate_binding_sha256": plan["candidate_binding_sha256"],
+        "source_binding_sha256": plan["source_binding_sha256"],
         "source_identity": source_identity_artifact,
         "source": closure,
         "adapter": adapter,
@@ -602,7 +639,7 @@ def prepare(source_root: Path, output_root: Path, *, identity: Mapping[str, Any]
         "correctness_only": sorted(module.CORRECTNESS_ONLY),
         "baseline_not_applicable": sorted(module.BASELINE_NOT_APPLICABLE),
         "signed_batch": dict(module.SIGNED_BATCH_POLICY),
-        "api_branches": list(API_BRANCHES),
+        "api_branch": module.ENDPOINT_API_BRANCH[endpoint],
         "plan": plan_artifact,
         "fixture_binding": fixture_binding_artifact,
         "probe_receipt": probes_artifact,
@@ -636,25 +673,27 @@ def _verify_probe_binding(prepared: Path, receipt: Mapping[str, Any], source_roo
 
 def _verify_generated_project(prepared: Path, receipt: Mapping[str, Any], source_root: Path) -> dict[str, Any]:
     module = _policy()
+    endpoint = str(receipt.get("endpoint", "after"))
+    _expect(endpoint in module.ENDPOINTS, "preparation endpoint is missing")
     project = prepared / "consumer"
     adapter_path = project / "src/api_compat.rs"
     main_path = project / "src/main.rs"
     manifest_path = project / "Cargo.toml"
     _expect(project.is_dir() and not project.is_symlink(), "consumer project is missing")
-    expected_adapter = _adapter_source().encode("utf-8")
+    expected_adapter = _adapter_source(endpoint).encode("utf-8")
     _expect(adapter_path.is_file() and not adapter_path.is_symlink(), "consumer adapter is missing")
     _expect(adapter_path.read_bytes() == expected_adapter, "consumer adapter source changed")
-    _, expected_main, expected_main_bytes = _generated_probe(source_root)
+    _, expected_main, expected_main_bytes = _generated_probe(source_root, endpoint)
     _expect(main_path.is_file() and not main_path.is_symlink(), "generated signed probe is missing")
     _expect(main_path.read_bytes() == expected_main_bytes, "generated signed probe is not the reviewed probe plus adapter")
     source_identity = receipt.get("source")
     _expect(isinstance(source_identity, Mapping), "preparation source closure is missing")
     features = source_identity.get("features", {}).get("selected", [])
     _expect(isinstance(features, list) and all(isinstance(item, str) and item for item in features), "generated feature selection is incomplete")
-    expected_manifest = _project_toml(source_root, features).encode("utf-8")
+    expected_manifest = _project_toml(source_root, features, endpoint).encode("utf-8")
     _expect(manifest_path.is_file() and not manifest_path.is_symlink(), "consumer manifest is missing")
     _expect(manifest_path.read_bytes() == expected_manifest, "consumer manifest changed")
-    expected_adapter_receipt = _adapter_receipt(adapter_path, main_path, manifest_path)
+    expected_adapter_receipt = _adapter_receipt(adapter_path, main_path, manifest_path, endpoint)
     _expect(receipt.get("adapter") == expected_adapter_receipt, "generated adapter receipt differs")
     return expected_adapter_receipt
 
@@ -671,11 +710,12 @@ def _source_identity_from_preparation(prepared: Path, receipt: Mapping[str, Any]
     source_root_path = Path(source_root)
     generated_adapter = _verify_generated_project(prepared, receipt, source_root_path)
     _verify_probe_binding(prepared, receipt, source_root_path)
-    current = module.candidate_identity(source_root_path)
+    endpoint = str(source_value.get("endpoint", receipt.get("endpoint", "after")))
+    current = module.endpoint_identity(source_root_path, endpoint)
     current["source_root"] = str(Path(source_root).resolve())
     current["adapter"] = generated_adapter
     current["source_capture"] = str(source_path.resolve())
-    _expect(current == source_value, "candidate source identity changed after preparation")
+    _expect(current == source_value, "endpoint source identity changed after preparation")
     _expect(receipt.get("source") == _source_closure(Path(source_root), source_value), "preparation source closure changed")
     return source_value
 
@@ -745,12 +785,14 @@ def _revalidate_preparation(prepared_root: Path) -> dict[str, Any]:
     _expect(receipt.get("schema") == PREPARATION_SCHEMA, "preparation receipt schema differs")
     _expect(receipt.get("status") == "prepared" and receipt.get("execution_admitted") is True, "preparation receipt is not executable")
     module = _policy()
+    endpoint = receipt.get("endpoint")
+    _expect(endpoint in module.ENDPOINTS, "preparation endpoint is missing")
     _expect(receipt.get("formats") == list(module.NATIVE_FORMATS), "preparation format order differs")
     _expect(receipt.get("routes") == list(module.ROUTES), "preparation route matrix differs")
-    _expect(receipt.get("api_branches") == list(API_BRANCHES), "preparation API branch matrix differs")
+    _expect(receipt.get("api_branch") == module.ENDPOINT_API_BRANCH[endpoint], "preparation API branch differs from endpoint")
     _expect(receipt.get("signed_batch") == module.SIGNED_BATCH_POLICY, "preparation signed-batch policy differs")
     _expect(receipt.get("policy") == _policy_identity(), "policy artifact changed after preparation")
-    _expect(receipt.get("candidate_binding_sha256") == _sha256(_canonical(module.CANDIDATE_BINDING)), "candidate binding changed after preparation")
+    _expect(receipt.get("source_binding_sha256") == _sha256(_canonical(module._endpoint_source_binding(endpoint))), "endpoint source binding changed after preparation")
     source = _source_identity_from_preparation(prepared, receipt)
     fixture = _verify_fixture_binding(prepared, receipt)
     adapter = receipt.get("adapter")
@@ -763,13 +805,14 @@ def _revalidate_preparation(prepared_root: Path) -> dict[str, Any]:
     plan, actual_plan = _load_canonical(Path(str(plan_artifact["path"])), "preparation plan")
     _expect(actual_plan == dict(plan_artifact), "preparation plan artifact changed")
     _expect(plan.get("source") == receipt.get("source"), "plan source closure differs")
-    _expect(plan.get("api_branches") == list(API_BRANCHES), "plan API branch matrix differs")
+    _expect(plan.get("api_branch") == module.ENDPOINT_API_BRANCH[endpoint], "plan API branch differs from endpoint")
     probes = receipt.get("probes")
     _expect(isinstance(probes, Mapping) and probes.get("schema") == "litchi.signed-native.probes.v2", "probe receipt schema differs")
     return {
         "prepared": prepared,
         "receipt": receipt,
         "receipt_artifact": receipt_artifact,
+        "endpoint": endpoint,
         "source": source,
         "fixture": fixture,
         "adapter": adapter,
@@ -789,12 +832,16 @@ def _directory_bytes(path: Path) -> int:
     return total
 
 
-def build(prepared_root: Path, cargo: Path | None, *, api_branch: str) -> dict[str, Any]:
+def build(prepared_root: Path, cargo: Path | None, *, api_branch: str | None = None) -> dict[str, Any]:
     """Build the generated consumer with the caller's pinned Cargo shim."""
 
     state = _revalidate_preparation(prepared_root)
     prepared = state["prepared"]
-    _expect(api_branch in API_BRANCHES, f"unknown API branch: {api_branch}")
+    endpoint = state["endpoint"]
+    expected_branch = _policy().ENDPOINT_API_BRANCH[endpoint]
+    if api_branch is None:
+        api_branch = expected_branch
+    _expect(api_branch == expected_branch, f"API branch {api_branch!r} does not belong to endpoint {endpoint}")
     _expect(cargo is not None, "build requires the approved pinned cargo shim")
     cargo_path = _safe_external(Path(cargo), "cargo shim")
     cargo_artifact = _artifact(cargo_path, "cargo shim", executable=True)
@@ -823,11 +870,10 @@ def build(prepared_root: Path, cargo: Path | None, *, api_branch: str) -> dict[s
             "LITCHI_SIGNED_FIXTURE_MANIFEST_SHA256": str(fixture_manifest["sha256"]),
         }
     )
-    branch_args = ["--features", "legacy_api"] if api_branch == "legacy_api" else []
     commands = [
         [str(cargo_path), "generate-lockfile", "--offline"],
         [str(cargo_path), "metadata", "--offline", "--locked", "--format-version=1"],
-        [str(cargo_path), "build", "--offline", "--locked", "--release", *branch_args, "--bin", "signed-native-consumer"],
+        [str(cargo_path), "build", "--offline", "--locked", "--release", "--bin", "signed-native-consumer"],
     ]
     try:
         subprocess.run(commands[0], cwd=project, env=environment, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -847,14 +893,17 @@ def build(prepared_root: Path, cargo: Path | None, *, api_branch: str) -> dict[s
     receipt = {
         "schema": BUILD_SCHEMA,
         "status": "built",
+        "endpoint": endpoint,
         "preparation_receipt": state["receipt_artifact"],
         "api_branch": api_branch,
-        "api_feature": "legacy_api" if api_branch == "legacy_api" else None,
+        "api_feature": None,
         "source_identity": _concrete_source_identity(state),
         "source_identity_receipt": state["receipt"]["source_identity"],
         "source": state["receipt"]["source"],
         "source_archive": state["receipt"]["source"]["archive"],
         "lock": state["receipt"]["source"]["locks"],
+        "lock_graph": state["receipt"]["source"].get("lock_graph"),
+        "source_manifests": state["receipt"]["source"].get("manifests"),
         "adapter": state["adapter"],
         "fixture": state["receipt"]["fixture"],
         "routes": state["receipt"]["routes"],
@@ -878,7 +927,15 @@ def build(prepared_root: Path, cargo: Path | None, *, api_branch: str) -> dict[s
     return {"status": "built", "receipt": str(receipt_path), "binary": binary_artifact}
 
 
-def _route_rows(value: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+def _expected_route_status(endpoint: str, route: str) -> str:
+    module = _policy()
+    _expect(endpoint in module.ENDPOINTS, "unknown signed-native endpoint")
+    expected = module.ENDPOINT_ROUTE_STATUS[endpoint].get(route)
+    _expect(expected is not None, f"route is not in the endpoint matrix: {route}")
+    return str(expected)
+
+
+def _route_rows(value: Mapping[str, Any], endpoint: str) -> dict[str, Mapping[str, Any]]:
     module = _policy()
     routes = value.get("routes")
     evidence_map = value.get("evidence")
@@ -909,7 +966,7 @@ def _route_rows(value: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
         raise ConsumerError("capability receipt routes are missing")
     for route, row in result.items():
         status = row.get("status")
-        expected = "expected_refusal" if route in module.CORRECTNESS_ONLY else "available"
+        expected = _expected_route_status(endpoint, route)
         _expect(status == expected, f"capability route status is invalid for {route}: expected {expected}")
         _expect(isinstance(row.get("evidence"), Mapping), f"capability evidence is required for {route}")
         if evidence_map is not None:
@@ -917,7 +974,7 @@ def _route_rows(value: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     return result
 
 
-def _validate_route_result(route: str, result: Mapping[str, Any], fixture: Mapping[str, Any]) -> None:
+def _validate_route_result(route: str, result: Mapping[str, Any], fixture: Mapping[str, Any], endpoint: str = "after") -> None:
     """Check the typed semantic row emitted by the v2 probe.
 
     The old probe's v1 JSON is intentionally not accepted here.  The v2
@@ -925,7 +982,6 @@ def _validate_route_result(route: str, result: Mapping[str, Any], fixture: Mappi
     caller cannot turn a capability-missing row into a successful endpoint.
     """
 
-    module = _policy()
     _expect(result.get("name") == fixture.get("name"), f"{route} fixture name differs")
     _expect(result.get("format") == fixture.get("format"), f"{route} fixture format differs")
     _expect(result.get("origin") == fixture.get("origin"), f"{route} fixture origin differs")
@@ -936,7 +992,21 @@ def _validate_route_result(route: str, result: Mapping[str, Any], fixture: Mappi
         _expect(isinstance(result.get("source_sha256"), str) and len(result["source_sha256"]) == 64, f"{route} fixture source digest is missing")
     _expect(result.get("signature_presence") == "detected", f"{route} lacks detected signature presence")
     _expect(result.get("cryptographic_verification") == "not_performed", f"{route} makes a cryptographic verification claim")
-    expected_status = "expected_refusal" if route in module.CORRECTNESS_ONLY else "ok"
+    endpoint_status = _expected_route_status(endpoint, route)
+    if endpoint_status == "not_applicable":
+        _expect(result.get("status") == "not_applicable", f"{route} baseline disposition differs")
+        _expect(result.get("signed_before") is True, f"{route} baseline signed state is missing")
+        _expect(result.get("disposition") == "requires_signed_noop_admission", f"{route} baseline disposition proof is missing")
+        _expect(result.get("reason") == "the historical endpoint cannot construct a signed no-op base", f"{route} baseline reason differs")
+        return
+    if endpoint_status == "capability_missing":
+        _expect(result.get("status") == "capability_missing", f"{route} baseline capability disposition differs")
+        _expect(result.get("signed_before") is True, f"{route} baseline signed state is missing")
+        _expect(result.get("refusal_kind") == "ProtectedDocument", f"{route} baseline refusal kind differs")
+        _expect(result.get("refusal_code") == "document_protected", f"{route} baseline refusal code differs")
+        _expect(isinstance(result.get("error"), str) and result.get("error"), f"{route} baseline capability reason is missing")
+        return
+    expected_status = "expected_refusal" if endpoint_status == "expected_refusal" else "ok"
     _expect(result.get("status") == expected_status, f"{route} result status differs")
 
     if route.endswith("/noop_commit"):
@@ -988,6 +1058,12 @@ def _validate_batch(value: Mapping[str, Any], state: Mapping[str, Any]) -> dict[
     _expect(batch.get("schema") == "litchi.signed-native.batch-proof.v2", "signed-batch proof schema differs")
     _expect(batch.get("runner") == _artifact(RUNNER_PATH, "signed-native v2 runner"), "signed-batch runner identity differs")
     _expect(batch.get("binary") == value.get("binary"), "signed-batch binary binding differs")
+    _expect(batch.get("endpoint") == state["endpoint"], "signed-batch endpoint differs")
+    _expect(batch.get("source_identity") == _concrete_source_identity(state), "signed-batch source identity differs")
+    _expect(batch.get("source_archive") == state["receipt"]["source"]["archive"], "signed-batch source archive differs")
+    _expect(batch.get("lock") == state["receipt"]["source"]["locks"], "signed-batch lock differs")
+    _expect(batch.get("lock_graph") == state["receipt"]["source"].get("lock_graph"), "signed-batch lock graph differs")
+    _expect(batch.get("source_manifests") == state["receipt"]["source"].get("manifests"), "signed-batch source manifests differ")
     _expect(batch.get("fixture") == value.get("fixture"), "signed-batch fixture binding differs")
     _expect(dict(batch).get("selection") == module.SIGNED_BATCH_POLICY["selection"], "signed-batch selection differs")
     _expect(dict(batch).get("status") == "expected_refusal", "signed-batch did not refuse immediately")
@@ -1010,7 +1086,7 @@ def _validate_batch(value: Mapping[str, Any], state: Mapping[str, Any]) -> dict[
     _expect(environment.get("LITCHI_SIGNED_FIXTURE_ROOT") == state["fixture"]["root"], "signed-batch fixture root differs")
     _expect(environment.get("LITCHI_SIGNED_FIXTURE_MANIFEST") == state["fixture"]["manifest"]["path"], "signed-batch fixture manifest differs")
     _expect(environment.get("LITCHI_SIGNED_FIXTURE_MANIFEST_SHA256") == state["fixture"]["manifest"]["sha256"], "signed-batch fixture manifest hash differs")
-    _expect(environment.get("LITCHI_SIGNED_ENDPOINT") in {"before", "after"}, "signed-batch endpoint is missing")
+    _expect(environment.get("LITCHI_SIGNED_ENDPOINT") == state["endpoint"], "signed-batch endpoint differs from preparation")
     _expect(batch.get("argv") == expected_command, "signed-batch argv receipt differs")
     _expect(batch.get("cwd") == str(state["prepared"] / "consumer"), "signed-batch working directory differs")
     process = batch.get("process")
@@ -1045,6 +1121,7 @@ def _validate_child_evidence(
     state: Mapping[str, Any],
     build_value: Mapping[str, Any],
 ) -> dict[str, Any]:
+    endpoint = str(state["endpoint"])
     evidence = row.get("evidence")
     _expect(isinstance(evidence, Mapping), f"capability evidence is required for {route}")
     _verify_external_artifact(evidence, f"capability evidence for {route}")
@@ -1063,6 +1140,7 @@ def _validate_child_evidence(
     _expect(child.get("probe_schema") == "litchi.signed-native.probe.v2", f"capability evidence probe schema differs for {route}")
     _expect(child.get("mode") == "validate", f"capability evidence mode differs for {route}")
     _expect(child.get("route") == route, f"capability evidence route differs for {route}")
+    _expect(child.get("endpoint") == endpoint, f"capability evidence endpoint differs for {route}")
     _expect(child.get("api_branch") == build_value.get("api_branch"), f"capability evidence API branch differs for {route}")
     _expect(child.get("status") == row.get("status"), f"capability evidence disposition differs for {route}")
     _expect(child.get("preparation_receipt") == state["receipt_artifact"], f"capability evidence preparation binding differs for {route}")
@@ -1070,6 +1148,8 @@ def _validate_child_evidence(
     _expect(child.get("source_identity") == _concrete_source_identity(state), f"capability evidence source identity differs for {route}")
     _expect(child.get("source_archive") == state["receipt"]["source"]["archive"], f"capability evidence source archive differs for {route}")
     _expect(child.get("lock") == state["receipt"]["source"]["locks"], f"capability evidence lock binding differs for {route}")
+    _expect(child.get("lock_graph") == state["receipt"]["source"].get("lock_graph"), f"capability evidence lock graph differs for {route}")
+    _expect(child.get("source_manifests") == state["receipt"]["source"].get("manifests"), f"capability evidence manifests differ for {route}")
     _expect(child.get("adapter") == state["adapter"], f"capability evidence adapter differs for {route}")
     _expect(child.get("binary") == build_value["binary"], f"capability evidence binary differs for {route}")
     _expect(child.get("fixture") == state["receipt"]["fixture"], f"capability evidence fixture differs for {route}")
@@ -1081,7 +1161,7 @@ def _validate_child_evidence(
     _expect(environment.get("LITCHI_SIGNED_FIXTURE_ROOT") == state["fixture"]["root"], f"capability fixture root differs for {route}")
     _expect(environment.get("LITCHI_SIGNED_FIXTURE_MANIFEST") == state["fixture"]["manifest"]["path"], f"capability fixture manifest differs for {route}")
     _expect(environment.get("LITCHI_SIGNED_FIXTURE_MANIFEST_SHA256") == state["fixture"]["manifest"]["sha256"], f"capability fixture manifest hash differs for {route}")
-    _expect(environment.get("LITCHI_SIGNED_ENDPOINT") in {"before", "after"}, f"capability endpoint is missing for {route}")
+    _expect(environment.get("LITCHI_SIGNED_ENDPOINT") == endpoint, f"capability endpoint differs for {route}")
     _expect(child.get("argv") == expected_command, f"capability argv receipt differs for {route}")
     _expect(child.get("cwd") == str(state["prepared"] / "consumer"), f"capability working directory differs for {route}")
     process = child.get("process")
@@ -1114,7 +1194,7 @@ def _validate_child_evidence(
         name = fixture_row.get("name")
         _expect(isinstance(name, str) and name in fixture_contract and name not in seen, f"capability fixture identity differs for {route}")
         seen.add(name)
-        _validate_route_result(route, fixture_row, fixture_contract[name])
+        _validate_route_result(route, fixture_row, fixture_contract[name], endpoint)
     _expect(seen == set(fixture_contract), f"capability fixture set differs for {route}")
     return child
 
@@ -1124,6 +1204,7 @@ def execute(
     capabilities: Path | None = None,
     *,
     output: Path | None = None,
+    endpoint: str | None = None,
     executor: Callable[[Mapping[str, Any]], Path | str | None] | None = None,
 ) -> dict[str, Any]:
     """Consume a typed v2 capabilities receipt into an execution receipt.
@@ -1138,19 +1219,25 @@ def execute(
         raise ConsumerError("execute requires a prepared v2 consumer output")
     state = _revalidate_preparation(prepared_root)
     prepared = state["prepared"]
+    if endpoint is not None:
+        _expect(endpoint == state["endpoint"], "execution endpoint does not match preparation")
     build_path = prepared / "build-receipt.json"
     build_value, build_artifact = _load_canonical(build_path, "build receipt")
     _expect(build_value.get("schema") == BUILD_SCHEMA and build_value.get("status") == "built", "build receipt is not a v2 build")
+    endpoint = state["endpoint"]
+    _expect(build_value.get("endpoint") == endpoint, "build endpoint differs from preparation")
     _expect(build_value.get("preparation_receipt") == state["receipt_artifact"], "build receipt is not bound to preparation")
     _verify_artifact(build_value.get("binary"), "signed-native consumer binary", executable=True)
     _expect(build_value.get("source_identity") == _concrete_source_identity(state), "build concrete source identity differs")
     _expect(build_value.get("source_identity_receipt") == state["receipt"]["source_identity"], "build source identity receipt differs")
     _expect(build_value.get("source_archive") == state["receipt"]["source"]["archive"], "build source archive differs")
     _expect(build_value.get("lock") == state["receipt"]["source"]["locks"], "build role lock binding differs")
+    _expect(build_value.get("lock_graph") == state["receipt"]["source"].get("lock_graph"), "build lock graph differs")
+    _expect(build_value.get("source_manifests") == state["receipt"]["source"].get("manifests"), "build source manifests differ")
     _expect(build_value.get("adapter") == state["adapter"], "build adapter differs")
     _expect(build_value.get("routes") == state["receipt"]["routes"], "build route matrix differs")
     api_branch = build_value.get("api_branch")
-    _expect(api_branch in API_BRANCHES, "build API branch is missing")
+    _expect(api_branch == _policy().ENDPOINT_API_BRANCH[endpoint], "build API branch does not belong to endpoint")
     if capabilities is None:
         if executor is not None:
             produced = executor(state)
@@ -1166,10 +1253,13 @@ def execute(
     _expect(capability_value.get("preparation_receipt") == state["receipt_artifact"], "capabilities are not bound to preparation")
     _expect(capability_value.get("build_receipt") == build_artifact, "capabilities are not bound to build receipt")
     _expect(capability_value.get("source_identity") == _concrete_source_identity(state), "capabilities concrete source identity differs")
+    _expect(capability_value.get("endpoint") == endpoint, "capabilities endpoint differs")
     _expect(capability_value.get("source_identity_receipt") == state["receipt"]["source_identity"], "capabilities source identity receipt differs")
     _expect(capability_value.get("source") == state["receipt"]["source"], "capabilities source closure differs")
     _expect(capability_value.get("source_archive") == state["receipt"]["source"]["archive"], "capabilities source archive differs")
     _expect(capability_value.get("lock") == state["receipt"]["source"]["locks"], "capabilities role lock binding differs")
+    _expect(capability_value.get("lock_graph") == state["receipt"]["source"].get("lock_graph"), "capabilities lock graph differs")
+    _expect(capability_value.get("source_manifests") == state["receipt"]["source"].get("manifests"), "capabilities source manifests differ")
     _expect(capability_value.get("binary") == build_value["binary"], "capabilities binary differs")
     _expect(capability_value.get("api_branch") == api_branch, "capabilities API branch differs")
     _expect(
@@ -1183,13 +1273,14 @@ def execute(
     _expect(capability_value.get("fixture") == state["receipt"]["fixture"], "capabilities fixture binding differs")
     _expect(capability_value.get("protocol_schema") == RUNNER_SCHEMA, "capabilities runner schema differs")
     _expect(capability_value.get("runner") == _artifact(RUNNER_PATH, "signed-native v2 runner"), "capabilities runner identity differs")
-    rows = _route_rows(capability_value)
+    rows = _route_rows(capability_value, endpoint)
     batch = _validate_batch(capability_value, state)
     for route, row in rows.items():
         _validate_child_evidence(route, row, state, build_value)
     execution = {
         "schema": EXECUTION_SCHEMA,
         "status": "completed",
+        "endpoint": endpoint,
         "preparation_receipt": state["receipt_artifact"],
         "build_receipt": build_artifact,
         "capabilities_receipt": capability_artifact,
@@ -1199,6 +1290,8 @@ def execute(
         "source": state["receipt"]["source"],
         "source_archive": state["receipt"]["source"]["archive"],
         "lock": state["receipt"]["source"]["locks"],
+        "lock_graph": state["receipt"]["source"].get("lock_graph"),
+        "source_manifests": state["receipt"]["source"].get("manifests"),
         "adapter": state["adapter"],
         "binary": build_value["binary"],
         "build_receipt_binding": {
@@ -1230,21 +1323,23 @@ def main(argv: Sequence[str]) -> int:
     prepare_parser = sub.add_parser("prepare")
     prepare_parser.add_argument("--source-root", type=Path, required=True)
     prepare_parser.add_argument("--output-root", type=Path, required=True)
+    prepare_parser.add_argument("--endpoint", choices=("before", "after"), default="after")
     build_parser = sub.add_parser("build")
     build_parser.add_argument("--prepared", type=Path, required=True)
     build_parser.add_argument("--cargo", type=Path, required=True)
-    build_parser.add_argument("--api-branch", choices=API_BRANCHES, required=True)
+    build_parser.add_argument("--api-branch", choices=API_BRANCHES)
     execute_parser = sub.add_parser("execute")
     execute_parser.add_argument("--prepared", type=Path, required=True)
     execute_parser.add_argument("--capabilities", type=Path)
     execute_parser.add_argument("--output", type=Path)
+    execute_parser.add_argument("--endpoint", choices=("before", "after"))
     args = parser.parse_args(list(argv))
     if args.command == "prepare":
-        value = prepare(args.source_root, args.output_root)
+        value = prepare(args.source_root, args.output_root, endpoint=args.endpoint)
     elif args.command == "build":
         value = build(args.prepared, args.cargo, api_branch=args.api_branch)
     else:
-        value = execute(args.prepared, args.capabilities, output=args.output)
+        value = execute(args.prepared, args.capabilities, output=args.output, endpoint=args.endpoint)
     print(json.dumps(value, indent=2, sort_keys=True))
     return 0
 

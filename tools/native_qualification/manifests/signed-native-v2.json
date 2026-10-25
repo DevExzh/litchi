@@ -9,6 +9,50 @@
     "receipts_are_historical": true,
     "receipts_accepted_by_v2": false
   },
+  "endpoints": {
+    "before": {
+      "role": "baseline",
+      "source_kind": "f2",
+      "commit": "f2bbbc8d07ab5da26c180f1ff74813d39f632d54",
+      "source_root": "/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/src",
+      "source_archive": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/f2-source.tar",
+        "bytes": 6614528000,
+        "sha256": "de625729ec8e6f8055e619443ad31bf1a91719cd31465975f951d54dbc1c2280"
+      },
+      "source_assembly": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/out/provenance/original-baseline-source-assembly.json",
+        "bytes": 787,
+        "sha256": "b9de004ed2a74a509ebc2e3879b8d8812fcf543b92cb8bccf740ec82486ea44d"
+      },
+      "lock": {
+        "path": "Cargo.lock",
+        "bytes": 139441,
+        "sha256": "1b9b10ae7a9fd65db3b8b29a5bedad1aa560473c10b462f8a7d654c169335b2c"
+      }
+    },
+    "after": {
+      "role": "candidate",
+      "source_kind": "472b",
+      "commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+      "source_root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+      "source_archive": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-472b-native.V1lU2E/candidate/472b-source.tar",
+        "bytes": 6634147840,
+        "sha256": "44c11e933974c8fa3d6a67b46739bedeef866e60fbd4360ffe7f3bb8a4dc2274"
+      },
+      "source_assembly": {
+        "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-472b-native.V1lU2E/candidate/source-assembly.json",
+        "bytes": 483,
+        "sha256": "cc9d9f67e8d4474685fa0daf4ba9054adcb508ca6dcc047f49fda39aa6b1289f"
+      },
+      "lock": {
+        "path": "Cargo.lock",
+        "bytes": 139606,
+        "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1"
+      }
+    }
+  },
   "formats": [
     "DOCX",
     "PPTX",
@@ -54,6 +98,44 @@
     "signed_leaf/budget",
     "signed_facade/budget"
   ],
+  "endpoint_routes": {
+    "before": {
+      "signed_leaf/noop_commit": "capability_missing",
+      "signed_facade/noop_commit": "capability_missing",
+      "signed_leaf/noop_write": "capability_missing",
+      "signed_facade/noop_write": "capability_missing",
+      "signed_leaf/noop_replay": "capability_missing",
+      "signed_facade/noop_replay": "capability_missing",
+      "signed_leaf/refusal": "expected_refusal",
+      "signed_facade/refusal": "expected_refusal",
+      "signed_leaf/unsign_write": "available",
+      "signed_facade/unsign_write": "available",
+      "signed_leaf/unsigned_negative": "not_applicable",
+      "signed_facade/unsigned_negative": "not_applicable",
+      "signed_leaf/source_freshness": "not_applicable",
+      "signed_facade/source_freshness": "not_applicable",
+      "signed_leaf/budget": "not_applicable",
+      "signed_facade/budget": "not_applicable"
+    },
+    "after": {
+      "signed_leaf/noop_commit": "available",
+      "signed_facade/noop_commit": "available",
+      "signed_leaf/noop_write": "available",
+      "signed_facade/noop_write": "available",
+      "signed_leaf/noop_replay": "available",
+      "signed_facade/noop_replay": "available",
+      "signed_leaf/refusal": "expected_refusal",
+      "signed_facade/refusal": "expected_refusal",
+      "signed_leaf/unsign_write": "available",
+      "signed_facade/unsign_write": "available",
+      "signed_leaf/unsigned_negative": "expected_refusal",
+      "signed_facade/unsigned_negative": "expected_refusal",
+      "signed_leaf/source_freshness": "expected_refusal",
+      "signed_facade/source_freshness": "expected_refusal",
+      "signed_leaf/budget": "expected_refusal",
+      "signed_facade/budget": "expected_refusal"
+    }
+  },
   "semantics": {
     "signature_presence": "detected_metadata_only",
     "cryptographic_verification": "not_performed",
@@ -73,13 +155,11 @@
   "adapter": {
     "schema": "litchi.signed-native.adapter.v2",
     "source": "consumer_only_external_project",
-    "legacy_feature": "legacy_api",
-    "api_branches": [
-      "legacy_commit_fields",
-      "current_commit_accessors",
-      "legacy_xlsb_option",
-      "current_xlsb_resolve"
-    ],
+    "legacy_feature": null,
+    "api_branches": {
+      "before": ["legacy_commit_fields", "legacy_xlsb_option"],
+      "after": ["current_commit_accessors", "current_xlsb_resolve"]
+    },
     "route_count": 16
   },
   "execution": {

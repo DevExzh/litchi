@@ -287,7 +287,8 @@ def _child(
     output: Path,
 ) -> dict[str, Any]:
     module = consumer._policy()
-    expected = "expected_refusal" if route in module.CORRECTNESS_ONLY else "available"
+    endpoint = str(state["endpoint"])
+    expected = consumer._expected_route_status(endpoint, route)
     _expect(result.get("schema") == PROBE_SCHEMA, f"{route} probe schema is not v2")
     _expect(result.get("route") == route, f"{route} probe route differs")
     _expect(result.get("capability") == expected, f"{route} probe capability differs")
@@ -299,12 +300,15 @@ def _child(
         "mode": "validate",
         "route": route,
         "status": status,
+        "endpoint": endpoint,
         "api_branch": build["api_branch"],
         "preparation_receipt": state["receipt_artifact"],
         "build_receipt": build_artifact,
         "source_identity": consumer._concrete_source_identity(state),
         "source_archive": state["receipt"]["source"]["archive"],
         "lock": state["receipt"]["source"]["locks"],
+        "lock_graph": state["receipt"]["source"].get("lock_graph"),
+        "source_manifests": state["receipt"]["source"].get("manifests"),
         "adapter": state["adapter"],
         "binary": build["binary"],
         "fixture": state["receipt"]["fixture"],
@@ -379,6 +383,12 @@ def _batch_proof(
         "schema": BATCH_PROOF_SCHEMA,
         "source_before": before_artifact,
         "source_after": after_artifact,
+        "endpoint": state["endpoint"],
+        "source_identity": consumer._concrete_source_identity(state),
+        "source_archive": state["receipt"]["source"]["archive"],
+        "lock": state["receipt"]["source"]["locks"],
+        "lock_graph": state["receipt"]["source"].get("lock_graph"),
+        "source_manifests": state["receipt"]["source"].get("manifests"),
         "binary": build["binary"],
         "fixture": state["receipt"]["fixture"],
         "runner": runner_artifact,
@@ -417,15 +427,21 @@ def run(
     state: Mapping[str, Any],
     *,
     output: Path | None = None,
-    endpoint: str = "after",
+    endpoint: str | None = None,
 ) -> Path:
     """Run every route and the signed-batch proof, returning capabilities."""
 
-    _expect(endpoint in {"before", "after"}, "native endpoint must be before or after")
+    state_endpoint = str(state.get("endpoint"))
+    _expect(state_endpoint in {"before", "after"}, "prepared state endpoint is missing")
+    if endpoint is None:
+        endpoint = state_endpoint
+    _expect(endpoint == state_endpoint, "native endpoint does not match the prepared source binary")
     prepared = Path(state["prepared"])
     build_path = prepared / "build-receipt.json"
     build, build_artifact = consumer._load_canonical(build_path, "build receipt")
     _expect(build.get("schema") == consumer.BUILD_SCHEMA and build.get("status") == "built", "native runner needs a built v2 receipt")
+    _expect(build.get("endpoint") == state_endpoint, "native build receipt belongs to a different endpoint")
+    _expect(build.get("api_branch") == consumer._policy().ENDPOINT_API_BRANCH[state_endpoint], "native build API branch belongs to a different endpoint")
     binary = consumer._verify_artifact(build.get("binary"), "signed-native consumer binary", executable=True)
     _expect(binary == build["binary"], "native runner binary identity changed")
     runner_artifact = consumer._artifact(Path(__file__).resolve(), "signed-native v2 runner")
@@ -446,8 +462,7 @@ def run(
             stderr_path=destination / "children" / f"{route.replace('/', '__')}.stderr",
         )
         result = _output_json(process, f"{route} probe")
-        expected = "expected_refusal" if route in consumer._policy().CORRECTNESS_ONLY else "available"
-        routes[route] = expected
+        routes[route] = consumer._expected_route_status(endpoint, route)
         child = _child(
             route=route,
             state=state,
@@ -487,10 +502,13 @@ def run(
         "preparation_receipt": state["receipt_artifact"],
         "build_receipt": build_artifact,
         "source_identity": consumer._concrete_source_identity(state),
+        "endpoint": endpoint,
         "source_identity_receipt": state["receipt"]["source_identity"],
         "source": state["receipt"]["source"],
         "source_archive": state["receipt"]["source"]["archive"],
         "lock": state["receipt"]["source"]["locks"],
+        "lock_graph": state["receipt"]["source"].get("lock_graph"),
+        "source_manifests": state["receipt"]["source"].get("manifests"),
         "binary": binary,
         "api_branch": build["api_branch"],
         "build_receipt_binding": {
@@ -509,7 +527,7 @@ def run(
     return return_path
 
 
-def run_prepared(prepared_root: Path, *, output: Path | None = None, endpoint: str = "after") -> Path:
+def run_prepared(prepared_root: Path, *, output: Path | None = None, endpoint: str | None = None) -> Path:
     state = consumer._revalidate_preparation(prepared_root)
     return run(state, output=output, endpoint=endpoint)
 
@@ -520,7 +538,7 @@ def main(argv: Sequence[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--prepared", type=Path, required=True)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--endpoint", choices=("before", "after"), default="after")
+    parser.add_argument("--endpoint", choices=("before", "after"))
     args = parser.parse_args(list(argv))
     receipt = run_prepared(args.prepared, output=args.output, endpoint=args.endpoint)
     print(json.dumps({"status": "completed", "capabilities": str(receipt)}, indent=2, sort_keys=True))

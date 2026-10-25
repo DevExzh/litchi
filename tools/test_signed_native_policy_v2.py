@@ -54,12 +54,12 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
                 policy.execute()
             self.assertFalse(output.exists())
 
-    def test_prepare_fails_before_source_or_output_mutation(self) -> None:
+    def test_prepare_rejects_an_unbound_source_before_output_mutation(self) -> None:
         with tempfile.TemporaryDirectory(prefix="signed-native-v2-prepare-") as name:
             root = Path(name)
             source = root / "source"
             output = root / "output"
-            with self.assertRaisesRegex(policy.IncompletePolicyError, "candidate is incomplete"):
+            with self.assertRaisesRegex(policy.PolicyError, "candidate source must be a Git worktree"):
                 policy.prepare(source, output)
             self.assertFalse(output.exists())
 
@@ -96,6 +96,19 @@ class SignedNativePolicyV2Tests(unittest.TestCase):
         )
         self.assertEqual(
             document["signed_batch"], policy.SIGNED_BATCH_POLICY
+        )
+        self.assertEqual(policy.ENDPOINT_API_BRANCH, {"before": "legacy_api", "after": "current_api"})
+        self.assertEqual(
+            policy.ENDPOINT_ROUTE_STATUS["before"]["signed_leaf/unsigned_negative"],
+            "not_applicable",
+        )
+        self.assertEqual(
+            policy.ENDPOINT_ROUTE_STATUS["before"]["signed_leaf/noop_commit"],
+            "capability_missing",
+        )
+        self.assertEqual(
+            policy.ENDPOINT_ROUTE_STATUS["after"]["signed_leaf/unsigned_negative"],
+            "expected_refusal",
         )
 
     def test_signed_batch_choice_cannot_be_overridden_by_policy_input(self) -> None:

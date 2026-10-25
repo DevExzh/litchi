@@ -123,6 +123,10 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
         }
         identity = {
             "source_root": "",
+            "endpoint": "after",
+            "source_role": "candidate",
+            "source_kind": "472b",
+            "api_branch": "current_api",
             **fake_binding["source"],
             "manifests": fake_binding["manifests"],
             "locks": {value["path"]: {"path": value["path"], "bytes": 1, "sha256": value["candidate"]["sha256"]} for value in role_locks.values()},
@@ -188,6 +192,7 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
             "schema": consumer.BUILD_SCHEMA,
             "status": "built",
             "preparation_receipt": state["receipt_artifact"],
+            "endpoint": "after",
             "api_branch": "current_api",
             "api_feature": None,
             "source_identity": consumer._concrete_source_identity(state),
@@ -195,6 +200,8 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
             "source": state["receipt"]["source"],
             "source_archive": state["receipt"]["source"]["archive"],
             "lock": state["receipt"]["source"]["locks"],
+            "lock_graph": state["receipt"]["source"].get("lock_graph"),
+            "source_manifests": state["receipt"]["source"].get("manifests"),
             "adapter": state["adapter"],
             "fixture": state["receipt"]["fixture"],
             "routes": state["receipt"]["routes"],
@@ -255,6 +262,7 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
             result = {
                 "schema": consumer.PROBE_SCHEMA,
                 "route": route,
+                "endpoint": "after",
                 "capability": statuses[route],
                 "fixtures": results,
             }
@@ -269,12 +277,15 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
                 "mode": "validate",
                 "route": route,
                 "status": statuses[route],
+                "endpoint": "after",
                 "api_branch": build["api_branch"],
                 "preparation_receipt": state["receipt_artifact"],
                 "build_receipt": build_artifact,
                 "source_identity": consumer._concrete_source_identity(state),
                 "source_archive": state["receipt"]["source"]["archive"],
                 "lock": state["receipt"]["source"]["locks"],
+                "lock_graph": state["receipt"]["source"].get("lock_graph"),
+                "source_manifests": state["receipt"]["source"].get("manifests"),
                 "adapter": state["adapter"],
                 "binary": build["binary"],
                 "fixture": state["receipt"]["fixture"],
@@ -321,11 +332,14 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
             "protocol_schema": consumer.RUNNER_SCHEMA,
             "preparation_receipt": state["receipt_artifact"],
             "build_receipt": build_artifact,
+            "endpoint": "after",
             "source_identity": consumer._concrete_source_identity(state),
             "source_identity_receipt": state["receipt"]["source_identity"],
             "source": state["receipt"]["source"],
             "source_archive": state["receipt"]["source"]["archive"],
             "lock": state["receipt"]["source"]["locks"],
+            "lock_graph": state["receipt"]["source"].get("lock_graph"),
+            "source_manifests": state["receipt"]["source"].get("manifests"),
             "binary": build["binary"],
             "api_branch": build["api_branch"],
             "build_receipt_binding": {
@@ -343,6 +357,12 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
                 "source_before": consumer._artifact(before, "batch source before"),
                 "source_after": consumer._artifact(after, "batch source after"),
                 "source_bytes_equal": True,
+                "endpoint": "after",
+                "source_identity": consumer._concrete_source_identity(state),
+                "source_archive": state["receipt"]["source"]["archive"],
+                "lock": state["receipt"]["source"]["locks"],
+                "lock_graph": state["receipt"]["source"].get("lock_graph"),
+                "source_manifests": state["receipt"]["source"].get("manifests"),
                 "binary": build["binary"],
                 "fixture": state["receipt"]["fixture"],
                 "runner": runner_artifact,
@@ -487,9 +507,13 @@ class SignedNativeV2ConsumerTests(unittest.TestCase):
     def test_api_branches_are_explicit_build_inputs(self) -> None:
         project = consumer._project_toml(Path("/reviewed/source"), ["docx", "pptx", "xlsx", "xlsb", "doc", "ppt", "xls"])
         self.assertIn("default = []", project)
-        self.assertIn("legacy_api = []", project)
+        self.assertNotIn("legacy_api", project)
         self.assertIn('features = ["docx", "pptx", "xlsx", "xlsb", "doc", "ppt", "xls"]', project)
         self.assertEqual(consumer.API_BRANCHES, ("current_api", "legacy_api"))
+        self.assertIn("commit.file;", consumer._adapter_source("before"))
+        self.assertNotIn("#[cfg", consumer._adapter_source("before"))
+        self.assertIn("commit.file()", consumer._adapter_source("after"))
+        self.assertNotIn("legacy_api", consumer._adapter_source("after"))
 
     def test_runner_produces_process_bound_v2_receipts(self) -> None:
         from native_qualification import signed_native_v2_runner as runner

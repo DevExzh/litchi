@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
 """Prepare the version-two signed-native qualification source pair.
 
-This module is deliberately a source-only boundary.  It records the inputs a
-future signed-native run must use and verifies those inputs before a consumer
-or a native process may be started.  The final candidate source was not
-frozen when this policy was recorded, so the checked-in binding is ``None``.
-Consequently :func:`prepare` and :func:`execute` currently fail closed before
-creating an output directory, receipt, build, or measurement.  Once the
-coordinator supplies the immutable binding, they delegate to the tracked
-consumer in :mod:`native_qualification.signed_native_v2_consumer`.
+This module is deliberately a source-only boundary.  It records the two
+immutable signed-native endpoints and verifies each source closure before a
+consumer or a native process may be started.  The historical candidate
+binding constant remains for compatibility with the earlier pending policy,
+but endpoint preparation uses the separately pinned f2/472b inputs and never
+uses a feature flag to select an API spelling.  Preparation delegates to the
+tracked consumer in :mod:`native_qualification.signed_native_v2_consumer`.
 
 The old 0362ul24 receipts are historical v1 evidence.  They are never
 relabelled as v2, and this module does not accept a v1 receipt as a v2 source
 or qualification result.
 
-No Cargo, compiler, native probe, rustdoc, or timing command is invoked by the
-pending source-only path.  All digests used for a bound candidate are
+No Cargo, compiler, native probe, rustdoc, or timing command is invoked by
+this source-only preparation path.  All digests used for a bound endpoint are
 recomputed from the selected source tree; a caller cannot supply a digest or
 commit on the command line to make an unbound policy executable.
 """
@@ -24,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -46,13 +46,11 @@ POLICY_VERSION = 2
 ADAPTER_POLICY = {
     "schema": "litchi.signed-native.adapter.v2",
     "source": "consumer_only_external_project",
-    "legacy_feature": "legacy_api",
-    "api_branches": [
-        "legacy_commit_fields",
-        "current_commit_accessors",
-        "legacy_xlsb_option",
-        "current_xlsb_resolve",
-    ],
+    "legacy_feature": None,
+    "api_branches": {
+        "before": ["legacy_commit_fields", "legacy_xlsb_option"],
+        "after": ["current_commit_accessors", "current_xlsb_resolve"],
+    },
     "route_count": 16,
 }
 EXECUTION_POLICY = {
@@ -137,6 +135,74 @@ BASELINE_NOT_APPLICABLE = frozenset(
         "signed_facade/budget",
     }
 )
+
+# Endpoint bindings are deliberately separate.  The historical f2 checkout
+# cannot compile the current API and the 472b checkout cannot compile the
+# removed API; a feature flag in one generated project is therefore not an
+# endpoint selector.  These are provenance pins, not result receipts.  The
+# actual source/archive/lock graph is revalidated by ``endpoint_identity``
+# before a consumer directory is created.
+ENDPOINTS = ("before", "after")
+ENDPOINT_SOURCE_KINDS = {"before": "f2", "after": "472b"}
+ENDPOINT_API_BRANCH = {"before": "legacy_api", "after": "current_api"}
+ENDPOINT_ROLE = {"before": "baseline", "after": "candidate"}
+ENDPOINT_ROUTE_STATUS = {
+    "before": {
+        **{route: "capability_missing" for route in ROUTES if route.endswith("/noop_commit") or route.endswith("/noop_write") or route.endswith("/noop_replay")},
+        **{route: "expected_refusal" for route in ROUTES if route.endswith("/refusal")},
+        **{route: "available" for route in ROUTES if route.endswith("/unsign_write")},
+        **{route: "not_applicable" for route in BASELINE_NOT_APPLICABLE},
+    },
+    "after": {
+        **{route: "available" for route in TIMED_ROUTES},
+        **{route: "expected_refusal" for route in CORRECTNESS_ONLY},
+    },
+}
+
+ENDPOINT_SOURCE_BINDINGS = {
+    "before": {
+        "role": "baseline",
+        "source_kind": "f2",
+        "commit": "f2bbbc8d07ab5da26c180f1ff74813d39f632d54",
+        "source_root": "/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/src",
+        "source_archive": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/f2-source.tar",
+            "bytes": 6614528000,
+            "sha256": "de625729ec8e6f8055e619443ad31bf1a91719cd31465975f951d54dbc1c2280",
+        },
+        "source_assembly": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-f2-baseline-sAirXf/out/provenance/original-baseline-source-assembly.json",
+            "bytes": 787,
+            "sha256": "b9de004ed2a74a509ebc2e3879b8d8812fcf543b92cb8bccf740ec82486ea44d",
+        },
+        "lock": {
+            "path": "Cargo.lock",
+            "bytes": 139441,
+            "sha256": "1b9b10ae7a9fd65db3b8b29a5bedad1aa560473c10b462f8a7d654c169335b2c",
+        },
+    },
+    "after": {
+        "role": "candidate",
+        "source_kind": "472b",
+        "commit": "472b6705475b073e7fe08f6e11ee17fb1e29f838",
+        "source_root": "/home/zhuhe/code/litchi-worktrees/.coord/final-api-capture-472b670547/source",
+        "source_archive": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-472b-native.V1lU2E/candidate/472b-source.tar",
+            "bytes": 6634147840,
+            "sha256": "44c11e933974c8fa3d6a67b46739bedeef866e60fbd4360ffe7f3bb8a4dc2274",
+        },
+        "source_assembly": {
+            "path": "/home/zhuhe/code/litchi-worktrees/.coord/w8-472b-native.V1lU2E/candidate/source-assembly.json",
+            "bytes": 483,
+            "sha256": "cc9d9f67e8d4474685fa0daf4ba9054adcb508ca6dcc047f49fda39aa6b1289f",
+        },
+        "lock": {
+            "path": "Cargo.lock",
+            "bytes": 139606,
+            "sha256": "4100b1fbb272dd24842f33a2d6f353a3f3a97dfa7e435c4649a0e1a029bfaea1",
+        },
+    },
+}
 
 # These are fixed source identities from the old preparation record.  They
 # describe the historical input boundary only; no old receipt is upgraded.
@@ -250,9 +316,9 @@ FIXTURE_INPUT = {
     "sha256": "729d326b9aab089a9b360852b7a29abe0ca7337ca4d93c0a21398ccc8f823af7",
 }
 
-# This is deliberately ``None``.  It may only be replaced by a later source
-# freeze that records all fields in the checked-in manifest and updates this
-# code constant in the same review.  There is no CLI or JSON override.
+# The legacy candidate slot remains ``None`` because it represented the
+# pre-endpoint pending policy.  It is not consulted by the endpoint path when
+# the reviewed 472b source is selected; there is no CLI or JSON override.
 CANDIDATE_BINDING: dict[str, Any] | None = None
 
 
@@ -684,7 +750,10 @@ def _validate_policy_document(value: Mapping[str, Any], *, execution: bool) -> d
     _expect(value.get("schema") == SCHEMA, "signed-native policy schema differs")
     _expect(value.get("policy_version") == POLICY_VERSION, "signed-native policy version differs")
     _expect(value.get("historical") == HISTORICAL_SOURCE, "historical v1 boundary changed")
+    _expect(value.get("endpoints") == ENDPOINT_SOURCE_BINDINGS, "endpoint source bindings changed")
     _validate_route_contract(value)
+    endpoint_routes = value.get("endpoint_routes")
+    _expect(endpoint_routes == ENDPOINT_ROUTE_STATUS, "endpoint route disposition matrix changed")
     candidate = value.get("candidate")
     _expect(isinstance(candidate, dict), "candidate policy is missing")
     _expect(candidate.get("source_manifests") == list(SOURCE_MANIFEST_PATHS), "candidate manifest paths changed")
@@ -935,18 +1004,206 @@ def candidate_identity(root: Path) -> dict[str, Any]:
     }
 
 
-def prepare(source_root: Path, output_root: Path) -> dict[str, Any]:
-    """Prepare the external v2 consumer after the checked-in source gate passes.
+def _reviewed_source_helper() -> Any:
+    """Load the reviewed W8 source-closure verifier without executing it."""
 
-    The current checked-in policy remains pending and therefore returns before
-    this import.  Once a reviewed binding is committed, all source checks are
-    completed before the consumer creates its fresh output root.
+    path = REPOSITORY / "docs/unified-ops/results/0362ul24/prepare_signed_native_consumer.py"
+    _expect(path.is_file() and not path.is_symlink(), f"reviewed source verifier is missing: {path}")
+    spec = importlib.util.spec_from_file_location("signed_native_v1_source_fence", path)
+    _expect(spec is not None and spec.loader is not None, "cannot load reviewed source verifier")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except Exception as error:
+        raise PolicyError(f"reviewed source verifier failed to load: {error}") from error
+    return module
+
+
+def _endpoint_root(value: Path, endpoint: str) -> Path:
+    """Resolve a pinned endpoint, allowing the extracted f2 tree without .git."""
+
+    _expect(endpoint in ENDPOINTS, f"unknown signed-native endpoint: {endpoint}")
+    try:
+        return _root(value)
+    except PolicyError:
+        # The reviewed f2 source is an extracted, immutable workspace rather
+        # than a Git checkout.  The source verifier below supplies its commit
+        # and archive fence; do not silently accept this fallback for 472b.
+        _expect(endpoint == "before", "candidate source must be a Git worktree")
+        _reject_symlink_components(value, "baseline source root")
+        root = value.resolve(strict=False)
+        _expect(root.is_dir(), f"baseline source root is not a directory: {root}")
+        _expect((root / "Cargo.toml").is_file(), f"baseline source lacks Cargo.toml: {root}")
+        return root
+
+
+def _endpoint_source_binding(endpoint: str) -> Mapping[str, Any]:
+    _expect(endpoint in ENDPOINTS, f"unknown signed-native endpoint: {endpoint}")
+    return ENDPOINT_SOURCE_BINDINGS[endpoint]
+
+
+def _endpoint_lock_spec(endpoint: str) -> dict[str, dict[str, Any]]:
+    binding = _endpoint_source_binding(endpoint)
+    lock = dict(binding["lock"])
+    return {
+        "workspace": {
+            "path": lock["path"],
+            "bytes": lock["bytes"],
+            "sha256": lock["sha256"],
+        }
+    }
+
+
+def _endpoint_identity_from_reviewed(root: Path, endpoint: str) -> dict[str, Any]:
+    """Build the v2 closure from the retained W8 source verifier.
+
+    This intentionally verifies each endpoint independently.  In particular,
+    the before leg uses the extracted f2 assembly and its baseline lock while
+    the after leg uses the 472b Git tree and candidate lock; no API feature is
+    used to switch between those source graphs.
     """
 
-    validate_policy(execution=True)
-    source_root = _root(source_root)
-    _expect(CANDIDATE_BINDING is not None, "candidate source identity is not frozen")
-    archive_path = Path(str(CANDIDATE_BINDING["source"]["archive"]["path"]))
+    binding = _endpoint_source_binding(endpoint)
+    kind = str(binding["source_kind"])
+    helper = _reviewed_source_helper()
+    archive_path = Path(str(binding["source_archive"]["path"]))
+    # The reviewed helper performs the fixed archive hash and, for both
+    # endpoints, the member/tree closure proof.  Avoid a second full archive
+    # hash here; the returned artifact is compared with this static pin below.
+    assembly_spec = binding.get("source_assembly")
+    assembly_path: Path | None = None
+    assembly_artifact: dict[str, Any] | None = None
+    if isinstance(assembly_spec, Mapping):
+        assembly_path = Path(str(assembly_spec["path"]))
+        _reject_symlink_components(assembly_path, f"{endpoint} source assembly")
+        _expect(assembly_path.is_file() and not assembly_path.is_symlink(), f"{endpoint} source assembly is missing")
+        assembly_artifact = _artifact_identity(assembly_path, f"{endpoint} source assembly")
+        if isinstance(assembly_spec.get("bytes"), int):
+            _expect(assembly_artifact["bytes"] == assembly_spec["bytes"], f"{endpoint} source assembly size changed")
+        _expect(assembly_artifact["sha256"] == assembly_spec["sha256"], f"{endpoint} source assembly digest changed")
+    try:
+        reviewed = helper.source_identity(
+            root,
+            kind,
+            source_archive=archive_path,
+            source_assembly=assembly_path,
+            verify_closure=True,
+        )
+    except Exception as error:
+        raise PolicyError(f"{endpoint} source closure failed reviewed verification: {error}") from error
+    source_tree = reviewed.get("source_tree") or {}
+    tree_sha = source_tree.get("sha256")
+    _expect(isinstance(tree_sha, str) and SHA256.fullmatch(tree_sha), f"{endpoint} source tree digest is missing")
+    git_tree: str | None = None
+    try:
+        git_tree = _tree_id(root, "HEAD")
+    except PolicyError:
+        _expect(endpoint == "before", "after endpoint source has no Git tree")
+    manifests = {relative: _file_identity(root, relative) for relative in SOURCE_MANIFEST_PATHS}
+    lock_artifact = _checked_artifact(root / str(binding["lock"]["path"]), binding["lock"], f"{endpoint} source lock")
+    lock_graph = {
+        "workspace": {
+            **lock_artifact,
+            "graph_sha256": _lock_graph_identity_for_path(root / str(binding["lock"]["path"]), f"{endpoint} workspace"),
+        }
+    }
+    toolchain = {relative: _file_identity(root, relative) for relative in TOOLCHAIN_PATHS}
+    _expect(toolchain == TOOLCHAIN_IDENTITIES, f"{endpoint} toolchain inputs differ")
+    probe_inputs = {name: _file_identity(root, str(item["path"])) for name, item in PROBE_INPUTS.items()}
+    _expect(probe_inputs == PROBE_INPUTS, f"{endpoint} reviewed probe inputs differ")
+    fixture = _file_identity(root, FIXTURE_INPUT["path"])
+    _expect(fixture == FIXTURE_INPUT, f"{endpoint} fixture input differs")
+    _fixture_policy(root)
+    try:
+        features = list(helper._reviewed_harness_features(kind))
+    except Exception as error:
+        raise PolicyError(f"{endpoint} feature projection could not be loaded: {error}") from error
+    _expect(features and all(isinstance(item, str) and item for item in features), f"{endpoint} feature projection is empty")
+    source_archive = dict(reviewed.get("source_archive") or binding["source_archive"])
+    _expect(source_archive.get("bytes") == binding["source_archive"]["bytes"], f"{endpoint} source archive size differs from the trusted pin")
+    _expect(source_archive.get("sha256") == binding["source_archive"]["sha256"], f"{endpoint} source archive digest differs from the trusted pin")
+    source_assembly = reviewed.get("source_assembly") or assembly_artifact
+    return {
+        "source_root": str(root),
+        "endpoint": endpoint,
+        "source_role": binding["role"],
+        "source_kind": kind,
+        "commit": str(reviewed["commit"]),
+        "git_tree": git_tree,
+        "tree_sha256": tree_sha,
+        "source_tree": source_tree,
+        "reviewed_policy": reviewed.get("reviewed_policy"),
+        "manifests": manifests,
+        "locks": {str(binding["lock"]["path"]): lock_artifact},
+        "lock_graph": lock_graph,
+        "role_locks": _endpoint_lock_spec(endpoint),
+        "vendor_tree": {"source_role": source_tree.get("source_role"), "verified_closure": reviewed.get("verified_closure")},
+        "toolchain": toolchain,
+        "probe_inputs": probe_inputs,
+        "fixture": fixture,
+        "archive": source_archive,
+        "source_assembly": source_assembly,
+        "features": {"package": "litchi-ops", "all_features": True, "selected": features},
+    }
+
+
+def _lock_graph_identity_for_path(path: Path, label: str) -> str:
+    try:
+        lock = tomllib.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
+        raise PolicyError(f"{label} lock graph is not valid TOML: {error}") from error
+    packages = lock.get("package")
+    _expect(isinstance(packages, list), f"{label} lock graph has no package list")
+    normalized: list[dict[str, Any]] = []
+    for package in packages:
+        _expect(isinstance(package, dict), f"{label} lock graph has a malformed package")
+        _expect(isinstance(package.get("name"), str) and isinstance(package.get("version"), str), f"{label} lock graph package identity is incomplete")
+        dependencies = package.get("dependencies", [])
+        _expect(isinstance(dependencies, list) and all(isinstance(item, str) for item in dependencies), f"{label} lock graph dependencies are malformed")
+        normalized.append({"name": package["name"], "version": package["version"], "source": package.get("source"), "checksum": package.get("checksum"), "dependencies": sorted(dependencies)})
+    normalized.sort(key=lambda item: (item["name"], item["version"], item["source"] or ""))
+    return _sha256_bytes(_canonical(normalized))
+
+
+def endpoint_identity(root: Path, endpoint: str) -> dict[str, Any]:
+    """Return the independently verified identity for one real endpoint."""
+
+    _expect(endpoint in ENDPOINTS, f"unknown signed-native endpoint: {endpoint}")
+    source = _endpoint_root(root, endpoint)
+    if endpoint == "after" and CANDIDATE_BINDING is not None:
+        identity = candidate_identity(source)
+        identity.setdefault("source_kind", "472b")
+        identity.setdefault("source_role", "candidate")
+    else:
+        identity = _endpoint_identity_from_reviewed(source, endpoint)
+    identity = dict(identity)
+    identity["endpoint"] = endpoint
+    identity["source_kind"] = ENDPOINT_SOURCE_KINDS[endpoint]
+    identity["source_role"] = ENDPOINT_ROLE[endpoint]
+    identity["api_branch"] = ENDPOINT_API_BRANCH[endpoint]
+    return identity
+
+
+def validate_endpoint_policy(endpoint: str) -> dict[str, Any]:
+    """Validate endpoint pins without treating the other leg as its source."""
+
+    _expect(endpoint in ENDPOINTS, f"unknown signed-native endpoint: {endpoint}")
+    document = load_policy()
+    _validate_policy_document(document, execution=False)
+    endpoints = document.get("endpoints")
+    _expect(isinstance(endpoints, dict), "endpoint source policy is missing")
+    _expect(endpoints.get(endpoint) == ENDPOINT_SOURCE_BINDINGS[endpoint], f"{endpoint} source binding differs from the trusted policy")
+    _expect(ENDPOINT_ROUTE_STATUS[endpoint] and set(ENDPOINT_ROUTE_STATUS[endpoint]) == set(ROUTES), f"{endpoint} route disposition matrix is incomplete")
+    _fixture_policy()
+    return {"endpoint": endpoint, "source": ENDPOINT_SOURCE_BINDINGS[endpoint], "api_branch": ENDPOINT_API_BRANCH[endpoint], "routes": ENDPOINT_ROUTE_STATUS[endpoint]}
+
+
+def prepare(source_root: Path, output_root: Path, *, endpoint: str = "after") -> dict[str, Any]:
+    """Prepare one endpoint after its checked-in source gate passes."""
+
+    validate_endpoint_policy(endpoint)
+    source_root = _endpoint_root(source_root, endpoint)
+    archive_path = Path(str(_endpoint_source_binding(endpoint)["source_archive"]["path"]))
     _assert_disjoint_paths(
         {
             "candidate source": source_root,
@@ -954,12 +1211,53 @@ def prepare(source_root: Path, output_root: Path) -> dict[str, Any]:
             "preparation output": output_root,
         }
     )
-    identity = candidate_identity(source_root)
-    # Import lazily so the pending source-only policy has no consumer side
-    # effects and so this module remains usable by the policy tests.
+    identity = endpoint_identity(source_root, endpoint)
+    # Import lazily so source validation remains independent of the consumer
+    # and no output is created until the endpoint fence has passed.
     from native_qualification import signed_native_v2_consumer as consumer
 
-    return consumer.prepare(source_root, output_root, identity=identity)
+    return consumer.prepare(source_root, output_root, endpoint=endpoint, identity=identity)
+
+
+def prepare_pair(
+    before_source: Path,
+    after_source: Path,
+    output_root: Path,
+) -> dict[str, Any]:
+    """Prepare both immutable endpoint projects under disjoint output roots."""
+
+    validate_endpoint_policy("before")
+    validate_endpoint_policy("after")
+    before = _endpoint_root(before_source, "before")
+    after = _endpoint_root(after_source, "after")
+    output = output_root.absolute()
+    _assert_disjoint_paths(
+        {
+            "before source": before,
+            "after source": after,
+            "before archive": Path(str(ENDPOINT_SOURCE_BINDINGS["before"]["source_archive"]["path"])),
+            "after archive": Path(str(ENDPOINT_SOURCE_BINDINGS["after"]["source_archive"]["path"])),
+            "pair output": output,
+        }
+    )
+    _expect(not output.exists() and not output.is_symlink(), f"refusing to overwrite pair output: {output}")
+    from native_qualification import signed_native_v2_consumer as consumer
+
+    output.mkdir(parents=True)
+    before_result = consumer.prepare(before, output / "before", endpoint="before")
+    after_result = consumer.prepare(after, output / "after", endpoint="after")
+    pair = {
+        "schema": "litchi.signed-native.preparation-pair.v2",
+        "status": "prepared",
+        "endpoints": {
+            "before": before_result["receipt"],
+            "after": after_result["receipt"],
+        },
+    }
+    pair_path = output / "pair-receipt.json"
+    _expect(not pair_path.exists(), f"refusing to overwrite pair receipt: {pair_path}")
+    pair_path.write_bytes(_canonical(pair))
+    return {"status": "prepared", "output": str(output), "receipt": pair, "pair_receipt": str(pair_path)}
 
 
 def execute(
@@ -967,19 +1265,24 @@ def execute(
     capabilities: Path | None = None,
     *,
     output: Path | None = None,
+    endpoint: str | None = None,
 ) -> dict[str, Any]:
     """Consume a built v2 receipt and typed protocol capabilities.
 
-    The execution gate is checked before the consumer is imported.  Thus a
-    pending policy still fails closed and cannot create an output directory or
-    relabel a historical v1 receipt.
+    A no-input invocation still checks the historical pending policy and fails
+    closed; an explicit prepared endpoint delegates only after its own source
+    receipt has been revalidated.
     """
 
-    validate_policy(execution=True)
-    _expect(CANDIDATE_BINDING is not None, "candidate source identity is not frozen")
+    if prepared_root is None:
+        # Keep the no-input invocation fail-closed rather than guessing an
+        # endpoint or consuming a historical receipt.
+        validate_policy(execution=True)
+    if endpoint is not None:
+        validate_endpoint_policy(endpoint)
     from native_qualification import signed_native_v2_consumer as consumer
 
-    return consumer.execute(prepared_root, capabilities, output=output)
+    return consumer.execute(prepared_root, capabilities, output=output, endpoint=endpoint)
 
 
 def reject_v1_receipt(receipt: Mapping[str, Any]) -> None:
@@ -992,11 +1295,19 @@ def reject_v1_receipt(receipt: Mapping[str, Any]) -> None:
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source-root", type=Path, required=True)
+    parser.add_argument("--endpoint", choices=ENDPOINTS, default="after")
+    parser.add_argument("--source-root", type=Path)
+    parser.add_argument("--before-source", type=Path)
+    parser.add_argument("--after-source", type=Path)
     parser.add_argument("--output-root", type=Path, required=True)
     arguments = parser.parse_args(argv)
     try:
-        prepare(arguments.source_root, arguments.output_root)
+        if arguments.before_source is not None or arguments.after_source is not None:
+            _expect(arguments.before_source is not None and arguments.after_source is not None, "pair preparation requires both endpoint source roots")
+            prepare_pair(arguments.before_source, arguments.after_source, arguments.output_root)
+        else:
+            _expect(arguments.source_root is not None, "single endpoint preparation requires --source-root")
+            prepare(arguments.source_root, arguments.output_root, endpoint=arguments.endpoint)
     except (OSError, ValueError) as error:
         parser.error(str(error))
     return 0
