@@ -4956,3 +4956,49 @@ See [0063](0063-source-pptx-modern-comments.md).
   passes the retained source limits to both raw parser calls. Feature-specific
   and standalone reruns remain required; all-feature passes did not cover
   those branches. Final gate and performance qualification remain open.
+
+- Coordinator RTF, Markdown and benchmark integration (2026-10-25):
+  Markdown atomic `e8b359eb6a` merges at `d86898161a`. Root verifies its
+  seven passing guarded rows, source equality, retained replay/history policy
+  and empty final process ownership. RTF atomic `d80cbb4fb6` merges at
+  `ee7e9955d3` with the complete reviewed DrawingML-v2 packet and both
+  standalone PPT benchmark repairs. The approved-lock RTF rerun passes all
+  nine rows, including 1,539 tests; root verifies source, locks, logs, traces,
+  target guards and terminal cleanup. The earlier regenerated-lock receipt
+  remains rejected and preserved.
+
+  Composed `200a3e5af3` passes all ten PPT/PPTX/XLSX/ops/facade check and
+  Clippy rows across its preserved attempts. Minimal/non-encryption PPT check
+  and Clippy pass on `9d8b8e5a8c`, whose standalone failure exposes two more
+  benchmark callers. Return 0362ul39b supplies the required default parser
+  profile and the equivalent public snapshot constructor; independent review
+  confirms unchanged behavior and timer boundaries. Fresh composed `ee7e9955d3`
+  then passes the actual guarded standalone all-target compiler check. Root
+  verifies its complete receipt and 2,851,946,744-byte final target; record
+  0362ul77 binds this result. These are compiler checks, not performance runs.
+
+  DrawingML ancestry merges at `45c18b4e08`; the protocol uses the exact
+  historical library rather than reversing later candidate migrations. The
+  signed-native and current-native protocols merge at `2cce4e55c1` and
+  `dcd5709b5c`; a standalone Python import failure is repaired at `0dc6c76634`
+  and preserved in 0362ul75e. The candidate bindings remain unset. The tooling
+  row now has 39 modules with 53 gate steps unchanged. The 113 selected
+  integration tests and 47 protocol/wiring tests pass; a fresh complete
+  tooling row is running. Crypto 0362ul52 receipts are explicitly classified
+  as correctness/compiler evidence; all 3,700 measurement rows and 150 open
+  misses remain unchanged.
+
+  Further review returns PPTX replay for destination-profile enforcement:
+  equal-content replay must apply the recipient's selected semantic limits.
+  PPTX content also needs complete source-backed profile retention and
+  fallible allocations. Numbers-wire 0362ul66a, XLDM 0362ul68b and formula
+  0362ul69c pass source review; actual validation remains required. The four
+  build slots now belong to ODF, VBA, PPTX properties and XLDM. A newly found
+  output-symlink escape in the current-native validator is returned as
+  0362ul75f for independent review; no native acceptance is claimed.
+
+  Cleanup wave 60 is authorized for the merged font, crypto and Markdown
+  worktrees after their owners retire all stale audit groups. Completion and
+  measured savings remain pending. Full integration acceptance, complete
+  gates, native/performance qualification and the signed-batch contract choice
+  remain open. Nothing is pushed.
