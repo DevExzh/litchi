@@ -520,12 +520,7 @@ fn durable_stale_and_wire_tampering_are_atomic() {
     };
     let target_error =
         assert_rejected_unchanged(&original, &decode_wire(&target_tampered), "target tamper");
-    assert!(
-        target_error
-            .to_string()
-            .to_ascii_lowercase()
-            .contains("target")
-    );
+    assert_patch_conflict(&target_error, "unexpected target-tamper error");
 
     let (_, _, intent) = wire_blob(&wire, "forward_blobs");
     let altered_intent = durable_replace_once(&intent, b"runtime-public", b"runtime-stale");
