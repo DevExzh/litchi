@@ -4932,3 +4932,27 @@ See [0063](0063-source-pptx-modern-comments.md).
   XLDM and formula changes for concrete retained-policy, typed-error and
   preallocation gaps. Those fixes and actual acceptance remain required;
   nothing is pushed.
+
+- Coordinator feature coverage and lock-provenance return (2026-10-25):
+  Census tooling registration merges at `8ea056c5dc`. The 53-step gate now
+  includes 36 tooling modules; its changed runner line only adds the census
+  test module. Root verifies the exact one-line delta, fourteen selected tests
+  and synchronized external gate recipe. Active scoped runs keep their
+  original approved runner; historical receipts remain unchanged.
+
+  Markdown source `19767b4467` passes seven actual guarded Markdown, ops and
+  facade rows. Root verifies logs, traces, target guards and empty terminal
+  owned-process lists; independent review accepts its final compile/Clippy
+  delta and populated-history regression. Its atomic packet awaits final
+  coordinator composition. Slot 2 moves to reviewed VBA `604bce4fc5`.
+
+  RTF's guarded suite used locally regenerated root lock `558fafc4fd`, rather
+  than approved `4100b1fbb2`. Root independently confirms six registry-version
+  substitutions and rejects that run as acceptance. The source and original
+  receipts remain preserved; slot 3 reruns with the exact approved lock and
+  a separate provenance correction. No dependency regeneration is accepted.
+  Its standalone compiler failure also exposes two unmigrated PPT calls
+  behind the non-encryption feature branch. Return 0362ul39a at `9d8b8e5a8c`
+  passes the retained source limits to both raw parser calls. Feature-specific
+  and standalone reruns remain required; all-feature passes did not cover
+  those branches. Final gate and performance qualification remain open.
