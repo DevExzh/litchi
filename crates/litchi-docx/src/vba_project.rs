@@ -294,15 +294,6 @@ impl VbaProject {
         &self.supplemental_data_part_name
     }
 
-    /// Parse the `vbaProject.bin` payload with default resource limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation cannot be completed.
-    pub fn project(&self, package: &OpcPackage) -> Result<Project> {
-        self.project_with(package, &Limits::default())
-    }
-
     /// Parse the `vbaProject.bin` payload with explicit resource limits.
     ///
     /// The relationship graph remains independently inspectable through this
@@ -312,7 +303,7 @@ impl VbaProject {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn project_with(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
+    pub fn project(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
         Ok(read_project_part(package, &self.project_part_name, limits)?)
     }
 }
@@ -642,7 +633,9 @@ mod tests {
         bytes.set_position(0);
         let mut reopened = Package::from_reader(bytes).unwrap();
         let metadata = reopened.vba().unwrap().unwrap();
-        let parsed = metadata.project(reopened.opc_package()).unwrap();
+        let parsed = metadata
+            .project(reopened.opc_package(), &Limits::default())
+            .unwrap();
         assert_eq!(parsed.name(), "WordProject");
         assert_eq!(
             reopened

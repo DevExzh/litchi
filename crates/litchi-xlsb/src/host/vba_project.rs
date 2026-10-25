@@ -87,16 +87,11 @@ impl VbaProject {
         &self.signatures
     }
 
-    /// Parse the `vbaProject.bin` payload with default resource limits.
-    pub fn project(&self, package: &OpcPackage) -> Result<Project> {
-        self.project_with(package, &Limits::default())
-    }
-
     /// Parse the `vbaProject.bin` payload with explicit resource limits.
     ///
     /// Declared signature payloads remain separate opaque relationship
     /// metadata and are not treated as trust decisions.
-    pub fn project_with(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
+    pub fn project(&self, package: &OpcPackage, limits: &Limits) -> Result<Project> {
         Ok(read_project_part(package, &self.project_part_name, limits)?)
     }
 }
@@ -539,7 +534,9 @@ mod tests {
         workbook.save(&mut bytes).unwrap();
         let mut reopened = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
         let metadata = reopened.vba().unwrap().unwrap();
-        let parsed = metadata.project(reopened.opc_package()).unwrap();
+        let parsed = metadata
+            .project(reopened.opc_package(), &Limits::default())
+            .unwrap();
         assert_eq!(parsed.name(), "BinaryWorkbookProject");
         assert_eq!(parsed.modules().len(), 1);
 
@@ -571,7 +568,7 @@ mod tests {
             assert_eq!(metadata.project_part_name().as_str(), PROJECT_PART);
             assert_eq!(
                 metadata
-                    .project_with(workbook.opc_package(), &limits)
+                    .project(workbook.opc_package(), &limits)
                     .unwrap()
                     .name(),
                 "BinaryWorkbookProject"
@@ -751,7 +748,10 @@ mod tests {
         let preserved = workbook.vba().unwrap().unwrap();
         assert_eq!(preserved.relationship_id(), relationship_id);
         assert_eq!(
-            preserved.project(workbook.opc_package()).unwrap().name(),
+            preserved
+                .project(workbook.opc_package(), &Limits::default())
+                .unwrap()
+                .name(),
             "BinaryWorkbookProject"
         );
     }

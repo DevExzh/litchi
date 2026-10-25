@@ -5,7 +5,7 @@
 )]
 #![cfg(feature = "vba-inspection")]
 
-#[cfg(feature = "encryption")]
+use litchi_core::OwnedSource;
 use litchi_ppt::OpenOptions;
 use litchi_ppt::embedded::storage::{Compression, Kind};
 use litchi_ppt::writer::Builder;
@@ -17,6 +17,7 @@ use litchi_vba::{
     build::{Module, Project},
 };
 use std::io::Cursor;
+use std::sync::Arc;
 
 fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
@@ -127,7 +128,8 @@ fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
             .is_err()
     );
 
-    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let bytes = write(&mut writer);
+    let mut package = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
     let presentation = package.presentation().unwrap();
     let project = presentation.vba().unwrap().unwrap();
     assert_eq!(project.name(), "ExistingProject");
@@ -136,17 +138,117 @@ fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
         max_cfb_bytes: 1,
         ..VbaProjectLimits::default()
     };
+    let limited_cfb = package
+        .presentation_with_options(OpenOptions::new().vba_project_limits(limits))
+        .unwrap();
+    assert_eq!(limited_cfb.vba_project_limits(), limits);
+    let owned = litchi_ppt::Package::from_bytes_with_options(
+        &bytes,
+        OpenOptions::new().vba_project_limits(limits),
+    )
+    .unwrap();
+    let owned_presentation = owned.presentation().unwrap();
+    assert_eq!(owned_presentation.vba_project_limits(), limits);
     assert!(matches!(
-        presentation.vba_with(&limits),
+        owned_presentation.vba(),
         Err(VbaProjectError::PowerPoint(_))
     ));
+    assert!(matches!(
+        limited_cfb.vba(),
+        Err(VbaProjectError::PowerPoint(_))
+    ));
+
+    let inverse_limits = VbaProjectLimits {
+        project: Limits {
+            max_cfb_bytes: 1,
+            ..Limits::default()
+        },
+        ..VbaProjectLimits::default()
+    };
+    let inverse = package
+        .presentation_with_options(OpenOptions::new().vba_project_limits(inverse_limits))
+        .unwrap();
+    assert!(matches!(inverse.vba(), Err(VbaProjectError::PowerPoint(_))));
 
     let stored_limits = VbaProjectLimits {
         max_stored_bytes: 0,
         ..VbaProjectLimits::default()
     };
+    let limited_stored = package
+        .presentation_with_options(OpenOptions::new().vba_project_limits(stored_limits))
+        .unwrap();
     assert!(matches!(
-        presentation.vba_with(&stored_limits),
+        limited_stored.vba(),
+        Err(VbaProjectError::PowerPoint(_))
+    ));
+}
+
+#[test]
+fn vba_policy_survives_projection_adoption_and_republication() {
+    let mut writer = Builder::new();
+    writer.add_slide().unwrap();
+    writer.set_vba(Project::new("RetainedPolicy")).unwrap();
+    let bytes = write(&mut writer);
+    let selected = VbaProjectLimits {
+        project: Limits {
+            max_cfb_bytes: 1,
+            ..Limits::default()
+        },
+        ..VbaProjectLimits::default()
+    };
+
+    let mut eager = Reader::from_reader_with_options(
+        Cursor::new(bytes.clone()),
+        OpenOptions::new().vba_project_limits(selected),
+    )
+    .unwrap();
+    let inherited = eager.presentation_with_options(OpenOptions::new()).unwrap();
+    assert_eq!(inherited.vba_project_limits(), selected);
+    assert!(matches!(
+        inherited.vba(),
+        Err(VbaProjectError::PowerPoint(_))
+    ));
+    let explicitly_replaced = eager
+        .presentation_with_options(
+            OpenOptions::new().vba_project_limits(VbaProjectLimits::default()),
+        )
+        .unwrap();
+    assert_eq!(
+        explicitly_replaced.vba_project_limits(),
+        VbaProjectLimits::default()
+    );
+    assert!(explicitly_replaced.vba().unwrap().is_some());
+
+    let source = litchi_ppt::SourceBackedPackage::from_read_at_with_options(
+        Arc::new(OwnedSource::new(bytes)),
+        OpenOptions::new().vba_project_limits(selected),
+    )
+    .unwrap();
+    assert_eq!(
+        source
+            .presentation_with_options(OpenOptions::new())
+            .unwrap()
+            .vba_project_limits(),
+        selected
+    );
+    let adopted = litchi_ppt::Package::from_source(source, OpenOptions::new()).unwrap();
+    assert_eq!(
+        adopted.presentation().unwrap().vba_project_limits(),
+        selected
+    );
+
+    let mut metadata = adopted.edit_metadata().unwrap();
+    metadata
+        .merge_metadata(&litchi_core::Metadata {
+            title: Some("Retained policy".to_owned()),
+            ..litchi_core::Metadata::default()
+        })
+        .unwrap();
+    let republished = metadata.commit().unwrap().into_package();
+    let republished_presentation = republished.presentation().unwrap();
+    assert_eq!(republished_presentation.vba_project_limits(), selected);
+    assert!(matches!(
+        republished_presentation.vba(),
         Err(VbaProjectError::PowerPoint(_))
     ));
 }

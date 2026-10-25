@@ -28,6 +28,8 @@ pub struct SourceBackedPackage {
     shared: Arc<SharedOleFile>,
     source_limits: SourceLimits,
     leniency: crate::leniency::Leniency,
+    #[cfg(feature = "vba-inspection")]
+    vba_project_limits: crate::VbaProjectLimits,
 }
 
 impl std::fmt::Debug for SourceBackedPackage {
@@ -54,6 +56,8 @@ impl SourceBackedPackage {
             shared,
             source_limits,
             leniency: options.leniency_value(),
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: options.vba_project_limits_value(),
         })
     }
 
@@ -64,10 +68,10 @@ impl SourceBackedPackage {
 
     /// Open a positional source under explicit open options.
     ///
-    /// The package keeps the options' source limits and leniency; every
-    /// presentation it builds inherits them. The CFB index is validated
-    /// before this method returns. Stream payloads are not read by the
-    /// package constructor.
+    /// The package keeps the options' source limits, leniency, and VBA
+    /// inspection profile; every presentation it builds inherits them. The
+    /// CFB index is validated before this method returns. Stream payloads are
+    /// not read by the package constructor.
     pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
         options: OpenOptions<'_>,
@@ -123,6 +127,8 @@ impl SourceBackedPackage {
             shared: Arc::new(shared),
             source_limits,
             leniency: options.leniency_value(),
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: options.vba_project_limits_value(),
         })
     }
 
@@ -166,6 +172,8 @@ impl SourceBackedPackage {
             shared: Arc::new(shared),
             source_limits,
             leniency: options.leniency_value(),
+            #[cfg(feature = "vba-inspection")]
+            vba_project_limits: options.vba_project_limits_value(),
         }))
     }
 
@@ -227,7 +235,10 @@ impl SourceBackedPackage {
     /// semantic pipeline as [`crate::raw::Reader::presentation`]. `Pictures` is
     /// only represented by its validated descriptor.
     pub fn presentation(&self) -> Result<Presentation> {
-        self.presentation_with_options(OpenOptions::default().leniency(self.leniency))
+        let options = OpenOptions::default().leniency(self.leniency);
+        #[cfg(feature = "vba-inspection")]
+        let options = options.vba_project_limits(self.vba_project_limits);
+        self.presentation_with_options(options)
     }
 
     /// Build a presentation with per-call open options, such as the password
@@ -236,6 +247,8 @@ impl SourceBackedPackage {
     /// Explicit source limits in `options` can only tighten the package's
     /// own; the options' leniency replaces the package's for this call.
     pub fn presentation_with_options(&self, options: OpenOptions<'_>) -> Result<Presentation> {
+        #[cfg(feature = "vba-inspection")]
+        let options = options.inherit_vba_project_limits(self.vba_project_limits);
         let source_limits = if options.has_explicit_source_limits() {
             self.source_limits
                 .constrained_by(options.source_limits_value())

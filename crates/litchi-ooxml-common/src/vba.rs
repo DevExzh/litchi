@@ -111,7 +111,7 @@ pub fn read_project_part(
     limits: &Limits,
 ) -> Result<Project> {
     let part = package.get_part(part_name)?;
-    Project::read_with(part.blob(), limits).map_err(Error::from)
+    Project::read(part.blob(), limits).map_err(Error::from)
 }
 
 /// Replace or attach the one VBA graph allowed for an OOXML main part.

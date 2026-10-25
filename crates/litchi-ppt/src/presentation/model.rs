@@ -158,6 +158,9 @@ pub(crate) struct PresentationData {
     pub(super) pictures_source: Option<LazyPictures>,
     /// Record limits retained for lazy live-persist parsing.
     pub(crate) source_limits: SourceLimits,
+    /// VBA inspection limits retained from the owning open options.
+    #[cfg(feature = "vba-inspection")]
+    pub(crate) vba_project_limits: crate::VbaProjectLimits,
     /// Non-structural defects repaired while the presentation was opened.
     ///
     /// Aggregated by the constructors in `package.rs`; see
@@ -204,6 +207,13 @@ impl Presentation {
     #[must_use]
     pub fn source_limits(&self) -> SourceLimits {
         self.inner.source_limits
+    }
+
+    /// Limits retained for inert VBA project inspection.
+    #[cfg(feature = "vba-inspection")]
+    #[must_use]
+    pub fn vba_project_limits(&self) -> crate::VbaProjectLimits {
+        self.inner.vba_project_limits
     }
 
     /// Whether this presentation was opened with password-to-open encryption.
@@ -1015,11 +1025,13 @@ impl Presentation {
         Ok(self.vba_project_storage()?.map(|storage| storage.info()))
     }
 
-    /// Parse the embedded MS-OVBA project with safe default limits.
+    /// Parse the embedded MS-OVBA project with the limits retained by the
+    /// owning open options.
     ///
     /// The outer zlib stream, inner CFB, and MS-OVBA compressed containers are
-    /// bounded, and source is never compiled, interpreted, or executed. Use
-    /// [`Self::vba_with`] to supply custom ceilings.
+    /// bounded, and source is never compiled, interpreted, or executed. Set
+    /// [`crate::OpenOptions::vba_project_limits`] before constructing this
+    /// immutable projection to select custom ceilings.
     ///
     /// # Errors
     ///
@@ -1028,22 +1040,7 @@ impl Presentation {
     pub fn vba(
         &self,
     ) -> std::result::Result<Option<litchi_vba::project::Project>, crate::VbaProjectError> {
-        self.vba_with(&crate::VbaProjectLimits::default())
-    }
-
-    /// Parse the embedded MS-OVBA project with explicit resource limits.
-    ///
-    /// Stored and declared outer sizes are checked on a borrowed record view
-    /// before any VBA payload is copied or decompressed.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    #[cfg(feature = "vba-inspection")]
-    pub fn vba_with(
-        &self,
-        limits: &crate::VbaProjectLimits,
-    ) -> std::result::Result<Option<litchi_vba::project::Project>, crate::VbaProjectError> {
+        let limits = self.inner.vba_project_limits;
         let records = self.inner.parser.find_records_ref();
         let Some(info) = crate::VbaInfo::parse_records(&records)? else {
             return Ok(None);
@@ -1063,14 +1060,13 @@ impl Presentation {
             ))
             .into());
         };
+        let cfb_limits = crate::vba_info::vba_cfb_limits(&limits)?;
         let storage = storage_ref.check_stored_limit(limits.max_stored_bytes)?;
-        let cfb = storage.decompressed_bytes(limits.max_cfb_bytes)?;
-        let mut ole = OleFile::open(
-            Cursor::new(cfb.as_ref()),
-            litchi_cfb::OleFileLimits::default(),
-        )
-        .map_err(litchi_vba::Error::from)
-        .map_err(crate::VbaProjectError::from)?;
+        let decompressed_limit = limits.max_cfb_bytes.min(limits.project.max_cfb_bytes);
+        let cfb = storage.decompressed_bytes(decompressed_limit)?;
+        let mut ole = OleFile::open(Cursor::new(cfb.as_ref()), cfb_limits)
+            .map_err(litchi_vba::Error::from)
+            .map_err(crate::VbaProjectError::from)?;
         litchi_vba::project::Project::open(&mut ole, &[], &limits.project)
             .map(Some)
             .map_err(Into::into)

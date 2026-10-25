@@ -518,6 +518,7 @@ impl Project {
         Ok(Payload {
             bytes,
             module_count,
+            limits: *limits,
         })
     }
 }
@@ -677,6 +678,7 @@ impl Streams {
 pub struct Payload {
     bytes: Vec<u8>,
     module_count: usize,
+    limits: Limits,
 }
 
 impl Payload {
@@ -688,10 +690,7 @@ impl Payload {
     /// file, or contains a malformed MS-OVBA project.
     pub fn read(bytes: Vec<u8>, limits: &Limits) -> Result<Self, Error> {
         check_limit(LimitKind::CfbBytes, bytes.len(), limits.max_cfb_bytes)?;
-        let mut ole = OleFile::open(
-            Cursor::new(bytes.as_slice()),
-            litchi_cfb::OleFileLimits::default(),
-        )?;
+        let mut ole = OleFile::open(Cursor::new(bytes.as_slice()), crate::cfb_limits(limits)?)?;
         let project = crate::project::Project::open(&mut ole, &[], limits)?;
         project.validate_payload(limits)?;
         let _ = project.project_wm(limits)?;
@@ -699,6 +698,7 @@ impl Payload {
         Ok(Self {
             bytes,
             module_count,
+            limits: *limits,
         })
     }
 
@@ -728,6 +728,9 @@ impl Payload {
 
     /// Copy all payload streams into an existing CFB writer at a project root.
     ///
+    /// The physical CFB reader and every copied stream use the same limits
+    /// that admitted this payload; no nested CFB default is introduced.
+    ///
     /// # Errors
     ///
     /// Returns an error if the validated payload cannot be re-read, or if the
@@ -739,7 +742,7 @@ impl Payload {
     ) -> Result<(), Error> {
         let mut source = OleFile::open(
             Cursor::new(self.bytes.as_slice()),
-            litchi_cfb::OleFileLimits::default(),
+            crate::cfb_limits(&self.limits)?,
         )?;
         for source_path in source.list_streams() {
             let is_vba_stream =
@@ -757,7 +760,11 @@ impl Payload {
             {
                 version_project_stream()
             } else {
-                source.open_stream(&source_components)?
+                crate::project::read_limited_stream(
+                    &mut source,
+                    &source_components,
+                    self.limits.max_cfb_bytes,
+                )?
             };
             let mut target_path: Vec<String> = project_root_path
                 .iter()

@@ -67,6 +67,8 @@ fn presentation_with_vba_storage() -> Presentation {
         pictures_data: None,
         pictures_source: None,
         source_limits: crate::SourceLimits::default(),
+        #[cfg(feature = "vba-inspection")]
+        vba_project_limits: crate::VbaProjectLimits::default(),
         tolerance: crate::leniency::ToleranceReport::default(),
         source: None,
         #[cfg(feature = "encryption")]
@@ -93,6 +95,8 @@ fn lazy_live_document_reuses_presentation_source_limits() {
             max_record_payload_bytes: 0,
             ..crate::SourceLimits::default()
         },
+        #[cfg(feature = "vba-inspection")]
+        vba_project_limits: crate::VbaProjectLimits::default(),
         tolerance: crate::leniency::ToleranceReport::default(),
         source: None,
         #[cfg(feature = "encryption")]

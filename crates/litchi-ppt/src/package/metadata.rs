@@ -401,12 +401,12 @@ fn ensure_source_version(base: &Package, expected: SourceVersion) -> Result<()> 
 }
 
 fn reopen(base: &Package, bytes: &[u8]) -> Result<Package> {
-    Ok(Package::from_bytes_with_options(
-        bytes,
-        OpenOptions::default()
-            .source_limits(base.source_limits())
-            .leniency(base.leniency()),
-    )?)
+    let options = OpenOptions::default()
+        .source_limits(base.source_limits())
+        .leniency(base.leniency());
+    #[cfg(feature = "vba-inspection")]
+    let options = options.vba_project_limits(base.vba_project_limits());
+    Ok(Package::from_bytes_with_options(bytes, options)?)
 }
 
 #[cfg(test)]
