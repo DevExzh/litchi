@@ -1223,7 +1223,7 @@ pub(crate) fn rewrite_shape_text(
 /// an inverse can restore its original spelling and run distribution.
 pub(crate) fn shape_text_skeleton(xml: &[u8]) -> Result<[u8; 32]> {
     use sha2::{Digest, Sha256};
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     if scene.is_rewritten() {
         return Err(invalid(
             "source patch text proof cannot select MCE branches",
@@ -1369,7 +1369,7 @@ pub(super) fn stage_shape_texts_admitted(
         });
     }
 
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -1430,7 +1430,7 @@ pub(super) fn stage_shape_texts_admitted(
     let Some(candidate) = staged.as_deref() else {
         return Ok((None, 0));
     };
-    let published = crate::shape::Scene::read(candidate)?;
+    let published = crate::shape::Scene::read(candidate, crate::shape::Limits::DEFAULT)?;
     if published.is_rewritten() || published.len() != scene.len() {
         return Err(invalid(
             "opened-presentation shape text batch changed the semantic shape graph",
@@ -1774,8 +1774,8 @@ pub(crate) fn append_shape(xml: &[u8], fragment: &[u8]) -> Result<Vec<u8>> {
 /// or placement; the caller then applies the ordinary skeleton proof and
 /// rejects the pair.
 pub(crate) fn strip_appended_text_boxes(before: &[u8], after: &[u8]) -> Result<Option<Vec<u8>>> {
-    let before_scene = crate::shape::Scene::read(before)?;
-    let after_scene = crate::shape::Scene::read(after)?;
+    let before_scene = crate::shape::Scene::read(before, crate::shape::Limits::DEFAULT)?;
+    let after_scene = crate::shape::Scene::read(after, crate::shape::Limits::DEFAULT)?;
     if before_scene.is_rewritten() || after_scene.is_rewritten() {
         return Ok(None);
     }
@@ -2030,7 +2030,7 @@ fn shape_removal_plan(
     xml: &[u8],
     key: crate::shape::Key<'_>,
 ) -> Result<(Range<usize>, BTreeSet<u32>, usize)> {
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -2124,7 +2124,7 @@ pub(crate) fn stage_shape_removal(
     candidate.extend_from_slice(span_bytes(xml, span.end..xml.len())?);
     validate_shape_removal_dependencies(&candidate, &removed_identities)?;
 
-    let published = crate::shape::Scene::read(&candidate)?;
+    let published = crate::shape::Scene::read(&candidate, crate::shape::Limits::DEFAULT)?;
     if published.is_rewritten()
         || published.len().checked_add(removed_identities.len()) != Some(shape_count)
     {
@@ -2132,7 +2132,7 @@ pub(crate) fn stage_shape_removal(
             "opened-presentation shape removal changed the semantic shape graph",
         ));
     }
-    let original = crate::shape::Scene::read(xml)?;
+    let original = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     let mut retained_shapes = original.iter().filter(|shape| {
         shape
             .id()

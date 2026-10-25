@@ -51,7 +51,7 @@ fn picture_bounds_are_set_lexically() -> Result<()> {
     assert_eq!(changed, 1);
     let after = edit.commit()?.into_package();
     let xml = slide_xml(&after)?;
-    let scene = crate::shape::Scene::read(&xml)?;
+    let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
     let bounds = scene.at(0)?.common().bounds().expect("bounds");
     assert_eq!(
         (bounds.x(), bounds.y(), bounds.width(), bounds.height()),
@@ -97,7 +97,7 @@ fn descriptions_are_set_and_removed() -> Result<()> {
     assert!(edit.set_shape_description(0usize, 0usize, Some("A \"logo\" & mark"))?);
     let described = edit.commit()?.into_package();
     let xml = slide_xml(&described)?;
-    let scene = crate::shape::Scene::read(&xml)?;
+    let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
     assert_eq!(
         scene.at(0)?.description()?.as_deref(),
         Some("A \"logo\" & mark")

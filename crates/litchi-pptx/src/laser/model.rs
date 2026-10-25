@@ -113,10 +113,172 @@ impl Trace {
     }
 }
 
-/// Aggregate resource state for reading one or more slide XML parts.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+/// Caller-selected resource policy for laser-trace XML operations.
+///
+/// This policy is immutable.  Aggregate accounting for a package or a slide
+/// walk lives in [`Usage`], so tightening a policy cannot accidentally reset
+/// or reuse a mutable counter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[must_use]
 pub struct Limits {
-    pub(super) total_slide_xml_bytes: usize,
-    pub(super) trace_count: usize,
-    pub(super) point_count: usize,
+    max_slide_xml_bytes: usize,
+    max_total_slide_xml_bytes: usize,
+    max_trace_count: usize,
+    max_point_count: usize,
+    max_xml_nodes: usize,
+    max_xml_depth: usize,
+    max_output_bytes: usize,
+}
+
+impl Limits {
+    /// Conservative bounded policy for ordinary PresentationML slides.
+    pub const DEFAULT: Self = Self {
+        max_slide_xml_bytes: 32 * 1024 * 1024,
+        max_total_slide_xml_bytes: 256 * 1024 * 1024,
+        max_trace_count: 4_096,
+        max_point_count: 65_536,
+        max_xml_nodes: 250_000,
+        max_xml_depth: 128,
+        max_output_bytes: 32 * 1024 * 1024,
+    };
+
+    /// Construct a finite policy, bounded by the crate's safety ceilings.
+    #[must_use]
+    pub const fn new(
+        max_slide_xml_bytes: usize,
+        max_total_slide_xml_bytes: usize,
+        max_trace_count: usize,
+        max_point_count: usize,
+        max_xml_nodes: usize,
+        max_xml_depth: usize,
+        max_output_bytes: usize,
+    ) -> Option<Self> {
+        let default = Self::DEFAULT;
+        if max_slide_xml_bytes == 0
+            || max_slide_xml_bytes > default.max_slide_xml_bytes
+            || max_total_slide_xml_bytes == 0
+            || max_total_slide_xml_bytes > default.max_total_slide_xml_bytes
+            || max_trace_count == 0
+            || max_trace_count > default.max_trace_count
+            || max_point_count == 0
+            || max_point_count > default.max_point_count
+            || max_xml_nodes == 0
+            || max_xml_nodes > default.max_xml_nodes
+            || max_xml_depth == 0
+            || max_xml_depth > default.max_xml_depth
+            || max_output_bytes == 0
+            || max_output_bytes > default.max_output_bytes
+        {
+            return None;
+        }
+        Some(Self {
+            max_slide_xml_bytes,
+            max_total_slide_xml_bytes,
+            max_trace_count,
+            max_point_count,
+            max_xml_nodes,
+            max_xml_depth,
+            max_output_bytes,
+        })
+    }
+
+    /// Maximum bytes accepted from one slide XML part.
+    #[must_use]
+    pub const fn max_slide_xml_bytes(self) -> usize {
+        self.max_slide_xml_bytes
+    }
+
+    /// Maximum aggregate bytes accepted across slide XML parts.
+    #[must_use]
+    pub const fn max_total_slide_xml_bytes(self) -> usize {
+        self.max_total_slide_xml_bytes
+    }
+
+    /// Maximum traces retained across the operation's usage ledger.
+    #[must_use]
+    pub const fn max_trace_count(self) -> usize {
+        self.max_trace_count
+    }
+
+    /// Maximum points retained across the operation's usage ledger.
+    #[must_use]
+    pub const fn max_point_count(self) -> usize {
+        self.max_point_count
+    }
+
+    /// Maximum XML nodes scanned in one slide.
+    #[must_use]
+    pub const fn max_xml_nodes(self) -> usize {
+        self.max_xml_nodes
+    }
+
+    /// Maximum XML nesting depth scanned in one slide.
+    #[must_use]
+    pub const fn max_xml_depth(self) -> usize {
+        self.max_xml_depth
+    }
+
+    /// Maximum bytes emitted by one trace fragment.
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+
+    /// Return this policy with a separate bounded output budget.
+    #[must_use]
+    pub const fn with_output_bytes(mut self, max_output_bytes: usize) -> Option<Self> {
+        if max_output_bytes == 0 || max_output_bytes > Self::DEFAULT.max_output_bytes {
+            return None;
+        }
+        self.max_output_bytes = max_output_bytes;
+        Some(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+/// Mutable aggregate usage for one or more laser-trace slide reads.
+///
+/// Pass one value through a slide walk to preserve package-wide byte, trace,
+/// and point ceilings.  A failed read does not commit its staged charges.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[must_use]
+pub struct Usage {
+    total_slide_xml_bytes: usize,
+    trace_count: usize,
+    point_count: usize,
+}
+
+impl Usage {
+    /// Start an empty aggregate ledger.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            total_slide_xml_bytes: 0,
+            trace_count: 0,
+            point_count: 0,
+        }
+    }
+
+    /// Aggregate slide XML bytes charged by successful reads.
+    #[must_use]
+    pub const fn total_slide_xml_bytes(self) -> usize {
+        self.total_slide_xml_bytes
+    }
+
+    /// Aggregate traces charged by successful reads.
+    #[must_use]
+    pub const fn trace_count(self) -> usize {
+        self.trace_count
+    }
+
+    /// Aggregate points charged by successful reads.
+    #[must_use]
+    pub const fn point_count(self) -> usize {
+        self.point_count
+    }
 }

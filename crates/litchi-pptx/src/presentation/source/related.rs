@@ -731,7 +731,8 @@ impl SourceSlide {
 
             notes::validate(&self.owner, &self.data.part_uri, &part)?;
             let candidate = acquire_scene(&self.owner, &part, |source| {
-                let parsed = crate::shape::Scene::read(source.blob())?;
+                let parsed =
+                    crate::shape::Scene::read(source.blob(), crate::shape::Limits::DEFAULT)?;
                 let scene = OwnedScene::from_source(parsed, source.source_data().clone())?;
                 strict_scene(&scene, "notes")?;
                 Ok(scene)

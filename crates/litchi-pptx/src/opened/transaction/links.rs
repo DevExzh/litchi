@@ -160,7 +160,7 @@ impl Edit {
         let owner = self.working.get_part(&selected.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
         let xml = owner.blob().to_vec();
-        let scene = crate::shape::Scene::read(&xml)?;
+        let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
         if scene.is_rewritten() {
             return Err(crate::Error::refused(
                 litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -374,7 +374,7 @@ impl Edit {
         }
         out.extend_from_slice(&xml[cursor..]);
         // Read the candidate back: the same shapes, the click in place.
-        let staged = crate::shape::Scene::read(&out)?;
+        let staged = crate::shape::Scene::read(&out, crate::shape::Limits::DEFAULT)?;
         let staged_shape = staged.shape(key)?;
         if staged_shape.id() != shape_id {
             return Err(invalid("the hyperlink edit moved the shape"));

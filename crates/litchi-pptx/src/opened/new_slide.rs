@@ -54,7 +54,7 @@ impl Planned {
 
 /// The placeholders a new slide based on the layout XML instantiates.
 pub(crate) fn plan(layout_xml: &[u8]) -> Result<Vec<Planned>> {
-    let scene = crate::shape::Scene::read(layout_xml)?;
+    let scene = crate::shape::Scene::read(layout_xml, crate::shape::Limits::DEFAULT)?;
     let mut plan = Vec::new();
     let mut identities: HashSet<(u32, Option<PlaceholderKind>)> = HashSet::new();
     for shape in scene.roots() {
@@ -289,7 +289,7 @@ pub(crate) fn slide_xml(slide_id: u32, plan: &[Planned]) -> Result<String> {
 
 /// Check that a staged new slide holds exactly the planned placeholders.
 pub(crate) fn read_back(slide_xml: &[u8], plan: &[Planned]) -> Result<()> {
-    let scene = crate::shape::Scene::read(slide_xml)?;
+    let scene = crate::shape::Scene::read(slide_xml, crate::shape::Limits::DEFAULT)?;
     let read: Vec<_> = scene
         .iter()
         .map(|shape| {

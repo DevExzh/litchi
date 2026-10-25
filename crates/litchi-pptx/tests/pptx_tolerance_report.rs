@@ -452,7 +452,7 @@ fn ill_formed_shape_xml_stays_fatal() {
             r#"<a:off x="914400" y="914400">"#,
         )
     });
-    assert!(litchi_pptx::shape::Scene::read(&slide).is_err());
+    assert!(litchi_pptx::shape::Scene::read(&slide, litchi_pptx::shape::Limits::DEFAULT).is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -780,7 +780,9 @@ fn processing_instructions_are_skipped_and_recorded_once_per_part() {
         .unwrap()
         .blob()
         .to_vec();
-    let transition = litchi_pptx::transition::read(&blob).unwrap().unwrap();
+    let transition = litchi_pptx::transition::read(&blob, litchi_pptx::transition::Limits::DEFAULT)
+        .unwrap()
+        .unwrap();
     assert_eq!(transition.kind(), &TransitionKind::Fade { black: None });
 
     // DOCTYPE stays rejected.
@@ -788,7 +790,10 @@ fn processing_instructions_are_skipped_and_recorded_once_per_part() {
         String::from_utf8(blob)
             .unwrap()
             .replacen("<p:sld ", "<!DOCTYPE p:sld><p:sld ", 1);
-    assert!(litchi_pptx::shape::Scene::read(doctype.as_bytes()).is_err());
+    assert!(
+        litchi_pptx::shape::Scene::read(doctype.as_bytes(), litchi_pptx::shape::Limits::DEFAULT)
+            .is_err()
+    );
 }
 
 // ---------------------------------------------------------------------------

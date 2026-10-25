@@ -35,7 +35,7 @@ fn deck() -> Package {
 }
 
 fn placeholders(xml: &[u8]) -> Vec<(Option<String>, u32, Option<String>)> {
-    let scene = litchi_pptx::shape::Scene::read(xml).unwrap();
+    let scene = litchi_pptx::shape::Scene::read(xml, litchi_pptx::shape::Limits::DEFAULT).unwrap();
     scene
         .iter()
         .map(|shape| {
@@ -90,7 +90,8 @@ fn eager_insertion_instantiates_layout_placeholders() {
     let package = edit.commit().unwrap().into_package();
     let reopened = Package::from_bytes(&package.to_bytes().unwrap()).unwrap();
     let scene_xml = slide_xml(&reopened, 1);
-    let scene = litchi_pptx::shape::Scene::read(&scene_xml).unwrap();
+    let scene =
+        litchi_pptx::shape::Scene::read(&scene_xml, litchi_pptx::shape::Limits::DEFAULT).unwrap();
     assert_eq!(scene.at(0).unwrap().text(), Some("Agenda"));
 }
 

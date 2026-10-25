@@ -89,9 +89,11 @@ pub(super) fn validate_source(xml: &[u8], operation: &'static str) -> Result<()>
     let _ = validate_owner_for_read(xml, &layout)?;
     let scene_is_rewritten = if let Some(range) = layout.transition.as_ref() {
         let scene_xml = remove_owner(xml, range)?;
-        crate::shape::Scene::read(&scene_xml)?.is_rewritten() && has_mce_markup(&scene_xml)?
+        crate::shape::Scene::read(&scene_xml, crate::shape::Limits::DEFAULT)?.is_rewritten()
+            && has_mce_markup(&scene_xml)?
     } else {
-        crate::shape::Scene::read(xml)?.is_rewritten() && has_mce_markup(xml)?
+        crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?.is_rewritten()
+            && has_mce_markup(xml)?
     };
     if scene_is_rewritten {
         return Err(Error::refused(
@@ -268,7 +270,7 @@ fn preflight_replacement_len(
         },
         (Some(OwnerKind::AlternateContent), None) => clear_alternate_fragment_len(xml, layout),
         (_, Some(value)) => {
-            let canonical = crate::transition::write(value)?;
+            let canonical = crate::transition::write(value, crate::transition::Limits::DEFAULT)?;
             rewrite_pml_qnames_len(canonical.as_bytes(), &layout.prefix)
         },
         (_, None) => Ok(0),
@@ -291,13 +293,15 @@ fn validate_owner_for_read(xml: &[u8], layout: &Layout) -> Result<Option<Transit
         return Err(invalid("direct transition range is outside its slide"));
     }
     match layout.owner {
-        Some(OwnerKind::Direct) => crate::transition::read(xml)?
-            .map(Some)
-            .ok_or_else(|| invalid("direct transition disappeared during semantic read")),
+        Some(OwnerKind::Direct) => {
+            crate::transition::read(xml, crate::transition::Limits::DEFAULT)?
+                .map(Some)
+                .ok_or_else(|| invalid("direct transition disappeared during semantic read"))
+        },
         Some(OwnerKind::AlternateContent) => {
             // Clearing the active branch leaves the AlternateContent owner in
             // place so inactive choices and fallback bytes remain intact.
-            crate::transition::read(xml)
+            crate::transition::read(xml, crate::transition::Limits::DEFAULT)
         },
         None => Err(invalid("direct transition owner kind is unavailable")),
     }
@@ -378,7 +382,7 @@ fn validate_active_transition(xml: &[u8], operation: &'static str) -> Result<()>
     // placement and attribute names. Run the bounded typed reader as well so
     // token/boolean domains, duplicate attributes, and exact p14 timing are
     // checked before a destructive branch splice.
-    let active = crate::transition::read(processed.as_ref())?
+    let active = crate::transition::read(processed.as_ref(), crate::transition::Limits::DEFAULT)?
         .ok_or_else(|| invalid("active transition disappeared during typed validation"))?;
     // The edit planner keeps the strict domain check the reader now repairs.
     if !active.tolerance_report().is_clean() {
@@ -412,7 +416,7 @@ fn remove_owner(xml: &[u8], range: &Range<usize>) -> Result<Vec<u8>> {
 
 fn direct_fragment(value: &Transition, prefix: &str, operation: &'static str) -> Result<Vec<u8>> {
     validate_target(value, operation)?;
-    let canonical = crate::transition::write(value)?;
+    let canonical = crate::transition::write(value, crate::transition::Limits::DEFAULT)?;
     Ok(rewrite_pml_qnames(canonical.as_bytes(), prefix)?.into_bytes())
 }
 
@@ -440,7 +444,7 @@ fn alternate_fragment(
             "source-backed transition edit cannot insert into an AlternateContent owner without an active transition",
         ));
     };
-    let canonical = crate::transition::write(target)?;
+    let canonical = crate::transition::write(target, crate::transition::Limits::DEFAULT)?;
     let canonical_range = first_transition_range(&canonical)?;
     let fragment = canonical
         .as_bytes()
@@ -506,7 +510,7 @@ fn alternate_fragment_len(
         .as_ref()
         .ok_or_else(|| invalid("alternate transition owner has no source range"))?;
     let active = active_transition_range(xml, owner, operation)?.ok_or(Error::refused(litchi_core::edit::RefusalKind::UnsupportedContent, operation, "source-backed transition edit cannot insert into an AlternateContent owner without an active transition"))?;
-    let canonical = crate::transition::write(target)?;
+    let canonical = crate::transition::write(target, crate::transition::Limits::DEFAULT)?;
     let canonical_range = first_transition_range(&canonical)?;
     let fragment = canonical
         .as_bytes()
@@ -1463,7 +1467,7 @@ fn validate_target(value: &Transition, operation: &'static str) -> Result<()> {
     // reader. Ask the writer to validate portability before any output
     // allocation; preserved effect/auxiliary XML is intentionally retained
     // when a caller edits timing around a typed effect.
-    crate::transition::write(value)?;
+    crate::transition::write(value, crate::transition::Limits::DEFAULT)?;
     Ok(())
 }
 

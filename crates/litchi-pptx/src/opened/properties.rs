@@ -64,7 +64,7 @@ pub(super) fn stage_shape_properties_admitted(
         });
     }
 
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -194,7 +194,7 @@ pub(super) fn stage_shape_properties_admitted(
         }
         return Ok((None, 0));
     };
-    let published = crate::shape::Scene::read(&candidate)?;
+    let published = crate::shape::Scene::read(&candidate, crate::shape::Limits::DEFAULT)?;
     if published.is_rewritten() || published.len() != scene.len() {
         return Err(Error::Invalid(
             "opened-presentation shape property batch changed the semantic shape graph".into(),

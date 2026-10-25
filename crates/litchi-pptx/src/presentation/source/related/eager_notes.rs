@@ -32,7 +32,7 @@ pub(crate) fn load<'a>(package: &'a OpcPackage, slide: &SlidePart<'a>) -> Result
 
     super::notes::validate_eager(package, slide.part(), part)?;
     let processed = super::notes::processed_eager_notes(part, package.read_limits())?;
-    let parsed = shape::Scene::read(processed.as_slice())?;
+    let parsed = shape::Scene::read(processed.as_slice(), crate::shape::Limits::DEFAULT)?;
     let scene = OwnedScene::from_parsed(parsed, Arc::clone(&processed))?;
     super::strict_scene(&scene, "notes")?;
     let text = notes_text(&scene)?;

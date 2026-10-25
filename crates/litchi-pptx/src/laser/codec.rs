@@ -4,7 +4,7 @@
 //! never replays, renders, interpolates, modifies, or executes slide-show
 //! events.
 
-use super::model::{Conformance, Limits, Trace, TracePoint};
+use super::model::{Conformance, Limits, Trace, TracePoint, Usage};
 use crate::time::{Offset, ParseError as TimeParseError};
 use crate::{Error, Result};
 use litchi_drawingml::coordinate::{Coordinate, ParseError as CoordinateParseError};
@@ -14,7 +14,6 @@ use quick_xml::encoding::Decoder;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::{Namespace, QName, ResolveResult};
 use quick_xml::reader::NsReader;
-use std::fmt::Write as _;
 
 /// The `PowerPoint` extension URI that contains persisted laser-pointer traces.
 pub const LASER_TRACE_EXTENSION_URI: &str = "{3A86A75C-4F4B-4683-9AE1-C65F6400EC91}";
@@ -26,13 +25,6 @@ const STRICT_PRESENTATIONML_NAMESPACE_BYTES: &[u8] =
 
 const P14_NAMESPACE: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
 const P14_NAMESPACE_BYTES: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
-const MAX_SLIDE_XML_BYTES: usize = 32 * 1024 * 1024;
-const MAX_TOTAL_SLIDE_XML_BYTES: usize = 256 * 1024 * 1024;
-const MAX_LASER_TRACES: usize = 4_096;
-const MAX_LASER_POINTS: usize = 65_536;
-const MAX_XML_NODES: usize = 250_000;
-const MAX_XML_DEPTH: usize = 128;
-
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ElementKind {
     Other,
@@ -52,58 +44,63 @@ impl ElementKind {
     }
 }
 
-/// Read bounded, inert laser-pointer traces from one `PresentationML` slide.
+/// Read one slide under the caller-selected policy and accumulate successful
+/// resource use in `usage`. The separate ledger is required so a package can
+/// retain aggregate usage across all of its slide parts without mutating its
+/// policy.
 ///
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn read(slide_index: usize, xml_bytes: &[u8]) -> Result<Vec<Trace>> {
-    read_with(slide_index, xml_bytes, &mut Limits::default())
-}
-
-/// Read one slide while accumulating resource use in limits.
-///
-/// # Errors
-///
-/// Returns an error if the input cannot be read or is malformed.
-pub fn read_with(slide_index: usize, xml_bytes: &[u8], limits: &mut Limits) -> Result<Vec<Trace>> {
-    limits.add_slide_xml(xml_bytes.len())?;
-    scan_slide_laser_traces(slide_index, xml_bytes, limits)
+pub fn read(
+    slide_index: usize,
+    xml_bytes: &[u8],
+    limits: &Limits,
+    usage: &mut Usage,
+) -> Result<Vec<Trace>> {
+    let mut next = *usage;
+    limits.add_slide_xml(xml_bytes.len(), &mut next)?;
+    let traces = scan_slide_laser_traces(slide_index, xml_bytes, limits, &mut next)?;
+    *usage = next;
+    Ok(traces)
 }
 
 impl Limits {
-    fn add_slide_xml(&mut self, bytes: usize) -> Result<()> {
-        if bytes > MAX_SLIDE_XML_BYTES {
-            return Err(limit("slide XML bytes", MAX_SLIDE_XML_BYTES));
+    fn add_slide_xml(&self, bytes: usize, usage: &mut Usage) -> Result<()> {
+        if bytes > self.max_slide_xml_bytes() {
+            return Err(limit("slide XML bytes", self.max_slide_xml_bytes()));
         }
-        self.total_slide_xml_bytes = self
+        usage.total_slide_xml_bytes = usage
             .total_slide_xml_bytes
             .checked_add(bytes)
-            .ok_or_else(|| limit("total slide XML bytes", MAX_TOTAL_SLIDE_XML_BYTES))?;
-        if self.total_slide_xml_bytes > MAX_TOTAL_SLIDE_XML_BYTES {
-            return Err(limit("total slide XML bytes", MAX_TOTAL_SLIDE_XML_BYTES));
+            .ok_or_else(|| limit("total slide XML bytes", self.max_total_slide_xml_bytes()))?;
+        if usage.total_slide_xml_bytes > self.max_total_slide_xml_bytes() {
+            return Err(limit(
+                "total slide XML bytes",
+                self.max_total_slide_xml_bytes(),
+            ));
         }
         Ok(())
     }
 
-    fn add_trace(&mut self) -> Result<()> {
-        self.trace_count = self
+    fn add_trace(&self, usage: &mut Usage) -> Result<()> {
+        usage.trace_count = usage
             .trace_count
             .checked_add(1)
-            .ok_or_else(|| limit("laser trace count", MAX_LASER_TRACES))?;
-        if self.trace_count > MAX_LASER_TRACES {
-            return Err(limit("laser trace count", MAX_LASER_TRACES));
+            .ok_or_else(|| limit("laser trace count", self.max_trace_count()))?;
+        if usage.trace_count > self.max_trace_count() {
+            return Err(limit("laser trace count", self.max_trace_count()));
         }
         Ok(())
     }
 
-    fn add_point(&mut self) -> Result<()> {
-        self.point_count = self
+    fn add_point(&self, usage: &mut Usage) -> Result<()> {
+        usage.point_count = usage
             .point_count
             .checked_add(1)
-            .ok_or_else(|| limit("laser trace-point count", MAX_LASER_POINTS))?;
-        if self.point_count > MAX_LASER_POINTS {
-            return Err(limit("laser trace-point count", MAX_LASER_POINTS));
+            .ok_or_else(|| limit("laser trace-point count", self.max_point_count()))?;
+        if usage.point_count > self.max_point_count() {
+            return Err(limit("laser trace-point count", self.max_point_count()));
         }
         Ok(())
     }
@@ -112,18 +109,19 @@ impl Limits {
 fn scan_slide_laser_traces(
     slide_index: usize,
     xml_bytes: &[u8],
-    limits: &mut Limits,
+    limits: &Limits,
+    usage: &mut Usage,
 ) -> Result<Vec<Trace>> {
-    if xml_bytes.len() > MAX_SLIDE_XML_BYTES {
-        return Err(limit("slide XML bytes", MAX_SLIDE_XML_BYTES));
+    if xml_bytes.len() > limits.max_slide_xml_bytes() {
+        return Err(limit("slide XML bytes", limits.max_slide_xml_bytes()));
     }
 
     let mut capabilities = Capabilities::ooxml_baseline();
     capabilities.understand_namespace(P14_NAMESPACE);
     let mce_limits = litchi_ooxml_common::mce::Limits {
-        max_input_bytes: MAX_SLIDE_XML_BYTES,
-        max_output_bytes: MAX_SLIDE_XML_BYTES,
-        max_depth: MAX_XML_DEPTH,
+        max_input_bytes: limits.max_slide_xml_bytes(),
+        max_output_bytes: limits.max_slide_xml_bytes(),
+        max_depth: limits.max_xml_depth(),
         max_namespace_bindings: 4_096,
         max_directive_tokens: 4_096,
         max_choices_per_alternate: 1_024,
@@ -149,13 +147,13 @@ fn scan_slide_laser_traces(
 
         match event {
             Event::Start(element) => {
-                increment_nodes(&mut nodes)?;
+                increment_nodes(&mut nodes, limits)?;
                 let depth = stack
                     .len()
                     .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth", MAX_XML_DEPTH))?;
-                if depth > MAX_XML_DEPTH {
-                    return Err(limit("slide XML depth", MAX_XML_DEPTH));
+                    .ok_or_else(|| limit("slide XML depth", limits.max_xml_depth()))?;
+                if depth > limits.max_xml_depth() {
+                    return Err(limit("slide XML depth", limits.max_xml_depth()));
                 }
                 let parent = stack.last().copied().unwrap_or(ElementKind::Other);
                 let kind = classify_element(
@@ -168,6 +166,7 @@ fn scan_slide_laser_traces(
                     false,
                     &mut active_trace,
                     limits,
+                    usage,
                 )?;
                 if kind == ElementKind::Root {
                     saw_root = true;
@@ -175,13 +174,13 @@ fn scan_slide_laser_traces(
                 stack.push(kind);
             },
             Event::Empty(element) => {
-                increment_nodes(&mut nodes)?;
+                increment_nodes(&mut nodes, limits)?;
                 let depth = stack
                     .len()
                     .checked_add(1)
-                    .ok_or_else(|| limit("slide XML depth", MAX_XML_DEPTH))?;
-                if depth > MAX_XML_DEPTH {
-                    return Err(limit("slide XML depth", MAX_XML_DEPTH));
+                    .ok_or_else(|| limit("slide XML depth", limits.max_xml_depth()))?;
+                if depth > limits.max_xml_depth() {
+                    return Err(limit("slide XML depth", limits.max_xml_depth()));
                 }
                 let parent = stack.last().copied().unwrap_or(ElementKind::Other);
                 let kind = classify_element(
@@ -194,6 +193,7 @@ fn scan_slide_laser_traces(
                     true,
                     &mut active_trace,
                     limits,
+                    usage,
                 )?;
                 if kind == ElementKind::Root {
                     saw_root = true;
@@ -267,7 +267,8 @@ fn classify_element(
     root_seen: bool,
     empty: bool,
     active_trace: &mut Option<Vec<TracePoint>>,
-    limits: &mut Limits,
+    limits: &Limits,
+    usage: &mut Usage,
 ) -> Result<ElementKind> {
     if depth == 1 {
         if root_seen || !is_presentationml_name(namespace, element.name(), b"sld") {
@@ -311,7 +312,7 @@ fn classify_element(
             },
         };
         if kind == ElementKind::LaserTrace {
-            limits.add_trace()?;
+            limits.add_trace(usage)?;
             if active_trace.replace(Vec::new()).is_some() {
                 return Err(invalid("nested laser traces are not valid"));
             }
@@ -330,7 +331,7 @@ fn classify_element(
             };
         }
         let point = parse_trace_point(element, decoder)?;
-        limits.add_point()?;
+        limits.add_point(usage)?;
         active_trace
             .as_mut()
             .ok_or_else(|| invalid("laser trace point has no active trace"))?
@@ -477,12 +478,12 @@ fn time_error(error: TimeParseError) -> Error {
     ))
 }
 
-fn increment_nodes(nodes: &mut usize) -> Result<()> {
+fn increment_nodes(nodes: &mut usize, limits: &Limits) -> Result<()> {
     *nodes = nodes
         .checked_add(1)
-        .ok_or_else(|| limit("slide XML node count", MAX_XML_NODES))?;
-    if *nodes > MAX_XML_NODES {
-        return Err(limit("slide XML node count", MAX_XML_NODES));
+        .ok_or_else(|| limit("slide XML node count", limits.max_xml_nodes()))?;
+    if *nodes > limits.max_xml_nodes() {
+        return Err(limit("slide XML node count", limits.max_xml_nodes()));
     }
     Ok(())
 }
@@ -503,12 +504,12 @@ fn limit(resource: &'static str, limit: usize) -> Error {
 /// # Errors
 ///
 /// Returns an error if the input cannot be read or is malformed.
-pub fn validate(points: &[TracePoint]) -> Result<()> {
+pub fn validate(points: &[TracePoint], limits: &Limits) -> Result<()> {
     if points.is_empty() {
         return Err(invalid("laser trace requires at least one point"));
     }
-    if points.len() > MAX_LASER_POINTS {
-        return Err(limit("laser trace-point count", MAX_LASER_POINTS));
+    if points.len() > limits.max_point_count() {
+        return Err(limit("laser trace-point count", limits.max_point_count()));
     }
     Ok(())
 }
@@ -518,9 +519,9 @@ pub fn validate(points: &[TracePoint]) -> Result<()> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn write(points: &[TracePoint], conformance: Conformance) -> Result<String> {
+pub fn write(points: &[TracePoint], conformance: Conformance, limits: Limits) -> Result<String> {
     let mut xml = String::new();
-    write_to(points, conformance, &mut xml)?;
+    write_to(points, conformance, &mut xml, limits)?;
     Ok(xml)
 }
 
@@ -529,37 +530,95 @@ pub fn write(points: &[TracePoint], conformance: Conformance) -> Result<String> 
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn write_to(points: &[TracePoint], conformance: Conformance, xml: &mut String) -> Result<()> {
-    validate(points)?;
+pub fn write_to(
+    points: &[TracePoint],
+    conformance: Conformance,
+    xml: &mut String,
+    limits: Limits,
+) -> Result<()> {
+    validate(points, &limits)?;
+    let start = xml.len();
     let capacity = points
         .len()
         .checked_mul(48)
         .and_then(|bytes| bytes.checked_add(256))
-        .ok_or_else(|| limit("laser trace XML bytes", MAX_SLIDE_XML_BYTES))?;
-    xml.try_reserve(capacity)
+        .ok_or_else(|| limit("laser trace XML bytes", limits.max_output_bytes()))?;
+    xml.try_reserve(capacity.min(limits.max_output_bytes()))
         .map_err(|source| Error::Allocation {
             resource: "laser trace XML",
             source,
         })?;
 
-    xml.push_str("<p:ext xmlns:p=\"");
-    xml.push_str(conformance.namespace());
-    xml.push_str("\" xmlns:p14=\"");
-    xml.push_str(P14_NAMESPACE);
-    xml.push_str("\" uri=\"");
-    xml.push_str(LASER_TRACE_EXTENSION_URI);
-    xml.push_str("\"><p14:laserTraceLst><p14:tracePtLst>");
-    for point in points {
-        xml.push_str("<p14:tracePt t=\"");
-        xml.push_str(point.time.as_str());
-        xml.push_str("\" x=\"");
-        write!(xml, "{}", point.x).map_err(|_err| Error::Write)?;
-        xml.push_str("\" y=\"");
-        write!(xml, "{}", point.y).map_err(|_err| Error::Write)?;
-        xml.push_str("\"/>");
+    let result = {
+        let mut output = LimitedXml {
+            xml,
+            start,
+            maximum: limits.max_output_bytes(),
+        };
+        output.push("<p:ext xmlns:p=\"")?;
+        output.push(conformance.namespace())?;
+        output.push("\" xmlns:p14=\"")?;
+        output.push(P14_NAMESPACE)?;
+        output.push("\" uri=\"")?;
+        output.push(LASER_TRACE_EXTENSION_URI)?;
+        output.push("\"><p14:laserTraceLst><p14:tracePtLst>")?;
+        for point in points {
+            output.push("<p14:tracePt t=\"")?;
+            output.push(point.time.as_str())?;
+            output.push("\" x=\"")?;
+            output.format(format_args!("{}", point.x))?;
+            output.push("\" y=\"")?;
+            output.format(format_args!("{}", point.y))?;
+            output.push("\"/>")?;
+        }
+        output.push("</p14:tracePtLst></p14:laserTraceLst></p:ext>")
+    };
+    if result.is_err() {
+        xml.truncate(start);
     }
-    xml.push_str("</p14:tracePtLst></p14:laserTraceLst></p:ext>");
-    Ok(())
+    result
+}
+
+struct LimitedXml<'a> {
+    xml: &'a mut String,
+    start: usize,
+    maximum: usize,
+}
+
+impl LimitedXml<'_> {
+    fn push(&mut self, value: &str) -> Result<()> {
+        if self
+            .xml
+            .len()
+            .saturating_sub(self.start)
+            .saturating_add(value.len())
+            > self.maximum
+        {
+            return Err(limit("laser trace XML bytes", self.maximum));
+        }
+        self.xml.push_str(value);
+        Ok(())
+    }
+
+    fn format(&mut self, arguments: std::fmt::Arguments<'_>) -> Result<()> {
+        std::fmt::write(self, arguments).map_err(|_| limit("laser trace XML bytes", self.maximum))
+    }
+}
+
+impl std::fmt::Write for LimitedXml<'_> {
+    fn write_str(&mut self, value: &str) -> std::fmt::Result {
+        if self
+            .xml
+            .len()
+            .saturating_sub(self.start)
+            .saturating_add(value.len())
+            > self.maximum
+        {
+            return Err(std::fmt::Error);
+        }
+        self.xml.push_str(value);
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -579,7 +638,8 @@ mod tests {
         let xml = format!(
             r#"<p:sld xmlns:p="{PML}" xmlns:mc="{MCE}" xmlns:p14="{P14_NAMESPACE}" mc:Ignorable="p14"><p:extLst><p:ext uri="{LASER_TRACE_EXTENSION_URI}"><p14:laserTraceLst><p14:tracePtLst><p14:tracePt t="1.5s" x="-2" y="3"/><p14:tracePt t="2000ms" x="1.5cm" y="-2pt"/></p14:tracePtLst><p14:tracePtLst/></p14:laserTraceLst></p:ext></p:extLst></p:sld>"#
         );
-        let traces = read_with(4, xml.as_bytes(), &mut Limits::default()).unwrap();
+        let mut usage = Usage::default();
+        let traces = read(4, xml.as_bytes(), &Limits::DEFAULT, &mut usage).unwrap();
 
         assert_eq!(traces.len(), 2);
         assert_eq!(traces[0].slide_index(), 4);
@@ -599,17 +659,44 @@ mod tests {
             r#"<p:sld xmlns:p="{PML}" xmlns:p14="{P14_NAMESPACE}"><p:extLst><p:ext uri="{LASER_TRACE_EXTENSION_URI}"><p14:laserTraceLst><p14:tracePtLst><p14:tracePt t="1..2s" x="0" y="0"/></p14:tracePtLst></p14:laserTraceLst></p:ext></p:extLst></p:sld>"#
         );
 
-        assert!(read_with(0, xml.as_bytes(), &mut Limits::default()).is_err());
+        assert!(read(0, xml.as_bytes(), &Limits::DEFAULT, &mut Usage::default()).is_err());
 
         for coordinate in ["27273042316901", "1e2mm", "+1mm", "1px"] {
             let xml = format!(
                 r#"<p:sld xmlns:p="{PML}" xmlns:p14="{P14_NAMESPACE}"><p:extLst><p:ext uri="{LASER_TRACE_EXTENSION_URI}"><p14:laserTraceLst><p14:tracePtLst><p14:tracePt t="0" x="{coordinate}" y="0"/></p14:tracePtLst></p14:laserTraceLst></p:ext></p:extLst></p:sld>"#
             );
             assert!(
-                read_with(0, xml.as_bytes(), &mut Limits::default()).is_err(),
+                read(0, xml.as_bytes(), &Limits::DEFAULT, &mut Usage::default()).is_err(),
                 "accepted {coordinate:?}"
             );
         }
+    }
+
+    #[test]
+    fn usage_preserves_aggregate_across_slides_without_mutating_policy() {
+        let xml = format!(
+            r#"<p:sld xmlns:p="{PML}" xmlns:p14="{P14_NAMESPACE}"><p:extLst><p:ext uri="{LASER_TRACE_EXTENSION_URI}"><p14:laserTraceLst><p14:tracePtLst><p14:tracePt t="0" x="0" y="0"/></p14:tracePtLst></p14:laserTraceLst></p:ext></p:extLst></p:sld>"#
+        );
+        let limits = Limits::new(
+            xml.len(),
+            xml.len().checked_mul(2).unwrap(),
+            2,
+            2,
+            Limits::DEFAULT.max_xml_nodes(),
+            Limits::DEFAULT.max_xml_depth(),
+            Limits::DEFAULT.max_output_bytes(),
+        )
+        .unwrap();
+        let mut usage = Usage::default();
+        read(0, xml.as_bytes(), &limits, &mut usage).unwrap();
+        read(1, xml.as_bytes(), &limits, &mut usage).unwrap();
+        assert_eq!(usage.total_slide_xml_bytes(), xml.len() * 2);
+        assert_eq!(usage.point_count(), 2);
+        assert_eq!(limits.max_point_count(), 2);
+
+        let before_failed_read = usage;
+        assert!(read(2, xml.as_bytes(), &limits, &mut usage).is_err());
+        assert_eq!(usage, before_failed_read);
     }
 
     #[test]
@@ -619,12 +706,62 @@ mod tests {
             Coordinate::emu(914_400).unwrap(),
             Coordinate::emu(457_200).unwrap(),
         );
-        let transitional = write(std::slice::from_ref(&point), Conformance::Transitional).unwrap();
-        let strict = write(&[point], Conformance::Strict).unwrap();
+        let transitional = write(
+            std::slice::from_ref(&point),
+            Conformance::Transitional,
+            Limits::DEFAULT,
+        )
+        .unwrap();
+        let strict = write(&[point], Conformance::Strict, Limits::DEFAULT).unwrap();
 
         assert!(
             transitional.contains("http://schemas.openxmlformats.org/presentationml/2006/main")
         );
         assert!(strict.contains("http://purl.oclc.org/ooxml/presentationml/main"));
+    }
+
+    #[test]
+    fn writer_admits_exact_output_and_refuses_one_byte_under_atomically() {
+        let point = TracePoint::new(
+            Offset::ZERO,
+            Coordinate::emu(914_400).unwrap(),
+            Coordinate::emu(457_200).unwrap(),
+        );
+        let expected = write(
+            std::slice::from_ref(&point),
+            Conformance::Transitional,
+            Limits::DEFAULT,
+        )
+        .unwrap();
+        let exact = Limits::DEFAULT
+            .with_output_bytes(expected.len())
+            .expect("bounded output policy");
+        assert_eq!(
+            write(
+                std::slice::from_ref(&point),
+                Conformance::Transitional,
+                exact
+            )
+            .unwrap(),
+            expected
+        );
+
+        let narrow = Limits::DEFAULT
+            .with_output_bytes(expected.len() - 1)
+            .expect("one-byte narrower output policy");
+        let mut output = "prefix".to_owned();
+        assert!(matches!(
+            write_to(
+                std::slice::from_ref(&point),
+                Conformance::Transitional,
+                &mut output,
+                narrow,
+            ),
+            Err(Error::Limit {
+                resource: "laser trace XML bytes",
+                ..
+            })
+        ));
+        assert_eq!(output, "prefix");
     }
 }

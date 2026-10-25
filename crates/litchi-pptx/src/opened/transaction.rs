@@ -707,7 +707,7 @@ impl Edit {
         let text = text.as_ref();
         let owner = self.working.get_part(&selected_slide.part_name)?;
         crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let scene = crate::shape::Scene::read(owner.blob(), crate::shape::Limits::DEFAULT)?;
         let selected_shape = scene.shape(key)?;
         if selected_shape.common().text() == Some(text) {
             return Ok(false);
@@ -725,7 +725,7 @@ impl Edit {
             text,
             self.source_ref()?.limits.max_text_bytes(),
         )?;
-        let staged = crate::shape::Scene::read(&xml)?;
+        let staged = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
         let staged_shape = staged.shape(key)?;
         if staged_shape.common().text() != Some(text) || staged.len() != scene.len() {
             return Err(invalid(
@@ -1145,7 +1145,7 @@ impl Edit {
     ) -> Result<u32> {
         let selected = self.resolve_slide(slide.into())?;
         let owner = self.working.get_part(&selected.part_name)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let scene = crate::shape::Scene::read(owner.blob(), crate::shape::Limits::DEFAULT)?;
         let shape_id = next_shape_id(&scene, "text box")?;
         let conformance = crate::media_parts::document_conformance(owner.blob())?;
         let fragment = text_box_fragment(
@@ -1232,7 +1232,7 @@ impl Edit {
             ));
         }
         let owner = self.working.get_part(&selected.part_name)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let scene = crate::shape::Scene::read(owner.blob(), crate::shape::Limits::DEFAULT)?;
         let shape_id = next_shape_id(&scene, "picture")?;
         let conformance = crate::media_parts::document_conformance(owner.blob())?;
         let reserved: HashSet<_> = self
@@ -1350,7 +1350,8 @@ impl Edit {
         let source_slide = resolve_snapshot_slide(source, source_slide.into())?;
         let destination = self.resolve_slide(destination_slide.into())?;
         let source_owner = source.package.get_part(&source_slide.part_name)?;
-        let source_scene = crate::shape::Scene::read(source_owner.blob())?;
+        let source_scene =
+            crate::shape::Scene::read(source_owner.blob(), crate::shape::Limits::DEFAULT)?;
         let key = source_shape.into();
         let shape = source_scene.shape(key)?;
         let source_roots: Vec<_> = source_scene.roots().collect();
@@ -1447,8 +1448,10 @@ impl Edit {
         )?;
         let mut candidate = self.working.clone();
         publish_transfer(source.package.as_ref(), &mut candidate, &mapping)?;
-        let destination_scene =
-            crate::shape::Scene::read(candidate.get_part(&destination.part_name)?.blob())?;
+        let destination_scene = crate::shape::Scene::read(
+            candidate.get_part(&destination.part_name)?.blob(),
+            crate::shape::Limits::DEFAULT,
+        )?;
         let shape_id_mapping = plan_shape_identity_transfer(&destination_scene, &source_shape_ids)?;
         let shape_id = *shape_id_mapping.get(&source_shape_id).ok_or_else(|| {
             invalid("opened-presentation transferred root identity mapping disappeared")
@@ -1745,7 +1748,7 @@ impl Edit {
     ) -> Result<u32> {
         let selected = self.resolve_slide(slide.into())?;
         let owner = self.working.get_part(&selected.part_name)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let scene = crate::shape::Scene::read(owner.blob(), crate::shape::Limits::DEFAULT)?;
         let shape_id = next_shape_id(&scene, "table")?;
         let conformance = crate::media_parts::document_conformance(owner.blob())?;
         let fragment = table_fragment(
@@ -1757,7 +1760,7 @@ impl Edit {
         )?;
         let _table = crate::table::Table::from_graphic_frame(fragment.as_bytes())?;
         let xml = super::xml::append_shape(owner.blob(), fragment.as_bytes())?;
-        let staged = crate::shape::Scene::read(&xml)?;
+        let staged = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
         if !staged.iter().any(|shape| shape.id() == Some(shape_id)) {
             return Err(invalid(
                 "opened-presentation table did not round-trip semantically",
@@ -1816,7 +1819,10 @@ impl Edit {
             crate::presentation::embedded::excel::Workbook::from_spec(&spec)?.into_bytes();
         let mut candidate = self.working.clone();
         crate::package::signature::refuse_signed_change(&candidate)?;
-        let scene = crate::shape::Scene::read(candidate.get_part(&selected.part_name)?.blob())?;
+        let scene = crate::shape::Scene::read(
+            candidate.get_part(&selected.part_name)?.blob(),
+            crate::shape::Limits::DEFAULT,
+        )?;
         let shape_id = next_shape_id(&scene, "chart")?;
         let (chart_stem, content_type, relationship_type) = if extended {
             (
@@ -1879,7 +1885,7 @@ impl Edit {
         let fragment = chart_frame(shape_id, &relationship_id, name, bounds, extended);
         let owner = candidate.get_part(&selected.part_name)?;
         let xml = super::xml::append_shape(owner.blob(), fragment.as_bytes())?;
-        let scene = crate::shape::Scene::read(&xml)?;
+        let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
         if !scene.iter().any(|shape| shape.id() == Some(shape_id)) {
             return Err(invalid(
                 "opened-presentation chart frame did not round-trip semantically",
@@ -2659,7 +2665,7 @@ impl Edit {
     ) -> Result<u32> {
         let selected = self.resolve_slide(slide)?;
         let owner = self.working.get_part(&selected.part_name)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let scene = crate::shape::Scene::read(owner.blob(), crate::shape::Limits::DEFAULT)?;
         let shape_id = next_shape_id(&scene, label)?;
         let conformance = crate::media_parts::document_conformance(owner.blob())?;
         let fragment =
@@ -2837,7 +2843,7 @@ fn compaction_scene(xml: &[u8]) -> Result<ShapeSemantics> {
 }
 
 fn shape_semantics(xml: &[u8]) -> Result<ShapeSemantics> {
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     Ok(scene
         .iter()
         .map(|shape| {
@@ -2919,7 +2925,7 @@ fn chart_targets(
     use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
     let owner = package.get_part(slide)?;
-    let scene = crate::shape::Scene::read(owner.blob())?;
+    let scene = crate::shape::Scene::read(owner.blob(), crate::shape::Limits::DEFAULT)?;
     let shape = scene
         .get(shape)
         .map_err(|error| invalid(format!("chart frame lookup: {error}")))?
@@ -3152,7 +3158,7 @@ pub(crate) fn stage_text_box(
     // allocating the exact fragment. The exact post-escape length is checked
     // again below before the lexical append.
     let _output_bound = text_box_output_bound(xml.len(), text.len(), max_output_bytes)?;
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     let shape_id = next_shape_id(&scene, "text box")?;
     let conformance = crate::media_parts::document_conformance(xml)?;
     let fragment = text_box_fragment(
@@ -3286,7 +3292,7 @@ fn resolve_snapshot_slide(source: &Snapshot, key: crate::slide::Selector<'_>) ->
 }
 
 fn ensure_shape_id(xml: &[u8], shape_id: u32, label: &str) -> Result<()> {
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     if scene.iter().any(|shape| shape.id() == Some(shape_id)) {
         Ok(())
     } else {
@@ -3956,6 +3962,7 @@ mod compaction_tests {
                 .package
                 .get_part(&snapshot.slides[1].part_name)?
                 .blob(),
+            crate::shape::Limits::DEFAULT,
         )?
         .at(0)
         .map_err(|error| crate::Error::Invalid(error.to_string()))?

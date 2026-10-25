@@ -109,7 +109,7 @@ struct Frame {
 
 pub(super) fn read_state(xml: &[u8]) -> Result<State> {
     let creation_id = read(xml, Owner::Slide)?.id;
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     let mut shapes = Vec::new();
     shapes
         .try_reserve_exact(scene.len())

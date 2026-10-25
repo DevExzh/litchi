@@ -335,7 +335,7 @@ pub(crate) fn stage_text_structure(
 ) -> Result<Vec<u8>> {
     let operation = operation(change);
     validate(change, max_text_bytes)?;
-    let original = crate::shape::Scene::read(xml)?;
+    let original = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     if original.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -411,7 +411,7 @@ pub(crate) fn stage_text_structure(
     candidate.extend_from_slice(&xml[..span.start]);
     candidate.extend_from_slice(&replacement);
     candidate.extend_from_slice(&xml[span.end..]);
-    let published = crate::shape::Scene::read(&candidate)?;
+    let published = crate::shape::Scene::read(&candidate, crate::shape::Limits::DEFAULT)?;
     if published.is_rewritten() || published.len() != original.len() {
         return Err(Error::Invalid(
             "opened-presentation text structure edit changed the semantic shape graph".into(),

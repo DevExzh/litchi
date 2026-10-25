@@ -121,7 +121,7 @@ fn shape_edits_work_after_an_extension_transition() -> Result<()> {
     let morph = Transition::new(Kind::Morph(Morph::ByObject));
     let (morphed, _) = set(&deck()?, Some(&morph))?;
     let xml = slide_xml(&morphed)?;
-    assert!(!crate::shape::Scene::read(&xml)?.is_rewritten());
+    assert!(!crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?.is_rewritten());
     let mut edit = morphed.edit()?;
     edit.add_text_box(0_usize, "beta", (0, 0, 914_400, 914_400))?;
     edit.set_text_properties(
@@ -148,6 +148,8 @@ fn shape_edits_work_after_an_extension_transition() -> Result<()> {
         "<p:spTree><mc:AlternateContent xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"><mc:Choice xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\" Requires=\"p14\"/><mc:Fallback/></mc:AlternateContent>",
         1,
     );
-    assert!(crate::shape::Scene::read(inside.as_bytes())?.is_rewritten());
+    assert!(
+        crate::shape::Scene::read(inside.as_bytes(), crate::shape::Limits::DEFAULT)?.is_rewritten()
+    );
     Ok(())
 }

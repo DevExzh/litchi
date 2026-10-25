@@ -405,6 +405,7 @@ mod tests {
             candidate
                 .as_deref()
                 .ok_or_else(|| Error::Invalid("chunked stage returned no candidate".into()))?,
+            crate::shape::Limits::DEFAULT,
         )?;
         assert_eq!(scene.at(0)?.common().text(), Some("updated first"));
         assert_eq!(scene.at(1)?.common().text(), Some("updated second"));

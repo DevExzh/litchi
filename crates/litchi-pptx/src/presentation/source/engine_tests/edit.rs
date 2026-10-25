@@ -615,7 +615,7 @@ fn changed_edit_reopens_and_changes_only_the_selected_logical_part() {
                 "only the selected shape text may differ"
             );
             assert!(
-                !crate::shape::read(output_part.blob())
+                !crate::shape::read(output_part.blob(), crate::shape::Limits::DEFAULT)
                     .unwrap()
                     .is_rewritten()
             );
@@ -899,7 +899,8 @@ fn atomic_batch_is_order_independent_and_changes_two_shapes_in_one_part() {
             relationship_signatures(candidate.rels())
         );
         if part.partname().as_str() == SLIDE {
-            let scene = crate::shape::read(candidate.blob()).unwrap();
+            let scene =
+                crate::shape::read(candidate.blob(), crate::shape::Limits::DEFAULT).unwrap();
             assert_eq!(
                 scene.shape("Title").unwrap().common().text(),
                 Some("after & <title>")
@@ -1179,7 +1180,8 @@ fn direct_transition_set_replaces_clears_and_reopens_with_one_part_overlay() {
     let package = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
     let changed_slide = package.get_part(&PackURI::new(SLIDE).unwrap()).unwrap();
     let changed_xml = std::str::from_utf8(changed_slide.blob()).unwrap();
-    let fragment = crate::transition::write(&requested).unwrap();
+    let fragment =
+        crate::transition::write(&requested, crate::transition::Limits::DEFAULT).unwrap();
     assert_eq!(
         changed_xml,
         slide.replacen("<p:timing/>", &format!("{fragment}<p:timing/>"), 1)
@@ -1455,7 +1457,11 @@ fn source_backed_p14_transition_effects_edit_reopen_and_inverse() {
     ];
 
     for kind in targets {
-        let active = crate::transition::write(&Transition::new(kind.clone())).unwrap();
+        let active = crate::transition::write(
+            &Transition::new(kind.clone()),
+            crate::transition::Limits::DEFAULT,
+        )
+        .unwrap();
         let source = fixture("", slide_with_tail(PML, "before", &active), false);
         let editor =
             SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))

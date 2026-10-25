@@ -2202,7 +2202,8 @@ impl SourceBackedPresentationEditor {
                 #[cfg(test)]
                 record_test_semantic_scene_read();
                 {
-                    let _scene = crate::shape::Scene::read(raw.as_bytes())?;
+                    let _scene =
+                        crate::shape::Scene::read(raw.as_bytes(), crate::shape::Limits::DEFAULT)?;
                 }
                 let part = SourcePart::from_view(&view, raw)?;
                 #[cfg(test)]
@@ -2268,7 +2269,7 @@ impl SourceBackedPresentationEditor {
         let source_part = SourcePart::from_view(&view, view.data()?)?;
         validate_source_slide_root(&source_part)?;
         validate_full_slide_picture_relationships(&self.package, source_part.blob())?;
-        let scene = crate::shape::Scene::read(source_part.blob())?;
+        let scene = crate::shape::Scene::read(source_part.blob(), crate::shape::Limits::DEFAULT)?;
         let mut picture_xmls = Vec::new();
         picture_xmls
             .try_reserve(scene.len())
@@ -4117,7 +4118,7 @@ impl SourceSlide {
                 return Err(error);
             }
         }
-        let scene = match crate::shape::Scene::read(part.blob()) {
+        let scene = match crate::shape::Scene::read(part.blob(), crate::shape::Limits::DEFAULT) {
             Ok(scene) => scene,
             Err(Error::MarkupCompatibility(_)) => {
                 return self.query_images_from_raw_owner(&part, &view, mode);
@@ -8092,7 +8093,7 @@ mod picture_fragment_tests {
     fn self_contained_picture_descriptors_parse_for_any_producer_prefix() {
         for (p, a, r) in [("p", "a", "r"), ("q", "d", "rel")] {
             let xml = slide(p, a, r);
-            let scene = Scene::read(xml.as_bytes()).unwrap();
+            let scene = Scene::read(xml.as_bytes(), crate::shape::Limits::DEFAULT).unwrap();
             assert!(scene.is_rewritten(), "{p}: the MCE input must be rewritten");
             let shape = scene.at(0).unwrap();
             assert!(matches!(shape, Shape::Picture(_)));
@@ -8106,7 +8107,7 @@ mod picture_fragment_tests {
     #[test]
     fn a_borrowed_span_does_not_re_declare_an_unconventional_ancestor_prefix() {
         let xml = slide("q", "d", "rel");
-        let scene = Scene::read(xml.as_bytes()).unwrap();
+        let scene = Scene::read(xml.as_bytes(), crate::shape::Limits::DEFAULT).unwrap();
         let borrowed = scene.at(0).unwrap().xml().unwrap();
         assert!(
             !borrowed

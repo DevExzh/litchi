@@ -494,7 +494,7 @@ mod tests {
         let xml = format!(
             r#"<p:spTree xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:nvGrpSpPr/><p:grpSpPr/>{body}</p:spTree>"#
         );
-        Scene::read(xml.into_bytes()).unwrap()
+        Scene::read(xml.into_bytes(), crate::shape::Limits::DEFAULT).unwrap()
     }
 
     fn weight(scene: &Scene, part: &PackURI) -> usize {

@@ -95,7 +95,10 @@ impl Edit {
         let selected = self.resolve_slide(slide.into())?;
         let mut candidate = self.working.clone();
         crate::package::signature::refuse_signed_change(&candidate)?;
-        let scene = crate::shape::Scene::read(candidate.get_part(&selected.part_name)?.blob())?;
+        let scene = crate::shape::Scene::read(
+            candidate.get_part(&selected.part_name)?.blob(),
+            crate::shape::Limits::DEFAULT,
+        )?;
         let shape_id = next_shape_id(&scene, "SmartArt")?;
         let number = free_diagram_number(&candidate)?;
         let part_name = |stem: &str| {
@@ -152,7 +155,7 @@ impl Edit {
         let fragment = frame(shape_id, name, bounds, [&ids[0], &ids[1], &ids[2], &ids[3]]);
         let owner = candidate.get_part(&selected.part_name)?;
         let xml = super::super::xml::append_shape(owner.blob(), fragment.as_bytes())?;
-        let scene = crate::shape::Scene::read(&xml)?;
+        let scene = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
         if !scene.iter().any(|shape| {
             shape.id() == Some(shape_id) && matches!(shape, crate::shape::Shape::Diagram(_))
         }) {
@@ -435,7 +438,7 @@ fn targets(package: &OpcPackage, slide: &PackURI, shape: crate::shape::Key<'_>) 
     let owner = package.get_part(slide)?;
     let blob = owner.blob();
     {
-        let scene = crate::shape::Scene::read(blob)?;
+        let scene = crate::shape::Scene::read(blob, crate::shape::Limits::DEFAULT)?;
         let found = scene
             .get(shape)
             .map_err(|error| invalid(format!("SmartArt frame lookup: {error}")))?

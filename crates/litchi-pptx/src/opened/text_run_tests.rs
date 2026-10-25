@@ -120,6 +120,7 @@ fn well_formed_empty_text_runs_still_edit() -> Result<()> {
             .package
             .get_part(&PackURI::new(SLIDE).map_err(Error::Invalid)?)?
             .blob(),
+        crate::shape::Limits::DEFAULT,
     )?
     .at(0)
     .map_err(|error| Error::Invalid(error.to_string()))?
@@ -251,7 +252,7 @@ fn a_byte_order_marked_slide_is_edited_correctly_and_keeps_its_mark() -> Result<
         .blob()
         .to_vec();
     assert!(blob.starts_with(&[0xef, 0xbb, 0xbf]), "the mark is kept");
-    let text = crate::shape::Scene::read(&blob)?
+    let text = crate::shape::Scene::read(&blob, crate::shape::Limits::DEFAULT)?
         .at(0)
         .map_err(|error| Error::Invalid(error.to_string()))?
         .common()
@@ -269,7 +270,7 @@ fn explicit_empty_text_body_can_be_cleared_and_filled_through_both_verbs() -> Re
     let cleared = edit.commit()?.into_package();
     let root = cleared.opened_presentation()?;
     let part = cleared.opc.get_part(root.slides()[0].part_name())?;
-    let scene = crate::shape::Scene::read(part.blob())?;
+    let scene = crate::shape::Scene::read(part.blob(), crate::shape::Limits::DEFAULT)?;
     assert_eq!(scene.at(0)?.common().text(), Some(""));
     let mut edit = cleared.edit()?;
     assert!(!edit.set_shape_text(0_usize, 0_usize, "")?);

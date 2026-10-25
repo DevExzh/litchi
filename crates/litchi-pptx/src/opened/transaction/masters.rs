@@ -158,7 +158,7 @@ impl Edit {
     ) -> Result<bool> {
         let owner = self.working.get_part(part)?;
         crate::parts::validate_content_type(owner, content_type)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let scene = crate::shape::Scene::read(owner.blob(), crate::shape::Limits::DEFAULT)?;
         let selected = scene.shape(key)?;
         if selected.common().text() == Some(text) {
             return Ok(false);
@@ -173,7 +173,7 @@ impl Edit {
             text,
             self.source_ref()?.limits.max_text_bytes(),
         )?;
-        let staged = crate::shape::Scene::read(&xml)?;
+        let staged = crate::shape::Scene::read(&xml, crate::shape::Limits::DEFAULT)?;
         if staged.shape(key)?.common().text() != Some(text) || staged.len() != scene.len() {
             return Err(invalid("the shape text did not round-trip semantically"));
         }

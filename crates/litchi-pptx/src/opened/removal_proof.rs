@@ -20,8 +20,8 @@ pub(crate) fn normalize_shape_removal_pair(
     } else {
         (after, before)
     };
-    let scene = crate::shape::Scene::read(complete)?;
-    let next = crate::shape::Scene::read(candidate)?;
+    let scene = crate::shape::Scene::read(complete, crate::shape::Limits::DEFAULT)?;
+    let next = crate::shape::Scene::read(candidate, crate::shape::Limits::DEFAULT)?;
     if scene.is_rewritten() || next.is_rewritten() {
         return Ok(None);
     }

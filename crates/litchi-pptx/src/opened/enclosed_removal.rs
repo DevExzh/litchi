@@ -141,7 +141,7 @@ pub(crate) fn stage_enclosed_shape_removal(
     key: crate::shape::Key<'_>,
     max_output_bytes: usize,
 ) -> Result<(Option<Vec<u8>>, usize)> {
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     if !scene.is_rewritten() {
         return stage_shape_removal(xml, key, max_output_bytes);
     }
@@ -178,7 +178,7 @@ pub(crate) fn stage_enclosed_shape_removal(
     validate_shape_removal_dependencies(&candidate, &removed)?;
     // The deleted source child must carry exactly the removed shapes: the
     // candidate's shapes are the source's shapes without them, in order.
-    let published = crate::shape::Scene::read(&candidate)?;
+    let published = crate::shape::Scene::read(&candidate, crate::shape::Limits::DEFAULT)?;
     let mut retained = scene
         .iter()
         .filter(|shape| shape.id().is_none_or(|id| !removed.contains(&id)));
@@ -256,8 +256,14 @@ pub(crate) fn validate_enclosed_removal_pair(
     if retained.next().is_some() || removed.is_empty() || without(larger, &removed)? != smaller {
         return Err(enclosed_edit_refusal(operation));
     }
-    let larger_ids = identities(&crate::shape::Scene::read(larger)?)?;
-    let smaller_ids = identities(&crate::shape::Scene::read(smaller)?)?;
+    let larger_ids = identities(&crate::shape::Scene::read(
+        larger,
+        crate::shape::Limits::DEFAULT,
+    )?)?;
+    let smaller_ids = identities(&crate::shape::Scene::read(
+        smaller,
+        crate::shape::Limits::DEFAULT,
+    )?)?;
     let gone: BTreeSet<u32> = larger_ids.difference(&smaller_ids).copied().collect();
     if gone.is_empty() || !smaller_ids.is_subset(&larger_ids) {
         return Err(enclosed_edit_refusal(operation));

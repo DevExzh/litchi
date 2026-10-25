@@ -11,7 +11,7 @@ const LOCAL_SHAPE_XML: &[u8] =
 
 #[test]
 fn slide_shapes_use_names_first_with_checked_numeric_fallback() {
-    let scene = Scene::read(LOCAL_SHAPE_XML).unwrap();
+    let scene = Scene::read(LOCAL_SHAPE_XML, litchi_pptx::shape::Limits::DEFAULT).unwrap();
     assert_eq!(
         scene
             .placeholders()
@@ -45,7 +45,7 @@ fn duplicate_semantic_shape_names_are_typed_errors() {
     let xml = std::str::from_utf8(LOCAL_SHAPE_XML)
         .unwrap()
         .replace("name=\"Body\"", "name=\"Title\"");
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
 
     assert!(matches!(
         scene.shape("Title"),

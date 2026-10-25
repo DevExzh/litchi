@@ -555,7 +555,7 @@ fn prepare_placeholder_shape_source(
 ) -> Result<Vec<u8>> {
     validate_placeholder_spec(spec)?;
     limits.check_source(source.len())?;
-    let scene = Scene::read(source)?;
+    let scene = Scene::read(source, crate::shape::Limits::DEFAULT)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -598,7 +598,7 @@ fn prepare_placeholder_shape_source(
     };
 
     limits.check_source(patched.len())?;
-    let final_scene = Scene::read(&patched)?;
+    let final_scene = Scene::read(&patched, crate::shape::Limits::DEFAULT)?;
     if final_scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -696,7 +696,7 @@ fn patch_existing_shape_fields(
     spec: &PlaceholderSpec,
     limits: Limits,
 ) -> Result<Vec<u8>> {
-    let scene = Scene::read(source)?;
+    let scene = Scene::read(source, crate::shape::Limits::DEFAULT)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -1120,7 +1120,7 @@ fn slot_snapshot_from_source_for_key<'a>(
     limits: Limits,
 ) -> Result<Snapshot> {
     limits.check_source(source.len())?;
-    let scene = Scene::read(source.as_slice())?;
+    let scene = Scene::read(source.as_slice(), crate::shape::Limits::DEFAULT)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,
@@ -1160,7 +1160,7 @@ fn slot_snapshot_from_source(
     shape_index: usize,
     limits: Limits,
 ) -> Result<Snapshot> {
-    let scene = Scene::read(source.as_slice())?;
+    let scene = Scene::read(source.as_slice(), crate::shape::Limits::DEFAULT)?;
     if scene.is_rewritten() {
         return Err(Error::refused(
             litchi_core::edit::RefusalKind::UnsupportedContent,

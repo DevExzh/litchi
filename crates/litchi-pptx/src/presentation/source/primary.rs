@@ -1525,7 +1525,8 @@ impl Slide {
         }
         let scene_reservation =
             reserve_scene(&self.package, self.snapshot.xml.as_bytes().len(), maximum)?;
-        let parsed = crate::shape::Scene::read(self.snapshot.xml.as_bytes())?;
+        let parsed =
+            crate::shape::Scene::read(self.snapshot.xml.as_bytes(), crate::shape::Limits::DEFAULT)?;
         let scene = match &self.snapshot.xml {
             SourcePayload::Original(data) => {
                 crate::shape::owned::Scene::from_source(parsed, data.clone())?

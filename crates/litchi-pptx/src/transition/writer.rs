@@ -8,7 +8,7 @@ use crate::{Error, Result};
 use super::model::{
     Axis, Corner, InOut, Kind, LeftRight, Origin, Ripple, Shape, Side, Speed, Transition,
 };
-use super::reader::{P14, P15, P159};
+use super::reader::{Limits, P14, P15, P159};
 
 const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
@@ -17,9 +17,9 @@ const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn write(value: &Transition) -> Result<String> {
+pub fn write(value: &Transition, limits: Limits) -> Result<String> {
     let mut xml = String::new();
-    write_to(value, &mut xml)?;
+    write_to(value, &mut xml, limits)?;
     Ok(xml)
 }
 
@@ -31,27 +31,90 @@ pub fn write(value: &Transition) -> Result<String> {
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
-pub fn write_to(value: &Transition, xml: &mut String) -> Result<()> {
+pub fn write_to(value: &Transition, xml: &mut String, limits: Limits) -> Result<()> {
     validate_raw(value)?;
 
-    if let Some(requires) = extension_requirement(value) {
-        write_alternate_start(xml, requires);
-        xml.push_str("<mc:Choice Requires=\"");
-        xml.push_str(requires);
-        xml.push_str("\">");
-        write_transition(value, xml, value.duration_offset(), Effect::Value)?;
-        xml.push_str("</mc:Choice><mc:Fallback>");
-        let fallback = if uses_fade_fallback(&value.kind) {
-            Effect::FadeFallback
-        } else {
-            Effect::Value
+    let start = xml.len();
+    let result = {
+        let mut output = LimitedXml {
+            xml,
+            start,
+            maximum: limits.output_bytes(),
+            exceeded: false,
         };
-        write_transition(value, xml, None, fallback)?;
-        xml.push_str("</mc:Fallback></mc:AlternateContent>");
-    } else {
-        write_transition(value, xml, None, Effect::Value)?;
+
+        let result = (|| -> Result<()> {
+            if let Some(requires) = extension_requirement(value) {
+                write_alternate_start(&mut output, requires);
+                output.push_str("<mc:Choice Requires=\"");
+                output.push_str(requires);
+                output.push_str("\">");
+                write_transition(value, &mut output, value.duration_offset(), Effect::Value)?;
+                output.push_str("</mc:Choice><mc:Fallback>");
+                let fallback = if uses_fade_fallback(&value.kind) {
+                    Effect::FadeFallback
+                } else {
+                    Effect::Value
+                };
+                write_transition(value, &mut output, None, fallback)?;
+                output.push_str("</mc:Fallback></mc:AlternateContent>");
+            } else {
+                write_transition(value, &mut output, None, Effect::Value)?;
+            }
+            Ok(())
+        })();
+        result.and_then(|()| {
+            if output.exceeded {
+                Err(Error::Limit {
+                    resource: "transition output bytes",
+                    limit: limits.output_bytes(),
+                })
+            } else {
+                Ok(())
+            }
+        })
+    };
+    if result.is_err() {
+        xml.truncate(start);
     }
-    Ok(())
+    result
+}
+
+struct LimitedXml<'a> {
+    xml: &'a mut String,
+    start: usize,
+    maximum: usize,
+    exceeded: bool,
+}
+
+impl LimitedXml<'_> {
+    fn push_str(&mut self, value: &str) {
+        if self.exceeded {
+            return;
+        }
+        let length = self
+            .xml
+            .len()
+            .saturating_sub(self.start)
+            .saturating_add(value.len());
+        if length > self.maximum {
+            self.exceeded = true;
+            return;
+        }
+        self.xml.push_str(value);
+    }
+
+    fn push(&mut self, value: char) {
+        let mut encoded = [0u8; 4];
+        self.push_str(value.encode_utf8(&mut encoded));
+    }
+}
+
+impl std::fmt::Write for LimitedXml<'_> {
+    fn write_str(&mut self, value: &str) -> std::fmt::Result {
+        self.push_str(value);
+        Ok(())
+    }
 }
 
 fn extension_requirement(value: &Transition) -> Option<&'static str> {
@@ -101,7 +164,7 @@ enum Effect {
     FadeFallback,
 }
 
-fn write_alternate_start(xml: &mut String, requires: &str) {
+fn write_alternate_start(xml: &mut LimitedXml<'_>, requires: &str) {
     xml.push_str("<mc:AlternateContent xmlns:mc=\"");
     xml.push_str(MCE);
     if requires
@@ -130,7 +193,7 @@ fn write_alternate_start(xml: &mut String, requires: &str) {
 
 fn write_transition(
     value: &Transition,
-    xml: &mut String,
+    xml: &mut LimitedXml<'_>,
     duration: Option<&Offset>,
     effect: Effect,
 ) -> Result<()> {
@@ -162,7 +225,7 @@ fn write_transition(
     Ok(())
 }
 
-fn write_effect(value: &Transition, xml: &mut String) -> Result<()> {
+fn write_effect(value: &Transition, xml: &mut LimitedXml<'_>) -> Result<()> {
     if let Some(raw) = value.effect_xml() {
         write_raw(raw, xml);
         return Ok(());
@@ -330,11 +393,11 @@ fn validate_raw(value: &Transition) -> Result<()> {
     }
 }
 
-fn write_raw(raw: &super::Raw, xml: &mut String) {
+fn write_raw(raw: &super::Raw, xml: &mut LimitedXml<'_>) {
     xml.push_str(raw.xml());
 }
 
-fn write_preset(value: &super::Preset, xml: &mut String) -> Result<()> {
+fn write_preset(value: &super::Preset, xml: &mut LimitedXml<'_>) -> Result<()> {
     xml.push_str("<p15:prstTrans");
     if let Some(name) = value.name() {
         xml.push_str(" prst=\"");
@@ -351,7 +414,7 @@ fn write_preset(value: &super::Preset, xml: &mut String) -> Result<()> {
     Ok(())
 }
 
-fn escape_attribute(value: &str, output: &mut String) -> Result<()> {
+fn escape_attribute(value: &str, output: &mut LimitedXml<'_>) -> Result<()> {
     for character in value.chars() {
         match character {
             '&' => output.push_str("&amp;"),
@@ -381,7 +444,7 @@ fn escape_attribute(value: &str, output: &mut String) -> Result<()> {
     Ok(())
 }
 
-fn write_black(xml: &mut String, tag: &str, black: Option<bool>) {
+fn write_black(xml: &mut LimitedXml<'_>, tag: &str, black: Option<bool>) {
     xml.push_str("<p:");
     xml.push_str(tag);
     if let Some(black) = black {
@@ -392,7 +455,7 @@ fn write_black(xml: &mut String, tag: &str, black: Option<bool>) {
     xml.push_str("/>");
 }
 
-fn write_direction(xml: &mut String, tag: &str, attribute: &str, value: &str) {
+fn write_direction(xml: &mut LimitedXml<'_>, tag: &str, attribute: &str, value: &str) {
     xml.push_str("<p:");
     xml.push_str(tag);
     xml.push(' ');
@@ -402,7 +465,7 @@ fn write_direction(xml: &mut String, tag: &str, attribute: &str, value: &str) {
     xml.push_str("\"/>");
 }
 
-fn write_p14_direction(xml: &mut String, tag: &str, value: &str) {
+fn write_p14_direction(xml: &mut LimitedXml<'_>, tag: &str, value: &str) {
     xml.push_str("<p14:");
     xml.push_str(tag);
     xml.push_str(" dir=\"");
@@ -410,7 +473,7 @@ fn write_p14_direction(xml: &mut String, tag: &str, value: &str) {
     xml.push_str("\"/>");
 }
 
-fn write_p14_left_right(xml: &mut String, tag: &str, value: Option<&str>) {
+fn write_p14_left_right(xml: &mut LimitedXml<'_>, tag: &str, value: Option<&str>) {
     xml.push_str("<p14:");
     xml.push_str(tag);
     if let Some(value) = value {

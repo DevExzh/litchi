@@ -54,7 +54,7 @@ fn non_visual_properties_decode_lazily_and_debug_is_content_free() {
     let xml = tree(
         r#"<p:sp><p:nvSpPr><p:cNvPr id="4567" name="private-name" descr="private-description &amp; more" title="private-title&#10;line" hidden="true"/></p:nvSpPr></p:sp>"#,
     );
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
     let shape = scene.at(0).unwrap();
     let properties = shape.non_visual().unwrap();
     assert_eq!(properties.description(), Some("private-description & more"));
@@ -90,14 +90,14 @@ fn optional_flags_and_malformed_values_remain_distinct() {
         let xml = tree(&format!(
             r#"<p:sp><p:nvSpPr><p:cNvPr {attribute}/></p:nvSpPr></p:sp>"#
         ));
-        let scene = Scene::read(xml.as_bytes()).unwrap();
+        let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
         assert_eq!(scene.at(0).unwrap().hidden().unwrap(), expected);
         assert!(scene.at(0).unwrap().description().unwrap().is_none());
     }
     let xml = tree(
         r#"<p:sp><p:nvSpPr><p:cNvPr descr="plain" title="a&#9;b" hidden="private-invalid"/></p:nvSpPr></p:sp>"#,
     );
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
     let error = scene.at(0).unwrap().non_visual().unwrap_err();
     assert!(!format!("{error:?} {error}").contains("private-invalid"));
 }
@@ -106,7 +106,7 @@ fn transforms_preserve_rotation_flip_and_group_child_coordinates() {
     let xml = tree(
         r#"<p:grpSp><p:nvGrpSpPr/><p:grpSpPr><a:xfrm rot="60000" flipH="1"><a:off x="1" y="2"/><a:ext cx="3" cy="4"/><a:chOff x="5" y="6"/><a:chExt cx="7" cy="8"/></a:xfrm></p:grpSpPr><p:sp><p:spPr><a:xfrm flipV="true"/></p:spPr></p:sp></p:grpSp><p:graphicFrame><p:xfrm><a:off x="9" y="10"/><a:ext cx="11" cy="12"/></p:xfrm></p:graphicFrame>"#,
     );
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
     let transform = scene.at(0).unwrap().transform().unwrap().unwrap();
     assert_eq!(transform.rotation().value(), 60000);
     assert!(transform.flip_horizontal());
@@ -145,12 +145,12 @@ fn transform_decoding_refuses_namespace_spoofs_duplicates_and_bad_scalars() {
         r#"<a:xfrm><a:off x="private-invalid" y="0"/></a:xfrm>"#,
     ] {
         let xml = tree(&format!("<p:sp><p:spPr>{body}</p:spPr></p:sp>"));
-        let scene = Scene::read(xml.as_bytes()).unwrap();
+        let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
         let error = scene.at(0).unwrap().transform().unwrap_err();
         assert!(!format!("{error:?} {error}").contains("private-invalid"));
     }
     let xml = tree(r#"<p:sp><p:extLst><a:xfrm rot="60000"/></p:extLst></p:sp>"#);
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
     assert!(scene.at(0).unwrap().transform().unwrap().is_none());
 }
 #[test]
@@ -166,7 +166,7 @@ fn payload_relationships_use_explicit_raw_access() {
         ),
     ] {
         let xml = tree(&picture(attrs));
-        let scene = Scene::read(xml.as_bytes()).unwrap();
+        let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
         let payload = raw::payload(scene.at(0).unwrap()).unwrap().unwrap();
         assert_eq!(payload.attribute(), kind);
         assert_eq!(payload.relationship_id().unwrap(), "private&payload");
@@ -180,7 +180,7 @@ fn payload_ambiguity_and_namespace_mismatch_are_typed() {
         r#"r:embed="one" s:embed="two""#,
     ] {
         let xml = tree(&picture(attributes));
-        let scene = Scene::read(xml.as_bytes()).unwrap();
+        let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
         assert_eq!(
             raw::payload(scene.at(0).unwrap()).unwrap_err(),
             raw::Error::Ambiguous
@@ -199,14 +199,14 @@ fn payload_ambiguity_and_namespace_mismatch_are_typed() {
                 &format!(r#"xmlns:r="{namespace}""#),
             )
         };
-        let scene = Scene::read(xml.as_bytes()).unwrap();
+        let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
         assert_eq!(
             raw::payload(scene.at(0).unwrap()).unwrap_err(),
             raw::Error::InvalidNamespace
         );
     }
     let xml = tree(&picture(r#"f:embed="private""#));
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
     assert!(raw::payload(scene.at(0).unwrap()).unwrap().is_none());
 }
 #[test]
@@ -217,7 +217,7 @@ fn frame_payloads_are_direct_and_conflicts_are_not_selected() {
         r#"<p:oleObj r:id="part"/>"#,
     ] {
         let xml = tree(&frame(payload));
-        let scene = Scene::read(xml.as_bytes()).unwrap();
+        let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
         assert_eq!(
             raw::payload(scene.at(0).unwrap())
                 .unwrap()
@@ -233,7 +233,7 @@ fn frame_payloads_are_direct_and_conflicts_are_not_selected() {
         r#"<c:chart r:id="one"/><a:tbl/>"#,
     ] {
         let xml = tree(&frame(payloads));
-        let scene = Scene::read(xml.as_bytes()).unwrap();
+        let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
         assert!(matches!(scene.at(0).unwrap(), Shape::Frame(_)));
         assert_eq!(
             raw::payload(scene.at(0).unwrap()).unwrap_err(),
@@ -243,7 +243,7 @@ fn frame_payloads_are_direct_and_conflicts_are_not_selected() {
     let xml = tree(&frame(
         r#"<f:extension><c:chart r:id="opaque"/></f:extension>"#,
     ));
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
     assert!(matches!(scene.at(0).unwrap(), Shape::Frame(_)));
     assert!(raw::payload(scene.at(0).unwrap()).unwrap().is_none());
 }
@@ -255,7 +255,7 @@ fn source_spans_survive_bom_mce_and_retention() {
     ));
     for xml in [tree(body), xml] {
         let bytes = [vec![0xef, 0xbb, 0xbf], xml.into_bytes()].concat();
-        let scene = owned::Scene::read(bytes).unwrap();
+        let scene = owned::Scene::read(bytes, litchi_pptx::shape::Limits::DEFAULT).unwrap();
         let handle = scene.shape(0usize).unwrap().unwrap();
         let span = raw::transform_span(handle.view()).unwrap();
         assert!(
@@ -363,13 +363,13 @@ fn strict_payload_namespaces_and_content_parts_are_checked() {
     let xml = tree(&picture(r#"r:embed="part""#))
         .replace(P, "http://purl.oclc.org/ooxml/presentationml/main")
         .replace(A, "http://purl.oclc.org/ooxml/drawingml/main");
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
     assert_eq!(
         raw::payload(scene.at(0).unwrap()).unwrap_err(),
         raw::Error::InvalidNamespace
     );
     let xml = xml.replace(R, "http://purl.oclc.org/ooxml/officeDocument/relationships");
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
     assert_eq!(
         raw::payload(scene.at(0).unwrap())
             .unwrap()
@@ -382,7 +382,7 @@ fn strict_payload_namespaces_and_content_parts_are_checked() {
     let xml = tree(
         r#"<p:contentPart r:id="content"/><p:pic><p:extLst><a:blip r:embed="forged"/></p:extLst></p:pic>"#,
     );
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
     assert_eq!(
         raw::payload(scene.at(0).unwrap())
             .unwrap()
@@ -397,7 +397,7 @@ fn strict_payload_namespaces_and_content_parts_are_checked() {
 #[test]
 fn borrowed_lookup_errors_omit_authored_names() {
     let xml = tree(&(picture("") + &picture("")));
-    let scene = Scene::read(xml.as_bytes()).unwrap();
+    let scene = Scene::read(xml.as_bytes(), litchi_pptx::shape::Limits::DEFAULT).unwrap();
     for key in ["private-name", "private-missing"] {
         let error = scene.shape(key).unwrap_err();
         assert!(!format!("{error:?} {error}").contains("private"));

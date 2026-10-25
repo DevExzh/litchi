@@ -1741,7 +1741,10 @@ impl<'a> SlidePart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
+        Ok(
+            Scene::read(self.part.blob(), crate::shape::Limits::DEFAULT)?
+                .locate_in_part(self.part.partname().as_str()),
+        )
     }
 
     /// Resolve ordinary `DrawingML` chart parts related to this slide.
@@ -1882,7 +1885,10 @@ impl<'a> SlideLayoutPart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
+        Ok(
+            Scene::read(self.part.blob(), crate::shape::Limits::DEFAULT)?
+                .locate_in_part(self.part.partname().as_str()),
+        )
     }
 
     /// Read the optional theme override attached to this layout.
@@ -1976,7 +1982,10 @@ impl<'a> SlideMasterPart<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
-        Ok(Scene::read(self.part.blob())?.locate_in_part(self.part.partname().as_str()))
+        Ok(
+            Scene::read(self.part.blob(), crate::shape::Limits::DEFAULT)?
+                .locate_in_part(self.part.partname().as_str()),
+        )
     }
 
     /// Read the theme reached from this slide master.

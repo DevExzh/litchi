@@ -3954,7 +3954,7 @@ fn general_shapes_picture_parts_and_modern_extensions_are_atomic_and_reversible(
         .map_err(|error| Error::Invalid(format!("reopen modern package: {error}")))?;
     let opened = reopened.opened_presentation()?;
     let slide = reopened.opc.get_part(opened.slides()[0].part_name())?;
-    let scene = crate::shape::Scene::read(slide.blob())?;
+    let scene = crate::shape::Scene::read(slide.blob(), crate::shape::Limits::DEFAULT)?;
     for id in [text_id, rectangle_id, ellipse_id, picture_id] {
         assert!(scene.iter().any(|shape| shape.id() == Some(id)));
     }
@@ -4044,10 +4044,11 @@ fn picture_shape_transfer_copies_relationship_closure_and_remaps_identity() -> R
     let source_slide = source_package
         .opc
         .get_part(source_root.slides()[0].part_name())?;
-    let source_position = crate::shape::Scene::read(source_slide.blob())?
-        .iter()
-        .position(|shape| shape.id() == Some(picture_id))
-        .ok_or_else(|| Error::Invalid("source picture shape disappeared".into()))?;
+    let source_position =
+        crate::shape::Scene::read(source_slide.blob(), crate::shape::Limits::DEFAULT)?
+            .iter()
+            .position(|shape| shape.id() == Some(picture_id))
+            .ok_or_else(|| Error::Invalid("source picture shape disappeared".into()))?;
 
     let mut destination = opened_two_slide_package()?;
     let before = part_states(&destination);
@@ -4061,7 +4062,7 @@ fn picture_shape_transfer_copies_relationship_closure_and_remaps_identity() -> R
     let mut reopened = Package::from_bytes(&bytes)?;
     let opened = reopened.opened_presentation()?;
     let slide = reopened.opc.get_part(opened.slides()[1].part_name())?;
-    let transferred_scene = crate::shape::Scene::read(slide.blob())?;
+    let transferred_scene = crate::shape::Scene::read(slide.blob(), crate::shape::Limits::DEFAULT)?;
     let transferred = transferred_scene
         .iter()
         .find(|shape| shape.id() == Some(transferred_id))
@@ -4118,7 +4119,8 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
     let source_slide = source_package
         .opc
         .get_part(source_root.slides()[0].part_name())?;
-    let source_scene = crate::shape::Scene::read(source_slide.blob())?;
+    let source_scene =
+        crate::shape::Scene::read(source_slide.blob(), crate::shape::Limits::DEFAULT)?;
     let unknown_position = source_scene
         .iter()
         .position(|shape| matches!(shape, crate::shape::Shape::Unknown(_)))
@@ -4246,7 +4248,7 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
     let opened = reopened.opened_presentation()?;
     let destination_slide = reopened.opc.get_part(opened.slides()[1].part_name())?;
     assert!(!destination_slide.blob().contains(&b'\n'));
-    let scene = crate::shape::Scene::read(destination_slide.blob())?;
+    let scene = crate::shape::Scene::read(destination_slide.blob(), crate::shape::Limits::DEFAULT)?;
     let transferred_group = scene
         .roots()
         .find(|shape| {
@@ -4484,7 +4486,8 @@ fn disjoint_new_shape_and_modern_comment_changes_merge_automatically() -> Result
             reopened
                 .opc
                 .get_part(reopened.opened_presentation()?.slides()[0].part_name())?
-                .blob()
+                .blob(),
+            crate::shape::Limits::DEFAULT
         )?
         .iter()
         .any(|shape| shape
@@ -5701,7 +5704,7 @@ fn authored_charts_carry_a_deterministic_embedded_workbook_and_edit_in_place() -
     let reopened = Package::from_bytes(&committed.to_bytes()?)?;
     let root = reopened.opened_presentation()?;
     let slide = reopened.opc.get_part(root.slides()[0].part_name())?;
-    let scene = crate::shape::Scene::read(slide.blob())?;
+    let scene = crate::shape::Scene::read(slide.blob(), crate::shape::Limits::DEFAULT)?;
     let position = scene
         .iter()
         .position(|shape| shape.id() == Some(id))
@@ -5895,7 +5898,7 @@ fn extended_charts_are_chartex_parts_with_their_companions() -> Result<()> {
     }
     let root = reopened.opened_presentation()?;
     let slide = reopened.opc.get_part(root.slides()[0].part_name())?;
-    let scene = crate::shape::Scene::read(slide.blob())?;
+    let scene = crate::shape::Scene::read(slide.blob(), crate::shape::Limits::DEFAULT)?;
     let position = scene
         .iter()
         .position(|shape| shape.id() == Some(id))

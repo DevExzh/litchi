@@ -93,7 +93,7 @@ impl Edit {
     ) -> Result<Position> {
         let selected = self.resolve_slide(slide.into())?;
         let scene_xml = self.working.get_part(&selected.part_name)?.blob().to_vec();
-        let scene = crate::shape::Scene::read(&scene_xml)?;
+        let scene = crate::shape::Scene::read(&scene_xml, crate::shape::Limits::DEFAULT)?;
         let existing = scene.iter().position(|shape| {
             shape.placeholder().is_some_and(|placeholder| {
                 let found = kind_of(placeholder);
@@ -190,7 +190,7 @@ impl Edit {
         text: &str,
     ) -> Result<Position> {
         let owner = self.working.get_part(&slide.part_name)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
+        let scene = crate::shape::Scene::read(owner.blob(), crate::shape::Limits::DEFAULT)?;
         let used: Vec<(Option<PlaceholderKind>, u32)> = scene
             .roots()
             .filter_map(|shape| shape.placeholder())
@@ -300,7 +300,7 @@ impl Edit {
             return Ok(Vec::new());
         };
         let layout = self.working.get_part(&edge.target_partname()?)?;
-        let scene = crate::shape::Scene::read(layout.blob())?;
+        let scene = crate::shape::Scene::read(layout.blob(), crate::shape::Limits::DEFAULT)?;
         Ok(scene
             .roots()
             .filter_map(|shape| shape.placeholder())

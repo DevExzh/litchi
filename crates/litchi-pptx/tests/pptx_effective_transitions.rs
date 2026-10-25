@@ -114,7 +114,7 @@ fn effective_transition(
     };
     for name in candidates.into_iter().flatten() {
         let part = package.get_part(&PackURI::new(name).unwrap())?;
-        if let Some(transition) = read(part.blob())? {
+        if let Some(transition) = read(part.blob(), litchi_pptx::transition::Limits::DEFAULT)? {
             return Ok(Some(transition));
         }
     }

@@ -320,7 +320,7 @@ fn selected_layout(owner: &dyn OpcPart, key: crate::shape::Key<'_>) -> Result<La
 }
 
 pub(crate) fn selected_raw_span(xml: &[u8], key: crate::shape::Key<'_>) -> Result<Range<usize>> {
-    let scene = crate::shape::read(xml)?;
+    let scene = crate::shape::read(xml, crate::shape::Limits::DEFAULT)?;
     let shape = scene.shape(key)?;
     selected_raw_span_for_shape(xml, &scene, shape)
 }

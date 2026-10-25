@@ -214,8 +214,8 @@ fn scene_spans_are_byte_offsets_into_the_marked_slide() {
     let slide = members(&deck)["ppt/slides/slide1.xml"].clone();
     assert!(!slide.starts_with(BOM));
     let marked = [BOM, slide.as_slice()].concat();
-    let plain_scene = Scene::read(&slide).unwrap();
-    let marked_scene = Scene::read(&marked).unwrap();
+    let plain_scene = Scene::read(&slide, litchi_pptx::shape::Limits::DEFAULT).unwrap();
+    let marked_scene = Scene::read(&marked, litchi_pptx::shape::Limits::DEFAULT).unwrap();
     assert_eq!(marked_scene.len(), plain_scene.len());
     assert!(!marked_scene.is_rewritten());
     assert_eq!(marked_scene.xml(), marked.as_slice());

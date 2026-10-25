@@ -1,6 +1,6 @@
 //! OPC graph ownership for persisted laser-trace extensions.
 
-use super::{Conformance, Limits, Trace, TracePoint, read_with, validate, write};
+use super::{Conformance, Limits, Trace, TracePoint, Usage, read, validate, write};
 use crate::{Error, Result};
 use litchi_core::xml::ReaderOrigin;
 use litchi_opc::constants::content_type as ct;
@@ -24,7 +24,8 @@ const STRICT_PML: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
 pub fn load_slide_traces(
     slide_index: usize,
     slide: &dyn Part,
-    limits: &mut Limits,
+    limits: &Limits,
+    usage: &mut Usage,
 ) -> Result<Vec<Trace>> {
     if slide.content_type() != ct::PML_SLIDE {
         return Err(Error::ContentType {
@@ -32,7 +33,7 @@ pub fn load_slide_traces(
             actual: slide.content_type().to_owned(),
         });
     }
-    read_with(slide_index, slide.blob(), limits)
+    read(slide_index, slide.blob(), limits, usage)
 }
 
 /// Store one trace in a slide's extension list, preserving its dialect.
@@ -45,7 +46,7 @@ pub(crate) fn store_slide_trace(
     slide_name: &PackURI,
     points: &[TracePoint],
 ) -> Result<()> {
-    validate(points)?;
+    validate(points, &Limits::DEFAULT)?;
     let slide = package.get_part(slide_name)?;
     if slide.content_type() != ct::PML_SLIDE {
         return Err(Error::ContentType {
@@ -53,7 +54,8 @@ pub(crate) fn store_slide_trace(
             actual: slide.content_type().to_owned(),
         });
     }
-    if !load_slide_traces(0, slide, &mut Limits::default())?.is_empty() {
+    let mut usage = Usage::default();
+    if !load_slide_traces(0, slide, &Limits::DEFAULT, &mut usage)?.is_empty() {
         return Err(Error::Invalid(
             "slide already contains a laser-trace extension; replacement is not supported"
                 .to_owned(),
@@ -61,10 +63,11 @@ pub(crate) fn store_slide_trace(
     }
 
     let conformance = Conformance::from_namespace(slide_dialect(slide.blob())?);
-    let fragment = write(points, conformance)?;
+    let fragment = write(points, conformance, Limits::DEFAULT)?;
     let updated = insert_extension_fragment(slide.blob(), &fragment)?;
     let probe = BlobPart::new(slide_name.clone(), ct::PML_SLIDE.into(), updated.clone());
-    let traces = load_slide_traces(0, &probe, &mut Limits::default())?;
+    let mut usage = Usage::default();
+    let traces = load_slide_traces(0, &probe, &Limits::DEFAULT, &mut usage)?;
     if traces.len() != 1 || traces[0].points().len() != points.len() {
         return Err(Error::Invalid(
             "laser-trace storage failed read-back validation".to_owned(),
@@ -356,7 +359,8 @@ mod tests {
             let (mut package, name) = package(&xml);
             store_slide_trace(&mut package, &name, &[point()]).unwrap();
             let slide = package.get_part(&name).unwrap();
-            let traces = load_slide_traces(0, slide, &mut Limits::default()).unwrap();
+            let mut usage = Usage::default();
+            let traces = load_slide_traces(0, slide, &Limits::DEFAULT, &mut usage).unwrap();
             assert_eq!(traces.len(), 1);
             assert_eq!(traces[0].point_count(), 1);
         }

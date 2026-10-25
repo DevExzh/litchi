@@ -112,7 +112,7 @@ pub(super) fn rewrite_shape_bounds_many(
         validate_requested_bounds(bounds)?;
     }
 
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     refuse_rewritten_scene(&scene)?;
     let scanned = scan_geometry(xml)?;
 
@@ -175,7 +175,7 @@ pub(super) fn rewrite_shape_bounds_many(
     }
     edits.sort_unstable_by_key(|edit| (edit.span.start, edit.span.end));
     let output = emit_replacements(xml, &edits, max_output_bytes)?;
-    let published = crate::shape::Scene::read(&output)?;
+    let published = crate::shape::Scene::read(&output, crate::shape::Limits::DEFAULT)?;
     refuse_rewritten_scene(&published)?;
     if !same_shape_identity(&scene, &published) {
         return Err(Error::Invalid(
@@ -202,7 +202,7 @@ pub(super) fn rewrite_shape_bounds_many(
 /// ordinary shapes.  The result intentionally retains all tags, attributes,
 /// namespaces, comments, and unknown extension bytes exactly.
 pub(crate) fn geometry_skeleton(xml: &[u8]) -> Result<Vec<u8>> {
-    let scene = crate::shape::Scene::read(xml)?;
+    let scene = crate::shape::Scene::read(xml, crate::shape::Limits::DEFAULT)?;
     refuse_rewritten_scene(&scene)?;
     let scanned = scan_geometry(xml)?;
     let mut edits = Vec::new();
@@ -965,7 +965,7 @@ mod tests {
             assert!(String::from_utf8_lossy(&output).contains(r#"rot="900000"#));
             assert!(String::from_utf8_lossy(&output).contains(r#"<d:foo data="keep"/>"#));
             assert_eq!(
-                crate::shape::Scene::read(&output)
+                crate::shape::Scene::read(&output, crate::shape::Limits::DEFAULT)
                     .expect("scene")
                     .at(0)
                     .expect("shape")
