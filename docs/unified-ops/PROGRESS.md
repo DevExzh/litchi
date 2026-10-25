@@ -5061,3 +5061,28 @@ See [0063](0063-source-pptx-modern-comments.md).
   content aggregate-limit returns remain engineering work. Integration is
   clean with no source hold. Final gate/native/performance qualification and
   the signed-batch contract choice remain open. Nothing is pushed.
+
+- Coordinator tooling repair and composed follow-up (2026-10-25):
+  Record 0362ul80 merges at `317f648242` after independent review and all
+  60 focused tests pass in the composed tree. The fixture guard uses exact
+  policy-line exceptions with decoy negatives; lease and fast-exit tests now
+  coordinate the intended paths deterministically. The actual complete
+  39-module row is assigned a fresh detached capture of that source. The old
+  1,745-test failure remains preserved; current full-row acceptance is pending.
+
+  Both standalone performance-tool and native-tool all-target checks pass
+  on clean `ebc7425644`, covering the ODF and VBA consumer composition. Root
+  verifies logs, target traces, source/lock identities and empty terminal
+  ownership; the target peaks at 3,095,985,461 bytes. Record 0362ul77 now binds
+  both composed captures. Slot 3 is released.
+
+  PPTX properties' nine guarded rows pass on `a75cf6419d`; root verifies the
+  complete receipt. Later core replay/profile repairs and their new strict
+  recipient regression remain source-only and require combined validation.
+  Further audit confirms metadata public raw codecs still use fixed resource
+  ceilings without required profiles. Active returns 0362ul81–82 cover those
+  structural/history families, including every consumer and recipient replay
+  policy; they are required work, not exceptions. Their source workers share
+  the existing 61–63 profile-carrier design and receive no build slot yet.
+  Census 0362ul79c is closing validator bytecode self-pollution after its
+  receipt/guard/lock binding review. No final census or acceptance is claimed.

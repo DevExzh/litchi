@@ -46,3 +46,36 @@ earlier failed and interrupted attempts remain preserved in 0362ul39b.
 This closes the queued compiler check for the composed RTF/PPT consumers.
 Later source lanes still require their own composed checks; the final gate,
 native execution and performance qualification remain open.
+
+## ODF and VBA composed follow-up
+
+The subsequent clean source `ebc742564462d5d3fcc1f0c029ee6fb4599e8df3`
+also passes both standalone all-target compiler checks after ODF and VBA
+integration. The commands run sequentially under the same approved runner
+and unchanged font-transition locks:
+
+```sh
+cd tools/perf-baseline && cargo check --offline --locked --all-targets
+cd tools/native-resave && cargo check --offline --locked --all-targets
+```
+
+The external state directory is
+`.coord/final-composed-ebc742-validation/f5-perf-native-validation`.
+`result.json` is 17,077 bytes with SHA-256
+`b90f9a2fe8e77a5026af7fad9ef0d4956490aecd1ecc14a499477b5b9faba60d`;
+`rows.json` is 16,063 bytes with SHA-256
+`4e8ef13a550eb92ffcf62a8d84304c904d453725f4960c43d809689cbf9fa031`;
+`manifest.json` is 1,974 bytes with SHA-256
+`214b1ec8035a64eb7f7cb6b119c552b5e47921030a51fa5a69f33882ad77fe70`.
+The performance-tool command exits 0 in 161.602 seconds (log SHA-256
+`bef4b599164a16b85bab8cbd3d9ecf671ebc88d8d72b20bbdb69a78aadf37b76`),
+and the native-tool command exits 0 in 9.938 seconds (log SHA-256
+`d1350a7e7a5766d9ab076e286c3c2fa8338bfbde4f0c84b5cc72cb8bf124c324`).
+Their target traces have SHA-256
+`a5c01d972002afc9e21f1929c9dfcc38bffb7320e9f8bfc1b81e757ca362d0e5`
+and `ea5f848c4943f3195b703edd0d0ac2941ea9102f341fef12f29b6f26822dcb13`.
+
+Root verifies both row logs/traces, unchanged clean source and locks, all
+empty terminal ownership samples and target guards. The maximum target is
+3,095,985,461 bytes. These compile results do not cover later unmerged source
+lanes or constitute actual native execution/performance qualification.
