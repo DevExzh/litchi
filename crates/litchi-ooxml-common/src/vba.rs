@@ -1099,7 +1099,10 @@ impl<'a> Edit<'a> {
 
     fn remove_inner(&mut self) -> Result<bool> {
         let current_limits = self.options.effective(self.current()).source_limits;
-        validate_recipient_metadata_limits(self.current(), current_limits)?;
+        let admission = validate_recipient_metadata_limits(self.current(), current_limits)?;
+        if self.candidate.is_none() && self.base_admission.is_none() {
+            self.base_admission = Some(admission);
+        }
         if inspect_existing_graph(self.current(), &self.source_part, self.host)?.is_none() {
             return Ok(false);
         }
@@ -2757,6 +2760,11 @@ mod tests {
     use super::*;
     use litchi_opc::PackageWriter;
 
+    const EXCEL_MAIN_XML: &[u8] =
+        br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
+    const WORD_MAIN_XML: &[u8] =
+        br#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#;
+
     #[derive(Clone)]
     struct ImmutableContentTypePart {
         inner: BlobPart,
@@ -2874,7 +2882,7 @@ mod tests {
             let mut owner = BlobPart::new(
                 owner_name.clone(),
                 "application/xml".to_string(),
-                b"owner".to_vec(),
+                br#"<owner/>"#.to_vec(),
             );
             owner.relate_to(target, "urn:test:dangling");
 
@@ -2883,7 +2891,7 @@ mod tests {
                 .try_add_part(Box::new(BlobPart::new(
                     source_name.clone(),
                     ct::WML_DOCUMENT_MAIN.to_string(),
-                    b"document".to_vec(),
+                    WORD_MAIN_XML.to_vec(),
                 )))
                 .unwrap();
             package.try_add_part(Box::new(owner)).unwrap();
@@ -2938,7 +2946,7 @@ mod tests {
             .try_add_part(Box::new(BlobPart::new(
                 source_name.clone(),
                 ct::SML_SHEET_MAIN.to_string(),
-                b"workbook".to_vec(),
+                EXCEL_MAIN_XML.to_vec(),
             )))
             .unwrap();
         package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
@@ -2992,7 +3000,7 @@ mod tests {
             .try_add_part(Box::new(BlobPart::new(
                 source_name.clone(),
                 ct::SML_SHEET_MAIN.to_string(),
-                b"workbook".to_vec(),
+                EXCEL_MAIN_XML.to_vec(),
             )))
             .unwrap();
 
@@ -3038,7 +3046,7 @@ mod tests {
             .try_add_part(Box::new(BlobPart::new(
                 source_name,
                 ct::SML_SHEET_MAIN.to_string(),
-                b"workbook".to_vec(),
+                EXCEL_MAIN_XML.to_vec(),
             )))
             .unwrap();
         package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
@@ -3052,7 +3060,7 @@ mod tests {
             .try_add_part(Box::new(BlobPart::new(
                 source_name,
                 ct::WML_DOCUMENT_MAIN.to_string(),
-                b"document".to_vec(),
+                WORD_MAIN_XML.to_vec(),
             )))
             .unwrap();
         package.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
@@ -3951,7 +3959,7 @@ mod tests {
         let mut source = BlobPart::new(
             source_name.clone(),
             ct::SML_SHEET_MACRO_MAIN.to_string(),
-            b"workbook".to_vec(),
+            EXCEL_MAIN_XML.to_vec(),
         );
         let relationship_id = source.relate_to(EXCEL_PROJECT_TARGET, rt::VBA_PROJECT);
 
