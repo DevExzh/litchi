@@ -132,6 +132,65 @@ def _validate_manifest(receipt: Mapping[str, Any]) -> None:
         raise ValidationError(str(error)) from error
 
 
+def _validate_output_root(receipt: Mapping[str, Any], *, required: bool) -> Path | None:
+    value = receipt.get("output_root")
+    if value is None:
+        if required:
+            raise ValidationError("ready preparation is missing its disjoint output root")
+        return None
+    if not isinstance(value, str) or not Path(value).is_absolute():
+        raise ValidationError("preparation output root must be an absolute path")
+    root = Path(value)
+    lexical = root.absolute()
+    cursor = Path(lexical.anchor)
+    for component in lexical.parts[1:]:
+        cursor /= component
+        if cursor.is_symlink():
+            raise ValidationError(f"preparation output root contains a symlink component: {cursor}")
+    if root.is_symlink() or not root.is_dir():
+        raise ValidationError("preparation output root is not a regular directory")
+    root_resolved = root.resolve()
+    identities = receipt.get("identities")
+    if isinstance(identities, Mapping):
+        for side in ("before", "after"):
+            identity = identities.get(side)
+            if not isinstance(identity, Mapping):
+                continue
+            source_value = identity.get("source_root")
+            if isinstance(source_value, str):
+                source = Path(source_value).resolve()
+                if root_resolved == source or root_resolved in source.parents or source in root_resolved.parents:
+                    raise ValidationError("preparation output root overlaps a source root")
+            archive = identity.get("archive")
+            archive_value = archive.get("path") if isinstance(archive, Mapping) else None
+            if isinstance(archive_value, str):
+                archive_path = Path(archive_value).resolve()
+                if root_resolved == archive_path or root_resolved in archive_path.parents or archive_path in root_resolved.parents:
+                    raise ValidationError("preparation output root overlaps a source archive")
+    return root_resolved
+
+
+def _validate_output_artifact(evidence: Mapping[str, Any], expected: Any, output_root: Path, label: str) -> None:
+    artifact = evidence.get("output_artifact")
+    if not isinstance(artifact, Mapping):
+        raise ValidationError(f"{label} is missing output artifact identity")
+    relative = artifact.get("relative_path")
+    if not isinstance(relative, str) or Path(relative).is_absolute() or ".." in Path(relative).parts:
+        raise ValidationError(f"{label} output relative path is unsafe")
+    if relative != expected.output:
+        raise ValidationError(f"{label} output path differs from the policy")
+    expected_path = (output_root / relative).resolve(strict=False)
+    recorded_path = artifact.get("path")
+    if not isinstance(recorded_path, str) or Path(recorded_path).absolute().resolve(strict=False) != expected_path:
+        raise ValidationError(f"{label} output artifact is outside the prepared output root")
+    try:
+        actual_output = _file_identity(expected_path, label)
+    except (OSError, ValidationError) as error:
+        raise ValidationError(str(error)) from error
+    if dict(artifact) != {**actual_output, "relative_path": relative}:
+        raise ValidationError(f"{label} output artifact changed")
+
+
 def validate_preparation(path: Path) -> dict[str, Any]:
     """Admit a ready preparation receipt and revalidate both source roots."""
 
@@ -142,6 +201,7 @@ def validate_preparation(path: Path) -> dict[str, Any]:
         raise ValidationError("preparation receipt is not bound to the trusted current-source policy")
     _validate_manifest(receipt)
     _validate_tooling(receipt)
+    output_root = _validate_output_root(receipt, required=TRUSTED_POLICY.status == "ready")
     TRUSTED_POLICY.require_execution_ready()
     if receipt.get("status") != "ready" or receipt.get("execution_admitted") is not True:
         raise ValidationError("preparation receipt is blocked and cannot be executed")
@@ -174,6 +234,7 @@ def validate_preparation(path: Path) -> dict[str, Any]:
         "receipt": receipt,
         "receipt_sha256": receipt_sha256,
         "lane": lane,
+        "output_root": output_root,
     }
 
 
@@ -193,6 +254,8 @@ def validate_qualification(path: Path, preparation_path: Path) -> dict[str, Any]
         raise ValidationError("qualification lane differs from its preparation receipt")
     if value.get("abba_order") != list(ABBA_ORDER):
         raise ValidationError("qualification ABBA order differs from the fixed protocol")
+    if prepared["output_root"] is None or value.get("output_root") != str(prepared["output_root"]):
+        raise ValidationError("qualification output root is not the prepared disjoint root")
     if value.get("source_artifacts") != prepared["receipt"].get("identities"):
         raise ValidationError("qualification source/lock/archive artifacts differ from preparation")
     if value.get("tooling") != prepared["receipt"].get("tooling"):
@@ -222,19 +285,7 @@ def validate_qualification(path: Path, preparation_path: Path) -> dict[str, Any]
         }
         if evidence.get("source_bindings") != expected_bindings:
             raise ValidationError(f"qualification result {index} source bindings differ from preparation")
-        output_artifact = evidence.get("output_artifact")
-        if not isinstance(output_artifact, Mapping):
-            raise ValidationError(f"qualification result {index} is missing output artifact identity")
-        relative = output_artifact.get("relative_path")
-        output_path = output_artifact.get("path")
-        if relative != expected.output or not isinstance(output_path, str) or not Path(output_path).is_absolute():
-            raise ValidationError(f"qualification result {index} output path differs from the policy")
-        try:
-            actual_output = _file_identity(Path(output_path), f"qualification result {index} output")
-        except (OSError, ValidationError) as error:
-            raise ValidationError(str(error)) from error
-        if dict(output_artifact) != {**actual_output, "relative_path": relative}:
-            raise ValidationError(f"qualification result {index} output artifact changed")
+        _validate_output_artifact(evidence, expected, prepared["output_root"], f"qualification result {index}")
     return {"schema": QUALIFICATION_SCHEMA, "lane": lane, "policy_sha256": TRUSTED_POLICY.digest(), "sha256": value_sha256}
 
 

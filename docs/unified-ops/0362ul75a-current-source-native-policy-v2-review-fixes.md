@@ -16,18 +16,23 @@ The review fixes close the following receipt and execution gaps:
 - source archives have fixed size/hash pins and an explicit tar-to-Git-tree
   regular-member proof path, following the reviewed signed-native archive
   shape;
+- the ignored root `Cargo.lock` is admitted only when it is the exact lock
+  pin declared by the endpoint policy; every other ignored or untracked path
+  remains rejected;
 - preparation tooling and manifest path/hash identities are reloaded and
   checked at validation time, including policy/preparer/validator bytes;
 - qualification receipts must bind the prepared source/lock/archive
-  identities and exact route role/program/output metadata, including actual
-  output-file identities and per-route source bindings.
+  identities and exact route role/program/output/status metadata, including
+  actual output-file identities under the prepared disjoint output root and
+  per-route source bindings.  Refusal routes cannot masquerade as successful
+  build/open/text routes.
 
 The candidate remains incomplete: abbreviated font references are still
 provenance hints only, and no execution is admitted until exact candidate
 source/tree/lock/probe/fixture/archive pins are reviewed and committed.
 
 The updated pending-policy digest is
-`291df36554711e0e889977be4696702f470244898e3b43cf317d8145020df0c9`.
+`d380c25389b289b0edc774e3932d04055b7f717bcb80a666fab4be90d97241e4`.
 
 Focused verification:
 
@@ -35,6 +40,8 @@ Focused verification:
 PYTHONPATH=tools python3 -m unittest tools.test_current_native_policy_v2
 ```
 
-Result: 13 tests passed, including sparse omission, ignored overlay, tracked
-symlink, root-overlap, source/output/archive overlap, manifest/tooling
-mutation, route tampering, and pending-policy fabrication refusals.
+Result: 15 tests passed, including sparse omission, ignored overlay, exact
+pinned root-lock admission, tracked symlink, root-overlap,
+source/output/archive overlap, manifest/tooling mutation, route/status
+tampering, unrelated-output rejection, and pending-policy fabrication
+refusals.

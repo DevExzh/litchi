@@ -47,6 +47,11 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
         tampered["routes"][0]["output"] = "target/release/other"
         with self.assertRaises(policy.PolicyMismatch):
             policy.validate_routes("ppt-auxiliary", tampered["routes"])
+        refused = copy.deepcopy(value)
+        for route in refused["routes"]:
+            route["status"] = "refused"
+        with self.assertRaises(policy.PolicyMismatch):
+            policy.validate_routes("ppt-auxiliary", refused["routes"])
 
     def test_pending_preparation_is_diagnostic_only(self) -> None:
         manifest = ROOT / "tools/native_qualification/manifests/ppt-current-v2.json"
@@ -108,6 +113,23 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
             with self.assertRaises(policy.PolicyMismatch):
                 policy.observe_source(source, "candidate")
 
+    def test_exact_pinned_root_lock_is_the_only_allowed_ignored_overlay(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            source = self._fake_source(Path(directory) / "source", "ignored-lock")
+            (source / ".gitignore").write_text("Cargo.lock\n")
+            subprocess.run(["git", "add", ".gitignore"], cwd=source, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "ignore-lock"], cwd=source, check=True)
+            lock = source / "Cargo.lock"
+            lock.write_bytes(b"pinned lock\n")
+            digest = hashlib.sha256(lock.read_bytes()).hexdigest()
+            entries = policy._git_tree_entries(source)
+            identity = policy._tracked_materialization(
+                source,
+                entries,
+                (policy.ArtifactPin("Cargo.lock", digest, lock.stat().st_size),),
+            )
+            self.assertGreaterEqual(identity["files"], 2)
+
     def test_tracked_symlink_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             source = self._fake_source(Path(directory) / "source", "symlink")
@@ -140,6 +162,27 @@ class CurrentNativePolicyV2Tests(unittest.TestCase):
                 policy._check_plan_paths(source, source / "state", Path(directory) / "target", None)
             with self.assertRaises(policy.PolicyMismatch):
                 policy._check_plan_paths(source, Path(directory) / "state", Path(directory) / "target", source / "archive.tar")
+
+    def test_output_artifact_must_be_the_policy_path_under_the_prepared_root(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "outputs"
+            expected = policy.PPT_ROUTES[0]
+            output = root / expected.output
+            output.parent.mkdir(parents=True)
+            output.write_bytes(b"bound output")
+            identity = {
+                "path": str(output.resolve()),
+                "sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+                "bytes": output.stat().st_size,
+                "relative_path": expected.output,
+            }
+            validator._validate_output_artifact({"output_artifact": identity}, expected, root.resolve(), "output")
+            unrelated = Path(directory) / "unrelated"
+            unrelated.write_bytes(b"bound output")
+            forged = dict(identity)
+            forged["path"] = str(unrelated)
+            with self.assertRaises(validator.ValidationError):
+                validator._validate_output_artifact({"output_artifact": forged}, expected, root.resolve(), "output")
 
     def test_manifest_mutation_is_checked_before_pending_admission(self) -> None:
         source_manifest = ROOT / "tools/native_qualification/manifests/ppt-current-v2.json"

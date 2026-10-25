@@ -134,6 +134,7 @@ class RoutePin:
     program: str
     output: str
     role: str = "paired"
+    status: str = "ok"
 
     def json(self) -> dict[str, str]:
         return {
@@ -142,6 +143,7 @@ class RoutePin:
             "program": self.program,
             "output": self.output,
             "role": self.role,
+            "status": self.status,
         }
 
 
@@ -213,8 +215,8 @@ LEGACY_CURRENT_ROUTES = (
     RoutePin("legacy-current/text_commit_save_1k", "probe", "legacy-current", "state/text_commit_save_1k.json"),
     RoutePin("legacy-current/replay_1k", "probe", "legacy-current", "state/replay_1k.json"),
     RoutePin("legacy-current/tail_commit_1k", "probe", "legacy-current", "state/tail_commit_1k.json"),
-    RoutePin("legacy-current/unsupported_content", "refusal", "legacy-current", "state/unsupported_content.json"),
-    RoutePin("legacy-current/protected_commit", "refusal", "legacy-current", "state/protected_commit.json"),
+    RoutePin("legacy-current/unsupported_content", "refusal", "legacy-current", "state/unsupported_content.json", status="refused"),
+    RoutePin("legacy-current/protected_commit", "refusal", "legacy-current", "state/protected_commit.json", status="refused"),
 )
 
 
@@ -437,7 +439,11 @@ def _git_blob_sha1(payload: bytes) -> str:
     return hashlib.sha1(f"blob {len(payload)}\0".encode("ascii") + payload).hexdigest()
 
 
-def _tracked_materialization(source: Path, entries: Sequence[Mapping[str, str]]) -> dict[str, Any]:
+def _tracked_materialization(
+    source: Path,
+    entries: Sequence[Mapping[str, str]],
+    allowed_overlays: Sequence[ArtifactPin] = (),
+) -> dict[str, Any]:
     """Verify every tracked blob is materialized exactly once.
 
     Git's normal status intentionally hides ignored files and sparse checkouts
@@ -448,8 +454,24 @@ def _tracked_materialization(source: Path, entries: Sequence[Mapping[str, str]])
     """
 
     status = _git(source, "status", "--porcelain=v1", "--ignored=matching", "--untracked-files=all")
+    allowed_by_path = {
+        item.relative_path: item
+        for item in allowed_overlays
+        if item.relative_path == "Cargo.lock" and item.complete()
+    }
     if status:
-        raise PolicyMismatch(f"source checkout has a dirty, ignored, or untracked overlay:\n{status}")
+        for line in status.splitlines():
+            if len(line) < 4:
+                raise PolicyMismatch(f"source checkout has a malformed status entry: {line!r}")
+            relative = line[3:]
+            if relative.startswith('"') and relative.endswith('"'):
+                relative = relative[1:-1]
+            pin = allowed_by_path.get(relative.rstrip("/"))
+            if pin is None:
+                raise PolicyMismatch(f"source checkout has a dirty, ignored, or untracked overlay: {line}")
+            digest, size = _hash_file(source / relative, "pinned root Cargo.lock")
+            if digest != pin.sha256 or size != pin.bytes:
+                raise PolicyMismatch("ignored root Cargo.lock differs from its explicit policy pin")
     skip_worktree = _git(source, "ls-files", "-v", "-z")
     # ``git ls-files -v`` marks skip-worktree entries with a lower-case status
     # letter.  The text mode is safe for the repository's UTF-8 tracked paths;
@@ -605,8 +627,8 @@ def observe_source(source: Path, side: str, archive: Path | None = None) -> dict
     tree = _git(root, "rev-parse", "HEAD^{tree}")
     entries = _git_tree_entries(root)
     listing = _git_tree_payload(root)
-    tracked_tree = _tracked_materialization(root, entries)
     pin = TRUSTED_POLICY.baseline if side == "baseline" else TRUSTED_POLICY.candidate
+    tracked_tree = _tracked_materialization(root, entries, (pin.lock,))
     artifacts: dict[str, Any] = {}
     # The candidate may have no frozen probe/fixture pins.  We still report
     # the paths, but do not call _pin_file with a missing expected identity.
@@ -726,7 +748,7 @@ def validate_routes(lane: str, routes: Sequence[Mapping[str, Any]]) -> None:
     for index, (actual, wanted) in enumerate(zip(routes, expected)):
         if not isinstance(actual, Mapping):
             raise PolicyMismatch(f"{lane} route {index} is not an object")
-        for field in ("route", "kind", "program", "output", "role"):
+        for field in ("route", "kind", "program", "output", "role", "status"):
             if actual.get(field) != getattr(wanted, field):
                 raise PolicyMismatch(f"{lane} route {index} {field} differs from the trusted policy")
 
@@ -767,6 +789,12 @@ def make_ppt_steps_v2(
     state_dir = Path(state_dir)
     target = Path(target)
     _check_plan_paths(root, state_dir, target, source_archive)
+    if source_archive is None:
+        raise PolicyMismatch("PPT v2 execution requires the verified candidate source archive")
+    # Do the full candidate check at plan construction time as well as at
+    # receipt consumption.  A plan must never be able to pair a later binary
+    # with a merely named source root or archive.
+    validate_source(root, "candidate", source_archive)
     lock = root / "Cargo.lock"
     guard = Path(__file__).resolve()
     host_guard = root / "docs/unified-ops/results/0362g/ppt_host_process_guard.py"

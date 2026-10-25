@@ -97,6 +97,7 @@ def prepare(
     output: Path,
     before_archive: Path | None = None,
     after_archive: Path | None = None,
+    output_root: Path | None = None,
 ) -> dict[str, Any]:
     """Write a blocked or ready source receipt without invoking Cargo.
 
@@ -131,6 +132,8 @@ def prepare(
         disjoint.append(("baseline source archive", Path(before_archive)))
     if after_archive is not None:
         disjoint.append(("candidate source archive", Path(after_archive)))
+    if output_root is not None:
+        disjoint.append(("qualification output root", Path(output_root)))
     disjoint.append(("preparation receipt", Path(output)))
     _disjoint(disjoint)
     before_observed = observe_source(before_path, "baseline", before_archive)
@@ -168,6 +171,7 @@ def prepare(
         "execution_admitted": ready,
         "blocked_reason": reason,
         "manifest": {"path": str(Path(manifest).absolute()), "sha256": manifest_sha256, "bytes": manifest_bytes},
+        "output_root": str(Path(output_root).absolute().resolve()) if output_root is not None else None,
         "preparer": tooling["preparer"],
         "tooling": tooling,
         "protocol": TRUSTED_POLICY.json()["protocol"],
@@ -191,6 +195,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--after", type=Path, required=True)
     parser.add_argument("--before-archive", type=Path)
     parser.add_argument("--after-archive", type=Path)
+    parser.add_argument("--output-root", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     try:
@@ -202,6 +207,7 @@ def main(argv: list[str] | None = None) -> int:
             output=args.output,
             before_archive=args.before_archive,
             after_archive=args.after_archive,
+            output_root=args.output_root,
         )
     except (OSError, PolicyError, PreparationError) as error:
         print(f"current-native preparation refused: {error}", file=sys.stderr)
