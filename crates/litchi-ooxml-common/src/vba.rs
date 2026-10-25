@@ -973,7 +973,7 @@ pub struct Edit<'a> {
     options: EditOptions,
 }
 
-impl std::fmt::Debug for Edit {
+impl std::fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Edit")
@@ -2935,7 +2935,6 @@ mod tests {
     fn signed_store_and_remove_are_refused_until_unsigned() {
         let source_name = PackURI::new("/xl/workbook.xml").unwrap();
         let project_name = PackURI::new(EXCEL_PROJECT_PART).unwrap();
-        let refused = |result: Result<_>| matches!(result, Err(Error::Signed));
         let mut package = OpcPackage::new();
         package
             .try_add_part(Box::new(BlobPart::new(
@@ -2959,7 +2958,7 @@ mod tests {
             edit.store(b"project".to_vec(), None)?;
             edit.commit()
         };
-        assert!(refused(store(&package)));
+        assert!(matches!(store(&package), Err(Error::Signed)));
         assert!(package.is_signed());
         assert_eq!(package.part_count(), parts);
         assert_eq!(
@@ -2970,11 +2969,12 @@ mod tests {
         package.unsign();
         package = store(&package).unwrap().into_package();
         package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
-        assert!(refused(
+        assert!(matches!(
             Edit::new(&package, Host::Excel, EditOptions::new()).and_then(|mut edit| {
                 edit.remove()?;
                 edit.commit().map(|_| ())
-            })
+            }),
+            Err(Error::Signed)
         ));
         assert!(package.get_part(&project_name).is_ok());
         package.unsign();
@@ -3419,6 +3419,8 @@ mod tests {
             .sum::<u64>();
         let recipient_limits = SourceLimits::builder()
             .max_total_part_bytes(part_bytes)
+            .unwrap()
+            .build()
             .unwrap();
         let recipient = OpcPackage::from_bytes(&bytes, recipient_limits).unwrap();
         let before = PackageWriter::to_bytes(&recipient).unwrap();
@@ -3447,6 +3449,8 @@ mod tests {
             .len();
         let recipient_limits = SourceLimits::builder()
             .max_total_relationship_xml_bytes(relationship_bytes)
+            .unwrap()
+            .build()
             .unwrap();
         let recipient = OpcPackage::from_bytes(&bytes, recipient_limits).unwrap();
         let before = PackageWriter::to_bytes(&recipient).unwrap();
@@ -3498,24 +3502,32 @@ mod tests {
         assert_refused(
             SourceLimits::builder()
                 .max_content_type_mappings(content_types.mapping_count())
+                .unwrap()
+                .build()
                 .unwrap(),
             LimitKind::ContentTypeMappings,
         );
         assert_refused(
             SourceLimits::builder()
                 .max_total_relationship_xml_events(relationships.events as usize)
+                .unwrap()
+                .build()
                 .unwrap(),
             LimitKind::TotalRelationshipXmlEvents,
         );
         assert_refused(
             SourceLimits::builder()
                 .max_members(archive_members)
+                .unwrap()
+                .build()
                 .unwrap(),
             LimitKind::ArchiveMembers,
         );
         assert_refused(
             SourceLimits::builder()
                 .max_archive_total_entries(archive_members)
+                .unwrap()
+                .build()
                 .unwrap(),
             LimitKind::ArchiveTotalEntries,
         );
