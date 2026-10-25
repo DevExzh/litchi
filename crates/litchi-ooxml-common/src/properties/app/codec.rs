@@ -345,9 +345,9 @@ pub(crate) fn encode_new_len(props: &Props) -> Result<usize> {
         .try_fold(0usize, |total, (field, value)| {
             total
                 .checked_add(element_len(&[], field, value)?)
-                .ok_or_else(|| {
-                    Error::Internal("application-properties prepared-size invariant failed")
-                })
+                .ok_or(Error::Internal(
+                    "application-properties prepared-size invariant failed",
+                ))
         })?;
     length = if children == 0 {
         length.checked_add(2).ok_or(Error::Internal(
