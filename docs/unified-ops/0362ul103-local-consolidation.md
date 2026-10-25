@@ -437,3 +437,80 @@ Net allocated reclaim is 15,536,291,840 bytes. Totals are 373 refs, 109 fully
 verified worktree removals plus cleanup83's 21 with the recorded inventory
 gap, and a measured allocation ledger of 228,248,707,072 bytes under the
 same accounting caveats. Cleanup84, 86 and 87 are separately in progress.
+
+## Cleanup84 and 86–91 verification
+
+Root verifies cleanup84's fourteen removals, ten preserved locks and 28 small
+source archive extraction roundtrips, then deletes its twelve redundant refs.
+The worker's original gate-int payload label meant the whole cohort's ten
+locks; gate-int itself had four. Its `ignored_target_bytes` column counted
+paths, not bytes. Separate addenda preserve these corrections and distinguish
+the worker's work from the later root archive checks.
+
+Cleanup86 preserves all 1,304 OLE profiling payload files, including four
+ignored shared libraries, the lock and empty temporary directory. Root checks
+their content/type/mode/owner digests, all 5,530 old PPTX deletion blob IDs,
+both source archive streams and removed path/registry identities. An earlier
+full archive extraction exhausted tmpfs; it remains recorded as failed.
+Successful streaming validation and the payload restore proof support the
+subsequent cleanup without relabeling that failure.
+
+Cleanup87 removes seven superseded leaves, preserving eight locks and checking
+fourteen source blobs plus successor ancestry. Root reviews and reruns its
+88-check verifier and independently matches the recorded blobs to tip paths.
+Seven refs are deleted by exact-tip transaction.
+
+Cleanup88 removes nine historical ODF/ODG/ODP candidates or duplicate controls.
+Root verifies all 35 preserved payload files, both restore trees, actual source
+trees/ancestry and retained canonical endpoints. Cleanup89 removes seventeen
+sheet/legacy snapshots and verifies preserved overlays, locks and external
+evidence. Its receipt records live source/quarantine mode comparison, but no
+per-file pre-removal mode digest was persisted; current quarantined files are
+all mode 0664. The canonical F3 full-status inventory is reproducible despite
+a different historical packet serialization. Three b673 paths were removed
+by cleanup88, not cleanup89.
+
+Cleanup90 removes eight historical legacy candidates or duplicate controls.
+Root verifies all twelve preserved files against the complete recorded
+tracked/untracked/ignored inventory, performs a fresh restore, and checks
+actual tip trees and ancestry. Its last holder check found an owned read-only
+scanner, but the worker's shell continued without fail-fast handling. The
+receipt discloses this guard failure; the exact owned stale process group was
+subsequently retired. No zero-holder precondition is claimed for this wave.
+
+Cleanup91 removes the eight merged runtime repair leaves without force, after
+their two stale owned audit groups are retired. Fresh tracked/index/unmerged,
+untracked and ignored inventories are empty, and fresh holder checks pass.
+Root verifies all source trees, ancestry, absent paths/registrations and exact
+refs, then deletes cleanup86's two and cleanup91's eight refs atomically.
+The protected constructor probe remains unchanged.
+
+All artifact paths below are relative to the external cleanup directory's
+`trunk-consolidation/`. Each verification file records its input evidence.
+
+| Wave | Worktrees | Root verification file | SHA-256 | Net allocated bytes |
+|---|---:|---|---|---:|
+| 84 | 14 | `wave84-root-verification.json` | `55b9861243019a5c91077293a8c44e0471e1b604b446b214d8594e325da6a773` | 73,412,018,176 |
+| 86 | 2 | `cleanup86-root-verification.json` | `b14415a197146c7dae292d57b363c84e8e69935e2e3c45292d79fe0462904487` | 39,203,971,072 |
+| 87 | 7 | `wave87-root-verification.json` | `fdc1486ee43f1b8d1193b3e4b8c62d83e4eaea7f58b1b33e5cf47870eb5c3583` | 47,829,409,792 |
+| 88 | 9 | `cleanup88-root-verification.json` | `4317b24f4c9d4fd882cb5f56a33c931c3fd1bda3de62f416099ee2456731b3a7` | unmeasured |
+| 89 | 17 | `cleanup89-root-verification.json` | `b50f51bf6c14d6465725b9abc67c13e5900125b14293a1497fb24d5b1721cf25` | 91,926,253,568 |
+| 90 | 8 | `cleanup90-root-verification.json` | `0cc2a5503e8fe7ba34549d5f2e58630ca6427e88964b296bc46e8a7c1fbb571e` | unmeasured |
+| 91 | 8 | `wave91-root-verification.json` | `ac8987d1a04e033a4ab1da36c80d120fc0b47a3ce4744176953fedc9647a56c4` | 8,281,739,264 |
+
+Ref receipts: `wave84-twelve-ref-delete-receipt.json`, SHA-256
+`a801ba163b4776998f5737e315c3dcc556494aa86c8225f8fd0f428e44c189e2`;
+`wave87-seven-ref-delete-receipt.json`, SHA-256
+`d5d6cbfbdecea0ce373eed97331e0923789d991b485925580ef9f842944a50e2`;
+and `cleanup86-wave91-ten-ref-delete-receipt.json`, SHA-256
+`9e25af26a27bd776f3a34e653f4395555a09cbae4dd106cff49054b76bff99ab`.
+
+Cumulative deletions are 402 refs and 195 worktrees: 149 fully verified
+removals, cleanup89's seventeen with the mode-evidence limitation,
+cleanup90's eight with the disclosed holder-guard failure, and cleanup83's
+21 with its ignored-inventory gap. The measured allocation ledger reaches
+488,902,098,944 bytes, excluding unmeasured waves75/83/88/90, the small adapter
+archive and later supplemental verification/receipt footprints. This is not
+a filesystem-wide free-space measurement. Canonical controls and pending
+qualification endpoints remain protected; further ancestor-only snapshots
+and nineteen retired branch worktrees are under disposition review.
