@@ -165,7 +165,7 @@ pub fn parse_slide_comments_strict(xml: &[u8], limits: Limits) -> Result<Vec<Com
 fn parse_slide_comments_inner(
     xml: &[u8],
     limits: Limits,
-    mut tolerance: Option<&mut ToleranceReport>,
+    tolerance: Option<&mut ToleranceReport>,
 ) -> Result<Vec<Comment>> {
     let (root, instructions) = parse_document(xml, limits)?;
     parse_slide_comments_document(root, instructions, limits, tolerance)

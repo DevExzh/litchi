@@ -141,14 +141,14 @@ fn replay_threading_validator_enforces_active_text_at_exact_boundary() {
 fn replay_threading_validator_applies_string_budget_to_date_time() {
     let source = comment_source_with_date_time("2026-10-25T00:00:00Z");
     let budget = super::codec::selected_string_budget(
-        &source,
+        source.as_bytes(),
         super::codec::Kind::Threading,
         crate::comments::Limits::DEFAULT,
     )
     .unwrap();
     let mut exact = crate::comments::Limits::DEFAULT;
     exact.max_string_bytes = budget;
-    assert!(super::validate_threading_replay(&source, exact).is_ok());
+    assert!(super::validate_threading_replay(source.as_bytes(), exact).is_ok());
 
     let over = comment_source_with_date_time("2026-10-25T00:00:00.0Z");
     assert!(super::validate_threading_replay(over.as_bytes(), exact).is_err());
