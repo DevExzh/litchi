@@ -550,15 +550,6 @@ impl Package {
         package
     }
 
-    /// A new package holding `opc` under this package's retained policy
-    /// (tolerance report, encryption provenance, physical-source flag). The
-    /// payload-digest memo starts empty, because `opc` is another graph.
-    pub(crate) fn derive(&self, opc: impl Into<std::sync::Arc<OpcPackage>>) -> Self {
-        let opc = opc.into();
-        let part_bytes = opc.admitted_part_bytes().unwrap_or(self.part_bytes);
-        self.derive_with_part_bytes(opc, part_bytes)
-    }
-
     /// Derive a package when the caller has already accounted for the
     /// candidate's ordinary-part payload bytes in the same pass that built it.
     pub(crate) fn derive_with_part_bytes(

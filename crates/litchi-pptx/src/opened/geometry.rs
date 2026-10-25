@@ -100,6 +100,7 @@ pub(super) fn rewrite_shape_bounds(
 /// output allocation.  Callers use this for homogeneous property batches so
 /// the work remains proportional to the owner XML plus the number of spans,
 /// rather than reparsing the owner once per item.
+#[cfg(test)]
 pub(super) fn rewrite_shape_bounds_many(
     xml: &[u8],
     replacements: &[(Position, (i64, i64, i64, i64))],
@@ -216,6 +217,7 @@ pub(super) fn rewrite_shape_bounds_many_with_limits(
 /// Build a proof surface that masks only validated direct transform values of
 /// ordinary shapes.  The result intentionally retains all tags, attributes,
 /// namespaces, comments, and unknown extension bytes exactly.
+#[cfg(test)]
 pub(crate) fn geometry_skeleton(xml: &[u8]) -> Result<Vec<u8>> {
     geometry_skeleton_with_limits(xml, crate::shape::Limits::DEFAULT)
 }

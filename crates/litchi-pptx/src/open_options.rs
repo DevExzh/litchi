@@ -372,10 +372,6 @@ impl OpenOptions {
         self
     }
 
-    pub(crate) fn semantic_limits_value(&self) -> SemanticLimits {
-        selected(self.semantic_limits.as_ref())
-    }
-
     /// Select a validated finite payload-cache policy for positional-source
     /// ingress.
     #[must_use]

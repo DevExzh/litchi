@@ -2802,6 +2802,7 @@ impl SourceBackedSlideSnapshot {
         check_execution_context(self.context.as_ref())
     }
 
+    #[cfg(test)]
     fn laser_usage(&self) -> Result<crate::laser::Usage> {
         if let Some(usage) = self.laser_usage.get() {
             return Ok(*usage);

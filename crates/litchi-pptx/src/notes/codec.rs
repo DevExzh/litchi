@@ -468,6 +468,7 @@ pub(crate) struct XmlScan {
     pub(crate) slide_ids: Vec<String>,
 }
 
+#[cfg(test)]
 pub(crate) fn validate_resource_xml(
     xml: &[u8],
     max: usize,
@@ -501,6 +502,7 @@ pub(crate) fn validate_resource_xml_with_limits(
     Ok(())
 }
 
+#[cfg(test)]
 pub(crate) fn root_conformance(xml: &[u8], max: usize, root: &str) -> Result<Conformance> {
     root_conformance_with_limits(xml, max, root, Limits::DEFAULT)
 }
@@ -566,6 +568,7 @@ fn node_policy(expected_root: &str) -> (crate::error::CodecLimitKind, usize) {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn scan_xml(
     xml: &[u8],
     max: usize,
@@ -606,6 +609,7 @@ pub(crate) fn scan_xml_with_limits(
     )
 }
 
+#[cfg(test)]
 fn scan_processed_xml(
     processed: &[u8],
     raw_len: usize,

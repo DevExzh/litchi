@@ -25,10 +25,6 @@ pub(crate) fn slide_text(part: &SlidePart<'_>) -> Result<String> {
     part.text()
 }
 
-pub(crate) fn slide_shapes<'a>(part: &SlidePart<'a>) -> Result<Scene<'a>> {
-    part.shapes()
-}
-
 pub(crate) fn slide_shapes_with_limits<'a>(
     part: &SlidePart<'a>,
     limits: crate::shape::Limits,
@@ -44,10 +40,6 @@ pub(crate) fn layout_kind(part: &SlideLayoutPart<'_>) -> Result<Option<String>> 
     part.kind()
 }
 
-pub(crate) fn layout_shapes<'a>(part: &SlideLayoutPart<'a>) -> Result<Scene<'a>> {
-    part.shapes()
-}
-
 pub(crate) fn layout_shapes_with_limits<'a>(
     part: &SlideLayoutPart<'a>,
     limits: crate::shape::Limits,
@@ -61,10 +53,6 @@ pub(crate) fn master_name(part: &SlideMasterPart<'_>) -> Result<String> {
 
 pub(crate) fn master_preserved(part: &SlideMasterPart<'_>) -> Result<bool> {
     part.is_preserved()
-}
-
-pub(crate) fn master_shapes<'a>(part: &SlideMasterPart<'a>) -> Result<Scene<'a>> {
-    part.shapes()
 }
 
 pub(crate) fn master_shapes_with_limits<'a>(

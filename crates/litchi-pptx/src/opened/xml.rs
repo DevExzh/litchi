@@ -1204,21 +1204,6 @@ fn append_namespace_binding(output: &mut Vec<u8>, name: &[u8], namespace: &[u8])
     Ok(())
 }
 
-pub(crate) fn rewrite_shape_text(
-    xml: &[u8],
-    shape: Range<usize>,
-    text: &str,
-    max_text_bytes: usize,
-) -> Result<Vec<u8>> {
-    rewrite_shape_text_with_limits(
-        xml,
-        shape,
-        text,
-        max_text_bytes,
-        crate::shape::Limits::DEFAULT,
-    )
-}
-
 pub(crate) fn rewrite_shape_text_with_limits(
     xml: &[u8],
     shape: Range<usize>,
@@ -1234,14 +1219,6 @@ pub(crate) fn rewrite_shape_text_with_limits(
     }];
     rewrite_shape_texts(xml, &edits, max_text_bytes, shape_limits.output_bytes())?
         .ok_or_else(|| invalid("opened-presentation shape text rewrite disappeared"))
-}
-
-/// Fingerprint the exact XML outside the native editable DrawingML text slots.
-/// Empty text elements are expanded exactly as the native writer expands them;
-/// CDATA/entity spelling inside an editable slot is intentionally erased, so
-/// an inverse can restore its original spelling and run distribution.
-pub(crate) fn shape_text_skeleton(xml: &[u8]) -> Result<[u8; 32]> {
-    shape_text_skeleton_with_limits(xml, crate::shape::Limits::DEFAULT)
 }
 
 pub(crate) fn shape_text_skeleton_with_limits(
@@ -1353,21 +1330,6 @@ pub(super) fn escape_character_data(
     Ok(std::borrow::Cow::Owned(output))
 }
 
-pub(crate) fn stage_shape_texts(
-    xml: &[u8],
-    replacements: &[super::ShapeTextReplacement<'_>],
-    max_text_bytes: usize,
-    max_output_bytes: usize,
-) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_shape_texts_with_limits(
-        xml,
-        replacements,
-        max_text_bytes,
-        max_output_bytes,
-        crate::shape::Limits::DEFAULT,
-    )
-}
-
 pub(crate) fn stage_shape_texts_with_limits(
     xml: &[u8],
     replacements: &[super::ShapeTextReplacement<'_>],
@@ -1383,29 +1345,6 @@ pub(crate) fn stage_shape_texts_with_limits(
         super::MAX_SHAPE_TEXT_REPLACEMENTS,
         max_text_bytes,
         shape_limits,
-    )
-}
-
-/// Stage a text batch after its caller has admitted the aggregate shape
-/// budget. The regular entry point above supplies the historical
-/// 256-selection and aggregate-text limits; chunked operations use this inner
-/// path with their larger whole-operation ceilings.
-pub(super) fn stage_shape_texts_admitted(
-    xml: &[u8],
-    replacements: &[super::ShapeTextReplacement<'_>],
-    max_text_bytes: usize,
-    max_output_bytes: usize,
-    selection_limit: usize,
-    aggregate_text_limit: usize,
-) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_shape_texts_admitted_with_limits(
-        xml,
-        replacements,
-        max_text_bytes,
-        max_output_bytes,
-        selection_limit,
-        aggregate_text_limit,
-        crate::shape::Limits::DEFAULT,
     )
 }
 
@@ -1878,6 +1817,7 @@ pub(crate) fn append_shape_with_limit(
 /// shape-tree end tag.  Returning `None` is deliberate for every other shape
 /// or placement; the caller then applies the ordinary skeleton proof and
 /// rejects the pair.
+#[cfg(test)]
 pub(crate) fn strip_appended_text_boxes(before: &[u8], after: &[u8]) -> Result<Option<Vec<u8>>> {
     strip_appended_text_boxes_with_limits(before, after, crate::shape::Limits::DEFAULT)
 }
@@ -2135,17 +2075,6 @@ pub(crate) fn connector_connection_ids(source: &[u8]) -> Result<BTreeSet<u32>> {
     Ok(connections)
 }
 
-/// Plan removal of one direct shape-tree root and collect every shape identity
-/// contained by that root. A grouped child is not a root and therefore cannot
-/// be removed independently; removing the group root removes the complete
-/// grouped subtree as one lexical unit.
-fn shape_removal_plan(
-    xml: &[u8],
-    key: crate::shape::Key<'_>,
-) -> Result<(Range<usize>, BTreeSet<u32>, usize)> {
-    shape_removal_plan_with_limits(xml, key, crate::shape::Limits::DEFAULT)
-}
-
 fn shape_removal_plan_with_limits(
     xml: &[u8],
     key: crate::shape::Key<'_>,
@@ -2162,7 +2091,7 @@ fn shape_removal_plan_with_limits(
     shape_removal_plan_in(&scene, xml, key)
 }
 
-/// [`shape_removal_plan`] on an already read scene whose spans are defined
+/// [`shape_removal_plan_with_limits`] on an already read scene whose spans are defined
 /// against `xml` (the processed owner of a rewritten scene, record 0303).
 pub(super) fn shape_removal_plan_in(
     scene: &crate::shape::Scene<'_>,
@@ -2213,18 +2142,6 @@ pub(crate) fn shape_removal_span_with_limits(
     shape_limits: crate::shape::Limits,
 ) -> Result<Range<usize>> {
     shape_removal_plan_with_limits(xml, key, shape_limits).map(|(span, _, _)| span)
-}
-
-/// Stage one direct top-level shape removal without changing slide
-/// relationships. Relationship IDs and now-unreachable Parts are deliberately
-/// retained by source-backed edits; keeping those opaque package resources is
-/// legal and preserves source topology for exact durable replay.
-pub(crate) fn stage_shape_removal(
-    xml: &[u8],
-    key: crate::shape::Key<'_>,
-    max_output_bytes: usize,
-) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_shape_removal_with_limits(xml, key, max_output_bytes, crate::shape::Limits::DEFAULT)
 }
 
 pub(crate) fn stage_shape_removal_with_limits(

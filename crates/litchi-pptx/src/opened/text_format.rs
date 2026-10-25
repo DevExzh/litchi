@@ -372,26 +372,6 @@ impl<'a> TextAssignment<'a> {
     }
 }
 
-/// Stage a same-slide batch of text formatting edits, applied in order.
-///
-/// Returns the candidate slide XML and the number of edits whose bytes
-/// changed, or `None` when nothing changed. The candidate is read back as a
-/// complete shape scene whose shape count and identities must match.
-pub(crate) fn stage_text_properties(
-    xml: &[u8],
-    edits: &[TextAssignment<'_>],
-    max_text_bytes: usize,
-    max_output_bytes: usize,
-) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_text_properties_with_limits(
-        xml,
-        edits,
-        max_text_bytes,
-        max_output_bytes,
-        crate::shape::Limits::DEFAULT,
-    )
-}
-
 pub(crate) fn stage_text_properties_with_limits(
     xml: &[u8],
     edits: &[TextAssignment<'_>],
@@ -432,30 +412,13 @@ pub(crate) fn stage_text_properties_with_limits(
 
 /// Stage several already bounded batches of text formatting edits, applied
 /// in order, in one scene read and one read-back (record 0333). Each chunk
-/// keeps the limits of [`stage_text_properties`]; the chunk count is bounded
+/// keeps the limits of [`stage_text_properties_with_limits`]; the chunk count is bounded
 /// by the scene's shape limit and the total by 100,000 edits.
 ///
 /// With `changes`, it is cleared and then receives, for each edit in order,
 /// whether that edit changed the bytes of its target element as the earlier
 /// edits left them (record 0348), as one edit applied after the other
 /// reports it.
-pub(crate) fn stage_text_property_chunks(
-    xml: &[u8],
-    chunks: &[&[TextAssignment<'_>]],
-    max_text_bytes: usize,
-    max_output_bytes: usize,
-    changes: Option<&mut Vec<bool>>,
-) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_text_property_chunks_with_limits(
-        xml,
-        chunks,
-        max_text_bytes,
-        max_output_bytes,
-        changes,
-        crate::shape::Limits::DEFAULT,
-    )
-}
-
 pub(crate) fn stage_text_property_chunks_with_limits(
     xml: &[u8],
     chunks: &[&[TextAssignment<'_>]],

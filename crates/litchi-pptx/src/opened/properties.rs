@@ -5,28 +5,6 @@ use std::ops::Range;
 
 use crate::{Error, Result};
 
-/// Stage one same-slide batch of shape text and complete local transform
-/// replacements.
-///
-/// The scene and every selector are resolved before a candidate is published.
-/// Text is spliced first and geometry is then rewritten against that local
-/// candidate; the transaction owner receives a new payload only after the
-/// final scene has read back with the requested semantic values.
-pub(crate) fn stage_shape_properties(
-    xml: &[u8],
-    replacements: &[super::ShapePropertiesReplacement<'_>],
-    max_text_bytes: usize,
-    max_output_bytes: usize,
-) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_shape_properties_with_limits(
-        xml,
-        replacements,
-        max_text_bytes,
-        max_output_bytes,
-        crate::shape::Limits::DEFAULT,
-    )
-}
-
 pub(crate) fn stage_shape_properties_with_limits(
     xml: &[u8],
     replacements: &[super::ShapePropertiesReplacement<'_>],
@@ -42,29 +20,6 @@ pub(crate) fn stage_shape_properties_with_limits(
         super::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
         max_text_bytes,
         shape_limits,
-    )
-}
-
-/// Stage a property batch after its caller has admitted the aggregate shape
-/// budget. The regular entry point above keeps the historical 256-selection
-/// and aggregate-text limits; chunked operations use the larger whole-slide
-/// limits through this inner path.
-pub(super) fn stage_shape_properties_admitted(
-    xml: &[u8],
-    replacements: &[super::ShapePropertiesReplacement<'_>],
-    max_text_bytes: usize,
-    max_output_bytes: usize,
-    selection_limit: usize,
-    aggregate_text_limit: usize,
-) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_shape_properties_admitted_with_limits(
-        xml,
-        replacements,
-        max_text_bytes,
-        max_output_bytes,
-        selection_limit,
-        aggregate_text_limit,
-        crate::shape::Limits::DEFAULT,
     )
 }
 

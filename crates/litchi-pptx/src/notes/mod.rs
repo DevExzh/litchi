@@ -25,8 +25,7 @@ pub(crate) use package::{
 pub(crate) use package::{clear, put, remove, with_refused_slide_root_reservation};
 #[cfg(test)]
 pub(crate) use package::{
-    clear_checked, clear_with_limits, load, load_snapshot, load_snapshot_with_slide_root_proofs,
-    remove_checked, remove_with_limits,
+    clear_with_limits, load, load_snapshot, remove_checked, remove_with_limits,
 };
 pub(crate) use transaction::Draft;
 pub use transaction::{Revision, Snapshot};

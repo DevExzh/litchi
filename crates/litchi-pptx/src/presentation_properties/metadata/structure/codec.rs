@@ -1344,6 +1344,7 @@ struct Frame {
     start: usize,
     local: String,
     direct: bool,
+    #[cfg(test)]
     target_custom: bool,
     target_section: bool,
 }
@@ -1351,6 +1352,7 @@ struct Frame {
 struct XmlLayout {
     root_close: usize,
     direct: Vec<Span>,
+    #[cfg(test)]
     custom: Vec<Span>,
     section_extensions: Vec<Span>,
 }
@@ -1367,6 +1369,7 @@ fn scan_layout(xml: &[u8], limits: Limits) -> Result<XmlLayout> {
     let origin = ReaderOrigin::of(xml);
     let mut stack = Vec::<Frame>::new();
     let mut direct = Vec::new();
+    #[cfg(test)]
     let mut custom = Vec::new();
     let mut section_extensions = Vec::new();
     let mut root_close = None;
@@ -1400,6 +1403,7 @@ fn scan_layout(xml: &[u8], limits: Limits) -> Result<XmlLayout> {
                         .any(|(name, value)| name == "uri" && value == SECTION_URI);
                 stack.push(Frame {
                     start: before,
+                    #[cfg(test)]
                     target_custom: local == "custShowLst",
                     target_section,
                     direct: stack.len() == 1,
@@ -1434,6 +1438,7 @@ fn scan_layout(xml: &[u8], limits: Limits) -> Result<XmlLayout> {
                 if stack.len() == 1 {
                     direct.push(span.clone());
                 }
+                #[cfg(test)]
                 if local == "custShowLst" {
                     custom.push(span.clone());
                 }
@@ -1460,6 +1465,7 @@ fn scan_layout(xml: &[u8], limits: Limits) -> Result<XmlLayout> {
                 if frame.direct {
                     direct.push(span.clone());
                 }
+                #[cfg(test)]
                 if frame.target_custom {
                     custom.push(span.clone());
                 }
@@ -1485,11 +1491,13 @@ fn scan_layout(xml: &[u8], limits: Limits) -> Result<XmlLayout> {
     Ok(XmlLayout {
         root_close: root_close.ok_or_else(|| invalid("missing presentation root close"))?,
         direct,
+        #[cfg(test)]
         custom,
         section_extensions,
     })
 }
 
+#[cfg(test)]
 fn patch_custom_shows(xml: &[u8], replacement: &[u8], limits: Limits) -> Result<Vec<u8>> {
     let layout = scan_layout(xml, limits)?;
     if !layout.custom.is_empty() {
@@ -1648,6 +1656,7 @@ fn insert_bytes(xml: &[u8], offset: usize, value: &[u8], limits: Limits) -> Resu
     Ok(output)
 }
 
+#[cfg(test)]
 fn schema_rank(local: &str) -> Option<usize> {
     [
         "sldMasterIdLst",

@@ -196,28 +196,13 @@ impl Prepared {
 }
 
 /// Load source-bound properties for one selected shape with default limits.
+#[cfg(test)]
 pub(crate) fn load_properties<'k>(
     package: &OpcPackage,
     owner: &PackURI,
     key: impl Into<crate::shape::Key<'k>>,
 ) -> Result<Snapshot> {
     load_properties_with_shape_limits(package, owner, key, crate::shape::Limits::DEFAULT)
-}
-
-/// Load source-bound properties under explicit finite limits.
-pub(crate) fn load_properties_with_limits<'k>(
-    package: &OpcPackage,
-    owner: &PackURI,
-    key: impl Into<crate::shape::Key<'k>>,
-    limits: Limits,
-) -> Result<Snapshot> {
-    load_properties_with_limits_and_shape_limits(
-        package,
-        owner,
-        key,
-        limits,
-        crate::shape::Limits::DEFAULT,
-    )
 }
 
 /// Load source-bound properties under explicit semantic and shape limits.
@@ -342,15 +327,6 @@ fn validate_current_source(package: &OpcPackage, snapshot: &Snapshot) -> Result<
 }
 
 /// Directly replace or create selected shape Designer properties.
-pub(crate) fn put_properties<'k>(
-    package: &mut OpcPackage,
-    owner: &PackURI,
-    key: impl Into<crate::shape::Key<'k>>,
-    value: DrawingProperties,
-) -> Result<Snapshot> {
-    put_properties_with_shape_limits(package, owner, key, value, crate::shape::Limits::DEFAULT)
-}
-
 pub(crate) fn put_properties_with_shape_limits<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
@@ -364,6 +340,7 @@ pub(crate) fn put_properties_with_shape_limits<'k>(
 }
 
 /// Directly remove selected shape Designer properties.
+#[cfg(test)]
 pub(crate) fn remove_properties<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,

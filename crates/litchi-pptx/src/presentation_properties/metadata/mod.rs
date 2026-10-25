@@ -372,12 +372,6 @@ impl Default for Limits {
     }
 }
 
-/// Derive the selected metadata profile at a package boundary.
-#[inline]
-pub(crate) fn limits_for(package: &OpcPackage) -> Limits {
-    Limits::from_source_limits(package.read_limits())
-}
-
 /// Metadata owner whose changed payload receives family-specific replay
 /// admission.  The common patch engine already checks the exact before image,
 /// relationship graph, and recipient physical source limits; these families
@@ -604,26 +598,6 @@ impl BoundedString {
             resource,
             failure: None,
         }
-    }
-
-    pub(crate) fn with_capacity(
-        capacity: usize,
-        limits: Limits,
-        resource: &'static str,
-    ) -> crate::Result<Self> {
-        if capacity > limits.max_output_bytes() {
-            return Err(crate::Error::Limit {
-                kind: crate::LimitKind::Codec(crate::CodecLimitKind::OutputBytes),
-                observed: capacity,
-                maximum: limits.max_output_bytes(),
-            });
-        }
-        let mut output = Self::new(limits, resource);
-        output
-            .value
-            .try_reserve(capacity)
-            .map_err(|source| crate::Error::Allocation { resource, source })?;
-        Ok(output)
     }
 
     fn reserve_for(&mut self, additional: usize) -> crate::Result<()> {

@@ -36,12 +36,12 @@ pub use edit::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
     reason = "staged crate-private host API; public facades deliberately remain unchanged"
 )]
 // Staged crate-private host API; public facades deliberately remain unchanged.
-pub(crate) use properties::{
-    apply_properties, load_properties, put_properties, put_properties_with_shape_limits,
-    remove_properties, remove_properties_with_shape_limits,
-};
+pub(crate) use properties::apply_properties;
 pub(crate) use properties::{
     load_properties_with_limits_and_shape_limits, load_properties_with_shape_limits,
+};
+pub(crate) use properties::{
+    put_properties_with_shape_limits, remove_properties_with_shape_limits,
 };
 
 /// URI assigned to the design-element extension by [MS-PPTX] 2.2.17.

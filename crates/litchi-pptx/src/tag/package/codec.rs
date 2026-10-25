@@ -180,6 +180,7 @@ pub(crate) fn validate_replay_part(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+#[cfg(test)]
 pub(crate) fn put(package: &mut OpcPackage, owner: &PackURI, list: List) -> Result<Option<List>> {
     put_with_limits(
         package,
@@ -360,6 +361,7 @@ pub(crate) fn put_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+#[cfg(test)]
 pub(crate) fn remove(package: &mut OpcPackage, owner: &PackURI) -> Result<Option<List>> {
     remove_with_limits(package, owner, Limits::from_source(package.read_limits()))
 }
@@ -809,6 +811,7 @@ fn owner_active_offset_limits(max_bytes: usize) -> OffsetLimits {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn process_owner_ooxml(xml: &[u8]) -> Result<std::borrow::Cow<'_, [u8]>> {
     process_owner_ooxml_with_limit(xml, MAX_OWNER_BYTES)
 }

@@ -790,6 +790,7 @@ impl Snapshot {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn capture(
     package: &OpcPackage,
     limits: Limits,
@@ -798,6 +799,7 @@ pub(crate) fn capture(
     capture_with_provenance(package, limits, physical_source_provenance)
 }
 
+#[cfg(test)]
 pub(crate) fn capture_with_provenance(
     package: &OpcPackage,
     limits: Limits,
@@ -820,27 +822,6 @@ pub(crate) fn capture_with_provenance_and_semantic_limits(
         None,
         None,
         semantic_limits,
-    )
-}
-
-/// Capture `package`, reusing `parent`'s payload digest for every payload
-/// allocation the two packages share.
-///
-/// The revision is the one [`capture_with_provenance`] would compute: a memo
-/// hit only declines to re-hash bytes whose allocation identity — and
-/// therefore whose content — is already proven.
-pub(crate) fn capture_with_parent_digests(
-    package: &OpcPackage,
-    limits: Limits,
-    physical_source_provenance: bool,
-    parent: &PartDigests,
-) -> Result<Snapshot> {
-    capture_with_parent_digests_and_semantic_limits(
-        package,
-        limits,
-        physical_source_provenance,
-        parent,
-        None,
     )
 }
 
@@ -868,6 +849,7 @@ pub(crate) fn capture_with_parent_digests_and_semantic_limits(
 /// commit passes its source snapshot's; the cross-slide copy passes neither.
 /// Every validation still runs; only work whose result is proved for the
 /// identical bytes is not repeated.
+#[cfg(test)]
 pub(crate) fn capture_with_revision_and_digests_and_mce(
     package: &OpcPackage,
     limits: Limits,

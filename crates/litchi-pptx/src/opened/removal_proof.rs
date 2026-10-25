@@ -9,21 +9,6 @@ pub(crate) struct NormalizedPair {
     pub(crate) after: Vec<u8>,
 }
 
-pub(crate) fn normalize_shape_removal_pair(
-    before: &[u8],
-    after: &[u8],
-    forward: bool,
-    replacements: bool,
-) -> Result<Option<NormalizedPair>> {
-    normalize_shape_removal_pair_with_limits(
-        before,
-        after,
-        forward,
-        replacements,
-        crate::shape::Limits::DEFAULT,
-    )
-}
-
 pub(crate) fn normalize_shape_removal_pair_with_limits(
     before: &[u8],
     after: &[u8],

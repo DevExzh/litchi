@@ -92,11 +92,6 @@ impl PartLoader for EagerLoader<'_> {
     }
 }
 
-/// Validate the selected source-backed notes part and its targeted closure.
-pub(super) fn validate(owner: &SourceInner, slide: &PackURI, part: &SourcePart) -> Result<()> {
-    validate_with_limits(owner, slide, part, Limits::from_source(owner.limits))
-}
-
 pub(super) fn validate_with_limits(
     owner: &SourceInner,
     slide: &PackURI,
@@ -113,20 +108,6 @@ pub(super) fn validate_with_limits(
         &presentation_content_type,
         part,
         limits,
-    )
-}
-
-/// Validate the selected eager notes part and its targeted closure.
-pub(super) fn validate_eager(
-    package: &OpcPackage,
-    slide: &dyn Part,
-    part: &dyn Part,
-) -> Result<()> {
-    validate_eager_with_limits(
-        package,
-        slide,
-        part,
-        Limits::from_source(package.read_limits()),
     )
 }
 
@@ -156,16 +137,6 @@ pub(super) fn validate_eager_with_limits(
             )
         },
     )
-}
-
-/// Process one eager notes part with the same bounded MCE policy used by the
-/// source loader. The returned allocation is also the input retained by the
-/// owned shape scene.
-pub(super) fn processed_eager_notes(
-    part: &dyn Part,
-    source_limits: litchi_opc::SourceLimits,
-) -> Result<Arc<Vec<u8>>> {
-    processed_eager_notes_with_limits(part, source_limits, Limits::from_source(source_limits))
 }
 
 pub(super) fn processed_eager_notes_with_limits(

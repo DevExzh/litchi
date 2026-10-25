@@ -207,6 +207,7 @@ pub(crate) fn validate_replay_part(part: &dyn Part, limits: Limits) -> Result<()
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
+#[cfg(test)]
 pub(crate) fn store_presentation_comments(
     package: &mut OpcPackage,
     value: &Comments,
@@ -356,6 +357,7 @@ pub fn find_presentation_comment_author(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+#[cfg(test)]
 pub(crate) fn add_presentation_comment_author(
     package: &mut OpcPackage,
     author: Author,
@@ -410,6 +412,7 @@ pub(crate) fn add_presentation_comment_author_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+#[cfg(test)]
 pub(crate) fn update_presentation_comment_author(
     package: &mut OpcPackage,
     author_id: u32,
@@ -456,6 +459,7 @@ pub(crate) fn update_presentation_comment_author_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+#[cfg(test)]
 pub(crate) fn remove_presentation_comment_author(
     package: &mut OpcPackage,
     author_id: u32,
@@ -508,6 +512,7 @@ pub(crate) fn remove_presentation_comment_author_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+#[cfg(test)]
 pub(crate) fn reorder_presentation_comment_authors(
     package: &mut OpcPackage,
     ordered_ids: &[u32],
@@ -589,6 +594,7 @@ pub fn find_presentation_comment(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+#[cfg(test)]
 pub(crate) fn add_presentation_comment(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -683,6 +689,7 @@ pub(crate) fn add_presentation_comment_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+#[cfg(test)]
 pub(crate) fn update_presentation_comment(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -740,6 +747,7 @@ pub(crate) fn update_presentation_comment_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+#[cfg(test)]
 pub(crate) fn remove_presentation_comment(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -811,6 +819,7 @@ pub(crate) fn remove_presentation_comment_with_limits(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+#[cfg(test)]
 pub(crate) fn reorder_presentation_comments(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -866,47 +875,6 @@ pub(crate) fn reorder_presentation_comments_with_limits(
         })
         .collect::<Result<Vec<_>>>()?;
     commit_legacy_slide_comments_with_limits(package, slide, comments, conformance, limits)
-}
-
-/// Re-attribute one legacy comment (record 0346): the comment keyed by
-/// `(author_id, index)` on `slide_part_name` takes the author `name` and
-/// `initials` (each `None` keeps the current author's value).
-///
-/// The comment author is a record the comments share, so a rename that
-/// touched every comment of that author would rewrite attribution the
-/// caller did not name. When no other comment of the presentation refers
-/// to the author, the author is renamed in place; otherwise the comment is
-/// routed to the author of that exact name and initials (a new one, with
-/// the next free identifier, when the presentation has none) and takes
-/// that author's next index. Returns whether anything changed.
-///
-/// A change to a signed package is refused with
-/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// (ADR 0006); an exact no-op keeps the signature.
-///
-/// # Errors
-///
-/// Returns an error for a missing comment or author, exhausted author
-/// identifiers or indexes, and the errors of the comment codec.
-pub(crate) fn reattribute_presentation_comment(
-    package: &mut OpcPackage,
-    slide_part_name: &str,
-    author_id: u32,
-    index: u32,
-    name: Option<&str>,
-    initials: Option<&str>,
-    conformance: Conformance,
-) -> Result<bool> {
-    reattribute_presentation_comment_with_limits(
-        package,
-        slide_part_name,
-        author_id,
-        index,
-        name,
-        initials,
-        conformance,
-        Limits::from_source(package.read_limits()),
-    )
 }
 
 pub(crate) fn reattribute_presentation_comment_with_limits(
@@ -1001,19 +969,6 @@ pub(crate) fn reattribute_presentation_comment_with_limits(
     Ok(true)
 }
 
-fn commit_legacy_authors(
-    package: &mut OpcPackage,
-    graph: &Comments,
-    conformance: Conformance,
-) -> Result<()> {
-    commit_legacy_authors_with_limits(
-        package,
-        graph,
-        conformance,
-        Limits::from_source(package.read_limits()),
-    )
-}
-
 fn commit_legacy_authors_with_limits(
     package: &mut OpcPackage,
     graph: &Comments,
@@ -1033,21 +988,6 @@ fn commit_legacy_authors_with_limits(
     package.get_part_mut(&uri)?.set_blob(xml);
     settle_unsigned_change(package)?;
     Ok(())
-}
-
-fn commit_legacy_slide_comments(
-    package: &mut OpcPackage,
-    slide: &List,
-    comments: Vec<Comment>,
-    conformance: Conformance,
-) -> Result<()> {
-    commit_legacy_slide_comments_with_limits(
-        package,
-        slide,
-        comments,
-        conformance,
-        Limits::from_source(package.read_limits()),
-    )
 }
 
 fn commit_legacy_slide_comments_with_limits(

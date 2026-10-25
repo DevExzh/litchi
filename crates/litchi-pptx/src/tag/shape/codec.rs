@@ -87,6 +87,7 @@ pub fn load<'k>(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+#[cfg(test)]
 pub(crate) fn put<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
@@ -278,6 +279,7 @@ pub(crate) fn put_with_limits<'k>(
 /// # Errors
 ///
 /// Returns an error if the operation fails.
+#[cfg(test)]
 pub(crate) fn remove<'k>(
     package: &mut OpcPackage,
     owner: &PackURI,
@@ -369,6 +371,7 @@ fn selected_layout(
     scan_layout(owner.blob(), span, shape_limits)
 }
 
+#[cfg(test)]
 pub(crate) fn selected_raw_span(xml: &[u8], key: crate::shape::Key<'_>) -> Result<Range<usize>> {
     selected_raw_span_with_limits(xml, key, crate::shape::Limits::DEFAULT)
 }

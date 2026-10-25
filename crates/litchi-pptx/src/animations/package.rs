@@ -336,6 +336,7 @@ fn validate_relationship_id(value: &str) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 fn scan_hosts(xml: &[u8]) -> Result<HashMap<u32, HostReference>> {
     scan_hosts_with_limits(xml, Limits::DEFAULT)
 }

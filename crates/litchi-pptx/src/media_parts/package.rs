@@ -245,6 +245,7 @@ fn load_resource(
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
+#[cfg(test)]
 pub(crate) fn store(
     package: &mut OpcPackage,
     slide_name: &PackURI,
@@ -257,6 +258,7 @@ pub(crate) fn store(
 /// [`store`], or, with `append`, add the pictures after the slide's
 /// existing media (record 0321). The caller chooses shape IDs, relationship
 /// IDs and part names that are free on the slide; collisions are refused.
+#[cfg(test)]
 pub(crate) fn store_with(
     package: &mut OpcPackage,
     slide_name: &PackURI,
@@ -454,6 +456,7 @@ fn insert_pictures(
     Ok(output)
 }
 
+#[cfg(test)]
 pub(crate) fn validate_value(value: &List, require_resources: bool) -> Result<()> {
     validate_value_with_limits(value, require_resources, Limits::DEFAULT)
 }
@@ -587,6 +590,7 @@ fn time_error(error: TimeParseError) -> Error {
     invalid(format!("invalid media universal time offset: {error}"))
 }
 
+#[cfg(test)]
 pub(crate) fn resource_uri(
     resource: &Resource,
     image: bool,

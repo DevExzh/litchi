@@ -1332,6 +1332,7 @@ impl History {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn apply(
     package: &mut OpcPackage,
     patch: &Patch,
@@ -1357,17 +1358,6 @@ pub(crate) fn apply_with_semantic_limits(
     )
 }
 
-/// Build an immutable replay result using the destination's retained memo.
-/// The candidate is constructed once and returned without a second graph clone.
-pub(crate) fn apply_to_new(
-    package: &OpcPackage,
-    patch: &Patch,
-    physical_source_provenance: bool,
-    parent: &super::model::PartDigests,
-) -> Result<(OpcPackage, Snapshot)> {
-    apply_to_new_with_semantic_limits(package, patch, physical_source_provenance, parent, None)
-}
-
 pub(crate) fn apply_to_new_with_semantic_limits(
     package: &OpcPackage,
     patch: &Patch,
@@ -1383,21 +1373,6 @@ pub(crate) fn apply_to_new_with_semantic_limits(
         physical_source_provenance,
         Some(parent),
         semantic_limits,
-    )
-}
-
-pub(crate) fn apply_exact_revision(
-    package: &mut OpcPackage,
-    patch: &Patch,
-    result_revision: [u8; 32],
-    physical_source_provenance: bool,
-) -> Result<Snapshot> {
-    apply_exact_revision_with_semantic_limits(
-        package,
-        patch,
-        result_revision,
-        physical_source_provenance,
-        None,
     )
 }
 

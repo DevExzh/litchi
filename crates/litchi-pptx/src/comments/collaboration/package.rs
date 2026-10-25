@@ -11,7 +11,6 @@ use super::transaction::{
 use super::{PresenceInfo, ThreadingInfo};
 use crate::comments::{
     AUTHORS_REL, COMMENTS_REL, Comments, Limits, STRICT_AUTHORS_REL, STRICT_COMMENTS_REL,
-    load_presentation_comments,
 };
 use crate::{Error, Result};
 
@@ -212,6 +211,7 @@ pub(crate) fn apply_threading_commit(
 }
 
 /// Replace or create the selected author presence extension.
+#[cfg(test)]
 pub(crate) fn put_presence(
     package: &mut OpcPackage,
     author_id: u32,
@@ -238,6 +238,7 @@ pub(crate) fn put_presence_with_limits(
 }
 
 /// Remove the selected author presence extension.
+#[cfg(test)]
 pub(crate) fn remove_presence(
     package: &mut OpcPackage,
     author_id: u32,
@@ -265,6 +266,7 @@ pub(crate) fn remove_presence_with_limits(
 }
 
 /// Replace or create the selected comment threading extension.
+#[cfg(test)]
 pub(crate) fn put_threading(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -296,6 +298,7 @@ pub(crate) fn put_threading_with_limits(
 }
 
 /// Remove the selected comment threading extension.
+#[cfg(test)]
 pub(crate) fn remove_threading(
     package: &mut OpcPackage,
     slide_part_name: &str,
@@ -326,11 +329,6 @@ pub(crate) fn remove_threading_with_limits(
     edit.remove()?;
     apply_threading_commit(package, edit.commit()?)?;
     Ok(previous)
-}
-
-fn validate_graph(package: &OpcPackage) -> Result<Option<Comments>> {
-    validate_comment_relationship_targets(package)?;
-    load_presentation_comments(package)
 }
 
 fn validate_graph_with_limits(package: &OpcPackage, limits: Limits) -> Result<Option<Comments>> {

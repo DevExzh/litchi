@@ -107,10 +107,6 @@ struct Frame {
     other_content: bool,
 }
 
-pub(super) fn read_state(xml: &[u8]) -> Result<State> {
-    read_state_with_limits(xml, crate::shape::Limits::DEFAULT)
-}
-
 pub(super) fn read_state_with_limits(
     xml: &[u8],
     shape_limits: crate::shape::Limits,
@@ -167,10 +163,6 @@ pub(super) fn validate_unique_modification_ids(state: &State) -> Result<()> {
 pub(super) fn set(xml: &[u8], owner: Owner, id: Id) -> Result<Vec<u8>> {
     let source = read(xml, owner)?;
     set_source(xml, owner, id, &source)
-}
-
-pub(super) fn set_shape(xml: &[u8], position: usize, id: Id) -> Result<Vec<u8>> {
-    set_shape_with_limits(xml, position, id, crate::shape::Limits::DEFAULT)
 }
 
 pub(super) fn set_shape_with_limits(
@@ -239,10 +231,6 @@ fn set_source(xml: &[u8], owner: Owner, id: Id, source: &Source) -> Result<Vec<u
 pub(super) fn remove(xml: &[u8], owner: Owner) -> Result<Vec<u8>> {
     let source = read(xml, owner)?;
     remove_source(xml, &source)
-}
-
-pub(super) fn remove_shape(xml: &[u8], position: usize) -> Result<Vec<u8>> {
-    remove_shape_with_limits(xml, position, crate::shape::Limits::DEFAULT)
 }
 
 pub(super) fn remove_shape_with_limits(

@@ -8,10 +8,6 @@ use super::transaction::{Change, Prepared};
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
-pub(crate) fn load(package: &OpcPackage, owner: &PackURI) -> Result<Snapshot> {
-    load_with_limits(package, owner, crate::shape::Limits::DEFAULT)
-}
-
 pub(crate) fn load_with_limits(
     package: &OpcPackage,
     owner: &PackURI,
@@ -20,10 +16,6 @@ pub(crate) fn load_with_limits(
     let part = package.get_part(owner)?;
     crate::parts::validate_content_type(part, ct::PML_SLIDE)?;
     Snapshot::from_source_with_limits(part.partname().clone(), part.blob().to_vec(), shape_limits)
-}
-
-pub(crate) fn apply_commit(package: &mut OpcPackage, commit: Prepared) -> Result<Snapshot> {
-    apply_commit_with_limits(package, commit, crate::shape::Limits::DEFAULT)
 }
 
 pub(crate) fn apply_commit_with_limits(
@@ -38,10 +30,6 @@ pub(crate) fn apply_commit_with_limits(
         ));
     }
     apply_patch_with_limits(package, &patch, shape_limits)
-}
-
-pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Change) -> Result<Snapshot> {
-    apply_patch_with_limits(package, patch, crate::shape::Limits::DEFAULT)
 }
 
 pub(crate) fn apply_patch_with_limits(

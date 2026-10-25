@@ -435,6 +435,7 @@ impl SlotChange {
 }
 
 /// Load an optional p232 extension from a slide, master, or layout placeholder.
+#[cfg(test)]
 pub(crate) fn load_slot_snapshot<'a>(
     package: &OpcPackage,
     owner: &PackURI,
@@ -450,6 +451,7 @@ pub(crate) fn load_slot_snapshot<'a>(
 }
 
 /// Load an optional p232 extension under finite source and growth limits.
+#[cfg(test)]
 pub(crate) fn load_slot_snapshot_with_limits<'a>(
     package: &OpcPackage,
     owner: &PackURI,
@@ -537,19 +539,6 @@ pub(crate) fn apply_slot_patch(package: &mut OpcPackage, patch: &SlotChange) -> 
 /// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
 /// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
 /// no-op keeps the signature.
-pub(crate) fn store_placeholder_shape_source(
-    package: &mut OpcPackage,
-    part_name: &PackURI,
-    spec: &PlaceholderSpec,
-) -> Result<()> {
-    store_placeholder_shape_source_with_shape_limits(
-        package,
-        part_name,
-        spec,
-        crate::shape::Limits::DEFAULT,
-    )
-}
-
 pub(crate) fn store_placeholder_shape_source_with_shape_limits(
     package: &mut OpcPackage,
     part_name: &PackURI,
@@ -675,19 +664,6 @@ fn prepare_placeholder_shape_source(
 
 /// Validate the bounded inputs that the package facade must check before its
 /// generic transaction snapshots the whole OPC graph.
-pub(crate) fn preflight_store_placeholder_shape(
-    package: &OpcPackage,
-    part_name: &PackURI,
-    spec: &PlaceholderSpec,
-) -> Result<bool> {
-    preflight_store_placeholder_shape_with_shape_limits(
-        package,
-        part_name,
-        spec,
-        crate::shape::Limits::DEFAULT,
-    )
-}
-
 pub(crate) fn preflight_store_placeholder_shape_with_shape_limits(
     package: &OpcPackage,
     part_name: &PackURI,

@@ -293,6 +293,7 @@ fn add_slide_layout_inner(
 /// # Errors
 ///
 /// Returns an error if the output cannot be encoded or written.
+#[cfg(test)]
 pub(crate) fn store_placeholder_shape(
     package: &mut OpcPackage,
     part_name: &PackURI,

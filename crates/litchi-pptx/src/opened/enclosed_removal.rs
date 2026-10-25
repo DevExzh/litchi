@@ -136,22 +136,6 @@ fn refusal(reason: &'static str) -> Error {
     )
 }
 
-/// Remove one top-level shape from a slide whose markup compatibility is
-/// enclosed in shape-tree children, splicing the source bytes. A slide that
-/// processing leaves unchanged takes the ordinary path.
-pub(crate) fn stage_enclosed_shape_removal(
-    xml: &[u8],
-    key: crate::shape::Key<'_>,
-    max_output_bytes: usize,
-) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_enclosed_shape_removal_with_limits(
-        xml,
-        key,
-        max_output_bytes,
-        crate::shape::Limits::DEFAULT,
-    )
-}
-
 pub(crate) fn stage_enclosed_shape_removal_with_limits(
     xml: &[u8],
     key: crate::shape::Key<'_>,
@@ -238,23 +222,6 @@ fn identities(scene: &crate::shape::Scene<'_>) -> Result<BTreeSet<u32>> {
 ///
 /// # Errors
 ///
-/// Refuses a pair that holds markup compatibility outside shape-tree
-/// children, or one that differs in any other way, with the guard's typed
-/// refusal.
-pub(crate) fn validate_enclosed_removal_pair(
-    before: &[u8],
-    after: &[u8],
-    operation: &'static str,
-) -> Result<bool> {
-    validate_enclosed_removal_pair_with_limits(
-        before,
-        after,
-        operation,
-        crate::shape::Limits::DEFAULT,
-        crate::transition::Limits::DEFAULT,
-    )
-}
-
 pub(crate) fn validate_enclosed_removal_pair_with_limits(
     before: &[u8],
     after: &[u8],

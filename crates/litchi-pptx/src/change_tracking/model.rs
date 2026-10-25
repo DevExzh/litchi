@@ -143,6 +143,7 @@ impl Snapshot {
         super::Draft::new(self.clone())
     }
 
+    #[cfg(test)]
     pub(super) fn from_source(owner: PackURI, source: Vec<u8>) -> Result<Self> {
         Self::from_source_with_limits(owner, source, crate::shape::Limits::DEFAULT)
     }

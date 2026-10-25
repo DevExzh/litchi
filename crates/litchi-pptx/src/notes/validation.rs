@@ -45,10 +45,6 @@ pub(crate) fn validate_links(links: &[Link]) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn validate_parts(parts: &[PartState]) -> Result<()> {
-    validate_parts_with_limits(parts, Limits::DEFAULT)
-}
-
 pub(crate) fn validate_parts_with_limits(parts: &[PartState], limits: Limits) -> Result<()> {
     let mut total = 0usize;
     let mut names = HashSet::new();

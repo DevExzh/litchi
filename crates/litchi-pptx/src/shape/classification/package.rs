@@ -9,15 +9,6 @@ use super::transaction;
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
-/// Read a classification snapshot from one selected shape in a slide part.
-pub(crate) fn load<'k>(
-    package: &OpcPackage,
-    owner: &PackURI,
-    key: impl Into<crate::shape::Key<'k>>,
-) -> Result<Option<Snapshot>> {
-    load_with_limits(package, owner, key, crate::shape::Limits::DEFAULT)
-}
-
 pub(crate) fn load_with_limits<'k>(
     package: &OpcPackage,
     owner: &PackURI,
@@ -34,16 +25,6 @@ pub(crate) fn load_with_limits<'k>(
             .ok_or_else(|| Error::Invalid("classification shape span is invalid".into()))?,
     )?;
     Ok(source.snapshot)
-}
-
-/// Replace or create the typed outcome in one shape transaction.
-pub(crate) fn put<'k>(
-    package: &mut OpcPackage,
-    owner: &PackURI,
-    key: impl Into<crate::shape::Key<'k>>,
-    outcome: Outcome,
-) -> Result<Option<Snapshot>> {
-    put_with_limits(package, owner, key, outcome, crate::shape::Limits::DEFAULT)
 }
 
 pub(crate) fn put_with_limits<'k>(
@@ -92,15 +73,6 @@ pub(crate) fn put_with_limits<'k>(
     part.set_blob(staged_owner);
     settle_unsigned_change(package)?;
     Ok(previous)
-}
-
-/// Remove the typed classification element while retaining unrelated entries.
-pub(crate) fn remove<'k>(
-    package: &mut OpcPackage,
-    owner: &PackURI,
-    key: impl Into<crate::shape::Key<'k>>,
-) -> Result<Option<Snapshot>> {
-    remove_with_limits(package, owner, key, crate::shape::Limits::DEFAULT)
 }
 
 pub(crate) fn remove_with_limits<'k>(

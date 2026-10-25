@@ -2957,6 +2957,7 @@ fn refuse_signed_change(source: &OpcPackage, working: &OpcPackage) -> Result<()>
     Ok(())
 }
 
+#[cfg(test)]
 fn compact_changed_slides(
     working: &mut OpcPackage,
     source: &OpcPackage,
@@ -3065,14 +3066,6 @@ thread_local! {
 
 type ShapeSemantics = Vec<(Option<u32>, Option<String>, Option<String>)>;
 
-/// The scene read compaction performs, counted in tests. Debug re-derivations
-/// call [`shape_semantics`] directly and are not counted.
-fn compaction_scene(xml: &[u8]) -> Result<ShapeSemantics> {
-    #[cfg(test)]
-    COMPACTION_SCENE_READS.with(|reads| reads.set(reads.get() + 1));
-    shape_semantics(xml)
-}
-
 fn compaction_scene_with_limits(
     xml: &[u8],
     shape_limits: crate::shape::Limits,
@@ -3082,6 +3075,7 @@ fn compaction_scene_with_limits(
     shape_semantics_with_limits(xml, shape_limits)
 }
 
+#[cfg(test)]
 fn shape_semantics(xml: &[u8]) -> Result<ShapeSemantics> {
     shape_semantics_with_limits(xml, crate::shape::Limits::DEFAULT)
 }

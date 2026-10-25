@@ -811,17 +811,6 @@ pub(crate) fn validate_id(value: &str) -> Result<()> {
         Ok(())
     }
 }
-pub(crate) fn bounded(value: &str) -> Result<()> {
-    if value.len() <= MAX_STRING_BYTES {
-        Ok(())
-    } else {
-        Err(limit(
-            crate::error::CodecLimitKind::StringBytes,
-            value.len(),
-            MAX_STRING_BYTES,
-        ))
-    }
-}
 fn add_strings(total: &mut usize, size: usize, maximum: usize) -> Result<()> {
     *total = total.checked_add(size).ok_or_else(|| {
         limit(

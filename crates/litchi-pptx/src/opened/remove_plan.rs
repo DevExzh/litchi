@@ -429,14 +429,6 @@ impl Snapshot {
     }
 }
 
-pub(crate) fn apply_patch(
-    package: &mut OpcPackage,
-    patch: &Patch,
-    physical_source_provenance: bool,
-) -> Result<Snapshot> {
-    apply_patch_with_semantic_limits(package, patch, physical_source_provenance, None)
-}
-
 pub(crate) fn apply_patch_with_semantic_limits(
     package: &mut OpcPackage,
     patch: &Patch,

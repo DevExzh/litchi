@@ -9,15 +9,6 @@ use super::transaction;
 use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
 use crate::{Error, Result};
 
-/// Read one selected shape's optional design-element snapshot.
-pub(crate) fn load<'k>(
-    package: &OpcPackage,
-    owner: &PackURI,
-    key: impl Into<crate::shape::Key<'k>>,
-) -> Result<Option<Snapshot>> {
-    load_with_limits(package, owner, key, crate::shape::Limits::DEFAULT)
-}
-
 pub(crate) fn load_with_limits<'k>(
     package: &OpcPackage,
     owner: &PackURI,
@@ -33,16 +24,6 @@ pub(crate) fn load_with_limits<'k>(
         .get(span)
         .ok_or_else(|| Error::Invalid("designer shape span is invalid".into()))?;
     Ok(codec::read(shape)?.snapshot)
-}
-
-/// Replace or create a selected shape's design-element boolean atomically.
-pub(crate) fn put<'k>(
-    package: &mut OpcPackage,
-    owner: &PackURI,
-    key: impl Into<crate::shape::Key<'k>>,
-    value: bool,
-) -> Result<Option<Snapshot>> {
-    put_with_limits(package, owner, key, value, crate::shape::Limits::DEFAULT)
 }
 
 pub(crate) fn put_with_limits<'k>(
@@ -91,15 +72,6 @@ pub(crate) fn put_with_limits<'k>(
     part.set_blob(staged_owner);
     settle_unsigned_change(package)?;
     Ok(previous)
-}
-
-/// Remove a selected shape's design-element value while preserving other XML.
-pub(crate) fn remove<'k>(
-    package: &mut OpcPackage,
-    owner: &PackURI,
-    key: impl Into<crate::shape::Key<'k>>,
-) -> Result<Option<Snapshot>> {
-    remove_with_limits(package, owner, key, crate::shape::Limits::DEFAULT)
 }
 
 pub(crate) fn remove_with_limits<'k>(

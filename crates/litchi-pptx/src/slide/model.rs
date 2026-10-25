@@ -130,14 +130,6 @@ impl<'a> Slide<'a> {
         }
     }
 
-    pub(crate) fn new_with_shape_limits(
-        package: &'a OpcPackage,
-        part: SlidePart<'a>,
-        shape_limits: crate::shape::Limits,
-    ) -> Self {
-        Self::new_with_shape_and_semantic_limits(package, part, shape_limits, None)
-    }
-
     pub(crate) fn new_with_shape_and_semantic_limits(
         package: &'a OpcPackage,
         part: SlidePart<'a>,

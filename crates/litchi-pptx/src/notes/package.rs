@@ -296,6 +296,7 @@ pub(crate) fn with_refused_slide_root_reservation<T>(operation: impl FnOnce() ->
 /// The returned graph is lifetime-free and independently editable, so each
 /// validated notes, master, and theme payload is copied exactly once. Package
 /// deletion uses the metadata-only index and does not perform these copies.
+#[cfg(test)]
 pub(crate) fn load(package: &OpcPackage, presentation_name: &PackURI) -> Result<Option<Graph>> {
     load_with_limits(
         package,
@@ -351,6 +352,7 @@ pub(crate) fn validate_replay_total(index: &ReplayIndex, limits: Limits) -> Resu
 }
 
 /// Capture a complete source-checked snapshot of an existing notes graph.
+#[cfg(test)]
 pub(crate) fn load_snapshot(
     package: &OpcPackage,
     presentation_name: &PackURI,
@@ -372,24 +374,6 @@ pub(crate) fn load_snapshot_with_limits(
         presentation_name,
         load_index_with_limits(package, presentation_name, limits)?,
         limits,
-    )
-}
-
-/// Capture a notes snapshot while reusing root classifications produced by
-/// the opened-presentation slide pass. The proof vector is an optional
-/// optimization; ordinary notes callers retain the legacy path.
-pub(crate) fn load_snapshot_with_slide_root_proofs<'a>(
-    package: &OpcPackage,
-    presentation_name: &PackURI,
-    expected_catalog_len: usize,
-    proofs: &[SlideRootProof<'a>],
-) -> Result<Option<Snapshot>> {
-    load_snapshot_with_slide_root_proofs_and_limits(
-        package,
-        presentation_name,
-        expected_catalog_len,
-        proofs,
-        Limits::from_source(package.read_limits()),
     )
 }
 
@@ -504,38 +488,12 @@ pub(crate) fn apply_commit(
     apply_patch(package, &patch)
 }
 
-/// Validate and index the complete notes graph without copying resource payloads.
-fn load_index(package: &OpcPackage, presentation_name: &PackURI) -> Result<Option<GraphIndex>> {
-    load_index_with_limits(
-        package,
-        presentation_name,
-        Limits::from_source(package.read_limits()),
-    )
-}
-
 fn load_index_with_limits(
     package: &OpcPackage,
     presentation_name: &PackURI,
     limits: Limits,
 ) -> Result<Option<GraphIndex>> {
     load_index_with_slide_root_proofs_and_limits(package, presentation_name, None, limits)
-}
-
-/// Validate and index the notes graph, optionally consuming capture-local
-/// slide-root classifications. The expected catalog length prevents a notes
-/// scanner that observes a different `sldId` inventory from using positional
-/// proofs.
-fn load_index_with_slide_root_proofs<'a>(
-    package: &OpcPackage,
-    presentation_name: &PackURI,
-    slide_root_proofs: Option<(usize, &[SlideRootProof<'a>])>,
-) -> Result<Option<GraphIndex>> {
-    load_index_with_slide_root_proofs_and_limits(
-        package,
-        presentation_name,
-        slide_root_proofs,
-        Limits::from_source(package.read_limits()),
-    )
 }
 
 fn load_index_with_slide_root_proofs_and_limits<'a>(
@@ -934,6 +892,7 @@ impl From<&SlideIndex> for Removal {
 ///
 /// Returns an error when the notes graph, selected slide, relationships, or
 /// descendant ownership is malformed or exceeds a resource limit.
+#[cfg(test)]
 pub(crate) fn remove(
     package: &mut OpcPackage,
     presentation_name: &PackURI,
@@ -970,6 +929,7 @@ pub(crate) fn remove_with_limits(
     Ok(true)
 }
 
+#[cfg(test)]
 pub(crate) fn remove_checked(
     package: &mut OpcPackage,
     source: &Snapshot,
@@ -999,6 +959,7 @@ pub(crate) fn remove_checked_with_limits(
 ///
 /// Returns an error when the notes graph, relationships, or descendant
 /// ownership is malformed or exceeds a resource limit.
+#[cfg(test)]
 pub(crate) fn clear(package: &mut OpcPackage, presentation_name: &PackURI) -> Result<usize> {
     clear_with_limits(
         package,
@@ -1027,11 +988,6 @@ pub(crate) fn clear_with_limits(
     apply_notes_removals(package, &removals, &descendants)
 }
 
-pub(crate) fn clear_checked(package: &mut OpcPackage, source: &Snapshot) -> Result<usize> {
-    require_current_source(package, source)?;
-    clear(package, source.presentation_part_name())
-}
-
 pub(crate) fn clear_checked_with_limits(
     package: &mut OpcPackage,
     source: &Snapshot,
@@ -1041,6 +997,7 @@ pub(crate) fn clear_checked_with_limits(
     clear_with_limits(package, source.presentation_part_name(), limits)
 }
 
+#[cfg(test)]
 fn require_current_source(package: &OpcPackage, source: &Snapshot) -> Result<()> {
     require_current_source_with_limits(package, source, Limits::from_source(package.read_limits()))
 }
@@ -1615,10 +1572,6 @@ pub(crate) fn put_changed_with_limits(
     }
     settle_unsigned_change(package)?;
     Ok(true)
-}
-
-pub(crate) fn validate_graph(graph: &Graph) -> Result<()> {
-    validate_graph_with_limits(graph, Limits::DEFAULT)
 }
 
 pub(crate) fn validate_graph_with_limits(graph: &Graph, limits: Limits) -> Result<()> {

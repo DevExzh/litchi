@@ -63,6 +63,7 @@ fn property_policy(max_text_bytes: usize, max_output_bytes: usize) -> ChunkPolic
 /// The flattened operation is admitted against the slide shape count and the
 /// output budget, then resolved and published once so duplicate selectors and
 /// overlapping shape spans are checked globally.
+#[cfg(test)]
 pub(crate) fn stage_shape_text_chunks<'a>(
     xml: &[u8],
     chunks: &[&[super::ShapeTextReplacement<'a>]],
@@ -97,26 +98,6 @@ pub(crate) fn stage_shape_text_chunks_with_limits<'a>(
     )
 }
 
-/// Stage text chunks after a caller has retained the matching no-allocation
-/// admission. This lets managed source code reserve its own state before the
-/// descriptor flatten, without scanning or admitting the chunks twice.
-pub(crate) fn stage_shape_text_chunks_admitted<'a>(
-    xml: &[u8],
-    chunks: &[&[super::ShapeTextReplacement<'a>]],
-    max_text_bytes: usize,
-    max_output_bytes: usize,
-    admission: ChunkAdmission,
-) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_shape_text_chunks_admitted_with_limits(
-        xml,
-        chunks,
-        max_text_bytes,
-        max_output_bytes,
-        admission,
-        crate::shape::Limits::DEFAULT,
-    )
-}
-
 pub(crate) fn stage_shape_text_chunks_admitted_with_limits<'a>(
     xml: &[u8],
     chunks: &[&[super::ShapeTextReplacement<'a>]],
@@ -135,25 +116,6 @@ pub(crate) fn stage_shape_text_chunks_admitted_with_limits<'a>(
         MAX_SELECTIONS,
         max_output_bytes,
         shape_limits,
-    )
-}
-
-/// Stage several positional shape-property chunks as one same-slide
-/// operation.  Text and geometry are flattened before the scene is read, so
-/// duplicate selectors and overlapping owners are rejected across chunk
-/// boundaries by the shared property staging path.
-pub(crate) fn stage_shape_property_chunks<'a>(
-    xml: &[u8],
-    chunks: &[&[super::ShapePropertiesReplacement<'a>]],
-    max_text_bytes: usize,
-    max_output_bytes: usize,
-) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_shape_property_chunks_with_limits(
-        xml,
-        chunks,
-        max_text_bytes,
-        max_output_bytes,
-        crate::shape::Limits::DEFAULT,
     )
 }
 
@@ -177,26 +139,6 @@ pub(crate) fn stage_shape_property_chunks_with_limits<'a>(
         max_output_bytes,
         admission,
         shape_limits,
-    )
-}
-
-/// Stage property chunks after a caller has retained the matching
-/// no-allocation admission. Geometry-only updates still use the same scalar
-/// admission and atomic property publication path.
-pub(crate) fn stage_shape_property_chunks_admitted<'a>(
-    xml: &[u8],
-    chunks: &[&[super::ShapePropertiesReplacement<'a>]],
-    max_text_bytes: usize,
-    max_output_bytes: usize,
-    admission: ChunkAdmission,
-) -> Result<(Option<Vec<u8>>, usize)> {
-    stage_shape_property_chunks_admitted_with_limits(
-        xml,
-        chunks,
-        max_text_bytes,
-        max_output_bytes,
-        admission,
-        crate::shape::Limits::DEFAULT,
     )
 }
 
