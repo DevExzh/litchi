@@ -26,8 +26,10 @@ import argparse
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 import re
 from pathlib import Path
+import stat
 import subprocess
 import tomllib
 from typing import Any, Iterable, Mapping
@@ -42,6 +44,46 @@ except ImportError:  # Direct command-line execution.
 
 SCHEMA_VERSION = 1
 CAPTURE_RECEIPT_SCHEMA = 1
+CAPTURE_POLICY_ENV = {
+    "CARGO_NET_OFFLINE": "true",
+    "CARGO_BUILD_JOBS": "1",
+    "CARGO_INCREMENTAL": "0",
+    "CARGO_PROFILE_DEV_DEBUG": "0",
+    "CARGO_PROFILE_TEST_DEBUG": "0",
+    "CARGO_PROFILE_RELEASE_DEBUG": "0",
+    "RUSTC_BOOTSTRAP": "1",
+    "LITCHI_MEM_MAX": "20G",
+    "RUST_TEST_THREADS": "1",
+    "CARGO_TERM_COLOR": "never",
+    "LITCHI_CAPPED": "",
+    "LITCHI_GATE_ATTEMPT": "f5",
+    "RUSTDOCFLAGS": "",
+}
+CAPTURE_POLICY_GUARDS = {
+    "target_pre_max_bytes": 18_000_000_000,
+    "target_live_max_bytes": 19_000_000_000,
+    "target_hard_max_bytes": 20_000_000_000,
+    "free_min_bytes": 12_000_000_000,
+    "memory_max": "20G",
+    "memory_max_bytes": 20 * 1024**3,
+    "build_jobs": 1,
+    "test_threads": 1,
+    "incremental": 0,
+    "offline": True,
+    "locked": True,
+}
+CAPTURE_RECEIPT_ENV_KEYS = frozenset({
+    *CAPTURE_POLICY_ENV,
+    "CARGO_TARGET_DIR",
+    "LITCHI_GATE_TARGET_ROOT",
+    "LITCHI_GATE_TARGET_TRACE",
+    "TMPDIR",
+})
+CAPTURE_RECEIPT_GUARD_KEYS = frozenset(CAPTURE_POLICY_GUARDS)
+CAPTURE_RESOURCE_KEYS = frozenset({
+    "target_pre_bytes", "target_live_peak_bytes", "target_post_bytes", "peak_rss_bytes",
+    "free_bytes_after", "target_live_guard_triggered",
+})
 DISPOSITIONS = frozenset({
     "required_raw_limits",
     "configured_owner",
@@ -100,6 +142,50 @@ def _path_string(value: Any, label: str) -> str:
     if "3rdparty" in path_obj.parts:
         raise CoverageError(f"{label} must not reference 3rdparty/")
     return path
+
+
+def _policy_external_path(value: Any, label: str) -> str:
+    path = _nonempty_string(value, label)
+    path_obj = Path(path)
+    if not path_obj.is_absolute():
+        raise CoverageError(f"{label} must be an absolute path")
+    resolved = path_obj.resolve()
+    if resolved == Path("/tmp") or Path("/tmp") in resolved.parents:
+        raise CoverageError(f"{label} must not be under /tmp")
+    return str(resolved)
+
+
+def _capture_policy(value: Any, label: str = "coverage.capture_policy") -> dict[str, Any]:
+    required = {
+        "runner_path", "runner_sha256", "cap_wrapper_path", "cap_wrapper_sha256",
+        "underlying_cargo_path", "underlying_cargo_sha256", "environment", "guards",
+    }
+    if not isinstance(value, dict) or set(value) != required:
+        raise CoverageError(f"{label} requires exact runner, wrapper, environment and guard fields")
+    result = dict(value)
+    for field in ("runner_path", "cap_wrapper_path", "underlying_cargo_path"):
+        result[field] = _policy_external_path(result[field], f"{label}.{field}")
+    for field in ("runner_sha256", "cap_wrapper_sha256", "underlying_cargo_sha256"):
+        digest = _nonempty_string(result[field], f"{label}.{field}").lower()
+        if not HEX64.fullmatch(digest):
+            raise CoverageError(f"{label}.{field} must be a full lowercase SHA-256")
+        result[field] = digest
+    environment = result["environment"]
+    if not isinstance(environment, dict) or set(environment) != set(CAPTURE_POLICY_ENV):
+        raise CoverageError(f"{label}.environment must match the fixed f5 capture environment")
+    if any(not isinstance(item, str) for item in environment.values()):
+        raise CoverageError(f"{label}.environment values must be strings")
+    if environment != CAPTURE_POLICY_ENV:
+        raise CoverageError(f"{label}.environment differs from the fixed f5 capture environment")
+    result["environment"] = dict(environment)
+    guards = result["guards"]
+    if not isinstance(guards, dict) or set(guards) != set(CAPTURE_POLICY_GUARDS):
+        raise CoverageError(f"{label}.guards must match the fixed resource protocol")
+    for field, expected in CAPTURE_POLICY_GUARDS.items():
+        if type(guards[field]) is not type(expected) or guards[field] != expected:
+            raise CoverageError(f"{label}.guards.{field} differs from the fixed resource protocol")
+    result["guards"] = dict(guards)
+    return result
 
 
 def _source_anchor(value: Any, label: str) -> SourceAnchor:
@@ -251,7 +337,7 @@ def load_manifest(path: Path) -> dict[str, Any]:
     coverage_fields = {
         "state", "reason", "expected_profile_source", "expected_profile_source_blob",
         "expected_workspace_source", "expected_workspace_source_blob",
-        "approved_cargo_lock_sha256",
+        "approved_cargo_lock_sha256", "capture_policy",
     }
     if not isinstance(coverage, dict) or set(coverage) != coverage_fields:
         raise CoverageError(
@@ -280,6 +366,7 @@ def load_manifest(path: Path) -> dict[str, Any]:
     if not HEX64.fullmatch(lock_blob):
         raise CoverageError("coverage.approved_cargo_lock_sha256 must be a full lowercase SHA-256")
     coverage["approved_cargo_lock_sha256"] = lock_blob
+    coverage["capture_policy"] = _capture_policy(coverage["capture_policy"])
     profiles = manifest["profiles"]
     if not isinstance(profiles, list):
         raise CoverageError("profiles must be an array")
@@ -415,6 +502,27 @@ def _sha256_file(path: Path) -> str | None:
         return None
 
 
+def _regular_file_with_components(path: Path) -> bool:
+    """Require a regular file and reject symlinks in every path component."""
+    absolute = path.absolute()
+    current = Path(absolute.anchor)
+    components = absolute.parts[1:]
+    for component in components:
+        current /= component
+        try:
+            mode = current.lstat().st_mode
+        except OSError:
+            return False
+        if stat.S_ISLNK(mode):
+            return False
+        if current != absolute and not stat.S_ISDIR(mode):
+            return False
+    try:
+        return stat.S_ISREG(absolute.lstat().st_mode)
+    except OSError:
+        return False
+
+
 def _source_blob_failure(root: Path, commit: str, label: str, path: str,
                          expected_blob: str) -> str | None:
     resolved = _git_object(root, commit, path)
@@ -448,8 +556,9 @@ def _source_overlay_failures(root: Path, cargo_lock_sha256: str | None) -> list[
             except json.JSONDecodeError:
                 pass
         if path == "Cargo.lock" and cargo_lock_sha256 is not None:
-            actual = _sha256_file(root / path)
-            if actual == cargo_lock_sha256:
+            lock = root / path
+            actual = _sha256_file(lock)
+            if _regular_file_with_components(lock) and actual == cargo_lock_sha256:
                 continue
         failures.append(f"source checkout overlay {path!r} ({state})")
         candidate = root / path.rstrip("/")
@@ -490,7 +599,10 @@ def _capture_receipt(value: Any, label: str) -> dict[str, Any]:
         "source_commit", "source_tree", "source_root", "target_dir",
         "cargo_lock_path", "cargo_lock_sha256", "rust_toolchain_path",
         "rust_toolchain_sha256", "cargo_path", "cargo_sha256", "rustc_path",
-        "rustc_sha256", "artifact",
+        "rustc_sha256", "artifact", "runner_path", "runner_sha256",
+        "cap_wrapper_path", "cap_wrapper_sha256", "underlying_cargo_path",
+        "underlying_cargo_sha256", "capture_env", "guards", "resource",
+        "execution_trace",
     }
     if not isinstance(value, dict) or set(value) != required:
         raise CoverageError(f"{label} requires exact capture identity fields")
@@ -520,6 +632,52 @@ def _capture_receipt(value: Any, label: str) -> dict[str, Any]:
         raise CoverageError(f"{label}.cargo_lock_path must be exactly Cargo.lock")
     if value["rust_toolchain_path"] not in {"rust-toolchain.toml", "rust-toolchain"}:
         raise CoverageError(f"{label}.rust_toolchain_path is not an approved root toolchain path")
+    for field in ("runner_path", "cap_wrapper_path", "underlying_cargo_path"):
+        _nonempty_string(value[field], f"{label}.{field}")
+    for field in ("runner_sha256", "cap_wrapper_sha256", "underlying_cargo_sha256"):
+        digest = _nonempty_string(value[field], f"{label}.{field}").lower()
+        if not HEX64.fullmatch(digest):
+            raise CoverageError(f"{label}.{field} must be a full lowercase SHA-256")
+        value[field] = digest
+    capture_env = value["capture_env"]
+    if not isinstance(capture_env, dict) or set(capture_env) != CAPTURE_RECEIPT_ENV_KEYS:
+        raise CoverageError(f"{label}.capture_env has an incomplete or extra environment identity")
+    if any(not isinstance(item, str) for item in capture_env.values()):
+        raise CoverageError(f"{label}.capture_env values must be strings")
+    guards = value["guards"]
+    if not isinstance(guards, dict) or set(guards) != CAPTURE_RECEIPT_GUARD_KEYS:
+        raise CoverageError(f"{label}.guards has an incomplete or extra resource identity")
+    for field, expected in CAPTURE_POLICY_GUARDS.items():
+        if type(guards[field]) is not type(expected):
+            raise CoverageError(f"{label}.guards.{field} has the wrong type")
+    resource = value["resource"]
+    if not isinstance(resource, dict) or set(resource) != CAPTURE_RESOURCE_KEYS:
+        raise CoverageError(f"{label}.resource requires exact target, RSS and free-space fields")
+    for field in CAPTURE_RESOURCE_KEYS - {"target_live_guard_triggered"}:
+        if type(resource[field]) is not int or resource[field] < 0:
+            raise CoverageError(f"{label}.resource.{field} must be a nonnegative integer")
+    if type(resource["target_live_guard_triggered"]) is not bool:
+        raise CoverageError(f"{label}.resource.target_live_guard_triggered must be boolean")
+    trace = value["execution_trace"]
+    if not isinstance(trace, dict) or set(trace) != {"path", "bytes", "sha256", "rows"}:
+        raise CoverageError(f"{label}.execution_trace requires path, bytes, sha256 and rows")
+    _nonempty_string(trace["path"], f"{label}.execution_trace.path")
+    if type(trace["bytes"]) is not int or trace["bytes"] < 1:
+        raise CoverageError(f"{label}.execution_trace.bytes must be positive")
+    trace_hash = _nonempty_string(trace["sha256"], f"{label}.execution_trace.sha256").lower()
+    if not HEX64.fullmatch(trace_hash):
+        raise CoverageError(f"{label}.execution_trace.sha256 must be a full lowercase SHA-256")
+    trace["sha256"] = trace_hash
+    rows = trace["rows"]
+    if not isinstance(rows, list) or not rows:
+        raise CoverageError(f"{label}.execution_trace.rows must be nonempty")
+    for index, row in enumerate(rows):
+        if not isinstance(row, dict) or set(row) != {"pid", "command", "target"}:
+            raise CoverageError(f"{label}.execution_trace.rows[{index}] requires pid, command and target")
+        if not isinstance(row["pid"], str) or not row["pid"].isdigit() or int(row["pid"]) < 1:
+            raise CoverageError(f"{label}.execution_trace.rows[{index}].pid is invalid")
+        for field in ("command", "target"):
+            _nonempty_string(row[field], f"{label}.execution_trace.rows[{index}].{field}")
     artifact = value["artifact"]
     if not isinstance(artifact, dict) or set(artifact) != {"path", "bytes", "sha256"}:
         raise CoverageError(f"{label}.artifact requires path, bytes and sha256")
@@ -551,6 +709,19 @@ def _validate_capture_receipt(manifest: Mapping[str, Any], profile: Profile,
         _external_path(str(receipt_path.resolve()), f"{profile.profile_id}.receipt_path", root)
         cargo_path = _external_path(str(receipt["cargo_path"]), f"{profile.profile_id}.cargo_path", root)
         rustc_path = _external_path(str(receipt["rustc_path"]), f"{profile.profile_id}.rustc_path", root)
+        runner_path = _external_path(str(receipt["runner_path"]), f"{profile.profile_id}.runner_path", root)
+        cap_wrapper_path = _external_path(
+            str(receipt["cap_wrapper_path"]), f"{profile.profile_id}.cap_wrapper_path", root
+        )
+        underlying_cargo_path = _external_path(
+            str(receipt["underlying_cargo_path"]),
+            f"{profile.profile_id}.underlying_cargo_path", root,
+        )
+        trace_path = _external_path(
+            str(receipt["execution_trace"]["path"]),
+            f"{profile.profile_id}.execution_trace.path", root,
+        )
+        tmpdir = _external_path(str(receipt["capture_env"]["TMPDIR"]), f"{profile.profile_id}.TMPDIR", root)
     except CoverageError as error:
         failures.append(f"{profile.profile_id}: {error}")
         return failures
@@ -562,13 +733,45 @@ def _validate_capture_receipt(manifest: Mapping[str, Any], profile: Profile,
         failures.append(f"{profile.profile_id}: receipt default_features differs from manifest")
     if tuple(receipt["features"]) != profile.features:
         failures.append(f"{profile.profile_id}: receipt features differ from manifest")
+    policy = manifest["coverage"]["capture_policy"]
+    for field in ("runner_path", "cap_wrapper_path", "underlying_cargo_path"):
+        if str(Path(receipt[field]).resolve()) != policy[field]:
+            failures.append(f"{profile.profile_id}: receipt {field} differs from the approved f5 runner")
+    for field in ("runner_sha256", "cap_wrapper_sha256", "underlying_cargo_sha256"):
+        if receipt[field] != policy[field]:
+            failures.append(f"{profile.profile_id}: receipt {field} differs from the approved f5 runner")
+    if str(cargo_path) != str(cap_wrapper_path):
+        failures.append(f"{profile.profile_id}: cargo_path is not the f5 cap wrapper")
+    if not _regular_file_with_components(runner_path):
+        failures.append(f"{profile.profile_id}: runner is not a regular file: {runner_path}")
+    for label, path in (("cap wrapper", cap_wrapper_path), ("underlying Cargo", underlying_cargo_path)):
+        if not _regular_file_with_components(path) or not os.access(path, os.X_OK):
+            failures.append(f"{profile.profile_id}: {label} is not a regular executable: {path}")
+    if not _regular_file_with_components(trace_path):
+        failures.append(f"{profile.profile_id}: execution trace is not a regular file: {trace_path}")
     for label, path, expected in (
         ("cargo", cargo_path, receipt["cargo_sha256"]),
         ("rustc", rustc_path, receipt["rustc_sha256"]),
+        ("runner", runner_path, receipt["runner_sha256"]),
+        ("cap wrapper", cap_wrapper_path, receipt["cap_wrapper_sha256"]),
+        ("underlying Cargo", underlying_cargo_path, receipt["underlying_cargo_sha256"]),
     ):
         actual = _sha256_file(path)
         if actual != expected:
             failures.append(f"{profile.profile_id}: {label} identity differs from receipt")
+    try:
+        wrapper_source = cap_wrapper_path.read_text(encoding="utf-8")
+        underlying_source = underlying_cargo_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        failures.append(f"{profile.profile_id}: cannot read f5 cap wrapper identity: {error}")
+    else:
+        trace_printf = "printf '%s\\t%s\\t%s\\n' \"$$\" \"$command\" \"$requested_target\""
+        if ("LITCHI_GATE_TARGET_TRACE" not in wrapper_source
+                or "requested_target" not in wrapper_source
+                or trace_printf not in wrapper_source):
+            failures.append(f"{profile.profile_id}: cap wrapper does not publish target trace rows")
+        if "systemd-run" not in underlying_source or "MemoryMax=${LITCHI_MEM_MAX" not in underlying_source:
+            failures.append(f"{profile.profile_id}: underlying Cargo is not the memory-capped shim")
     expected_argv = [
         str(cargo_path), "rustdoc", "--package", profile.package, "--lib",
         "--target-dir", str(Path(receipt["target_dir"]).resolve()),
@@ -583,6 +786,49 @@ def _validate_capture_receipt(manifest: Mapping[str, Any], profile: Profile,
     ]
     if receipt["argv"] != expected_argv:
         failures.append(f"{profile.profile_id}: receipt argv does not exactly match profile capture")
+    expected_env = dict(policy["environment"])
+    expected_env.update({
+        "CARGO_TARGET_DIR": str(target),
+        "LITCHI_GATE_TARGET_ROOT": str(target),
+        "LITCHI_GATE_TARGET_TRACE": str(trace_path),
+        "TMPDIR": str(tmpdir),
+    })
+    if receipt["capture_env"] != expected_env:
+        failures.append(f"{profile.profile_id}: capture environment differs from the f5 policy")
+    if receipt["guards"] != policy["guards"]:
+        failures.append(f"{profile.profile_id}: resource guards differ from the f5 policy")
+    resource = receipt["resource"]
+    guards = policy["guards"]
+    if resource["target_pre_bytes"] > guards["target_pre_max_bytes"]:
+        failures.append(f"{profile.profile_id}: target preflight exceeded the f5 guard")
+    if resource["target_live_peak_bytes"] > guards["target_live_max_bytes"]:
+        failures.append(f"{profile.profile_id}: target live guard exceeded the f5 limit")
+    if resource["target_live_guard_triggered"]:
+        failures.append(f"{profile.profile_id}: target live guard reported an overflow")
+    if resource["target_post_bytes"] > guards["target_hard_max_bytes"]:
+        failures.append(f"{profile.profile_id}: target post-size exceeded the f5 hard cap")
+    if resource["peak_rss_bytes"] < 1 or resource["peak_rss_bytes"] >= guards["memory_max_bytes"]:
+        failures.append(f"{profile.profile_id}: peak RSS exceeded or omitted the f5 memory cap")
+    if resource["free_bytes_after"] < guards["free_min_bytes"]:
+        failures.append(f"{profile.profile_id}: free-space receipt is below the f5 guard")
+    try:
+        trace_bytes = trace_path.read_bytes()
+        actual_trace_rows = []
+        for line in trace_bytes.decode("utf-8").splitlines():
+            fields = line.split("\t")
+            if len(fields) != 3 or not fields[0].isdigit() or int(fields[0]) < 1:
+                raise ValueError("trace row has invalid pid or field count")
+            actual_trace_rows.append({"pid": fields[0], "command": fields[1], "target": fields[2]})
+    except (OSError, UnicodeDecodeError, ValueError) as error:
+        failures.append(f"{profile.profile_id}: invalid f5 execution trace: {error}")
+    else:
+        trace = receipt["execution_trace"]
+        if len(trace_bytes) != trace["bytes"] or hashlib.sha256(trace_bytes).hexdigest() != trace["sha256"]:
+            failures.append(f"{profile.profile_id}: execution trace bytes/SHA differs from receipt")
+        if actual_trace_rows != trace["rows"]:
+            failures.append(f"{profile.profile_id}: execution trace rows differ from receipt")
+        if any(row["command"] != "rustdoc" or row["target"] != str(target) for row in actual_trace_rows):
+            failures.append(f"{profile.profile_id}: execution trace does not match the cap wrapper rustdoc target")
     head = _git_head(root)
     approved_lock = manifest["coverage"]["approved_cargo_lock_sha256"]
     if receipt["cargo_lock_sha256"] != approved_lock:
@@ -593,6 +839,8 @@ def _validate_capture_receipt(manifest: Mapping[str, Any], profile: Profile,
     if tree != receipt["source_tree"]:
         failures.append(f"{profile.profile_id}: receipt source_tree differs from source commit")
     lock = root / receipt["cargo_lock_path"]
+    if not _regular_file_with_components(lock):
+        failures.append(f"{profile.profile_id}: approved Cargo.lock is not a regular non-symlink path")
     if _sha256_file(lock) != receipt["cargo_lock_sha256"]:
         failures.append(f"{profile.profile_id}: seeded Cargo.lock identity differs from receipt")
     selected_toolchain = next(

@@ -8,7 +8,43 @@
     "expected_profile_source_blob": "0e4ffb67ad53c8d7dff68f17fc0d5685e84f265b",
     "expected_workspace_source": "Cargo.toml",
     "expected_workspace_source_blob": "806bb190ca15bb53d0ec8b29c8812b338ffaca72",
-    "approved_cargo_lock_sha256": "efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811"
+    "approved_cargo_lock_sha256": "efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811",
+    "capture_policy": {
+      "runner_path": "/home/zhuhe/code/litchi-worktrees/uo2-gate-runner-self-attribution/docs/unified-ops/results/0362ul29/tooling/run_safe_gate.py",
+      "runner_sha256": "1904177040fc7c523582433028d9bba56efc30fe0d9d96beb554a2fab343691e",
+      "cap_wrapper_path": "/home/zhuhe/code/litchi-worktrees/uo2-gate-runner-self-attribution/docs/unified-ops/results/0362ul29/tooling/bin/cargo",
+      "cap_wrapper_sha256": "495e24c6f60b238378386d86ac4158cba904992ce8870a9494f2c4a0eedd256d",
+      "underlying_cargo_path": "/home/zhuhe/code/litchi-worktrees/.coord/bin/cargo",
+      "underlying_cargo_sha256": "1b22a69fd625d57565041bf6c634d8ebd1a82be8b3d0006390472c86324230d8",
+      "environment": {
+        "CARGO_NET_OFFLINE": "true",
+        "CARGO_BUILD_JOBS": "1",
+        "CARGO_INCREMENTAL": "0",
+        "CARGO_PROFILE_DEV_DEBUG": "0",
+        "CARGO_PROFILE_TEST_DEBUG": "0",
+        "CARGO_PROFILE_RELEASE_DEBUG": "0",
+        "RUSTC_BOOTSTRAP": "1",
+        "LITCHI_MEM_MAX": "20G",
+        "RUST_TEST_THREADS": "1",
+        "CARGO_TERM_COLOR": "never",
+        "LITCHI_CAPPED": "",
+        "LITCHI_GATE_ATTEMPT": "f5",
+        "RUSTDOCFLAGS": ""
+      },
+      "guards": {
+        "target_pre_max_bytes": 18000000000,
+        "target_live_max_bytes": 19000000000,
+        "target_hard_max_bytes": 20000000000,
+        "free_min_bytes": 12000000000,
+        "memory_max": "20G",
+        "memory_max_bytes": 21474836480,
+        "build_jobs": 1,
+        "test_threads": 1,
+        "incremental": 0,
+        "offline": true,
+        "locked": true
+      }
+    }
   },
   "profiles": [
     {

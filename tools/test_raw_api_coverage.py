@@ -106,6 +106,16 @@ def manifest(entries: list[dict], *, state: str = "complete") -> dict:
             "expected_workspace_source": "Cargo.toml",
             "expected_workspace_source_blob": "d" * 40,
             "approved_cargo_lock_sha256": "e" * 64,
+            "capture_policy": {
+                "runner_path": "/opt/f5/run_safe_gate.py",
+                "runner_sha256": "f" * 64,
+                "cap_wrapper_path": "/opt/f5/bin/cargo",
+                "cap_wrapper_sha256": "a" * 64,
+                "underlying_cargo_path": "/opt/f5/coord/cargo",
+                "underlying_cargo_sha256": "b" * 64,
+                "environment": dict(coverage.CAPTURE_POLICY_ENV),
+                "guards": dict(coverage.CAPTURE_POLICY_GUARDS),
+            },
         },
         "profiles": [{
             "id": "fixture-profile",
@@ -153,7 +163,7 @@ class RawApiCoverageTests(unittest.TestCase):
     def sha256(path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest()
 
-    def capture_fixture(self) -> tuple[Path, coverage.Profile, dict, Path, Path]:
+    def capture_fixture(self) -> tuple[Path, coverage.Profile, dict, Path, Path, dict]:
         external = Path(tempfile.mkdtemp(prefix="raw-api-receipt-", dir=Path.cwd().parent))
         self.capture_dirs.append(external)
         root = external / "source"
@@ -179,19 +189,56 @@ class RawApiCoverageTests(unittest.TestCase):
 
         toolchain = external / "toolchain"
         toolchain.mkdir()
-        cargo = toolchain / "cargo-shim"
         rustc = toolchain / "rustc"
-        cargo.write_text("cargo fixture shim\n", encoding="utf-8")
         rustc.write_text("rustc fixture\n", encoding="utf-8")
+        runner = external / "runner" / "run_safe_gate.py"
+        runner.parent.mkdir()
+        runner.write_text("runner fixture\n", encoding="utf-8")
+        cap_wrapper = external / "runner" / "bin" / "cargo"
+        cap_wrapper.parent.mkdir()
+        cap_wrapper.write_text(
+            "#!/bin/sh\n"
+            "LITCHI_GATE_TARGET_TRACE=requested_target\n"
+            "printf '%s\\t%s\\t%s\\n' \"$$\" \"$command\" \"$requested_target\"\n",
+            encoding="utf-8",
+        )
+        cap_wrapper.chmod(0o755)
+        underlying_cargo = external / "runner" / "coord" / "cargo"
+        underlying_cargo.parent.mkdir()
+        underlying_cargo.write_text(
+            "#!/bin/sh\nsystemd-run MemoryMax=${LITCHI_MEM_MAX:-20G}\n", encoding="utf-8"
+        )
+        underlying_cargo.chmod(0o755)
         target = external / "target"
         target.mkdir()
+        tmpdir = external / "tmp"
+        tmpdir.mkdir()
         artifact = external / "capture" / "fixture-profile.json"
         artifact.parent.mkdir()
         artifact.write_text(json.dumps(rustdoc_fixture()), encoding="utf-8")
+        trace = external / "capture" / "fixture-profile.trace"
+        trace.write_text(f"123\trustdoc\t{target}\n", encoding="utf-8")
         receipt_path = external / "receipts" / "fixture-profile.json"
         receipt_path.parent.mkdir()
         profile = coverage.Profile("fixture-profile", "fixture", False, ("feature-a",))
         lock_sha = self.sha256(root / "Cargo.lock")
+        policy = {
+            "runner_path": str(runner),
+            "runner_sha256": self.sha256(runner),
+            "cap_wrapper_path": str(cap_wrapper),
+            "cap_wrapper_sha256": self.sha256(cap_wrapper),
+            "underlying_cargo_path": str(underlying_cargo),
+            "underlying_cargo_sha256": self.sha256(underlying_cargo),
+            "environment": dict(coverage.CAPTURE_POLICY_ENV),
+            "guards": dict(coverage.CAPTURE_POLICY_GUARDS),
+        }
+        capture_env = dict(policy["environment"])
+        capture_env.update({
+            "CARGO_TARGET_DIR": str(target),
+            "LITCHI_GATE_TARGET_ROOT": str(target),
+            "LITCHI_GATE_TARGET_TRACE": str(trace),
+            "TMPDIR": str(tmpdir),
+        })
         receipt = {
             "schema": coverage.CAPTURE_RECEIPT_SCHEMA,
             "profile": profile.profile_id,
@@ -199,7 +246,7 @@ class RawApiCoverageTests(unittest.TestCase):
             "default_features": profile.default_features,
             "features": list(profile.features),
             "argv": [
-                str(cargo), "rustdoc", "--package", "fixture", "--lib",
+                str(cap_wrapper), "rustdoc", "--package", "fixture", "--lib",
                 "--target-dir", str(target), "--no-default-features", "--features", "feature-a",
                 "--offline", "--locked", "--", "-Zunstable-options", "--output-format", "json",
                 "--document-hidden-items",
@@ -212,10 +259,32 @@ class RawApiCoverageTests(unittest.TestCase):
             "cargo_lock_sha256": lock_sha,
             "rust_toolchain_path": "rust-toolchain.toml",
             "rust_toolchain_sha256": self.sha256(root / "rust-toolchain.toml"),
-            "cargo_path": str(cargo),
-            "cargo_sha256": self.sha256(cargo),
+            "cargo_path": str(cap_wrapper),
+            "cargo_sha256": self.sha256(cap_wrapper),
             "rustc_path": str(rustc),
             "rustc_sha256": self.sha256(rustc),
+            "runner_path": str(runner),
+            "runner_sha256": self.sha256(runner),
+            "cap_wrapper_path": str(cap_wrapper),
+            "cap_wrapper_sha256": self.sha256(cap_wrapper),
+            "underlying_cargo_path": str(underlying_cargo),
+            "underlying_cargo_sha256": self.sha256(underlying_cargo),
+            "capture_env": capture_env,
+            "guards": dict(coverage.CAPTURE_POLICY_GUARDS),
+            "resource": {
+                "target_pre_bytes": 0,
+                "target_live_peak_bytes": 1,
+                "target_post_bytes": 1,
+                "peak_rss_bytes": 1,
+                "free_bytes_after": coverage.CAPTURE_POLICY_GUARDS["free_min_bytes"] + 1,
+                "target_live_guard_triggered": False,
+            },
+            "execution_trace": {
+                "path": str(trace),
+                "bytes": trace.stat().st_size,
+                "sha256": self.sha256(trace),
+                "rows": [{"pid": "123", "command": "rustdoc", "target": str(target)}],
+            },
             "artifact": {
                 "path": str(artifact),
                 "bytes": artifact.stat().st_size,
@@ -223,7 +292,7 @@ class RawApiCoverageTests(unittest.TestCase):
             },
         }
         receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
-        return root, profile, receipt, artifact, receipt_path
+        return root, profile, receipt, artifact, receipt_path, policy
 
     def loaded(self, value: dict, *, require_complete: bool = False,
                extra_rustdoc: bool = False) -> dict:
@@ -250,10 +319,13 @@ class RawApiCoverageTests(unittest.TestCase):
         }
 
     def test_capture_receipt_binds_profile_source_tools_and_artifact(self) -> None:
-        root, profile, receipt, artifact, receipt_path = self.capture_fixture()
+        root, profile, receipt, artifact, receipt_path, policy = self.capture_fixture()
         manifest_value = {
             "source_commit": receipt["source_commit"],
-            "coverage": {"approved_cargo_lock_sha256": receipt["cargo_lock_sha256"]},
+            "coverage": {
+                "approved_cargo_lock_sha256": receipt["cargo_lock_sha256"],
+                "capture_policy": policy,
+            },
         }
         parsed = coverage._capture_receipt(receipt, "receipt[fixture-profile]")
         overlays = coverage._source_overlay_failures(root, receipt["cargo_lock_sha256"])
@@ -295,7 +367,10 @@ class RawApiCoverageTests(unittest.TestCase):
 
         wrong_seed = {
             "source_commit": receipt["source_commit"],
-            "coverage": {"approved_cargo_lock_sha256": "0" * 64},
+            "coverage": {
+                "approved_cargo_lock_sha256": "0" * 64,
+                "capture_policy": policy,
+            },
         }
         self.assertTrue(
             any("approved seeded lock" in failure for failure in coverage._validate_capture_receipt(
@@ -304,7 +379,7 @@ class RawApiCoverageTests(unittest.TestCase):
         )
 
     def test_capture_receipt_rejects_source_overlays_and_wrong_seed_lock(self) -> None:
-        root, profile, receipt, artifact, receipt_path = self.capture_fixture()
+        root, profile, receipt, artifact, receipt_path, _ = self.capture_fixture()
         del profile, artifact, receipt_path
         (root / "vendor" / "overlay").mkdir(parents=True)
         (root / "vendor" / "overlay" / "fixture.bin").write_bytes(b"overlay")
@@ -317,6 +392,50 @@ class RawApiCoverageTests(unittest.TestCase):
         self.assertTrue(any("fixtures/fixture.json" in failure for failure in failures), failures)
         wrong_lock = coverage._source_overlay_failures(root, "0" * 64)
         self.assertTrue(any("Cargo.lock" in failure for failure in wrong_lock), wrong_lock)
+
+    def test_capture_receipt_rejects_lock_symlink(self) -> None:
+        root, _, receipt, _, _, _ = self.capture_fixture()
+        target = root.parent / "alternate-lock"
+        target.write_text("approved lock\n", encoding="utf-8")
+        (root / "Cargo.lock").unlink()
+        (root / "Cargo.lock").symlink_to(target)
+        failures = coverage._source_overlay_failures(root, receipt["cargo_lock_sha256"])
+        self.assertTrue(any("Cargo.lock" in failure for failure in failures), failures)
+        self.assertFalse(coverage._regular_file_with_components(root / "Cargo.lock"))
+
+    def test_capture_receipt_rejects_runner_environment_and_trace_tampering(self) -> None:
+        root, profile, receipt, artifact, receipt_path, policy = self.capture_fixture()
+        manifest_value = {
+            "source_commit": receipt["source_commit"],
+            "coverage": {
+                "approved_cargo_lock_sha256": receipt["cargo_lock_sha256"],
+                "capture_policy": policy,
+            },
+        }
+        overlays = coverage._source_overlay_failures(root, receipt["cargo_lock_sha256"])
+        bad_env = dict(receipt)
+        bad_env["capture_env"] = dict(receipt["capture_env"])
+        bad_env["capture_env"]["CARGO_NET_OFFLINE"] = "false"
+        parsed = coverage._capture_receipt(bad_env, "receipt[fixture-profile]")
+        self.assertTrue(any("capture environment" in failure for failure in coverage._validate_capture_receipt(
+            manifest_value, profile, artifact, receipt_path, root, parsed, overlays
+        )))
+
+        bad_runner = dict(receipt)
+        bad_runner["runner_sha256"] = "0" * 64
+        parsed = coverage._capture_receipt(bad_runner, "receipt[fixture-profile]")
+        self.assertTrue(any("runner_sha256" in failure for failure in coverage._validate_capture_receipt(
+            manifest_value, profile, artifact, receipt_path, root, parsed, overlays
+        )))
+
+        Path(receipt["execution_trace"]["path"]).write_text(
+            f"123\tcheck\t{receipt['target_dir']}\n", encoding="utf-8"
+        )
+        parsed = coverage._capture_receipt(receipt, "receipt[fixture-profile]")
+        failures = coverage._validate_capture_receipt(
+            manifest_value, profile, artifact, receipt_path, root, parsed, overlays
+        )
+        self.assertTrue(any("execution trace" in failure for failure in failures), failures)
 
     def test_receipt_argument_rejects_duplicate_profiles(self) -> None:
         with self.assertRaises(coverage.CoverageError):
