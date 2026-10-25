@@ -33,8 +33,12 @@ per crate when one coordinated target fits; run the captures sequentially.
 Keep `litchi-iwa-protos` isolated from other rustdoc jobs because its prior
 kill was load-related.
 
-Use the memory-capped Cargo shim and the single-job settings for every build
-or rustdoc capture:
+Use the approved F5 capture policy and the single-job settings for every build
+or rustdoc capture. The runner, cap wrapper, underlying Cargo identity,
+environment and guards are the values recorded in
+`tools/raw_api_coverage.json` under `coverage.capture_policy`; a PATH shim
+alone is not an accepted capture boundary. A worker `env.sh` only provisions
+that already-approved wrapper and must not substitute another Cargo path:
 
 ```sh
 source /home/zhuhe/code/litchi-worktrees/.coord/<slug>/env.sh
@@ -80,15 +84,14 @@ Cargo jobs are allowed. Call `postflight_target` immediately after each one.
 
 ## JSON inventory
 
-For every direct library package not covered by a glossary profile, and for
-every package lacking a receipt-proven all-features capture, run sequentially:
-
-```sh
-cargo rustdoc -p <package> --lib --all-features --offline --locked \
-  --target-dir "$CARGO_TARGET_DIR" -- \
-  -Zunstable-options --output-format json --document-hidden-items
-postflight_target
-```
+The final all-features inventory is executed sequentially by
+`tools/final_api_inventory.py` under the approved F5 capture policy. The
+wrapper verifies the resolved coordinator Cargo cap wrapper, source/lock/
+toolchain identity, target-size guards and per-command resource receipt. Do
+not treat an ad-hoc direct `cargo rustdoc` invocation, even when it happens
+to use a memory-capped shim, as a capture receipt. The wrapper constructs and
+records the equivalent locked, offline rustdoc command for each direct
+library package; do not substitute a hand-written command for that step.
 
 Copy the generated crate JSON immediately to `$OUT/inventory/` and record its
 crate name, source commit, command and SHA-256. The inventory is then produced
