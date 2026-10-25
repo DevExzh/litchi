@@ -1,7 +1,7 @@
 # 0362ul87c — shared OOXML VBA publication boundary
 
 Status: source-only implementation on `uo2/ooxml-vba-publication-0362ul87c`;
-87cc and 87cd review repairs are included in the follow-up commit.
+87cc, 87cd, and 87ce review repairs are included in the follow-up commit.
 This slice follows the boundary audit in 0362ul87. It has not run Cargo,
 rustdoc, native qualification, or performance measurements; those require a
 coordinator validation slot after the four OOXML consumers are composed.
@@ -113,3 +113,24 @@ removed, counted, or used for a selector, and foreign attributes with the
 same local name do not become OPC attributes. The review regression set covers
 foreign namespace preservation, pre-hydration refusal, opaque aggregate
 accounting, and recipient-composed manifest limits.
+
+## 87ce review repair
+
+Retained ZIP metadata admission now counts each entry's variable central
+directory fields exactly, without charging the 46-byte fixed central header,
+and adds the terminal EOCD comment plus ZIP64 extensible data. This avoids
+false metadata refusals while still admitting every variable archive field.
+Opaque-member accounting follows the immutable `SourceMemberKind` captured at
+ingress and the writer's preservation plan, rather than the package's current
+part map; removed known source parts therefore do not become opaque while
+unknown source members remain charged when the writer carries them forward.
+
+`Patch::apply` and the no-op proof path now run the complete recipient
+metadata/physical admission before selected graph capture. Central-directory
+names, metadata, entries, per-member sizes, retained aggregate bytes, OPC part
+metadata, relationship totals, and content-types mappings are checked without
+decoding a selected payload. A regression recipient with an unrelated
+oversized member proves the refusal is atomic and leaves the selected deferred
+decode counter at zero. The divergent content-types replay test also derives
+the composed archive aggregate and covers both the exact limit and one-byte
+under boundary.

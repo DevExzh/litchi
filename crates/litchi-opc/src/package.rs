@@ -83,6 +83,44 @@ impl RetainedArchiveMetrics {
     }
 }
 
+/// Count archive-level ZIP metadata which is not attached to one central
+/// directory entry.  `metadata_size_hint` covers each entry's variable name,
+/// extra-field, and comment fields; the fixed 46-byte central header is not a
+/// source-policy resource.  The terminal EOCD comment and (when present) the
+/// ZIP64 EOCD extensible data are the remaining variable metadata.
+fn archive_tail_metadata_bytes<T: AsRef<[u8]>>(
+    archive: &soapberry_zip::ZipSliceArchive<T>,
+) -> Result<u64> {
+    const ZIP64_EOCD_FIXED_BYTES: u64 = 56;
+    const ZIP64_LOCATOR_FIXED_BYTES: u64 = 20;
+
+    let comment_bytes = u64::try_from(archive.comment().as_bytes().len()).map_err(|_| {
+        OpcError::ZipError("ZIP EOCD comment length does not fit this platform".to_owned())
+    })?;
+    if !archive.is_zip64() {
+        return Ok(comment_bytes);
+    }
+
+    let locator_offset = archive
+        .eocd_offset()
+        .checked_sub(ZIP64_LOCATOR_FIXED_BYTES)
+        .ok_or_else(|| {
+            OpcError::ZipError("ZIP64 locator offset underflows the EOCD tail".to_owned())
+        })?;
+    let fixed_record_end = archive
+        .head_eocd_offset()
+        .checked_add(ZIP64_EOCD_FIXED_BYTES)
+        .ok_or_else(|| OpcError::ZipError("ZIP64 EOCD offset overflows".to_owned()))?;
+    let extensible_bytes = locator_offset
+        .checked_sub(fixed_record_end)
+        .ok_or_else(|| {
+            OpcError::ZipError("ZIP64 EOCD extensible data has an invalid span".to_owned())
+        })?;
+    comment_bytes
+        .checked_add(extensible_bytes)
+        .ok_or_else(|| OpcError::ZipError("ZIP archive metadata overflows".to_owned()))
+}
+
 fn same_optional_manifest_bytes(left: Option<&[u8]>, right: Option<&[u8]>) -> bool {
     match (left, right) {
         (None, None) => true,
@@ -765,32 +803,31 @@ impl OpcPackage {
         )?;
         let mut entries = 0usize;
         let mut members = 0usize;
-        let mut metadata_bytes = 0u64;
+        let mut metadata_bytes = archive_tail_metadata_bytes(&archive)?;
         let mut aggregate_bytes = 0u64;
         let mut opaque_members = 0usize;
         let mut opaque_bytes = 0u64;
-        let mut known_names = HashSet::new();
-        known_names
-            .try_reserve(self.parts.len().saturating_mul(2).saturating_add(2))
-            .map_err(|source| OpcError::Allocation {
-                resource: "OPC retained archive known member names",
-                source,
-            })?;
-        known_names.insert("[content_types].xml".to_owned());
-        let root = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
-        if self.source_relationships_member_present(&root) {
-            known_names.insert("_rels/.rels".to_owned());
-        }
-        for metadata in self.iter_parts() {
-            known_names.insert(metadata.partname().membername().to_ascii_lowercase());
-            if self.source_relationships_member_present(metadata.partname()) {
-                let relationships = metadata
-                    .partname()
-                    .rels_uri()
-                    .map_err(OpcError::InvalidPackUri)?;
-                known_names.insert(relationships.membername().to_ascii_lowercase());
-            }
-        }
+        // The writer's preservation decision is based on the immutable source
+        // classification captured at ingress.  Looking at `self.parts` here
+        // is incorrect after an edit: a removed known source part is omitted,
+        // while a source member classified as `Unknown` is copied verbatim.
+        // Keep the classification indexed by the physical central-directory
+        // order so this pass remains metadata-only and follows that exact
+        // publication rule.
+        let source_members = self
+            .preservation
+            .as_deref()
+            .map(|provenance| provenance.members.as_slice());
+
+        // ZIP central-directory records have a fixed 46-byte header that is
+        // not part of the archive metadata budget.  The variable fields are
+        // counted by each entry's hint; the terminal EOCD comment and ZIP64
+        // extensible data are archive metadata too and must be included once.
+        limits.check(
+            crate::SourceLimitKind::ArchiveMetadataBytes,
+            metadata_bytes,
+            limits.max_archive_metadata_bytes(),
+        )?;
         for entry_result in archive.entries() {
             let entry = entry_result.map_err(OpcError::from)?;
             entries = entries.checked_add(1).ok_or_else(|| {
@@ -806,11 +843,9 @@ impl OpcPackage {
                 entry.file_path().as_ref().len() as u64,
                 limits.max_archive_member_name_bytes(),
             )?;
-            let entry_metadata = entry.metadata_size_hint().checked_add(46).ok_or_else(|| {
-                OpcError::ZipError("ZIP central-directory metadata overflows".to_owned())
-            })?;
+            let entry_metadata = entry.metadata_size_hint();
             metadata_bytes = metadata_bytes.checked_add(entry_metadata).ok_or_else(|| {
-                OpcError::ZipError("ZIP central-directory metadata total overflows".to_owned())
+                OpcError::ZipError("ZIP central-directory metadata overflows".to_owned())
             })?;
             limits.check(
                 crate::SourceLimitKind::ArchiveMetadataBytes,
@@ -843,8 +878,15 @@ impl OpcPackage {
                 .ok_or_else(|| {
                     OpcError::ZipError("ZIP aggregate uncompressed bytes overflow".to_owned())
                 })?;
-            let name = String::from_utf8_lossy(entry.file_path().as_ref()).to_ascii_lowercase();
-            if !known_names.contains(name.as_str()) {
+            limits.check(
+                crate::SourceLimitKind::AggregateBytes,
+                aggregate_bytes,
+                limits.max_aggregate_bytes(),
+            )?;
+            let source_member = source_members.and_then(|members| members.get(entries - 1));
+            if source_member
+                .is_some_and(|member| matches!(&member.kind, &SourceMemberKind::Unknown))
+            {
                 opaque_members = opaque_members.checked_add(1).ok_or_else(|| {
                     OpcError::ZipError("ZIP opaque member count overflows".to_owned())
                 })?;
@@ -858,6 +900,13 @@ impl OpcPackage {
         if entries != declared_entries {
             return Err(OpcError::ZipError(
                 "ZIP central-directory entry count differs from EOCD".to_owned(),
+            ));
+        }
+        if let Some(members) = source_members
+            && members.len() != entries
+        {
+            return Err(OpcError::ZipError(
+                "ZIP preservation member count differs from central directory".to_owned(),
             ));
         }
         Ok(Some(RetainedArchiveMetrics {

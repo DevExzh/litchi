@@ -1236,12 +1236,10 @@ impl Patch {
                 .proof
                 .as_ref()
                 .ok_or_else(|| Error::Invalid("VBA patch has no replay base".to_string()))?;
-            let current = GraphProof::capture(
-                package,
-                &proof.source_part,
-                proof.host,
-                self.options.effective(package).source_limits,
-            )?;
+            let recipient_limits = self.options.effective(package).source_limits;
+            validate_recipient_metadata_limits(package, recipient_limits)?;
+            let current =
+                GraphProof::capture(package, &proof.source_part, proof.host, recipient_limits)?;
             if current != *proof {
                 return Err(Error::PatchConflict);
             }
@@ -1256,6 +1254,7 @@ impl Patch {
             .as_ref()
             .ok_or_else(|| Error::Invalid("VBA patch has no target graph".to_string()))?;
         let recipient_limits = self.options.effective(package).source_limits;
+        validate_recipient_metadata_limits(package, recipient_limits)?;
         let current =
             GraphSnapshot::capture(package, &before.source.name, before.host, recipient_limits)?;
         if !current.same_selected_graph(before) {
@@ -1409,6 +1408,142 @@ fn map_source_limit_error(error: Error) -> Error {
         observed: limit_observed(observed),
         maximum: limit_observed(maximum),
     }
+}
+
+/// Re-admit the recipient's retained archive and OPC metadata before any
+/// selected VBA payload is decoded.  Patch replay may replace only a small
+/// graph, but its writer still carries every retained source member forward;
+/// checking those physical and metadata-only dimensions first prevents an
+/// unrelated oversized member from forcing selected-graph hydration.
+fn validate_recipient_metadata_limits(package: &OpcPackage, limits: SourceLimits) -> Result<()> {
+    let retained = package
+        .retained_archive_metrics(limits)
+        .map_err(Error::from)?;
+    let content_types = package.source_content_types(limits)?;
+    let content_type_bytes = u64::try_from(content_types.bytes().len()).unwrap_or(u64::MAX);
+    check_vba_limit(
+        LimitKind::ContentTypesBytes,
+        content_type_bytes,
+        limits.max_content_types_bytes() as u64,
+    )?;
+    check_vba_limit(
+        LimitKind::ContentTypeMappings,
+        u64::try_from(content_types.mapping_count()).unwrap_or(u64::MAX),
+        limits.max_content_type_mappings() as u64,
+    )?;
+    content_types
+        .preflight_under(limits)
+        .map_err(|error| map_source_limit_error(Error::from(error)))?;
+
+    let mut parts = 0usize;
+    let mut part_bytes = 0u64;
+    for metadata in package.iter_parts() {
+        parts = parts.saturating_add(1);
+        check_vba_limit(
+            LimitKind::GraphParts,
+            parts as u64,
+            limits.max_parts() as u64,
+        )?;
+        check_vba_limit(
+            LimitKind::ArchiveMemberNameBytes,
+            u64::try_from(metadata.partname().membername().len()).unwrap_or(u64::MAX),
+            limits.max_archive_member_name_bytes(),
+        )?;
+        let relationship_name = metadata
+            .partname()
+            .rels_uri()
+            .map_err(|error| Error::Uri(error.clone()))?;
+        check_vba_limit(
+            LimitKind::ArchiveMemberNameBytes,
+            u64::try_from(relationship_name.membername().len()).unwrap_or(u64::MAX),
+            limits.max_archive_member_name_bytes(),
+        )?;
+        let bytes = u64::try_from(metadata.payload_len()?).unwrap_or(u64::MAX);
+        check_vba_limit(LimitKind::PartBytes, bytes, limits.max_part_bytes())?;
+        check_vba_limit(LimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
+        part_bytes = part_bytes.checked_add(bytes).ok_or_else(|| Error::Limit {
+            kind: crate::LimitKind::Vba(LimitKind::TotalPartBytes),
+            observed: usize::MAX,
+            maximum: limit_observed(limits.max_total_part_bytes()),
+        })?;
+    }
+    check_vba_limit(
+        LimitKind::TotalPartBytes,
+        part_bytes,
+        limits.max_total_part_bytes(),
+    )?;
+
+    check_vba_limit(
+        LimitKind::ArchiveMemberNameBytes,
+        u64::try_from("[Content_Types].xml".len()).unwrap_or(u64::MAX),
+        limits.max_archive_member_name_bytes(),
+    )?;
+    check_vba_limit(
+        LimitKind::ArchiveMemberNameBytes,
+        u64::try_from("_rels/.rels".len()).unwrap_or(u64::MAX),
+        limits.max_archive_member_name_bytes(),
+    )?;
+    for member in package.non_part_members() {
+        check_vba_limit(
+            LimitKind::ArchiveMemberNameBytes,
+            u64::try_from(member.name().len()).unwrap_or(u64::MAX),
+            limits.max_archive_member_name_bytes(),
+        )?;
+    }
+
+    let relationships = relationship_totals(package, limits)?;
+    check_vba_limit(
+        LimitKind::RelationshipParts,
+        relationships.members as u64,
+        limits.max_relationship_parts() as u64,
+    )?;
+    check_vba_limit(
+        LimitKind::TotalRelationshipXmlBytes,
+        relationships.xml_bytes,
+        limits.max_total_relationship_xml_bytes() as u64,
+    )?;
+    check_vba_limit(
+        LimitKind::TotalRelationshipXmlEvents,
+        relationships.events,
+        limits.max_total_relationship_xml_events() as u64,
+    )?;
+    check_vba_limit(
+        LimitKind::TotalRelationships,
+        relationships.relationships,
+        limits.max_total_relationships() as u64,
+    )?;
+
+    if retained.is_none() {
+        let non_part_files = package
+            .non_part_members()
+            .iter()
+            .filter(|member| !member.name().ends_with('/'))
+            .count();
+        let non_part_entries = package.non_part_members().len();
+        let physical_members = 1usize
+            .saturating_add(parts)
+            .saturating_add(relationships.members)
+            .saturating_add(non_part_files);
+        check_vba_limit(
+            LimitKind::ArchiveMembers,
+            physical_members as u64,
+            limits.max_members() as u64,
+        )?;
+        check_vba_limit(
+            LimitKind::ArchiveTotalEntries,
+            physical_members.saturating_add(non_part_entries.saturating_sub(non_part_files)) as u64,
+            limits.max_archive_total_entries() as u64,
+        )?;
+        let aggregate = part_bytes
+            .saturating_add(relationships.xml_bytes)
+            .saturating_add(content_type_bytes);
+        check_vba_limit(
+            LimitKind::AggregateBytes,
+            aggregate,
+            limits.max_aggregate_bytes(),
+        )?;
+    }
+    Ok(())
 }
 
 fn relationship_totals(package: &OpcPackage, limits: SourceLimits) -> Result<RelationshipTotals> {
@@ -2805,6 +2940,66 @@ mod tests {
             divergent_content_types.as_slice()
         );
 
+        // The recipient's manifest is deliberately divergent.  Derive the
+        // exact aggregate from the composed replay image, then prove the
+        // operation admits that boundary and refuses one byte below it.
+        let projected = divergent_replayed.package();
+        let projected_content_types = projected.source_content_types(limits).unwrap();
+        let projected_part_bytes = projected
+            .iter_parts()
+            .map(|part| part.payload_len().unwrap() as u64)
+            .sum::<u64>();
+        let projected_relationship_bytes =
+            relationship_totals(projected, limits).unwrap().xml_bytes;
+        let projected_aggregate = projected_part_bytes
+            .saturating_add(projected_relationship_bytes)
+            .saturating_add(projected_content_types.bytes().len() as u64);
+        assert_eq!(
+            projected
+                .retained_content_types_xml()
+                .unwrap()
+                .unwrap()
+                .as_slice(),
+            divergent_content_types.as_slice()
+        );
+
+        let exact_limits = SourceLimits::builder()
+            .max_aggregate_bytes(projected_aggregate)
+            .unwrap()
+            .build()
+            .unwrap();
+        let mut exact_patch = commit.patch().clone();
+        exact_patch.options = EditOptions::new().source_limits(exact_limits);
+        let exact = exact_patch.apply(&divergent).unwrap();
+        assert_eq!(
+            exact
+                .package()
+                .retained_content_types_xml()
+                .unwrap()
+                .unwrap()
+                .as_slice(),
+            divergent_content_types.as_slice()
+        );
+
+        let before_too_tight = PackageWriter::to_bytes(&divergent).unwrap();
+        let one_under = SourceLimits::builder()
+            .max_aggregate_bytes(projected_aggregate.saturating_sub(1))
+            .unwrap()
+            .build()
+            .unwrap();
+        exact_patch.options = EditOptions::new().source_limits(one_under);
+        assert!(matches!(
+            exact_patch.apply(&divergent),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Vba(LimitKind::AggregateBytes),
+                ..
+            })
+        ));
+        assert_eq!(
+            PackageWriter::to_bytes(&divergent).unwrap(),
+            before_too_tight
+        );
+
         let stored_again = PackageWriter::to_bytes(&stored).unwrap();
         let stored_recipient =
             OpcPackage::from_bytes(&stored_again, package.read_limits()).unwrap();
@@ -3097,6 +3292,42 @@ mod tests {
             })
         ));
         assert_eq!(opened.deferred_decode_counters(), Some((0, 0)));
+    }
+
+    #[test]
+    fn replay_rejects_unrelated_oversized_member_before_selected_hydration() {
+        let mut recipient = excel_package();
+        recipient
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/custom/unrelated.bin").unwrap(),
+                "application/octet-stream".to_owned(),
+                vec![0; 4096],
+            )))
+            .unwrap();
+        let source = PackageWriter::to_bytes(&recipient).unwrap();
+        let opened = OpcPackage::from_vec(source, SourceLimits::default()).unwrap();
+        assert_eq!(opened.deferred_decode_counters(), Some((0, 0)));
+
+        let package = excel_package();
+        let mut edit = Edit::new(&package, Host::Excel, EditOptions::new()).unwrap();
+        edit.store(b"project".to_vec(), None).unwrap();
+        let mut patch = edit.commit().unwrap().patch().clone();
+        let tighter = SourceLimits::builder()
+            .max_entry_bytes(1024)
+            .unwrap()
+            .build()
+            .unwrap();
+        patch.options = EditOptions::new().source_limits(tighter);
+        let before = PackageWriter::to_bytes(&opened).unwrap();
+        assert!(matches!(
+            patch.apply(&opened),
+            Err(Error::Limit {
+                kind: crate::LimitKind::Vba(LimitKind::EntryBytes),
+                ..
+            })
+        ));
+        assert_eq!(opened.deferred_decode_counters(), Some((0, 0)));
+        assert_eq!(PackageWriter::to_bytes(&opened).unwrap(), before);
     }
 
     #[test]
