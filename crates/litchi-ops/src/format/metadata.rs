@@ -24,7 +24,7 @@
 )]
 
 use litchi_core::FileFormat;
-use litchi_core::metadata::{Field, Metadata, Timestamp};
+use litchi_core::metadata::{Metadata, Timestamp};
 use litchi_ooxml_common::custom;
 use litchi_ooxml_common::properties;
 #[cfg(test)]
@@ -404,12 +404,14 @@ impl Assignments {
 /// complete metadata creation, where the native refusal deliberately carries
 /// no property detail so its reason remains fixed and content-free.
 pub(crate) fn unsupported_field(metadata: &Metadata) -> Option<&'static str> {
-    Field::ALL.into_iter().find_map(|field| {
-        (metadata.is_set(field)
-            && !properties::CORE_FIELDS.contains(&field)
-            && !properties::app::METADATA_FIELDS.contains(&field))
-        .then_some(field.name())
-    })
+    litchi_core::metadata::Field::ALL
+        .into_iter()
+        .find_map(|field| {
+            (metadata.is_set(field)
+                && !properties::CORE_FIELDS.contains(&field)
+                && !properties::app::METADATA_FIELDS.contains(&field))
+            .then_some(field.name())
+        })
 }
 
 /// Restore caller-facing property context after mapping a typed native
