@@ -70,6 +70,32 @@
     "status": "owner_confirmed",
     "selection": "immediate_refusal"
   },
+  "adapter": {
+    "schema": "litchi.signed-native.adapter.v2",
+    "source": "consumer_only_external_project",
+    "legacy_feature": "legacy_api",
+    "api_branches": [
+      "legacy_commit_fields",
+      "current_commit_accessors",
+      "legacy_xlsb_option",
+      "current_xlsb_resolve"
+    ],
+    "route_count": 16
+  },
+  "execution": {
+    "capabilities_schema": "litchi.signed-native.capabilities.v2",
+    "execution_schema": "litchi.signed-native.execution.v2",
+    "build_receipt_required": true,
+    "child_timeout_seconds": 300.0,
+    "child_output_limit_bytes": 4194304,
+    "target_cap_bytes": 20000000000,
+    "tmp_cap_bytes": 20000000000,
+    "signed_batch": {
+      "selection": "immediate_refusal",
+      "iterator_reads": 0,
+      "publication_attempts": 0
+    }
+  },
   "candidate": {
     "status": "pending_final_source_freeze",
     "source": {
@@ -91,8 +117,8 @@
           "bytes": 139441
         },
         "candidate": {
-          "sha256": "efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811",
-          "bytes": 139189
+          "sha256": "02fda2543226f28c2ded9bbf7e18618f8b0aab1c4d02c7b2c4fdd73511e4ff7a",
+          "bytes": 139207
         }
       },
       "perf": {

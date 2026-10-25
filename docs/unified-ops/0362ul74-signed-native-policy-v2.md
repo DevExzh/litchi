@@ -20,7 +20,7 @@ inputs, not as source commit identities:
 
 | role | candidate lock SHA-256 | bytes |
 | --- | --- | ---: |
-| workspace `Cargo.lock` | `efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811` | 139,189 |
+| workspace `Cargo.lock` | `02fda2543226f28c2ded9bbf7e18618f8b0aab1c4d02c7b2c4fdd73511e4ff7a` | 139,207 |
 | perf `tools/perf-baseline/Cargo.lock` | `de1f8ae53b3455a4246da0b9340896881cd72ca0295b8e52444e0d55e6c9c4ea` | 56,941 |
 | native `tools/native-resave/Cargo.lock` | `989da70f10deab4460a77e4afa3a1b840b4697bbea2c07e134e22d9b4c5084ae` | 56,689 |
 
@@ -46,7 +46,8 @@ the following:
   probe/driver/validator/memory/final-collector inputs, and the signed fixture
   payloads;
 * the exact route and format lists from the current signature policy tests;
-* the owner’s signed-batch choice.
+* the owner’s signed-batch choice, which is `immediate_refusal` with no
+  iterator reads or publication attempt.
 
 The verifier enumerates the candidate Git tree and reads every bound vendor
 file.  A sparse checkout, missing file, symlink, modified blob, extra vendor
@@ -65,7 +66,9 @@ and all sixteen leaf/facade routes: exact no-op commit/write/replay,
 protected refusal, explicit unsign-and-write, unsigned negative,
 source-freshness, and budget.  The route contract also records the existing
 cancellation rule: a cancelled intermediate edit remains signed and does not
-publish.  No new signed-batch behavior is selected in this record.
+publish.  The owner-confirmed signed-batch behavior is immediate refusal
+before the iterator is touched; this is not a timed or native acceptance
+claim.
 
 The expected typed dispositions are unchanged: `ProtectedDocument` /
 `document_protected`, `PatchConflict` / `invalid_input`, `SourceChanged` /

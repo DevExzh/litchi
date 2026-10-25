@@ -5,17 +5,19 @@ This module is deliberately a source-only boundary.  It records the inputs a
 future signed-native run must use and verifies those inputs before a consumer
 or a native process may be started.  The final candidate source was not
 frozen when this policy was recorded, so the checked-in binding is ``None``.
-Consequently :func:`prepare` and :func:`execute` fail closed before creating
-an output directory, receipt, build, or measurement.
+Consequently :func:`prepare` and :func:`execute` currently fail closed before
+creating an output directory, receipt, build, or measurement.  Once the
+coordinator supplies the immutable binding, they delegate to the tracked
+consumer in :mod:`native_qualification.signed_native_v2_consumer`.
 
 The old 0362ul24 receipts are historical v1 evidence.  They are never
 relabelled as v2, and this module does not accept a v1 receipt as a v2 source
 or qualification result.
 
-No Cargo, compiler, native probe, rustdoc, or timing command is invoked here.
-All digests used for a bound candidate are recomputed from the selected source
-tree; a caller cannot supply a digest or commit on the command line to make an
-unbound policy executable.
+No Cargo, compiler, native probe, rustdoc, or timing command is invoked by the
+pending source-only path.  All digests used for a bound candidate are
+recomputed from the selected source tree; a caller cannot supply a digest or
+commit on the command line to make an unbound policy executable.
 """
 
 from __future__ import annotations
@@ -41,6 +43,32 @@ FIXTURE_MANIFEST = REPOSITORY / "docs/unified-ops/results/0362ul24/fixtures.json
 SCHEMA = "litchi.signed-native.policy.v2"
 PREPARATION_SCHEMA = "litchi.signed-native.preparation.v2"
 POLICY_VERSION = 2
+ADAPTER_POLICY = {
+    "schema": "litchi.signed-native.adapter.v2",
+    "source": "consumer_only_external_project",
+    "legacy_feature": "legacy_api",
+    "api_branches": [
+        "legacy_commit_fields",
+        "current_commit_accessors",
+        "legacy_xlsb_option",
+        "current_xlsb_resolve",
+    ],
+    "route_count": 16,
+}
+EXECUTION_POLICY = {
+    "capabilities_schema": "litchi.signed-native.capabilities.v2",
+    "execution_schema": "litchi.signed-native.execution.v2",
+    "build_receipt_required": True,
+    "child_timeout_seconds": 300.0,
+    "child_output_limit_bytes": 4 * 1024 * 1024,
+    "target_cap_bytes": 20_000_000_000,
+    "tmp_cap_bytes": 20_000_000_000,
+    "signed_batch": {
+        "selection": "immediate_refusal",
+        "iterator_reads": 0,
+        "publication_attempts": 0,
+    },
+}
 SIGNED_BATCH_POLICY = {
     "status": "owner_confirmed",
     "selection": "immediate_refusal",
@@ -126,8 +154,11 @@ ROLE_LOCKS: dict[str, dict[str, Any]] = {
             "bytes": 139441,
         },
         "candidate": {
-            "sha256": "efff87af6c339a44e267987c5c79ba3fb1910cef734f0a9f212f08f865dac811",
-            "bytes": 139189,
+            # The workspace lock is the exact C-780 source lock.  The source
+            # commit/archive itself remains pending until the coordinator
+            # supplies the immutable post-134a production capture.
+            "sha256": "02fda2543226f28c2ded9bbf7e18618f8b0aab1c4d02c7b2c4fdd73511e4ff7a",
+            "bytes": 139207,
         },
     },
     "perf": {
@@ -663,6 +694,8 @@ def _validate_policy_document(value: Mapping[str, Any], *, execution: bool) -> d
         {"package": "zlib-rs", "version": "0.6.8", "baseline_source": "registry", "candidate_source": "path", "candidate_path": "vendor/zlib-rs"},
     ], "dependency path policy changed")
     _expect(value.get("signed_batch") == SIGNED_BATCH_POLICY, "signed-batch owner choice changed")
+    _expect(value.get("adapter") == ADAPTER_POLICY, "signed-native consumer adapter policy changed")
+    _expect(value.get("execution") == EXECUTION_POLICY, "signed-native execution receipt policy changed")
     status = candidate.get("status")
     _expect(status in {"pending_final_source_freeze", "bound"}, "candidate policy status is invalid")
     source = candidate.get("source")
@@ -848,27 +881,61 @@ def candidate_identity(root: Path) -> dict[str, Any]:
         _expect(expected_graph[role]["bytes"] == identity["bytes"], f"candidate lock bytes differ: {role}")
         _expect(expected_graph[role]["sha256"] == identity["sha256"], f"candidate lock hash differs: {role}")
         _expect(_lock_graph_identity(root, role) == expected_graph[role]["graph_sha256"], f"candidate lock graph differs: {role}")
-    for path in TOOLCHAIN_PATHS:
-        _expect(_file_identity(root, path) == TOOLCHAIN_IDENTITIES[path], f"candidate toolchain input differs: {path}")
-    for item in PROBE_INPUTS.values():
-        _expect(_file_identity(root, str(item["path"])) == item, f"candidate probe input differs: {item['path']}")
+    toolchain = {
+        path: _file_identity(root, path) for path in TOOLCHAIN_PATHS
+    }
+    _expect(toolchain == TOOLCHAIN_IDENTITIES, "candidate toolchain inputs differ")
+    probe_inputs = {
+        name: _file_identity(root, str(item["path"]))
+        for name, item in PROBE_INPUTS.items()
+    }
+    _expect(probe_inputs == PROBE_INPUTS, "candidate probe inputs differ")
+    fixture = _file_identity(root, FIXTURE_INPUT["path"])
+    _expect(fixture == FIXTURE_INPUT, "candidate fixture input differs")
     _fixture_policy(root)
     vendor = _vendor_tree_identity(root)
     expected_vendor = trusted["vendor_tree"]
     _expect(vendor == expected_vendor, "candidate vendor tree differs from the bound file list")
-    _archive_tree_identity(root, "HEAD", expected_source["archive"])
+    archive = _archive_tree_identity(root, "HEAD", expected_source["archive"])
+    archive_identity = dict(expected_source["archive"])
+    archive_identity.update(archive["archive"])
+    lock_graph = {
+        role: {
+            "path": identity["path"],
+            "bytes": identity["bytes"],
+            "sha256": identity["sha256"],
+            "graph_sha256": expected_graph[role]["graph_sha256"],
+        }
+        for role, identity in locks.items()
+    }
+    _expect(
+        all(_lock_graph_identity(root, role) == expected_graph[role]["graph_sha256"] for role in ROLE_LOCKS),
+        "candidate lock graph differs",
+    )
     return {
+        "source_root": str(root),
         "commit": expected_commit,
         "git_tree": expected_source["git_tree"],
         "tree_sha256": expected_source["tree_sha256"],
         "manifests": manifests,
         "locks": locks,
-        "vendor_tree": {key: value for key, value in vendor.items() if key != "entries"},
+        "lock_graph": lock_graph,
+        "vendor_tree": vendor,
+        "toolchain": toolchain,
+        "probe_inputs": probe_inputs,
+        "fixture": fixture,
+        "archive": archive_identity,
+        "features": trusted["features"],
     }
 
 
-def prepare(source_root: Path, output_root: Path) -> None:
-    """Refuse preparation until the checked-in final source binding exists."""
+def prepare(source_root: Path, output_root: Path) -> dict[str, Any]:
+    """Prepare the external v2 consumer after the checked-in source gate passes.
+
+    The current checked-in policy remains pending and therefore returns before
+    this import.  Once a reviewed binding is committed, all source checks are
+    completed before the consumer creates its fresh output root.
+    """
 
     validate_policy(execution=True)
     source_root = _root(source_root)
@@ -881,20 +948,32 @@ def prepare(source_root: Path, output_root: Path) -> None:
             "preparation output": output_root,
         }
     )
-    # This branch is unreachable in the current policy.  It intentionally
-    # remains side-effect free until a later source-freeze review supplies the
-    # complete binding and a separately approved build adapter.
-    candidate_identity(source_root)
-    _reject_symlink_components(output_root, "preparation output")
-    _expect(not output_root.exists(), f"refusing to overwrite preparation output: {output_root}")
-    raise PolicyError("signed-native v2 preparation adapter is not enabled in this source-only policy")
+    identity = candidate_identity(source_root)
+    # Import lazily so the pending source-only policy has no consumer side
+    # effects and so this module remains usable by the policy tests.
+    from native_qualification import signed_native_v2_consumer as consumer
+
+    return consumer.prepare(source_root, output_root, identity=identity)
 
 
-def execute() -> None:
-    """The only execution entry point; it cannot bypass the source gate."""
+def execute(
+    prepared_root: Path | None = None,
+    capabilities: Path | None = None,
+    *,
+    output: Path | None = None,
+) -> dict[str, Any]:
+    """Consume a built v2 receipt and typed protocol capabilities.
+
+    The execution gate is checked before the consumer is imported.  Thus a
+    pending policy still fails closed and cannot create an output directory or
+    relabel a historical v1 receipt.
+    """
 
     validate_policy(execution=True)
-    raise PolicyError("signed-native v2 execution is unavailable until the final source freeze")
+    _expect(CANDIDATE_BINDING is not None, "candidate source identity is not frozen")
+    from native_qualification import signed_native_v2_consumer as consumer
+
+    return consumer.execute(prepared_root, capabilities, output=output)
 
 
 def reject_v1_receipt(receipt: Mapping[str, Any]) -> None:
