@@ -4600,3 +4600,21 @@ See [0063](0063-source-pptx-modern-comments.md).
   No target, source capture, foreign process or protected probe is removed.
   Final capture, full gate, the signed-batch contract decision and actual
   native/performance qualification remain open. Nothing is pushed.
+
+- Coordinator image-codec integration (2026-10-25):
+  Reviewed atomic imgconv leaf `aaeaa79a0b` merges at `566451176d`. EMF and
+  WMF compatibility playback retains the caller-selected parser profile;
+  two explicit output-limit regressions and final all-target/all-feature
+  clippy pass. Root verifies the final tree equals tested e392, all terminal
+  receipt hashes, unchanged lock, target below 1.54 GB and completed process
+  cleanup. Record 0362ul47 distinguishes predecessor facade checks from the
+  final source validation and preserves the earlier configuration/lint
+  failures. The composed glossary policy keeps both XLSX and imgconv rows.
+
+  The freed slot is assigned to source-reviewed DOCX `25ed716942`. Crypto
+  `6c3277b18e` also passes its focused independent source review and awaits
+  bounded Cargo validation. ODF 0362ul44c is returned for redundant full
+  scans with large token reservations and remaining authored-fragment/output
+  budget gaps; this performance regression is not accepted. All remaining
+  source fixes, full-gate and performance obligations stay active. Nothing
+  is pushed.
