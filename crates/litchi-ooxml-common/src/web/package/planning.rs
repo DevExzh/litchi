@@ -18,7 +18,7 @@ use super::{
     planned_deletions, preflight_planned_parts, validate_plan_counts,
 };
 use crate::web::LimitKind;
-use crate::xml::attributes::BytesStartExt as _;
+
 /// Plan an exact, source-checked replacement of the persisted task-pane graph
 /// under `limits`.
 ///
