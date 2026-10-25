@@ -5744,3 +5744,20 @@ See [0063](0063-source-pptx-modern-comments.md).
   allocation ledger is 488,902,098,944 bytes under record103's exclusions,
   including no allocation claim for waves88/90. Remaining ancestor snapshots
   and retired leaves are being consolidated. No push or final acceptance.
+
+  Record117 removes the obsolete Web Extensions import found after the
+  formatting return. Repaired integration `a8d32513b8` passes all eight joint
+  compiler/consumer checks, including strict leaves/ops/facade Clippy and the
+  performance/native harnesses. Root verifies the complete terminal capture;
+  fresh runtime/glossary qualification follows on this frozen source (118).
+
+  Consolidation reaches 422 deleted refs and 231 removed worktrees. Root
+  verifies dirty overlays and old blob identities before deleting nineteen
+  retired refs. The notes control is detached at measured `c5d2b30740`, with
+  its old provenance branch archived/deleted and eight harness blobs verified.
+  Only unified trunk, private integration and the active runner remain as
+  unified-derived branches; main/office and 68 independent office siblings
+  are untouched. The measured allocated ledger is 676,827,754,496 bytes under
+  the recorded exclusions and evidence limitations. Further detached-candidate
+  cleanup continues. Full runtime, workspace/wsdoc, API/fidelity and performance
+  acceptance remain open. No push.
