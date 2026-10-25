@@ -380,6 +380,7 @@ pub(super) fn validate_comment_list_with_limit(
         }
         validate_string_with_limit("comment text", &comment.text, max_string_bytes)?;
         if let Some(date_time) = &comment.date_time {
+            validate_string_with_limit("comment date time", date_time, max_string_bytes)?;
             validate_date_time(date_time)?;
         }
         if !keys.insert((comment.author_id, comment.index)) {
@@ -399,6 +400,7 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
             maximum: limits.max_input_bytes,
         });
     }
+    admit_raw_attribute_limits(xml, limits)?;
     let (processed, instructions) = process_comment_mce(xml, limits)?;
     if processed.len() > limits.max_input_bytes {
         return Err(Error::Limit {
@@ -408,6 +410,33 @@ fn parse_document(xml: &[u8], limits: Limits) -> Result<(Node, bool)> {
         });
     }
     parse_document_processed(processed.as_ref(), instructions, limits)
+}
+
+/// Admit raw attribute values before MCE can discard an inactive branch.
+/// This pass borrows quick-XML events and does not decode or own values; the
+/// selected parser applies its semantic aggregate after MCE has chosen a
+/// projection.
+fn admit_raw_attribute_limits(xml: &[u8], limits: Limits) -> Result<()> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        let (_namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                for attribute in element.checked_attributes() {
+                    let attribute = attribute.map_err(xml_error)?;
+                    if attribute.value.len() > limits.max_attribute_bytes {
+                        return Err(limit(
+                            crate::error::CodecLimitKind::XmlAttributeBytes,
+                            attribute.value.len(),
+                            limits.max_attribute_bytes,
+                        ));
+                    }
+                }
+            },
+            Event::Eof => return Ok(()),
+            _ => {},
+        }
+    }
 }
 
 fn parse_document_processed(

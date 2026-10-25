@@ -172,15 +172,15 @@ pub(crate) fn locate(source: &[u8], kind: Kind, owner: Owner, limits: Limits) ->
             "legacy comment collaboration owner has the wrong root",
         ));
     }
+    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
     let capabilities = capabilities();
     let mce_limits = mce_limits(limits);
-    let processed = process_semantic_source(source, &capabilities, &mce_limits)?;
+    let processed = process_semantic_source(&mce_source, &capabilities, &mce_limits)?;
     validate_processed_part(processed.as_ref(), kind, limits, false)?;
 
     // The common MCE selector intentionally rejects processing instructions.
     // They are inert in this owner, so remove them only from the temporary
     // MCE input while retaining a mapping back to the original source offsets.
-    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
     let item_indices = item_indices(&scan, root_index, kind, owner)?;
     let offsets = collect_offsets(&scan, &item_indices, limits)?;
     let active = if offsets.is_empty() {
@@ -523,9 +523,11 @@ pub(super) fn selected_string_budget(
     kind: Kind,
     limits: Limits,
 ) -> Result<usize> {
+    let scan = scan_raw(source, limits)?;
+    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
     let capabilities = capabilities();
     let mce_limits = mce_limits(limits);
-    let processed = process_semantic_source(source, &capabilities, &mce_limits)?;
+    let processed = process_semantic_source(&mce_source, &capabilities, &mce_limits)?;
     preflight_processed_strings(processed.as_ref(), kind, limits)
 }
 
@@ -715,11 +717,11 @@ fn validate_replay_extensions(
             "legacy comment collaboration owner has the wrong root",
         ));
     }
+    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
     let capabilities = capabilities();
     let mce_limits = mce_limits(limits);
-    let processed = process_semantic_source(source, &capabilities, &mce_limits)?;
+    let processed = process_semantic_source(&mce_source, &capabilities, &mce_limits)?;
     validate_processed_part(processed.as_ref(), kind, limits, strict_threading)?;
-    let mce_source = MceSource::new(source, &scan.processing_instructions)?;
 
     let mut candidate_items = Vec::new();
     let mut candidate_set = HashSet::new();
@@ -2527,27 +2529,16 @@ fn capabilities() -> Capabilities {
 }
 
 fn process_semantic_source<'a>(
-    source: &'a [u8],
+    source: &'a MceSource<'_>,
     capabilities: &Capabilities,
     limits: &MceLimits,
 ) -> Result<Cow<'a, [u8]>> {
-    // PIs are inert for this owner but the common MCE selector intentionally
-    // rejects them.  Remove them only from this temporary semantic view; the
-    // source-bound scan below still retains their original offsets and bytes.
-    let (filtered, _) = crate::markup::without_processing_instructions(source)?;
-    let processed = match filtered {
-        Cow::Borrowed(filtered) => {
-            process_markup_compatibility(filtered, capabilities, limits)
-                .map_err(Error::MarkupCompatibility)?
-                .xml
-        },
-        Cow::Owned(filtered) => Cow::Owned(
-            process_markup_compatibility(&filtered, capabilities, limits)
-                .map_err(Error::MarkupCompatibility)?
-                .xml
-                .into_owned(),
-        ),
-    };
+    // PIs are inert for this owner.  The raw scan already validated and
+    // recorded them, and `MceSource` supplies the single filtered view for
+    // both semantic parsing and offset translation.
+    let processed = process_markup_compatibility(source.bytes(), capabilities, limits)
+        .map_err(Error::MarkupCompatibility)?
+        .xml;
     if processed.len() > limits.max_input_bytes {
         return Err(limit(
             crate::error::CodecLimitKind::XmlBytes,

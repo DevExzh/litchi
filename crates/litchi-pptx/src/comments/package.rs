@@ -1334,6 +1334,23 @@ mod tests {
     }
 
     #[test]
+    fn writer_enforces_date_time_string_limit() {
+        let mut comment = comment();
+        comment.date_time = Some("2026-10-25T00:00:00Z".into());
+        let mut limits = Limits::DEFAULT;
+        limits.max_string_bytes = 4;
+        let error = write_slide_comments(&[comment], Conformance::Strict, limits).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::StringBytes),
+                observed,
+                maximum: 4,
+            } if observed > 4
+        ));
+    }
+
+    #[test]
     fn raw_policy_admits_exact_wire_and_refuses_one_byte_under() {
         let authors = vec![author()];
         let comments = vec![comment()];
@@ -1403,6 +1420,25 @@ mod tests {
             parse_slide_comments(xml.as_bytes(), Limits::DEFAULT).unwrap()[0].text,
             "fallback"
         );
+    }
+
+    #[test]
+    fn raw_attribute_cap_applies_before_mce_discards_inactive_choice() {
+        let oversized = "x".repeat(129);
+        let xml = format!(
+            r#"<p:cmLst xmlns:p="{PML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future"><mc:AlternateContent><mc:Choice Requires="x"><x:cm payload="{oversized}"/></mc:Choice><mc:Fallback><p:cm authorId="7" idx="1"><p:pos x="1" y="2"/><p:text>fallback</p:text></p:cm></mc:Fallback></mc:AlternateContent></p:cmLst>"#
+        );
+        let mut limits = Limits::DEFAULT;
+        limits.max_attribute_bytes = 128;
+        let error = parse_slide_comments(xml.as_bytes(), limits).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::error::LimitKind::Codec(crate::error::CodecLimitKind::XmlAttributeBytes),
+                observed,
+                maximum: 128,
+            } if observed > 128
+        ));
     }
 
     #[test]
