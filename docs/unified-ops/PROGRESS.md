@@ -5941,3 +5941,12 @@ See [0063](0063-source-pptx-modern-comments.md).
   The overwritten worker preflight failure is disclosed without attributing
   its unknown cause. Signed136d is reviewed; its identity label is being
   normalized. Final qualification and trunk integration remain open. No push.
+
+  Signed136e is independently reviewed and merged at ee1bec60ec; the combined
+  focused suite passes 67 tests (145). Candidate identity, all three lock
+  graphs and generated consumer lock validation are bound; actual native
+  execution still awaits final pins. Cleanup106 retires the last implementation
+  leaf, reaching 273 worktrees and 435 refs removed. All 73 remaining heads
+  are accounted for: three unified controls, main/office and 68 independent
+  office refs. Required detached baselines remain. Final binding, qualification
+  and trunk integration are open; nothing is pushed.
