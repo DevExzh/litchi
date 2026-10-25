@@ -5,7 +5,9 @@ use crate::{Error, Result};
 
 use super::limit::LimitKind;
 use litchi_opc::TargetMode;
-use litchi_opc::{OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, Part, XmlPart};
+use litchi_opc::{
+    BlobPart, OpcPackage, OwnedContentTypes, OwnedRelationships, PackURI, Part, XmlPart,
+};
 use std::cmp::Ordering;
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -423,7 +425,7 @@ impl std::fmt::Debug for Edit<'_> {
 
 impl<'a> Edit<'a> {
     /// Start a staged edit with standard Ribbon limits.
-    pub fn new(package: &OpcPackage) -> Result<Self> {
+    pub fn new(package: &'a OpcPackage) -> Result<Self> {
         Self::new_with_options(package, EditOptions::default())
     }
 
@@ -675,11 +677,25 @@ fn apply_graph_state(
     // mismatch is a stale or malformed patch, not an implicit codec rewrite.
     for target in after.parts.iter() {
         match find_part(&before.parts, &target.name) {
-            None => package.try_add_owned_xml_part_bytes(
-                target.name.clone(),
-                target.content_type.clone(),
-                Arc::clone(&target.bytes),
-            )?,
+            None => {
+                if is_xml_part_content_type(&target.content_type) {
+                    package.try_add_owned_xml_part_bytes(
+                        target.name.clone(),
+                        target.content_type.clone(),
+                        Arc::clone(&target.bytes),
+                    )?;
+                } else {
+                    // Relationship closures may contain opaque binary assets
+                    // (for example Ribbon images). Restore those through the
+                    // binary part API; the relationship loop below then
+                    // installs any retained source `.rels` token.
+                    package.try_add_part(Box::new(BlobPart::new_shared(
+                        target.name.clone(),
+                        target.content_type.clone(),
+                        Arc::clone(&target.bytes),
+                    )))?;
+                }
+            },
             Some(source) => {
                 if source.content_type != target.content_type {
                     return Err(Error::Invalid(
@@ -733,6 +749,12 @@ fn apply_graph_state(
         )?;
     }
     Ok(())
+}
+
+fn is_xml_part_content_type(content_type: &str) -> bool {
+    let bytes = content_type.as_bytes();
+    content_type.eq_ignore_ascii_case("application/xml")
+        || (bytes.len() >= 4 && bytes[bytes.len() - 4..].eq_ignore_ascii_case(b"+xml"))
 }
 
 /// A published Ribbon change.

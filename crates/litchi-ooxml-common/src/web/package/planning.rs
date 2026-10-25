@@ -18,6 +18,10 @@ use super::{
     planned_deletions, preflight_planned_parts, validate_plan_counts,
 };
 use crate::web::LimitKind;
+use crate::xml::attributes::BytesStartExt as _;
+use quick_xml::XmlVersion;
+use quick_xml::events::Event;
+use quick_xml::reader::Reader;
 /// Plan an exact, source-checked replacement of the persisted task-pane graph
 /// under `limits`.
 ///
@@ -568,12 +572,55 @@ fn relationship_attributes_use_namespace(
     let root = effective.root()?;
     let mut opposite_seen = false;
     let mut expected_seen = false;
+    let (root_expected, root_opposite) = root_namespace_profile(xml, expected)?;
+    expected_seen |= root_expected;
+    opposite_seen |= root_opposite;
     inspect_relationship_attributes(root, expected, &mut opposite_seen, &mut expected_seen);
     // Preserve the declared profile even when a graph happens to contain no
     // relationship-valued attributes.  Without this check a strict request
     // could be reported as a signed no-op for a transitional source (and
     // vice versa), losing the caller's explicit conformance intent.
     Ok(expected_seen && !opposite_seen)
+}
+
+fn root_namespace_profile(xml: &[u8], expected: &str) -> Result<(bool, bool)> {
+    let opposite = if expected == TRANSITIONAL_RELATIONSHIPS_NAMESPACE {
+        STRICT_RELATIONSHIPS_NAMESPACE
+    } else {
+        TRANSITIONAL_RELATIONSHIPS_NAMESPACE
+    };
+    let mut reader = Reader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buffer)? {
+            Event::Start(element) | Event::Empty(element) => {
+                let mut expected_seen = false;
+                let mut opposite_seen = false;
+                for attribute in element.checked_attributes() {
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    let name = std::str::from_utf8(attribute.key.as_ref())
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    if name != "xmlns" && !name.starts_with("xmlns:") {
+                        continue;
+                    }
+                    let value = attribute
+                        .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    if value == expected {
+                        expected_seen = true;
+                    }
+                    if value == opposite {
+                        opposite_seen = true;
+                    }
+                }
+                return Ok((expected_seen, opposite_seen));
+            },
+            Event::Eof => return Ok((false, false)),
+            Event::DocType(_) => return invalid("DTD is forbidden in web extension XML".into()),
+            _ => buffer.clear(),
+        }
+    }
 }
 
 fn inspect_relationship_attributes(

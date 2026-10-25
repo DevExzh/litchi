@@ -14,6 +14,7 @@ const LOCAL_EXTENSION: &[u8] =
 const LOCAL_TASK_PANES: &[u8] =
     include_bytes!("../../../test-data/ooxml/web_extensions/visible_taskpanes.xml");
 const SNAPSHOT_IMAGE: &[u8] = include_bytes!("../../../test-data/images/jpg/abstract1.jpg");
+const EMPTY_TASK_PANES_WITH_OPAQUE_ROOT: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?><wetp:taskpanes xmlns:wetp="http://schemas.microsoft.com/office/webextensions/taskpanes/2010/11" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><!-- preserve this comment --></wetp:taskpanes>"#;
 
 #[test]
 fn package_graph_discovers_local_task_panes_without_activation() {
@@ -91,6 +92,43 @@ fn conformance_profile_is_part_of_web_edit_intent() {
     let task_panes_xml =
         std::str::from_utf8(package.get_part(&task_panes_name).unwrap().blob()).unwrap();
     assert!(task_panes_xml.contains("http://purl.oclc.org/ooxml/officeDocument/relationships"));
+}
+
+#[test]
+fn signed_empty_task_panes_preserve_root_profile_as_an_exact_noop() {
+    let mut package = OpcPackage::new();
+    install_empty_task_panes(&mut package);
+    let panes = web::load(&package, &web::Limits::standard())
+        .unwrap()
+        .unwrap();
+    assert!(panes.is_empty());
+    let source_xml = package
+        .get_part(&PackURI::new("/webextensions/empty-taskpanes.xml").unwrap())
+        .unwrap()
+        .blob()
+        .to_vec();
+    package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+
+    let mut edit = web::Edit::new(&package).unwrap();
+    assert!(!edit.put(panes.clone(), Conformance::Transitional).unwrap());
+    let commit = edit.commit().unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.package().is_signed());
+    assert_eq!(
+        commit
+            .package()
+            .get_part(&PackURI::new("/webextensions/empty-taskpanes.xml").unwrap())
+            .unwrap()
+            .blob(),
+        source_xml.as_slice()
+    );
+
+    // An explicit profile change must not be folded into that signed no-op.
+    // The opaque comment makes a source rewrite unsafe, so the operation is
+    // refused before any signed package mutation is attempted.
+    let mut strict_edit = web::Edit::new(&package).unwrap();
+    assert!(strict_edit.put(panes, Conformance::Strict).is_err());
+    assert!(package.is_signed());
 }
 
 #[test]
@@ -310,6 +348,20 @@ fn install_task_panes(package: &mut OpcPackage) {
         PackURI::new("/webextensions/webextension1.xml").unwrap(),
         ADD_IN_CONTENT_TYPE.into(),
         LOCAL_EXTENSION.to_vec(),
+    )));
+}
+
+fn install_empty_task_panes(package: &mut OpcPackage) {
+    package.rels_mut().add_relationship(
+        TASK_PANES_RELATIONSHIP.into(),
+        "webextensions/empty-taskpanes.xml".into(),
+        "rIdEmptyTaskPanes".into(),
+        false,
+    );
+    package.add_part(Box::new(XmlPart::new(
+        PackURI::new("/webextensions/empty-taskpanes.xml").unwrap(),
+        TASK_PANES_CONTENT_TYPE.into(),
+        EMPTY_TASK_PANES_WITH_OPAQUE_ROOT.to_vec(),
     )));
 }
 

@@ -1,4 +1,4 @@
-use litchi_ooxml_common::ribbon::{self, Version};
+use litchi_ooxml_common::ribbon::{self, Family, Version};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, XmlPart};
 
@@ -152,6 +152,47 @@ fn ribbon_patch_checks_root_content_types_and_opaque_closure() {
         vec![9],
     )));
     assert!(commit.patch().apply(&content_types_conflict).is_err());
+}
+
+#[test]
+fn ribbon_remove_inverse_restores_unshared_binary_image() {
+    let mut source = OpcPackage::new();
+    put(&mut source, Version::V2007, OFFICE_2007_XML.to_vec());
+    let ribbon_part = ribbon::load(&source, &ribbon::Limits::standard())
+        .unwrap()
+        .legacy()
+        .unwrap()
+        .part()
+        .clone();
+    let image = PackURI::new("/customUI/icon.png").unwrap();
+    source.add_part(Box::new(BlobPart::new(
+        image.clone(),
+        "image/png".into(),
+        vec![1, 2, 3, 4],
+    )));
+    source
+        .get_part_mut(&ribbon_part)
+        .unwrap()
+        .relate_to("icon.png", rt::IMAGE);
+
+    let mut edit = ribbon::Edit::new(&source).unwrap();
+    assert!(edit.remove(Family::Legacy).unwrap());
+    let removed = edit.commit().unwrap();
+    assert!(removed.package().get_part(&image).is_err());
+
+    let restored = removed.patch().inverse().apply(removed.package()).unwrap();
+    assert_eq!(
+        restored.package().get_part(&image).unwrap().blob(),
+        &[1, 2, 3, 4]
+    );
+    assert_eq!(
+        ribbon::load(restored.package(), &ribbon::Limits::standard())
+            .unwrap()
+            .legacy()
+            .unwrap()
+            .xml(),
+        OFFICE_2007_XML
+    );
 }
 
 #[test]

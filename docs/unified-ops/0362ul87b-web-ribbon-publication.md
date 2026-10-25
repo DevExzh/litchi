@@ -3,8 +3,10 @@
 Status: implementation complete; source-only until the coordinator grants a
 scoped validation slot. This lane closes the semantic `&mut OpcPackage`
 surfaces identified by 0362ul87. Byte/XML codecs and the physical OPC graph
-substrate remain unchanged. Review repair 87ba made staging borrowed/lazy and
-made Ribbon replay prove the complete retained dependency closure.
+substrate remain unchanged. Review repairs 87ba and 87bb made staging
+borrowed/lazy, made Ribbon replay prove and restore the complete retained
+dependency closure (including binary assets), and made empty Web task-pane
+root profile declarations part of conformance matching.
 
 The shared package API has one source-preserving route for each family:
 
