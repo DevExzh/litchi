@@ -4,7 +4,7 @@ use super::model::{
     DeliveryOption, Metadata, NarrowString, Protection, Recipient, validate_short_string,
 };
 use super::validation;
-use crate::package::{Error as PackageError, Result};
+use crate::package::{Error as PackageError, Result, SourceLimits};
 use crate::parts::fib::FileInformationBlock;
 
 /// FIB index of `fcRouteSlip`/`lcbRouteSlip` in `FibRgFcLcb97`
@@ -15,7 +15,11 @@ const ROUTE_SLIP_FIXED_SIZE: usize = 16;
 const MAX_SHORT_STRING_LENGTH: usize = 255;
 
 /// Parse the optional Metadata table range addressed by a FIB.
-pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<Metadata>> {
+pub fn parse(
+    fib: &FileInformationBlock,
+    table_stream: &[u8],
+    limits: &SourceLimits,
+) -> Result<Option<Metadata>> {
     let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX) else {
         return Ok(None);
     };
@@ -24,11 +28,12 @@ pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<M
     }
 
     let data = validation::table_range(table_stream, offset, length)?;
-    parse_bytes(data).map(Some)
+    parse_bytes(data, limits).map(Some)
 }
 
 /// Parse exactly one complete Metadata payload.
-pub fn parse_bytes(data: &[u8]) -> Result<Metadata> {
+pub fn parse_bytes(data: &[u8], limits: &SourceLimits) -> Result<Metadata> {
+    crate::parts::enforce_source_entry_limit(data, limits)?;
     let mut reader = Reader::new(data);
     let routed = reader.bool16("fRouted")?;
     let return_original = reader.bool16("fReturnOrig")?;
@@ -57,9 +62,13 @@ pub fn parse_bytes(data: &[u8]) -> Result<Metadata> {
     let status = reader.narrow_short_string("szStatus")?;
     let title = reader.narrow_short_string("szTitle")?;
 
+    let minimum_recipients = recipient_count
+        .checked_mul(4)
+        .ok_or_else(|| corrupted("Metadata recipient minimum size overflows"))?;
+    reader.ensure(minimum_recipients, "Metadata rgRouteSlips")?;
     let mut recipients = Vec::with_capacity(recipient_count);
     for index in 0..recipient_count {
-        let (recipient, consumed) = Recipient::parse_prefix(&data[reader.offset..], index)?;
+        let (recipient, consumed) = Recipient::parse_prefix(&data[reader.offset..], index, limits)?;
         reader.advance(consumed, "Recipient")?;
         recipients.push(recipient);
     }
@@ -81,9 +90,10 @@ pub fn parse_bytes(data: &[u8]) -> Result<Metadata> {
 }
 
 /// Serialize one complete Metadata payload.
-pub fn to_bytes(route_slip: &Metadata) -> Result<Vec<u8>> {
+pub fn to_bytes(route_slip: &Metadata, limits: &SourceLimits) -> Result<Vec<u8>> {
     route_slip.validate()?;
     let capacity = serialized_len(route_slip)?;
+    crate::parts::enforce_source_entry_size(capacity, limits)?;
     let mut data = Vec::with_capacity(capacity);
     data.extend_from_slice(&bool16(route_slip.routed).to_le_bytes());
     data.extend_from_slice(&bool16(route_slip.return_original).to_le_bytes());
@@ -107,25 +117,30 @@ pub fn to_bytes(route_slip: &Metadata) -> Result<Vec<u8>> {
 
 impl Metadata {
     /// Parse the optional Metadata table range addressed by a FIB.
-    pub fn parse(fib: &FileInformationBlock, table_stream: &[u8]) -> Result<Option<Self>> {
-        parse(fib, table_stream)
+    pub fn parse(
+        fib: &FileInformationBlock,
+        table_stream: &[u8],
+        limits: &SourceLimits,
+    ) -> Result<Option<Self>> {
+        parse(fib, table_stream, limits)
     }
 
     /// Parse exactly one complete Metadata payload.
-    pub fn parse_bytes(data: &[u8]) -> Result<Self> {
-        parse_bytes(data)
+    pub fn parse_bytes(data: &[u8], limits: &SourceLimits) -> Result<Self> {
+        parse_bytes(data, limits)
     }
 
     /// Serialize one complete Metadata payload.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        to_bytes(self)
+    pub fn to_bytes(&self, limits: &SourceLimits) -> Result<Vec<u8>> {
+        to_bytes(self, limits)
     }
 }
 
 impl Recipient {
     /// Parse exactly one complete Recipient payload.
-    pub fn parse_bytes(data: &[u8]) -> Result<Self> {
-        let (value, consumed) = Self::parse_prefix(data, 0)?;
+    pub fn parse_bytes(data: &[u8], limits: &SourceLimits) -> Result<Self> {
+        crate::parts::enforce_source_entry_limit(data, limits)?;
+        let (value, consumed) = Self::parse_prefix(data, 0, limits)?;
         if consumed != data.len() {
             return Err(corrupted("Recipient has trailing bytes"));
         }
@@ -133,7 +148,7 @@ impl Recipient {
     }
 
     /// Serialize one complete Recipient payload.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+    pub fn to_bytes(&self, limits: &SourceLimits) -> Result<Vec<u8>> {
         self.validate()?;
         let capacity = self
             .entry_id
@@ -141,12 +156,14 @@ impl Recipient {
             .checked_add(self.name.len())
             .and_then(|length| length.checked_add(4))
             .ok_or_else(|| corrupted("Recipient serialized length overflows"))?;
+        crate::parts::enforce_source_entry_size(capacity, limits)?;
         let mut data = Vec::with_capacity(capacity);
         append_recipient(&mut data, self)?;
         Ok(data)
     }
 
-    fn parse_prefix(data: &[u8], index: usize) -> Result<(Self, usize)> {
+    fn parse_prefix(data: &[u8], index: usize, limits: &SourceLimits) -> Result<(Self, usize)> {
+        crate::parts::enforce_source_entry_limit(data, limits)?;
         let mut reader = Reader::new(data);
         let entry_id_length =
             nonnegative_i16(reader.i16("Recipient cbEntryID")?, "Recipient cbEntryID")?;
@@ -284,6 +301,14 @@ impl<'a> Reader<'a> {
 
     fn advance(&mut self, length: usize, field: &str) -> Result<()> {
         self.take(length, field).map(|_| ())
+    }
+
+    fn ensure(&self, length: usize, field: &str) -> Result<()> {
+        self.offset
+            .checked_add(length)
+            .filter(|end| *end <= self.data.len())
+            .ok_or_else(|| corrupted(format!("{field} is truncated")))
+            .map(|_| ())
     }
 
     fn u16(&mut self, field: &str) -> Result<u16> {

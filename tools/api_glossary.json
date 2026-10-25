@@ -8947,6 +8947,212 @@
       "package": "litchi-doc",
       "default_features": false,
       "features": [],
+      "required_signatures": [
+        {
+          "method": "litchi_doc::parts::annotation_bookmarks::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::annotation_bookmarks::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::annotation_bookmarks::Tags::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::annotation_bookmarks::Tags::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::ole_controls::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::ole_controls::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::ole_controls::RgxOcxInfo::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::ole_controls::RgxOcxInfo::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::Metadata::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::Metadata::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::Recipient::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::XString::parse_prefix",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::XString::parse",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::XString::parse_terminated_prefix",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::annotation_bookmarks::to_bytes",
+          "inputs": ["value", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::annotation_bookmarks::Tags::to_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::to_bytes",
+          "inputs": ["value", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::to_control_bytes",
+          "inputs": ["value", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::Control::to_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::ToolbarWrapper::with_delta_controls",
+          "inputs": ["self", "controls", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::write",
+          "inputs": ["fib", "table_stream", "value", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::ole_controls::to_bytes",
+          "inputs": ["table", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::ole_controls::RgxOcxInfo::to_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::to_bytes",
+          "inputs": ["route_slip", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::Metadata::to_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::Recipient::to_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::XString::to_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::XString::to_terminated_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::xml_schemas::Collection::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::xml_schemas::parse_custom_xml_transform",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        }
+      ],
       "banned_names": [
         {
           "name": "Writer",
@@ -9469,6 +9675,212 @@
       "features": [
         "formula",
         "performance-diagnostics"
+      ],
+      "required_signatures": [
+        {
+          "method": "litchi_doc::parts::route_slip::Recipient::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::XString::parse_prefix",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::XString::parse",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::XString::parse_terminated_prefix",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::XString::to_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::XString::to_terminated_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::annotation_bookmarks::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::annotation_bookmarks::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::annotation_bookmarks::Tags::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::annotation_bookmarks::Tags::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::ole_controls::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::ole_controls::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::ole_controls::RgxOcxInfo::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::ole_controls::RgxOcxInfo::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::Metadata::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::Metadata::parse_bytes",
+          "inputs": ["data", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::annotation_bookmarks::to_bytes",
+          "inputs": ["value", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::annotation_bookmarks::Tags::to_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::to_bytes",
+          "inputs": ["value", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::to_control_bytes",
+          "inputs": ["value", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::Control::to_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::ToolbarWrapper::with_delta_controls",
+          "inputs": ["self", "controls", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::command_bars::write",
+          "inputs": ["fib", "table_stream", "value", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::ole_controls::to_bytes",
+          "inputs": ["table", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::ole_controls::RgxOcxInfo::to_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::to_bytes",
+          "inputs": ["route_slip", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::Metadata::to_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::route_slip::Recipient::to_bytes",
+          "inputs": ["self", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::xml_schemas::Collection::parse",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        },
+        {
+          "method": "litchi_doc::parts::xml_schemas::parse_custom_xml_transform",
+          "inputs": ["fib", "table_stream", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_doc::SourceLimits"
+        }
       ],
       "banned_names": [
         {
@@ -13115,6 +13527,26 @@
       "default_features": false,
       "features": [
         "performance-diagnostics"
+      ],
+      "required_signatures": [
+        {
+          "method": "litchi_ole_common::custom_xml::write",
+          "inputs": ["writer", "store", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ole_common::custom_xml::Limits"
+        },
+        {
+          "method": "litchi_ole_common::custom_xml::parse_properties",
+          "inputs": ["xml", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ole_common::custom_xml::Limits"
+        },
+        {
+          "method": "litchi_ole_common::custom_xml::write_properties",
+          "inputs": ["properties", "limits"],
+          "limits_argument": "limits",
+          "limits_type": "litchi_ole_common::custom_xml::Limits"
+        }
       ],
       "banned_names": [
         {

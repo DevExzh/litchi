@@ -226,7 +226,7 @@ impl Document {
             AuxiliaryTableDefect::AutoSummary,
             &mut tolerance,
         );
-        let route_slip = Metadata::parse(&fib, &table_stream);
+        let route_slip = Metadata::parse(&fib, &table_stream, &source_limits);
         let protected_ranges = auxiliary_or_absent(
             Ranges::parse(&fib, &table_stream),
             AuxiliaryTableDefect::ProtectedRanges,
@@ -243,17 +243,21 @@ impl Document {
             &mut tolerance,
         );
         let xml_schemas = auxiliary_or_absent(
-            crate::parts::xml_schemas::Collection::parse(&fib, &table_stream),
+            crate::parts::xml_schemas::Collection::parse(&fib, &table_stream, &source_limits),
             AuxiliaryTableDefect::XmlSchemas,
             &mut tolerance,
         );
         let custom_xml_transform_path = auxiliary_or_absent(
-            crate::parts::xml_schemas::parse_custom_xml_transform(&fib, &table_stream),
+            crate::parts::xml_schemas::parse_custom_xml_transform(
+                &fib,
+                &table_stream,
+                &source_limits,
+            ),
             AuxiliaryTableDefect::CustomXmlTransform,
             &mut tolerance,
         );
         let ole_controls = auxiliary_or_absent(
-            RgxOcxInfo::parse(&fib, &table_stream),
+            RgxOcxInfo::parse(&fib, &table_stream, &source_limits),
             AuxiliaryTableDefect::OleControls,
             &mut tolerance,
         );
@@ -457,6 +461,7 @@ impl Document {
         );
 
         Ok(Document::from_state(DocumentState {
+            source_limits,
             fib,
             word_document,
             data_stream,

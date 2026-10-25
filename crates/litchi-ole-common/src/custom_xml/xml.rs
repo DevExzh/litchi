@@ -152,6 +152,62 @@ pub(crate) fn normalize_encoding(xml: &[u8]) -> Result<Cow<'_, [u8]>> {
     Ok(Cow::Owned(text.into_bytes()))
 }
 
+/// Re-encode a normalized Properties document using the source document's
+/// UTF-8/UTF-16 representation.  Property rewrites operate on normalized
+/// UTF-8 so that source offsets are stable, then restore the original wire
+/// encoding before publishing the retained stream.
+pub(crate) fn restore_encoding(
+    source: &[u8],
+    normalized: &[u8],
+    maximum: usize,
+) -> Result<Vec<u8>> {
+    let (little_endian, bom) = if source.starts_with(&[0xFF, 0xFE]) {
+        (true, true)
+    } else if source.starts_with(&[0xFE, 0xFF]) {
+        (false, true)
+    } else if source.starts_with(&[b'<', 0, b'?', 0]) || source.starts_with(&[b'<', 0]) {
+        (true, false)
+    } else if source.starts_with(&[0, b'<', 0, b'?']) || source.starts_with(&[0, b'<']) {
+        (false, false)
+    } else {
+        if normalized.len() > maximum {
+            return Err(limit("serialized Properties XML exceeds its byte limit"));
+        }
+        return Ok(normalized.to_vec());
+    };
+
+    let text = std::str::from_utf8(normalized)
+        .map_err(|error| xml_error(format!("normalized XML is not UTF-8: {error}")))?;
+    let body_len = text
+        .encode_utf16()
+        .count()
+        .checked_mul(2)
+        .ok_or_else(|| limit("UTF-16 Properties XML size overflows usize"))?;
+    let output_len = body_len
+        .checked_add(if bom { 2 } else { 0 })
+        .ok_or_else(|| limit("UTF-16 Properties XML size overflows usize"))?;
+    if output_len > maximum {
+        return Err(limit("serialized Properties XML exceeds its byte limit"));
+    }
+    let mut output = Vec::with_capacity(output_len);
+    if bom {
+        output.extend_from_slice(if little_endian {
+            &[0xFF, 0xFE]
+        } else {
+            &[0xFE, 0xFF]
+        });
+    }
+    for unit in text.encode_utf16() {
+        let bytes = if little_endian {
+            unit.to_le_bytes()
+        } else {
+            unit.to_be_bytes()
+        };
+        output.extend_from_slice(&bytes);
+    }
+    Ok(output)
+}
+
 pub(crate) fn validate_characters(value: &str) -> Result<()> {
     if value.chars().any(|character| {
         !matches!(
@@ -186,6 +242,7 @@ pub(crate) fn required_attribute(
     element: &BytesStart<'_>,
     namespace: &str,
     local_name: &[u8],
+    limits: &Limits,
 ) -> Result<String> {
     let mut value = None;
     for attribute_result in element.checked_attributes() {
@@ -194,10 +251,14 @@ pub(crate) fn required_attribute(
         if local.as_ref() == local_name
             && matches!(resolved, ResolveResult::Bound(bound) if bound.as_ref() == namespace.as_bytes())
         {
+            preflight_attribute_value(&attribute, limits)?;
             let decoded = attribute
                 .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
-                .map_err(|error| xml_error(error.to_string()))?
-                .into_owned();
+                .map_err(|error| xml_error(error.to_string()))?;
+            if decoded.len() > limits.max_string_bytes {
+                return Err(limit("XML attribute value exceeds its byte limit"));
+            }
+            let decoded = decoded.into_owned();
             if value.replace(decoded).is_some() {
                 return Err(invalid("XML element has a duplicate attribute"));
             }
@@ -215,6 +276,7 @@ pub(crate) fn reject_other_attributes(
     reader: &NsReader<&[u8]>,
     element: &BytesStart<'_>,
     allowed: &[(&str, &[u8])],
+    limits: &Limits,
 ) -> Result<()> {
     // The typed projection owns only the schema-defined attributes. Other
     // well-formed attributes are opaque extension data and remain in the
@@ -230,12 +292,97 @@ pub(crate) fn reject_other_attributes(
         if matches!(resolved, ResolveResult::Unknown(_)) {
             return Err(invalid("XML attribute uses an unknown namespace prefix"));
         }
+        preflight_attribute_value(&attribute, limits)?;
         let value = attribute
             .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
             .map_err(|error| xml_error(error.to_string()))?;
         validate_characters(&value)?;
     }
     Ok(())
+}
+
+fn preflight_attribute_value(
+    attribute: &quick_xml::events::attributes::Attribute<'_>,
+    limits: &Limits,
+) -> Result<()> {
+    let length = normalized_attribute_len(attribute.value.as_ref())?;
+    if length > limits.max_string_bytes {
+        return Err(limit("XML attribute value exceeds its byte limit"));
+    }
+    Ok(())
+}
+
+/// Compute the exact XML 1.0 normalized, decoded attribute length without
+/// constructing the decoded string.  `Properties` parsing normalizes source
+/// encoding before quick-xml sees it, so this scan receives UTF-8 bytes just
+/// like the decoder used by `decoded_and_normalized_value`.
+fn normalized_attribute_len(value: &[u8]) -> Result<usize> {
+    let value = std::str::from_utf8(value)
+        .map_err(|error| xml_error(format!("XML attribute is not UTF-8: {error}")))?;
+    let bytes = value.as_bytes();
+    let mut cursor = 0usize;
+    let mut length = 0usize;
+    while cursor < bytes.len() {
+        match bytes[cursor] {
+            b'\t' | b'\n' => {
+                length = length
+                    .checked_add(1)
+                    .ok_or_else(|| limit("XML attribute length overflows usize"))?;
+                cursor += 1;
+            },
+            b'\r' => {
+                length = length
+                    .checked_add(1)
+                    .ok_or_else(|| limit("XML attribute length overflows usize"))?;
+                cursor += 1;
+                if bytes.get(cursor) == Some(&b'\n') {
+                    cursor += 1;
+                }
+            },
+            b'&' => {
+                let entity_start = cursor + 1;
+                let relative_end = bytes
+                    .get(entity_start..)
+                    .and_then(|remaining| remaining.iter().position(|byte| *byte == b';'))
+                    .ok_or_else(|| xml_error("XML attribute has an unterminated entity"))?;
+                let entity_end = entity_start + relative_end;
+                let entity = &value[entity_start..entity_end];
+                let decoded_length = if let Some(number) = entity.strip_prefix('#') {
+                    let code = if let Some(hex) = number.strip_prefix('x') {
+                        u32::from_str_radix(hex, 16)
+                    } else {
+                        number.parse::<u32>()
+                    }
+                    .map_err(|error| {
+                        xml_error(format!("invalid XML character reference: {error}"))
+                    })?;
+                    let character = char::from_u32(code).ok_or_else(|| {
+                        xml_error("XML character reference is not a scalar value")
+                    })?;
+                    character.len_utf8()
+                } else {
+                    quick_xml::escape::resolve_predefined_entity(entity)
+                        .ok_or_else(|| xml_error("XML attribute uses an unknown entity"))?
+                        .len()
+                };
+                length = length
+                    .checked_add(decoded_length)
+                    .ok_or_else(|| limit("XML attribute length overflows usize"))?;
+                cursor = entity_end + 1;
+            },
+            _ => {
+                let character = value[cursor..]
+                    .chars()
+                    .next()
+                    .ok_or_else(|| xml_error("XML attribute contains invalid UTF-8"))?;
+                length = length
+                    .checked_add(character.len_utf8())
+                    .ok_or_else(|| limit("XML attribute length overflows usize"))?;
+                cursor += character.len_utf8();
+            },
+        }
+    }
+    Ok(length)
 }
 
 pub(crate) fn escape_attribute(output: &mut Vec<u8>, value: &str) {

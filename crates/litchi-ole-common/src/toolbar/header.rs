@@ -119,6 +119,12 @@ impl ControlHeader {
         self.dimensions
     }
 
+    /// Return the exact serialized `TBCHeader` length without allocating.
+    #[must_use]
+    pub const fn encoded_len(&self) -> usize {
+        if self.dimensions.is_some() { 15 } else { 11 }
+    }
+
     pub(crate) fn validate(&self) -> Result<(), Error> {
         self.control_type.validate()?;
         self.flags.validate()?;
@@ -212,6 +218,12 @@ impl<'a> Header<'a> {
     #[must_use]
     pub const fn name(&self) -> &WString<'a> {
         &self.name
+    }
+
+    /// Return the exact serialized byte length without allocating.
+    #[must_use]
+    pub fn encoded_len(&self) -> usize {
+        17 + self.name.encoded_len()
     }
 
     /// Move a decoded toolbar header into an owned representation.

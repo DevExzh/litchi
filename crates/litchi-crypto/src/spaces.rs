@@ -3016,6 +3016,7 @@ mod tests {
         litchi_ole_common::custom_xml::write(
             &mut writer,
             &Store::new(Promotion::Modified, vec![custom_item]).unwrap(),
+            &litchi_ole_common::custom_xml::Limits::default(),
         )
         .unwrap();
         let mut bytes = Cursor::new(Vec::new());
@@ -3120,7 +3121,12 @@ mod tests {
         assert!(validate_custom_xml_promotion(Some(&store), None).is_err());
 
         let mut writer = OleWriter::new();
-        litchi_ole_common::custom_xml::write(&mut writer, &store).unwrap();
+        litchi_ole_common::custom_xml::write(
+            &mut writer,
+            &store,
+            &litchi_ole_common::custom_xml::Limits::default(),
+        )
+        .unwrap();
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
         let mut ole = OleFile::open(

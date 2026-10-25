@@ -12,7 +12,7 @@ use super::transaction::{
     Snapshot as TransactionSnapshot,
 };
 use super::validation;
-use crate::package::{Error as PackageError, Result};
+use crate::package::{Error as PackageError, Result, SourceLimits};
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{EditProtection, PackagePatch, ProtectionPolicy, classify};
 use crate::writer::fib::FibBuilder;
@@ -27,6 +27,7 @@ pub const FIB_INDEX_CMDS: usize = 24;
 pub fn parse<'a>(
     fib: &FileInformationBlock,
     table_stream: &'a [u8],
+    limits: &SourceLimits,
 ) -> Result<Option<CommandBars<'a>>> {
     let Some((offset, length)) = fib.get_table_pointer(FIB_INDEX_CMDS) else {
         return Ok(None);
@@ -43,7 +44,7 @@ pub fn parse<'a>(
     let data = table_stream
         .get(start..end)
         .ok_or_else(|| corrupted("Tcg extends beyond the table stream"))?;
-    codec::parse_bytes(data).map(Some)
+    codec::parse_bytes(data, limits).map(Some)
 }
 
 /// Append a command-bar table and update its FIB pointer atomically with the
@@ -52,8 +53,9 @@ pub fn write(
     fib: &mut FibBuilder,
     table_stream: &mut Vec<u8>,
     value: &CommandBars<'_>,
+    limits: &SourceLimits,
 ) -> Result<()> {
-    let data = codec::to_bytes(value)?;
+    let data = codec::to_bytes(value, limits)?;
     let offset = u32::try_from(table_stream.len())
         .map_err(|_| corrupted("table-stream offset exceeds u32::MAX"))?;
     let length = u32::try_from(data.len()).map_err(|_| corrupted("Tcg length exceeds u32::MAX"))?;
@@ -134,6 +136,7 @@ impl Commit {
 pub(crate) struct Editor {
     package: ObjectEditor,
     table_name: String,
+    source_limits: SourceLimits,
     original: TransactionSnapshot,
     command_bars: TransactionSnapshot,
     protection: EditProtection,
@@ -144,20 +147,30 @@ pub(crate) struct Editor {
 impl Editor {
     /// Opens an unencrypted Word 97+ package from CFB bytes.
     pub(crate) fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::open_bounded(bytes, Limits::default(), ProtectionPolicy::default())
+        Self::open_bounded(
+            bytes,
+            SourceLimits::default(),
+            Limits::default(),
+            ProtectionPolicy::default(),
+        )
     }
 
     /// Opens a package with an explicit policy for changed protected content.
     pub(crate) fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
-        Self::open_bounded(bytes, Limits::default(), policy)
+        Self::open_bounded(bytes, SourceLimits::default(), Limits::default(), policy)
     }
 
     /// Opens a package under one edit profile: its revision limits bound the
     /// compound-file parse and its protection policy governs changed
     /// protected content.
-    pub(crate) fn open_with_options(bytes: Vec<u8>, options: &crate::EditOptions) -> Result<Self> {
+    pub(crate) fn open_with_options(
+        bytes: Vec<u8>,
+        source_limits: SourceLimits,
+        options: &crate::EditOptions,
+    ) -> Result<Self> {
         Self::open_bounded(
             bytes,
+            source_limits,
             options.revision_limits_value(),
             options.protection_policy_value(),
         )
@@ -166,6 +179,7 @@ impl Editor {
     /// Opens a package with both bounded resources and an explicit protection policy.
     fn open_bounded(
         bytes: Vec<u8>,
+        source_limits: SourceLimits,
         limits: Limits,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
@@ -192,10 +206,11 @@ impl Editor {
             .stream(&[table_name.to_owned()])
             .ok_or_else(|| PackageError::StreamNotFound(table_name.to_owned()))?;
         let protection = classify(&fib, table)?;
-        let command_bars = TransactionSnapshot::new(parse(&fib, table)?)?;
+        let command_bars = TransactionSnapshot::new(parse(&fib, table, &source_limits)?)?;
         Ok(Self {
             package,
             table_name: table_name.to_owned(),
+            source_limits,
             original: command_bars.clone(),
             command_bars,
             protection,
@@ -341,7 +356,7 @@ impl Editor {
         let fib = FileInformationBlock::parse(&word)?;
         let pointer = validation::pointer_location(&fib)?;
         if let Some(command_bars) = snapshot.command_bars() {
-            let payload = codec::to_bytes(command_bars)?;
+            let payload = codec::to_bytes(command_bars, &self.source_limits)?;
             let offset = u32::try_from(table.len())
                 .map_err(|_| PackageError::Corrupted("table stream exceeds u32::MAX".into()))?;
             let length = u32::try_from(payload.len()).map_err(|_| {
@@ -355,7 +370,8 @@ impl Editor {
         }
 
         let reparsed_fib = FileInformationBlock::parse(&word)?;
-        let reparsed = TransactionSnapshot::new(parse(&reparsed_fib, &table)?)?;
+        let reparsed =
+            TransactionSnapshot::new(parse(&reparsed_fib, &table, &self.source_limits)?)?;
         if &reparsed != snapshot {
             return Err(PackageError::Corrupted(
                 "command-bar snapshot failed FIB/table-stream round-trip validation".into(),
