@@ -13,7 +13,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     /// The underlying OPC graph is malformed or could not be mutated safely.
     #[error("OPC error: {0}")]
-    Opc(litchi_opc::error::OpcError),
+    Opc(#[source] litchi_opc::error::OpcError),
 
     /// A bounded durable semantic patch failed decoding or validation.
     #[error("invalid durable OOXML patch: {0}")]
@@ -143,6 +143,24 @@ impl From<litchi_opc::error::OpcError> for Error {
             litchi_opc::error::OpcError::SignedSourceRequiresExplicitPolicy => Self::Signed,
             other => Self::Opc(other),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn opc_errors_retain_their_source_chain() {
+        let error = Error::from(litchi_opc::error::OpcError::PartNotFound(
+            "missing.xml".to_owned(),
+        ));
+        let source = std::error::Error::source(&error).expect("OPC source");
+        assert!(
+            source
+                .downcast_ref::<litchi_opc::error::OpcError>()
+                .is_some()
+        );
     }
 }
 

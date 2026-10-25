@@ -29,11 +29,9 @@ const CORE_CLOSE: &str = "</cp:coreProperties>";
 /// [`OpcPackage::unsign`] or the format facade's `unsign`.
 /// # Errors
 ///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a change to a signed package, and an error when input violates OOXML
-/// constraints, exceeds a configured bound, or an underlying XML or package
-/// operation fails.
+/// Returns [`Error::Signed`] for a change to a signed package, and an error
+/// when input violates OOXML constraints, exceeds a configured bound, or an
+/// underlying XML or package operation fails.
 pub(crate) fn write_core(package: &mut OpcPackage, props: Core) -> Result<bool> {
     let result = sync(package, &props);
     drop(props);
@@ -49,11 +47,9 @@ pub(crate) fn write_core(package: &mut OpcPackage, props: Core) -> Result<bool> 
 /// [`OpcPackage::unsign`] or the format facade's `unsign`.
 /// # Errors
 ///
-/// Returns [`Error::Opc`] with
-/// [`SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-/// for a change to a signed package, and an error when input violates OOXML
-/// constraints, exceeds a configured bound, or an underlying XML or package
-/// operation fails.
+/// Returns [`Error::Signed`] for a change to a signed package, and an error
+/// when input violates OOXML constraints, exceeds a configured bound, or an
+/// underlying XML or package operation fails.
 pub fn clear(package: &mut OpcPackage) -> Result<bool> {
     let graph = graph::inspect(package)?;
     let Some(part_name) = graph.part else {
@@ -723,12 +719,7 @@ mod tests {
         // A changed value refuses the signed package and leaves the slot dirty
         // until the signature is removed explicitly (ADR 0006).
         slot.get_mut().unwrap().title = Some("Changed".to_owned());
-        assert!(matches!(
-            slot.flush(&mut package),
-            Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-            ))
-        ));
+        assert!(matches!(slot.flush(&mut package), Err(Error::Signed)));
         assert!(slot.is_dirty());
         assert!(package.is_signed());
         assert_eq!(
@@ -890,12 +881,7 @@ mod tests {
             unknown
         );
 
-        assert!(matches!(
-            clear(&mut package),
-            Err(Error::Opc(
-                litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy
-            ))
-        ));
+        assert!(matches!(clear(&mut package), Err(Error::Signed)));
         assert!(package.is_signed());
         assert_eq!(
             package

@@ -88,7 +88,7 @@ pub enum Error {
 
     /// A shared host-neutral OOXML service failed.
     #[error("shared OOXML error: {0}")]
-    Common(litchi_ooxml_common::Error),
+    Common(#[source] litchi_ooxml_common::Error),
 
     /// File or stream I/O failed.
     #[error("I/O error: {0}")]

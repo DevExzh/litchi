@@ -38,6 +38,11 @@ were migrated to the typed signed error. The common properties test error
 taxonomy was extended for the new non-exhaustive variants; properties
 transaction implementation remains outside this lane.
 
+The review follow-up also migrated the remaining signed-error assertions in
+custom-properties, extended-properties, and core-properties writer tests,
+updated the writer documentation for `Error::Signed`, and retained source
+chains through common and leaf error wrappers.
+
 ## Source-only validation
 
 The changed Rust paths pass `rustfmt --edition 2024 --check`, and

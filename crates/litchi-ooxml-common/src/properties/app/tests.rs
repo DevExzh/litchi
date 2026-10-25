@@ -6,7 +6,7 @@
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
-use litchi_opc::{OpcError, OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI};
 
 use super::*;
 use crate::Error;
@@ -203,12 +203,9 @@ fn signed_packages_keep_noops_and_refuse_changes() {
     assert!(!write(&mut package, word()).unwrap());
     assert!(matches!(
         write(&mut package, Props::new()),
-        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+        Err(Error::Signed)
     ));
-    assert!(matches!(
-        clear(&mut package),
-        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
-    ));
+    assert!(matches!(clear(&mut package), Err(Error::Signed)));
     assert_eq!(read(&package).unwrap(), Some(word()));
     assert!(package.is_signed());
     package.unsign();

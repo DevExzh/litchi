@@ -597,7 +597,7 @@ pub enum Error {
 
     /// Shared custom document-property graph or value validation failed.
     #[error("PPTX custom document-property error: {0}")]
-    CustomProperties(litchi_ooxml_common::Error),
+    CustomProperties(#[source] litchi_ooxml_common::Error),
 
     /// Optional system-font discovery, subsetting, or EOT preparation failed.
     #[cfg(feature = "automatic-fonts")]

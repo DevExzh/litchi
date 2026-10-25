@@ -67,7 +67,7 @@ pub enum Error {
     Drawing(#[from] litchi_drawingml::Error),
     /// A host-neutral OOXML package service failed.
     #[error("shared OOXML service error: {0}")]
-    Common(litchi_ooxml_common::Error),
+    Common(#[source] litchi_ooxml_common::Error),
     /// A caller-owned resource budget refused an operation.
     ///
     /// Retains the resource, observed amount, limit, and budget scope so callers
