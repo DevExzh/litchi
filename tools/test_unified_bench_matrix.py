@@ -59,6 +59,19 @@ class EvidenceCoverage(unittest.TestCase):
         self.assertEqual(len(problems), 3)
         self.assertTrue(all("contributes no rows" in problem for problem in problems))
 
+    def test_numbered_follow_up_ids_keep_the_full_id_and_filename_boundary(self):
+        found = self.evidence(["0362ul3", "0362ul10f-receipt.json", "0362ul48",
+                               "0362ul3-extra.json", "0362ul3_extra.json", "10362ul3.json",
+                               "10362.json", "03621", "03621-receipt.json"])
+        self.assertEqual(found, {
+            "0362ul3": ["0362ul3", "0362ul3-extra.json"],
+            "0362ul10f": ["0362ul10f-receipt.json"],
+            "0362ul48": ["0362ul48"],
+        })
+        self.assertEqual(matrix.coverage_problems(
+            [], {"evidence_without_rows": [{"record": "0362ul48", "reason": "tooling-only"}]},
+            {"0362ul48": ["0362ul48"]}), [])
+
     def test_an_exemption_needs_a_reason_and_must_not_go_stale(self):
         evidence = {"0339": ["0339"], "0328": ["0328"]}
         ok = {"evidence_without_rows": [{"record": "0339", "reason": "a probe, not a measurement"}]}
